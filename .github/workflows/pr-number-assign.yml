@@ -27,6 +27,7 @@ jobs:
         cache: pip
 
     - name: Assign pr-number
+      id: assign_pr_number
       run: |
         pip install tomlkit
         python scripts/pr-number-assign.py ${{ github.event.pull_request.number }}
@@ -36,11 +37,13 @@ jobs:
       run: |
         curl -Ls "https://api.github.com/users/${{ github.actor }}/events/public" > .response
         email=$(cat .response | jq '.[0].payload.commits[-1].author.email')
+        echo "Found the actor's email: $email"
         echo "email=$email" >> $GITHUB_OUTPUT
         rm -f .response
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
+      if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
       with:
         commit_author: ${{ github.actor }} <${{ steps.get_email.outputs.email }}>
-        commit_message: "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(env.RENAME_RESULTS), '\n') }}"
+        commit_message: "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}"

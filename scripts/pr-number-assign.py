@@ -45,11 +45,14 @@ def main(pr_number: str) -> None:
             )
 
     if renamed_pairs:
-        with open(os.getenv("GITHUB_ENV", os.devnull), "a") as ghenv:
+        with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
             rename_results = [f"{pair[0]} -> {pair[1]}" for pair in renamed_pairs]
-            ghenv.write(f"RENAME_RESULTS={json.dumps(rename_results)}\n")
+            print(f"rename_results={json.dumps(rename_results)}", file=ghoutput)
+            print("has_renamed_pairs=true", file=ghoutput)
     else:
         print("There are no unnumbered news fragments.")
+        with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
+            print("has_renamed_pairs=false", file=ghoutput)
     sys.exit(0)
 
 
