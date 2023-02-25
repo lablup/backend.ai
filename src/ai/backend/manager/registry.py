@@ -2587,7 +2587,8 @@ class AgentRegistry:
         result = await execute_with_retry(_update_kernel_status)
 
         async def _recalc() -> None:
-            nonlocal access_key, agent
+            nonlocal result
+            _, access_key, agent = result
             async with self.db.begin() as conn:
                 log.debug(
                     "recalculate concurrency used in kernel termination (ak: {})",
