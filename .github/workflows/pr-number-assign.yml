@@ -8,40 +8,38 @@ jobs:
   pr-number-assign:
     runs-on: ubuntu-latest
 
-    env:
-      FEAT: default
-
     steps:
-    - name: Checks-out repository
+    - name: Check out
       uses: actions/checkout@v3
       with:
-        ref: ${{ github.head_ref }}
+        fetch-depth: 2
+
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
 
     - name: Assign pr-number
       run: |
         pip install tomlkit
-        python scripts/pr-number-assign.py ${{github.event.pull_request.number}}
+        python scripts/pr-number-assign.py ${{ github.event.pull_request.number }}
 
     - name: Get user info
       id: get_user_info
       run: |
-        response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0]')
-        email=$(echo $response | jq '.payload.commits[-1].author.email')
-        id=$(echo $response | jq '.id')
-        message=$(echo $response | jq '.payload.commits[-1].message')
+        curl -Ls "https://api.github.com/users/${{ github.actor }}/events/public" > .response
+        email=$(cat .response | jq '.[0].payload.commits[-1].author.email')
         echo "email=$email" >> $GITHUB_OUTPUT
-        echo "id=$id" >> $GITHUB_OUTPUT
-        echo "message=$message" >> $GITHUB_OUTPUT
-
-    - name: Check user info
-      run: |
-        echo "Actor: $GITHUB_ACTOR"
-        echo "User email: ${{ steps.get_user_info.outputs.email }}"
-        echo "Recent id in github api(https://api.github.com/users/${{github.actor}}/events/public): ${{ steps.get_user_info.outputs.id }}"
-        echo "Workflow-Triggered commit message: ${{ steps.get_user_info.outputs.message }}"
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_author: ${{ github.actor }} <${{ steps.get_user_info.outputs.email }}>
-        commit_message: "docs: Rename the news fragment: '${{ env.ORIGINAL_FILENAME }}' -> '${{ github.event.pull_request.number }}.${{ env.FEAT }}.md'"
+        commit_message: "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(env.RENAME_RESULTS), '\n') }}"
