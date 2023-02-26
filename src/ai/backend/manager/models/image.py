@@ -466,6 +466,7 @@ class Image(graphene.ObjectType):
     tag = graphene.String()
     registry = graphene.String()
     architecture = graphene.String()
+    is_local = graphene.Boolean()
     digest = graphene.String()
     labels = graphene.List(KVPair)
     aliases = graphene.List(graphene.String)
@@ -493,6 +494,7 @@ class Image(graphene.ObjectType):
             tag=row.tag,
             registry=row.registry,
             architecture=row.architecture,
+            is_local=row.is_local,
             digest=row.config_digest,
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             aliases=[alias_row.alias for alias_row in row.aliases],
@@ -869,6 +871,7 @@ class ModifyImageInput(graphene.InputObjectType):
     image = graphene.String(required=False)
     tag = graphene.String(required=False)
     architecture = graphene.String(required=False)
+    is_local = graphene.Boolean(required=False)
     size_bytes = graphene.Int(required=False)
     type = graphene.String(required=False)
 
@@ -905,6 +908,7 @@ class ModifyImage(graphene.Mutation):
         set_if_set(props, data, "image")
         set_if_set(props, data, "tag")
         set_if_set(props, data, "architecture")
+        set_if_set(props, data, "is_local")
         set_if_set(props, data, "size_bytes")
         set_if_set(props, data, "type")
         set_if_set(props, data, "digest", target_key="config_digest")
