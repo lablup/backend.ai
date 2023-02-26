@@ -16,6 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.13 (2023-02-26)
+
+22.09.13 (2023-02-26)
+
+### Features
+* Add the `session_id` and `cluster_mode` columns to `get_container_stats_for_period` API to provide container statistics in response to multi-node sessions. ([#949](https://github.com/lablup/backend.ai/issues/949))
+* Update `image_list` query resolver to resolve image list faster ([#1073](https://github.com/lablup/backend.ai/issues/1073))
+* Add more HTTP forwarding headers in the webserver for the manager and webapp plugins: `X-Forwarded-Host` and `X-Forwarded-Proto` ([#1075](https://github.com/lablup/backend.ai/issues/1075))
+* Avoid inadvertent killing (e.g., by `killall python`) of the kernel runner daemon inside user containers by changing the process title not to include "python" ([#1090](https://github.com/lablup/backend.ai/issues/1090))
+
+### Fixes
+* Replace accessing non-existent `ImageRow.installed` with direct Redis queries in the `mgr image list --installed` command ([#1063](https://github.com/lablup/backend.ai/issues/1063))
+* Update agent's resource usage strictly after kernel creation, cancel and termination. ([#1069](https://github.com/lablup/backend.ai/issues/1069))
+* Preserve the `PYTHONPATH` environment variable if defined by user-provided container images ([#1096](https://github.com/lablup/backend.ai/issues/1096))
+* Fix typos and add proper whitespace in the comment and CLI help strings ([#1099](https://github.com/lablup/backend.ai/issues/1099))
+* Fix a regression bug in `session watch` command ([#1103](https://github.com/lablup/backend.ai/issues/1103))
+* Resolve an error from `backend.ai admin group info` by taking the first returned group item ([#1104](https://github.com/lablup/backend.ai/issues/1104))
+
+
 ## 22.09.12 (2023-02-20)
 
 22.09.12 (2023-02-20)
