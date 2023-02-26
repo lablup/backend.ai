@@ -26,24 +26,25 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
 
-    - name: Assign pr-number
+    - name: Check news fragments and assign the PR number
       id: assign_pr_number
       run: |
         pip install tomlkit
         python scripts/pr-number-assign.py ${{ github.event.pull_request.number }}
 
-    - name: Get user email for commit message
-      id: get_email
+    - name: Extract the author information
+      id: get_author_info
+      if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
       run: |
-        curl -Ls "https://api.github.com/users/${{ github.actor }}/events/public" > .response
-        email=$(cat .response | jq '.[0].payload.commits[-1].author.email')
-        echo "Found the actor's email: $email"
-        echo "email=$email" >> $GITHUB_OUTPUT
-        rm -f .response
+        author_name=$(git show -q --pretty='format:%an')
+        author_email=$(git show -q --pretty='format:%ae')
+        echo "Retrieved author information: $name <$email>"
+        echo "name=$author_name" >> $GITHUB_OUTPUT
+        echo "email=$author_email" >> $GITHUB_OUTPUT
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
       with:
-        commit_author: ${{ github.actor }} <${{ steps.get_email.outputs.email }}>
+        commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
         commit_message: "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}"
