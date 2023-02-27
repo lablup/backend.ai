@@ -684,7 +684,7 @@ class AgentRegistry:
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
                     "startup_command": kernel.get("startup_command"),
-                    "occupied_slots": ResourceSlot(),
+                    "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
                     "resource_opts": resource_opts,
                     "environ": [f"{k}={v}" for k, v in environ.items()],
