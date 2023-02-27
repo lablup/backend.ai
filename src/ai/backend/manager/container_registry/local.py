@@ -3,11 +3,13 @@ import logging
 from typing import AsyncIterator
 
 import aiohttp
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..models.image import ImageRow
 from .base import BaseContainerRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -53,38 +55,43 @@ class LocalRegistry(BaseContainerRegistry):
         image: str,
         tag: str,
     ) -> None:
-        async def _read_image_info(_tag: str):
+        async def _read_image_info(
+            _tag: str,
+        ) -> tuple[dict[str, dict], str | None]:
             async with sess.get(
                 self.registry_url / "images" / f"{image}:{tag}" / "json"
             ) as response:
                 data = await response.json()
                 architecture = data["Architecture"]
-                if (reporter := self.reporter.get()) is not None:
-                    reporter.total_progress += 1
                 summary = {
                     "Id": data["Id"],
-                    "RepoDigests": data["RepoDigests"],
+                    "RepoDigests": data.get("RepoDigests", []),
                     "Config.Image": data["Config"]["Image"],
                     "ContainerConfig.Image": data["ContainerConfig"]["Image"],
                     "Architecture": data["Architecture"],
                 }
                 log.debug(
-                    "Scanned image info: {}:{}\n{}", image, tag, json.dumps(summary, indent=2)
+                    "scanned image info: {}:{}\n{}", image, tag, json.dumps(summary, indent=2)
                 )
-                if not data["RepoDigests"]:
-                    # images not pushed to registry v2 do not have the manifest yet.
-                    digest = data["Id"]
-                else:
-                    digest = data["RepoDigests"][0].rpartition("@")[2]
+                already_exists = 0
+                config_digest = data["Id"]
+                async with self.db.begin_readonly_session() as db_session:
+                    already_exists = await db_session.scalar(
+                        sa.select([sa.func.count(ImageRow.id)]).where(
+                            ImageRow.config_digest == config_digest,
+                            ImageRow.is_local == sa.false(),
+                        )
+                    )
+                if already_exists > 0:
+                    return {}, "already synchronized from a remote registry"
                 return {
                     architecture: {
                         "size": data["Size"],
                         "labels": data["Config"]["Labels"],
-                        "digest": digest,
+                        "digest": config_digest,
                     },
-                }
+                }, None
 
         async with self.sema.get():
-            manifests = await _read_image_info(tag)
-        if manifests:
-            await self._read_manifest(image, tag, manifests)
+            manifests, skip_reason = await _read_image_info(tag)
+            await self._read_manifest(image, tag, manifests, skip_reason)

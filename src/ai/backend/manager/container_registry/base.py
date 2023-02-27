@@ -248,21 +248,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             manifests = await _load_manifest(tag)
         await self._read_manifest(image, tag, manifests)
 
-    async def _read_manifest(self, image: str, tag: str, manifests: dict[str, dict]):
-        skip_reason: Optional[str] = None
-        if len(manifests.keys()) == 0:
-            log.warning("Skipped image - {}:{} (missing/deleted)", image, tag)
-            progress_msg = f"Skipped {image}:{tag} (missing/deleted)"
+    async def _read_manifest(
+        self,
+        image: str,
+        tag: str,
+        manifests: dict[str, dict],
+        skip_reason: Optional[str] = None,
+    ) -> None:
+        if not manifests:
+            if not skip_reason:
+                skip_reason = "missing/deleted"
+            log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
+            progress_msg = f"Skipped {image}:{tag} ({skip_reason})"
             if (reporter := self.reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
+            return
 
         assert ImageRow.resources is not None
         for architecture, manifest in manifests.items():
-            if manifest is None:
-                skip_reason = "missing/deleted"
-                # TODO: auto-delete from our scanned database?
-                continue
-
             try:
                 try:
                     validate_image_labels(manifest["labels"])
