@@ -514,7 +514,7 @@ def run(
 
     \b
     IMAGE: The name (and version/platform tags appended after a colon) of session
-          runtime or programming language.')
+           runtime or programming language.
     FILES: The code file(s). Can be added multiple times.
     """
     if quiet:

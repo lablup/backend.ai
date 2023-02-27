@@ -5,16 +5,18 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
-import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from passlib.hash import bcrypt
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -24,13 +26,15 @@ from ai.backend.common.types import RedisConnectionInfo
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
+    Base,
     EnumValueType,
     IDColumn,
+    IPColumn,
     Item,
     PaginatedList,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -38,15 +42,17 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__file__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 __all__: Sequence[str] = (
     "users",
+    "UserRow",
     "User",
     "UserList",
     "UserGroup",
@@ -102,7 +108,7 @@ INACTIVE_USER_STATUSES = (
 
 users = sa.Table(
     "users",
-    metadata,
+    mapper_registry.metadata,
     IDColumn("uuid"),
     sa.Column("username", sa.String(length=64), unique=True),
     sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
@@ -123,7 +129,18 @@ users = sa.Table(
     sa.Column("integration_id", sa.String(length=512)),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
+    sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
+    sa.Column("totp_key", sa.String(length=32)),
+    sa.Column("totp_activated", sa.Boolean),
+    sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
 )
+
+
+class UserRow(Base):
+    __table__ = users
+    sessions = relationship("SessionRow", back_populates="user")
+    domain = relationship("DomainRow", back_populates="users")
+    groups = relationship("AssocGroupUserRow", back_populates="user")
 
 
 class UserGroup(graphene.ObjectType):
@@ -178,6 +195,9 @@ class User(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     role = graphene.String()
+    allowed_client_ip = graphene.List(lambda: graphene.String)
+    totp_activated = graphene.Boolean()
+    totp_activated_at = GQLDateTime()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -211,6 +231,9 @@ class User(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             role=row["role"],
+            allowed_client_ip=row["allowed_client_ip"],
+            totp_activated=row["totp_activated"],
+            totp_activated_at=row["totp_activated_at"],
         )
 
     @classmethod
@@ -262,6 +285,9 @@ class User(graphene.ObjectType):
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", lambda s: UserRole[s]),
+        "allowed_client_ip": ("allowed_client_ip", None),
+        "totp_activated": ("totp_activated", None),
+        "totp_activated_at": ("totp_activated_at", dtparse),
     }
 
     _queryorder_colmap = {
@@ -452,6 +478,7 @@ class UserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=True, default="default")
     role = graphene.String(required=False, default=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
@@ -468,6 +495,7 @@ class ModifyUserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -511,6 +539,7 @@ class CreateUser(graphene.Mutation):
             "status_info": "admin-requested",  # user mutation is only for admin
             "domain_name": props.domain_name,
             "role": UserRole(props.role),
+            "allowed_client_ip": props.allowed_client_ip,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -598,6 +627,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "status", clean_func=UserStatus)
         set_if_set(props, data, "domain_name")
         set_if_set(props, data, "role", clean_func=UserRole)
+        set_if_set(props, data, "allowed_client_ip")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -610,13 +640,7 @@ class ModifyUser(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             nonlocal user_update_data, prev_domain_name, prev_role
             result = await conn.execute(
-                sa.select(
-                    [
-                        users.c.domain_name,
-                        users.c.role,
-                        users.c.status,
-                    ]
-                )
+                sa.select([users.c.domain_name, users.c.role, users.c.status])
                 .select_from(users)
                 .where(users.c.email == email),
             )
@@ -636,7 +660,6 @@ class ModifyUser(graphene.Mutation):
         async def _post_func(conn: SAConnection, result: Result) -> Row:
             nonlocal prev_domain_name, prev_role
             updated_user = result.first()
-
             if "role" in data and data["role"] != prev_role:
                 from ai.backend.manager.models import keypairs
 
@@ -646,6 +669,7 @@ class ModifyUser(graphene.Mutation):
                             keypairs.c.user,
                             keypairs.c.is_active,
                             keypairs.c.is_admin,
+                            keypairs.c.access_key,
                         ]
                     )
                     .select_from(keypairs)
@@ -655,13 +679,14 @@ class ModifyUser(graphene.Mutation):
                 )
                 if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
                     # User's becomes admin. Set the keypair as active admin.
+                    # TODO: Should we update the role of all users related to keypair?
                     kp = result.first()
                     kp_data = dict()
                     if not kp.is_admin:
                         kp_data["is_admin"] = True
                     if not kp.is_active:
                         kp_data["is_active"] = True
-                    if len(kp_data.keys()) > 0:
+                    if kp_data:
                         await conn.execute(
                             sa.update(keypairs)
                             .values(kp_data)
@@ -670,36 +695,34 @@ class ModifyUser(graphene.Mutation):
                 else:
                     # User becomes non-admin. Make the keypair non-admin as well.
                     # If there are multiple admin keypairs, inactivate them.
+                    # TODO: Should elaborate keypair inactivation policy.
                     rows = result.fetchall()
-                    cnt = 0
                     kp_updates = []
-                    for row in rows:
+                    for idx, row in enumerate(rows):
                         kp_data = {
-                            "user": row.user,
-                            "is_admin": keypairs.c.is_admin,
-                            "is_active": keypairs.c.is_active,
+                            "b_access_key": row.access_key,
+                            "is_admin": row.is_admin,
+                            "is_active": row.is_active,
                         }
-                        changed = False
-                        if cnt == 0:
+                        if idx == 0:
                             kp_data["is_admin"] = False
-                            changed = True
-                        elif row.is_admin and row.is_active:
-                            kp_data["is_active"] = False
-                            changed = True
-                        if changed:
                             kp_updates.append(kp_data)
-                        cnt += 1
-                    await conn.execute(
-                        sa.update(keypairs)
-                        .values(
-                            {
-                                "is_admin": bindparam("is_admin"),
-                                "is_active": bindparam("is_active"),
-                            }
+                            continue
+                        if row.is_admin and row.is_active:
+                            kp_data["is_active"] = False
+                            kp_updates.append(kp_data)
+                    if kp_updates:
+                        await conn.execute(
+                            sa.update(keypairs)
+                            .values(
+                                {
+                                    "is_admin": bindparam("is_admin"),
+                                    "is_active": bindparam("is_active"),
+                                }
+                            )
+                            .where(keypairs.c.access_key == bindparam("b_access_key")),
+                            kp_updates,
                         )
-                        .where(keypairs.c.user == bindparam("user")),
-                        kp_updates,
-                    )
 
             # If domain is changed and no group is associated, clear previous domain's group.
             if prev_domain_name != updated_user.domain_name and not props.group_ids:
@@ -843,7 +866,7 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(conn, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
@@ -939,7 +962,7 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         user_uuid: UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
@@ -951,39 +974,33 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolder_permissions, vfolders
 
-        await conn.execute(
-            vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-        )
-        result = await conn.execute(
-            sa.select([vfolders.c.id, vfolders.c.host])
-            .select_from(vfolders)
-            .where(vfolders.c.user == user_uuid),
-        )
-        target_vfs = result.fetchall()
-        result = await conn.execute(
-            sa.delete(vfolders).where(vfolders.c.user == user_uuid),
-        )
-        for row in target_vfs:
-            try:
-                async with storage_manager.request(
-                    row["host"],
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": storage_manager.split_host(row["host"])[1],
-                        "vfid": str(row["id"]),
-                    },
-                    raise_for_status=True,
-                ):
-                    pass
-            except aiohttp.ClientResponseError:
-                log.error("error on deleting vfolder filesystem directory: {0}", row["id"])
-                raise VFolderOperationFailed
-        if result.rowcount > 0:
-            log.info("deleted {0} user's virtual folders ({1})", result.rowcount, user_uuid)
-        return result.rowcount
+        async with engine.begin_session() as conn:
+            await conn.execute(
+                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
+            )
+            result = await conn.execute(
+                sa.select([vfolders.c.id, vfolders.c.host])
+                .select_from(vfolders)
+                .where(vfolders.c.user == user_uuid),
+            )
+            target_vfs = result.fetchall()
+
+        storage_ptask_group = aiotools.PersistentTaskGroup()
+        try:
+            deleted_count = await initiate_vfolder_removal(
+                engine,
+                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                storage_manager,
+                storage_ptask_group,
+            )
+        except VFolderOperationFailed as e:
+            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
+            raise
+        if deleted_count > 0:
+            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
+        return deleted_count
 
     @classmethod
     async def user_vfolder_mounted_to_active_kernels(
@@ -1089,11 +1106,12 @@ class PurgeUser(graphene.Mutation):
         ak_rows = await conn.execute(
             sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
         )
-        access_key = ak_rows.first().access_key
-        await redis_helper.execute(
-            redis_conn,
-            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-        )
+        if (row := ak_rows.first()) and (access_key := row.access_key):
+            # Log concurrency used only when there is at least one keypair.
+            await redis_helper.execute(
+                redis_conn,
+                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            )
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
         )

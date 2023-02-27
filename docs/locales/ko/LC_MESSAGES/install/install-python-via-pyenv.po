@@ -59,7 +59,7 @@ msgstr ""
 #: ../../install/install-python-via-pyenv.rst:37
 #: 93a7c8f68b3a44f7a49dca49d0e0606d
 msgid ""
-"**NOTE:** Change ``~/.profile`` accroding to your shell/system (e.g., ``~/."
+"**NOTE:** Change ``~/.profile`` according to your shell/system (e.g., ``~/."
 "bashrc``\\ , ``~/.bash_profile``\\ , ``~/.zshrc``\\ , ...) -- whichever "
 "loaded at startup of your shell!"
 msgstr ""

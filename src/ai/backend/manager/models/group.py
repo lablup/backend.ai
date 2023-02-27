@@ -16,13 +16,13 @@ from typing import (
     overload,
 )
 
-import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
@@ -32,11 +32,13 @@ from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
 from .base import (
     GUID,
+    Base,
     IDColumn,
     ResourceSlotColumn,
+    VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
@@ -44,18 +46,20 @@ from .base import (
 )
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserRole
-from .utils import execute_with_retry
+from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .scaling_group import ScalingGroup
 
-log = BraceStyleAdapter(logging.getLogger(__file__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 __all__: Sequence[str] = (
     "groups",
+    "GroupRow",
     "association_groups_users",
+    "AssocGroupUserRow",
     "resolve_group_name_or_id",
     "Group",
     "GroupInput",
@@ -75,26 +79,33 @@ _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 association_groups_users = sa.Table(
     "association_groups_users",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "user_id",
         GUID,
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "group_id",
         GUID,
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
 )
+
+
+class AssocGroupUserRow(Base):
+    __table__ = association_groups_users
+    user = relationship("UserRow", back_populates="groups")
+    group = relationship("GroupRow", back_populates="users")
 
 
 groups = sa.Table(
     "groups",
-    metadata,
+    mapper_registry.metadata,
     IDColumn("id"),
     sa.Column("name", sa.String(length=64), nullable=False),
     sa.Column("description", sa.String(length=512)),
@@ -117,13 +128,28 @@ groups = sa.Table(
     ),
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
-    sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
+    sa.Column(
+        "allowed_vfolder_hosts",
+        VFolderHostPermissionColumn(),
+        nullable=False,
+        default={},
+    ),
     sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
     # dotfiles column, \x90 means empty list in msgpack
     sa.Column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     ),
 )
+
+
+class GroupRow(Base):
+    __table__ = groups
+    sessions = relationship("SessionRow", back_populates="group")
+    domain = relationship("DomainRow", back_populates="groups")
+    scaling_groups = relationship(
+        "ScalingGroupRow", secondary="sgroups_for_groups", back_populates="groups"
+    )
+    users = relationship("AssocGroupUserRow", back_populates="group")
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -202,7 +228,7 @@ class Group(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
 
     scaling_groups = graphene.List(lambda: graphene.String)
@@ -220,7 +246,7 @@ class Group(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
         )
 
@@ -348,7 +374,7 @@ class GroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False, default=True)
     domain_name = graphene.String(required=True)
     total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
 
 
@@ -360,7 +386,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(required=False)
     user_uuids = graphene.List(lambda: graphene.String, required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
 
 
@@ -556,7 +582,7 @@ class PurgeGroup(graphene.Mutation):
                 raise RuntimeError(
                     "Group has some active session. " "Terminate them first to proceed removal.",
                 )
-            await cls.delete_vfolders(conn, gid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
@@ -565,7 +591,7 @@ class PurgeGroup(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        db_conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         group_id: uuid.UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
@@ -577,36 +603,33 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolders
 
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
             .select_from(vfolders)
             .where(vfolders.c.group == group_id)
         )
-        result = await db_conn.execute(query)
-        target_vfs = result.fetchall()
-        delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
-        result = await db_conn.execute(delete_query)
-        for row in target_vfs:
-            try:
-                async with storage_manager.request(
-                    row["host"],
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": storage_manager.split_host(row["host"])[1],
-                        "vfid": str(row["id"]),
-                    },
-                    raise_for_status=True,
-                ):
-                    pass
-            except aiohttp.ClientResponseError:
-                log.error("error on deleting vfolder filesystem directory: {0}", row["id"])
-                raise VFolderOperationFailed
-        if result.rowcount > 0:
-            log.info("deleted {0} group's virtual folders ({1})", result.rowcount, group_id)
-        return result.rowcount
+        async with engine.begin_session() as db_conn:
+            result = await db_conn.execute(query)
+            target_vfs = result.fetchall()
+            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
+            result = await db_conn.execute(delete_query)
+
+        storage_ptask_group = aiotools.PersistentTaskGroup()
+        try:
+            deleted_count = await initiate_vfolder_removal(
+                engine,
+                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                storage_manager,
+                storage_ptask_group,
+            )
+        except VFolderOperationFailed as e:
+            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
+            raise
+        if deleted_count > 0:
+            log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
+        return deleted_count
 
     @classmethod
     async def delete_kernels(

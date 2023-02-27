@@ -50,6 +50,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
 
+    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
+    try:
+        os.unlink(registry_state_path)
+    except FileNotFoundError:
+        pass
+
     cfg = {
         "agent": {
             "region": f"rg-{test_id}",
@@ -58,9 +64,11 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "ipc-base-path": ipc_base_path,
             "var-base-path": var_base_path,
             "backend": "docker",
-            "rpc-listen-addr": HostPortPair("", 6001),
-            "agent-sock-port": 6009,
+            "rpc-listen-addr": HostPortPair("", 6101 + get_parallel_slot()),
+            "agent-sock-port": 6109 + get_parallel_slot(),
+            "metadata-server-port": 40130 + get_parallel_slot(),
             "allow-compute-plugins": set(),
+            "block-compute-plugins": set(),
         },
         "container": {
             "scratch-type": "hostdir",
@@ -105,25 +113,19 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         pass
     yield cfg
     shutil.rmtree(ipc_base_path)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(local_config, session_mocker, test_id):
-    var_base_path = local_config["agent"]["var-base-path"]
-    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
     try:
         os.unlink(registry_state_path)
     except FileNotFoundError:
         pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_local_instance_id(session_mocker, test_id):
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )
     mock_generate_local_instance_id.return_value = f"i-{test_id}"
     yield
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture(scope="session")

@@ -3,13 +3,13 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
-import attr
+import attrs
 import graphene
 
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor
+    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
@@ -35,9 +35,11 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
+from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
+from .endpoint import Endpoint, EndpointList
 from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
 from .image import (
     AliasImage,
@@ -53,8 +55,6 @@ from .image import (
 from .kernel import (
     ComputeContainer,
     ComputeContainerList,
-    ComputeSession,
-    ComputeSessionList,
     LegacyComputeSession,
     LegacyComputeSessionList,
 )
@@ -71,6 +71,7 @@ from .resource_preset import (
     ModifyResourcePreset,
     ResourcePreset,
 )
+from .routing import Routing, RoutingList
 from .scaling_group import (
     AssociateScalingGroupWithDomain,
     AssociateScalingGroupWithKeyPair,
@@ -85,6 +86,7 @@ from .scaling_group import (
     ModifyScalingGroup,
     ScalingGroup,
 )
+from .session import ComputeSession, ComputeSessionList
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,
@@ -104,7 +106,7 @@ from .vfolder import (
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
@@ -486,6 +488,40 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),
     )
 
+    vfolder_host_permissions = graphene.Field(
+        PredefinedAtomicPermission,
+    )
+
+    endpoint = graphene.Field(
+        Endpoint,
+        endpoint_id=graphene.UUID(required=True),
+    )
+
+    endpoint_list = graphene.Field(
+        EndpointList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
+        project=graphene.UUID(),
+    )
+
+    routing = graphene.Field(
+        Routing,
+        routing_id=graphene.UUID(required=True),
+    )
+
+    routing_list = graphene.Field(
+        RoutingList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
+        endpoint_id=graphene.UUID(),
+    )
+
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
@@ -558,6 +594,9 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
+        if ctx.local_config["manager"]["hide-agents"]:
+            raise ObjectNotFound(object_name="agent")
+
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "Agent",
@@ -583,8 +622,12 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
         status: str | None = None,
     ) -> AgentSummaryList:
+        ctx: GraphQueryContext = info.context
+        if ctx.local_config["manager"]["hide-agents"]:
+            raise ObjectNotFound(object_name="agent")
+
         total_count = await AgentSummary.load_count(
-            info.context,
+            ctx,
             access_key=access_key,
             scaling_group=scaling_group,
             domain_name=domain_name,
@@ -592,7 +635,7 @@ class Queries(graphene.ObjectType):
             filter=filter,
         )
         agent_list = await AgentSummary.load_slice(
-            info.context,
+            ctx,
             limit,
             offset,
             access_key=access_key,
@@ -1400,12 +1443,88 @@ class Queries(graphene.ObjectType):
         else:
             raise TooManyKernelsFound
 
+    @staticmethod
+    async def resolve_vfolder_host_permissions(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+    ) -> PredefinedAtomicPermission:
+        graph_ctx: GraphQueryContext = info.context
+        return await PredefinedAtomicPermission.load_all(graph_ctx)
+
+    @staticmethod
+    async def resolve_endpoint(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        endpoint_id: uuid.UUID,
+    ) -> Endpoint:
+        graph_ctx: GraphQueryContext = info.context
+        return await Endpoint.load_item(graph_ctx, endpoint_id=endpoint_id)
+
+    @staticmethod
+    async def resolve_endpoint_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+    ) -> EndpointList:
+        total_count = await Endpoint.load_count(
+            info.context,
+            project=project,
+        )
+        endpoint_list = await Endpoint.load_slice(
+            info.context,
+            limit,
+            offset,
+            project=project,
+            filter=filter,
+            order=order,
+        )
+        return EndpointList(endpoint_list, total_count)
+
+    @staticmethod
+    async def resolve_routing(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        routing_id: uuid.UUID,
+    ) -> Routing:
+        graph_ctx: GraphQueryContext = info.context
+        return await Routing.load_item(graph_ctx, routing_id=routing_id)
+
+    @staticmethod
+    async def resolve_routing_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+    ) -> RoutingList:
+        total_count = await Routing.load_count(
+            info.context,
+            endpoint_id=endpoint_id,
+        )
+        routing_list = await Routing.load_slice(
+            info.context,
+            limit,
+            offset,
+            endpoint_id=endpoint_id,
+            filter=filter,
+            order=order,
+        )
+        return RoutingList(routing_list, total_count)
+
 
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == "mutation" and len(info.path) == 1:
-            mutation_cls = getattr(Mutations, info.path[0]).type
+            mutation_cls = getattr(Mutations, info.field_name).type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:

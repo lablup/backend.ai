@@ -156,7 +156,10 @@ sizebytes_output_formatter = SizeBytesOutputFormatter()
 
 class AgentStatFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        raw_stats = json.loads(value)
+        try:
+            raw_stats = json.loads(value)
+        except TypeError:
+            return ""
 
         value_formatters = {
             "bytes": lambda m: "{} / {}".format(

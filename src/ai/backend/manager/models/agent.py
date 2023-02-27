@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -11,18 +11,21 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
 
 from .base import (
+    Base,
     EnumType,
     Item,
     PaginatedList,
     ResourceSlotColumn,
     batch_result,
-    metadata,
+    mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
@@ -40,6 +43,7 @@ if TYPE_CHECKING:
 
 __all__: Sequence[str] = (
     "agents",
+    "AgentRow",
     "AgentStatus",
     "AgentList",
     "Agent",
@@ -47,6 +51,7 @@ __all__: Sequence[str] = (
     "AgentSummaryList",
     "ModifyAgent",
     "recalc_agent_resource_occupancy",
+    "list_schedulable_agents_by_sgroup",
 )
 
 
@@ -59,7 +64,7 @@ class AgentStatus(enum.Enum):
 
 agents = sa.Table(
     "agents",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("id", sa.String(length=64), primary_key=True),
     sa.Column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
@@ -86,6 +91,26 @@ agents = sa.Table(
 )
 
 
+class AgentRow(Base):
+    __table__ = agents
+    kernels = relationship("KernelRow", back_populates="agent_row")
+    scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
+
+
+async def list_schedulable_agents_by_sgroup(
+    db_sess: SASession,
+    sgroup_name: str,
+) -> Sequence[AgentRow]:
+    query = sa.select(AgentRow).where(
+        (AgentRow.status == AgentStatus.ALIVE)
+        & (AgentRow.scaling_group == sgroup_name)
+        & (AgentRow.schedulable == true()),
+    )
+
+    result = await db_sess.execute(query)
+    return result.scalars().all()
+
+
 class Agent(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -105,6 +130,7 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
+    local_config = graphene.JSONString()
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -190,9 +216,17 @@ class Agent(graphene.ObjectType):
     async def resolve_hardware_metadata(
         self,
         info: graphene.ResolveInfo,
-    ) -> Mapping[str, HardwareMetadata]:
+    ) -> Optional[Mapping[str, HardwareMetadata]]:
+        if self.status != AgentStatus.ALIVE.name:
+            return None
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+        if self.status != AgentStatus.ALIVE.name:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
@@ -587,7 +621,9 @@ class ModifyAgent(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, "schedulable")
         set_if_set(props, data, "scaling_group")
-        await graph_ctx.registry.update_scaling_group(id, data["scaling_group"])
+        # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
+        if (scaling_group := data.get("scaling_group")) is not None:
+            await graph_ctx.registry.update_scaling_group(id, scaling_group)
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)

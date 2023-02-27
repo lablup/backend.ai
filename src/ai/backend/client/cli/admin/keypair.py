@@ -60,7 +60,7 @@ def info(ctx: CLIContext) -> None:
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
-@click.option("--limit", default=None, help="The page size for pagination.")
+@click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> None:
     """
     List keypairs.
