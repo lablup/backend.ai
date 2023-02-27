@@ -5,7 +5,6 @@ import copy
 import itertools
 import logging
 import re
-import secrets
 import time
 import typing
 import uuid
@@ -1158,7 +1157,6 @@ class AgentRegistry:
             order_key=str(scheduled_session.id),
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            kernel_creation_id = secrets.token_urlsafe(16)
             # Prepare kernel_started event handling
             for binding in items:
                 self.kernel_creation_tracker[binding.kernel.id] = loop.create_future()
@@ -1178,7 +1176,6 @@ class AgentRegistry:
                 get_image_ref = lambda k: image_infos[str(k.image_ref)].image_ref
                 # Issue a batched RPC call to create kernels on this agent
                 created_infos = await rpc.call.create_kernels(
-                    kernel_creation_id,
                     str(scheduled_session.id),
                     [str(binding.kernel.id) for binding in items],
                     [
@@ -1700,7 +1697,7 @@ class AgentRegistry:
 
                             await execute_with_retry(_update)
                             await self.event_producer.produce_event(
-                                KernelCancelledEvent(kernel.id, "", reason),
+                                KernelCancelledEvent(kernel.id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
@@ -1973,7 +1970,6 @@ class AgentRegistry:
         async def _restart_kernel(kernel: KernelRow) -> None:
             loop = asyncio.get_running_loop()
             try:
-                kernel_creation_id = secrets.token_urlsafe(16)
                 start_future = loop.create_future()
                 self.kernel_creation_tracker[kernel.id] = start_future
                 try:
@@ -1988,7 +1984,6 @@ class AgentRegistry:
                             # TODO: support resacling of sub-containers
                         }
                         kernel_info = await rpc.call.restart_kernel(
-                            kernel_creation_id,
                             str(kernel.session_id),
                             str(kernel.id),
                             updated_config,
