@@ -598,6 +598,7 @@ class AbstractAgent(
         # Prepare stat collector tasks.
         self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
         self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
+        self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
 
         # Prepare heartbeats.
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
@@ -806,6 +807,25 @@ class AbstractAgent(
             pass
         except Exception:
             log.exception("unhandled exception while syncing container stats")
+            await self.produce_error_event()
+
+    async def collect_process_stat(self, interval: float):
+        if self.local_config["debug"]["log-stats"]:
+            log.debug("collecting process statistics in container")
+        try:
+            updated_kernel_ids = []
+            container_ids = []
+            async with self.registry_lock:
+                for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
+                    if not kernel_obj.stats_enabled:
+                        continue
+                    updated_kernel_ids.append(kernel_id)
+                    container_ids.append(kernel_obj["container_id"])
+                await self.stat_ctx.collect_per_container_process_stat(container_ids)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
