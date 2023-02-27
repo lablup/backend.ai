@@ -9,6 +9,9 @@ import pytest
 from ai.backend.storage.purestorage import FlashBladeVolume
 from ai.backend.storage.types import DirEntryType
 
+# module-level marker
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def fbroot():

@@ -447,7 +447,7 @@ Uploading a File to Virtual Folder
 
 Upload a local file to a virtual folder associated with the current keypair.
 Internally, the Manager will deligate the upload to a Backend.AI Storage-Proxy
-service. JSON web token is used for the authenticaiton of the request.
+service. JSON web token is used for the authentication of the request.
 
 * URI: ``/folders/:name/request-upload``
 * Method: ``POST``
@@ -563,7 +563,7 @@ Downloading a File or a Directory from a Virtual Folder
 
 Download a file or a directory from a virtual folder associated with the current
 keypair. Internally, the Manager will deligate the download to a Backend.AI
-Storage-Proxy service. JSON web token is used for the authenticaiton of the
+Storage-Proxy service. JSON web token is used for the authentication of the
 request.
 
 .. versionadded:: v4.20190315
@@ -1225,7 +1225,7 @@ Response
      - Values
    * - ``shared_emails``
      - ``list[str]``
-     - A list of user emails those are succesfully shared the virtual folder
+     - A list of user emails those are successfully shared the virtual folder
 
 
 Unshare a Group Virtual Folder from Users
@@ -1280,7 +1280,7 @@ Response
      - Values
    * - ``unshared_emails``
      - ``list[str]``
-     - A list of user emails those are succesfully unshared the virtual folder
+     - A list of user emails those are successfully unshared the virtual folder
 
 
 Clone a Virtual Folder
@@ -1351,7 +1351,7 @@ Response
      - Values
    * - ``unshared_emails``
      - ``list[str]``
-     - A list of user emails those are succesfully unshared the virtual folder.
+     - A list of user emails those are successfully unshared the virtual folder.
 
 .. list-table::
    :widths: 15 5 80

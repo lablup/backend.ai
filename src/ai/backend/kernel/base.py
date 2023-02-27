@@ -82,8 +82,7 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
 
 def promote_path(path_env: str, path_to_promote: Union[Path, str]) -> str:
     paths = path_env.split(":")
-    print(f"promote_path: {path_to_promote=} {path_env=}", file=sys.stderr)
-    path_to_promote = str(path_to_promote)
+    path_to_promote = os.fsdecode(path_to_promote)
     result_paths = [p for p in paths if path_to_promote != p]
     result_paths.insert(0, path_to_promote)
     return ":".join(result_paths)
@@ -279,7 +278,7 @@ class BaseRunner(metaclass=ABCMeta):
             self.kernel_mgr = None
 
     async def _shutdown_jupyter_kernel(self):
-        if self.kernel_mgr and self.kernel_mgr.is_alive():
+        if self.kernel_mgr and await self.kernel_mgr.is_alive():
             assert self.kernel_client is not None
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
             await self.kernel_mgr.shutdown_kernel()

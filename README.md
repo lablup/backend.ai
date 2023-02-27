@@ -131,8 +131,8 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-manager
   * Available plugin interfaces
     - `backendai_scheduler_v10`
-    - `backendai_hook_v10`
-    - `backendai_webapp_v10`
+    - `backendai_hook_v20`
+    - `backendai_webapp_v20`
     - `backendai_monitor_stats_v10`
     - `backendai_monitor_error_v10`
 
@@ -147,7 +147,7 @@ heartbeats.
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/agent/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-agent
   * Available plugin interfaces
-    - `backendai_accelerator_v12`
+    - `backendai_accelerator_v21`
     - `backendai_monitor_stats_v10`
     - `backendai_monitor_error_v10`
 
@@ -197,7 +197,7 @@ commercial and non-commercial software products and services.
 
 * Python (provides the command-line interface)
    * `pip install backend.ai-client`
-   * https://github.com/lablup/backend.ai-client-py
+   * https://github.com/lablup/backend.ai/tree/main/src/ai/backend/client
 * Java
    * Currently only available via GitHub releases
    * https://github.com/lablup/backend.ai-client-java
@@ -212,18 +212,18 @@ commercial and non-commercial software products and services.
 Plugins
 -------
 
-* `backendai_accelerator_v12`
-  - [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai-accelerator-cuda): CUDA accelerator plugin
-  - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai-accelerator-cuda-mock): CUDA mockup plugin
+* `backendai_accelerator_v21`
+  - [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_open): CUDA accelerator plugin
+  - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
     - This emulates the presence of CUDA devices without actual CUDA devices,
       so that developers can work on CUDA integration without real GPUs.
-  - [`ai.backend.accelerator.rocm`](https://github.com/lablup/backend.ai-accelerator-rocm): ROCM accelerator plugin
+  - [`ai.backend.accelerator.rocm`]: ROCm accelerator plugin
   - More available in the enterprise edition!
 * `backendai_monitor_stats_v10`
-  - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-stats-monitor)
+  - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)
     - Statistics collector based on the Datadog API
 * `backendai_monitor_error_v10`
-  - [`ai.backend.monitor.error`](https://github.com/lablup/backend.ai-error-monitor)
+  - [`ai.backend.monitor.error`](https://github.com/lablup/backend.ai-monitor-sentry)
     - Exception collector based on the Sentry API
 
 
@@ -254,6 +254,15 @@ animated vector graphics)
 
 We now recommend using in-kernel applications such as Jupyter Lab, Visual Studio Code Server,
 or native SSH connection to kernels via our client SDK or desktop apps.
+
+Python Version Compatibility
+----------------------------
+
+| Backend.AI Core Version | Compatible Python Version |
+|:-----------------------:|:-------------------------:|
+| 23.03.x                 | 3.11.x                    |
+| 22.03.x / 22.09.x       | 3.10.x                    |
+| 21.03.x / 21.09.x       | 3.8.x                     |
 
 
 License

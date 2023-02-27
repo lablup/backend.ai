@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, SubsystemRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -22,12 +22,12 @@ from pants.option.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-class PlatformResourcesSusbystem(Subsystem):
+class PlatformResourcesSubsystem(Subsystem):
     options_scope = "platform-specific-resources"
     help = "The platform-specific resource provider."
     platform = EnumOption(
         "--target",
-        default=lambda cls: Platform.current,
+        default=lambda cls: Platform.create_for_localhost(),
         enum_type=Platform,
         advanced=False,
         help="Select only resources compatible with the given platform",
@@ -73,7 +73,7 @@ class InferPlatformSpecificDependenciesRequest(InferDependenciesRequest):
 @rule
 async def infer_platform_specific_dependencies(
     request: InferPlatformSpecificDependenciesRequest,
-    subsystem: PlatformResourcesSusbystem,
+    subsystem: PlatformResourcesSubsystem,
 ) -> InferredDependencies:
     logger.info("infer_platform_specific_dependencies")
     logger.info(
@@ -107,6 +107,6 @@ def target_types():
 def rules():
     return [
         *collect_rules(),
-        SubsystemRule(PlatformResourcesSusbystem),
+        *PlatformResourcesSubsystem.rules(),
         UnionRule(InferDependenciesRequest, InferPlatformSpecificDependenciesRequest),
     ]
