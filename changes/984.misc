@@ -1,0 +1,1 @@
+More explicit log for webserver's `login_handler` to filter and save the authentication logs only.

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Any, Final, Mapping, Optional
 
-import attr
+import attrs
 import trafaret as t
 
 from ai.backend.common import validators as tx
@@ -19,7 +19,7 @@ class Sentinel(enum.Enum):
 SENTINEL: Final = Sentinel.token
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class FSPerfMetric:
     # iops
     iops_read: int
@@ -32,13 +32,13 @@ class FSPerfMetric:
     io_usec_write: float
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class FSUsage:
     capacity_bytes: BinarySize
     used_bytes: BinarySize
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class VolumeInfo:
     backend: str
     path: Path
@@ -57,7 +57,7 @@ class VolumeInfo:
         )
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class VFolderCreationOptions:
     quota: Optional[BinarySize]
 
@@ -74,13 +74,13 @@ class VFolderCreationOptions:
         return VFolderCreationOptions(quota=quota)
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class VFolderUsage:
     file_count: int
     used_bytes: int
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class Stat:
     size: int
     owner: str
@@ -95,7 +95,7 @@ class DirEntryType(enum.Enum):
     SYMLINK = 2
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class DirEntry:
     name: str
     path: Path

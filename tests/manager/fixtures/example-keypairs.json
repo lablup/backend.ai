@@ -120,7 +120,18 @@
             "max_vfolder_count": 10,
             "max_vfolder_size": 0,
             "idle_timeout": 3600,
-            "allowed_vfolder_hosts": ["local:volume1"]
+            "allowed_vfolder_hosts": {
+                "local:volume1": [
+                    "create-vfolder",
+                    "modify-vfolder",
+                    "delete-vfolder",
+                    "mount-in-session",
+                    "upload-file",
+                    "download-file",
+                    "invite-others",
+                    "set-user-specific-permission"
+                ]
+            }
         }
     ],
     "keypairs": [

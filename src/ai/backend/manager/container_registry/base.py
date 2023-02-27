@@ -10,16 +10,19 @@ from typing import Any, AsyncIterator, Dict, Mapping, Optional, cast
 import aiohttp
 import aiotools
 import sqlalchemy as sa
+import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, arch_name_aliases
+from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.docker import validate_image_labels
+from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -242,43 +245,46 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if (reporter := self.reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
 
-        idx = 0
         for architecture, manifest in manifests.items():
-            idx += 1
             if manifest is None:
                 skip_reason = "missing/deleted"
+                # TODO: auto-delete from our scanned database?
                 continue
 
             try:
-                size_bytes = manifest["size"]
-                labels = manifest["labels"]
-                config_digest = manifest["digest"]
-                if "ai.backend.kernelspec" not in labels:
-                    # Skip non-Backend.AI kernel images
-                    skip_reason = architecture + ": missing kernelspec"
+                try:
+                    validate_image_labels(manifest["labels"])
+                except t.DataError as e:
+                    match e.as_dict():
+                        case str() as error_msg:
+                            skip_reason = error_msg
+                        case dict() as error_data:
+                            skip_reason = "; ".join(
+                                f"{field} {reason}" for field, reason in error_data.items()
+                            )
                     continue
-                if not (MIN_KERNELSPEC <= int(labels["ai.backend.kernelspec"]) <= MAX_KERNELSPEC):
-                    # Skip unsupported kernelspec images
-                    skip_reason = architecture + ": unsupported kernelspec"
+                except ValueError as e:
+                    skip_reason = str(e)
                     continue
-
                 update_key = ImageRef(
                     f"{self.registry_name}/{image}:{tag}",
                     [self.registry_name],
                     architecture,
                 )
                 updates = {
-                    "config_digest": config_digest,
-                    "size_bytes": size_bytes,
-                    "labels": labels,
+                    "config_digest": manifest["digest"],
+                    "size_bytes": manifest["size"],
+                    "labels": manifest["labels"],  # keep the original form
                 }
-                accels = labels.get("ai.backend.accelerators")
+                accels = manifest["labels"].get("ai.backend.accelerators")
                 if accels:
                     updates["accels"] = accels
 
                 resources = {}
                 res_prefix = "ai.backend.resource.min."
-                for k, v in filter(lambda pair: pair[0].startswith(res_prefix), labels.items()):
+                for k, v in filter(
+                    lambda pair: pair[0].startswith(res_prefix), manifest["labels"].items()
+                ):
                     res_key = k[len(res_prefix) :]
                     resources[res_key] = {"min": v}
                 updates["resources"] = resources
@@ -287,6 +293,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         update_key: updates,
                     }
                 )
+            except (InvalidImageName, InvalidImageTag) as e:
+                skip_reason = str(e)
             finally:
                 if skip_reason:
                     log.warning(

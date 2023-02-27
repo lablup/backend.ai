@@ -1,0 +1,1 @@
+Add function that automate making news fragement process

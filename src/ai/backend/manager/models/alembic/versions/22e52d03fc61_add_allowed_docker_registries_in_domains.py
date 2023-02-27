@@ -10,6 +10,7 @@ import os
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "22e52d03fc61"
@@ -35,7 +36,7 @@ def upgrade():
         allowed_registries = "{index.docker.io}"
     connection = op.get_bind()
     query = "UPDATE domains SET allowed_docker_registries = '{}';".format(allowed_registries)
-    connection.execute(query)
+    connection.execute(text(query))
 
     op.alter_column("domains", column_name="allowed_docker_registries", nullable=False)
 

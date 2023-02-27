@@ -9,6 +9,7 @@ import textwrap
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID, ForeignKeyIDColumn, IDColumn, convention
 
@@ -83,7 +84,7 @@ def upgrade():
         RETURNING id;
     """
     )
-    result = connection.execute(query).first()
+    result = connection.execute(text(query)).first()
     gid = result.id if hasattr(result, "id") else None
     if gid is None:  # group already exists
         query = textwrap.dedent(
@@ -91,7 +92,7 @@ def upgrade():
             SELECT id FROM groups where name = 'default' and domain_name = 'default';
         """
         )
-        gid = connection.execute(query).first().id
+        gid = connection.execute(text(query)).first().id
 
     # Fill in kernels' domain_name, group_id, and user_uuid.
     query = sa.select([kernels.c.id, kernels.c.access_key]).select_from(kernels)
@@ -128,7 +129,7 @@ def upgrade():
             gid,
             user.uuid,
         )
-        connection.execute(query)
+        connection.execute(text(query))
 
     # Make kernel's new fields non-nullable.
     op.alter_column("kernels", column_name="domain_name", nullable=False)

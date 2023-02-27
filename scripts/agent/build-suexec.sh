@@ -2,7 +2,12 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
+# distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
+distros=("ubuntu16.04")
+
+if [ $arch = "arm64" ]; then
+  arch="aarch64"
+fi
 
 ubuntu1604_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:16.04
@@ -65,6 +70,7 @@ done
 
 cd "$temp_dir"
 git clone -c advice.detachedHead=false https://github.com/ncopa/su-exec su-exec
+cp $SCRIPT_DIR/su-exec.c su-exec
 
 for distro in "${distros[@]}"; do
   docker run --rm -it \
@@ -78,6 +84,6 @@ for distro in "${distros[@]}"; do
 done
 
 ls -l .
-cp su-exec.*.bin $SCRIPT_DIR/../src/ai/backend/runner
+cp su-exec.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 
 rm -rf "$temp_dir"

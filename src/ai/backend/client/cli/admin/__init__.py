@@ -9,6 +9,7 @@ def admin():
 
 
 from . import (  # noqa
+    acl,
     agent,
     domain,
     etcd,

@@ -23,7 +23,7 @@ from typing import (
     Union,
 )
 
-import attr
+import attrs
 
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
@@ -38,16 +38,16 @@ class Action(TypedDict):
     ref: Optional[str]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ServiceDefinition:
     command: List[str]
     noop: bool = False
     url_template: str = ""
-    prestart_actions: List[Action] = attr.Factory(list)
-    env: Mapping[str, str] = attr.Factory(dict)
-    allowed_envs: List[str] = attr.Factory(list)
-    allowed_arguments: List[str] = attr.Factory(list)
-    default_arguments: Mapping[str, Union[None, str, List[str]]] = attr.Factory(dict)
+    prestart_actions: List[Action] = attrs.Factory(list)
+    env: Mapping[str, str] = attrs.Factory(dict)
+    allowed_envs: List[str] = attrs.Factory(list)
+    allowed_arguments: List[str] = attrs.Factory(list)
+    default_arguments: Mapping[str, Union[None, str, List[str]]] = attrs.Factory(dict)
 
 
 class ServiceParser:
