@@ -324,16 +324,18 @@ class ImageRef:
     will allow any repository on canonical string.
     """
 
-    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha")
+    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local")
 
     _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
     def __init__(
         self,
         value: str,
-        known_registries: Union[Mapping[str, Any], Sequence[str]] = None,
-        architecture="x86_64",
+        known_registries: Optional[Mapping[str, Any] | Sequence[str]] = None,
+        architecture: str = "x86_64",
+        is_local: bool = False,
     ):
+        self._is_local = is_local
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
         if "://" in value or value.startswith("//"):
@@ -457,6 +459,10 @@ class ImageRef:
     def tag_set(self) -> Tuple[str, PlatformTagSet]:
         # e.g., '3.6', {'ubuntu', 'cuda', ...}
         return self._tag_set
+
+    @property
+    def is_local(self) -> bool:
+        return self._is_local
 
     @property
     def short(self) -> str:
