@@ -1,0 +1,22 @@
+name: Feature Request
+description: Suggest an idea for this project
+labels: feature
+assignees: []
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Main idea
+      description: Describe what you want to add or improve
+    validations:
+      required: true
+  - type: textarea
+    id: alternative
+    attributes:
+      label: Alternative ideas
+      description: Describe alternative ideas or directions if any
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?
+      description: Add any other context about the suggestion here.

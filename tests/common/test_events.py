@@ -3,7 +3,7 @@ from types import TracebackType
 from typing import Type
 
 import aiotools
-import attr
+import attrs
 import pytest
 
 from ai.backend.common import redis_helper
@@ -17,11 +17,11 @@ from ai.backend.common.events import (
 from ai.backend.common.types import AgentId, EtcdRedisConfig
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class DummyEvent(AbstractEvent):
     name = "testing"
 
-    value: int = attr.ib()
+    value: int = attrs.field()
 
     def serialize(self) -> tuple:
         return (self.value + 1,)

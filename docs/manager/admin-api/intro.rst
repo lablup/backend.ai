@@ -24,7 +24,8 @@ There are two modes of operation:
    :maxdepth: 2
 
    domains
-   scaling-gruops
+   scaling-groups
+   resource-presets
    agents
    users
    groups

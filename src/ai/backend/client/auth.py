@@ -4,7 +4,7 @@ import hmac
 from datetime import datetime
 from typing import Mapping, Tuple
 
-import attr
+import attrs
 from yarl import URL
 
 __all__ = (
@@ -19,10 +19,10 @@ class AuthTokenTypes(enum.Enum):
     JWT = "jwt"
 
 
-@attr.s
+@attrs.define()
 class AuthToken:
-    type = attr.ib(default=AuthTokenTypes.KEYPAIR)  # type: AuthTokenTypes
-    content = attr.ib(default=None)  # type: str
+    type = attrs.field(default=AuthTokenTypes.KEYPAIR)  # type: AuthTokenTypes
+    content = attrs.field(default=None)  # type: str
 
 
 def generate_signature(

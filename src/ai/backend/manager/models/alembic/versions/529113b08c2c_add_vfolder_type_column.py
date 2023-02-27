@@ -10,6 +10,7 @@ import textwrap
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.manager.models import VFolderOwnershipType, VFolderPermission, VFolderUsageMode
@@ -82,11 +83,11 @@ def upgrade():
     # Fill vfolders.c.usage_mode with 'general' and vfolders.c.permission.
     conn = op.get_bind()
     query = textwrap.dedent("UPDATE vfolders SET usage_mode = 'general';")
-    conn.execute(query)
+    conn.execute(text(query))
     query = textwrap.dedent("UPDATE vfolders SET permission = 'wd' WHERE \"user\" IS NOT NULL;")
-    conn.execute(query)
+    conn.execute(text(query))
     query = textwrap.dedent("UPDATE vfolders SET permission = 'rw' WHERE \"group\" IS NOT NULL;")
-    conn.execute(query)
+    conn.execute(text(query))
 
     # Set vfolders.c.ownership_type field based on user and group column.
     query = sa.select([vfolders.c.id, vfolders.c.user, vfolders.c.group]).select_from(vfolders)

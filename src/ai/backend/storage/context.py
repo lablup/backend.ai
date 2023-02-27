@@ -9,7 +9,9 @@ from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
 from .dellemc import DellEMCVolume
+from .cephfs import CephFSVolume
 from .exception import InvalidVolumeError
+from .gpfs import GPFSVolume
 from .netapp import NetAppVolume
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
@@ -23,6 +25,8 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "netapp": NetAppVolume,
     "dell": DellEMCVolume,
     "weka": WekaVolume,
+    "spectrumscale": GPFSVolume,
+    "cephfs": CephFSVolume,
 }
 
 

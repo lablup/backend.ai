@@ -8,6 +8,7 @@ Create Date: 2019-01-27 17:05:13.997279
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "f0f4ee907155"
@@ -45,11 +46,7 @@ def upgrade():
             server_default=sa.text("'{}'::jsonb"),
         ),
     )
-    query = """
-    UPDATE agents SET available_slots = json_strip_nulls(json_build_object(
-        'cpu', cpu_slots,
-        'mem', mem_slots::text || 'g'
-    ));
+    queries = """
     UPDATE agents SET available_slots = available_slots || json_build_object(
         'cuda.device', gpu_slots
     )::jsonb
@@ -58,7 +55,6 @@ def upgrade():
         'tpu.device', tpu_slots
     )::jsonb
     WHERE tpu_slots > 0;
-
     UPDATE agents SET occupied_slots = json_strip_nulls(json_build_object(
         'cpu', used_cpu_slots,
         'mem', used_mem_slots::text || 'g'
@@ -72,7 +68,10 @@ def upgrade():
     )::jsonb
     WHERE used_tpu_slots > 0;
     """
-    connection.execute(query)
+    for query in queries.split(";"):
+        if len(query.strip()) == 0:
+            continue
+        connection.execute(text(query))
     op.drop_column("agents", "cpu_slots")
     op.drop_column("agents", "mem_slots")
     op.drop_column("agents", "gpu_slots")
@@ -100,7 +99,7 @@ def upgrade():
             server_default=sa.text("'{}'::jsonb"),
         ),
     )
-    query = """
+    queries = """
     UPDATE kernels SET occupied_slots = json_build_object(
         'cpu', cpu_slot,
         'mem', mem_slot,
@@ -114,7 +113,10 @@ def upgrade():
         'tpu.device', '{}'::json
     );
     """
-    connection.execute(query)
+    for query in queries.split(";"):
+        if len(query.strip()) == 0:
+            continue
+        connection.execute(text(query))
     op.drop_column("kernels", "cpu_slot")
     op.drop_column("kernels", "mem_slot")
     op.drop_column("kernels", "gpu_slot")
@@ -196,7 +198,7 @@ def downgrade():
             FROM json_array_elements((occupied_shares->>'tpu.device')::json) v)
     ;
     """
-    connection.execute(query)
+    connection.execute(text(query))
     query = """
     UPDATE kernels
     SET
@@ -206,7 +208,7 @@ def downgrade():
         tpu_slot = coalesce((occupied_slots->>'tpu.device')::text::float, 0)
     ;
     """
-    connection.execute(query)
+    connection.execute(text(query))
     op.drop_column("kernels", "occupied_shares")
     op.drop_column("kernels", "occupied_slots")
 
@@ -291,7 +293,7 @@ def downgrade():
         tpu_slots = coalesce((available_slots->>'tpu.device')::text::float, 0)
     ;
     """
-    connection.execute(query)
+    connection.execute(text(query))
     query = """
     UPDATE agents
     SET
@@ -301,7 +303,7 @@ def downgrade():
         used_tpu_slots = coalesce((occupied_slots->>'tpu.device')::text::float, 0)
     ;
     """
-    connection.execute(query)
+    connection.execute(text(query))
     op.drop_column("agents", "occupied_slots")
     op.drop_column("agents", "available_slots")
     # ### end Alembic commands ###

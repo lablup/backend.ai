@@ -15,6 +15,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 from ..defs import LockID
 from ..types import Sentinel
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -49,6 +50,7 @@ class ExtendedAsyncSAEngine(SAEngine):
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
         self._txn_concurrency_threshold = kwargs.pop("txn_concurrency_threshold", 8)
+        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
 
     @actxmgr
     async def begin(self) -> AsyncIterator[SAConnection]:
@@ -88,9 +90,10 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self) -> AsyncIterator[SASession]:
+    async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            session = SASession(bind=conn)
+            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+            session = self._sess_factory()
             try:
                 yield session
                 await session.commit()
@@ -99,9 +102,13 @@ class ExtendedAsyncSAEngine(SAEngine):
                 raise e
 
     @actxmgr
-    async def begin_readonly_session(self, deferrable: bool = False) -> AsyncIterator[SASession]:
+    async def begin_readonly_session(
+        self, deferrable: bool = False, expire_on_commit=False
+    ) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            yield SASession(bind=conn)
+            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+            session = self._sess_factory()
+            yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
@@ -144,6 +151,7 @@ def create_async_engine(*args, **kwargs) -> ExtendedAsyncSAEngine:
 @actxmgr
 async def connect_database(
     local_config: LocalConfig | Mapping[str, Any],
+    isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
@@ -164,10 +172,10 @@ async def connect_database(
     db = create_async_engine(
         url,
         connect_args=pgsql_connect_opts,
-        pool_size=8,
-        max_overflow=64,
+        pool_size=local_config["db"]["pool-size"],
+        max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
-        isolation_level="SERIALIZABLE",
+        isolation_level=isolation_level,
         future=True,
     )
     yield db
@@ -189,6 +197,24 @@ async def reenter_txn(
     else:
         async with conn.begin_nested():
             yield conn
+
+
+@actxmgr
+async def reenter_txn_session(
+    pool: ExtendedAsyncSAEngine,
+    sess: SASession,
+    read_only: bool = False,
+) -> AsyncIterator[SAConnection]:
+    if sess is None:
+        if read_only:
+            async with pool.begin_readonly_session() as sess:
+                yield sess
+        else:
+            async with pool.begin_session() as sess:
+                yield sess
+    else:
+        async with sess.begin_nested():
+            yield sess
 
 
 TQueryResult = TypeVar("TQueryResult")

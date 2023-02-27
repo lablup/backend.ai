@@ -204,7 +204,7 @@ class StringList(DelimiterSeperatedList[str]):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class Enum(t.Trafaret):
+class Enum(t.Trafaret, Generic[T_enum]):
     def __init__(self, enum_cls: Type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name

@@ -62,7 +62,11 @@ def list(ctx: CLIContext) -> None:
 @click.option("-i", "--inactive", is_flag=True, help="New domain will be inactive.")
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
 @click.option(
-    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+    "--allowed-vfolder-hosts",
+    type=str,
+    default="{}",
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 @click.option(
     "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
@@ -119,7 +123,10 @@ def add(
 @click.option("--is-active", type=bool, help="Set domain inactive.")
 @click.option("--total-resource-slots", type=str, help="Update total resource slots.")
 @click.option(
-    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+    "--allowed-vfolder-hosts",
+    type=str,
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 @click.option(
     "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
