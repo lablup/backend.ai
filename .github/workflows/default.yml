@@ -249,7 +249,7 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Upload wheels-and-sdists
+    - name: Upload wheels and sdists
       uses: actions/upload-artifact@v3
       with:
         name: wheels-and-sdists
@@ -297,7 +297,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Download built wheels-and-sdists
+    - name: Download built wheels and sdists
       uses: actions/download-artifact@v3
       with:
         name: wheels-and-sdists
@@ -344,7 +344,7 @@ jobs:
     - name: Install local dependencies for publishing
       run: |
         pip install -U 'twine~=4.0'
-    - name: Download built wheels-and-sdists
+    - name: Download built wheels and sdists
       uses: actions/download-artifact@v3
       with:
         name: wheels-and-sdists
