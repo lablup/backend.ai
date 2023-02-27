@@ -966,13 +966,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 case _:
                     docker_host = "(unknown)"
             log.info("accessing the local Docker daemon via {}", docker_host)
-            if not self._skip_initial_scan:
-                docker_version = await docker.version()
-                log.info(
-                    "running with Docker {0} with API {1}",
-                    docker_version["Version"],
-                    docker_version["ApiVersion"],
-                )
+            docker_version = await docker.version()
+            log.info(
+                "running with Docker {0} with API {1}",
+                docker_version["Version"],
+                docker_version["ApiVersion"],
+            )
+            kernel_version = docker_version["KernelVersion"]
+            if "linuxkit" in kernel_version:
+                self.local_config["agent"]["docker-mode"] = "linuxkit"
+            else:
+                self.local_config["agent"]["docker-mode"] = "native"
             docker_info = await docker.system.info()
             docker_info = dict(docker_info)
             # Assume cgroup v1 if CgroupVersion key is absent

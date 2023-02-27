@@ -599,6 +599,7 @@ class AbstractAgent(
         # Prepare stat collector tasks.
         self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
         self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
+        self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
 
         # Prepare heartbeats.
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
@@ -807,6 +808,25 @@ class AbstractAgent(
             pass
         except Exception:
             log.exception("unhandled exception while syncing container stats")
+            await self.produce_error_event()
+
+    async def collect_process_stat(self, interval: float):
+        if self.local_config["debug"]["log-stats"]:
+            log.debug("collecting process statistics in container")
+        try:
+            updated_kernel_ids = []
+            container_ids = []
+            async with self.registry_lock:
+                for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
+                    if not kernel_obj.stats_enabled:
+                        continue
+                    updated_kernel_ids.append(kernel_id)
+                    container_ids.append(kernel_obj["container_id"])
+                await self.stat_ctx.collect_per_container_process_stat(container_ids)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1392,7 +1412,6 @@ class AbstractAgent(
 
     async def create_kernel(
         self,
-        creation_id: str,
         session_id: SessionId,
         kernel_id: KernelId,
         kernel_config: KernelCreationConfig,
@@ -1406,7 +1425,7 @@ class AbstractAgent(
 
         if not restarting:
             await self.produce_event(
-                KernelPreparingEvent(kernel_id, creation_id),
+                KernelPreparingEvent(kernel_id),
             )
 
         # Initialize the creation context
@@ -1446,13 +1465,13 @@ class AbstractAgent(
         )
         if do_pull:
             await self.produce_event(
-                KernelPullingEvent(kernel_id, creation_id, ctx.image_ref.canonical),
+                KernelPullingEvent(kernel_id, ctx.image_ref.canonical),
             )
             await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
         if not restarting:
             await self.produce_event(
-                KernelCreatingEvent(kernel_id, creation_id),
+                KernelCreatingEvent(kernel_id),
             )
 
         # Get the resource spec from existing kernel scratches
@@ -1749,7 +1768,6 @@ class AbstractAgent(
         await self.produce_event(
             KernelStartedEvent(
                 kernel_id,
-                creation_id,
                 creation_info={
                     **kernel_creation_info,
                     "id": str(KernelId(kernel_id)),
@@ -1853,7 +1871,6 @@ class AbstractAgent(
 
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: SessionId,
         kernel_id: KernelId,
         updating_kernel_config: KernelCreationConfig,
@@ -1899,7 +1916,6 @@ class AbstractAgent(
             else:
                 try:
                     await self.create_kernel(
-                        creation_id,
                         session_id,
                         kernel_id,
                         kernel_config,
