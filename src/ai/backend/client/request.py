@@ -144,7 +144,7 @@ class Request:
         :param BaseSession session: The session where this request is executed on.
 
         :param str path: The query path. When performing requests, the version number
-                         prefix will be automatically perpended if required.
+                         prefix will be automatically prepended if required.
 
         :param RequestContent content: The API query body which will be encoded as
                                        JSON.

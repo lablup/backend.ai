@@ -184,6 +184,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
             known_registries=[kernel_config["image"]["registry"]["name"]],
+            is_local=kernel_config["image"]["is_local"],
             architecture=kernel_config["image"].get("architecture", get_arch_name()),
         )
         self.internal_data = kernel_config["internal_data"] or {}
@@ -400,7 +401,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
-            jail_candidates = find_artifacts(f"jail.*.{arch}.bin")
+            jail_candidates = find_artifacts(
+                f"jail.*.{arch}.bin"
+            )  # architecture check is already done when starting agent
             _, jail_candidate = match_distro_data(jail_candidates, distro)
             jail_path = self.resolve_krunner_filepath("runner/" + jail_candidate)
         else:
@@ -596,6 +599,7 @@ class AbstractAgent(
         # Prepare stat collector tasks.
         self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
         self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
+        self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
 
         # Prepare heartbeats.
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
@@ -804,6 +808,25 @@ class AbstractAgent(
             pass
         except Exception:
             log.exception("unhandled exception while syncing container stats")
+            await self.produce_error_event()
+
+    async def collect_process_stat(self, interval: float):
+        if self.local_config["debug"]["log-stats"]:
+            log.debug("collecting process statistics in container")
+        try:
+            updated_kernel_ids = []
+            container_ids = []
+            async with self.registry_lock:
+                for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
+                    if not kernel_obj.stats_enabled:
+                        continue
+                    updated_kernel_ids.append(kernel_id)
+                    container_ids.append(kernel_obj["container_id"])
+                await self.stat_ctx.collect_per_container_process_stat(container_ids)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1321,6 +1344,7 @@ class AbstractAgent(
 
     async def execute_batch(
         self,
+        session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
     ) -> None:
@@ -1337,6 +1361,7 @@ class AbstractAgent(
             while True:
                 try:
                     result = await self.execute(
+                        session_id,
                         kernel_id,
                         "batch-job",  # a reserved run ID
                         mode,
@@ -1357,13 +1382,13 @@ class AbstractAgent(
                     if result["exitCode"] == 0:
                         await self.produce_event(
                             SessionSuccessEvent(
-                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
                             ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
-                                SessionId(kernel_id),
+                                session_id,
                                 KernelLifecycleEventReason.TASK_FAILED,
                                 result["exitCode"],
                             ),
@@ -1372,7 +1397,7 @@ class AbstractAgent(
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
                         SessionFailureEvent(
-                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
                         ),
                     )
                     break
@@ -1382,14 +1407,11 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                SessionFailureEvent(
-                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
-                ),
+                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
             )
 
     async def create_kernel(
         self,
-        creation_id: str,
         session_id: SessionId,
         kernel_id: KernelId,
         kernel_config: KernelCreationConfig,
@@ -1403,7 +1425,7 @@ class AbstractAgent(
 
         if not restarting:
             await self.produce_event(
-                KernelPreparingEvent(kernel_id, creation_id),
+                KernelPreparingEvent(kernel_id),
             )
 
         # Initialize the creation context
@@ -1436,20 +1458,20 @@ class AbstractAgent(
             )
 
         # Check if we need to pull the container image
-        do_pull = await self.check_image(
+        do_pull = (not ctx.image_ref.is_local) and await self.check_image(
             ctx.image_ref,
             kernel_config["image"]["digest"],
             AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
         )
         if do_pull:
             await self.produce_event(
-                KernelPullingEvent(kernel_id, creation_id, ctx.image_ref.canonical),
+                KernelPullingEvent(kernel_id, ctx.image_ref.canonical),
             )
             await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
         if not restarting:
             await self.produce_event(
-                KernelCreatingEvent(kernel_id, creation_id),
+                KernelCreatingEvent(kernel_id),
             )
 
         # Get the resource spec from existing kernel scratches
@@ -1606,11 +1628,13 @@ class AbstractAgent(
         if self.local_config["container"]["sandbox-type"] == "jail":
             cmdargs += [
                 "/opt/kernel/jail",
-                "-policy",
-                "/etc/backend.ai/jail/policy.yml",
+                # "--policy",
+                # "/etc/backend.ai/jail/policy.yml",
+                # TODO: Update default Jail policy in images
             ]
             if self.local_config["container"]["jail-args"]:
                 cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
+            cmdargs += ["--"]
         if self.local_config["debug"]["kernel-runner"]:
             krunner_opts.append("--debug")
         cmdargs += [
@@ -1744,7 +1768,6 @@ class AbstractAgent(
         await self.produce_event(
             KernelStartedEvent(
                 kernel_id,
-                creation_id,
                 creation_info={
                     **kernel_creation_info,
                     "id": str(KernelId(kernel_id)),
@@ -1756,7 +1779,9 @@ class AbstractAgent(
         if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
             self._ongoing_exec_batch_tasks.add(
                 asyncio.create_task(
-                    self.execute_batch(kernel_id, kernel_config["startup_command"] or ""),
+                    self.execute_batch(
+                        session_id, kernel_id, kernel_config["startup_command"] or ""
+                    ),
                 ),
             )
 
@@ -1846,7 +1871,6 @@ class AbstractAgent(
 
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: SessionId,
         kernel_id: KernelId,
         updating_kernel_config: KernelCreationConfig,
@@ -1892,7 +1916,6 @@ class AbstractAgent(
             else:
                 try:
                     await self.create_kernel(
-                        creation_id,
                         session_id,
                         kernel_id,
                         kernel_config,
@@ -1918,6 +1941,7 @@ class AbstractAgent(
 
     async def execute(
         self,
+        session_id: SessionId,
         kernel_id: KernelId,
         run_id: Optional[str],
         mode: Literal["query", "batch", "input", "continue"],
@@ -1933,7 +1957,7 @@ class AbstractAgent(
             await restart_tracker.done_event.wait()
 
         await self.produce_event(
-            ExecutionStartedEvent(SessionId(kernel_id)),
+            ExecutionStartedEvent(session_id),
         )
         try:
             kernel_obj = self.kernel_registry[kernel_id]
@@ -1942,7 +1966,7 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             await self.produce_event(
-                ExecutionCancelledEvent(SessionId(kernel_id)),
+                ExecutionCancelledEvent(session_id),
             )
             raise
         except KeyError:
@@ -1956,11 +1980,11 @@ class AbstractAgent(
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
             await self.produce_event(
-                ExecutionFinishedEvent(SessionId(kernel_id)),
+                ExecutionFinishedEvent(session_id),
             )
         elif result["status"] == "exec-timeout":
             await self.produce_event(
-                ExecutionTimeoutEvent(SessionId(kernel_id)),
+                ExecutionTimeoutEvent(session_id),
             )
             await self.inject_container_lifecycle_event(
                 kernel_id,

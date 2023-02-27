@@ -117,6 +117,7 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
+
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
@@ -175,7 +176,8 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
-  deploy-to-pypi:
+
+  build:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -221,9 +223,9 @@ jobs:
         gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Install local dependencies for packaging and publishing
+    - name: Install local dependencies for packaging
       run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
+        pip install -U 'packaging>=21.3'
     - name: Build packages
       run: |
         # Normalize the package version
@@ -247,6 +249,111 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
+    - name: Upload wheels and sdists
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels-and-sdists
+        path: |
+          dist/*.whl
+          dist/*.tar.gz
+        if-no-files-found: error
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  windows-conda-package:
+    needs: [build]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v3
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      shell: bash
+      run: |
+        export LANG=C.UTF-8
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Download built wheels and sdists
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels-and-sdists
+        path: dist
+    - name: Install conda-pack
+      uses: s-weigand/setup-conda@v1
+      with:
+        activate-conda: false
+    - name: Create conda environment
+      run: |
+        pip install conda-pack
+        conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
+        conda activate backend.ai-client
+        pip install dist/backend.ai-client-*.whl
+        conda-pack -o backend.ai-client-windows-conda.tar.gz
+    - name: Upload conda-pack
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-conda
+        path: backend.ai-client-windows-conda.tar.gz
+        if-no-files-found: error
+
+
+  deploy-to-pypi:
+    needs: [windows-conda-package]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Extract Python version from pants.toml
+      shell: bash
+      run: |
+        export LANG=C.UTF-8
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Install local dependencies for publishing
+      run: |
+        pip install -U 'twine~=4.0'
+    - name: Download built wheels and sdists
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels-and-sdists
+        path: dist
+    - name: Download conda-pack
+      uses: actions/download-artifact@v3
+      with:
+        name: windows-conda
+        path: windows-conda
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -266,9 +373,5 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*.whl
-    - name: Upload pants log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
-      if: always()  # We want the log even on failures.
+          dist/*.tar.gz
+          windows-conda/backend.ai-client-windows-conda.tar.gz

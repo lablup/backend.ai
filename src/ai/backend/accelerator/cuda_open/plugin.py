@@ -41,6 +41,7 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
@@ -268,6 +269,11 @@ class CUDAPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
+        return []
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
         return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:

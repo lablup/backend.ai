@@ -47,6 +47,7 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
 from ai.backend.common import config
@@ -470,6 +471,11 @@ class CUDAPlugin(AbstractComputePlugin):
                 },
             ),
         ]
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()

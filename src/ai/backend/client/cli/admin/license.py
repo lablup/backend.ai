@@ -30,10 +30,10 @@ def show():
             async with rqst.fetch() as resp:
                 data = await resp.json()
             if data["status"] == "valid":
-                print_done("Your Backend.AI lincese is valid.")
+                print_done("Your Backend.AI license is valid.")
                 print(tabulate([(k, v) for k, v in data["certificate"].items()]))
             else:
-                print_warn("Your Backend.AI lincese is valid.")
+                print_warn("Your Backend.AI license is valid.")
 
     try:
         asyncio.run(_show_license())
