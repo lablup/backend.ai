@@ -29,7 +29,7 @@ from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
@@ -507,10 +507,7 @@ LinuxKit_CMD_EXEC_PREFIX = [
 
 
 async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) -> None:
-    async with closing_async(Docker()) as docker:
-        kernel_version = (await docker.version())["KernelVersion"]
-    if "linuxkit" in kernel_version:
-        local_config["agent"]["docker-mode"] = "linuxkit"
+    if local_config["agent"]["docker-mode"] == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
         proxy_worker_binary = pkg_resources.resource_filename(
@@ -577,6 +574,3 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
             log.info("Inserted the iptables rules.")
         else:
             log.info("The iptables rule already exists.")
-    else:
-        # Linux Mode
-        local_config["agent"]["docker-mode"] = "native"

@@ -90,7 +90,7 @@ from .utils import PersistentServiceContainer
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 eof_sentinel = Sentinel.TOKEN
 
 
@@ -764,6 +764,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 {
                     "HostConfig": {
                         "SecurityOpt": ["seccomp=unconfined", "apparmor=unconfined"],
+                        "CapAdd": ["SYS_PTRACE"],
                     },
                 },
             )
@@ -964,14 +965,22 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 case _:
                     docker_host = "(unknown)"
             log.info("accessing the local Docker daemon via {}", docker_host)
-            if not self._skip_initial_scan:
-                docker_version = await docker.version()
-                log.info(
-                    "running with Docker {0} with API {1}",
-                    docker_version["Version"],
-                    docker_version["ApiVersion"],
-                )
+            docker_version = await docker.version()
+            log.info(
+                "running with Docker {0} with API {1}",
+                docker_version["Version"],
+                docker_version["ApiVersion"],
+            )
+            kernel_version = docker_version["KernelVersion"]
+            if "linuxkit" in kernel_version:
+                self.local_config["agent"]["docker-mode"] = "linuxkit"
+            else:
+                self.local_config["agent"]["docker-mode"] = "native"
             docker_info = await docker.system.info()
+            docker_info = dict(docker_info)
+            # Assume cgroup v1 if CgroupVersion key is absent
+            if "CgroupVersion" not in docker_info:
+                docker_info["CgroupVersion"] = "1"
             log.info(
                 "Cgroup Driver: {0}, Cgroup Version: {1}",
                 docker_info["CgroupDriver"],
