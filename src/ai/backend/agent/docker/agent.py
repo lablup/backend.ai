@@ -805,12 +805,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.computer_docker_args["HostConfig"]["MemorySwap"] -= shmem
             self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
+        image_service_ports = image_labels.get("ai.backend.service-ports", "")
         encoded_preopen_ports = ",".join(
             f"{port_no}:preopen:{port_no}" for port_no in preopen_ports
         )
         container_config["Labels"]["ai.backend.service-ports"] = (
-            image_labels["ai.backend.service-ports"] + "," + encoded_preopen_ports
-        )
+            image_service_ports + "," if image_service_ports else ""
+        ) + encoded_preopen_ports
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
         if self.local_config["debug"]["log-kernel-config"]:

@@ -797,6 +797,9 @@ class AgentRegistry:
         # Aggregate image registry information
         keyfunc = lambda item: item.kernel.image_ref
         image_infos: MutableMapping[str, ImageRow] = {}
+        is_local_image = True
+        registry_url = URL("http://localhost")
+        registry_creds: dict[str, str] = {}
         async with self.db.begin_readonly_session() as session:
             for image_ref, _ in itertools.groupby(
                 sorted(kernel_agent_bindings, key=keyfunc),
@@ -808,16 +811,20 @@ class AgentRegistry:
                 log.debug(
                     "start_session(): image ref => {} ({})", image_ref, image_ref.architecture
                 )
-                image_infos[str(image_ref)] = await ImageRow.resolve(session, [image_ref])
-                registry_url, registry_creds = await get_registry_info(
-                    self.shared_config.etcd, image_ref.registry
-                )
+                resolved_image_info = await ImageRow.resolve(session, [image_ref])
+                image_infos[str(image_ref)] = resolved_image_info
+                if not resolved_image_info.image_ref.is_local:
+                    is_local_image = False
+                    registry_url, registry_creds = await get_registry_info(
+                        self.shared_config.etcd, image_ref.registry
+                    )
         image_info = {
             "image_infos": image_infos,
             "registry_url": registry_url,
             "registry_creds": registry_creds,
             "resource_policy": resource_policy,
             "auto_pull": auto_pull,
+            "is_local": is_local_image,
         }
 
         network_name: Optional[str] = None
@@ -1146,6 +1153,7 @@ class AgentRegistry:
         registry_url = image_info["registry_url"]
         registry_creds = image_info["registry_creds"]
         image_infos = image_info["image_infos"]
+        is_local = image_info["is_local"]
         resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
         auto_pull = image_info["auto_pull"]
         assert agent_alloc_ctx.agent_id is not None
@@ -1181,6 +1189,7 @@ class AgentRegistry:
                     [
                         {
                             "image": {
+                                # TODO: refactor registry and is_local to be specified per kernel.
                                 "registry": {
                                     "name": get_image_ref(binding.kernel).registry,
                                     "url": str(registry_url),
@@ -1191,6 +1200,7 @@ class AgentRegistry:
                                 "canonical": get_image_ref(binding.kernel).canonical,
                                 "architecture": get_image_ref(binding.kernel).architecture,
                                 "labels": image_infos[binding.kernel.image].labels,
+                                "is_local": is_local,
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,

@@ -856,6 +856,7 @@ class ImageConfig(TypedDict):
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
+    is_local: bool
 
 
 class ServicePort(TypedDict):
