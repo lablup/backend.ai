@@ -252,8 +252,11 @@ jobs:
     - name: Upload wheels and sdist
       uses: actions/upload-artifact@v3
       with:
-        name: wheels
-        path: dist/*.whl dist/*.tar.gz
+        name: wheels and sdist
+        path: |
+          dist/*.whl
+          dist/*.tar.gz
+        if-no-files-found: error
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -315,6 +318,7 @@ jobs:
       with:
         name: windows-conda
         path: backend.ai-client-windows-conda.tar.gz
+        if-no-files-found: error
 
 
   deploy-to-pypi:
