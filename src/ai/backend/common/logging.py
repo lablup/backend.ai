@@ -79,7 +79,7 @@ logging_config_iv = t.Dict(
                 t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
                 t.Key("ssl-enabled", default=True): t.Bool,
                 t.Key("ssl-verify", default=True): t.Bool,
-                # NOTE: logstash does not have format optoin.
+                # NOTE: logstash does not have format option.
             }
         ).allow_extra("*"),
     }

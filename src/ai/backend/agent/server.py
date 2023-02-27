@@ -22,7 +22,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Literal,
     Mapping,
     Optional,
@@ -59,6 +58,7 @@ from ai.backend.common.types import (
     HostPortPair,
     KernelCreationConfig,
     KernelId,
+    LogSeverity,
     SessionId,
     aobject,
 )
@@ -74,12 +74,12 @@ from .config import (
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
-from .utils import get_subnet_ip
+from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -353,7 +353,6 @@ class AgentRPCServer(aobject):
     @collect_error
     async def create_kernels(
         self,
-        creation_id: str,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
@@ -373,7 +372,6 @@ class AgentRPCServer(aobject):
             kernel_config = cast(KernelCreationConfig, raw_config)
             coros.append(
                 self.agent.create_kernel(
-                    creation_id,
                     session_id,
                     kernel_id,
                     kernel_config,
@@ -448,14 +446,12 @@ class AgentRPCServer(aobject):
     @collect_error
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: str,
         kernel_id: str,
         updated_config: dict,
-    ):
+    ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
-            creation_id,
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             cast(KernelCreationConfig, updated_config),
@@ -465,15 +461,15 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
-        kernel_id,  # type: str
-        api_version,  # type: int
-        run_id,  # type: str
-        mode,  # type: Literal['query', 'batch', 'continue', 'input']
-        code,  # type: str
-        opts,  # type: Dict[str, Any]
-        flush_timeout,  # type: float
-    ):
-        # type: (...) -> Dict[str, Any]
+        session_id: str,
+        kernel_id: str,
+        api_version: int,
+        run_id: str,
+        mode: Literal["query", "batch", "continue", "input"],
+        code: str,
+        opts: dict[str, Any],
+        flush_timeout: float,
+    ) -> dict[str, Any]:
         if mode != "continue":
             log.info(
                 "rpc::execute(k:{0}, run-id:{1}, mode:{2}, code:{3!r})",
@@ -483,6 +479,7 @@ class AgentRPCServer(aobject):
                 code[:20] + "..." if len(code) > 20 else code,
             )
         result = await self.agent.execute(
+            SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             run_id,
             mode,
@@ -495,29 +492,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def execute_batch(
-        self,
-        kernel_id,  # type: str
-        startup_command,  # type: str
-    ) -> None:
-        # DEPRECATED
-        asyncio.create_task(
-            self.agent.execute_batch(
-                KernelId(UUID(kernel_id)),
-                startup_command,
-            )
-        )
-        await asyncio.sleep(0)
-
-    @rpc_function
-    @collect_error
     async def start_service(
         self,
-        kernel_id,  # type: str
-        service,  # type: str
-        opts,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        service: str,
+        opts: dict[str, Any],
+    ) -> dict[str, Any]:
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
@@ -525,9 +505,9 @@ class AgentRPCServer(aobject):
     @collect_error
     async def get_commit_status(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+    ) -> dict[str, Any]:
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
         status: CommitStatus = await self.agent.get_commit_status(
@@ -543,10 +523,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def commit(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-        filename,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+        filename: str,
+    ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
@@ -630,18 +610,6 @@ class AgentRPCServer(aobject):
         # TODO: implement
         log.info("rpc::shutdown_agent()")
         pass
-
-    @rpc_function
-    @collect_error
-    async def create_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::create_overlay_network(name:{})", network_name)
-        return await self.agent.create_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::destroy_overlay_network(name:{})", network_name)
-        return await self.agent.destroy_overlay_network(network_name)
 
     @rpc_function
     @collect_error
@@ -829,14 +797,27 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    debug: bool,
+    log_level: LogSeverity,
+    debug: bool = False,
 ) -> int:
+
+    # Delete this part when you remove --debug option
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
@@ -855,10 +836,10 @@ def main(
     config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
-    if debug:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
-        config.override_key(raw_cfg, ("logging", "level"), "DEBUG")
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -881,6 +862,12 @@ def main(
     except config.ConfigurationError as e:
         print("ConfigurationError: Validation of agent configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+
+    # FIXME: Remove this after ARM64 support lands on Jail
+    current_arch = get_arch_name()
+    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+        print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
@@ -937,7 +924,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if debug:
+                if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":
