@@ -2592,7 +2592,6 @@ class AgentRegistry:
         session_id, access_key, agent = result
 
         async def _recalc() -> None:
-            nonlocal access_key, agent
             async with self.db.begin() as conn:
                 log.debug(
                     "recalculate concurrency used in kernel termination (ak: {})",
