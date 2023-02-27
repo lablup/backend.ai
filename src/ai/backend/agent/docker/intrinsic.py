@@ -669,29 +669,32 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
-        async def psutil_impl(pid) -> Optional[Tuple[Decimal, Decimal, Decimal]]:
+        async def psutil_impl(pid) -> Tuple[Optional[int], Optional[int], Optional[int]]:
             try:
                 p = psutil.Process(pid)
             except psutil.NoSuchProcess:
                 log.warning("psutil cannot found process {0}", pid)
             else:
                 stats = p.as_dict(attrs=["memory_info", "io_counters"])
-                mem_cur_bytes = stats["memory_info"].rss
-                io_read_bytes = stats["io_counters"].read_bytes
-                io_write_bytes = stats["io_counters"].write_bytes
+                mem_cur_bytes = io_read_bytes = io_write_bytes = None
+                if stats["memory_info"] is not None:
+                    mem_cur_bytes = stats["memory_info"].rss
+                if stats["io_counters"] is not None:
+                    io_read_bytes = stats["io_counters"].read_bytes
+                    io_write_bytes = stats["io_counters"].write_bytes
                 return mem_cur_bytes, io_read_bytes, io_write_bytes
-            return None
+            return None, None, None
 
         async def api_impl(
             cid: str, pids: List[int]
-        ) -> List[Optional[Tuple[Decimal, Decimal, Decimal]]]:
+        ) -> List[Tuple[Optional[int], Optional[int], Optional[int]]]:
 
             return []
 
         per_process_mem_used_bytes = {}
         per_process_io_read_bytes = {}
         per_process_io_write_bytes = {}
-        results: List[Tuple[Decimal, Decimal, Decimal]]
+        results: List[Tuple[Optional[int], Optional[int], Optional[int]]]
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
@@ -715,11 +718,13 @@ class MemoryPlugin(AbstractComputePlugin):
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, _), result in zip(pid_map_list, results):
-            if result is None:
-                continue
-            per_process_mem_used_bytes[pid] = Measurement(Decimal(result[0]))
-            per_process_io_read_bytes[pid] = Measurement(Decimal(result[1]))
-            per_process_io_write_bytes[pid] = Measurement(Decimal(result[2]))
+            mem, io_read, io_write = result
+            if mem is not None:
+                per_process_mem_used_bytes[pid] = Measurement(Decimal(mem))
+            if io_read is not None:
+                per_process_io_read_bytes[pid] = Measurement(Decimal(io_read))
+            if io_write is not None:
+                per_process_io_write_bytes[pid] = Measurement(Decimal(io_write))
         return [
             ProcessMeasurement(
                 MetricKey("mem"),
