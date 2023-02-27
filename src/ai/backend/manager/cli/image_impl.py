@@ -3,6 +3,7 @@ import logging
 from pprint import pformat, pprint
 from typing import AsyncIterator
 
+import click
 import sqlalchemy as sa
 from redis.asyncio.client import Pipeline, Redis
 from tabulate import tabulate
@@ -12,7 +13,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.manager.cli.context import redis_ctx
+from ai.backend.manager.cli.context import CLIContext, redis_ctx
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image import rescan_images as rescan_images_func
 from ai.backend.manager.models.utils import connect_database
@@ -21,7 +22,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 @contextlib.asynccontextmanager
-async def etcd_ctx(cli_ctx) -> AsyncIterator[AsyncEtcd]:
+async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
     local_config = cli_ctx.local_config
     creds = None
     if local_config["etcd"]["user"]:
@@ -174,7 +175,9 @@ async def set_image_resource_limit(
             log.exception("An error occurred.")
 
 
-async def rescan_images(cli_ctx, registry: str, local: bool):
+async def rescan_images(cli_ctx: CLIContext, registry: str, local: bool) -> None:
+    if not registry and not local:
+        raise click.BadArgumentUsage("Please specify a valid registry name.")
     async with (
         connect_database(cli_ctx.local_config) as db,
         etcd_ctx(cli_ctx) as etcd,
