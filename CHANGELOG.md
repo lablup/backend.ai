@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.14 (2023-02-28)
+
+22.09.14 (2023-02-28)
+
+### Features
+* Add `architecture` argument and options to the client SDK's session creation functions and commands ([#881](https://github.com/lablup/backend.ai/issues/881))
+* Auto-start SSH agent upon session startup ([#1067](https://github.com/lablup/backend.ai/issues/1067))
+
+
 ## 22.09.13 (2023-02-26)
 
 22.09.13 (2023-02-26)
