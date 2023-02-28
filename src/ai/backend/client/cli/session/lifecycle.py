@@ -77,8 +77,6 @@ def _create_cmd(docs: str = None):
         default=None,
         help="A user-defined script to execute on startup.",
     )
-<<<<<<< HEAD:src/ai/backend/client/cli/session/lifecycle.py
-=======
     @click.option(
         "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
     )
@@ -91,7 +89,6 @@ def _create_cmd(docs: str = None):
         default=DEFAULT_IMAGE_ARCH,
         help="Architecture of the image to use.",
     )
->>>>>>> main:src/ai/backend/client/cli/session.py
     # resource spec
     @click.option(
         "--cluster-mode",
@@ -286,8 +283,6 @@ def _create_from_template_cmd(docs: str = None):
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
     )
-<<<<<<< HEAD:src/ai/backend/client/cli/session/lifecycle.py
-=======
     @click.option(
         "--enqueue-only",
         is_flag=True,
@@ -394,7 +389,6 @@ def _create_from_template_cmd(docs: str = None):
         help="Group name where the session is spawned. "
         "User should be a member of the group to execute the code.",
     )
->>>>>>> main:src/ai/backend/client/cli/session.py
     # template overrides
     @click.option(
         "--no-mount",
