@@ -5,11 +5,13 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterator, List
+from typing import Final, Iterator, List
 
 from ai.backend.cli.types import ExitCode
 
 from .pretty import print_fail, print_info
+
+CLI_EXECUTABLE: Final = (sys.executable, "-m", "ai.backend.cli")
 
 
 @contextlib.contextmanager
@@ -19,7 +21,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     key_path = Path(f"~/.ssh/id_{random_id}").expanduser()
     try:
         subprocess.run(
-            ["backend.ai", "session", "download", session_ref, key_filename],
+            [*CLI_EXECUTABLE, "session", "download", session_ref, key_filename],
             shell=False,
             check=True,
             stdout=subprocess.PIPE,
@@ -33,14 +35,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
-        [
-            "backend.ai",
-            "app",
-            session_ref,
-            "sshd",
-            "-b",
-            f"127.0.0.1:{port}",
-        ],
+        [*CLI_EXECUTABLE, "app", session_ref, "sshd", "-b", f"127.0.0.1:{port}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )

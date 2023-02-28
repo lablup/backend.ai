@@ -6,18 +6,20 @@ from typing import TYPE_CHECKING, Any, Dict, Sequence
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import relationship
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 
 from .base import (
+    Base,
     BigInt,
     EnumType,
     ResourceSlotColumn,
+    VFolderHostPermissionColumn,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -32,6 +34,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
     "keypair_resource_policies",
+    "KeyPairResourcePolicyRow",
     "KeyPairResourcePolicy",
     "DefaultForUnspecified",
     "CreateKeyPairResourcePolicy",
@@ -42,7 +45,7 @@ __all__: Sequence[str] = (
 
 keypair_resource_policies = sa.Table(
     "keypair_resource_policies",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("name", sa.String(length=256), primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column(
@@ -58,10 +61,20 @@ keypair_resource_policies = sa.Table(
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
     sa.Column("idle_timeout", sa.BigInteger(), nullable=False),
-    sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String), nullable=False),
+    sa.Column(
+        "allowed_vfolder_hosts",
+        VFolderHostPermissionColumn(),
+        nullable=False,
+        default={},
+    ),
     # TODO: implement with a many-to-many association table
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
 )
+
+
+class KeyPairResourcePolicyRow(Base):
+    __table__ = keypair_resource_policies
+    keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
@@ -75,7 +88,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     idle_timeout = BigInt()
     max_vfolder_count = graphene.Int()
     max_vfolder_size = BigInt()
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString()
 
     @classmethod
     def from_row(
@@ -96,7 +109,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             idle_timeout=row["idle_timeout"],
             max_vfolder_count=row["max_vfolder_count"],
             max_vfolder_size=row["max_vfolder_size"],
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
         )
 
     @classmethod
@@ -227,7 +240,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     idle_timeout = BigInt(required=True)
     max_vfolder_count = graphene.Int(required=True)
     max_vfolder_size = BigInt(required=True)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -239,7 +252,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     idle_timeout = BigInt(required=False)
     max_vfolder_count = graphene.Int(required=False)
     max_vfolder_size = BigInt(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):

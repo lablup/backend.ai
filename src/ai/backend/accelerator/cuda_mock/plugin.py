@@ -47,6 +47,7 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
 from ai.backend.common import config
@@ -245,7 +246,7 @@ class CUDAPlugin(AbstractComputePlugin):
                 device_id = DeviceId(dev_info["mother_uuid"])
             all_devices.append(
                 CUDADevice(
-                    device_id=device_id,
+                    device_id=DeviceId(device_id),
                     hw_location=f"0000:99:{idx:02d}.0",
                     mother_uuid=dev_info["mother_uuid"],
                     numa_node=dev_info["numa_node"],
@@ -470,6 +471,11 @@ class CUDAPlugin(AbstractComputePlugin):
                 },
             ),
         ]
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()

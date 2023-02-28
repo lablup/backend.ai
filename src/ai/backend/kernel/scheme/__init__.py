@@ -29,10 +29,10 @@ class Runner(BaseRunner):
         pass
 
     async def build_heuristic(self) -> int:
-        pass
+        return 0
 
     async def execute_heuristic(self) -> int:
-        pass
+        return 0
 
     async def query(self, code_text) -> int:
         with tempfile.NamedTemporaryFile(suffix=".scm", dir=".") as tmpf:

@@ -26,6 +26,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import graphene
@@ -37,23 +38,28 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language import ast  # pants: no-infer-dep
-from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AbstractPermission,
     BinarySize,
+    EndpointId,
     JSONSerializableMixin,
     KernelId,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
 )
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -69,7 +75,7 @@ if TYPE_CHECKING:
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 # The common shared metadata instance
 convention = {
@@ -326,6 +332,72 @@ class IPColumn(TypeDecorator):
         return ReadableCIDR(value)
 
 
+class PermissionListColumn(TypeDecorator):
+    """
+    A column type to convert Permission values back and forth.
+    """
+
+    impl = ARRAY
+    cache_ok = True
+
+    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+        super().__init__(sa.String)
+        self._perm_type = perm_type
+
+    @overload
+    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]:
+        ...
+
+    @overload
+    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]:
+        ...
+
+    @overload
+    def process_bind_param(self, value: None, dialect) -> List[str]:
+        ...
+
+    def process_bind_param(
+        self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
+    ) -> List[str]:
+        if value is None:
+            return []
+        try:
+            return [self._perm_type(perm).value for perm in value]
+        except ValueError:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
+
+    def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
+        if value is None:
+            return set()
+        return set(self._perm_type(perm) for perm in value)
+
+
+class VFolderHostPermissionColumn(TypeDecorator):
+    """
+    A column type to convert vfolder host permission back and forth.
+    """
+
+    impl = JSONB
+    cache_ok = True
+    perm_col = PermissionListColumn(VFolderHostPermission)
+
+    def process_bind_param(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+        if value is None:
+            return {}
+        return {
+            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+        }
+
+    def process_result_value(
+        self, value: Mapping[str, Any] | None, dialect
+    ) -> VFolderHostPermissionMap:
+        if value is None:
+            return VFolderHostPermissionMap()
+        return VFolderHostPermissionMap(
+            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
+        )
+
+
 class CurrencyTypes(enum.Enum):
     KRW = "KRW"
     USD = "USD"
@@ -351,7 +423,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
             return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
-        # NOTE: SessionId, KernelId are *not* actual types defined as classes,
+        # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
@@ -379,6 +451,11 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
+class EndpointIDColumnType(GUID[EndpointId]):
+    uuid_subtype_func = EndpointId
+    cache_ok = True
+
+
 class SessionIDColumnType(GUID[SessionId]):
     uuid_subtype_func = SessionId
     cache_ok = True
@@ -391,6 +468,12 @@ class KernelIDColumnType(GUID[KernelId]):
 
 def IDColumn(name="id"):
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+
+
+def EndpointIDColumn(name="id"):
+    return sa.Column(
+        name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
 
 def SessionIDColumn(name="id"):
@@ -569,6 +652,50 @@ async def batch_multiresult(
     for key in key_list:
         objs_per_key[key] = list()
     async for row in (await db_conn.stream(query)):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
+async def batch_result_in_session(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: Type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> item) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = collections.OrderedDict()
+    for key in key_list:
+        objs_per_key[key] = None
+    async for row in (await db_sess.stream(query)):
+        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
+    return [*objs_per_key.values()]
+
+
+async def batch_multiresult_in_session(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: Type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
+    objs_per_key = collections.OrderedDict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in (await db_sess.stream(query)):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )

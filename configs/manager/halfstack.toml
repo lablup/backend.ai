@@ -25,6 +25,7 @@ ssl-enabled = false
 heartbeat-timeout = 10.0
 #id = ""
 pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
+# allowed-plugins = []
 disabled-plugins = []
 
 hide-agents = true

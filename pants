@@ -26,6 +26,10 @@ fi
 #  locate the main branch SHA, set PANTS_SHA=<SHA> in the environment, and run this script as usual.
 #
 # E.g., PANTS_SHA=725fdaf504237190f6787dda3d72c39010a4c574 ./pants --version
+#
+# You can also use PANTS_VERSION=<VERSION> to override the config version that is in the pants.toml file.
+#
+# E.g., PANTS_VERSION=2.13.0 ./pants --version
 
 PYTHON_BIN_NAME="${PYTHON:-unspecified}"
 
@@ -139,6 +143,11 @@ function determine_pants_version {
   if [ -n "${PANTS_SHA:-}" ]; then
     # get_version_for_sha will echo the version, thus "returning" it from this function.
     get_version_for_sha "$PANTS_SHA"
+    return
+  fi
+
+  if [ -n "${PANTS_VERSION:-}" ]; then
+	echo "${PANTS_VERSION}"
     return
   fi
 
@@ -265,14 +274,13 @@ function bootstrap_pex {
       mkdir -p "${PANTS_BOOTSTRAP}"
       local staging_dir
       staging_dir=$(tempdir "${PANTS_BOOTSTRAP}")
-      cd "${staging_dir}"
       curl --proto "=https" \
            --tlsv1.2 \
            --silent \
            --location \
-           --remote-name \
+           -o "${staging_dir}/pex" \
            "${_PEX_URL}"
-      fingerprint="$(compute_sha256 "${python}" "pex")"
+      fingerprint="$(compute_sha256 "${python}" "${staging_dir}/pex")"
       if [[ "${_PEX_EXPECTED_SHA256}" != "${fingerprint}" ]]; then
         die "SHA256 of ${_PEX_URL} is not as expected. Aborting."
       fi
@@ -314,11 +322,10 @@ function bootstrap_virtualenv {
       mkdir -p "${PANTS_BOOTSTRAP}"
       local staging_dir
       staging_dir=$(tempdir "${PANTS_BOOTSTRAP}")
-      cd "${staging_dir}"
-      echo "${VIRTUALENV_REQUIREMENTS}" > requirements.txt
+      echo "${VIRTUALENV_REQUIREMENTS}" > "${staging_dir}/requirements.txt"
       (
         scrub_env_vars
-        "${python}" "${pex_path}" -r requirements.txt -c virtualenv -o virtualenv.pex
+        "${python}" "${pex_path}" -r "${staging_dir}/requirements.txt" -c virtualenv -o "${staging_dir}/virtualenv.pex"
       )
       mkdir -p "$(dirname "${bootstrapped}")"
       mv -f "${staging_dir}/virtualenv.pex" "${bootstrapped}"
@@ -355,17 +362,27 @@ function bootstrap_pants {
   local pants_version="$1"
   local python="$2"
   local pants_sha="${3:-}"
+  local pants_debug="${4:-}"
 
-  local pants_requirement="pantsbuild.pants==${pants_version}"
+  local pants_requirements=(pantsbuild.pants==${pants_version})
   local maybe_find_links
   if [[ -z "${pants_sha}" ]]; then
     maybe_find_links=""
   else
     maybe_find_links="--find-links=$(find_links_url "${pants_version}" "${pants_sha}")"
-   fi
+  fi
+
+  local debug_suffix
+  if [[ -z "${pants_debug}" ]]; then
+    debug_suffix=""
+  else
+    debug_suffix="-debug"
+    pants_requirements+=(debugpy==1.6.0)
+  fi
+
   local python_major_minor_version
   python_major_minor_version="$(get_python_major_minor_version "${python}")"
-  local target_folder_name="${pants_version}_py${python_major_minor_version}"
+  local target_folder_name="${pants_version}_py${python_major_minor_version}${debug_suffix}"
   local bootstrapped="${PANTS_BOOTSTRAP}/${target_folder_name}"
 
   if [[ ! -d "${bootstrapped}" ]]; then
@@ -375,7 +392,7 @@ function bootstrap_pants {
       staging_dir=$(tempdir "${PANTS_BOOTSTRAP}")
       local virtualenv_path
       virtualenv_path="$(bootstrap_virtualenv "${python}")" || exit 1
-      green "Installing ${pants_requirement} into a virtual environment at ${bootstrapped}"
+      green "Installing ${pants_requirements[@]} into a virtual environment at ${bootstrapped}"
       (
         scrub_env_vars
         # shellcheck disable=SC2086
@@ -383,7 +400,7 @@ function bootstrap_pants {
         # Grab the latest pip, but don't advance setuptools past 58 which drops support for the
         # `setup` kwarg `use_2to3` which Pants 1.x sdist dependencies (pystache) use.
         "${staging_dir}/install/bin/pip" install --quiet -U pip "setuptools<58" && \
-        "${staging_dir}/install/bin/pip" install ${maybe_find_links} --quiet --progress-bar off "${pants_requirement}"
+        "${staging_dir}/install/bin/pip" install ${maybe_find_links} --quiet --progress-bar off "${pants_requirements[@]}"
       ) && \
       ln -s "${staging_dir}/install" "${staging_dir}/${target_folder_name}" && \
       mv "${staging_dir}/${target_folder_name}" "${bootstrapped}" && \
@@ -467,15 +484,27 @@ fi
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 pants_version="$(determine_pants_version)"
 python="$(determine_python_exe "${pants_version}")"
-pants_dir="$(bootstrap_pants "${pants_version}" "${python}" "${PANTS_SHA:-}")" || exit 1
+pants_dir="$(bootstrap_pants "${pants_version}" "${python}" "${PANTS_SHA:-}" "${PANTS_DEBUG:-}")" || exit 1
 
 pants_python="${pants_dir}/bin/python"
-pants_binary="${pants_dir}/bin/pants"
+pants_binary=(${pants_dir}/bin/pants)
 pants_extra_args=""
 if [[ -n "${PANTS_SHA:-}" ]]; then
   pants_extra_args="${pants_extra_args} --python-repos-repos=$(find_links_url "$pants_version" "$PANTS_SHA")"
 fi
 
+pants_debug_args=()
+if [ -n "${PANTS_DEBUG:-}" ]; then
+  if [[ "$*" != *"--no-pantsd"* ]]; then
+    echo "Error! Must pass '--no-pantsd' when using PANTS_DEBUG"
+    exit 1
+  fi
+  # NB: We can't invoke `-m debugpy` as that'll prepend CWD to sys.path which might have unintended side-effects.
+  # `-c` also prepends, but we strip that ourselves.
+  pants_binary=(-c "__import__(\"sys\").path.pop(0);__import__(\"debugpy.server.cli\").server.cli.main()" --listen 127.0.0.1:5678 --wait-for-client "${pants_binary[@]}")
+  echo "Will launch debugpy server at '127.0.0.1:5678' waiting for client connection."
+fi
+
 # shellcheck disable=SC2086
-exec "${pants_python}" "${pants_binary}" ${pants_extra_args} \
+exec "${pants_python}" "${pants_binary[@]}" ${pants_extra_args} \
   --pants-bin-name="${PANTS_BIN_NAME}" --pants-version=${pants_version} "$@"

@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -13,29 +18,30 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
     - name: Bootstrap Pants
-      run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check '::'
     - name: Lint
@@ -62,34 +68,35 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
     - name: Bootstrap Pants
-      run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
     - name: Typecheck
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -111,6 +118,7 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
+
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
@@ -119,15 +127,6 @@ jobs:
       with:
         fetch-depth: 2
         submodules: true
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -143,15 +142,25 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
     - name: Bootstrap Pants
-      run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
     - name: Test
       run: |
         if [ -n "$GITHUB_BASE_REF" ]; then
@@ -168,26 +177,17 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
-  deploy-to-pypi:
+
+  build:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: true
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      id: cache
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -203,18 +203,30 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Prepare the pip cache directory
+      run: mkdir -p ~/.cache/pip
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
     - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Install local dependencies for packaging
       run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
-    - name: Install local dependencies for packaging and publishing
-      run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
+        pip install -U 'packaging>=21.3'
     - name: Build packages
       run: |
         # Normalize the package version
@@ -238,6 +250,111 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
+    - name: Upload wheels and sdists
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels-and-sdists
+        path: |
+          dist/*.whl
+          dist/*.tar.gz
+        if-no-files-found: error
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  windows-conda-package:
+    needs: [build]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v3
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      shell: bash
+      run: |
+        export LANG=C.UTF-8
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Download built wheels and sdists
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels-and-sdists
+        path: dist
+    - name: Install conda-pack
+      uses: s-weigand/setup-conda@v1
+      with:
+        activate-conda: false
+    - name: Create conda environment
+      run: |
+        pip install conda-pack
+        conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
+        conda activate backend.ai-client
+        pip install dist/backend.ai-client-*.whl
+        conda-pack -o backend.ai-client-windows-conda.tar.gz
+    - name: Upload conda-pack
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-conda
+        path: backend.ai-client-windows-conda.tar.gz
+        if-no-files-found: error
+
+
+  deploy-to-pypi:
+    needs: [windows-conda-package]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Extract Python version from pants.toml
+      shell: bash
+      run: |
+        export LANG=C.UTF-8
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Install local dependencies for publishing
+      run: |
+        pip install -U 'twine~=4.0'
+    - name: Download built wheels and sdists
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels-and-sdists
+        path: dist
+    - name: Download conda-pack
+      uses: actions/download-artifact@v3
+      with:
+        name: windows-conda
+        path: windows-conda
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -257,9 +374,5 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*.whl
-    - name: Upload pants log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
-      if: always()  # We want the log even on failures.
+          dist/*.tar.gz
+          windows-conda/backend.ai-client-windows-conda.tar.gz

@@ -5,6 +5,7 @@ import trafaret as t
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 
+from .affinity_map import AffinityPolicy
 from .stats import StatModes
 from .types import AgentBackend
 
@@ -40,7 +41,7 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50200): t.ToInt[1:65535],
+                    t.Key("aiomonitor-port", default=48200): t.ToInt[1:65535],
                     t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
@@ -79,6 +80,13 @@ agent_local_config_iv = (
                     t.Key("reserved-cpu", default=1): t.Int,
                     t.Key("reserved-mem", default="1G"): tx.BinarySize,
                     t.Key("reserved-disk", default="8G"): tx.BinarySize,
+                    t.Key(
+                        "allocation-order", default=["cuda", "rocm", "tpu", "cpu", "mem"]
+                    ): t.List(t.String),
+                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED.name): tx.Enum(
+                        AffinityPolicy,
+                        use_name=True,
+                    ),
                 }
             ).allow_extra("*"),
             t.Key("debug"): t.Dict(

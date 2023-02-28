@@ -10,7 +10,7 @@ __all__ = ("Admin",)
 
 class Admin(BaseFunction):
     """
-    Provides the function interface for making admin GrapQL queries.
+    Provides the function interface for making admin GraphQL queries.
 
     .. note::
 

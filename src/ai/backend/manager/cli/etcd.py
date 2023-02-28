@@ -29,7 +29,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()
@@ -306,7 +306,7 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
     """
     with cli_ctx.logger:
         log.warn("etcd rescan-images command is deprecated, use image rescan instead")
-        asyncio.run(rescan_images_impl(cli_ctx, registry))
+        asyncio.run(rescan_images_impl(cli_ctx, registry, False))
 
 
 @cli.command()

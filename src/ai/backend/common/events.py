@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import enum
 import hashlib
 import logging
 import secrets
@@ -55,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.common.events"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PTGExceptionHandler: TypeAlias = Callable[
     [Type[Exception], Exception, TracebackType], Awaitable[None]
@@ -64,7 +65,7 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 class AbstractEvent(metaclass=abc.ABCMeta):
 
-    # derivatives shoudld define the fields.
+    # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
 
@@ -110,7 +111,7 @@ class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
 
     session_id: SessionId = attrs.field()
-    reason: str = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field()
 
     def serialize(self) -> tuple:
         return (
@@ -191,17 +192,50 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
+class KernelLifecycleEventReason(str, enum.Enum):
+    AGENT_TERMINATION = "agent-termination"
+    ALREADY_TERMINATED = "already-terminated"
+    ANOMALY_DETECTED = "anomaly-detected"
+    EXEC_TIMEOUT = "exec-timeout"
+    FAILED_TO_START = "failed-to-start"
+    FORCE_TERMINATED = "force-terminated"
+    IDLE_TIMEOUT = "idle-timeout"
+    IDLE_SESSION_LIFETIME = "idle-session-lifetime"
+    IDLE_UTILIZATION = "idle-utilization"
+    KILLED_BY_EVENT = "killed-by-event"
+    NEW_CONTAINER_STARTED = "new-container-started"
+    PENDING_TIMEOUT = "pending-timeout"
+    RESTARTING = "restarting"
+    RESTART_TIMEOUT = "restart-timeout"
+    RESUMING_AGENT_OPERATION = "resuming-agent-operation"
+    SELF_TERMINATED = "self-terminated"
+    TASK_DONE = "task-done"
+    TASK_FAILED = "task-failed"
+    TASK_TIMEOUT = "task-timeout"
+    TASK_CANCELLED = "task-cancelled"
+    TASK_FINISHED = "task-finished"
+    TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
+    UNKNOWN = "unknown"
+    USER_REQUESTED = "user-requested"
+
+    @classmethod
+    def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
+        try:
+            return cls(value)
+        except ValueError:
+            pass
+        return None
+
+
 @attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attrs.field()
-    creation_id: str = attrs.field()
     reason: str = attrs.field(default="")
     creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
-            self.creation_id,
             self.reason,
             self.creation_info,
         )
@@ -210,14 +244,9 @@ class KernelCreationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
-            creation_id=value[1],
-            reason=value[2],
-            creation_info=value[3],
+            reason=value[1],
+            creation_info=value[2],
         )
-
-
-class KernelEnqueuedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_enqueued"
 
 
 class KernelPreparingEvent(KernelCreationEventArgs, AbstractEvent):
@@ -269,7 +298,7 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 @attrs.define(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attrs.field()
-    reason: str = attrs.field(default="")
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:
@@ -300,7 +329,7 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
 class SessionCreationEventArgs:
     session_id: SessionId = attrs.field()
     creation_id: str = attrs.field()
-    reason: str = attrs.field(default="")
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
 
     def serialize(self) -> tuple:
         return (
@@ -357,6 +386,10 @@ class SessionTerminationEventArgs:
         )
 
 
+class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
+    name = "session_terminating"
+
+
 class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
     name = "session_terminated"
 
@@ -364,7 +397,7 @@ class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
 @attrs.define(slots=True, frozen=True)
 class SessionResultEventArgs:
     session_id: SessionId = attrs.field()
-    reason: str = attrs.field(default="")
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:

@@ -390,3 +390,7 @@ class NetAppVolume(BaseVolume):
             )
 
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
+
+    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+        usage = await self.get_usage(vfid)
+        return BinarySize(usage.used_bytes)

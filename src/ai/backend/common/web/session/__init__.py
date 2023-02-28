@@ -1,10 +1,25 @@
 import abc
 import json
+import logging
+import logging.config
 import sys
 import time
 from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Optional, Union, cast
 
+import trafaret as t
 from aiohttp import web
+
+from ai.backend.common.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+
+extra_config_headers = t.Dict(
+    {
+        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
+        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
+        t.Key("X-BackendAI-SessionID", default=None): t.Null | t.String,
+    }
+).allow_extra("*")
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 Middleware = Callable[[web.Request, Handler], Awaitable[web.StreamResponse]]
