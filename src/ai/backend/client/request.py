@@ -28,7 +28,7 @@ from typing import (
 import aiohttp
 import aiohttp.web
 import appdirs
-import attr
+import attrs
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
@@ -40,7 +40,7 @@ from .session import AsyncSession, BaseSession
 from .session import Session as SyncSession
 from .session import api_session
 
-log = logging.getLogger("ai.backend.client.request")
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 __all__ = [
     "Request",
@@ -144,7 +144,7 @@ class Request:
         :param BaseSession session: The session where this request is executed on.
 
         :param str path: The query path. When performing requests, the version number
-                         prefix will be automatically perpended if required.
+                         prefix will be automatically prepended if required.
 
         :param RequestContent content: The API query body which will be encoded as
                                        JSON.
@@ -758,7 +758,7 @@ class WebSocketContextManager:
         return None
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class SSEMessage:
     event: str
     data: str

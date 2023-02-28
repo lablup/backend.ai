@@ -20,11 +20,12 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernel(AbstractKernel):
@@ -493,8 +494,8 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
 
     all_distros = []
     entry_prefix = "backendai_krunner_v10"
-    for entrypoint in pkg_resources.iter_entry_points(entry_prefix):
-        log.debug("loading krunner pkg: {}", entrypoint.module_name)
+    for entrypoint in scan_entrypoints(entry_prefix):
+        log.debug("loading krunner pkg: {}", entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (

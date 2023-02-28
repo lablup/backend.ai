@@ -15,11 +15,13 @@ import inquirer
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from faker import Faker
 from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
@@ -130,6 +132,15 @@ def _create_cmd(docs: str = None):
     @click.option(
         "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
     )
+    @click.option(
+        "--arch",
+        "--architecture",
+        "architecture",
+        metavar="ARCH_NAME",
+        type=str,
+        default=DEFAULT_IMAGE_ARCH,
+        help="Architecture of the image to use.",
+    )
     # resource spec
     @click.option(
         "-v",
@@ -232,6 +243,7 @@ def _create_cmd(docs: str = None):
         # extra options
         bootstrap_script: IO | None,
         tag: str | None,
+        architecture: str,
         # resource spec
         mount: Sequence[str],
         scaling_group: str | None,
@@ -257,7 +269,8 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         else:
             name = name
 
@@ -297,6 +310,7 @@ def _create_cmd(docs: str = None):
                     if bootstrap_script is not None
                     else None,
                     tag=tag,
+                    architecture=architecture,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
                 )
@@ -431,7 +445,7 @@ def _create_from_template_cmd(docs: str = None):
         metavar="CALLBACK_URL",
         type=str,
         default=None,
-        help="Callback URL which will be called upon sesison lifecycle events.",
+        help="Callback URL which will be called upon session lifecycle events.",
     )
     # execution environment
     @click.option(
@@ -568,8 +582,7 @@ def _create_from_template_cmd(docs: str = None):
         command.
 
         \b
-        IMAGE: The name (and version/platform tags appended after a colon) of session
-               runtime or programming language.
+        TEMPLATE_ID: The template ID to create a session from.
         """
         if name is undefined:
             name = f"pysdk-{secrets.token_hex(5)}"
@@ -939,21 +952,21 @@ def status_history(session_id):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-@click.argument("new_id", metavar="NEWID")
-def rename(session_id, new_id):
+@click.argument("new_name", metavar="NEWNAME")
+def rename(session_id, new_name):
     """
     Renames session name of running session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
-    NEWID: New Session ID to rename to.
+    NEWNAME: New Session name.
     """
 
     with Session() as session:
         try:
             kernel = session.ComputeSession(session_id)
-            kernel.rename(new_id)
-            print_done(f"Session renamed to {new_id}.")
+            kernel.rename(new_name)
+            print_done(f"Session renamed to {new_name}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -1184,7 +1197,11 @@ def _events_cmd(docs: str = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        print(click.style(ev.event, fg="cyan", bold=True), json.loads(ev.data))
+                        click.echo(
+                            click.style(ev.event, fg="cyan", bold=True)
+                            + " "
+                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+                        )
 
         try:
             asyncio_run(_run_events())
@@ -1209,12 +1226,10 @@ def _fetch_session_names():
             "PENDING",
             "SCHEDULED",
             "PREPARING",
-            "PULLING",
             "RUNNING",
+            "RUNNING_DEGRADED",
             "RESTARTING",
             "TERMINATING",
-            "RESIZING",
-            "SUSPENDED",
             "ERROR",
         ]
     )
@@ -1222,7 +1237,7 @@ def _fetch_session_names():
         session_fields["name"],
         session_fields["session_id"],
         session_fields["group_name"],
-        session_fields["kernel_id"],
+        session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],
         session_fields["status"],
@@ -1241,7 +1256,7 @@ def _fetch_session_names():
             order=None,
         )
 
-    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+    return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
 def _watch_cmd(docs: Optional[str] = None):
@@ -1367,7 +1382,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                sys.exit(ExitCode.TIMEOUT)
+                sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
             if max_wait > 0:

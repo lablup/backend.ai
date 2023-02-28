@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import aiohttp
 import aiohttp_cors
 import aiotools
-import attr
+import attrs
 import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -78,6 +79,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionSuccessEvent,
     SessionTerminatedEvent,
+    SessionTerminatingEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
@@ -97,9 +99,13 @@ from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    DEAD_KERNEL_STATUSES,
+    DEAD_SESSION_STATUSES,
     AgentStatus,
+    KernelRow,
     KernelStatus,
+    RoutingRow,
+    SessionRow,
+    SessionStatus,
     UserRole,
 )
 from ..models import association_groups_users as agus
@@ -117,7 +123,6 @@ from ..models import (
     verify_vfolder_name,
     vfolders,
 )
-from ..models.kernel import match_session_ids
 from ..models.utils import execute_with_retry
 from ..types import UserScope
 from .auth import auth_required
@@ -145,7 +150,7 @@ from .utils import catch_unexpected, check_api_params, get_access_key_scopes, un
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -318,7 +323,7 @@ def drop(d, dropval):
     return newd
 
 
-async def _query_userinfo(
+async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
@@ -454,6 +459,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     # Check work directory and reserved name directory.
     mount_map = params["config"].get("mount_map")
+
     if mount_map is not None:
         original_folders = mount_map.keys()
         alias_folders = mount_map.values()
@@ -486,15 +492,16 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 ],
             )
         requested_image_ref = image_row.image_ref
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == params["domain"])
-            )
-            allowed_registries = await conn.scalar(query)
-            if requested_image_ref.registry not in allowed_registries:
-                raise AliasResolutionFailed
+        if not requested_image_ref.is_local:
+            async with root_ctx.db.begin_readonly() as conn:
+                query = (
+                    sa.select([domains.c.allowed_docker_registries])
+                    .select_from(domains)
+                    .where(domains.c.name == params["domain"])
+                )
+                allowed_registries = await conn.scalar(query)
+                if requested_image_ref.registry not in allowed_registries:
+                    raise AliasResolutionFailed
     except AliasResolutionFailed:
         raise ImageNotFound("unknown alias or disallowed registry")
 
@@ -502,23 +509,30 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     try:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        kern = await root_ctx.registry.get_session(params["session_name"], owner_access_key)
-        running_image_ref = ImageRef(kern["image"], [kern["registry"]], kern["architecture"])
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            sess = await SessionRow.get_session_with_main_kernel(
+                params["session_name"],
+                owner_access_key,
+                db_session=db_sess,
+            )
+        running_image_ref = ImageRef(
+            sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
+        )
         if running_image_ref != requested_image_ref:
             # The image must be same if get_or_create() called multiple times
             # against an existing (non-terminated) session
-            raise SessionAlreadyExists(extra_data={"existingSessionId": str(kern["id"])})
+            raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
         if not params["reuse"]:
             # Respond as error since the client did not request to reuse,
             # but provide the overlapping session ID for later use.
-            raise SessionAlreadyExists(extra_data={"existingSessionId": str(kern["id"])})
+            raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
         # Respond as success with the reused session's information.
         return web.json_response(
             {
-                "sessionId": str(kern["id"]),
-                "sessionName": str(kern["session_name"]),
-                "status": kern["status"].name,
-                "service_ports": kern["service_ports"],
+                "sessionId": str(sess.id),
+                "sessionName": str(sess.name),
+                "status": sess.status.name,
+                "service_ports": sess.main_kernel.service_ports,
                 "created": False,
             },
             status=200,
@@ -547,12 +561,11 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     session_creation_id = secrets.token_urlsafe(16)
     start_event = asyncio.Event()
-    kernel_id: Optional[KernelId] = None
     session_creation_tracker = app_ctx.session_creation_tracker
     session_creation_tracker[session_creation_id] = start_event
 
     async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         # Use keypair bootstrap_script if it is not delivered as a parameter
         if not params["bootstrap_script"]:
@@ -560,23 +573,27 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             params["bootstrap_script"] = script
 
     try:
-        kernel_id = await asyncio.shield(
+        session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
                 root_ctx.registry.enqueue_session(
                     session_creation_id,
                     params["session_name"],
                     owner_access_key,
-                    [
-                        {
-                            "image_ref": requested_image_ref,
-                            "cluster_role": DEFAULT_ROLE,
-                            "cluster_idx": 1,
-                            "cluster_hostname": f"{DEFAULT_ROLE}1",
-                            "creation_config": params["config"],
-                            "bootstrap_script": params["bootstrap_script"],
-                            "startup_command": params["startup_command"],
-                        }
-                    ],
+                    {
+                        "creation_config": params["config"],
+                        "kernel_configs": [
+                            {
+                                "image_ref": requested_image_ref,
+                                "cluster_role": DEFAULT_ROLE,
+                                "cluster_idx": 1,
+                                "local_rank": 0,
+                                "cluster_hostname": f"{DEFAULT_ROLE}1",
+                                "creation_config": params["config"],
+                                "bootstrap_script": params["bootstrap_script"],
+                                "startup_command": params["startup_command"],
+                            }
+                        ],
+                    },
                     params["config"]["scaling_group"],
                     params["session_type"],
                     resource_policy,
@@ -596,7 +613,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 )
             ),
         )
-        resp["sessionId"] = str(kernel_id)  # changed since API v5
+        resp["sessionId"] = str(session_id)  # changed since API v5
         resp["sessionName"] = str(params["session_name"])
         resp["status"] = "PENDING"
         resp["servicePorts"] = []
@@ -615,22 +632,16 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 resp["status"] = "TIMEOUT"
             else:
                 await asyncio.sleep(0.5)
-                async with root_ctx.db.begin_readonly() as conn:
-                    query = (
-                        sa.select(
-                            [
-                                kernels.c.status,
-                                kernels.c.service_ports,
-                            ]
-                        )
-                        .select_from(kernels)
-                        .where(kernels.c.id == kernel_id)
+                async with root_ctx.db.begin_readonly_session() as db_sess:
+                    query = sa.select(KernelRow.status, KernelRow.service_ports).where(
+                        (KernelRow.session_id == session_id)
+                        & (KernelRow.cluster_role == DEFAULT_ROLE)
                     )
-                    result = await conn.execute(query)
+                    result = await db_sess.execute(query)
                     row = result.first()
-                if row["status"] == KernelStatus.RUNNING:
+                if row.status == KernelStatus.RUNNING:
                     resp["status"] = "RUNNING"
-                    for item in row["service_ports"]:
+                    for item in row.service_ports:
                         response_dict = {
                             "name": item["name"],
                             "protocol": item["protocol"],
@@ -644,7 +655,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             response_dict["allowed_envs"] = item["allowed_envs"]
                         resp["servicePorts"].append(response_dict)
                 else:
-                    resp["status"] = row["status"].name
+                    resp["status"] = row.status.name
     except asyncio.CancelledError:
         raise
     except BackendError:
@@ -772,6 +783,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         param_from_template["session_type"] = SessionTypes.INTERACTIVE
     elif template["spec"]["session_type"] == "batch":
         param_from_template["session_type"] = SessionTypes.BATCH
+    elif template["spec"]["session_type"] == "inference":
+        param_from_template["session_type"] = SessionTypes.INFERENCE
 
     # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
     # Check https://github.com/python/mypy/issues/7316
@@ -977,7 +990,12 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
     try:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        await root_ctx.registry.get_session(params["session_name"], owner_access_key)
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            await SessionRow.get_session(
+                params["session_name"],
+                owner_access_key,
+                db_session=db_sess,
+            )
     except SessionNotFound:
         pass
     except TooManySessionsMatched:
@@ -1028,6 +1046,8 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             kernel_config["sess_type"] = SessionTypes.INTERACTIVE
         elif template["spec"]["sess_type"] == "batch":
             kernel_config["sess_type"] = SessionTypes.BATCH
+        elif template["spec"]["sess_type"] == "inference":
+            kernel_config["sess_type"] = SessionTypes.INFERENCE
 
         if tag := template["metadata"].get("tag", None):
             kernel_config["tag"] = tag
@@ -1107,7 +1127,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 
     try:
         async with root_ctx.db.begin_readonly() as conn:
-            owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+            owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -1115,7 +1135,13 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                     session_creation_id,
                     params["session_name"],
                     owner_access_key,
-                    kernel_configs,
+                    {
+                        "creation_config": {
+                            "mount_map": mount_map,
+                            "environ": environ,
+                        },
+                        "kernel_configs": kernel_configs,
+                    },
                     params["scaling_group"],
                     params["sess_type"],
                     resource_policy,
@@ -1226,18 +1252,21 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     myself = asyncio.current_task()
     assert myself is not None
     try:
-        kernel = await asyncio.shield(
-            app_ctx.database_ptask_group.create_task(
-                root_ctx.registry.get_session(session_name, access_key),
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await asyncio.shield(
+                app_ctx.database_ptask_group.create_task(
+                    SessionRow.get_session_with_main_kernel(
+                        session_name, access_key, db_session=db_sess
+                    ),
+                )
             )
-        )
     except (SessionNotFound, TooManySessionsMatched):
         raise
 
     query = (
         sa.select([scaling_groups.c.wsproxy_addr])
         .select_from(scaling_groups)
-        .where((scaling_groups.c.name == kernel["scaling_group"]))
+        .where((scaling_groups.c.name == session.scaling_group_name))
     )
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -1252,11 +1281,11 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     else:
         wsproxy_advertise_addr = wsproxy_addr
 
-    if kernel["kernel_host"] is None:
-        kernel_host = urlparse(kernel["agent_addr"]).hostname
+    if session.main_kernel.kernel_host is None:
+        kernel_host = urlparse(session.main_kernel.agent_addr).hostname
     else:
-        kernel_host = kernel["kernel_host"]
-    for sport in kernel["service_ports"]:
+        kernel_host = session.main_kernel.kernel_host
+    for sport in session.main_kernel.service_ports:
         if sport["name"] == service:
             if params["port"]:
                 # using one of the primary/secondary ports of the app
@@ -1279,7 +1308,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 
     await asyncio.shield(
         app_ctx.database_ptask_group.create_task(
-            root_ctx.registry.increment_session_usage(session_name, access_key),
+            root_ctx.registry.increment_session_usage(session),
         )
     )
 
@@ -1291,7 +1320,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 
     result = await asyncio.shield(
         app_ctx.rpc_ptask_group.create_task(
-            root_ctx.registry.start_service(session_name, access_key, service, opts),
+            root_ctx.registry.start_service(session, service, opts),
         ),
     )
     if result["status"] == "failed":
@@ -1337,11 +1366,15 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        status_info = await root_ctx.registry.get_commit_status(session_name, owner_access_key)
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                session_name, owner_access_key, db_session=db_sess
+            )
+        status_info = await root_ctx.registry.get_commit_status(session)
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"stats": status_info["status"], "kernel": status_info["kernel"]}
+    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
     return web.json_response(resp, status=200)
 
 
@@ -1364,7 +1397,14 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
         "GET_ABUSING_REPORT (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        report = await root_ctx.registry.get_abusing_report(session_name, owner_access_key)
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                session_name, owner_access_key, db_session=db_sess
+            )
+        kernel = session.main_kernel
+        report = await root_ctx.registry.get_abusing_report(
+            kernel.id, kernel.agent, kernel.agent_addr
+        )
     except BackendError:
         log.exception("GET_ABUSING_REPORT: exception")
         raise
@@ -1399,9 +1439,14 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                session_name, owner_access_key, db_session=db_sess
+            )
+
         resp: Mapping[str, Any] = await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session(session_name, owner_access_key, filename),
+                root_ctx.registry.commit_session(session, filename=filename),
             ),
         )
     except BackendError:
@@ -1443,19 +1488,24 @@ async def handle_kernel_creation_lifecycle(
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
         pass
     elif isinstance(event, KernelPullingEvent):
-        await root_ctx.registry.set_kernel_status(
-            event.kernel_id, KernelStatus.PULLING, event.reason
+        await KernelRow.set_kernel_status(
+            root_ctx.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
         )
     elif isinstance(event, KernelCreatingEvent):
-        await root_ctx.registry.set_kernel_status(
-            event.kernel_id, KernelStatus.PREPARING, event.reason
+        await KernelRow.set_kernel_status(
+            root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
+        await root_ctx.registry.finalize_running(event.creation_info)
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
+        if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
+            session_id = event.creation_info.get("session_id")
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
+            log.warning(f"Kernel cancelled, {event.reason = }")
             tracker.cancel()
 
 
@@ -1499,14 +1549,16 @@ async def handle_session_creation_lifecycle(
 async def handle_session_termination_lifecycle(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionTerminatedEvent,
+    event: SessionTerminatingEvent | SessionTerminatedEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
     root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, SessionTerminatedEvent):
+    if isinstance(event, SessionTerminatingEvent):
+        await root_ctx.registry.mark_session_terminating(event.session_id, event.reason)
+    elif isinstance(event, SessionTerminatedEvent):
         await root_ctx.registry.mark_session_terminated(event.session_id, event.reason)
 
 
@@ -1516,13 +1568,12 @@ async def handle_destroy_session(
     event: DoTerminateSessionEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
+    async with root_ctx.db.begin_session() as db_sess:
+        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
     await root_ctx.registry.destroy_session(
-        functools.partial(
-            root_ctx.registry.get_session_by_session_id,
-            event.session_id,
-        ),
+        session,
         forced=False,
-        reason=event.reason or "killed-by-event",
+        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
     )
 
 
@@ -1587,6 +1638,7 @@ async def invoke_session_callback(
     | SessionPreparingEvent
     | SessionStartedEvent
     | SessionCancelledEvent
+    | SessionTerminatingEvent
     | SessionTerminatedEvent
     | SessionSuccessEvent
     | SessionFailureEvent,
@@ -1600,14 +1652,13 @@ async def invoke_session_callback(
         "when": datetime.now(tzutc()).isoformat(),
     }
     try:
-        async with root_ctx.db.begin_readonly() as db:
-            session = await root_ctx.registry.get_session_by_session_id(
-                event.session_id,
-                db_connection=db,
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                event.session_id, db_session=db_sess
             )
     except SessionNotFound:
         return
-    url = session["callback_url"]
+    url = session.callback_url
     if url is None:
         return
     app_ctx.webhook_ptask_group.create_task(
@@ -1625,15 +1676,14 @@ async def handle_batch_result(
     """
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, SessionSuccessEvent):
-        await root_ctx.registry.set_session_result(event.session_id, True, event.exit_code)
+        await SessionRow.set_session_result(root_ctx.db, event.session_id, True, event.exit_code)
     elif isinstance(event, SessionFailureEvent):
-        await root_ctx.registry.set_session_result(event.session_id, False, event.exit_code)
+        await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
+    async with root_ctx.db.begin_session() as db_sess:
+        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
     await root_ctx.registry.destroy_session(
-        functools.partial(
-            root_ctx.registry.get_session_by_session_id,
-            event.session_id,
-        ),
-        reason="task-finished",
+        session,
+        reason=KernelLifecycleEventReason.TASK_FINISHED,
     )
 
 
@@ -1823,22 +1873,18 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
         session_name,
         new_name,
     )
-    async with root_ctx.db.begin() as conn:
-        compute_session = await root_ctx.registry.get_session(
+    async with root_ctx.db.begin_session() as db_sess:
+        compute_session = await SessionRow.get_session(
             session_name,
             owner_access_key,
             allow_stale=True,
-            db_connection=conn,
             for_update=True,
+            db_session=db_sess,
         )
-        if compute_session["status"] != KernelStatus.RUNNING:
+        if compute_session.status != SessionStatus.RUNNING:
             raise InvalidAPIParameters("Can't change name of not running session")
-        update_query = (
-            sa.update(kernels)
-            .values(session_name=new_name)
-            .where(kernels.c.session_id == compute_session["session_id"])
-        )
-        await conn.execute(update_query)
+        compute_session.name = new_name
+        await db_sess.commit()
 
     return web.Response(status=204)
 
@@ -1873,13 +1919,12 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         session_name,
         params["forced"],
     )
+    async with root_ctx.db.begin_session() as db_sess:
+        session = await SessionRow.get_session_with_kernels(
+            session_name, owner_access_key, db_session=db_sess
+        )
     last_stat = await root_ctx.registry.destroy_session(
-        functools.partial(
-            root_ctx.registry.get_session,
-            session_name,
-            owner_access_key,
-            # domain_name=domain_name,
-        ),
+        session,
         forced=params["forced"],
     )
     resp = {
@@ -1911,20 +1956,20 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
         id_or_name_prefix,
     )
     matches: List[Dict[str, Any]] = []
-    async with root_ctx.db.begin_readonly() as conn:
-        session_infos = await match_session_ids(
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        sessions = await SessionRow.match_sessions(
+            db_sess,
             id_or_name_prefix,
             owner_access_key,
-            db_connection=conn,
         )
-    if session_infos:
+    if sessions:
         matches.extend(
             {
-                "id": str(item["session_id"]),
-                "name": item["session_name"],
-                "status": item["status"].name,
+                "id": str(item.id),
+                "name": item.name,
+                "status": item.status.name,
             }
-            for item in session_infos
+            for item in sessions
         )
     return web.json_response(
         {
@@ -1944,34 +1989,41 @@ async def get_info(request: web.Request) -> web.Response:
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("GET_INFO (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        kern = await root_ctx.registry.get_session(session_name, owner_access_key)
-        resp["domainName"] = kern["domain_name"]
-        resp["groupId"] = str(kern["group_id"])
-        resp["userId"] = str(kern["user_uuid"])
-        resp["lang"] = kern["image"]  # legacy
-        resp["image"] = kern["image"]
-        resp["architecture"] = kern["architecture"]
-        resp["registry"] = kern["registry"]
-        resp["tag"] = kern["tag"]
+        async with root_ctx.db.begin_session() as db_sess:
+            sess = await SessionRow.get_session_with_main_kernel(
+                session_name, owner_access_key, db_session=db_sess
+            )
+        await root_ctx.registry.increment_session_usage(sess)
+        resp["domainName"] = sess.domain_name
+        resp["groupId"] = str(sess.group_id)
+        resp["userId"] = str(sess.user_uuid)
+        resp["lang"] = sess.main_kernel.image  # legacy
+        resp["image"] = sess.main_kernel.image
+        resp["architecture"] = sess.main_kernel.architecture
+        resp["registry"] = sess.main_kernel.registry
+        resp["tag"] = sess.tag
 
         # Resource occupation
-        resp["containerId"] = str(kern["container_id"])
-        resp["occupiedSlots"] = str(kern["occupied_slots"])
-        resp["occupiedShares"] = str(kern["occupied_shares"])
-        resp["environ"] = str(kern["environ"])
+        resp["containerId"] = str(sess.main_kernel.container_id)
+        resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
+        resp["occupyingSlots"] = str(sess.occupying_slots)
+        resp["requestedSlots"] = str(sess.requested_slots)
+        resp["occupiedShares"] = str(
+            sess.main_kernel.occupied_shares
+        )  # legacy, only caculate main kernel's occupying resource
+        resp["environ"] = str(sess.environ)
 
         # Lifecycle
-        resp["status"] = kern["status"].name  # "e.g. 'KernelStatus.RUNNING' -> 'RUNNING' "
-        resp["statusInfo"] = str(kern["status_info"])
-        resp["statusData"] = kern["status_data"]
-        age = datetime.now(tzutc()) - kern["created_at"]
+        resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
+        resp["statusInfo"] = str(sess.status_info)
+        resp["statusData"] = sess.status_data
+        age = datetime.now(tzutc()) - sess.created_at
         resp["age"] = int(age.total_seconds() * 1000)  # age in milliseconds
-        resp["creationTime"] = str(kern["created_at"])
-        resp["terminationTime"] = str(kern["terminated_at"]) if kern["terminated_at"] else None
+        resp["creationTime"] = str(sess.created_at)
+        resp["terminationTime"] = str(sess.terminated_at) if sess.terminated_at else None
 
-        resp["numQueriesExecuted"] = kern["num_queries"]
-        resp["lastStat"] = kern["last_stat"]
+        resp["numQueriesExecuted"] = sess.num_queries
+        resp["lastStat"] = sess.last_stat
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
@@ -1987,13 +2039,16 @@ async def get_info(request: web.Request) -> web.Response:
 @auth_required
 async def restart(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    session_creation_id = secrets.token_urlsafe(16)
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("RESTART (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
+    async with root_ctx.db.begin_session() as db_sess:
+        session = await SessionRow.get_session_with_kernels(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        await root_ctx.registry.restart_session(session_creation_id, session_name, owner_access_key)
+        await root_ctx.registry.increment_session_usage(session)
+        await root_ctx.registry.restart_session(session)
     except BackendError:
         log.exception("RESTART: exception")
         raise
@@ -2017,8 +2072,12 @@ async def execute(request: web.Request) -> web.Response:
     except json.decoder.JSONDecodeError:
         log.warning("EXECUTE: invalid/missing parameters")
         raise InvalidAPIParameters
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
+        await root_ctx.registry.increment_session_usage(session)
         api_version = request["api_version"]
         if api_version[0] == 1:
             run_id = params.get("runId", secrets.token_hex(8))
@@ -2050,13 +2109,10 @@ async def execute(request: web.Request) -> web.Response:
             opts = {}  # noqa
         if mode == "complete":
             # For legacy
-            resp["result"] = await root_ctx.registry.get_completions(
-                session_name, owner_access_key, code, opts
-            )
+            resp["result"] = await root_ctx.registry.get_completions(session, code, opts)
         else:
             raw_result = await root_ctx.registry.execute(
-                session_name,
-                owner_access_key,
+                session,
                 api_version,
                 run_id,
                 mode,
@@ -2108,9 +2164,13 @@ async def interrupt(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("INTERRUPT(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        await root_ctx.registry.interrupt_session(session_name, owner_access_key)
+        await root_ctx.registry.increment_session_usage(session)
+        await root_ctx.registry.interrupt_session(session)
     except BackendError:
         log.exception("INTERRUPT: exception")
         raise
@@ -2136,13 +2196,17 @@ async def complete(request: web.Request) -> web.Response:
         )
     except json.decoder.JSONDecodeError:
         raise InvalidAPIParameters
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
         code = params.get("code", "")
         opts = params.get("options", None) or {}
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
+        await root_ctx.registry.increment_session_usage(session)
         resp["result"] = cast(
             Dict[str, Any],
-            await root_ctx.registry.get_completions(session_name, owner_access_key, code, opts),
+            await root_ctx.registry.get_completions(session, code, opts),
         )
     except AssertionError:
         raise InvalidAPIParameters
@@ -2169,8 +2233,12 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
         "SHUTDOWN_SERVICE (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
     )
     service_name = params.get("service_name")
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
-        await root_ctx.registry.shutdown_service(session_name, owner_access_key, service_name)
+        await root_ctx.registry.shutdown_service(session, service_name)
     except BackendError:
         log.exception("SHUTDOWN_SERVICE: exception")
         raise
@@ -2188,8 +2256,12 @@ async def upload_files(request: web.Request) -> web.Response:
     log.info(
         "UPLOAD_FILE (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
     )
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
+        await root_ctx.registry.increment_session_usage(session)
         file_count = 0
         upload_tasks = []
         async for file in aiotools.aiter(reader.next, None):
@@ -2210,9 +2282,7 @@ async def upload_files(request: web.Request) -> web.Response:
                 recv_size += chunk_size
             data = file.decode(b"".join(chunks))
             log.debug("received file: {0} ({1:,} bytes)", file.filename, recv_size)
-            t = loop.create_task(
-                root_ctx.registry.upload_file(session_name, owner_access_key, file.filename, data)
-            )
+            t = loop.create_task(root_ctx.registry.upload_file(session, file.filename, data))
             upload_tasks.append(t)
         await asyncio.gather(*upload_tasks)
     except BackendError:
@@ -2242,13 +2312,17 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
         session_name,
         files[0],
     )
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
     try:
         assert len(files) <= 5, "Too many files"
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
+        await root_ctx.registry.increment_session_usage(session)
         # TODO: Read all download file contents. Need to fix by using chuncking, etc.
         results = await asyncio.gather(
             *map(
-                functools.partial(root_ctx.registry.download_file, session_name, owner_access_key),
+                functools.partial(root_ctx.registry.download_file, session),
                 files,
             ),
         )
@@ -2297,8 +2371,12 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
         file,
     )
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        result = await root_ctx.registry.download_single(session_name, owner_access_key, file)
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                session_name, owner_access_key, db_session=db_sess
+            )
+        await root_ctx.registry.increment_session_usage(session)
+        result = await root_ctx.registry.download_single(session, owner_access_key, file)
     except asyncio.CancelledError:
         raise
     except BackendError:
@@ -2329,13 +2407,17 @@ async def list_files(request: web.Request) -> web.Response:
             session_name,
             path,
         )
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                session_name, owner_access_key, db_session=db_sess
+            )
     except (asyncio.TimeoutError, AssertionError, json.decoder.JSONDecodeError) as e:
         log.warning("LIST_FILES: invalid/missing parameters, {0!r}", e)
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
     resp: MutableMapping[str, Any] = {}
     try:
-        await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        result = await root_ctx.registry.list_files(session_name, owner_access_key, path)
+        await root_ctx.registry.increment_session_usage(session)
+        result = await root_ctx.registry.list_files(session, path)
         resp.update(result)
         log.debug("container file list for {0} retrieved", path)
     except asyncio.CancelledError:
@@ -2367,24 +2449,24 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
         "GET_CONTAINER_LOG (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     resp = {"result": {"logs": ""}}
-    async with root_ctx.db.begin_readonly() as conn:
-        compute_session = await root_ctx.registry.get_session(
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        compute_session = await SessionRow.get_session_with_main_kernel(
             session_name,
             owner_access_key,
             allow_stale=True,
-            db_connection=conn,
+            db_session=db_sess,
         )
         if (
-            compute_session["status"] in DEAD_KERNEL_STATUSES
-            and compute_session["container_log"] is not None
+            compute_session.status in DEAD_SESSION_STATUSES
+            and compute_session.main_kernel.container_log is not None
         ):
             log.debug("returning log from database record")
-            resp["result"]["logs"] = compute_session["container_log"].decode("utf-8")
+            resp["result"]["logs"] = compute_session.main_kernel.container_log.decode("utf-8")
             return web.json_response(resp, status=200)
     try:
         registry = root_ctx.registry
-        await registry.increment_session_usage(session_name, owner_access_key)
-        resp["result"]["logs"] = await registry.get_logs_from_agent(session_name, owner_access_key)
+        await registry.increment_session_usage(compute_session)
+        resp["result"]["logs"] = await registry.get_logs_from_agent(compute_session)
         log.debug("returning log from agent")
     except BackendError:
         log.exception(
@@ -2467,7 +2549,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     session_creation_tracker: Dict[str, asyncio.Event]
     pending_waits: Set[asyncio.Task[None]]
@@ -2528,6 +2610,12 @@ async def init(app: web.Application) -> None:
         name="api.session.kterm",
     )
     evd.consume(
+        SessionTerminatingEvent,
+        app,
+        handle_session_termination_lifecycle,
+        name="api.session.sterming",
+    ),
+    evd.consume(
         SessionTerminatedEvent,
         app,
         handle_session_termination_lifecycle,
@@ -2538,6 +2626,7 @@ async def init(app: web.Application) -> None:
     evd.consume(SessionPreparingEvent, app, invoke_session_callback)
     evd.consume(SessionStartedEvent, app, invoke_session_callback)
     evd.consume(SessionCancelledEvent, app, invoke_session_callback)
+    evd.consume(SessionTerminatingEvent, app, invoke_session_callback)
     evd.consume(SessionTerminatedEvent, app, invoke_session_callback)
     evd.consume(SessionSuccessEvent, app, invoke_session_callback)
     evd.consume(SessionFailureEvent, app, invoke_session_callback)

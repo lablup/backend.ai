@@ -9,58 +9,79 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 # 247c4ce2da714b1ca39c9d9de95b1158
-#: ../../client/func/vfolder.rst:2 fd27878c0ec141c5aa7baf9af20dfdf5
+#: ../../client/func/vfolder.rst:2 07e9973a2077484caac563451fe974e9
 msgid "Virtual Folder Functions"
 msgstr "가상폴더 함수"
 
-#: 832abcd8f43c415786340ee88b536ad2
-#: ai.backend.client.func.vfolder.VFolder.paginated_list:1 of
-msgid ""
-"Fetches the list of vfolders. Domain admins can only get domain vfolders."
+#: ai.backend.client.func.vfolder.VFolder.paginated_list:1
+#: ff3044be8c83494f99d93c3c9ddfeecf of
+msgid "Fetches the list of vfolders. Domain admins can only get domain vfolders."
 msgstr ""
 
-#: 0918d717eb8b40b3935cbd82f3ab51a8
+#: 3d10c2d9e1da4eabbf0f875ddf36bec4
 #: ai.backend.client.func.vfolder.VFolder.paginated_list of
 msgid "Parameters"
 msgstr ""
 
-#: 51bac7e791004c099af3a8eb8127b283
+#: 87a50824789543adb5fa3d67aef8b1b1
 #: ai.backend.client.func.vfolder.VFolder.paginated_list:4 of
 msgid "Fetch vfolders in a specific group."
 msgstr ""
 
-#: ai.backend.client.func.vfolder.VFolder.paginated_list:6
-#: d116f598330849fc9fd74636a1596167 of
+#: 1f7776d5e8a942e5b5b90faefa6df876
+#: ai.backend.client.func.vfolder.VFolder.paginated_list:6 of
 msgid "Additional per-vfolder query fields to fetch."
 msgstr ""
 
-#: 0d7d0bbbcfa34f7998df0ec5e5994a16 523284bcdc954119af86febdd475cddc
-#: 9262da78c0bf4efdba9f11881807377d
+#: 38da9c44c36145b7bca2d5b64922a1e6 64481fcf75b644398ecfdde5e50f0baa
+#: 6a968c8468e549a39e1d3270e32a0df5
 #: ai.backend.client.func.vfolder.VFolder.download
 #: ai.backend.client.func.vfolder.VFolder.paginated_list
 #: ai.backend.client.func.vfolder.VFolder.upload of
 msgid "Return type"
 msgstr ""
 
-#: 1fb5bfd8492c4a2bad62bc8298f2d307
-#: ai.backend.client.func.vfolder.VFolder.paginated_list:9 of
-msgid ""
-":py:class:`~ai.backend.client.output.types.PaginatedResult`\\[:py:class:"
-"`dict`]"
+#: ai.backend.client.func.vfolder.VFolder.paginated_list:9
+#: e275f57977994cc4a98b99ae40e84d15 of
+msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`\\[:py:class:`dict`]"
 msgstr ""
 
-#: 2a40d0cfada24ab8aac532fdb4384a1c 640f8712cd614505818c0ccb3e3980f6
+#: 2b1ed3b5ec374c7889e10e9c227680ab 6244f4c40aa942d3a6c276c9a842f8e4
 #: ai.backend.client.func.vfolder.VFolder.download:2
 #: ai.backend.client.func.vfolder.VFolder.upload:2 of
 msgid ":py:obj:`None`"
 msgstr ""
+
+#~ msgid ""
+#~ "Fetches the list of vfolders. Domain "
+#~ "admins can only get domain vfolders."
+#~ msgstr ""
+
+#~ msgid "Parameters"
+#~ msgstr ""
+
+#~ msgid "Fetch vfolders in a specific group."
+#~ msgstr ""
+
+#~ msgid "Additional per-vfolder query fields to fetch."
+#~ msgstr ""
+
+#~ msgid "Return type"
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`\\[:py:class:`dict`]"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`None`"
+#~ msgstr ""
+

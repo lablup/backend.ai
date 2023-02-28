@@ -50,6 +50,7 @@ config_iv = t.Dict(
                 | tx.StringList(empty_str_as_empty_list=True),
                 t.Key("enable_container_commit", default=False): t.ToBool,
                 t.Key("hide_agents", default=True): t.ToBool,
+                t.Key("app_download_url", default=""): t.String(allow_blank=True),
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(
@@ -71,7 +72,7 @@ config_iv = t.Dict(
         ).allow_extra("*"),
         t.Key("plugin"): t.Dict(
             {
-                t.Key("page", default=None): t.Null | t.String(allow_blank=True),
+                t.Key("page", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
             }
         ).allow_extra("*"),
         t.Key("pipeline"): t.Dict(

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, List, Tuple
 
 import aiotools
-import attr
+import attrs
 import pytest
 from etcetra.types import HostPortPair as EtcdHostPortPair
 from redis.asyncio import Redis
@@ -53,11 +53,11 @@ def dslice(start: Decimal, stop: Decimal, num: int):
     yield from (start + step * Decimal(tick) for tick in range(0, num))
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class NoopEvent(AbstractEvent):
     name = "_noop"
 
-    test_ns: str = attr.ib()
+    test_ns: str = attrs.field()
 
     def serialize(self) -> tuple:
         return (self.test_ns,)

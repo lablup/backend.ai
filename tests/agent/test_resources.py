@@ -14,6 +14,34 @@ from ai.backend.agent.vendor import linux
 # TODO: write tests for DiscretePropertyAllocMap, FractionAllocMap
 
 
+def test_parse_cpuset():
+    assert {*linux.parse_cpuset("0")} == {0}
+    assert {*linux.parse_cpuset("2-5")} == {2, 3, 4, 5}
+    assert {*linux.parse_cpuset("1-1")} == {1}
+    assert {*linux.parse_cpuset("12,35,99")} == {12, 35, 99}
+    assert {*linux.parse_cpuset("0-1,5-8,120,150-153")} == {
+        0,
+        1,
+        5,
+        6,
+        7,
+        8,
+        120,
+        150,
+        151,
+        152,
+        153,
+    }
+    with pytest.raises(ValueError):
+        {*linux.parse_cpuset("")}
+    with pytest.raises(ValueError):
+        {*linux.parse_cpuset("abc")}
+    with pytest.raises(ValueError):
+        {*linux.parse_cpuset("1-0")}
+    with pytest.raises(ValueError):
+        {*linux.parse_cpuset("-99")}
+
+
 def test_node_of_cpu():
     numa = linux.libnuma()
 

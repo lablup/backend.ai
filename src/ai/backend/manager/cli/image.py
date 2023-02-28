@@ -14,7 +14,7 @@ from .image_impl import list_images as list_images_impl
 from .image_impl import rescan_images as rescan_images_impl
 from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()
@@ -79,16 +79,22 @@ def set_resource_limit(
 
 
 @cli.command()
-@click.argument("registry")
+@click.argument("registry", required=False, default="")
+@click.option(
+    "--local",
+    is_flag=True,
+    default=False,
+    help="Scan the local Docker daemon instead of a registry",
+)
 @click.pass_obj
-def rescan(cli_ctx, registry) -> None:
+def rescan(cli_ctx, registry: str, local: bool) -> None:
     """
     Update the kernel image metadata from all configured docker registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
     with cli_ctx.logger:
-        asyncio.run(rescan_images_impl(cli_ctx, registry))
+        asyncio.run(rescan_images_impl(cli_ctx, registry, local))
 
 
 @cli.command()

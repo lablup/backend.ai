@@ -53,8 +53,12 @@ scaling-group = "default"
 # when the agent starts up. [default: false]
 # skip-manager-detection = false
 
+# The port number of container metadata server. Defaults to 40128.
+# Make sure to change source port number in update-metadata-iptables.sh script when changing this value.
+metadata-server-port = 40128
+
 # The port number for aiomonitor.
-# aiomonitor-port = 50200
+# aiomonitor-port = 48200
 
 # Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
 # open-source CUDA plugins in the mono-repo source installation.
@@ -243,6 +247,13 @@ reserved-mem = "1G"
 # This will be subtracted from the resource capacity reported to the manager.
 reserved-disk = "8G"
 
+# The order of device allocation.
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
+# How we mix up devices from multiple different NUMA nodes?
+# Options: PREFER_SINGLE_NODE, INTERLEAVED
+affinity-policy = "INTERLEAVED"
+
 
 [debug]
 # Enable or disable the debug-level logging.
@@ -259,6 +270,9 @@ asyncio = false
 
 # Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
 enhanced-aiomonitor-task-info = false
+
+# Enable the debug mode of the kernel-runner.
+kernel-runner = false
 
 # Include debug-level logs for internal events.
 log-events = false
