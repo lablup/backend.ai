@@ -284,6 +284,14 @@ def _create_from_template_cmd(docs: str = None):
         help="Set the command to execute for batch-type sessions.",
     )
     @click.option(
+        "--depends",
+        metavar="SESSION_ID",
+        type=str,
+        multiple=True,
+        help="Set the list of session ID or names that the newly created session depends on. "
+        "The session will get scheduled after all of them successfully finish.",
+    )
+    @click.option(
         "--enqueue-only",
         is_flag=True,
         help="Enqueue the session and return immediately without waiting for its startup.",
