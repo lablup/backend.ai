@@ -492,15 +492,16 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 ],
             )
         requested_image_ref = image_row.image_ref
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == params["domain"])
-            )
-            allowed_registries = await conn.scalar(query)
-            if requested_image_ref.registry not in allowed_registries:
-                raise AliasResolutionFailed
+        if not requested_image_ref.is_local:
+            async with root_ctx.db.begin_readonly() as conn:
+                query = (
+                    sa.select([domains.c.allowed_docker_registries])
+                    .select_from(domains)
+                    .where(domains.c.name == params["domain"])
+                )
+                allowed_registries = await conn.scalar(query)
+                if requested_image_ref.registry not in allowed_registries:
+                    raise AliasResolutionFailed
     except AliasResolutionFailed:
         raise ImageNotFound("unknown alias or disallowed registry")
 

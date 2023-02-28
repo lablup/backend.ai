@@ -28,6 +28,10 @@ def get_container_registry(registry_info: Mapping[str, Any]) -> Type[BaseContain
         from .harbor import HarborRegistry_v2
 
         cr_cls = HarborRegistry_v2
+    elif registry_type == "local":
+        from .local import LocalRegistry
+
+        cr_cls = LocalRegistry
     else:
         raise RuntimeError(f"Unsupported registry type: {registry_type}")
     return cr_cls
