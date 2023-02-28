@@ -52,7 +52,7 @@ async def execute_paginated_query(
     )
 
 
-async def generate_paginated_results(
+async def fetch_paginated_result(
     root_field: str,
     variables: Dict[str, Tuple[Any, str]],
     fields: Sequence[FieldSpec],
@@ -70,15 +70,11 @@ async def generate_paginated_results(
         # should remove to work with older managers
         variables.pop("filter")
         variables.pop("order")
-    offset = page_offset
-    while True:
-        limit = page_size
-        result = await execute_paginated_query(
-            root_field,
-            variables,
-            fields,
-            limit=limit,
-            offset=offset,
-        )
-        offset += page_size
-        return result
+    result = await execute_paginated_query(
+        root_field,
+        variables,
+        fields,
+        limit=page_size,
+        offset=page_offset,
+    )
+    return result

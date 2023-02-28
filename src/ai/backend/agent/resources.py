@@ -47,7 +47,7 @@ from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
 from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
-from .stats import ContainerMeasurement, NodeMeasurement, StatContext
+from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import Container as SessionContainer
 from .types import MountInfo
 
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.resources"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
@@ -216,26 +216,41 @@ class KernelResourceSpec:
         return json.dumps(self.to_json_serializable_dict())
 
 
-@attrs.define(frozen=True, auto_attribs=True)
 class AbstractComputeDevice:
     device_id: DeviceId
-    device_name: DeviceName = attrs.field(
-        kw_only=True
-    )  # should be same to the slot name's prefix part
     hw_location: str  # either PCI bus ID or arbitrary string
-    numa_node: Optional[int]  # NUMA node ID (None if not applicable)
     memory_size: int  # bytes of available per-accelerator memory
     processing_units: int  # number of processing units (e.g., cores, SMP)
+    _device_name: Optional[DeviceName]
+    numa_node: Optional[int]  # NUMA node ID (None if not applicable)
 
-    @device_name.default
-    def _device_name(self) -> DeviceName:
-        # It is recommended to explicitly set this attribute -- this is to
-        # avoid modification of existing compute-device plugins.
-        # e.g., "CPUDevice" -> "cpu", "CUDADevice" -> "cuda"
-        # The reason to make this a method is to avoid attr.field() with factory/default
-        # does not allow mixing non-kw-only fields coming after it, meaning that
-        # we need to anyway modify the existing plugin codes.
+    def __init__(
+        self,
+        device_id: DeviceId,
+        hw_location: str,
+        memory_size: int,
+        processing_units: int,
+        numa_node: Optional[int] = None,
+        device_name: Optional[DeviceName] = None,
+    ) -> None:
+        self.device_id = device_id
+        self.hw_location = hw_location
+        self.memory_size = memory_size
+        self.processing_units = processing_units
+        self._device_name = device_name
+        self.numa_node = numa_node
+
+    @property
+    def device_name(self) -> DeviceName:
+        if self._device_name:
+            return self._device_name
         return DeviceName(self.__class__.__name__.removesuffix("Device").lower())
+
+    def __hash__(self) -> int:
+        return hash(f"{self.device_name}-{self.device_id}")
+
+    def __eq__(self, __o: object) -> bool:
+        return hash(self) == hash(__o)
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
@@ -294,6 +309,15 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     ) -> Sequence[ContainerMeasurement]:
         """
         Return the container-level statistic metrics.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        """
+        Return the process statistic metrics in container.
         """
         raise NotImplementedError
 
@@ -383,7 +407,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
-    plugin_group = "backendai_accelerator_v20"
+    plugin_group = "backendai_accelerator_v21"
 
     @classmethod
     def discover_plugins(

@@ -21,7 +21,6 @@ from typing import (
 
 import aiodocker
 import aiohttp
-import attrs
 
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -42,6 +41,7 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
@@ -69,10 +69,14 @@ PREFIX = "cuda"
 log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
 
 
-@attrs.define(auto_attribs=True)
 class CUDADevice(AbstractComputeDevice):
     model_name: str
     uuid: str
+
+    def __init__(self, model_name: str, uuid: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.model_name = model_name
+        self.uuid = uuid
 
 
 class CUDAPlugin(AbstractComputePlugin):
@@ -265,6 +269,11 @@ class CUDAPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
+        return []
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
         return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:

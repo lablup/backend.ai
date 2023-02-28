@@ -41,7 +41,7 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50200): t.ToInt[1:65535],
+                    t.Key("aiomonitor-port", default=48200): t.ToInt[1:65535],
                     t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
@@ -83,7 +83,7 @@ agent_local_config_iv = (
                     t.Key(
                         "allocation-order", default=["cuda", "rocm", "tpu", "cpu", "mem"]
                     ): t.List(t.String),
-                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED): tx.Enum(
+                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED.name): tx.Enum(
                         AffinityPolicy,
                         use_name=True,
                     ),

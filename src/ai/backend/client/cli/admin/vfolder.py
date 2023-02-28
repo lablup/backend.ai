@@ -26,11 +26,76 @@ def vfolder() -> None:
 
 def _list_cmd(docs: str = None):
     @pass_ctx_obj
-    @click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
-    @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
-    @click.option("--order", default=None, help="Set the query ordering expression.")
+    @click.option(
+        "-g",
+        "--group",
+        type=str,
+        default=None,
+        help="""\b
+        Filter by group ID.
+
+        \b
+        EXAMPLE
+            --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
+
+        \b
+        """,
+    )
+    @click.option(
+        "--filter",
+        "filter_",
+        default=None,
+        help="""\b
+        Set the query filter expression.
+
+        \b
+        COLUMNS
+            host, name, created_at, creator,
+            ownership_type (UESR, GROUP),
+            status (READY, PERFORMING, CLONING, DELETING, MOUNTED),
+            permission (READ_ONLY, READ_WRITE, RW_DELETE, OWNER_PERM)
+
+        \b
+        OPERATORS
+            Binary Operators: ==, !=, <, <=, >, >=, is, isnot, like, ilike(case-insensitive), in, contains
+            Condition Operators: &, |
+            Special Symbol: % (wildcard for like and ilike operators)
+
+        \b
+        EXAMPLE QUERIES
+            --filter 'status == "READY" & permission in ["READ_ONLY", "READ_WRITE"]'
+            --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
+            --filter 'creator ilike "%@example.com"'
+
+        \b
+        """,
+    )
+    @click.option(
+        "--order",
+        default=None,
+        help="""\b
+        Set the query ordering expression.
+
+        \b
+        COLUMNS
+            host, name, created_at, creator, ownership_type, status, permission
+
+        \b
+        OPTIONS
+            ascending order (default): (+)column_name
+            descending order: -column_name
+
+        \b
+        EXAMPLE
+            --order 'host'
+            --order '+host'
+            --order '-created_at'
+
+        \b
+        """,
+    )
     @click.option("--offset", default=0, help="The index of the current page start for pagination.")
-    @click.option("--limit", default=None, help="The page size for pagination.")
+    @click.option("--limit", type=int, default=None, help="The page size for pagination.")
     def list(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
         """
         List virtual folders.
@@ -206,6 +271,36 @@ def umount_host(name, edit_fstab):
 
 
 @vfolder.command
+def list_shared_vfolders():
+    """
+    List all shared vfolder.
+    (superadmin privilege required)
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.list_shared_vfolders()
+            result = resp.get("shared", [])
+            for _result in result:
+                print(
+                    'Virtual folder "{0}" (ID: {1})'.format(
+                        _result["vfolder_name"], _result["vfolder_id"]
+                    )
+                )
+                print("- Owner: {0}".format(_result["owner"]))
+                print("- Status: {0}".format(_result["status"]))
+                print("- Permission: {0}".format(_result["perm"]))
+                print("- Folder Type: {0}".format(_result["type"]))
+                shared_to = _result.get("shared_to", {})
+                if shared_to:
+                    print("- Shared to:")
+                    for k, v in shared_to.items():
+                        print("\t- {0}: {1}\n".format(k, v))
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command
 @click.argument("vfolder_id", type=str)
 def shared_vfolder_info(vfolder_id):
     """Show the vfolder permission information of the given virtual folder.
@@ -225,9 +320,10 @@ def shared_vfolder_info(vfolder_id):
                     )
                 )
                 print("- Owner: {0}".format(_result["owner"]))
+                print("- Status: {0}".format(_result["status"]))
                 print("- Permission: {0}".format(_result["perm"]))
                 print("- Folder Type: {0}".format(_result["type"]))
-                shared_to = _result.get("shared_to", [])
+                shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
