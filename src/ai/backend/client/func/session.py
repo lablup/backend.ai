@@ -802,7 +802,7 @@ class ComputeSession(BaseFunction):
     async def upload(
         self,
         files: Sequence[str | Path],
-        basedir: str | Path = None,
+        basedir: Optional[str | Path] = None,
         show_progress: bool = False,
     ):
         """
@@ -1314,7 +1314,7 @@ class InferenceSession(BaseFunction):
     async def upload(
         self,
         files: Sequence[str | Path],
-        basedir: str | Path = None,
+        basedir: Optional[str | Path] = None,
         show_progress: bool = False,
     ):
         """
