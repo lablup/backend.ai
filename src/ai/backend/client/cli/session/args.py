@@ -41,14 +41,6 @@ START_OPTION = [
         "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
     ),
     click.option(
-        "--depends",
-        metavar="SESSION_ID",
-        type=str,
-        multiple=True,
-        help="Set the list of session ID or names that the newly created session depends on. "
-        "The session will get scheduled after all of them successfully finish.",
-    ),
-    click.option(
         "--callback-url",
         metavar="CALLBACK_URL",
         type=str,
