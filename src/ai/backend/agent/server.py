@@ -351,7 +351,6 @@ class AgentRPCServer(aobject):
     @collect_error
     async def create_kernels(
         self,
-        creation_id: str,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
@@ -371,7 +370,6 @@ class AgentRPCServer(aobject):
             kernel_config = cast(KernelCreationConfig, raw_config)
             coros.append(
                 self.agent.create_kernel(
-                    creation_id,
                     session_id,
                     kernel_id,
                     kernel_config,
@@ -446,14 +444,12 @@ class AgentRPCServer(aobject):
     @collect_error
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: str,
         kernel_id: str,
         updated_config: dict,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
-            creation_id,
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             cast(KernelCreationConfig, updated_config),
