@@ -28,6 +28,12 @@ if [ $USER_ID -eq 0 ]; then
   # Extract dotfiles
   /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
+  # Start ssh-agent if it is available
+  if command -v ssh-agent > /dev/null; then
+    eval "$(ssh-agent -s)"
+    setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
+  fi
+
   echo "Executing the main program..."
   exec "$@"
 
@@ -83,7 +89,13 @@ else
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
-  echo "Executing the main program..."
-  exec /opt/kernel/su-exec $USER_ID:$GROUP_ID "$@"
+  # Start ssh-agent if it is available
+  if command -v ssh-agent > /dev/null; then
+    eval "$(ssh-agent -s)"
+    setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
+  fi
+
+  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
+  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
 
 fi
