@@ -2,7 +2,7 @@ import argparse
 import random
 import string
 
-import hash_phrase
+import hash_phrase  # pants: no-infer-dep
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

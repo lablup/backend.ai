@@ -21,6 +21,7 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -76,6 +77,21 @@ def _create_cmd(docs: str = None):
         default=None,
         help="A user-defined script to execute on startup.",
     )
+<<<<<<< HEAD:src/ai/backend/client/cli/session/lifecycle.py
+=======
+    @click.option(
+        "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
+    )
+    @click.option(
+        "--arch",
+        "--architecture",
+        "architecture",
+        metavar="ARCH_NAME",
+        type=str,
+        default=DEFAULT_IMAGE_ARCH,
+        help="Architecture of the image to use.",
+    )
+>>>>>>> main:src/ai/backend/client/cli/session.py
     # resource spec
     @click.option(
         "--cluster-mode",
@@ -114,6 +130,7 @@ def _create_cmd(docs: str = None):
         # extra options
         bootstrap_script: IO | None,
         tag: str | None,
+        architecture: str,
         # resource spec
         mount: Sequence[str],
         scaling_group: str | None,
@@ -180,6 +197,7 @@ def _create_cmd(docs: str = None):
                     if bootstrap_script is not None
                     else None,
                     tag=tag,
+                    architecture=architecture,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
                 )
@@ -268,6 +286,115 @@ def _create_from_template_cmd(docs: str = None):
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
     )
+<<<<<<< HEAD:src/ai/backend/client/cli/session/lifecycle.py
+=======
+    @click.option(
+        "--enqueue-only",
+        is_flag=True,
+        help="Enqueue the session and return immediately without waiting for its startup.",
+    )
+    @click.option(
+        "--max-wait",
+        metavar="SECONDS",
+        type=int,
+        default=undefined,
+        help="The maximum duration to wait until the session starts.",
+    )
+    @click.option(
+        "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
+    )
+    @click.option(
+        "--depends",
+        metavar="SESSION_ID",
+        type=str,
+        multiple=True,
+        help="Set the list of session ID or names that the newly created session depends on. "
+        "The session will get scheduled after all of them successfully finish.",
+    )
+    @click.option(
+        "--callback-url",
+        metavar="CALLBACK_URL",
+        type=str,
+        default=None,
+        help="Callback URL which will be called upon session lifecycle events.",
+    )
+    # execution environment
+    @click.option(
+        "-e",
+        "--env",
+        metavar="KEY=VAL",
+        type=str,
+        multiple=True,
+        help="Environment variable (may appear multiple times)",
+    )
+    # extra options
+    @click.option(
+        "--tag", type=str, default=undefined, help="User-defined tag string to annotate sessions."
+    )
+    # resource spec
+    @click.option(
+        "-m",
+        "--mount",
+        metavar="NAME[=PATH]",
+        type=str,
+        multiple=True,
+        help="User-owned virtual folder names to mount. "
+        "When the target path is relative, it is placed under /home/work "
+        "with auto-created parent directories if any. "
+        "Absolute paths are mounted as-is, but it is prohibited to "
+        "override the predefined Linux system directories.",
+    )
+    @click.option(
+        "--scaling-group",
+        "--sgroup",
+        type=str,
+        default=undefined,
+        help="The scaling group to execute session. If not specified, "
+        "all available scaling groups are included in the scheduling.",
+    )
+    @click.option(
+        "-r",
+        "--resources",
+        metavar="KEY=VAL",
+        type=str,
+        multiple=True,
+        help="Set computation resources used by the session "
+        "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
+        "1 slot of cpu/gpu represents 1 core. "
+        "The unit of mem(ory) is MiB.",
+    )
+    @click.option(
+        "--cluster-size",
+        metavar="NUMBER",
+        type=int,
+        default=undefined,
+        help="The size of cluster in number of containers.",
+    )
+    @click.option(
+        "--resource-opts",
+        metavar="KEY=VAL",
+        type=str,
+        multiple=True,
+        help="Resource options for creating compute session " "(e.g: shmem=64m)",
+    )
+    # resource grouping
+    @click.option(
+        "-d",
+        "--domain",
+        metavar="DOMAIN_NAME",
+        default=None,
+        help="Domain name where the session will be spawned. "
+        "If not specified, config's domain name will be used.",
+    )
+    @click.option(
+        "-g",
+        "--group",
+        metavar="GROUP_NAME",
+        default=None,
+        help="Group name where the session is spawned. "
+        "User should be a member of the group to execute the code.",
+    )
+>>>>>>> main:src/ai/backend/client/cli/session.py
     # template overrides
     @click.option(
         "--no-mount",
@@ -328,8 +455,7 @@ def _create_from_template_cmd(docs: str = None):
         command.
 
         \b
-        IMAGE: The name (and version/platform tags appended after a colon) of session
-               runtime or programming language.
+        TEMPLATE_ID: The template ID to create a session from.
         """
         if name is undefined:
             name = f"pysdk-{secrets.token_hex(5)}"
@@ -699,21 +825,21 @@ def status_history(session_id):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-@click.argument("new_id", metavar="NEWID")
-def rename(session_id, new_id):
+@click.argument("new_name", metavar="NEWNAME")
+def rename(session_id, new_name):
     """
     Renames session name of running session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
-    NEWID: New Session ID to rename to.
+    NEWNAME: New Session name.
     """
 
     with Session() as session:
         try:
             kernel = session.ComputeSession(session_id)
-            kernel.rename(new_id)
-            print_done(f"Session renamed to {new_id}.")
+            kernel.rename(new_name)
+            print_done(f"Session renamed to {new_name}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -973,12 +1099,10 @@ def _fetch_session_names():
             "PENDING",
             "SCHEDULED",
             "PREPARING",
-            "PULLING",
             "RUNNING",
+            "RUNNING_DEGRADED",
             "RESTARTING",
             "TERMINATING",
-            "RESIZING",
-            "SUSPENDED",
             "ERROR",
         ]
     )
@@ -986,7 +1110,7 @@ def _fetch_session_names():
         session_fields["name"],
         session_fields["session_id"],
         session_fields["group_name"],
-        session_fields["kernel_id"],
+        session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],
         session_fields["status"],
@@ -1005,7 +1129,7 @@ def _fetch_session_names():
             order=None,
         )
 
-    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+    return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
 def _watch_cmd(docs: Optional[str] = None):
