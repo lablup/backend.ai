@@ -5,7 +5,6 @@ import copy
 import itertools
 import logging
 import re
-import secrets
 import time
 import typing
 import uuid
@@ -685,7 +684,7 @@ class AgentRegistry:
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
                     "startup_command": kernel.get("startup_command"),
-                    "occupied_slots": ResourceSlot(),
+                    "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
                     "resource_opts": resource_opts,
                     "environ": [f"{k}={v}" for k, v in environ.items()],
@@ -798,6 +797,9 @@ class AgentRegistry:
         # Aggregate image registry information
         keyfunc = lambda item: item.kernel.image_ref
         image_infos: MutableMapping[str, ImageRow] = {}
+        is_local_image = True
+        registry_url = URL("http://localhost")
+        registry_creds: dict[str, str] = {}
         async with self.db.begin_readonly_session() as session:
             for image_ref, _ in itertools.groupby(
                 sorted(kernel_agent_bindings, key=keyfunc),
@@ -809,16 +811,20 @@ class AgentRegistry:
                 log.debug(
                     "start_session(): image ref => {} ({})", image_ref, image_ref.architecture
                 )
-                image_infos[str(image_ref)] = await ImageRow.resolve(session, [image_ref])
-                registry_url, registry_creds = await get_registry_info(
-                    self.shared_config.etcd, image_ref.registry
-                )
+                resolved_image_info = await ImageRow.resolve(session, [image_ref])
+                image_infos[str(image_ref)] = resolved_image_info
+                if not resolved_image_info.image_ref.is_local:
+                    is_local_image = False
+                    registry_url, registry_creds = await get_registry_info(
+                        self.shared_config.etcd, image_ref.registry
+                    )
         image_info = {
             "image_infos": image_infos,
             "registry_url": registry_url,
             "registry_creds": registry_creds,
             "resource_policy": resource_policy,
             "auto_pull": auto_pull,
+            "is_local": is_local_image,
         }
 
         network_name: Optional[str] = None
@@ -1147,6 +1153,7 @@ class AgentRegistry:
         registry_url = image_info["registry_url"]
         registry_creds = image_info["registry_creds"]
         image_infos = image_info["image_infos"]
+        is_local = image_info["is_local"]
         resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
         auto_pull = image_info["auto_pull"]
         assert agent_alloc_ctx.agent_id is not None
@@ -1158,7 +1165,6 @@ class AgentRegistry:
             order_key=str(scheduled_session.id),
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            kernel_creation_id = secrets.token_urlsafe(16)
             # Prepare kernel_started event handling
             for binding in items:
                 self.kernel_creation_tracker[binding.kernel.id] = loop.create_future()
@@ -1178,12 +1184,12 @@ class AgentRegistry:
                 get_image_ref = lambda k: image_infos[str(k.image_ref)].image_ref
                 # Issue a batched RPC call to create kernels on this agent
                 created_infos = await rpc.call.create_kernels(
-                    kernel_creation_id,
                     str(scheduled_session.id),
                     [str(binding.kernel.id) for binding in items],
                     [
                         {
                             "image": {
+                                # TODO: refactor registry and is_local to be specified per kernel.
                                 "registry": {
                                     "name": get_image_ref(binding.kernel).registry,
                                     "url": str(registry_url),
@@ -1194,6 +1200,7 @@ class AgentRegistry:
                                 "canonical": get_image_ref(binding.kernel).canonical,
                                 "architecture": get_image_ref(binding.kernel).architecture,
                                 "labels": image_infos[binding.kernel.image].labels,
+                                "is_local": is_local,
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
@@ -1700,7 +1707,7 @@ class AgentRegistry:
 
                             await execute_with_retry(_update)
                             await self.event_producer.produce_event(
-                                KernelCancelledEvent(kernel.id, "", reason),
+                                KernelCancelledEvent(kernel.id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
@@ -1973,7 +1980,6 @@ class AgentRegistry:
         async def _restart_kernel(kernel: KernelRow) -> None:
             loop = asyncio.get_running_loop()
             try:
-                kernel_creation_id = secrets.token_urlsafe(16)
                 start_future = loop.create_future()
                 self.kernel_creation_tracker[kernel.id] = start_future
                 try:
@@ -1988,7 +1994,6 @@ class AgentRegistry:
                             # TODO: support resacling of sub-containers
                         }
                         kernel_info = await rpc.call.restart_kernel(
-                            kernel_creation_id,
                             str(kernel.session_id),
                             str(kernel.id),
                             updated_config,
@@ -2586,6 +2591,11 @@ class AgentRegistry:
 
         result = await execute_with_retry(_update_kernel_status)
 
+        if result is None:
+            return
+
+        session_id, access_key, agent = result
+
         async def _recalc() -> None:
             async with self.db.begin() as conn:
                 log.debug(
@@ -2600,11 +2610,6 @@ class AgentRegistry:
                 await recalc_agent_resource_occupancy(conn, agent)
 
         await execute_with_retry(_recalc)
-        if result is None:
-            return
-
-        assert result is not None
-        session_id, access_key, agent = result
 
         async def _check_session() -> None:
             async with self.db.begin_session() as db_sess:

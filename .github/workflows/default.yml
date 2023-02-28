@@ -4,6 +4,7 @@ on:
   push:
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
@@ -249,11 +250,14 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Upload wheels and sdist
+    - name: Upload wheels and sdists
       uses: actions/upload-artifact@v3
       with:
-        name: wheels
-        path: dist/*.whl dist/*.tar.gz
+        name: wheels-and-sdists
+        path: |
+          dist/*.whl
+          dist/*.tar.gz
+        if-no-files-found: error
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -294,10 +298,10 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Download built wheels and sdist
+    - name: Download built wheels and sdists
       uses: actions/download-artifact@v3
       with:
-        name: wheels and sdist
+        name: wheels-and-sdists
         path: dist
     - name: Install conda-pack
       uses: s-weigand/setup-conda@v1
@@ -315,6 +319,7 @@ jobs:
       with:
         name: windows-conda
         path: backend.ai-client-windows-conda.tar.gz
+        if-no-files-found: error
 
 
   deploy-to-pypi:
@@ -340,10 +345,10 @@ jobs:
     - name: Install local dependencies for publishing
       run: |
         pip install -U 'twine~=4.0'
-    - name: Download built wheels and sdist
+    - name: Download built wheels and sdists
       uses: actions/download-artifact@v3
       with:
-        name: wheels and sdist
+        name: wheels-and-sdists
         path: dist
     - name: Download conda-pack
       uses: actions/download-artifact@v3
