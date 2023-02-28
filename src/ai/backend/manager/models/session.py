@@ -93,6 +93,8 @@ __all__ = (
     "check_all_dependencies",
     "ComputeSession",
     "ComputeSessionList",
+    "InferenceSession",
+    "InferenceSessionList",
 )
 
 
@@ -1136,7 +1138,7 @@ class ComputeSession(graphene.ObjectType):
             "resource_opts": row.resource_opts,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            "mounts": row.vfolder_mounts,
+            "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
             # statistics
             "num_queries": row.num_queries,
@@ -1216,49 +1218,48 @@ class ComputeSession(graphene.ObjectType):
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     _queryfilter_fieldspec = {
-        "session_type": ("session_type", lambda s: SessionTypes[s]),
-        "name": ("name", None),
-        "image": ("image", None),
-        "architecture": ("architecture", None),
-        "domain_name": ("domain_name", None),
-        "group_name": ("groups_group_name", None),
+        "id": ("sessions_id", None),
+        "type": ("sessions_session_type", lambda s: SessionTypes[s]),
+        "name": ("sessions_name", None),
+        "domain_name": ("sessions_domain_name", None),
+        "group_name": ("groups_name", None),
         "user_email": ("users_email", None),
-        "access_key": ("access_key", None),
-        "scaling_group": ("scaling_group", None),
-        "cluster_mode": ("cluster_mode", lambda s: ClusterMode[s]),
-        "cluster_template": ("cluster_template", None),
-        "cluster_size": ("cluster_size", None),
-        "status": ("status", lambda s: KernelStatus[s]),
-        "status_info": ("status_info", None),
+        "user_name": ("users_username", None),
+        "access_key": ("sessions_access_key", None),
+        "scaling_group": ("sessions_scaling_group_name", None),
+        "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
+        "cluster_size": ("sessions_cluster_size", None),
+        "status": ("sessions_status", lambda s: SessionStatus[s]),
+        "status_info": ("sessions_status_info", None),
         # "status_changed": ("status_changed", dtparse),
-        "result": ("result", lambda s: SessionResult[s]),
-        "created_at": ("created_at", dtparse),
-        "terminated_at": ("terminated_at", dtparse),
-        "starts_at": ("starts_at", dtparse),
-        "startup_command": ("startup_command", None),
+        "result": ("sessions_result", lambda s: SessionResult[s]),
+        "created_at": ("sessions_created_at", dtparse),
+        "terminated_at": ("sessions_terminated_at", dtparse),
+        "starts_at": ("sessions_starts_at", dtparse),
+        "startup_command": ("sessions_startup_command", None),
     }
 
     _queryorder_colmap = {
-        "id": "id",
-        "session_type": "session_type",
-        "name": "name",
-        "image": "image",
-        "architecture": "architecture",
-        "domain_name": "domain_name",
-        "group_name": "group_name",
+        "id": "sessions_id",
+        "type": "sessions_session_type",
+        "name": "sessions_name",
+        # "image": "image",
+        # "architecture": "architecture",
+        "domain_name": "sessions_domain_name",
+        "group_name": "groups_name",
         "user_email": "users_email",
-        "access_key": "access_key",
-        "scaling_group": "scaling_group",
-        "cluster_mode": "cluster_mode",
-        "cluster_template": "cluster_template",
-        "cluster_size": "cluster_size",
-        "status": "status",
-        "status_info": "status_info",
-        # "status_changed": "status_info",
-        "result": "result",
-        "created_at": "created_at",
-        "terminated_at": "terminated_at",
-        "starts_at": "starts_at",
+        "user_name": "users_username",
+        "access_key": "sessions_access_key",
+        "scaling_group": "sessions_scaling_group_name",
+        "cluster_mode": "sessions_cluster_mode",
+        # "cluster_template": "cluster_template",
+        "cluster_size": "sessions_cluster_size",
+        "status": "sessions_status",
+        "status_info": "sessions_status_info",
+        "result": "sessions_result",
+        "created_at": "sessions_created_at",
+        "terminated_at": "sessions_terminated_at",
+        "starts_at": "sessions_starts_at",
     }
 
     @classmethod
@@ -1417,3 +1418,15 @@ class ComputeSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(ComputeSession, required=True)
+
+
+class InferenceSession(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+
+class InferenceSessionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(InferenceSession, required=True)

@@ -32,7 +32,7 @@ from ..types import (
 )
 from ..utils import fstime2datetime
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def run(cmd: Sequence[Union[str, Path]]) -> str:
@@ -129,6 +129,17 @@ class BaseVolume(AbstractVolume):
         def _purge():
             try:
                 shutil.rmtree(vfpath)
+            except FileNotFoundError:
+                pass
+            # remove intermediate prefix directories if they become empty
+            try:
+                if not os.listdir(vfpath.parent):
+                    vfpath.parent.rmdir()
+            except FileNotFoundError:
+                pass
+            try:
+                if not os.listdir(vfpath.parent.parent):
+                    vfpath.parent.parent.rmdir()
             except FileNotFoundError:
                 pass
 

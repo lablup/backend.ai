@@ -4,7 +4,7 @@ import os
 import platform
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, cast
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 import aiohttp
 import async_timeout
@@ -38,6 +38,7 @@ from ..stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
     StatModes,
 )
@@ -46,7 +47,7 @@ from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -249,6 +250,74 @@ class CPUPlugin(AbstractComputePlugin):
                 MetricTypes.USAGE,
                 unit_hint="msec",
                 per_container=per_container_cpu_used,
+            ),
+        ]
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        async def psutil_impl(pid: int) -> Optional[Decimal]:
+            try:
+                p = await asyncio.get_running_loop().run_in_executor(None, psutil.Process, pid)
+            except psutil.NoSuchProcess:
+                log.warning("psutil cannot found process {0}", pid)
+            else:
+                cpu_times = p.cpu_times()
+                cpu_used = Decimal(cpu_times.user + cpu_times.system) * 1000
+                return cpu_used
+            return None
+
+        async def api_impl(cid: str, pids: List[int]) -> List[Optional[Decimal]]:
+
+            return []
+
+        per_process_cpu_util = {}
+        per_process_cpu_used = {}
+        results: List[Decimal]
+        q = Decimal("0.000")
+        pid_map_list = list(pid_map.items())
+        match self.local_config["agent"]["docker-mode"]:
+            case "linuxkit":
+                api_tasks = []
+                # group by container ID
+                cid_pids_map: Dict[str, List[int]] = {}
+                for pid, cid in pid_map_list:
+                    if cid_pids_map.get(cid) is None:
+                        cid_pids_map[cid] = []
+                    cid_pids_map[cid].append(pid)
+                for cid, pids in cid_pids_map.items():
+                    api_tasks.append(asyncio.ensure_future(api_impl(cid, pids)))
+                chunked_results = await asyncio.gather(*api_tasks)
+                results = []
+                for chunk in chunked_results:
+                    results.extend(chunk)
+            case _:
+                psutil_tasks = []
+                for pid, _ in pid_map_list:
+                    psutil_tasks.append(asyncio.ensure_future(psutil_impl(pid)))
+                results = await asyncio.gather(*psutil_tasks)
+
+        for (pid, cid), cpu_used in zip(pid_map_list, results):
+            if cpu_used is None:
+                continue
+            per_process_cpu_util[pid] = Measurement(
+                Decimal(cpu_used).quantize(q), capacity=Decimal(1000)
+            )
+            per_process_cpu_used[pid] = Measurement(Decimal(cpu_used).quantize(q))
+        return [
+            ProcessMeasurement(
+                MetricKey("cpu_util"),
+                MetricTypes.UTILIZATION,
+                unit_hint="percent",
+                current_hook=lambda metric: metric.stats.rate,
+                stats_filter=frozenset({"avg", "max"}),
+                per_process=per_process_cpu_util,
+            ),
+            ProcessMeasurement(
+                MetricKey("cpu_used"),
+                MetricTypes.USAGE,
+                unit_hint="msec",
+                per_process=per_process_cpu_used,
             ),
         ]
 
@@ -594,6 +663,89 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_io_scratch_size,
+            ),
+        ]
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        async def psutil_impl(pid) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+            try:
+                p = psutil.Process(pid)
+            except psutil.NoSuchProcess:
+                log.warning("psutil cannot found process {0}", pid)
+            else:
+                stats = p.as_dict(attrs=["memory_info", "io_counters"])
+                mem_cur_bytes = io_read_bytes = io_write_bytes = None
+                if stats["memory_info"] is not None:
+                    mem_cur_bytes = stats["memory_info"].rss
+                if stats["io_counters"] is not None:
+                    io_read_bytes = stats["io_counters"].read_bytes
+                    io_write_bytes = stats["io_counters"].write_bytes
+                return mem_cur_bytes, io_read_bytes, io_write_bytes
+            return None, None, None
+
+        async def api_impl(
+            cid: str, pids: List[int]
+        ) -> List[Tuple[Optional[int], Optional[int], Optional[int]]]:
+
+            return []
+
+        per_process_mem_used_bytes = {}
+        per_process_io_read_bytes = {}
+        per_process_io_write_bytes = {}
+        results: List[Tuple[Optional[int], Optional[int], Optional[int]]]
+        pid_map_list = list(pid_map.items())
+        match self.local_config["agent"]["docker-mode"]:
+            case "linuxkit":
+                api_tasks = []
+                # group by container ID
+                cid_pids_map: Dict[str, List[int]] = {}
+                for pid, cid in pid_map_list:
+                    if cid_pids_map.get(cid) is None:
+                        cid_pids_map[cid] = []
+                    cid_pids_map[cid].append(pid)
+                for cid, pids in cid_pids_map.items():
+                    api_tasks.append(asyncio.ensure_future(api_impl(cid, pids)))
+                chunked_results = await asyncio.gather(*api_tasks)
+                results = []
+                for chunk in chunked_results:
+                    results.extend(chunk)
+            case _:
+                psutil_tasks = []
+                for pid, _ in pid_map_list:
+                    psutil_tasks.append(asyncio.ensure_future(psutil_impl(pid)))
+                results = await asyncio.gather(*psutil_tasks)
+
+        for (pid, _), result in zip(pid_map_list, results):
+            mem, io_read, io_write = result
+            if mem is not None:
+                per_process_mem_used_bytes[pid] = Measurement(Decimal(mem))
+            if io_read is not None:
+                per_process_io_read_bytes[pid] = Measurement(Decimal(io_read))
+            if io_write is not None:
+                per_process_io_write_bytes[pid] = Measurement(Decimal(io_write))
+        return [
+            ProcessMeasurement(
+                MetricKey("mem"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_process=per_process_mem_used_bytes,
+            ),
+            ProcessMeasurement(
+                MetricKey("io_read"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"rate"}),
+                per_process=per_process_io_read_bytes,
+            ),
+            ProcessMeasurement(
+                MetricKey("io_write"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"rate"}),
+                per_process=per_process_io_write_bytes,
             ),
         ]
 

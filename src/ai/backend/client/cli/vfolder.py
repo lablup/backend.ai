@@ -6,7 +6,6 @@ from pathlib import Path
 import click
 import humanize
 from tabulate import tabulate
-from tqdm import tqdm
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
@@ -17,7 +16,15 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
-from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
+from .pretty import (
+    ProgressViewer,
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
 
 
 @main.group()
@@ -86,8 +93,8 @@ def list_allowed_types():
     type=str,
     default="rw",
     help="Folder's innate permission. "
-    'Group folders can be shared as read-only by setting this option to "ro".'
-    "Invited folders override this setting by its own invitation permission.",
+    'Group folders can be shared as read-only by setting this option to "ro". '
+    "Invited folders override this setting by its own invitation permission. ",
 )
 @click.option(
     "-q",
@@ -148,6 +155,7 @@ def delete(name):
     This operation can be irreversible if the storage proxy has trash-bin.
     If it is set, `recover()` can reverse this operation.
 
+    \b
     NAME: Name of a virtual folder.
     """
     with Session() as session:
@@ -200,6 +208,7 @@ def rename(old_name, new_name):
     and the new name must be unique among all your accessible vfolders
     including the shared ones.
 
+    \b
     OLD_NAME: The current name of a virtual folder.
     NEW_NAME: The new name of a virtual folder.
     """
@@ -217,6 +226,7 @@ def rename(old_name, new_name):
 def info(name):
     """Show the information of the given virtual folder.
 
+    \b
     NAME: Name of a virtual folder.
     """
     with Session() as session:
@@ -225,6 +235,7 @@ def info(name):
             print('Virtual folder "{0}" (ID: {1})'.format(result["name"], result["id"]))
             print("- Owner:", result["is_owner"])
             print("- Permission:", result["permission"])
+            print("- Status: {0}".format(result["status"]))
             print("- Number of files: {0}".format(result["numFiles"]))
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
@@ -246,8 +257,8 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="The local parent directory which contains the file to be uploaded.  "
-    "[default: current working directry]",
+    help="The local parent directory which contains the file to be uploaded. "
+    "[default: current working directory]",
 )
 @click.option(
     "--chunk-size",
@@ -269,7 +280,7 @@ def info(name):
 def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     """
     TUS Upload a file to the virtual folder from the current working directory.
-    The files with the same names will be overwirtten.
+    The files with the same names will be overwritten.
 
     \b
     NAME: Name of a virtual folder.
@@ -300,7 +311,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     type=Path,
     default=None,
     help="The local parent directory which will contain the downloaded file.  "
-    "[default: current working directry]",
+    "[default: current working directory]",
 )
 @click.option(
     "--chunk-size",
@@ -328,7 +339,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
 def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
     """
     Download a file from the virtual folder to the current working directory.
-    The files with the same names will be overwirtten.
+    The files with the same names will be overwritten.
 
     \b
     NAME: Name of a virtual folder.
@@ -356,7 +367,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_
 @click.argument("filename", type=Path)
 def request_download(name, filename):
     """
-    Request JWT-formated download token for later use.
+    Request JWT-formatted download token for later use.
 
     \b
     NAME: Name of a virtual folder.
@@ -376,6 +387,7 @@ def request_download(name, filename):
 def cp(filenames):
     """An scp-like shortcut for download/upload commands.
 
+    \b
     FILENAMES: Paths of the files to operate on. The last one is the target while all
                others are the sources.  Either source paths or the target path should
                be prefixed with "<vfolder-name>:" like when using the Linux scp
@@ -515,7 +527,7 @@ def ls(name, path):
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
                 row = [file["filename"], file["size"], mtime, file["mode"]]
                 table.append(row)
-            print_done("Retrived.")
+            print_done("Retrieved.")
             print(tabulate(table, headers=headers))
         except Exception as e:
             print_error(e)
@@ -676,8 +688,9 @@ def unshare(name, emails):
     help="The ID of the person who wants to leave (the person who shared the vfolder).",
 )
 def leave(name, shared_user_uuid):
-    """Leave the shared virutal folder.
+    """Leave the shared virtual folder.
 
+    \b
     NAME: Name of a virtual folder
     """
     with Session() as session:
@@ -745,34 +758,38 @@ def clone(name, target_name, target_host, usage_mode, permission):
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
+    # NOTE: Tracking the progress from the storage-proxy is not supported yet. (See #1033)
     async def clone_vfolder_tracker(bgtask_id):
-        print_wait(
-            "Cloning the vfolder... "
-            "(This may take a while depending on its size and number of files!)",
-        )
         async with AsyncSession() as session:
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
-                async with bgtask.listen_events() as response:
-                    # TODO: get the unit of progress from response
-                    with tqdm(unit="bytes", disable=True) as pbar:
-                        async for ev in response:
-                            data = json.loads(ev.data)
-                            if ev.event == "bgtask_updated":
+                async with (
+                    bgtask.listen_events() as response,
+                    ProgressViewer(
+                        "Cloning the vfolder... "
+                        "(This may take a while depending on its size and number of files!)",
+                    ) as viewer,
+                ):
+                    async for ev in response:
+                        data = json.loads(ev.data)
+                        if ev.event == "bgtask_updated":
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm()
+                            else:
                                 pbar.total = data["total_progress"]
                                 pbar.write(data["message"])
                                 pbar.update(data["current_progress"] - pbar.n)
-                            elif ev.event == "bgtask_failed":
-                                error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
-                                    f"Error during the operation: {error_msg}",
-                                )
-                            elif ev.event == "bgtask_cancelled":
-                                completion_msg_func = lambda: print_warn(
-                                    "The operation has been cancelled in the middle. "
-                                    "(This may be due to server shutdown.)",
-                                )
+                        elif ev.event == "bgtask_failed":
+                            error_msg = data["message"]
+                            completion_msg_func = lambda: print_fail(
+                                f"Error during the operation: {error_msg}",
+                            )
+                        elif ev.event == "bgtask_cancelled":
+                            completion_msg_func = lambda: print_warn(
+                                "The operation has been cancelled in the middle. "
+                                "(This may be due to server shutdown.)",
+                            )
             finally:
                 completion_msg_func()
 

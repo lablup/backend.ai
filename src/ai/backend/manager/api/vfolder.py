@@ -9,6 +9,7 @@ import stat
 import uuid
 from datetime import datetime
 from pathlib import Path
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,10 +22,13 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
 )
 
 import aiohttp
 import aiohttp_cors
+import aiotools
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -44,6 +48,7 @@ from ..models import (
     KernelStatus,
     UserRole,
     VFolderAccessStatus,
+    VFolderDeletionInfo,
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -56,6 +61,7 @@ from ..models import (
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     groups,
+    initiate_vfolder_removal,
     kernels,
     keypairs,
     query_accessible_vfolders,
@@ -91,7 +97,7 @@ from .utils import check_api_params, get_user_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow = Mapping[str, Any]
 
@@ -123,24 +129,33 @@ async def ensure_vfolder_status(
 
     match perm:
         case VFolderAccessStatus.READABLE:
-            # if READABLE access status is requested, all operation status is accepted.
-            vf_status_conds = vfolders.c.status.in_(
-                [
-                    VFolderOperationStatus.READY,
-                    VFolderOperationStatus.PERFORMING,
-                    VFolderOperationStatus.CLONING,
-                    VFolderOperationStatus.ERROR,
-                    VFolderOperationStatus.DELETE_COMPLETE,
-                    VFolderOperationStatus.MOUNTED,
-                ]
-            )
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.PERFORMING,
+                VFolderOperationStatus.CLONING,
+                VFolderOperationStatus.DELETE_COMPLETE,
+                VFolderOperationStatus.MOUNTED,
+            }
         case VFolderAccessStatus.UPDATABLE:
             # if UPDATABLE access status is requested, only READY operation status is accepted.
-            vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
-        case VFolderAccessStatus.PURGABLE:
-            vf_status_conds = vfolders.c.status == VFolderOperationStatus.DELETE_COMPLETE
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.MOUNTED,
+            }
+        case VFolderAccessStatus.DELETABLE:
+            # if DELETABLE access status is requested, only READY operation status is accepted.
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+            }
         case VFolderAccessStatus.RECOVERABLE:
-            vf_status_conds = vfolders.c.status == VFolderOperationStatus.DELETE_COMPLETE
+            available_vf_statuses = {
+                VFolderOperationStatus.DELETE_COMPLETE,
+            }
+        case VFolderAccessStatus.PURGABLE:
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.DELETE_COMPLETE,
+            }
         case _:
             # Otherwise, raise VFolderFilterStatusNotAvailable()
             raise VFolderFilterStatusNotAvailable()
@@ -151,11 +166,16 @@ async def ensure_vfolder_status(
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vf_name_conds & vf_status_conds),
+            extra_vf_conds=vf_name_conds,
             allow_privileged_access=True,
         )
         if len(entries) == 0:
-            raise VFolderFilterStatusFailed()
+            raise VFolderFilterStatusFailed(
+                f"Cannot find any folder with the given identity ({folder_id = }, {folder_name = })"
+            )
+        for entry in entries:
+            if entry["status"] not in available_vf_statuses:
+                raise VFolderFilterStatusFailed()
 
 
 def vfolder_permission_required(perm: VFolderPermission):
@@ -508,33 +528,6 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
 
-    def make_entries(result, user_uuid) -> List[Dict[str, Any]]:
-        entries = []
-        for row in result:
-            entries.append(
-                {
-                    "name": row.vfolders_name,
-                    "id": row.vfolders_id,
-                    "host": row.vfolders_host,
-                    "usage_mode": row.vfolders_usage_mode,
-                    "created_at": row.vfolders_created_at,
-                    "is_owner": (row.vfolders_user == user_uuid),
-                    "permission": row.vfolders_permission,
-                    "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "group": str(row.vfolders_group) if row.vfolders_group else None,
-                    "creator": row.vfolders_creator,
-                    "user_email": row.users_email,
-                    "group_name": row.groups_name,
-                    "ownership_type": row.vfolders_ownership_type,
-                    "type": row.vfolders_ownership_type,  # legacy
-                    "unmanaged_path": row.vfolders_unmanaged_path,
-                    "cloneable": row.vfolders_cloneable if row.vfolders_cloneable else False,
-                    "max_files": row.vfolders_max_files,
-                    "max_size": row.vfolders_max_size,
-                }
-            )
-        return entries
-
     log.info("VFOLDER.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
     entries: List[Mapping[str, Any]] | Sequence[Mapping[str, Any]]
     owner_user_uuid, owner_user_role = await get_user_scopes(request, params)
@@ -563,6 +556,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "name": entry["name"],
                     "id": entry["id"].hex,
                     "host": entry["host"],
+                    "status": entry["status"],
                     "usage_mode": entry["usage_mode"].value,
                     "created_at": str(entry["created_at"]),
                     "is_owner": entry["is_owner"],
@@ -577,6 +571,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "cloneable": entry["cloneable"],
                     "max_files": entry["max_files"],
                     "max_size": entry["max_size"],
+                    "cur_size": entry["cur_size"],
                 }
             )
     return web.json_response(resp, status=200)
@@ -592,8 +587,10 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_id=params["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
+    app_ctx: PrivateContext = request.app["folders.context"]
+
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
@@ -619,30 +616,37 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             domain_name=domain_name,
             permission=VFolderHostPermission.DELETE,
         )
-        folder_id = uuid.UUID(params["id"])
-        # fs-level deletion may fail or take longer time
-        # but let's complete the db transaction to reflect that it's deleted.
-        cond = vfolders.c.id == folder_id
-        await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_ONGOING)
-        async with root_ctx.storage_manager.request(
-            folder_host,
-            "POST",
-            "folder/delete",
-            json={
-                "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                "vfid": str(folder_id),
-            },
-        ) as (_, storage_resp):
-            result = await storage_resp.json()
-        if result is not None:
-            match VFolderDeletionResult(result.get("result")):
-                case VFolderDeletionResult.PURGED:
-                    query = sa.delete(vfolders).where(cond)
-                    await conn.execute(query)
-                case VFolderDeletionResult.MOVED_TO_TRASH | VFolderDeletionResult.NO_CHANGE:
-                    await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
-                case VFolderDeletionResult.ALREADY_PURGED:
-                    pass
+        # folder_id = uuid.UUID(params["id"])
+        # # fs-level deletion may fail or take longer time
+        # # but let's complete the db transaction to reflect that it's deleted.
+        # cond = vfolders.c.id == folder_id
+        # await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_ONGOING)
+        # async with root_ctx.storage_manager.request(
+        #     folder_host,
+        #     "POST",
+        #     "folder/delete",
+        #     json={
+        #         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+        #         "vfid": str(folder_id),
+        #     },
+        # ) as (_, storage_resp):
+        #     result = await storage_resp.json()
+        # if result is not None:
+        #     match VFolderDeletionResult(result.get("result")):
+        #         case VFolderDeletionResult.PURGED:
+        #             query = sa.delete(vfolders).where(cond)
+        #             await conn.execute(query)
+        #         case VFolderDeletionResult.MOVED_TO_TRASH | VFolderDeletionResult.NO_CHANGE:
+        #             await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
+        #         case VFolderDeletionResult.ALREADY_PURGED:
+        #             pass
+    folder_id = uuid.UUID(params["id"])
+    await initiate_vfolder_removal(
+        root_ctx.db,
+        [VFolderDeletionInfo(folder_id, folder_host)],
+        root_ctx.storage_manager,
+        app_ctx.storage_ptask_group,
+    )
     return web.Response(status=204)
 
 
@@ -808,6 +812,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "name": row["name"],
         "id": row["id"].hex,
         "host": row["host"],
+        "status": row["status"],
         "numFiles": usage["file_count"],  # legacy
         "num_files": usage["file_count"],
         "used_bytes": usage["used_bytes"],  # added in v20.09
@@ -823,6 +828,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "status": row["status"],
         "cloneable": row["cloneable"],
         "max_size": row["max_size"],
+        "cur_size": row["cur_size"],
     }
     return web.json_response(resp, status=200)
 
@@ -993,6 +999,34 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         proxy_name,
         "GET",
         "folder/usage",
+        json={
+            "volume": volume_name,
+            "vfid": str(params["id"]),
+        },
+    ) as (_, storage_resp):
+        usage = await storage_resp.json()
+    return web.json_response(usage, status=200)
+
+
+@superadmin_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("folder_host"): t.String,
+            t.Key("id"): tx.UUID,
+        }
+    )
+)
+async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
+    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_id=params["id"])
+    root_ctx: RootContext = request.app["_root.context"]
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
+    async with root_ctx.storage_manager.request(
+        proxy_name,
+        "GET",
+        "folder/used-bytes",
         json={
             "volume": volume_name,
             "vfid": str(params["id"]),
@@ -2099,11 +2133,13 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def delete(request: web.Request) -> web.Response:
+async def delete_by_name(request: web.Request) -> web.Response:
     await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+        request, VFolderAccessStatus.DELETABLE, folder_name=request.match_info["name"]
     )
     root_ctx: RootContext = request.app["_root.context"]
+    app_ctx: PrivateContext = request.app["folders.context"]
+
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
@@ -2166,6 +2202,7 @@ async def delete(request: web.Request) -> web.Response:
         )
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+<<<<<<< HEAD
             raise InvalidAPIParameters("Cannot delete the vfolder " "that is not owned by myself.")
     folder_host = entry["host"]
     folder_id = entry["id"]
@@ -2346,6 +2383,16 @@ async def recover(request: web.Request) -> web.Response:
         ):
             pass
         await update_vfolder_status(conn, cond, VFolderOperationStatus.READY)
+=======
+            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+
+    await initiate_vfolder_removal(
+        root_ctx.db,
+        [VFolderDeletionInfo(entry["id"], folder_host)],
+        root_ctx.storage_manager,
+        app_ctx.storage_ptask_group,
+    )
+>>>>>>> main
     return web.Response(status=204)
 
 
@@ -2578,6 +2625,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             raise InvalidAPIParameters
 
     # Start the clone operation as a background task.
+    # NOTE: Tracking the progress from the storage-proxy is not supported yet. (See #1033)
     async def _clone_bgtask(reporter: ProgressReporter) -> None:
         async with root_ctx.storage_manager.request(
             source_folder_host,
@@ -2622,7 +2670,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["vfolder_id", "vfolderId"]): tx.UUID,
+            tx.AliasedKey(["vfolder_id", "vfolderId"], default=None): tx.UUID | t.Null,
         }
     ),
 )
@@ -2650,6 +2698,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
                 vfolders.c.id,
                 vfolders.c.name,
                 vfolders.c.group,
+                vfolders.c.status,
                 vfolders.c.user.label("vfolder_user"),
                 users.c.email,
             ]
@@ -2666,6 +2715,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             {
                 "vfolder_id": str(shared.id),
                 "vfolder_name": str(shared.name),
+                "status": shared.status.value,
                 "owner": str(owner),
                 "type": folder_type,
                 "shared_to": {
@@ -3135,12 +3185,32 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+async def storage_task_exception_handler(
+    exc_type: Type[Exception],
+    exc_obj: Exception,
+    tb: TracebackType,
+):
+    log.exception("Error while removing vFolder", exc_info=exc_obj)
+
+
+@attrs.define(slots=True, auto_attribs=True, init=False)
+class PrivateContext:
+    database_ptask_group: aiotools.PersistentTaskGroup
+    storage_ptask_group: aiotools.PersistentTaskGroup
+
+
 async def init(app: web.Application) -> None:
-    pass
+    app_ctx: PrivateContext = app["folders.context"]
+    app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.storage_ptask_group = aiotools.PersistentTaskGroup(
+        exception_handler=storage_task_exception_handler
+    )
 
 
 async def shutdown(app: web.Application) -> None:
-    pass
+    app_ctx: PrivateContext = app["folders.context"]
+    await app_ctx.database_ptask_group.shutdown()
+    await app_ctx.storage_ptask_group.shutdown()
 
 
 def create_app(default_cors_options):
@@ -3149,6 +3219,7 @@ def create_app(default_cors_options):
     app["api_versions"] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
+    app["folders.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
@@ -3157,9 +3228,13 @@ def create_app(default_cors_options):
     cors.add(root_resource.add_route("DELETE", delete_by_id))
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
+<<<<<<< HEAD
     cors.add(vfolder_resource.add_route("DELETE", delete))
     cors.add(add_route("POST", r"/{name}/purge", purge))
     cors.add(add_route("POST", r"/{name}/recover", recover))
+=======
+    cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
+>>>>>>> main
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))
@@ -3197,4 +3272,5 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/quota", get_quota))
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))
+    cors.add(add_route("GET", r"/_/used-bytes", get_used_bytes))
     return app, []

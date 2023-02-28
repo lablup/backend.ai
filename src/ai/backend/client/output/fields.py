@@ -78,6 +78,7 @@ domain_fields = FieldSet(
     ]
 )
 
+
 group_fields = FieldSet(
     [
         FieldSpec("id"),
@@ -280,6 +281,7 @@ vfolder_fields = FieldSet(
         FieldSpec("user", alt_name="user_id"),
         FieldSpec("group", alt_name="group_id"),
         FieldSpec("creator"),
+        FieldSpec("status"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
         FieldSpec("status"),
@@ -295,8 +297,23 @@ vfolder_fields = FieldSet(
     ]
 )
 
+
 permission_fields = FieldSet(
     [
         FieldSpec("vfolder_host_permission_list"),
+    ]
+)
+
+
+service_fields = FieldSet(
+    [
+        FieldSpec("model_id"),
+        FieldSpec("model_version"),
+        FieldSpec("image_ref"),
+        FieldSpec("project"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("endpoint_id"),
+        FieldSpec("service_id"),
+        FieldSpec("service_name"),
     ]
 )
