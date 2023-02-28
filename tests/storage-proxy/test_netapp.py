@@ -5,6 +5,9 @@ import pytest
 
 from ai.backend.storage.netapp import NetAppVolume
 
+# module-level marker
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 async def netapp_volume(vfroot):
