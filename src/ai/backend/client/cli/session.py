@@ -21,7 +21,7 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
@@ -132,11 +132,13 @@ def _create_cmd(docs: str = None):
         "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
     )
     @click.option(
+        "--arch",
         "--architecture",
+        "architecture",
         metavar="ARCH_NAME",
         type=str,
         default=DEFAULT_IMAGE_ARCH,
-        help="Architecture of image.",
+        help="Architecture of the image to use.",
     )
     # resource spec
     @click.option(
