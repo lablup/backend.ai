@@ -26,12 +26,6 @@ START_OPTION = [
         help="Let session to be started at a specific or relative time.",
     ),
     click.option(
-        "-c",
-        "--startup-command",
-        metavar="COMMAND",
-        help="Set the command to execute for batch-type sessions.",
-    ),
-    click.option(
         "--enqueue-only",
         is_flag=True,
         help="Enqueue the session and return immediately without waiting for its startup.",
