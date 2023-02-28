@@ -345,8 +345,6 @@ def prepare_mount_arg(
     default="single-node",
     help="The mode of clustering.",
 )
-<<<<<<< HEAD:src/ai/backend/client/cli/session/execute.py
-=======
 @click.option(
     "--resource-opts",
     metavar="KEY=VAL",
@@ -363,7 +361,6 @@ def prepare_mount_arg(
     default=DEFAULT_IMAGE_ARCH,
     help="Architecture of the image to use.",
 )
->>>>>>> main:src/ai/backend/client/cli/run.py
 # resource grouping
 @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
 @click.option(
