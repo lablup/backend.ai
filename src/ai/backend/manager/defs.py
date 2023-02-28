@@ -7,6 +7,7 @@ import re
 from typing import Final
 
 from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH as DEFAULT_IMAGE_ARCH_
 from ai.backend.common.arch import arch_name_aliases as arch_name_aliases_
 from ai.backend.common.types import SlotName, SlotTypes
 
@@ -16,7 +17,7 @@ INTRINSIC_SLOTS: Final = {
 }
 
 arch_name_aliases: Final = arch_name_aliases_
-DEFAULT_IMAGE_ARCH: Final = CURRENT_ARCH
+DEFAULT_IMAGE_ARCH: Final = DEFAULT_IMAGE_ARCH_
 MANAGER_ARCH: Final = CURRENT_ARCH
 
 # The default container role name for multi-container sessions
