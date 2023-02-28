@@ -18,6 +18,7 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
@@ -444,6 +445,15 @@ def prepare_mount_arg(
     multiple=True,
     help="Resource options for creating compute session. " "(e.g: shmem=64m)",
 )
+@click.option(
+    "--arch",
+    "--architecture",
+    "architecture",
+    metavar="ARCH_NAME",
+    type=str,
+    default=DEFAULT_IMAGE_ARCH,
+    help="Architecture of the image to use.",
+)
 # resource grouping
 @click.option(
     "-d",
@@ -502,6 +512,7 @@ def run(
     cluster_size,
     cluster_mode,
     resource_opts,
+    architecture,
     domain,
     group,
     preopen,
@@ -621,6 +632,7 @@ def run(
                 group_name=group,
                 scaling_group=scaling_group,
                 tag=tag,
+                architecture=architecture,
             )
         except Exception as e:
             print_error(e)
@@ -726,6 +738,7 @@ def run(
                 scaling_group=scaling_group,
                 bootstrap_script=bootstrap_script.read() if bootstrap_script is not None else None,
                 tag=tag,
+                architecture=architecture,
                 preopen_ports=preopen_ports,
                 assign_agent=assigned_agent_list,
             )
