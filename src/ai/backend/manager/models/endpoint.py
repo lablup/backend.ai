@@ -21,26 +21,26 @@ class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     id = EndpointIDColumn()
-    image = sa.Column(
-        "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
+    image_id = sa.Column(
+        "image_id", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
-    model = sa.Column(
-        "model", GUID, sa.ForeignKey("vfolders.id", ondelete="RESTRICT"), nullable=False
+    model_id = sa.Column(
+        "model_id", GUID, sa.ForeignKey("vfolders.id", ondelete="RESTRICT"), nullable=False
     )
-    domain = sa.Column(
-        "domain",
+    domain_name = sa.Column(
+        "domain_name",
         sa.String(length=64),
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project = sa.Column(
-        "project",
+    project_id = sa.Column(
+        "project_id",
         GUID,
         sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    resource_group = sa.Column(
-        "resource_group",
+    resource_group_name = sa.Column(
+        "resource_group_name",
         sa.ForeignKey("scaling_groups.name", ondelete="RESTRICT"),
         index=True,
         nullable=False,
@@ -78,11 +78,11 @@ class Endpoint(graphene.ObjectType):
         interfaces = (Item,)
 
     endpoint_id = graphene.UUID()
-    image = graphene.String()
-    model = graphene.UUID()
-    domain = graphene.String()
-    project = graphene.UUID()
-    resource_group = graphene.String()
+    image_id = graphene.String()
+    model_id = graphene.UUID()
+    domain_name = graphene.String()
+    project_id = graphene.UUID()
+    resource_group_name = graphene.String()
     resource_slots = graphene.JSONString()
     url = graphene.String()
     routings = graphene.List(Routing)
@@ -95,11 +95,11 @@ class Endpoint(graphene.ObjectType):
     ) -> "Endpoint":
         return cls(
             endpoint_id=row.id,
-            image=row.image_row.image,
-            model=row.model,
-            domain=row.domain,
-            project=row.project,
-            resource_group=row.resource_group,
+            image_id=row.image_id,
+            model_id=row.model_id,
+            domain_name=row.domain_name,
+            project_id=row.project_id,
+            resource_group_name=row.resource_group_name,
             resource_slots=row.resource_slots,
             url=row.url,
             routings=[await Routing.from_row(ctx, routing) for routing in row.routings],

@@ -3,15 +3,7 @@ import logging
 import secrets
 import uuid
 from datetime import datetime
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    MutableMapping,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple, Union
 
 import aiohttp_cors
 import aiotools
@@ -46,11 +38,11 @@ from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
     BackendError,
+    EndpointNotFound,
     ImageNotFound,
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
-    EndpointNotFound,
     UnknownImageReferenceError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
@@ -206,13 +198,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
         service_ports = {item["name"]: item for item in parsed_labels["ai.backend.service-ports"]}
         endpoints = parsed_labels["ai.backend.endpoint-ports"]
         # TODO: use endpoints & service_ports to populate the routing table
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == params["domain"])
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select([domains.c.allowed_docker_registries]).where(
+                domains.c.name == params["domain"]
             )
-            allowed_registries = await conn.scalar(query)
+            allowed_registries = await db_sess.scalar(query)
             if requested_image_ref.registry not in allowed_registries:
                 raise AliasResolutionFailed
     except AliasResolutionFailed:
@@ -349,12 +339,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
         await RoutingRow.create(
             root_ctx.db,
             endpoint_id,
-            session_id,
+            session_id=session_id,
             # TODO: set the following columns when creating the routing row
             model=model_id,
             model_version=params["model_version"],
-            session_endpoint_name=...,
-            session_endpoint_port=...,  # TODO: get the preopen host-side port number
+            session_endpoint_name=None,
+            session_endpoint_port=None,  # TODO: get the preopen host-side port number
             traffic_ratio=1.0,
         )
 
@@ -423,15 +413,22 @@ async def stop(request: web.Request, params: Any) -> web.Response:
 async def invoke(request: web.Request, params: Any) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
+    force_route = params["force_route"]
+    endpoint_id = params["endpoint_id"]
 
     log.info("SERVICE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
 
     # TODO: get the first attached endpoint and routing info
     #       If force_route is given, use that route.
     async with root_ctx.db.begin_readonly_session() as db_session:
-        endpoint_row = await db_session.get(EndpointRow, params["endpoint_id"])
+        endpoint_row = await db_session.get(EndpointRow, endpoint_id)
         if endpoint_row is None:
             raise EndpointNotFound()
+        if force_route is not None:
+            routing = await RoutingRow.get(db_session, force_route)
+        else:
+            query = sa.select(RoutingRow).where(RoutingRow.endpoint_id == endpoint_id)
+            routing = (await db_session.scalars(query)).first()
 
     # TODO: make a direct HTTP request to the container's endpoint port.
     response = web.StreamResponse(status=200)

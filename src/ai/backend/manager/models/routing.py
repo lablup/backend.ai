@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -23,12 +23,12 @@ __all__ = ("RoutingRow", "Routing", "RoutingList")
 class RoutingRow(Base):
     __tablename__ = "routings"
     __table_args__ = (
-        sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
+        sa.UniqueConstraint("endpoint_id", "session_id", name="uq_routings_endpoint_session"),
     )
 
     id = IDColumn("id")
-    endpoint = sa.Column(
-        "endpoint",
+    endpoint_id = sa.Column(
+        "endpoint_id",
         GUID,
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
         nullable=False,
@@ -36,19 +36,21 @@ class RoutingRow(Base):
     traffic_ratio = sa.Column("traffic_ratio", sa.Float(), nullable=False)
 
     # Backing inference session
-    session = sa.Column(
-        "session",
+    session_id = sa.Column(
+        "session_id",
         GUID,
         sa.ForeignKey("sessions.id", ondelete="RESTRICT"),
         nullable=False,
     )
     # TODO: create alembic migration for session_endpoint_*, model* columns
-    session_endpoint_name = ...  # TODO: which session endpoint is bound?
-    session_endpoint_port = ...  # TODO: host-side port number of the session's endpoint app
+    # TODO: which session endpoint is bound?
+    session_endpoint_name = sa.Column("session_endpoint_name", sa.String(length=256), nullable=True)
+    # TODO: host-side port number of the session's endpoint app
+    session_endpoint_port = sa.Column("session_endpoint_port", sa.String(length=256), nullable=True)
 
     # Mounted model vfolder and the version being used
-    model = sa.Column(
-        "model",
+    model_id = sa.Column(
+        "model_id",
         GUID,
         sa.ForeignKey("vfolders.id", ondelete="RESTRICT"),
         nullable=False,
@@ -62,12 +64,12 @@ class RoutingRow(Base):
     endpoint = relationship("EndpointRow", back_populates="routings")
 
     @classmethod
-    async def get(cls, session: AsyncSession, routing_id: uuid.UUID) -> "RoutingRow":
+    async def get(cls, db_session: AsyncSession, routing_id: uuid.UUID) -> "RoutingRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
-        query = sa.select(RoutingRow).filter(RoutingRow.id == routing_id)
-        result = await session.execute(query)
+        query = sa.select(RoutingRow).where(RoutingRow.id == routing_id)
+        result = await db_session.execute(query)
         try:
             return result.one()
         except NoResultFound:
@@ -79,6 +81,10 @@ class RoutingRow(Base):
         engine: ExtendedAsyncSAEngine,
         endpoint_id: uuid.UUID,
         session_id: uuid.UUID,
+        model_id: uuid.UUID,
+        model_version: str,
+        session_endpoint_name: Optional[str],
+        session_endpoint_port: Optional[str],
         traffic_ratio: float = 100.0,
     ) -> uuid.UUID:
         # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
@@ -90,12 +96,16 @@ class RoutingRow(Base):
                     psql.insert(RoutingRow)
                     .values(
                         id=routing_id,
-                        endpoint=endpoint_id,
-                        session=session_id,
+                        endpoint_id=endpoint_id,
+                        session_id=session_id,
+                        model_id=model_id,
+                        model_version=model_version,
+                        session_endpoint_name=session_endpoint_name,
+                        session_endpoint_port=session_endpoint_port,
                         traffic_ratio=traffic_ratio,
                     )
                     .on_conflict_do_nothing(
-                        index_elements=[RoutingRow.endpoint, RoutingRow.session]
+                        index_elements=[RoutingRow.endpoint_id, RoutingRow.session_id]
                     )
                 )
                 await db_sess.execute(query)
@@ -109,8 +119,8 @@ class Routing(graphene.ObjectType):
         interfaces = (Item,)
 
     routing_id = graphene.UUID()
-    endpoint = graphene.String()
-    session = graphene.UUID()
+    endpoint_id = graphene.String()
+    session_id = graphene.UUID()
     traffic_ratio = graphene.Float()
 
     @classmethod
@@ -121,8 +131,8 @@ class Routing(graphene.ObjectType):
     ) -> "Routing":
         return cls(
             routing_id=row.id,
-            endpoint=row.endpoint_row.url,
-            session=row.session,
+            endpoint_id=row.endpoint_id,
+            session_id=row.session_id,
             traffic_ratio=row.traffic_ratio,
         )
 
@@ -135,7 +145,7 @@ class Routing(graphene.ObjectType):
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(RoutingRow)
         if endpoint_id is not None:
-            query = query.where(RoutingRow.endpoint == endpoint_id)
+            query = query.where(RoutingRow.endpoint_id == endpoint_id)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
@@ -153,7 +163,7 @@ class Routing(graphene.ObjectType):
     ) -> Sequence["Routing"]:
         query = sa.select(RoutingRow).limit(limit).offset(offset)
         if endpoint_id is not None:
-            query = query.where(RoutingRow.endpoint == endpoint_id)
+            query = query.where(RoutingRow.endpoint_id == endpoint_id)
         """
         if filter is not None:
             parser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -162,15 +172,15 @@ class Routing(graphene.ObjectType):
             parser = QueryOrderParser(cls._queryorder_colmap)
             query = parser.append_ordering(query, order)
         """
-        async with ctx.db.begin_readonly_session() as session:
-            return [await cls.from_row(ctx, row) async for row in (await session.stream(query))]
+        async with ctx.db.begin_readonly_session() as db_session:
+            return [await cls.from_row(ctx, row) async for row in (await db_session.stream(query))]
 
     @classmethod
     async def load_all(
         cls, ctx, *, endpoint_id: uuid.UUID | None = None  # ctx: GraphQueryContext,
     ) -> Sequence["Routing"]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await RoutingRow.list(session, endpoint_id=endpoint_id)
+        async with ctx.db.begin_readonly_session() as db_session:
+            rows = await RoutingRow.list(db_session, endpoint_id=endpoint_id)
         return [await Routing.from_row(ctx, row) for row in rows]
 
     @classmethod
@@ -181,8 +191,8 @@ class Routing(graphene.ObjectType):
         routing_id: uuid.UUID,
     ) -> "Routing":
         try:
-            async with ctx.db.begin_readonly_session() as session:
-                row = await RoutingRow.get(session, routing_id=routing_id)
+            async with ctx.db.begin_readonly_session() as db_session:
+                row = await RoutingRow.get(db_session, routing_id=routing_id)
         except NoResultFound:
             raise RoutingNotFound
         return await Routing.from_row(ctx, row)
