@@ -795,7 +795,6 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "is_owner": is_owner,
         "permission": permission,
         "usage_mode": row["usage_mode"],
-        "status": row["status"],
         "cloneable": row["cloneable"],
         "max_size": row["max_size"],
         "cur_size": row["cur_size"],

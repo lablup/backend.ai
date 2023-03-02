@@ -42,8 +42,6 @@ from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
-    from sqlalchemy.sql.expression import BinaryExpression
-
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
