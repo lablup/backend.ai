@@ -4,6 +4,7 @@ on:
   push:
   pull_request:
     types: [labeled, unlabeled, opened, synchronize, reopened]
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
@@ -43,6 +44,8 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check '::'
+    - name: Check forbidden cross imports
+      run: ./scripts/check-cross-imports.sh
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then

@@ -26,6 +26,7 @@ import yarl
 from packaging import version
 
 from . import validators as tx
+from .arch import arch_name_aliases
 from .etcd import AsyncEtcd
 from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
@@ -50,13 +51,6 @@ __all__ = (
     "ImageRef",
 )
 
-arch_name_aliases: Final[Mapping[str, str]] = {
-    "arm64": "aarch64",  # macOS with LLVM
-    "amd64": "x86_64",  # Windows/Linux
-    "x64": "x86_64",  # Windows
-    "x32": "x86",  # Windows
-    "i686": "x86",  # Windows
-}
 # generalize architecture symbols to match docker API's norm
 docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "aarch64": "arm64",
