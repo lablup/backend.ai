@@ -295,6 +295,8 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+        # Normalize the package version
+        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -314,13 +316,13 @@ jobs:
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
-        pip install dist/backend.ai-client-*.whl
-        conda-pack -o backend.ai-client-windows-conda.tar.gz
+        pip install dist/backend.ai_client-*.whl
+        conda-pack -o backend.ai-client-{PKGVER}-windows-conda.zip
     - name: Upload conda-pack
       uses: actions/upload-artifact@v3
       with:
         name: windows-conda
-        path: backend.ai-client-windows-conda.tar.gz
+        path: backend.ai-client-{PKGVER}-windows-conda.zip
         if-no-files-found: error
 
 
@@ -377,4 +379,4 @@ jobs:
         files: |
           dist/*.whl
           dist/*.tar.gz
-          windows-conda/backend.ai-client-windows-conda.tar.gz
+          windows-conda/backend.ai-client-*.zip
