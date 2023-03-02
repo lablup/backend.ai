@@ -1,8 +1,8 @@
-"""impl_vfolder_trash_bin
+"""impl_vfolder_purge
 
-Revision ID: 97e6ff05b2be
-Revises: 5bce905c21e5
-Create Date: 2022-11-23 14:51:26.056482
+Revision ID: 11e6e03661f0
+Revises: 10c58e701d87
+Create Date: 2023-03-02 13:35:10.957065
 
 """
 import sqlalchemy as sa
@@ -14,17 +14,18 @@ from sqlalchemy.sql import text
 from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
-revision = "97e6ff05b2be"
-down_revision = "5bce905c21e5"
+revision = "11e6e03661f0"
+down_revision = "10c58e701d87"
 branch_labels = None
 depends_on = None
+
 
 DELETING = "deleting"
 enum_name = "vfolderoperationstatus"
 ERROR = "error"
 DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
 DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
-RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
+# RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
 PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
 
 
@@ -32,7 +33,7 @@ def upgrade():
     op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETING}' TO '{DELETE_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{ERROR}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{DELETE_COMPLETE}'")
-    op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{RECOVER_ONGOING}'")
+    # op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{RECOVER_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{PURGE_ONGOING}'")
     op.add_column(
         "vfolders", sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
@@ -87,15 +88,15 @@ def downgrade():
         )"""
         )
     )
-    op.execute(
-        text(
-            f"""DELETE FROM pg_enum
-        WHERE enumlabel = '{RECOVER_ONGOING}'
-        AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""
-        )
-    )
+    # op.execute(
+    #     text(
+    #         f"""DELETE FROM pg_enum
+    #     WHERE enumlabel = '{RECOVER_ONGOING}'
+    #     AND enumtypid = (
+    #         SELECT oid FROM pg_type WHERE typname = '{enum_name}'
+    #     )"""
+    #     )
+    # )
     op.execute(
         text(
             f"""DELETE FROM pg_enum

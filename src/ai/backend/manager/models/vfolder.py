@@ -39,7 +39,7 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
-from .utils import sql_json_merge, ExtendedAsyncSAEngine, execute_with_retry
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from sqlalchemy.sql.expression import BinaryExpression
@@ -62,6 +62,7 @@ __all__: Sequence[str] = (
     "DEAD_VFOLDER_STATUSES",
     "VFolderDeletionInfo",
     "query_accessible_vfolders",
+    "update_vfolder_status",
     "initiate_vfolder_removal",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
@@ -141,7 +142,6 @@ class VFolderOperationStatus(str, enum.Enum):
     ERROR = "error"
     DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
     DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
-    RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
     PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
     # PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
 
@@ -735,25 +735,41 @@ async def prepare_vfolder_mounts(
 
 
 async def update_vfolder_status(
-    conn: SAConnection,
-    target_vfolder_cond: BinaryExpression,
+    engine: ExtendedAsyncSAEngine,
+    vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
 ):
-    query = (
-        sa.update(vfolders)
-        .values(
-            status=update_status,
-            status_history=sql_json_merge(
-                vfolders.c.status_history,
-                (),
-                {
-                    update_status.name: datetime.now(tzutc()).isoformat(),
-                },
-            ),
-        )
-        .where(target_vfolder_cond)
+    vfolder_info_len = len(vfolder_ids)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return None
+    elif vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
+
+    async def _update() -> None:
+        async with engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(
+                    status=update_status,
+                    status_history=sql_json_merge(
+                        vfolders.c.status_history,
+                        (),
+                        {
+                            update_status.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
+                )
+                .where(cond)
+            )
+            await db_session.execute(query)
+
+    await execute_with_retry(_update)
+    log.debug(
+        "Successfully update status of vFolders {} to {}",
+        [str(x) for x in vfolder_ids],
+        update_status.name,
     )
-    await conn.execute(query)
 
 
 async def ensure_host_permission_allowed(
@@ -815,14 +831,7 @@ async def initiate_vfolder_removal(
         return 0
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
-
-    async with engine.begin_session() as db_session:
-
-        async def _update_vfolder_status() -> None:
-            query = sa.update(vfolders).values(status=VFolderOperationStatus.DELETE_COMPLETE).where(cond)
-            await db_session.execute(query)
-
-        await execute_with_retry(_update_vfolder_status)
+    await update_vfolder_status(engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING)
 
     async def _delete():
         for folder_id, host_name in requested_vfolders:
@@ -841,12 +850,11 @@ async def initiate_vfolder_removal(
             except aiohttp.ClientResponseError:
                 raise VFolderOperationFailed(extra_msg=str(folder_id))
 
-        async with engine.begin_session() as db_session:
-
-            async def _delete_row() -> None:
+        async def _delete_row() -> None:
+            async with engine.begin_session() as db_session:
                 await db_session.execute(sa.delete(vfolders).where(cond))
 
-            await execute_with_retry(_delete_row)
+        await execute_with_retry(_delete_row)
         log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
 
     storage_ptask_group.create_task(_delete())

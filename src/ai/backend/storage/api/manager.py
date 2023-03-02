@@ -17,7 +17,6 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderDeletionResult
 from ai.backend.storage.exception import ExecutionError
 
 from ..abc import AbstractVolume
@@ -120,55 +119,6 @@ async def get_hwinfo(request: web.Request) -> web.Response:
             return web.json_response(data)
 
 
-async def list_trash_bin(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-            },
-        ),
-    ) as params:
-        await log_manager_api_entry(log, "list_trash_bin", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            items = [
-                {
-                    "name": item.name,
-                    "type": item.type.name,
-                    "stat": {
-                        "mode": item.stat.mode,
-                        "size": item.stat.size,
-                        "created": item.stat.created.isoformat(),
-                        "modified": item.stat.modified.isoformat(),
-                    },
-                    "symlink_target": "",
-                }
-                async for item in volume.list_trash_bin()
-            ]
-        return web.json_response(
-            {
-                "items": items,
-            },
-        )
-
-
-async def empty_trash_bin(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-            },
-        ),
-    ) as params:
-        await log_manager_api_entry(log, "empty_trash_bin", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            await volume.empty_trash_bin()
-            return web.Response(status=204)
-
-
 async def create_vfolder(request: web.Request) -> web.Response:
     async with check_params(
         request,
@@ -201,56 +151,8 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            if await ctx.get_use_trash_bin():
-                result = await volume.move_to_trash(params["vfid"])
-            else:
-                result = VFolderDeletionResult.NO_CHANGE
-            return web.json_response(
-                {
-                    "result": result.value,
-                },
-            )
-
-
-async def purge_vfolder(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-            },
-        ),
-    ) as params:
-        await log_manager_api_entry(log, "purge_vfolder", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            if await ctx.get_use_trash_bin():
-                result = await volume.delete_in_trash(params["vfid"])
-            else:
-                result = await volume.delete_vfolder(params["vfid"])
-            return web.json_response(
-                {
-                    "result": result.value,
-                },
-            )
-
-
-async def recover_vfolder(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-            },
-        ),
-    ) as params:
-        await log_manager_api_entry(log, "recover_vfolder", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            await volume.recover_vfolder(params["vfid"])
-            return web.Response(status=204)
+            await volume.delete_vfolder(params["vfid"])
+        return web.Response(status=204)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -757,12 +659,8 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/", get_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
-    app.router.add_route("GET", "/volume/list-trash", list_trash_bin)
-    app.router.add_route("POST", "/volume/empty-trash", empty_trash_bin)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
-    app.router.add_route("POST", "/folder/purge", purge_vfolder)
-    app.router.add_route("POST", "/folder/recover", recover_vfolder)
     app.router.add_route("POST", "/folder/clone", clone_vfolder)
     app.router.add_route("GET", "/folder/mount", get_vfolder_mount)
     app.router.add_route("GET", "/volume/performance-metric", get_performance_metric)

@@ -8,7 +8,7 @@ from typing import Any, FrozenSet, Mapping
 from uuid import UUID
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata, VFolderDeletionResult
+from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
 from ai.backend.storage.vfs import BaseVolume
@@ -142,18 +142,12 @@ class WekaVolume(BaseVolume):
         except WekaNotFoundError:
             pass
 
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+    async def delete_vfolder(self, vfid: UUID) -> None:
         assert self._fs_uid is not None
         vfpath = self.mangle_vfpath(vfid)
         await self._remove_quota_vfolder(vfpath)
         await super().delete_vfolder(vfid)
-        return VFolderDeletionResult.PURGED
-
-    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        vfpath = self.get_vf_trash_path(vfid)
-        await self._remove_quota_vfolder(vfpath)
-        await super().delete_in_trash(vfid)
-        return VFolderDeletionResult.PURGED
+        return None
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         assert self._fs_uid is not None

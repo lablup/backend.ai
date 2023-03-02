@@ -9,7 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, VFolderDeletionResult
+from ai.backend.common.types import BinarySize
 from ai.backend.storage.abc import CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER
 
 from ..exception import ExecutionError, VFolderCreationError
@@ -204,17 +204,11 @@ class XfsVolume(BaseVolume):
                     await self.registry.remove_project_entry(vfid)
             yield
 
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+    async def delete_vfolder(self, vfid: UUID) -> None:
         async with self.deletion_ctx(vfid):
             await super().delete_vfolder(vfid)
             await self.registry.read_project_info()
-        return VFolderDeletionResult.PURGED
-
-    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        async with self.deletion_ctx(vfid):
-            await super().delete_in_trash(vfid)
-            await self.registry.read_project_info()
-        return VFolderDeletionResult.PURGED
+        return None
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         full_report = await run(

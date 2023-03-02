@@ -67,7 +67,6 @@ __all__ = (
     "MountPermissionLiteral",
     "MountTypes",
     "VFolderMount",
-    "VFolderDeletionResult",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -814,13 +813,6 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("mount_perm"): tx.Enum(MountPermission),
             }
         )
-
-
-class VFolderDeletionResult(str, enum.Enum):
-    NO_CHANGE = "no-change"
-    MOVED_TO_TRASH = "moved-to-trash"
-    PURGED = "purged"
-    ALREADY_PURGED = "already-purged"
 
 
 class VFolderHostPermissionMap(dict, JSONSerializableMixin):

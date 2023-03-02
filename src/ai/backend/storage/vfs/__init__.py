@@ -15,7 +15,7 @@ from uuid import UUID
 import janus
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata, VFolderDeletionResult
+from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_VFOLDER, AbstractVolume
 from ..exception import ExecutionError, InvalidAPIParameters
@@ -97,36 +97,18 @@ class BaseVolume(AbstractVolume):
         )
 
     @staticmethod
-    async def clean_empty_parents(path: Path) -> None:
+    async def clean_empty_parent(path: Path) -> None:
         # remove intermediate prefix directories if they become empty
         from aiofiles import os as aiofile_os
 
         if not os.listdir(path.parent):
             await aiofile_os.rmdir(path.parent)
-        if not os.listdir(path.parent.parent):
-            await aiofile_os.rmdir(path.parent.parent)
 
-    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
+    async def delete_vfolder(self, vfid: UUID) -> None:
         vfpath = self.mangle_vfpath(vfid)
-        dst = self.get_vf_trash_path(vfid)
-        if vfpath == dst:
-            return VFolderDeletionResult.NO_CHANGE
         loop = asyncio.get_running_loop()
 
-        def _move_to_trash():
-            shutil.move(vfpath, dst)
-
-        await loop.run_in_executor(
-            None,
-            _move_to_trash,
-        )
-        await self.clean_empty_parents(vfpath)
-        return VFolderDeletionResult.MOVED_TO_TRASH
-
-    async def _purge_vfolder(self, vfpath: Path):
-        loop = asyncio.get_running_loop()
-
-        def _purge():
+        def _delete():
             try:
                 shutil.rmtree(vfpath)
             except FileNotFoundError:
@@ -143,32 +125,8 @@ class BaseVolume(AbstractVolume):
             except FileNotFoundError:
                 pass
 
-        await loop.run_in_executor(None, _purge)
-        await self.clean_empty_parents(vfpath)
-
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
-        vfpath = self.mangle_vfpath(vfid)
-        await self._purge_vfolder(vfpath)
-        return VFolderDeletionResult.PURGED
-
-    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        vfpath = self.get_vf_trash_path(vfid)
-        await self._purge_vfolder(vfpath)
-        return VFolderDeletionResult.PURGED
-
-    async def recover_vfolder(self, vfid: UUID) -> None:
-        src = self.get_vf_trash_path(vfid)
-        dst = self.mangle_vfpath(vfid)
-        loop = asyncio.get_running_loop()
-
-        def _recover_vfolder():
-            shutil.move(src, dst)
-            self._clean_empty_parents(src)
-
-        await loop.run_in_executor(
-            None,
-            _recover_vfolder,
-        )
+        await loop.run_in_executor(None, _delete)
+        await self.clean_empty_parent(vfpath)
 
     async def clone_vfolder(
         self,

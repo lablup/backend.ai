@@ -5,7 +5,7 @@ from pathlib import Path, PurePath, PurePosixPath
 from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
 from uuid import UUID
 
-from ai.backend.common.types import BinarySize, HardwareMetadata, VFolderDeletionResult
+from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
@@ -82,14 +82,6 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def list_trash_bin(self) -> AsyncIterator[DirEntry]:
-        pass
-
-    @abstractmethod
-    async def empty_trash_bin(self) -> None:
-        pass
-
-    @abstractmethod
     async def create_vfolder(
         self,
         vfid: UUID,
@@ -100,29 +92,10 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        """
-        Move the vfolder to designated `trash` directory.
-        """
-        pass
-
-    @abstractmethod
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+    async def delete_vfolder(self, vfid: UUID) -> None:
         """
         Delete the vfolder permanently.
-        This does not move the vfolder to trash dir.
         """
-        pass
-
-    @abstractmethod
-    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        """
-        Delete the vfolder located in trash dir permanently.
-        """
-        pass
-
-    @abstractmethod
-    async def recover_vfolder(self, vfid: UUID) -> None:
         pass
 
     @abstractmethod

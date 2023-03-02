@@ -11,7 +11,7 @@ from uuid import UUID
 
 import aiofiles
 
-from ai.backend.common.types import BinarySize, HardwareMetadata, VFolderDeletionResult
+from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractVolume
 from ..exception import ExecutionError, StorageProxyError, VFolderCreationError
@@ -113,7 +113,7 @@ class NetAppVolume(BaseVolume):
             io_usec_write=metric["latency"]["write"],
         )
 
-    async def _purge_vfolder(self, vfpath: Path) -> None:
+    async def _delete(self, vfpath: Path) -> None:
         # extract target_dir from vfpath
         target_dir = str(vfpath).split(self.netapp_qtree_name + "/", 1)[1].split("/")[0]
         nfs_path = (
@@ -153,15 +153,10 @@ class NetAppVolume(BaseVolume):
 
         await read_progress(nfs_path)
 
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+    async def delete_vfolder(self, vfid: UUID) -> None:
         vfpath = self.mangle_vfpath(vfid)
-        await self._purge_vfolder(vfpath)
-        return VFolderDeletionResult.PURGED
-
-    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        vfpath = self.get_vf_trash_path(vfid)
-        await self._purge_vfolder(vfpath)
-        return VFolderDeletionResult.PURGED
+        await self._delete(vfpath)
+        return None
 
     async def clone_vfolder(
         self,
