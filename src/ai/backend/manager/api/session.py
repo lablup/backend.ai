@@ -1669,18 +1669,12 @@ async def invoke_session_callback(
         "password": None,
     }
     stream_key = "events"
-    payload = {
-        "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-        "token": url.query.get("token"),
-    }
+    token = url.query.get("token")
 
     async def _dispatch() -> None:
         hook_result = await root_ctx.hook_plugin_ctx.dispatch(
             "PUBLISH_EVENT",
-            (etcd_redis_config, REDIS_EVENT_STREAM_DB, stream_key, payload),
+            (event, etcd_redis_config, REDIS_EVENT_STREAM_DB, stream_key, token),
         )
         if hook_result.status != HookResults.PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
