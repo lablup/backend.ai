@@ -152,8 +152,8 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 @click.argument("name", type=str)
 def delete(name):
     """Delete the given virtual folder.
-    This operation can be irreversible if the storage proxy has trash-bin.
-    If it is set, `recover()` can reverse this operation.
+    This operation can be irreversible.
+    `recover()` can reverse this operation.
 
     \b
     NAME: Name of a virtual folder.
@@ -186,7 +186,7 @@ def purge(name):
 @vfolder.command()
 @click.argument("name", type=str)
 def recover(name):
-    """Recover the given virtual folder from 'trash bin'.
+    """Recover the given virtual folder from deleted status.
 
     NAME: Name of a virtual folder.
     """

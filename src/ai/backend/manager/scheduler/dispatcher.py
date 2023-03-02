@@ -20,7 +20,6 @@ from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
-    DoCheckStorageEvent,
     DoPrepareEvent,
     DoScheduleEvent,
     EventDispatcher,
@@ -123,7 +122,6 @@ class SchedulerDispatcher(aobject):
     event_producer: EventProducer
     schedule_timer: GlobalTimer
     prepare_timer: GlobalTimer
-    storage_timer: GlobalTimer
 
     def __init__(
         self,
@@ -158,7 +156,6 @@ class SchedulerDispatcher(aobject):
         evd.consume(AgentStartedEvent, None, self.schedule)
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoPrepareEvent, None, self.prepare)
-        evd.consume(DoCheckStorageEvent, None, self.check_storage)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
@@ -172,25 +169,14 @@ class SchedulerDispatcher(aobject):
             interval=10.0,
             initial_delay=5.0,
         )
-        self.storage_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_STORAGE_TIMER, 10.0),
-            self.event_producer,
-            lambda: DoCheckStorageEvent(),
-            interval=timedelta(
-                days=(self.shared_config.data["storage_check_interval_days"] or 10)
-            ).total_seconds(),
-            initial_delay=10.0,
-        )
         await self.schedule_timer.join()
         await self.prepare_timer.join()
-        await self.storage_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
-            tg.create_task(self.storage_timer.leave())
         log.info("Session scheduler stopped")
 
     async def schedule(
@@ -1127,45 +1113,6 @@ class SchedulerDispatcher(aobject):
                 log.debug(log_fmt + "cleanup-start-failure: done", *log_args)
         else:
             log.info(log_fmt + "started", *log_args)
-
-    async def check_storage(
-        self,
-        context: None,
-        source: AgentId,
-        event: DoCheckStorageEvent,
-    ) -> None:
-        """
-        Check storage's trash bin where deleted vfolders are located.
-        """
-        log.debug("check_storage(): triggered")
-        volumes = await self.registry.storage_manager.get_all_volumes()
-        for proxy_name, volume_info in volumes:
-            log.debug(
-                "check_storage(): proxy_name = {}, volume_name = {}",
-                proxy_name,
-                volume_info["name"],
-            )
-            async with self.registry.storage_manager.request(
-                proxy_name,
-                "GET",
-                "volume/list-trash",
-                json={
-                    "volume": volume_info["name"],
-                },
-            ) as (_, storage_resp):
-                result = await storage_resp.json()
-                trash_items = [
-                    {
-                        "name": item["name"],
-                        "type": item["type"],
-                        "size": item["stat"]["size"],  # humanize?
-                        "mode": oct(item["stat"]["mode"])[2:][-3:],
-                        "created": item["stat"]["created"],
-                        "modified": item["stat"]["modified"],
-                    }
-                    for item in result["items"]
-                ]
-        log.info(f"Total {len(trash_items)} of vfolders are in trash bin.")
 
 
 async def _list_managed_sessions(

@@ -177,7 +177,6 @@ import sys
 from abc import abstractmethod
 from collections import UserDict
 from contextvars import ContextVar
-from distutils.util import strtobool
 from pathlib import Path
 from pprint import pformat
 from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
@@ -198,7 +197,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
     current_resource_slots,
-    use_trash_bin,
 )
 
 from ..manager.defs import INTRINSIC_SLOTS
@@ -611,21 +609,6 @@ class SharedConfig(AbstractConfig):
             ret = list(vf_types.keys())
             current_vfolder_types.set(ret)
         return ret
-
-    @aiotools.lru_cache(maxsize=1, expire_after=2.0)
-    async def _get_use_trash_bin(self) -> bool:
-        val = await self.etcd.get("config/use_trash_bin")
-        if val is None:
-            return False
-        return bool(strtobool(val))
-
-    async def get_use_trash_bin(self) -> bool:
-        try:
-            val = use_trash_bin.get()
-        except LookupError:
-            val = await self._get_use_trash_bin() or False
-            use_trash_bin.set(val)
-        return val
 
     @aiotools.lru_cache(maxsize=1, expire_after=5.0)
     async def get_manager_nodes_info(self):

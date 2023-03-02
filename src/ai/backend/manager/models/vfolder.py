@@ -138,10 +138,10 @@ class VFolderOperationStatus(str, enum.Enum):
     CLONING = "cloning"
     MOUNTED = "mounted"
     ERROR = "error"
-    DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
-    DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
-    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
-    # PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted
+    DELETE_COMPLETE = "deleted-complete"  # vfolder is deleted
+    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed permanently
+    # PURGE_COMPLETE = "purged-complete"  # vfolder is removed permanently
 
 
 class VFolderAccessStatus(str, enum.Enum):

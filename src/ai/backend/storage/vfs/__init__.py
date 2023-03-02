@@ -50,7 +50,6 @@ async def run(cmd: Sequence[Union[str, Path]]) -> str:
 class BaseVolume(AbstractVolume):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        Path.mkdir(self.trash_path, parents=True, exist_ok=True)
 
     # ------ volume operations -------
 
@@ -63,24 +62,6 @@ class BaseVolume(AbstractVolume):
             "status_info": None,
             "metadata": {},
         }
-
-    def list_trash_bin(self) -> AsyncIterator[DirEntry]:
-        return self._scandir(self.trash_path)
-
-    async def empty_trash_bin(self) -> None:
-        loop = asyncio.get_running_loop()
-
-        def _purge_vfolder():
-            try:
-                for child in self.trash_path.iterdir():
-                    if child.is_dir():
-                        shutil.rmtree(child)
-                    else:
-                        child.unlink()
-            except FileNotFoundError:
-                pass
-
-        await loop.run_in_executor(None, _purge_vfolder)
 
     async def create_vfolder(
         self,
