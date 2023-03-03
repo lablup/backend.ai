@@ -41,9 +41,7 @@ def upgrade():
     op.add_column(
         "routings", sa.Column("session_endpoint_name", sa.String(length=256), nullable=True)
     )
-    op.add_column(
-        "routings", sa.Column("session_endpoint_port", sa.String(length=256), nullable=True)
-    )
+    op.add_column("routings", sa.Column("session_endpoint_port", sa.Integer(), nullable=True))
     op.add_column("routings", sa.Column("model_version", sa.String(length=64), nullable=False))
 
     # Add constraints and indexes
@@ -145,7 +143,7 @@ def downgrade():
     op.drop_index(op.f("ix_endpoints_resource_group_name"), table_name="endpoints")
 
     # Drop columns
-    # op.drop_column('routings', 'model_version')
+    op.drop_column("routings", "model_version")
     op.drop_column("routings", "session_endpoint_port")
     op.drop_column("routings", "session_endpoint_name")
 

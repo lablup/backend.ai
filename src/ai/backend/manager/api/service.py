@@ -3,7 +3,7 @@ import logging
 import secrets
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Sequence, Tuple, Union
 
 import aiohttp_cors
 import aiotools
@@ -18,12 +18,13 @@ from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes
+from ai.backend.common.types import ClusterMode, ServicePort, SessionTypes
 from ai.backend.common.utils import str_to_timedelta
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     ImageRow,
+    KernelRow,
     UserRole,
     domains,
     query_bootstrap_script,
@@ -33,7 +34,7 @@ from ..models import (
 from ..models.endpoint import EndpointRow
 from ..models.routing import RoutingRow
 from ..models.session import SessionRow, SessionStatus
-from ..models.utils import execute_with_retry
+from ..models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
@@ -43,6 +44,7 @@ from .exceptions import (
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
+    ServicePortNotFound,
     UnknownImageReferenceError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
@@ -173,6 +175,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     model_id = params["model_id"]
+    model_version = params["model_version"]
 
     params["owner_access_key"] = access_key
     async with root_ctx.db.begin_readonly() as db_conn:
@@ -193,10 +196,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
             img_id = image_row.id
         requested_image_ref = image_row.image_ref
-        parsed_labels = validate_image_labels(image_row.labels)
+        parsed_labels: dict[str, Any] = validate_image_labels(image_row.labels)
         model_mount_path = parsed_labels["ai.backend.model-path"]
-        service_ports = {item["name"]: item for item in parsed_labels["ai.backend.service-ports"]}
-        endpoints = parsed_labels["ai.backend.endpoint-ports"]
+        service_ports: dict[str, ServicePort] = {
+            item["name"]: item for item in parsed_labels["ai.backend.service-ports"]
+        }
+        endpoints: Sequence[str] = parsed_labels["ai.backend.endpoint-ports"]
         # TODO: use endpoints & service_ports to populate the routing table
         async with root_ctx.db.begin_readonly_session() as db_sess:
             query = sa.select([domains.c.allowed_docker_registries]).where(
@@ -294,6 +299,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             script, _ = await query_bootstrap_script(conn, access_key)
             params["bootstrap_script"] = script
 
+    creation_config = {
+        **params["config"],
+        "endpoint_id": endpoint_id,
+    }
     try:
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -302,7 +311,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     params["service_name"],
                     access_key,
                     {
-                        "creation_config": params["config"],
+                        "creation_config": creation_config,
                         "kernel_configs": [
                             {
                                 "image_ref": requested_image_ref,
@@ -310,7 +319,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                                 "cluster_idx": 1,
                                 "local_rank": 0,
                                 "cluster_hostname": f"{DEFAULT_ROLE}1",
-                                "creation_config": params["config"],
+                                "creation_config": creation_config,
                                 "bootstrap_script": params["bootstrap_script"],
                                 "startup_command": params["startup_command"],
                             }
@@ -341,7 +350,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             endpoint_id,
             session_id=session_id,
             # TODO: set the following columns when creating the routing row
-            model=model_id,
+            model_id=model_id,
             model_version=params["model_version"],
             session_endpoint_name=None,
             session_endpoint_port=None,  # TODO: get the preopen host-side port number
@@ -364,6 +373,48 @@ async def create(request: web.Request, params: Any) -> web.Response:
         log.exception("GET_OR_CREATE: unexpected error!")
         raise InternalServerError
     return web.json_response(resp, status=201)
+
+
+async def handle_service_kernel_creation(
+    db_engine: ExtendedAsyncSAEngine,
+    endpoint_id: uuid.UUID,
+    session_id: uuid.UUID,
+    kernel_id: uuid.UUID,
+    *,
+    service_ports: Sequence[ServicePort],
+) -> None:
+    async def _populate_service_port() -> ServicePort:
+        async with db_engine.begin_readonly_session() as db_session:
+            query = sa.select(KernelRow.image).where(KernelRow.id == kernel_id)
+            image_name = await db_session.scalar(query)
+            image_row = await ImageRow.resolve(
+                db_session,
+                [
+                    ImageRef(image_name),
+                ],
+            )
+            parsed_labels: dict[str, Any] = validate_image_labels(image_row.labels)
+            # service_ports: dict[str, ServicePort] = {item["name"]: item for item in parsed_labels["ai.backend.service-ports"]}
+            endpoints: Sequence[str] = parsed_labels["ai.backend.endpoint-ports"]
+
+        for eport in endpoints:
+            for sport in service_ports:
+                if int(eport) in sport["container_ports"]:
+                    return sport
+        raise ServicePortNotFound()
+
+    sport = await _populate_service_port()
+    async with db_engine.begin_session() as db_sess:
+        query = (
+            sa.update(RoutingRow)
+            .where((RoutingRow.endpoint_id == endpoint_id) & (RoutingRow.session_id == session_id))
+            .values(
+                session_endpoint_name=sport["name"],
+                session_endpoint_port=sport["container_ports"][0],
+            )
+        )
+        await db_sess.execute(query)
+    return None
 
 
 @auth_required

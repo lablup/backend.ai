@@ -68,7 +68,7 @@ class EndpointRow(Base):
     ) -> List["EndpointRow"]:
         query = sa.select(EndpointRow)
         if project:
-            query = query.filter(EndpointRow.project == project)
+            query = query.where(EndpointRow.project == project)
         result = await session.execute(query)
         return result.scalars().all()
 

@@ -46,7 +46,7 @@ class RoutingRow(Base):
     # TODO: which session endpoint is bound?
     session_endpoint_name = sa.Column("session_endpoint_name", sa.String(length=256), nullable=True)
     # TODO: host-side port number of the session's endpoint app
-    session_endpoint_port = sa.Column("session_endpoint_port", sa.String(length=256), nullable=True)
+    session_endpoint_port = sa.Column("session_endpoint_port", sa.Integer(), nullable=True)
 
     # Mounted model vfolder and the version being used
     model_id = sa.Column(

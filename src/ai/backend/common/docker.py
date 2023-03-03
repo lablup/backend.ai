@@ -32,7 +32,7 @@ from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
 from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
-from .service_ports import parse_service_ports
+from .service_ports import ServicePort, parse_service_ports
 
 __all__ = (
     "arch_name_aliases",
@@ -247,7 +247,7 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
 
 def validate_image_labels(labels: dict[str, str]) -> dict[str, Any]:
     common_labels = common_image_label_schema.check(labels)
-    service_ports = {
+    service_ports: dict[str, ServicePort] = {
         item["name"]: item
         for item in parse_service_ports(common_labels.get("ai.backend.service-ports", ""))
     }

@@ -103,7 +103,6 @@ from ..models import (
     AgentStatus,
     KernelRow,
     KernelStatus,
-    RoutingRow,
     SessionRow,
     SessionStatus,
     UserRole,
@@ -144,6 +143,7 @@ from .exceptions import (
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .scaling_group import query_wsproxy_status
+from .service import handle_service_kernel_creation
 from .types import CORSOptions, WebMiddleware
 from .utils import catch_unexpected, check_api_params, get_access_key_scopes, undefined
 
@@ -1502,7 +1502,13 @@ async def handle_kernel_creation_lifecycle(
             tracker.set_result(None)
         if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
             session_id = event.creation_info.get("session_id")
-            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
+            await handle_service_kernel_creation(
+                root_ctx.db,
+                uuid.UUID(endpoint_id),
+                uuid.UUID(session_id),
+                uuid.UUID(event.creation_info["id"]),
+                service_ports=event.creation_info["service_ports"],
+            )
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             log.warning(f"Kernel cancelled, {event.reason = }")

@@ -1772,6 +1772,7 @@ class AbstractAgent(
                     **kernel_creation_info,
                     "id": str(KernelId(kernel_id)),
                     "container_id": str(kernel_obj["container_id"]),
+                    "endpoint_id": kernel_config["endpoint_id"],
                 },
             ),
         )
