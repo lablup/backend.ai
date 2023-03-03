@@ -16,9 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 22.09.14 (2023-02-28)
+## 22.09.15 (2023-03-03)
 
-22.09.14 (2023-02-28)
+This is a hotfix release to remedy the packaging error related to a missing `su-exec` custom binary, which has prevented creating new sessions
+
+
+## 22.09.14 (2023-02-28)
 
 ### Features
 * Add `architecture` argument and options to the client SDK's session creation functions and commands ([#881](https://github.com/lablup/backend.ai/issues/881))
@@ -26,8 +29,6 @@ Changes
 
 
 ## 22.09.13 (2023-02-26)
-
-22.09.13 (2023-02-26)
 
 ### Features
 * Add the `session_id` and `cluster_mode` columns to `get_container_stats_for_period` API to provide container statistics in response to multi-node sessions. ([#949](https://github.com/lablup/backend.ai/issues/949))
@@ -46,8 +47,6 @@ Changes
 
 ## 22.09.12 (2023-02-20)
 
-22.09.12 (2023-02-20)
-
 ### Features
 * When rescanning container image registries, skip misformatted image names and tag names instead of failing the entire process. ([#933](https://github.com/lablup/backend.ai/issues/933))
 * Make the dev-setup installer to preserve a full dump of the initial etcd configuration as `./dev.etcd.installed.json` for easier restoration of etcd if corrupted during development ([#1061](https://github.com/lablup/backend.ai/issues/1061))
@@ -58,8 +57,6 @@ Changes
 
 
 ## 22.09.11 (2023-02-12)
-
-22.09.11 (2023-02-12)
 
 ### Features
 * Add vfolder status in api response and update vfolder cli `list`, `info` commands to show vfolder's status. ([#1017](https://github.com/lablup/backend.ai/issues/1017))
@@ -74,8 +71,6 @@ Changes
 
 
 ## 22.09.10 (2023-02-04)
-
-22.09.10 (2023-02-04)
 
 ### Breaking Changes
 * Now the mono-repo is updated to use Pants 2.16.0.dev5. Check out the PR description for the migration guide. ([#998](https://github.com/lablup/backend.ai/issues/998))
@@ -98,8 +93,6 @@ Changes
 
 ## 22.09.9 (2023-01-25)
 
-22.09.9 (2023-01-25)
-
 ### Fixes
 * Add comment out on gpfs sample volume when setting up the development environment with ./script/install-dev.sh ([#965](https://github.com/lablup/backend.ai/issues/965))
 * Disable the socket-relay container on macOS to avoid UNIX socket bind-mount compatibility issue in for macOS + virtiofs setups ([#986](https://github.com/lablup/backend.ai/issues/986))
@@ -110,15 +103,11 @@ Changes
 
 ## 22.09.8 (2023-01-10)
 
-22.09.8 (2023-01-10)
-
 ### Features
 * Support setting the `use_host_network` option of scaling group in the client-py. ([#941](https://github.com/lablup/backend.ai/issues/941))
 
 
 ## 22.09.7 (2023-01-09)
-
-22.09.7 (2023-01-09)
 
 ### Features
 * Support IBM Spectrum Scale storage ([#744](https://github.com/lablup/backend.ai/issues/744))
@@ -138,8 +127,6 @@ Changes
 
 ## 22.09.6 (2022-12-09)
 
-22.09.6 (2022-12-09)
-
 ### Features
 * Add the `local_rank` column in the `kernels` table and the `BACKENDAI_CLUSTER_LOCAL_RANK` environment variable in session containers to simplify execution of distributed computing/ML frameworks with one shell command ([#826](https://github.com/lablup/backend.ai/issues/826))
 * Add option to skip verifying SSL certificate of weka endpoint ([#903](https://github.com/lablup/backend.ai/issues/903))
@@ -157,8 +144,6 @@ Changes
 
 
 ## 22.09.5 (2022-11-28)
-
-22.09.5 (2022-11-28)
 
 ### Features
 * Make the listening port of the container metadata server configurable ([#447](https://github.com/lablup/backend.ai/issues/447))
