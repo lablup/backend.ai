@@ -36,6 +36,7 @@ as a reference implementation of API clients.
   - `storage/`: Storage proxy
   - `storage/api`: Storage proxy's manager-facing and client-facing APIs
   - `web/`: Web UI server
+    - `static/`: A git subtree of [lablup/backend.ai-app](https://github.com/lablup/backend.ai-app) tracking its main branch
   - `plugin/`: Plugin subsystem
   - `test/`: Integration test suite
   - `testutils/`: Shared utilities used by unit tests
@@ -169,6 +170,12 @@ and basic administration tasks.
 * `src/ai/backend/web`
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
+
+**Synchronizing the backend.ai-app repository as a subtree:**
+```console
+$ git remote add webui-package https://github.com/lablup/backend.ai-app  # first time only
+$ git subtree pull --squash --prefix=src/ai/backend/web/static webui-package main
+```
 
 ### Kernels
 
