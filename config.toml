@@ -1,0 +1,46 @@
+[general]
+#apiEndpoint = "http://127.0.0.1:8080"
+#apiEndpointText = "TEST"
+#defaultSessionEnvironment = "cr.backend.ai/stable/python"
+defaultSessionEnvironment = "cr.backend.ai/testing/python"
+siteDescription = "macOS"
+connectionMode = "SESSION"
+#connectionMode = "API"
+allowChangeSigninMode = true
+signupSupport = true
+allowProjectResourceMonitor = true
+debug = true
+allowAnonymousChangePassword = true
+autoLogout = true
+defaultImportEnvironment = "cr.backend.ai/stable/python:3.8-ubuntu18.04"
+#defaultImportEnvironment = "cr.backend.ai/testing/julia"
+allowManualImageNameForSession = true
+
+[wsproxy]
+#proxyURL = "https://wsproxy.onprem.backend.ai:9443/"
+#proxyURL = "https://apphub.v5.backend.ai/"
+proxyURL = "http://127.0.0.1:5050/"
+
+#proxyBaseURL = ""
+
+[resources]
+openPortToPublic = false
+maxCPUCoresPerSession = 6
+maxCUDADevicesPerSession = 16
+maxShmPerSession = 1
+maxFileUploadSize = 1000000000 # 4GB. 4294967296
+
+[environments]
+#allowlist = "cr.backend.ai/testing/julia,cr.backend.ai/testing/r-base"
+
+[menu]
+#blocklist = "statistics,data"
+
+[plugin]
+#login = "signup-cloud.js"
+#page = "flash-blade,dgx-system"
+
+[license]
+edition = "Enterprise"
+#validSince = ""
+#validUntil = "2021-12-31"
