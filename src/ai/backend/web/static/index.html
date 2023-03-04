@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Backend.AI">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="theme-color" content="#fff">
+  <base href="">
+  <link rel="icon" href="manifest/favicon.ico">
+  <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="manifest/backend-ai.iconset/icon_16x16@1x.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="resources/fonts/fonts.css">
+  <link rel="stylesheet" href="resources/custom.css">
+  <script src="manifest/app.js"></script>
+  <title>Backend.AI</title>
+  <script src="./src/lib/webcomponents-loader.js"></script>
+  <script src="./src/lib/web-animations-js/web-animations-next-lite.min.js"></script>
+
+  <script>
+    globalThis.isElectron = isElectron();
+    globalThis.enableSW = true;
+
+    globalThis.process = {
+      env: {
+        NODE_ENV: 'production'
+      }
+    };
+    globalThis.packageVersion = "22.09.12";
+    globalThis.buildVersion = "230226.070244";
+  </script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Ubuntu', Roboto, sans-serif;
+      background-color: rgba(247, 247, 246, 1);
+      background-image: url("resources/images/loading-background-large.jpg");
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-position: top left;
+    }
+
+    .splash {
+      position: absolute;
+      top: calc(50% - 150px);
+      left: calc(50% - 170px);
+      width: 340px;
+      height: 300px;
+      border: 1px solid #aaaaaa;
+      border-radius: 10px;
+      background-color: #ffffff;
+      box-shadow: 0px 0px 3px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .splash-header {
+      width: 340px;
+      height: 120px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: left top;
+      background-color: RGB(246, 253, 247);
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 60px;
+    }
+
+    ul {
+      list-style-type: none;
+    }
+
+    .splash-information .detail {
+      font-weight: 400;
+      font-size: 13px;
+    }
+
+    .loading-message {
+      position: absolute;
+      top: calc(50% + 108px);
+      left: calc(50% - 165px);
+      width: 300px;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    .sk-folding-cube {
+      margin: 20px auto;
+      width: 15px;
+      height: 15px;
+      position: absolute;
+      top: calc(50% + 110px);
+      left: calc(50% - 130px);
+      margin: auto;
+      -webkit-transform: rotateZ(45deg);
+      transform: rotateZ(45deg);
+    }
+
+    .sk-folding-cube .sk-cube {
+      float: left;
+      width: 50%;
+      height: 50%;
+      position: relative;
+      -webkit-transform: scale(1.1);
+      -ms-transform: scale(1.1);
+      transform: scale(1.1);
+    }
+
+    .sk-folding-cube .sk-cube:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #3e872d;
+      -webkit-animation: sk-foldCubeAngle 2.4s infinite linear both;
+      animation: sk-foldCubeAngle 2.4s infinite linear both;
+      -webkit-transform-origin: 100% 100%;
+      -ms-transform-origin: 100% 100%;
+      transform-origin: 100% 100%;
+    }
+
+    .sk-folding-cube .sk-cube2 {
+      -webkit-transform: scale(1.1) rotateZ(90deg);
+      transform: scale(1.1) rotateZ(90deg);
+    }
+
+    .sk-folding-cube .sk-cube3 {
+      -webkit-transform: scale(1.1) rotateZ(180deg);
+      transform: scale(1.1) rotateZ(180deg);
+    }
+
+    .sk-folding-cube .sk-cube4 {
+      -webkit-transform: scale(1.1) rotateZ(270deg);
+      transform: scale(1.1) rotateZ(270deg);
+    }
+
+    .sk-folding-cube .sk-cube2:before {
+      -webkit-animation-delay: 0.3s;
+      animation-delay: 0.3s;
+    }
+
+    .sk-folding-cube .sk-cube3:before {
+      -webkit-animation-delay: 0.6s;
+      animation-delay: 0.6s;
+    }
+
+    .sk-folding-cube .sk-cube4:before {
+      -webkit-animation-delay: 0.9s;
+      animation-delay: 0.9s;
+    }
+
+    @-webkit-keyframes sk-foldCubeAngle {
+      0%,
+      10% {
+        -webkit-transform: perspective(140px) rotateX(-180deg);
+        transform: perspective(140px) rotateX(-180deg);
+        opacity: 0;
+      }
+      25%,
+      75% {
+        -webkit-transform: perspective(140px) rotateX(0deg);
+        transform: perspective(140px) rotateX(0deg);
+        opacity: 1;
+      }
+      90%,
+      100% {
+        -webkit-transform: perspective(140px) rotateY(180deg);
+        transform: perspective(140px) rotateY(180deg);
+        opacity: 0;
+      }
+    }
+
+    @keyframes sk-foldCubeAngle {
+      0%,
+      10% {
+        -webkit-transform: perspective(140px) rotateX(-180deg);
+        transform: perspective(140px) rotateX(-180deg);
+        opacity: 0;
+      }
+      25%,
+      75% {
+        -webkit-transform: perspective(140px) rotateX(0deg);
+        transform: perspective(140px) rotateX(0deg);
+        opacity: 1;
+      }
+      90%,
+      100% {
+        -webkit-transform: perspective(140px) rotateY(180deg);
+        transform: perspective(140px) rotateY(180deg);
+        opacity: 0;
+      }
+    }
+
+    .copyright {
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+<backend-ai-webui id="webui-shell" style="background-color:#222222;">
+  <div class="splash">
+    <div class="splash-header">
+      <img src="manifest/backend.ai-text.svg" style="height:50px;padding:35px 20px;">
+    </div>
+    <div class="splash-information">
+      <ul>
+        <li>Backend.AI Web UI <span id="version-detail" class="detail"></span></li>
+        <li><span id="license-detail"></span></li>
+        <li><span id="mode-detail" class="detail"></span> <span id="build-detail" class="detail"></span></li>
+      </ul>
+      <ul>
+        <li>Powered by open-source software</li>
+        <li class="copyright">Copyright &copy; 2015-2022 Lablup Inc.</li>
+      </ul>
+    </div>
+    <div class="sk-folding-cube">
+      <div class="sk-cube1 sk-cube"></div>
+      <div class="sk-cube2 sk-cube"></div>
+      <div class="sk-cube4 sk-cube"></div>
+      <div class="sk-cube3 sk-cube"></div>
+    </div>
+    <div id="loading-message" class="loading-message">Loading components...</div>
+  </div>
+</backend-ai-webui>
+<noscript>
+  <p>Could not render Backend.AI Web UI. Check that JavaScript is enabled.</p>
+</noscript>
+<script src="./dist/components/backend-ai-webui.js" type="module"></script>
+<script>
+  document.getElementById('version-detail').innerText = globalThis.packageVersion;
+  document.getElementById('build-detail').innerText = ' Build ' + globalThis.buildVersion;
+  document.getElementById('license-detail').innerText = '';
+  if (globalThis.isElectron) {
+    document.getElementById('mode-detail').innerText = 'App';
+  } else {
+    document.getElementById('mode-detail').innerText = 'WebServer';
+  }
+  if (globalThis.isIE) {
+    alert('Internet Explorer is not supported. Please visit with modern browsers.');
+    document.getElementById('loading-message').innerText = 'Not supported browser.';
+    document.getElementById('loading-message').style.color = 'red';
+  }
+  if (!['127.0.0.1', 'localhost'].includes(window.location.hostname) &&
+    'enableSW' in globalThis &&
+    globalThis.enableSW === true) {
+    // Service worker routine.
+    if ('serviceWorker' in navigator && globalThis.isElectron === false) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+      });
+    }
+  }
+</script>
+</body>
+
+</html>

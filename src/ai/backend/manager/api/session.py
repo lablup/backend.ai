@@ -79,6 +79,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionSuccessEvent,
     SessionTerminatedEvent,
+    SessionTerminatingEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
@@ -102,6 +103,7 @@ from ..models import (
     AgentStatus,
     KernelRow,
     KernelStatus,
+    RoutingRow,
     SessionRow,
     SessionStatus,
     UserRole,
@@ -321,7 +323,7 @@ def drop(d, dropval):
     return newd
 
 
-async def _query_userinfo(
+async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
@@ -457,6 +459,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     # Check work directory and reserved name directory.
     mount_map = params["config"].get("mount_map")
+
     if mount_map is not None:
         original_folders = mount_map.keys()
         alias_folders = mount_map.values()
@@ -489,15 +492,16 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 ],
             )
         requested_image_ref = image_row.image_ref
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == params["domain"])
-            )
-            allowed_registries = await conn.scalar(query)
-            if requested_image_ref.registry not in allowed_registries:
-                raise AliasResolutionFailed
+        if not requested_image_ref.is_local:
+            async with root_ctx.db.begin_readonly() as conn:
+                query = (
+                    sa.select([domains.c.allowed_docker_registries])
+                    .select_from(domains)
+                    .where(domains.c.name == params["domain"])
+                )
+                allowed_registries = await conn.scalar(query)
+                if requested_image_ref.registry not in allowed_registries:
+                    raise AliasResolutionFailed
     except AliasResolutionFailed:
         raise ImageNotFound("unknown alias or disallowed registry")
 
@@ -561,7 +565,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     session_creation_tracker[session_creation_id] = start_event
 
     async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         # Use keypair bootstrap_script if it is not delivered as a parameter
         if not params["bootstrap_script"]:
@@ -779,6 +783,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         param_from_template["session_type"] = SessionTypes.INTERACTIVE
     elif template["spec"]["session_type"] == "batch":
         param_from_template["session_type"] = SessionTypes.BATCH
+    elif template["spec"]["session_type"] == "inference":
+        param_from_template["session_type"] = SessionTypes.INFERENCE
 
     # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
     # Check https://github.com/python/mypy/issues/7316
@@ -1040,6 +1046,8 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             kernel_config["sess_type"] = SessionTypes.INTERACTIVE
         elif template["spec"]["sess_type"] == "batch":
             kernel_config["sess_type"] = SessionTypes.BATCH
+        elif template["spec"]["sess_type"] == "inference":
+            kernel_config["sess_type"] = SessionTypes.INFERENCE
 
         if tag := template["metadata"].get("tag", None):
             kernel_config["tag"] = tag
@@ -1119,7 +1127,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 
     try:
         async with root_ctx.db.begin_readonly() as conn:
-            owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+            owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -1258,7 +1266,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     query = (
         sa.select([scaling_groups.c.wsproxy_addr])
         .select_from(scaling_groups)
-        .where((scaling_groups.c.name == session.main_kernel.scaling_group))
+        .where((scaling_groups.c.name == session.scaling_group_name))
     )
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -1492,8 +1500,12 @@ async def handle_kernel_creation_lifecycle(
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
+        if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
+            session_id = event.creation_info.get("session_id")
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
+            log.warning(f"Kernel cancelled, {event.reason = }")
             tracker.cancel()
 
 
@@ -1537,14 +1549,16 @@ async def handle_session_creation_lifecycle(
 async def handle_session_termination_lifecycle(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionTerminatedEvent,
+    event: SessionTerminatingEvent | SessionTerminatedEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
     root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, SessionTerminatedEvent):
+    if isinstance(event, SessionTerminatingEvent):
+        await root_ctx.registry.mark_session_terminating(event.session_id, event.reason)
+    elif isinstance(event, SessionTerminatedEvent):
         await root_ctx.registry.mark_session_terminated(event.session_id, event.reason)
 
 
@@ -1624,6 +1638,7 @@ async def invoke_session_callback(
     | SessionPreparingEvent
     | SessionStartedEvent
     | SessionCancelledEvent
+    | SessionTerminatingEvent
     | SessionTerminatedEvent
     | SessionSuccessEvent
     | SessionFailureEvent,
@@ -2595,6 +2610,12 @@ async def init(app: web.Application) -> None:
         name="api.session.kterm",
     )
     evd.consume(
+        SessionTerminatingEvent,
+        app,
+        handle_session_termination_lifecycle,
+        name="api.session.sterming",
+    ),
+    evd.consume(
         SessionTerminatedEvent,
         app,
         handle_session_termination_lifecycle,
@@ -2605,6 +2626,7 @@ async def init(app: web.Application) -> None:
     evd.consume(SessionPreparingEvent, app, invoke_session_callback)
     evd.consume(SessionStartedEvent, app, invoke_session_callback)
     evd.consume(SessionCancelledEvent, app, invoke_session_callback)
+    evd.consume(SessionTerminatingEvent, app, invoke_session_callback)
     evd.consume(SessionTerminatedEvent, app, invoke_session_callback)
     evd.consume(SessionSuccessEvent, app, invoke_session_callback)
     evd.consume(SessionFailureEvent, app, invoke_session_callback)

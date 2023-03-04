@@ -132,6 +132,7 @@ users = sa.Table(
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
     sa.Column("totp_key", sa.String(length=32)),
     sa.Column("totp_activated", sa.Boolean),
+    sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
 )
 
 
@@ -196,6 +197,7 @@ class User(graphene.ObjectType):
     role = graphene.String()
     allowed_client_ip = graphene.List(lambda: graphene.String)
     totp_activated = graphene.Boolean()
+    totp_activated_at = GQLDateTime()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -231,6 +233,7 @@ class User(graphene.ObjectType):
             role=row["role"],
             allowed_client_ip=row["allowed_client_ip"],
             totp_activated=row["totp_activated"],
+            totp_activated_at=row["totp_activated_at"],
         )
 
     @classmethod
@@ -284,6 +287,7 @@ class User(graphene.ObjectType):
         "role": ("role", lambda s: UserRole[s]),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
+        "totp_activated_at": ("totp_activated_at", dtparse),
     }
 
     _queryorder_colmap = {
