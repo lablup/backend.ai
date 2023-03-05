@@ -177,7 +177,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  build:
+  build-wheels:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -263,8 +263,8 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-#  windows-conda-package:
-#    needs: [build]
+#  build-conda-pack:
+#    needs: [build-wheels]
 #    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
 #    runs-on: windows-latest
 #    steps:
@@ -318,8 +318,23 @@ jobs:
 #        if-no-files-found: error
 
 
+#  upload-conda-pack:
+#  needs: [build-conda-pack]
+#  steps:
+#    - name: Download conda-pack
+#      uses: actions/download-artifact@v3
+#      with:
+#        name: windows-conda
+#        path: windows-conda
+#    - name: Release to GitHub
+#      uses: softprops/action-gh-release@v1
+#      with:
+#        files: |
+#          windows-conda/backend.ai-client-*.zip
+
+
   deploy-to-pypi:
-    #needs: [windows-conda-package]
+    needs: [build-wheels]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -346,11 +361,6 @@ jobs:
       with:
         name: wheels-and-sdists
         path: dist
-    #- name: Download conda-pack
-    #  uses: actions/download-artifact@v3
-    #  with:
-    #    name: windows-conda
-    #    path: windows-conda
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -363,12 +373,21 @@ jobs:
       run: |
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
-      with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*.whl
-          dist/*.tar.gz
-    #      windows-conda/backend.ai-client-*.zip
+
+
+#  upload-wheels:
+#  needs: [build-wheels]
+#  steps:
+#    - name: Download built wheels and sdists
+#      uses: actions/download-artifact@v3
+#      with:
+#        name: wheels-and-sdists
+#        path: dist
+#    - name: Release to GitHub
+#      uses: softprops/action-gh-release@v1
+#      with:
+#        body_path: "CHANGELOG_RELEASE.md"
+#        prerelease: ${{ env.IS_PRERELEASE }}
+#        files: |
+#          dist/*.whl
+#          dist/*.tar.gz
