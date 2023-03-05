@@ -1,8 +1,8 @@
 [general]
 #apiEndpoint = "http://127.0.0.1:8080"
 #apiEndpointText = "TEST"
-#defaultSessionEnvironment = "cr.backend.ai/stable/python"
-defaultSessionEnvironment = "cr.backend.ai/testing/python"
+defaultSessionEnvironment = "cr.backend.ai/stable/python"
+#defaultSessionEnvironment = "cr.backend.ai/testing/python"
 siteDescription = "macOS"
 connectionMode = "SESSION"
 #connectionMode = "API"
