@@ -91,7 +91,7 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
                 SessionRow.status,
             )
             .select_from(j)
-            .where(SessionRow.group_id == project_id)
+            .where(SessionRow.project_id == project_id)
         )
         result = await db_sess.execute(query)
         rows = result.scalars().all()
@@ -175,7 +175,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     params["owner_access_key"] = access_key
     async with root_ctx.db.begin_readonly() as db_conn:
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, db_conn)
+        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, db_conn)
 
     log.info("SERVE.CREATE (email:{}, ak:{})", request["user"]["email"], access_key)
     resp: MutableMapping[str, Any] = {}
@@ -259,7 +259,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 image=img_id,
                 model=model_id,
                 domain=domain_name,
-                project=group_id,
+                project=project_id,
                 resource_group=params["config"]["scaling_group"],
             )
             db_sess.add(endpoint)
@@ -360,7 +360,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     resource_policy,
                     user_scope=UserScope(
                         domain_name=domain_name,
-                        group_id=group_id,
+                        project_id=project_id,
                         user_uuid=owner_uuid,
                         user_role=user_role,
                     ),

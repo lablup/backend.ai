@@ -33,10 +33,10 @@ class EndpointRow(Base):
         sa.ForeignKey("domains.name", ondelete="RESTRICT"),
         nullable=False,
     )
-    project = sa.Column(
-        "project",
+    project_id = sa.Column(
+        "project_id",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        sa.ForeignKey("projects.id", ondelete="RESTRICT"),
         nullable=False,
     )
     resource_group = sa.Column(

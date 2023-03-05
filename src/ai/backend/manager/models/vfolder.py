@@ -632,7 +632,7 @@ async def prepare_vfolder_mounts(
             user_uuid=user_scope.user_uuid,
             resource_policy=resource_policy,
             domain_name=user_scope.domain_name,
-            group_id=user_scope.project_id,
+            project_id=user_scope.project_id,
             permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if vfolder["project_id"] is not None and vfolder["project_id"] != str(
