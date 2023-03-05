@@ -263,63 +263,63 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  windows-conda-package:
-    needs: [build]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v3
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
-    - name: Git LFS Pull
-      run: git lfs pull
-    - name: Extract Python version from pants.toml
-      shell: bash
-      run: |
-        export LANG=C.UTF-8
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
-    - name: Normalize package version
-      run: |
-        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
-    - name: Download built wheels and sdists
-      uses: actions/download-artifact@v3
-      with:
-        name: wheels-and-sdists
-        path: dist
-    - name: Install conda-pack
-      uses: s-weigand/setup-conda@v1
-      with:
-        activate-conda: false
-    - name: Create conda environment
-      run: |
-        pip install conda-pack
-        conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
-        conda activate backend.ai-client
-        pip install dist/backend.ai_client-*.whl
-        conda-pack -o backend.ai-client-{PKGVER}-windows-conda.zip
-    - name: Upload conda-pack
-      uses: actions/upload-artifact@v3
-      with:
-        name: windows-conda
-        path: backend.ai-client-{PKGVER}-windows-conda.zip
-        if-no-files-found: error
+#  windows-conda-package:
+#    needs: [build]
+#    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+#    runs-on: windows-latest
+#    steps:
+#    - uses: actions/checkout@v3
+#    - name: Create LFS file hash list
+#      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+#    - name: Restore LFS cache
+#      uses: actions/cache@v3
+#      id: lfs-cache
+#      with:
+#          path: .git/lfs
+#          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+#    - name: Git LFS Pull
+#      run: git lfs pull
+#    - name: Extract Python version from pants.toml
+#      shell: bash
+#      run: |
+#        export LANG=C.UTF-8
+#        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+#        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+#        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+#    - name: Set up Python
+#      uses: actions/setup-python@v4
+#      with:
+#        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+#        cache: pip
+#    - name: Normalize package version
+#      run: |
+#        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+#    - name: Download built wheels and sdists
+#      uses: actions/download-artifact@v3
+#      with:
+#        name: wheels-and-sdists
+#        path: dist
+#    - name: Install conda-pack
+#      uses: s-weigand/setup-conda@v1
+#      with:
+#        activate-conda: false
+#    - name: Create conda environment
+#      run: |
+#        pip install conda-pack
+#        conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
+#        conda activate backend.ai-client
+#        pip install dist/backend.ai_client-*.whl
+#        conda-pack -o backend.ai-client-{PKGVER}-windows-conda.zip
+#    - name: Upload conda-pack
+#      uses: actions/upload-artifact@v3
+#      with:
+#        name: windows-conda
+#        path: backend.ai-client-{PKGVER}-windows-conda.zip
+#        if-no-files-found: error
 
 
   deploy-to-pypi:
-    needs: [windows-conda-package]
+    #needs: [windows-conda-package]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -346,11 +346,11 @@ jobs:
       with:
         name: wheels-and-sdists
         path: dist
-    - name: Download conda-pack
-      uses: actions/download-artifact@v3
-      with:
-        name: windows-conda
-        path: windows-conda
+    #- name: Download conda-pack
+    #  uses: actions/download-artifact@v3
+    #  with:
+    #    name: windows-conda
+    #    path: windows-conda
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -371,4 +371,4 @@ jobs:
         files: |
           dist/*.whl
           dist/*.tar.gz
-          windows-conda/backend.ai-client-*.zip
+    #      windows-conda/backend.ai-client-*.zip
