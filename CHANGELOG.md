@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.16 (2023-03-05)
+
+Now we officially provide a conda-pack zip distribution of the client SDK for Windows users. Check out our GitHub release artifacts.
+
+### Features
+* Add an `enable_2FA` option to enable/disable 2-Factor-Authenticaiton feature. ([#1126](https://github.com/lablup/backend.ai/issues/1126))
+
+
 ## 22.09.15 (2023-03-03)
 
 This is a hotfix release to remedy the packaging error related to a missing `su-exec` custom binary, which has prevented creating new sessions
