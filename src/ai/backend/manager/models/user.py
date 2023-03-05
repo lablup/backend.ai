@@ -303,6 +303,8 @@ class User(graphene.ObjectType):
         "modified_at": "modified_at",
         "domain_name": "domain_name",
         "role": "role",
+        "totp_activated": "totp_activated",
+        "totp_activated_at": "totp_activated_at",
     }
 
     @classmethod

@@ -57,16 +57,16 @@ def test_parse_service_ports_invalid_values():
     with pytest.raises(ValueError, match="larger than"):
         parse_service_ports("x:http:1000")
 
-    with pytest.raises(ValueError, match="Invalid format"):
+    with pytest.raises(ValueError, match="Invalid service-ports format"):
         parse_service_ports("x:http:-1")
 
-    with pytest.raises(ValueError, match="Invalid format"):
+    with pytest.raises(ValueError, match="Invalid service-ports format"):
         parse_service_ports("abcdefg")
 
-    with pytest.raises(ValueError, match="Invalid format"):
+    with pytest.raises(ValueError, match="Invalid service-ports format"):
         parse_service_ports("x:tcp:1234,abcdefg")
 
-    with pytest.raises(ValueError, match="Invalid format"):
+    with pytest.raises(ValueError, match="Invalid service-ports format"):
         parse_service_ports("abcdefg,x:tcp:1234")
 
     with pytest.raises(ValueError, match="already used"):

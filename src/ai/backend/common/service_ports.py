@@ -18,7 +18,7 @@ def parse_service_ports(
     used_ports: Set[int] = set()
 
     def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match]:
-        if isinstance(s, Sequence):
+        if isinstance(s, Sequence) and not isinstance(s, str):
             s = list(s)
             while s:
                 piece = s.pop(0)
@@ -71,4 +71,5 @@ def parse_service_ports(
                 "host_ports": (None,) * len(ports),
             }
         )
+
     return items

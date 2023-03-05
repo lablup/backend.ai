@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import SessionTypes
 
 from ..compat import current_loop
@@ -186,6 +187,7 @@ class ComputeSession(BaseFunction):
         group_name: str = None,
         bootstrap_script: str = None,
         tag: str = None,
+        architecture: str = DEFAULT_IMAGE_ARCH,
         scaling_group: str = None,
         owner_access_key: str = None,
         preopen_ports: List[int] = None,
@@ -229,11 +231,11 @@ class ComputeSession(BaseFunction):
             of it.
 
             .. versionadded:: 19.09.0
-        :param mounts: The list of vfolder names that belongs to the currrent API
+        :param mounts: The list of vfolder names that belongs to the current API
             access key.
         :param mount_map: Mapping which contains custom path to mount vfolder.
             Key and value of this map should be vfolder name and custom path.
-            Defalut mounts or relative paths are under /home/work.
+            Default mounts or relative paths are under /home/work.
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
@@ -290,6 +292,7 @@ class ComputeSession(BaseFunction):
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
+            params["architecture"] = architecture
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
@@ -349,28 +352,28 @@ class ComputeSession(BaseFunction):
         cls,
         template_id: str,
         *,
-        name: Union[str, Undefined] = undefined,
-        type_: Union[str, Undefined] = undefined,
+        name: str | Undefined = undefined,
+        type_: str | Undefined = undefined,
         starts_at: str = None,
-        enqueue_only: Union[bool, Undefined] = undefined,
-        max_wait: Union[int, Undefined] = undefined,
+        enqueue_only: bool | Undefined = undefined,
+        max_wait: int | Undefined = undefined,
         dependencies: Sequence[str] = None,  # cannot be stored in templates
-        no_reuse: Union[bool, Undefined] = undefined,
-        image: Union[str, Undefined] = undefined,
+        no_reuse: bool | Undefined = undefined,
+        image: str | Undefined = undefined,
         mounts: Union[List[str], Undefined] = undefined,
         mount_map: Union[Mapping[str, str], Undefined] = undefined,
         envs: Union[Mapping[str, str], Undefined] = undefined,
-        startup_command: Union[str, Undefined] = undefined,
+        startup_command: str | Undefined = undefined,
         resources: Union[Mapping[str, int], Undefined] = undefined,
         resource_opts: Union[Mapping[str, int], Undefined] = undefined,
-        cluster_size: Union[int, Undefined] = undefined,
+        cluster_size: int | Undefined = undefined,
         cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
-        domain_name: Union[str, Undefined] = undefined,
-        group_name: Union[str, Undefined] = undefined,
-        bootstrap_script: Union[str, Undefined] = undefined,
-        tag: Union[str, Undefined] = undefined,
-        scaling_group: Union[str, Undefined] = undefined,
-        owner_access_key: Union[str, Undefined] = undefined,
+        domain_name: str | Undefined = undefined,
+        group_name: str | Undefined = undefined,
+        bootstrap_script: str | Undefined = undefined,
+        tag: str | Undefined = undefined,
+        scaling_group: str | Undefined = undefined,
+        owner_access_key: str | Undefined = undefined,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session from template.
@@ -413,11 +416,11 @@ class ComputeSession(BaseFunction):
             of it.
 
             .. versionadded:: 19.09.0
-        :param mounts: The list of vfolder names that belongs to the currrent API
+        :param mounts: The list of vfolder names that belongs to the current API
             access key.
         :param mount_map: Mapping which contains custom path to mount vfolder.
             Key and value of this map should be vfolder name and custom path.
-            Defalut mounts or relative paths are under /home/work.
+            Default mounts or relative paths are under /home/work.
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
@@ -798,8 +801,8 @@ class ComputeSession(BaseFunction):
     @api_function
     async def upload(
         self,
-        files: Sequence[Union[str, Path]],
-        basedir: Union[str, Path] = None,
+        files: Sequence[str | Path],
+        basedir: Optional[str | Path] = None,
         show_progress: bool = False,
     ):
         """
@@ -865,8 +868,8 @@ class ComputeSession(BaseFunction):
     @api_function
     async def download(
         self,
-        files: Sequence[Union[str, Path]],
-        dest: Union[str, Path] = ".",
+        files: Sequence[str | Path],
+        dest: str | Path = ".",
         show_progress: bool = False,
     ):
         """
@@ -929,7 +932,7 @@ class ComputeSession(BaseFunction):
         return {"file_names": file_names}
 
     @api_function
-    async def list_files(self, path: Union[str, Path] = "."):
+    async def list_files(self, path: str | Path = "."):
         """
         Gets the list of files in the given path inside the compute session
         container.
@@ -1086,7 +1089,7 @@ class ComputeSession(BaseFunction):
 
 class InferenceSession(BaseFunction):
     """
-    Provides various iteractions with inference sessions in Backend.AI.
+    Provides various interactions with inference sessions in Backend.AI.
     """
 
     id: Optional[UUID]
@@ -1169,6 +1172,7 @@ class InferenceSession(BaseFunction):
         group_name: Optional[str] = None,
         bootstrap_script: Optional[str] = None,
         tag: Optional[str] = None,
+        architecture: Optional[str] = None,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
         preopen_ports: Optional[List[int]] = None,
@@ -1185,28 +1189,29 @@ class InferenceSession(BaseFunction):
         cls,
         template_id: str,
         *,
-        name: Union[str, Undefined] = undefined,
-        type_: Union[str, Undefined] = undefined,
+        name: str | Undefined = undefined,
+        type_: str | Undefined = undefined,
         starts_at: Optional[str] = None,
-        enqueue_only: Union[bool, Undefined] = undefined,
-        max_wait: Union[int, Undefined] = undefined,
-        dependencies: Sequence[str] = None,  # cannot be stored in templates
-        no_reuse: Union[bool, Undefined] = undefined,
-        image: Union[str, Undefined] = undefined,
-        mounts: Union[List[str], Undefined] = undefined,
-        mount_map: Union[Mapping[str, str], Undefined] = undefined,
-        envs: Union[Mapping[str, str], Undefined] = undefined,
-        startup_command: Union[str, Undefined] = undefined,
-        resources: Union[Mapping[str, int], Undefined] = undefined,
-        resource_opts: Union[Mapping[str, int], Undefined] = undefined,
-        cluster_size: Union[int, Undefined] = undefined,
-        cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
-        domain_name: Union[str, Undefined] = undefined,
-        group_name: Union[str, Undefined] = undefined,
-        bootstrap_script: Union[str, Undefined] = undefined,
-        tag: Union[str, Undefined] = undefined,
-        scaling_group: Union[str, Undefined] = undefined,
-        owner_access_key: Union[str, Undefined] = undefined,
+        enqueue_only: bool | Undefined = undefined,
+        max_wait: int | Undefined = undefined,
+        dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
+        no_reuse: bool | Undefined = undefined,
+        image: str | Undefined = undefined,
+        mounts: List[str] | Undefined = undefined,
+        mount_map: Mapping[str, str] | Undefined = undefined,
+        envs: Mapping[str, str] | Undefined = undefined,
+        startup_command: str | Undefined = undefined,
+        resources: Mapping[str, int] | Undefined = undefined,
+        resource_opts: Mapping[str, int] | Undefined = undefined,
+        cluster_size: int | Undefined = undefined,
+        cluster_mode: Literal["single-node", "multi-node"] | Undefined = undefined,
+        domain_name: str | Undefined = undefined,
+        group_name: str | Undefined = undefined,
+        bootstrap_script: str | Undefined = undefined,
+        tag: str | Undefined = undefined,
+        architecture: str | Undefined = undefined,
+        scaling_group: str | Undefined = undefined,
+        owner_access_key: str | Undefined = undefined,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session from template.
@@ -1308,8 +1313,8 @@ class InferenceSession(BaseFunction):
     @api_function
     async def upload(
         self,
-        files: Sequence[Union[str, Path]],
-        basedir: Union[str, Path] = None,
+        files: Sequence[str | Path],
+        basedir: Optional[str | Path] = None,
         show_progress: bool = False,
     ):
         """
@@ -1320,8 +1325,8 @@ class InferenceSession(BaseFunction):
     @api_function
     async def download(
         self,
-        files: Sequence[Union[str, Path]],
-        dest: Union[str, Path] = ".",
+        files: Sequence[str | Path],
+        dest: str | Path = ".",
         show_progress: bool = False,
     ):
         """
@@ -1330,7 +1335,7 @@ class InferenceSession(BaseFunction):
         raise NotImplementedError
 
     @api_function
-    async def list_files(self, path: Union[str, Path] = "."):
+    async def list_files(self, path: str | Path = "."):
         """
         Gets the list of files in the given path inside the inference session
         container.
