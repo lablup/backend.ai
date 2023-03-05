@@ -938,6 +938,13 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     joined by single dots (e.g., "1.2.3", "18.04").
     """
     rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
+
+    def _extract_version(key: str) -> Tuple[int, ...]:
+        m = rx_ver_suffix.search(key)
+        if m is not None:
+            return tuple(map(int, m.group(1).split(".")))
+        return (0,)
+
     m = rx_ver_suffix.search(distro)
     if m is None:
         # Assume latest
@@ -945,7 +952,7 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
         distro_ver = None
     else:
         distro_prefix = distro[: -len(m.group(1))]
-        distro_ver = m.group(1)
+        distro_ver = tuple(map(int, m.group(1).split(".")))
 
     # Check if there are static-build krunners first.
     if distro_prefix == "alpine":
@@ -958,23 +965,17 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
 
     # Search through the per-distro versions
     match_list = [
-        (distro_key, value)
+        (distro_key, value, _extract_version(distro_key))
         for distro_key, value in data.items()
         if distro_key.startswith(distro_prefix)
     ]
 
-    def _extract_version(item: Tuple[str, Any]) -> Tuple[int, ...]:
-        m = rx_ver_suffix.search(item[0])
-        if m is not None:
-            return tuple(map(int, m.group(1).split(".")))
-        return (0,)
-
-    match_list = sorted(match_list, key=_extract_version, reverse=True)
+    match_list = sorted(match_list, key=lambda x: x[2], reverse=True)
     if match_list:
         if distro_ver is None:
-            return match_list[0]
-        for distro_key, value in match_list:
-            if distro_key == distro:
+            return match_list[0][:-1]  # return latest
+        for distro_key, value, matched_distro_ver in match_list:
+            if distro_ver >= matched_distro_ver:
                 return (distro_key, value)
-        return match_list[0]  # fallback to the latest of its kind
+        return match_list[-1][:-1]  # fallback to the latest of its kind
     raise UnsupportedBaseDistroError(distro)

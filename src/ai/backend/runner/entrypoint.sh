@@ -28,6 +28,12 @@ if [ $USER_ID -eq 0 ]; then
   # Extract dotfiles
   /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
+  # Start ssh-agent if it is available
+  if command -v ssh-agent > /dev/null; then
+    eval "$(ssh-agent -s)"
+    setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
+  fi
+
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
     /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
@@ -94,6 +100,12 @@ else
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
+  # Start ssh-agent if it is available
+  if command -v ssh-agent > /dev/null; then
+    eval "$(ssh-agent -s)"
+    setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
+  fi
+
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
     /opt/kernel/su-exec $USER_ID:$GROUP_ID  /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
@@ -102,6 +114,8 @@ else
     echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
   fi
 
+  # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
+  # Note that we also need to use our own patched version of su-exec to support multiple gids.
   echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
   exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
 
