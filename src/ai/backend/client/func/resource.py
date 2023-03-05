@@ -25,7 +25,7 @@ class Resource(BaseFunction):
     @classmethod
     async def check_presets(cls):
         """
-        Lists all resource presets in the current scaling group with additiona
+        Lists all resource presets in the current scaling group with additional
         information.
         """
         rqst = Request("POST", "/resource/check-presets")

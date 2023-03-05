@@ -4,17 +4,20 @@ import asyncio
 import json
 import logging
 from abc import ABCMeta, abstractmethod
+from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import Any, AsyncIterator, Dict, Mapping, Optional, cast
 
 import aiohttp
 import aiotools
 import sqlalchemy as sa
+import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, arch_name_aliases
+from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageRow, ImageType
@@ -61,6 +64,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self.reporter = ContextVar("reporter", default=None)
         self.all_updates = ContextVar("all_updates")
 
+    async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
+        ssl_ctx = None  # default
+        if not self.registry_info["ssl-verify"]:
+            ssl_ctx = False
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+        async with aiohttp.ClientSession(connector=connector) as sess:
+            yield self.registry_url, sess
+
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter = None,
@@ -83,15 +94,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             "backendai",
             "geofront",
         )
-        ssl_ctx = None  # default
-        if not self.registry_info["ssl-verify"]:
-            ssl_ctx = False
-        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
-        async with aiohttp.ClientSession(connector=connector) as sess:
+        async with actxmgr(self.prepare_client_session)() as (url, client_session):
+            self.registry_url = url
             async with aiotools.TaskGroup() as tg:
-                async for image in self.fetch_repositories(sess):
+                async for image in self.fetch_repositories(client_session):
                     if not any((w in image) for w in non_kernel_words):  # skip non-kernel images
-                        tg.create_task(self._scan_image(sess, image))
+                        tg.create_task(self._scan_image(client_session, image))
 
         all_updates = self.all_updates.get()
         if not all_updates:
@@ -104,6 +112,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
                     ),
                 )
+                is_local = self.registry_name == "local"
 
                 for image_row in existing_images:
                     key = image_row.image_ref
@@ -115,6 +124,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.size_bytes = values["size_bytes"]
                     image_row.accelerators = values.get("accels")
                     image_row.labels = values["labels"]
+                    image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
                 session.add_all(
@@ -125,6 +135,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             image=k.name,
                             tag=k.tag,
                             architecture=k.architecture,
+                            is_local=is_local,
                             config_digest=v["config_digest"],
                             size_bytes=v["size_bytes"],
                             type=ImageType.COMPUTE,
@@ -135,6 +146,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         for k, v in all_updates.items()
                     ]
                 )
+                await session.flush()
 
     async def _scan_image(
         self,
@@ -175,12 +187,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def _scan_tag(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args,
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
-        skip_reason = None
-
         async def _load_manifest(_tag: str):
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{_tag}", **rqst_args
@@ -236,51 +246,75 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
         async with self.sema.get():
             manifests = await _load_manifest(tag)
+        await self._read_manifest(image, tag, manifests)
 
-        if len(manifests.keys()) == 0:
-            log.warning("Skipped image - {}:{} (missing/deleted)", image, tag)
-            progress_msg = f"Skipped {image}:{tag} (missing/deleted)"
+    async def _read_manifest(
+        self,
+        image: str,
+        tag: str,
+        manifests: dict[str, dict],
+        skip_reason: Optional[str] = None,
+    ) -> None:
+        if not manifests:
+            if not skip_reason:
+                skip_reason = "missing/deleted"
+            log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
+            progress_msg = f"Skipped {image}:{tag} ({skip_reason})"
             if (reporter := self.reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
+            return
 
+        assert ImageRow.resources is not None
         for architecture, manifest in manifests.items():
-            if manifest is None:
-                skip_reason = "missing/deleted"
-                continue
-
             try:
-                size_bytes = manifest["size"]
-                labels = manifest["labels"]
-                config_digest = manifest["digest"]
-                if "ai.backend.kernelspec" not in labels:
-                    # Skip non-Backend.AI kernel images
-                    skip_reason = architecture + ": missing kernelspec"
+                try:
+                    validate_image_labels(manifest["labels"])
+                except t.DataError as e:
+                    match e.as_dict():
+                        case str() as error_msg:
+                            skip_reason = error_msg
+                        case dict() as error_data:
+                            skip_reason = "; ".join(
+                                f"{field} {reason}" for field, reason in error_data.items()
+                            )
                     continue
-                if not (MIN_KERNELSPEC <= int(labels["ai.backend.kernelspec"]) <= MAX_KERNELSPEC):
-                    # Skip unsupported kernelspec images
-                    skip_reason = architecture + ": unsupported kernelspec"
+                except ValueError as e:
+                    skip_reason = str(e)
                     continue
-
-                update_key = ImageRef(
-                    f"{self.registry_name}/{image}:{tag}",
-                    [self.registry_name],
-                    architecture,
-                )
+                if self.registry_name == "local":
+                    if image.partition("/")[1] == "":
+                        image = "library/" + image
+                    update_key = ImageRef(
+                        f"{image}:{tag}",
+                        ["index.docker.io"],
+                        architecture,
+                    )
+                else:
+                    update_key = ImageRef(
+                        f"{self.registry_name}/{image}:{tag}",
+                        [self.registry_name],
+                        architecture,
+                    )
                 updates = {
-                    "config_digest": config_digest,
-                    "size_bytes": size_bytes,
-                    "labels": labels,
+                    "config_digest": manifest["digest"],
+                    "size_bytes": manifest["size"],
+                    "labels": manifest["labels"],  # keep the original form
                 }
-                accels = labels.get("ai.backend.accelerators")
+                accels = manifest["labels"].get("ai.backend.accelerators")
                 if accels:
                     updates["accels"] = accels
 
-                resources = {}
+                resources = {  # default fallback if not defined
+                    "cpu": {"min": "1", "max": None},
+                    "mem": {"min": "1g", "max": None},
+                }
                 res_prefix = "ai.backend.resource.min."
-                for k, v in filter(lambda pair: pair[0].startswith(res_prefix), labels.items()):
+                for k, v in filter(
+                    lambda pair: pair[0].startswith(res_prefix), manifest["labels"].items()
+                ):
                     res_key = k[len(res_prefix) :]
                     resources[res_key] = {"min": v}
-                updates["resources"] = resources
+                updates["resources"] = ImageRow.resources.type._schema.check(resources)
                 self.all_updates.get().update(
                     {
                         update_key: updates,

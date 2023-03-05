@@ -46,6 +46,7 @@ __all__ = (
     "JSONSerializableMixin",
     "DeviceId",
     "ContainerId",
+    "EndpointId",
     "SessionId",
     "KernelId",
     "MetricKey",
@@ -200,6 +201,7 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
+EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
@@ -271,6 +273,7 @@ class ServicePortProtocols(str, enum.Enum):
 class SessionTypes(str, enum.Enum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
+    INFERENCE = "inference"
 
 
 class SessionResult(str, enum.Enum):
@@ -853,6 +856,7 @@ class ImageConfig(TypedDict):
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
+    is_local: bool
 
 
 class ServicePort(TypedDict):
@@ -921,6 +925,7 @@ class KernelCreationConfig(TypedDict):
     allocated_host_ports: List[int]
     scaling_group: str
     agent_addr: str
+    endpoint_id: Optional[str]
 
 
 class SessionEnqueueingConfig(TypedDict):

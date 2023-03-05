@@ -1,0 +1,34 @@
+{
+  "description": "Backend.AI Web UI",
+  "manifest_version": 8,
+  "name": "Backend.AI Web UI",
+  "short_name": "BackendAIWebUI",
+  "version": "22.09.12",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff",
+  "theme_color": "#fff",
+  "icons": [
+    {
+      "src": "./manifest/backend-ai.iconset/icon_16x16@2x.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "./manifest/backend-ai.iconset/icon_32x32@2x.png",
+    "sizes": "32x32",
+    "type": "image/png"
+  }, {
+    "src": "./manifest/backend-ai.iconset/icon_128x128@2x.png",
+    "sizes": "128x128",
+    "type": "image/png"
+  }, {
+    "src": "./manifest/backend-ai.iconset/icon_256x256@2x.png",
+    "sizes": "256x256",
+    "type": "image/png"
+  }, {
+    "src": "./manifest/backend-ai.iconset/icon_512x512@2x.png",
+    "sizes": "512x512",
+    "type": "image/png"
+  }]
+}

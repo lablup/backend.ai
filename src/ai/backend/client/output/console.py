@@ -35,6 +35,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                         field_map[k].formatter.format_console(v, field_map[k]),
                     )
                     for k, v in item.items()
+                    if k in field_map
                 ],
                 headers=("Field", "Value"),
             )
@@ -57,6 +58,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                             field_map[k].formatter.format_console(v, field_map[k]),
                         )
                         for k, v in item.items()
+                        if k in field_map
                     ],
                     headers=("Field", "Value"),
                 )

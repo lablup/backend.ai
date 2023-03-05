@@ -46,7 +46,8 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
         except ValueError:
             # interpret as name
             try:
-                item = session.Project.from_name(id_or_name)
+                projects = session.Project.from_name(id_or_name)
+                item = projects[0]  # take the first one
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)

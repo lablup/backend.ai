@@ -195,8 +195,8 @@ class APIConfig:
         "read_timeout": "0",
     }
     """
-    The default values for config parameterse settable via environment variables
-    xcept the access and secret keys.
+    The default values for config parameters settable via environment variables
+    except the access and secret keys.
     """
 
     _endpoints: List[URL]
