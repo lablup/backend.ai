@@ -82,6 +82,9 @@ class BaseVolume(AbstractVolume):
         # remove intermediate prefix directories if they become empty
         from aiofiles import os as aiofile_os
 
+        if not path.parent.is_dir():
+            return
+
         if not os.listdir(path.parent):
             await aiofile_os.rmdir(path.parent)
 
