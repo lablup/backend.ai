@@ -5,13 +5,15 @@ import logging
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from ..models.acl import get_all_permissions
 from .auth import auth_required
 from .manager import ALL_ALLOWED, server_status_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 @auth_required

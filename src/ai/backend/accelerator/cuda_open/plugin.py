@@ -29,7 +29,7 @@ from ai.backend.agent.resources import (
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -65,7 +65,10 @@ __all__ = (
 
 PREFIX = "cuda"
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
+logger = logging.getLogger("ai.backend.accelerator.cuda")
+logger.addHandler(graylog_handler)
+
+log = BraceStyleAdapter(logger)
 
 
 class CUDADevice(AbstractComputeDevice):

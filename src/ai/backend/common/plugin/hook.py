@@ -7,10 +7,12 @@ from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
 
 import attrs
 
-from ..logging_utils import BraceStyleAdapter
+from ..logging import BraceStyleAdapter, graylog_handler
 from . import AbstractPlugin, BasePluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 __all__ = (
     "HookHandler",

@@ -29,7 +29,7 @@ import trafaret as t
 import yaml
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import AccessKey
 
 from ..models import UserRole, keypairs, users
@@ -38,7 +38,9 @@ from .exceptions import GenericForbidden, InvalidAPIParameters, QueryNotImplemen
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 

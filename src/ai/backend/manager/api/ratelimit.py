@@ -10,7 +10,7 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common import redis_helper
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import RedisConnectionInfo
 
 from ..defs import REDIS_RLIM_DB
@@ -18,7 +18,9 @@ from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 _time_prec: Final = Decimal("1e-3")  # msec
 _rlim_window: Final = 60 * 15

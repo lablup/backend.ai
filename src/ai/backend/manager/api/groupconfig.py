@@ -9,7 +9,7 @@ from aiohttp import web
 
 from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from ..models import MAXIMUM_DOTFILE_SIZE
 from ..models import association_groups_users as agus
@@ -30,7 +30,9 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 @server_status_required(READ_ALLOWED)

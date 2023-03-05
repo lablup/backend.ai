@@ -81,7 +81,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
@@ -148,7 +148,9 @@ from .utils import catch_unexpected, check_api_params, get_access_key_scopes, un
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 

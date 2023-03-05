@@ -6,14 +6,16 @@ from typing import TYPE_CHECKING
 import click
 import graphene
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from ..models.gql import Mutations, Queries
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 @click.group()

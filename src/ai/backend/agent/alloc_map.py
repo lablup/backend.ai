@@ -22,7 +22,7 @@ from typing import (
 import attr
 import more_itertools
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 
 from .affinity_map import AffinityHint, AffinityPolicy
@@ -37,7 +37,9 @@ from .exception import (
 if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 log_alloc_map: bool = False
 T = TypeVar("T")
 

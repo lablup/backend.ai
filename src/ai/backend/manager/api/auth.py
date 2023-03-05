@@ -19,7 +19,7 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 
@@ -45,7 +45,9 @@ from .utils import check_api_params, get_handler_attr, set_handler_attr
 if TYPE_CHECKING:
     from .context import RootContext
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log: Final = BraceStyleAdapter(logger)
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,

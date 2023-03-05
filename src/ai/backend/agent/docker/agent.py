@@ -44,7 +44,7 @@ from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.logging import BraceStyleAdapter, pretty
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -90,7 +90,10 @@ from .utils import PersistentServiceContainer
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
+
 eof_sentinel = Sentinel.TOKEN
 
 

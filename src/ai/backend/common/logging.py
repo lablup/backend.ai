@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
 
 import coloredlogs
+import graypy
 import trafaret as t
 import yarl
 import zmq
@@ -84,6 +85,8 @@ logging_config_iv = t.Dict(
         ).allow_extra("*"),
     }
 ).allow_extra("*")
+
+graylog_handler = graypy.GELFTLSHandler("0.0.0.0", 12201)
 
 
 class PickledException(Exception):

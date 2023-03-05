@@ -7,7 +7,10 @@ from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
+from ai.backend.common.logging import graylog_handler
+
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log.addHandler(graylog_handler)
 
 
 def scan_entrypoints(

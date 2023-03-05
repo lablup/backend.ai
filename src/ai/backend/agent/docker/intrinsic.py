@@ -13,7 +13,7 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.types import MountInfo
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import (
     DeviceId,
     DeviceModelInfo,
@@ -46,7 +46,9 @@ from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:

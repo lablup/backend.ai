@@ -12,6 +12,8 @@ from typing import Awaitable, Callable, Iterable, Optional
 import aiodns
 import netifaces
 
+from ai.backend.common.logging import graylog_handler
+
 from .utils import curl
 
 __all__ = (
@@ -24,6 +26,7 @@ __all__ = (
 )
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log.addHandler(graylog_handler)
 
 
 def is_containerized() -> bool:

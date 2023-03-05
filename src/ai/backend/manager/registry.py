@@ -62,7 +62,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -149,7 +149,9 @@ if TYPE_CHECKING:
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 SESSION_NAME_LEN_LIMIT = 10
 _read_only_txn_opts = {

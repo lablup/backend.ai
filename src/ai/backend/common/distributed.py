@@ -4,14 +4,16 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Callable, Final
 
-from .logging import BraceStyleAdapter
+from .logging import BraceStyleAdapter, graylog_handler
 
 if TYPE_CHECKING:
     from .events import AbstractEvent, EventProducer
     from .lock import AbstractDistributedLock
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class GlobalTimer:

@@ -6,11 +6,13 @@ import aiohttp
 import yarl
 
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from .base import BaseContainerRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class DockerHubRegistry(BaseContainerRegistry):

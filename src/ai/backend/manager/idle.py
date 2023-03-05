@@ -44,7 +44,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     SessionStartedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionTypes
 from ai.backend.common.utils import nmget
 
@@ -61,7 +61,9 @@ if TYPE_CHECKING:
     from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class AppStreamingStatus(enum.Enum):

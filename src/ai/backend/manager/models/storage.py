@@ -25,7 +25,7 @@ import attrs
 import graphene
 import yarl
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import HardwareMetadata
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
@@ -42,7 +42,9 @@ __all__ = (
     "StorageVolume",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True)

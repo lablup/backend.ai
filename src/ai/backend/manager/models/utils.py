@@ -26,7 +26,7 @@ from tenacity import (
 )
 
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
@@ -34,7 +34,9 @@ if TYPE_CHECKING:
 from ..defs import LockID
 from ..types import Sentinel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also

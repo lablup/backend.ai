@@ -8,7 +8,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common.docker import get_known_registries
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -18,7 +18,9 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 async def get_resource_slots(request: web.Request) -> web.Response:

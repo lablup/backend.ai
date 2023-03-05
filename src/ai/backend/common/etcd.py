@@ -40,7 +40,7 @@ from etcetra.client import EtcdClient, EtcdTransactionAction
 from etcetra.types import CompareKey, EtcdCredential
 from etcetra.types import HostPortPair as EtcetraHostPortPair
 
-from .logging_utils import BraceStyleAdapter
+from .logging import BraceStyleAdapter, graylog_handler
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
@@ -51,7 +51,9 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class ConfigScopes(enum.Enum):

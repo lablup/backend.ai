@@ -9,12 +9,14 @@ import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class PersistentServiceContainer:

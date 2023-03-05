@@ -37,7 +37,7 @@ from redis.asyncio import ConnectionPool
 from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
-from .logging import BraceStyleAdapter
+from .logging import BraceStyleAdapter, graylog_handler
 from .types import (
     AgentId,
     EtcdRedisConfig,
@@ -56,7 +56,9 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 PTGExceptionHandler: TypeAlias = Callable[
     [Type[Exception], Exception, TracebackType], Awaitable[None]

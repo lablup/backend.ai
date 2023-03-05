@@ -6,7 +6,7 @@ import traceback
 from typing import TYPE_CHECKING, Any, Mapping
 
 from ai.backend.common.events import AgentErrorEvent
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId, LogSeverity
 
@@ -15,7 +15,9 @@ from ..models import error_logs
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):

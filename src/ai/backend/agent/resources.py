@@ -26,7 +26,7 @@ from typing import (
 import aiodocker
 import attrs
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
     BinarySize,
@@ -56,8 +56,9 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
 

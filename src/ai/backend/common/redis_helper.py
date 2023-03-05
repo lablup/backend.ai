@@ -29,7 +29,7 @@ from redis.asyncio.sentinel import (
     SlaveNotFoundError,
 )
 
-from .logging import BraceStyleAdapter
+from .logging import BraceStyleAdapter, graylog_handler
 from .types import EtcdRedisConfig, RedisConnectionInfo
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -66,7 +66,9 @@ _default_conn_opts: Mapping[str, Any] = {
 
 _scripts: Dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class ConnectionNotAvailable(Exception):

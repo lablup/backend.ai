@@ -4,7 +4,7 @@ import logging
 import click
 
 from ai.backend.common.cli import MinMaxRange
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from .image_impl import alias as alias_impl
 from .image_impl import dealias as dealias_impl
@@ -14,7 +14,9 @@ from .image_impl import list_images as list_images_impl
 from .image_impl import rescan_images as rescan_images_impl
 from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 @click.group()

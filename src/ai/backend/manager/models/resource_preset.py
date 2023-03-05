@@ -7,7 +7,7 @@ import graphene
 import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import ResourceSlot
 
 from .base import (
@@ -25,7 +25,9 @@ from .user import UserRole
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
+logger = logging.getLogger("ai.backend.manager.models")
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 __all__: Sequence[str] = (
     "resource_presets",

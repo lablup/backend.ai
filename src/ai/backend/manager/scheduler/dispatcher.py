@@ -31,7 +31,7 @@ from ai.backend.common.events import (
     SessionScheduledEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, aobject
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.types import DistributedLockFactory
@@ -81,7 +81,9 @@ __all__ = (
     "SchedulerDispatcher",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+logger = logging.getLogger("ai.backend.manager.scheduler")
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")
@@ -172,12 +174,14 @@ class SchedulerDispatcher(aobject):
         await self.schedule_timer.join()
         await self.prepare_timer.join()
         log.info("Session scheduler started")
+        # mgr_logger.info("Session scheduler started")
 
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
         log.info("Session scheduler stopped")
+        # mgr_logger.info("Session scheduler stopped")
 
     async def schedule(
         self,
@@ -196,6 +200,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
+        # mgr_logger.debug("schedule(): triggered")
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -981,7 +986,10 @@ class SchedulerDispatcher(aobject):
 
                 scheduled_sessions: Sequence[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
+
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
+                # mgr_logger.debug(f"prepare(): preparing {len(scheduled_sessions)} session(s)")
+
                 async with (
                     async_timeout.timeout(delay=50.0),
                     aiotools.PersistentTaskGroup() as tg,

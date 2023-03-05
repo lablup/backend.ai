@@ -21,7 +21,7 @@ from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import RedisConnectionInfo
 
 from ..api.exceptions import VFolderOperationFailed
@@ -47,8 +47,9 @@ from .utils import ExtendedAsyncSAEngine
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 __all__: Sequence[str] = (
     "users",

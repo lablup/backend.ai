@@ -9,9 +9,11 @@ from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Opt
 import trafaret as t
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+logger = logging.getLogger("ai.backend.web.server")
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 extra_config_headers = t.Dict(
     {

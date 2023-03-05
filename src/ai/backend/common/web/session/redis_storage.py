@@ -6,11 +6,13 @@ from typing import Any, Callable, Optional
 
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
 from . import AbstractStorage, Session, extra_config_headers
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+logger = logging.getLogger("ai.backend.web.server")
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 try:
     from redis import VERSION

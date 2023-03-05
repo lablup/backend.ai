@@ -3,9 +3,11 @@ import os
 from pathlib import Path
 from typing import Dict
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 # the names of following AWS variables follow boto3 convention.
 s3_access_key = os.environ.get("AWS_ACCESS_KEY_ID", "dummy-access-key")

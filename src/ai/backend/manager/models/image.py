@@ -33,7 +33,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry import get_container_registry
@@ -60,7 +60,9 @@ if TYPE_CHECKING:
 
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 __all__ = (
     "rescan_images",

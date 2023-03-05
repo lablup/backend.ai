@@ -34,11 +34,13 @@ from typing_extensions import Final
 from ai.backend.common import identity
 from ai.backend.common.cgroup import get_cgroup_of_pid, get_container_id_of_cgroup
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]

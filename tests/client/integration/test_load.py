@@ -13,11 +13,13 @@ from statistics import mean, median, stdev
 import pytest
 
 from ai.backend.client.func.session import ComputeSession
+from ai.backend.common.logging import graylog_handler
 
 # module-level marker
 pytestmark = pytest.mark.integration
 
 log = logging.getLogger("ai.backend.client.test.load")
+log.addHandler(graylog_handler)
 
 sample_code = """
 import os

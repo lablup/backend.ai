@@ -51,7 +51,7 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import (
     BinarySize,
     DeviceId,
@@ -73,8 +73,9 @@ __all__ = (
     "CUDAPlugin",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
-
+logger = logging.getLogger("ai.backend.accelerator.cuda")
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 MIN_MEM_UNIT = 512 * (2**20)  # 512 MiB
 MIN_SMP_UNIT = 2

@@ -45,7 +45,7 @@ from aiotools import adefer, apartial
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import KernelTerminatingEvent
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
@@ -69,7 +69,9 @@ if TYPE_CHECKING:
     from ..config import SharedConfig
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 @server_status_required(READ_ALLOWED)

@@ -34,6 +34,8 @@ from dateutil.tz import tzutc
 from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.common.logging import graylog_handler
+
 from .auth import generate_signature
 from .exceptions import BackendAPIError, BackendClientError
 from .session import AsyncSession, BaseSession
@@ -41,6 +43,7 @@ from .session import Session as SyncSession
 from .session import api_session
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log.addHandler(graylog_handler)
 
 __all__ = [
     "Request",

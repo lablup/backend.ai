@@ -7,14 +7,16 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Set
 
 import trafaret as t
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
 from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
 from .types import AbstractScheduler, KernelInfo
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+logger = logging.getLogger("ai.backend.manager.scheduler")
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
 
 
 class DRFScheduler(AbstractScheduler):

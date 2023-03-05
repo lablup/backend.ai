@@ -7,7 +7,7 @@ from typing import Dict, FrozenSet, List
 from uuid import UUID
 
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import BinarySize
 from ai.backend.storage.abc import CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER
 
@@ -15,7 +15,10 @@ from ..exception import ExecutionError, VFolderCreationError
 from ..types import VFolderCreationOptions, VFolderUsage
 from ..vfs import BaseVolume, run
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+logger.addHandler(graylog_handler)
+log = BraceStyleAdapter(logger)
+
 
 LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")
 Path(LOCK_FILE).touch()
