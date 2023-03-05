@@ -42,15 +42,6 @@ class ResourceGroupUnit(str, Enum):
 
 @attr.define(slots=True)
 class ResourceUsage:
-    # kernel_id: UUID
-    # container_id: str
-
-    # created_at: datetime
-    # terminated_at: Optional[datetime]
-    # used_time: Optional[str]
-    # used_days: Optional[int]
-    # last_stat: Optional[Mapping[str, Any]]
-
     nfs: set = attr.field(factory=set)
     cpu_allocated: float = attr.field(default=0.0)
     cpu_used: float = attr.field(default=0.0)
@@ -94,13 +85,6 @@ class ResourceUsage:
 
     def to_json(self) -> Mapping[str, Any]:
         return {
-            # "kernel_id": str(self.kernel_id),
-            # "container_id": self.container_id,
-            # "created_at": self.created_at,
-            # "terminated_at": self.terminated_at,
-            # "used_time": self.used_time,
-            # "used_days": self.used_days,
-            # "last_stat": self.last_stat,
             "nfs": self.nfs,
             "cpu_allocated": self.cpu_allocated,
             "cpu_used": self.cpu_used,

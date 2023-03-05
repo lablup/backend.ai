@@ -824,21 +824,7 @@ def jsonify_resource_usage_group(usage_group: ResourceUsageGroup) -> dict[str, A
     for g in usage_group.belonged_usage_groups:
         belonged_infos[f"{g.group_unit.value}_infos"].append(jsonify_resource_usage_group(g))
     return {
-        "user_id": usage_group.user_id,
-        "user_email": usage_group.user_email,
-        "access_key": usage_group.access_key,
-        "project_id": usage_group.project_id,
-        "project_name": usage_group.project_name,
-        "group_id": usage_group.project_id,  # legacy
-        "group_name": usage_group.project_name,  # legacy
-        "kernel_id": usage_group.kernel_id,
-        "container_id": usage_group.container_id,
-        "session_id": usage_group.session_id,
-        "session_name": usage_group.session_name,
-        "domain_name": usage_group.domain_name,
-        "agents": usage_group.total_usage.agent_ids,
-        "group_unit": usage_group.group_unit.value,
-        "total_usage": usage_group.total_usage.to_json(),
+        **usage_group.to_json(),
         **belonged_infos,
     }
 
