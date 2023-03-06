@@ -166,7 +166,16 @@ latex_engine = "pdflatex"
 latex_elements = {
     "papersize": "a4paper",
     "pointsize": "12pt",
-    "preamble": "\\usepackage[T1]{fontenc}\n\\usepackage{dhucs-nanumfont}\n\\setmainfont{NanumBarunGothic}\n",
+    "preamble": "\n".join(
+        [
+            "\\usepackage[T1]{fontenc}",
+            "\\usepackage{kotex}",
+            "\\usepackage{dhucs-nanumfont}",
+            "\\setmainhangulfont{NanumBarunGothic}",
+            "\\setsanshangulfont{NanumBarunGothic}",
+        ]
+    )
+    + "\n",
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }
