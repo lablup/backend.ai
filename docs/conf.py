@@ -166,9 +166,9 @@ latex_engine = "xelatex"
 latex_elements = {
     "papersize": "a4paper",
     "pointsize": "12pt",
-    "preamble": "\\usepackage{kotex}\n",
+    "preamble": "\\usepackage{kotex}\n\\setmainfont{NanumBarunGothic}\n",
     # Latex figure (float) alignment
-    #'figure_align': 'htbp',
+    # 'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
