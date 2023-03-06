@@ -29,7 +29,6 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
 
 
 class Context:
-
     __slots__ = ("pid", "etcd", "local_config")
 
     pid: int

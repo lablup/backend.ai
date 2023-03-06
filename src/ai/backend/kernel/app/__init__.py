@@ -15,7 +15,6 @@ DEFAULT_PYFLAGS: List[str] = []
 
 
 class Runner(BaseRunner):
-
     log_prefix = "app-kernel"
     default_runtime_path = "/opt/backend.ai/bin/python"
     default_child_env = {

@@ -15,7 +15,6 @@ from ai.backend.common import validators as tx
 
 
 def test_trafaret_dataerror_pickling():
-
     with pytest.raises(t.DataError):
         iv = t.Int()
         iv.check("x")

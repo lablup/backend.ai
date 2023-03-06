@@ -130,7 +130,6 @@ def _DockerContainerError_reduce(self):
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
-
     scratch_dir: Path
     tmp_dir: Path
     config_dir: Path
@@ -927,7 +926,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
-
     docker_info: Mapping[str, Any]
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path

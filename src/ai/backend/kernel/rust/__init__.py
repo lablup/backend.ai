@@ -13,7 +13,6 @@ RUSTC = "rustc"
 
 
 class Runner(BaseRunner):
-
     log_prefix = "rust-kernel"
     default_runtime_path = "/usr/bin/rustc"
     default_child_env = {
