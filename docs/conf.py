@@ -161,12 +161,12 @@ htmlhelp_basename = "BackendAIDoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_engine = "xelatex"
+latex_engine = "pdflatex"
 
 latex_elements = {
     "papersize": "a4paper",
     "pointsize": "12pt",
-    "preamble": "\\usepackage{xetexko}\n\\setmainfont{NanumBarunGothic}\n",
+    "preamble": "\\usepackage[T1]{fontenc}\n\\usepackage{dhucs-nanumfont}\n\\setmainfont{NanumBarunGothic}\n",
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }
