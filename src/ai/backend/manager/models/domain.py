@@ -175,7 +175,6 @@ class ModifyDomainInput(graphene.InputObjectType):
 
 
 class CreateDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -211,7 +210,6 @@ class CreateDomain(graphene.Mutation):
 
 
 class ModifyDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

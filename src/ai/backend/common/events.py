@@ -64,7 +64,6 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
-
     # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
@@ -129,7 +128,6 @@ class DoTerminateSessionEvent(AbstractEvent):
 
 @attrs.define(slots=True, frozen=True)
 class GenericAgentEventArgs:
-
     reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:

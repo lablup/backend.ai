@@ -8,7 +8,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "scheme-kernel"
     default_runtime_path = "/usr/bin/rustc"
     default_child_env = {

@@ -495,7 +495,6 @@ class PurgeUserInput(graphene.InputObjectType):
 
 
 class CreateUser(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -590,7 +589,6 @@ class CreateUser(graphene.Mutation):
 
 
 class ModifyUser(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

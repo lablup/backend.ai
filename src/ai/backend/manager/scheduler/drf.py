@@ -17,7 +17,6 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
 class DRFScheduler(AbstractScheduler):
-
     config_iv = t.Dict({}).allow_extra("*")
     per_user_dominant_share: Dict[AccessKey, Decimal]
     total_capacity: ResourceSlot

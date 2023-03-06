@@ -448,7 +448,6 @@ class ModifyKeyPairInput(graphene.InputObjectType):
 
 
 class CreateKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -497,7 +496,6 @@ class CreateKeyPair(graphene.Mutation):
 
 
 class ModifyKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -526,7 +524,6 @@ class ModifyKeyPair(graphene.Mutation):
 
 
 class DeleteKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

@@ -237,7 +237,6 @@ class TestAsyncBarrier:
 
 @pytest.mark.asyncio
 async def test_run_through() -> None:
-
     i = 0
 
     async def do():

@@ -352,7 +352,6 @@ async def test_global_timer_etcdlock(
 
 @pytest.mark.asyncio
 async def test_global_timer_join_leave(request, test_ns, redis_container) -> None:
-
     event_records = []
 
     async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:

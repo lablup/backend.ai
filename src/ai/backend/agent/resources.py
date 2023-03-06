@@ -254,7 +254,6 @@ class AbstractComputeDevice:
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
-
     key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]

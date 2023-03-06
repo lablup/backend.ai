@@ -29,7 +29,6 @@ def key_by_requested_slots(
 
 
 class FIFOSlotScheduler(AbstractScheduler):
-
     config_iv = t.Dict(
         {
             t.Key("num_retries_to_skip", default=0): t.ToInt(gte=0),
@@ -105,7 +104,6 @@ class FIFOSlotScheduler(AbstractScheduler):
 
 
 class LIFOSlotScheduler(AbstractScheduler):
-
     config_iv = t.Dict({}).allow_extra("*")
 
     def pick_session(

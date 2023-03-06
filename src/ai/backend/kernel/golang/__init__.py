@@ -12,7 +12,6 @@ DEFAULT_BFLAGS: List[str] = [""]
 
 
 class Runner(BaseRunner):
-
     log_prefix = "go-kernel"
     default_runtime_path = "/usr/local/bin/go"
     default_child_env = {

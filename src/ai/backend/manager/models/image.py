@@ -678,7 +678,6 @@ class Image(graphene.ObjectType):
 
 
 class PreloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -700,7 +699,6 @@ class PreloadImage(graphene.Mutation):
 
 
 class UnloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -722,7 +720,6 @@ class UnloadImage(graphene.Mutation):
 
 
 class RescanImages(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -752,7 +749,6 @@ class RescanImages(graphene.Mutation):
 
 
 class ForgetImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -784,7 +780,6 @@ class ForgetImage(graphene.Mutation):
 
 
 class AliasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -820,7 +815,6 @@ class AliasImage(graphene.Mutation):
 
 
 class DealiasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -851,7 +845,6 @@ class DealiasImage(graphene.Mutation):
 
 
 class ClearImages(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -899,7 +892,6 @@ class ModifyImageInput(graphene.InputObjectType):
 
 
 class ModifyImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

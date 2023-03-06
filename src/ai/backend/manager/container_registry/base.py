@@ -24,7 +24,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
-
     db: ExtendedAsyncSAEngine
     registry_name: str
     registry_info: Mapping[str, Any]

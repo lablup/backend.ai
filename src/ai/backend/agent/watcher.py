@@ -345,7 +345,6 @@ async def watcher_server(loop, pidx, args):
 )
 @click.pass_context
 def main(cli_ctx, config_path, debug):
-
     watcher_config_iv = (
         t.Dict(
             {

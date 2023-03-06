@@ -104,7 +104,6 @@ _mock_config_iv = t.Dict(
 
 
 class CUDAPlugin(AbstractComputePlugin):
-
     config_watch_enabled = False
 
     key = DeviceName("cuda")
@@ -620,7 +619,10 @@ class CUDAPlugin(AbstractComputePlugin):
             for slot_name, _ in self.slot_types:
                 alloc_map.apply_allocation(
                     {
-                        slot_name: resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                        slot_name: resource_spec.allocations.get(
+                            DeviceName("cuda"),
+                            {},
+                        ).get(
                             slot_name,
                             {
                                 dev_id: Decimal(0)
@@ -633,14 +635,20 @@ class CUDAPlugin(AbstractComputePlugin):
         else:  # older agents without lablup/backend.ai-agent#180
             if self._mode == AllocationModes.DISCRETE:
                 alloc_map.allocations[SlotName("cuda.device")].update(
-                    resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                    resource_spec.allocations.get(
+                        DeviceName("cuda"),
+                        {},
+                    ).get(
                         SlotName("cuda.device"),
                         {},
                     ),
                 )
             elif self._mode == AllocationModes.FRACTIONAL:
                 alloc_map.allocations[SlotName("cuda.shares")].update(
-                    resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                    resource_spec.allocations.get(
+                        DeviceName("cuda"),
+                        {},
+                    ).get(
                         SlotName("cuda.shares"),
                         {},
                     ),

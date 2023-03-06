@@ -336,7 +336,6 @@ class DockerKernel(AbstractKernel):
 
 
 class DockerCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int

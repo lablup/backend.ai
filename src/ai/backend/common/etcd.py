@@ -100,7 +100,6 @@ R = TypeVar("R")
 
 
 class AsyncEtcd:
-
     etcd: EtcdClient
 
     _creds: Optional[EtcdCredential]
