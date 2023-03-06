@@ -1,7 +1,7 @@
 Backend.AI Documentation
 ========================
 
-**Latest API version: v5.20191215**
+**Latest API version: v6.20220615**
 
 Backend.AI is an enterprise-grade development and service backend for a wide range of AI-powered applications.
 Its core technology is tailored for operating high density computing clusters including GPUs and heterogeneous accelerators.
