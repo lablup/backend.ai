@@ -1,0 +1,16 @@
+name: readthedocs/actions
+on:
+  pull_request_target:
+    types: [opened, reopened, labeled, unlabeled]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  pull-request-links:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'docs') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: readthedocs/actions/preview@v1
+        with:
+          project-slug: "sorna"
