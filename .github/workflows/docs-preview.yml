@@ -16,5 +16,5 @@ jobs:
           project-slug: "sorna"
       - uses: readthedocs/actions/preview@v1
         with:
-          project-slug: "sorna-kr"
+          project-slug: "sorna"
           project-language: "kr"
