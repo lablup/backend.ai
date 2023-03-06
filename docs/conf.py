@@ -171,8 +171,6 @@ latex_elements = {
             "\\usepackage[T1]{fontenc}",
             "\\usepackage{kotex}",
             "\\usepackage{dhucs-nanumfont}",
-            "\\setmainhangulfont{NanumBarunGothic}",
-            "\\setsanshangulfont{NanumBarunGothic}",
         ]
     )
     + "\n",
