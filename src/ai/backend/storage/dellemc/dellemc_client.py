@@ -189,16 +189,3 @@ class DellEMCClient:
         ) as resp:
             data = await resp.json()
         return data["system"][0]
-
-
-"""
-    async def get_workload_stats(self) -> Mapping[int, any]:
-        async with self._session.get(
-            f"{self.endpoint}/platform/{self.api_version}/statistics/summary/workload",
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
-        ) as resp:
-            data = await resp.json()
-        return data["workload"]
-"""

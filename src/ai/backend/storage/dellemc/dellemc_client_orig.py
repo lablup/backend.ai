@@ -5,16 +5,12 @@ from typing import Any, Dict, List, Mapping
 
 import aiohttp
 
-# from manager.src.ai.backend.manager.api import auth
-
 
 class DellEMCClient:
     endpoint: str
     user: str
     password: str
     _session: aiohttp.ClientSession
-    # svm: str
-    # volume_name: str
 
     def __init__(
         self,
@@ -29,36 +25,6 @@ class DellEMCClient:
 
     async def aclose(self) -> None:
         await self._session.close()
-
-    """
-    async def get_metadata(self) -> Mapping[str, Any]:
-        async with self._session.get(
-            f"{self.endpoint}/platform/12/cluster/config",
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
-        ) as resp:
-            data = await resp.json()
-        volume_cluster = {
-            "description": data["description"],
-            "encoding": data["encoding"],
-            "guid": data["guid"],
-            "has_quorum": str(data["has_quorum"]),
-            "is_compliance": str(data["is_compliance"]),
-            "is_virtual": str(data["is_virtual"]),
-            "is_vonefs": str(data["is_vonefs"]),
-            "join_mode": data["join_mode"],
-            "local_devid": str(data["local_devid"]),
-            "local_lnn": str(data["local_lnn"]),
-            "local_serial": data["local_serial"],
-            "name": data["name"],
-            "devices": json.dumps(data["devices"]),
-            "onefs_version": json.dumps(data["onefs_version"]),
-            "timezone": str(data["timezone"]),
-            "upgrade_type": str(data["upgrade_type"]),
-        }
-        return volume_cluster
-    """
 
     async def get_metadata(self) -> Mapping[str, Any]:
         # TODO: request-timeout-error

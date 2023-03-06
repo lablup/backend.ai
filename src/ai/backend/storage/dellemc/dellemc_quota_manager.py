@@ -6,13 +6,11 @@ import aiohttp
 
 
 class QuotaManager:
-
     endpoint: str
     user: str
     password: str
     api_version: str
     _session: aiohttp.ClientSession
-    # volume_name: str
 
     def __init__(
         self,

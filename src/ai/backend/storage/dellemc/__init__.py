@@ -16,13 +16,11 @@ from .dellemc_quota_manager import QuotaManager
 
 
 class DellEMCVolume(BaseVolume):
-
     endpoint: str
     dell_admin: str
     dell_password: str
 
     async def init(self) -> None:
-
         self.endpoint = self.config["dell_endpoint"]
         self.dell_admin = self.config["dell_admin"]
         self.dell_password = str(self.config["dell_password"])
@@ -73,12 +71,6 @@ class DellEMCVolume(BaseVolume):
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         raise NotImplementedError
-        # quota = await self.quota_manager.list_all_quota()
-        # return quota[0]["usage"]
-
-    # async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
-    #     msg = await self.quota_manager.create_quota()
-    #     return msg
 
     async def get_drive_stats(self):
         resp = await self.dellEMC_client.get_drive_stats()
