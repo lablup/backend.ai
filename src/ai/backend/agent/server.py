@@ -377,7 +377,7 @@ class AgentRPCServer(aobject):
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
-        errors = [*filter(lambda item: isinstance(item, Exception), results)]
+        errors = [*filter(lambda item: isinstance(item, (BaseException, Exception)), results)]
         if errors:
             # Raise up the first error.
             if len(errors) == 1:
