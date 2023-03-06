@@ -7,7 +7,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  pull-request-links:
+  docs-preview-links:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'docs') }}
     runs-on: ubuntu-latest
     steps:
