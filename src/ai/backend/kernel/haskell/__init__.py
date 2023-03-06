@@ -10,7 +10,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "haskell-kernel"
     default_runtime_path = "/usr/bin/ghc"
     default_child_env = {

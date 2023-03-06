@@ -26,7 +26,6 @@ CHILD_ENV = {
 
 
 class Runner(BaseRunner):
-
     log_prefix = "shell-kernel"
 
     def __init__(self, *args, **kwargs):

@@ -89,7 +89,6 @@ def promote_path(path_env: str, path_to_promote: Union[Path, str]) -> str:
 
 
 class BaseRunner(metaclass=ABCMeta):
-
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
@@ -170,7 +169,6 @@ class BaseRunner(metaclass=ABCMeta):
 
         intrinsic_host_ports_mapping_path = Path("/home/config/intrinsic-ports.json")
         if intrinsic_host_ports_mapping_path.is_file():
-
             intrinsic_host_ports_mapping = json.loads(
                 await asyncio.get_running_loop().run_in_executor(
                     None,

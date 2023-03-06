@@ -268,7 +268,6 @@ class CPUPlugin(AbstractComputePlugin):
             return None
 
         async def api_impl(cid: str, pids: List[int]) -> List[Optional[Decimal]]:
-
             return []
 
         per_process_cpu_util = {}
@@ -688,7 +687,6 @@ class MemoryPlugin(AbstractComputePlugin):
         async def api_impl(
             cid: str, pids: List[int]
         ) -> List[Tuple[Optional[int], Optional[int], Optional[int]]]:
-
             return []
 
         per_process_mem_used_bytes = {}

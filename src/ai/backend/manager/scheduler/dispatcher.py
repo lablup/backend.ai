@@ -112,7 +112,6 @@ StartTaskArgs = Tuple[
 
 
 class SchedulerDispatcher(aobject):
-
     config: LocalConfig
     shared_config: SharedConfig
     registry: AgentRegistry
@@ -317,7 +316,6 @@ class SchedulerDispatcher(aobject):
         zero = ResourceSlot()
         num_scheduled = 0
         while len(pending_sessions) > 0:
-
             async with self.db.begin_readonly_session() as db_sess:
                 candidate_agents = await list_schedulable_agents_by_sgroup(db_sess, sgroup_name)
             total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)

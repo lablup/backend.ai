@@ -18,7 +18,6 @@ class DomainSocketProxy:
 async def proxy_connection(
     upper_sock_path: Path, down_reader: asyncio.StreamReader, down_writer: asyncio.StreamWriter
 ) -> None:
-
     up_reader, up_writer = await asyncio.open_unix_connection(str(upper_sock_path))
 
     async def _downstream():

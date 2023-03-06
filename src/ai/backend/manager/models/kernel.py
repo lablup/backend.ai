@@ -1331,7 +1331,6 @@ async def recalc_concurrency_used(
     redis_stat: RedisConnectionInfo,
     access_key: AccessKey,
 ) -> None:
-
     concurrency_used: int
     async with db_sess.begin_nested():
         result = await db_sess.execute(
