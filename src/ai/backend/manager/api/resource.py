@@ -7,7 +7,6 @@ import functools
 import json
 import logging
 import re
-from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Optional, Sequence, Tuple
@@ -39,7 +38,6 @@ from ..models import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     AgentStatus,
     KernelRow,
-    ResourceUsageGroup,
     SessionRow,
     agents,
     association_groups_users,
@@ -50,6 +48,13 @@ from ..models import (
     resource_presets,
     users,
 )
+
+# from ..models.resource_usage import (
+#     ProjectResourceUsage,
+#     fetch_resource_usage,
+#     parse_resource_usage_groups,
+#     parse_total_resource_group,
+# )
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
 from .manager import READ_ALLOWED, server_status_required
@@ -306,6 +311,20 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     await root_ctx.registry.recalc_resource_usage()
     return web.json_response({}, status=200)
+
+
+# async def get_stats_for_period(
+#     request: web.Request,
+#     start_date: datetime,
+#     end_date: datetime,
+#     group_ids: Optional[Sequence[UUID]] = None,
+# ) -> dict[UUID, ProjectResourceUsage]:
+#     root_ctx: RootContext = request.app["_root.context"]
+#     kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, group_ids)
+#     local_tz = root_ctx.shared_config["system"]["timezone"]
+#     usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
+#     total_groups, _ = parse_total_resource_group(usage_groups)
+#     return total_groups
 
 
 async def get_stats_for_period(
@@ -817,16 +836,6 @@ async def get_container_stats_for_period(
             objs_per_group[group_id]["g_gpu_allocated"] += c_info["gpu_allocated"]
             objs_per_group[group_id]["c_infos"].append(c_info)
     return list(objs_per_group.values())
-
-
-def jsonify_resource_usage_group(usage_group: ResourceUsageGroup) -> dict[str, Any]:
-    belonged_infos = defaultdict(list)
-    for g in usage_group.belonged_usage_groups:
-        belonged_infos[f"{g.group_unit.value}_infos"].append(jsonify_resource_usage_group(g))
-    return {
-        **usage_group.to_json(),
-        **belonged_infos,
-    }
 
 
 @server_status_required(READ_ALLOWED)

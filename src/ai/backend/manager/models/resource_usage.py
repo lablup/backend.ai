@@ -26,7 +26,7 @@ from .utils import ExtendedAsyncSAEngine
 __all__: Sequence[str] = (
     "ResourceGroupUnit",
     "ResourceUsage",
-    "ResourceUsageGroup",
+    "BaseResourceUsageGroup",
     "parse_resource_usage",
     "parse_resource_usage_groups",
     "fetch_resource_usage",
@@ -34,10 +34,11 @@ __all__: Sequence[str] = (
 
 
 class ResourceGroupUnit(str, Enum):
-    CONTAINER = "container"
+    KERNEL = "kernel"
     SESSION = "session"
     PROJECT = "project"
     DOMAIN = "domain"
+    TOTAL = "total"
 
 
 @attr.define(slots=True)
@@ -103,9 +104,15 @@ class ResourceUsage:
 
 
 @attr.define(slots=True)
-class ResourceUsageGroup:
+class BaseResourceUsageGroup:
     group_unit: ResourceGroupUnit
-    created_at: datetime
+    child_usage_group: dict = attr.field(factory=dict)
+
+    project_row: Optional[GroupRow] = attr.field(default=None)
+    session_row: Optional[SessionRow] = attr.field(default=None)
+    kernel_row: Optional[KernelRow] = attr.field(default=None)
+
+    created_at: Optional[datetime] = attr.field(default=None)
     terminated_at: Optional[datetime] = attr.field(default=None)
     used_time: Optional[str] = attr.field(default=None)
     used_days: Optional[int] = attr.field(default=None)
@@ -123,55 +130,218 @@ class ResourceUsageGroup:
 
     last_stat: Optional[Mapping[str, Any]] = attr.field(default=None)
     extra_info: Mapping[str, Any] = attr.field(factory=dict)
-    belonged_usage_groups: list[ResourceUsageGroup] = attr.field(factory=list)
+
     total_usage: ResourceUsage = attr.field(factory=ResourceUsage)
 
-    def to_json(self) -> dict[str, Any]:
-        # belonged_infos = defaultdict(list)
-        # for g in self.belonged_usage_groups:
-        #     belonged_infos[f"{g.group_unit.value}_infos"].append(g.to_json())
+    # def to_json(self, child: bool = False) -> dict[str, Any]:
+    #     return_val = {
+    #         **self.to_map(),
+    #         "agents": self.total_usage.agent_ids,
+    #         "group_unit": self.group_unit.value,
+    #         "total_usage": self.total_usage.to_json(),
+    #     }
+    #     if child:
+    #         belonged_infos: dict[str, list[Mapping[str, Any]]] = {}
+    #         for g in self.child_usage_group.values():
+    #             if g.group_unit.value not in belonged_infos:
+    #                 belonged_infos[g.group_unit.value] = []
+    #             belonged_infos[g.group_unit.value].append(g.to_json())
+    #         return_val = {
+    #             **belonged_infos,
+    #             **return_val,
+    #             # **{k:v for k, v in belonged_infos.items()},
+    #         }
+    #     return return_val
+
+    def to_map(self) -> dict[str, Any]:
         return {
-            **self.extra_info,
+            "created_at": self.created_at,
+            "terminated_at": self.terminated_at,
+            "used_time": self.used_time,
+            "used_days": self.used_days,
             "user_id": self.user_id,
             "user_email": self.user_email,
             "access_key": self.access_key,
             "project_id": self.project_id,
             "project_name": self.project_name,
-            "group_id": self.project_id,  # legacy
-            "group_name": self.project_name,  # legacy
             "kernel_id": self.kernel_id,
             "container_id": self.container_id,
             "session_id": self.session_id,
             "session_name": self.session_name,
             "domain_name": self.domain_name,
+            "last_stat": self.last_stat,
+            "extra_info": self.extra_info,
+            "total_usage": self.total_usage,
+        }
+
+
+@attr.define(slots=True, kw_only=True)
+class KernelResourceUsage(BaseResourceUsageGroup):
+    group_unit: ResourceGroupUnit = ResourceGroupUnit.KERNEL
+    # child_usage_group: dict = attr.field(factory=dict)
+    kernel_id: UUID
+    project_row: GroupRow
+    session_row: SessionRow
+    kernel_row: KernelRow
+
+    def to_json(self, child: bool = False) -> dict[str, Any]:
+        return {
+            **self.to_map(),
             "agents": self.total_usage.agent_ids,
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
-            # **belonged_infos,
         }
 
-    def validate_hierarchy(self, other: ResourceUsageGroup) -> bool:
-        match self.group_unit:
-            case ResourceGroupUnit.CONTAINER:
-                pass
-            case ResourceGroupUnit.SESSION:
-                pass
-            case ResourceGroupUnit.PROJECT:
-                pass
-            case ResourceGroupUnit.DOMAIN:
-                pass
-        return True
+    @classmethod
+    def from_base_usage_group(cls, usage_group: BaseResourceUsageGroup) -> KernelResourceUsage:
+        if usage_group.group_unit != ResourceGroupUnit.KERNEL:
+            raise ValueError(
+                "Unable to parse `KernelResourceUsage` from usage_group "
+                "that DOES NOT have `ResourceGroupUnit.KERNEL` on group_unit field."
+            )
+        if (
+            usage_group.project_row is None
+            or usage_group.session_row is None
+            or usage_group.kernel_row is None
+        ):
+            raise ValueError(
+                "Cannot parse `KernelResourceUsage` from usage_group that have None value field"
+            )
+        return cls(
+            project_row=usage_group.project_row,
+            session_row=usage_group.session_row,
+            kernel_row=usage_group.kernel_row,
+            **usage_group.to_map(),
+        )
 
     def register_resource_group(
-        self, others: list[ResourceUsageGroup], *, strict: bool = False
-    ) -> ResourceUsageGroup:
-        for g in others:
-            if strict:
-                if not self.validate_hierarchy(g):
-                    continue
-            self.total_usage += g.total_usage
-            self.belonged_usage_groups.append(g)
-        return self
+        self,
+        other: BaseResourceUsageGroup,
+    ) -> bool:
+        return True
+
+
+@attr.define(slots=True, kw_only=True)
+class SessionResourceUsage(BaseResourceUsageGroup):
+    group_unit: ResourceGroupUnit = ResourceGroupUnit.SESSION
+    child_usage_group: dict[UUID, KernelResourceUsage] = attr.field(default=dict)
+    session_id: UUID
+    project_row: GroupRow
+    session_row: SessionRow
+
+    def to_json(self, child: bool = False) -> dict[str, Any]:
+        return_val = {
+            **self.to_map(),
+            "agents": self.total_usage.agent_ids,
+            "group_unit": self.group_unit.value,
+            "total_usage": self.total_usage.to_json(),
+        }
+        if child:
+            return_val = {
+                **return_val,
+                ResourceGroupUnit.KERNEL.value: {
+                    str(g.kernel_id): g.to_json(child) for g in self.child_usage_group.values()
+                },
+            }
+        return return_val
+
+    @classmethod
+    def from_base_usage_group(cls, usage_group: BaseResourceUsageGroup) -> SessionResourceUsage:
+        if usage_group.group_unit not in (ResourceGroupUnit.KERNEL, ResourceGroupUnit.SESSION):
+            raise ValueError(
+                "Unable to parse `SessionResourceUsage` from usage_group "
+                "that DOES NOT have `ResourceGroupUnit.KERNEL` or `ResourceGroupUnit.SESSION` on group_unit field."
+            )
+        if usage_group.project_row is None or usage_group.session_row is None:
+            raise ValueError(
+                "Cannot parse `SessionResourceUsage` from usage_group that have None value field"
+            )
+        return cls(
+            project_row=usage_group.project_row,
+            session_row=usage_group.session_row,
+            **usage_group.to_map(),
+        )
+
+    def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
+        if other.kernel_id is None:
+            return False
+        if other.kernel_id in self.child_usage_group:
+            return False
+        self.child_usage_group[other.kernel_id] = KernelResourceUsage.from_base_usage_group(other)
+        is_registered = self.child_usage_group[other.kernel_id].register_resource_group(other)
+        if is_registered:
+            self.total_usage += other.total_usage
+        return is_registered
+
+
+@attr.define(slots=True, kw_only=True)
+class ProjectResourceUsage(BaseResourceUsageGroup):
+    group_unit: ResourceGroupUnit = ResourceGroupUnit.PROJECT
+    child_usage_group: dict[UUID, SessionResourceUsage] = attr.field(default=dict)
+    project_id: UUID
+    project_row: GroupRow
+
+    def to_json(self, child: bool = False) -> dict[str, Any]:
+        return_val = {
+            **self.to_map(),
+            "agents": self.total_usage.agent_ids,
+            "group_unit": self.group_unit.value,
+            "total_usage": self.total_usage.to_json(),
+        }
+        if child:
+            return_val = {
+                **return_val,
+                ResourceGroupUnit.SESSION.value: {
+                    str(g.session_id): g.to_json(child) for g in self.child_usage_group.values()
+                },
+            }
+        return return_val
+
+    @classmethod
+    def from_base_usage_group(cls, usage_group: BaseResourceUsageGroup) -> ProjectResourceUsage:
+        if usage_group.project_row is None:
+            raise ValueError(
+                "Cannot parse `ProjectResourceUsage` from usage_group that have None value field"
+            )
+        return cls(
+            project_row=usage_group.project_row,
+            **usage_group.to_map(),
+        )
+
+    def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
+        if other.session_id is None:
+            return False
+        if other.session_id not in self.child_usage_group:
+            self.child_usage_group[other.session_id] = SessionResourceUsage.from_base_usage_group(
+                other
+            )
+        is_registered = self.child_usage_group[other.session_id].register_resource_group(other)
+        if is_registered:
+            self.total_usage += other.total_usage
+        return is_registered
+
+
+# @attr.define(slots=True, kw_only=True)
+# class DomainResourceUsage(BaseResourceUsageGroup):
+#     group_unit: ResourceGroupUnit = attr.field(default=ResourceGroupUnit.DOMAIN)
+#     child_usage_group: dict[UUID, ProjectResourceUsage] = attr.field(default=dict)
+
+
+def parse_total_resource_group(
+    groups: Sequence[BaseResourceUsageGroup],
+) -> tuple[dict[UUID, ProjectResourceUsage], ResourceUsage]:
+    group_map: dict[UUID, ProjectResourceUsage] = {}
+    total_usage = ResourceUsage()
+    for g in groups:
+        key = g.project_id
+        if key is None:
+            continue
+        if key not in group_map:
+            group_map[key] = ProjectResourceUsage.from_base_usage_group(g)
+        is_registered = group_map[key].register_resource_group(g)
+        if is_registered:
+            total_usage += g.total_usage
+    return group_map, total_usage
 
 
 def parse_resource_usage(
@@ -179,7 +349,9 @@ def parse_resource_usage(
     last_stat: Optional[Mapping[str, Any]],
 ) -> ResourceUsage:
     if not last_stat:
-        return ResourceUsage()
+        return ResourceUsage(
+            agent_ids={kernel.agent},
+        )
     nfs = set()
     if kernel.vfolder_mounts:
         # For >=22.03, return used host directories instead of volume host, which is not so useful.
@@ -224,11 +396,9 @@ def parse_resource_usage(
 
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
-    session: SessionRow,
-    project: GroupRow,
     redis_stat: RedisConnectionInfo,
     local_tz: tzfile,
-) -> list[ResourceUsageGroup]:
+) -> list[BaseResourceUsageGroup]:
     stat_map = {k.id: k.last_stat for k in kernels}
     stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
 
@@ -245,82 +415,29 @@ async def parse_resource_usage_groups(
         stat_map[kern_id] = msgpack.unpackb(raw_stat)
 
     return [
-        ResourceUsageGroup(
+        BaseResourceUsageGroup(
+            project_row=kern.session.group,
+            session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
-            user_id=session.user_uuid,
-            user_email=session.user.email,
-            access_key=session.access_key,
-            project_id=project.id,
-            project_name=project.name,
+            user_id=kern.session.user_uuid,
+            user_email=kern.session.user.email,
+            access_key=kern.session.access_key,
+            project_id=kern.session.group.id,
+            project_name=kern.session.group.name,
             kernel_id=kern.id,
             container_id=kern.container_id,
             session_id=kern.session_id,
-            session_name=session.name,
-            domain_name=session.domain_name,
-            group_unit=ResourceGroupUnit.CONTAINER,
+            session_name=kern.session.name,
+            domain_name=kern.session.domain_name,
+            group_unit=ResourceGroupUnit.KERNEL,
             total_usage=parse_resource_usage(kern, stat_map[kern.id]),
         )
         for kern in kernels
     ]
-
-
-async def parse_container_resource_usages(
-    kernels: list[KernelRow],
-    session: SessionRow,
-    project: GroupRow,
-    redis_stat: RedisConnectionInfo,
-    local_tz: tzfile,
-) -> list[ResourceUsageGroup]:
-    return await parse_resource_usage_groups(kernels, session, project, redis_stat, local_tz)
-
-
-async def parse_session_resource_usage(
-    session: SessionRow,
-    project: GroupRow,
-    redis_stat: RedisConnectionInfo,
-    local_tz: tzfile,
-) -> ResourceUsageGroup:
-    kernel_usages = await parse_container_resource_usages(
-        session.kernels, session, project, redis_stat, local_tz
-    )
-    session_usage = ResourceUsageGroup(
-        group_unit=ResourceGroupUnit.SESSION,
-        created_at=session.created_at,
-        user_id=session.user_uuid,
-        user_email=session.user.email,
-        access_key=session.access_key,
-        project_id=project.id,
-        project_name=project.name,
-        session_id=session.id,
-        session_name=session.name,
-        domain_name=session.domain_name,
-    )
-    session_usage.register_resource_group(kernel_usages)
-    return session_usage
-
-
-async def parse_project_resource_usage(
-    project: GroupRow,
-    redis_stat: RedisConnectionInfo,
-    local_tz: tzfile,
-) -> ResourceUsageGroup:
-    usages = [
-        await parse_session_resource_usage(session, project, redis_stat, local_tz)
-        for session in project.sessions
-    ]
-    project_usage = ResourceUsageGroup(
-        group_unit=ResourceGroupUnit.PROJECT,
-        created_at=project.created_at,
-        project_id=project.id,
-        project_name=project.name,
-        domain_name=project.domain_name,
-    )
-    project_usage.register_resource_group(usages)
-    return project_usage
 
 
 SESSION_RESOURCE_SELECT_COLS = (
@@ -386,11 +503,15 @@ async def fetch_resource_usage(
     db_engine: ExtendedAsyncSAEngine,
     start_date: datetime,
     end_date: datetime,
+    session_ids: Optional[Sequence[UUID]] = None,
     project_ids: Optional[Sequence[UUID]] = None,
 ) -> list[KernelRow]:
     project_cond = None
     if project_ids:
         project_cond = GroupRow.id.in_(project_ids)
+    session_cond = None
+    if session_ids:
+        session_cond = SessionRow.id.in_(session_ids)
     query = _parse_query(
         kernel_cond=(
             # Filter sessions which existence period overlaps with requested period
@@ -403,6 +524,7 @@ async def fetch_resource_usage(
             # Or, filter running sessions which created before requested end_date
             ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS))),
         ),
+        session_cond=session_cond,
         project_cond=project_cond,
     )
     async with db_engine.begin_readonly_session() as db_sess:
