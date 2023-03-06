@@ -7,10 +7,14 @@ permissions:
   pull-requests: write
 
 jobs:
-  docs-preview-links:
+  docs-preview-links-:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'docs') }}
     runs-on: ubuntu-latest
     steps:
       - uses: readthedocs/actions/preview@v1
         with:
           project-slug: "sorna"
+      - uses: readthedocs/actions/preview@v1
+        with:
+          project-slug: "sorna-kr"
+          project-language: "kr"
