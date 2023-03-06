@@ -979,10 +979,10 @@ class KubernetesAgent(
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
     async def create_local_network(self, network_name: str) -> None:
-        return await super().create_local_network(network_name)
+        log.warning("k8s backend does not support local overlay network creation")
 
     async def destroy_local_network(self, network_name: str) -> None:
-        return await super().destroy_local_network(network_name)
+        log.warning("k8s backend does not support local overlay network destruction")
 
     async def restart_kernel__load_config(
         self,
