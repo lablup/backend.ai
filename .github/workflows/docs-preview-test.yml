@@ -1,0 +1,17 @@
+name: docs-preview-test
+on:
+  pull_request:
+    types: [opened, reopened, labeled, unlabeled, synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  docs-preview-links-:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'docs') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Yaminyam/actions/preview@v1
+        with:
+          project-slug: "sorna"
+          project-language: "ko,en"
