@@ -40,7 +40,7 @@ from etcetra.client import EtcdClient, EtcdTransactionAction
 from etcetra.types import CompareKey, EtcdCredential
 from etcetra.types import HostPortPair as EtcetraHostPortPair
 
-from .logging import BraceStyleAdapter, graylog_handler
+from .logging_utils import BraceStyleAdapter, graylog_handler
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
