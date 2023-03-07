@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+import graphene
+import sqlalchemy as sa
+from graphene.types.datetime import DateTime as GQLDateTime
+
+from .base import GUID, ForeignKeyIDColumn, metadata
+
+__all__ = [
+    "git_tokens",
+]
+
+git_tokens = sa.Table(
+    "git_tokens",
+    metadata,
+    sa.Column(
+        "user_id",
+        GUID,
+        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        primary_key=True,
+    ),
+    sa.Column("domain", sa.String(length=200, unique=True, primary_key=True, nullable=False)),
+    sa.Column("token", sa.String(length=200)),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column(
+        "modified_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.current_timestamp(),
+    ),
+    ForeignKeyIDColumn("user", "users.uuid", nullable=False),
+)
+
+
+class GitToken(graphene.ObjectType):
+    user_id = graphene.UUID()
+    domain = graphene.String()
+    token = graphene.String()
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
