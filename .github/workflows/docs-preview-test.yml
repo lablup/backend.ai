@@ -14,4 +14,6 @@ jobs:
       - uses: Yaminyam/actions/preview@main
         with:
           project-slug: "sorna"
-          project-language: "ko,en"
+          project-language: |
+            "en"
+            "kr"
