@@ -2268,6 +2268,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         params["permission"].value,
     )
     source_folder_host = row["host"]
+    source_folder_id = row["id"]
     target_folder_host = params["folder_host"]
     source_proxy_name, source_volume_name = root_ctx.storage_manager.split_host(source_folder_host)
     target_proxy_name, target_volume_name = root_ctx.storage_manager.split_host(target_folder_host)
@@ -2355,7 +2356,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         query = (
             sa.update(vfolders)
             .values(status=VFolderOperationStatus.CLONING)
-            .where(vfolders.c.name == row["name"])
+            .where(vfolders.c.id == source_folder_id)
         )
         await conn.execute(query)
 
@@ -2417,7 +2418,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
                 query = (
                     sa.update(vfolders)
                     .values(status=VFolderOperationStatus.READY)
-                    .where(vfolders.c.name == row["name"])
+                    .where(vfolders.c.id == source_folder_id)
                 )
                 await conn.execute(query)
 
