@@ -268,6 +268,7 @@ user_fields = FieldSet(
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
         FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
     ]
 )
 
