@@ -131,7 +131,7 @@ users = sa.Table(
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
     sa.Column("totp_key", sa.String(length=32)),
-    sa.Column("totp_activated", sa.Boolean),
+    sa.Column("totp_activated", sa.Boolean, server_default=sa.false(), default=False),
     sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
 )
 
