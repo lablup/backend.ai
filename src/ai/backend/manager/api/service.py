@@ -246,7 +246,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         query = sa.select([vfolders.c.name]).where(vfolders.c.id == model_id)
         result = await db_conn.execute(query)
         vfolder_name = result.first()["name"]
-    model_path = f"{vfolder_name}/versions/{params['model_version']}"
+    model_path = f"{vfolder_name}/versions/{model_version}"
     mounts = [*mounts, model_path]
     mount_map = {
         **mount_map,
@@ -349,9 +349,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             root_ctx.db,
             endpoint_id,
             session_id=session_id,
-            # TODO: set the following columns when creating the routing row
             model_id=model_id,
-            model_version=params["model_version"],
+            model_version=model_version,
             session_endpoint_name=None,
             session_endpoint_port=None,  # TODO: get the preopen host-side port number
             traffic_ratio=1.0,
