@@ -15,7 +15,6 @@ from ai.backend.common.asyncio import AsyncBarrier, run_through
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.networking import curl
-from ai.backend.common.testutils import AsyncContextManagerMock, mock_awaitable, mock_corofunc
 from ai.backend.common.utils import (
     dict2kvlist,
     generate_uuid,
@@ -25,6 +24,7 @@ from ai.backend.common.utils import (
     readable_size_to_bytes,
     str_to_timedelta,
 )
+from ai.backend.testutils.mock import AsyncContextManagerMock, mock_awaitable, mock_corofunc
 
 
 def test_odict() -> None:
@@ -171,6 +171,11 @@ def test_string_set_flag() -> None:
     assert MyFlags.A in {"a", "c"}
     assert MyFlags.B not in {"a", "c"}
 
+    assert MyFlags.A in {MyFlags.A, MyFlags.B}
+    assert MyFlags.B in {MyFlags.A, MyFlags.B}
+
+    assert MyFlags.A == MyFlags.A
+    assert MyFlags.A != MyFlags.B
     assert MyFlags.A == "a"
     assert MyFlags.A != "b"
     assert "a" == MyFlags.A
@@ -237,7 +242,6 @@ class TestAsyncBarrier:
 
 @pytest.mark.asyncio
 async def test_run_through() -> None:
-
     i = 0
 
     async def do():

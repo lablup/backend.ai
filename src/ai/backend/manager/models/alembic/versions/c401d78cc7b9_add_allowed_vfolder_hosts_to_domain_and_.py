@@ -8,6 +8,7 @@ Create Date: 2019-06-26 11:34:55.426107
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "c401d78cc7b9"
@@ -29,9 +30,9 @@ def upgrade():
     print("\nSet domain and group's allowed_vfolder_hosts with empty array.")
     connection = op.get_bind()
     query = "UPDATE domains SET allowed_vfolder_hosts = '{}';"
-    connection.execute(query)
+    connection.execute(text(query))
     query = "UPDATE groups SET allowed_vfolder_hosts = '{}';"
-    connection.execute(query)
+    connection.execute(text(query))
 
     op.alter_column("domains", column_name="allowed_vfolder_hosts", nullable=False)
     op.alter_column("groups", column_name="allowed_vfolder_hosts", nullable=False)

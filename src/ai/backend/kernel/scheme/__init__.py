@@ -8,7 +8,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "scheme-kernel"
     default_runtime_path = "/usr/bin/rustc"
     default_child_env = {
@@ -29,10 +28,10 @@ class Runner(BaseRunner):
         pass
 
     async def build_heuristic(self) -> int:
-        pass
+        return 0
 
     async def execute_heuristic(self) -> int:
-        pass
+        return 0
 
     async def query(self, code_text) -> int:
         with tempfile.NamedTemporaryFile(suffix=".scm", dir=".") as tmpf:

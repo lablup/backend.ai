@@ -10,6 +10,7 @@ import textwrap
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "22964745c12b"
@@ -42,7 +43,7 @@ def upgrade():
     """
     )
     connection = op.get_bind()
-    connection.execute(query)
+    connection.execute(text(query))
 
 
 def downgrade():

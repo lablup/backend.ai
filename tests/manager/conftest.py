@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
 import aiohttp
+import asyncpg
 import pytest
 import sqlalchemy as sa
 from aiohttp import web
@@ -33,6 +34,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
@@ -43,10 +45,16 @@ from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config import LocalConfig, SharedConfig
 from ai.backend.manager.config import load as load_config
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
+    DomainRow,
+    GroupRow,
+    KernelRow,
+    ScalingGroupRow,
+    SessionRow,
+    UserRow,
     agents,
     domains,
-    groups,
     kernels,
     keypairs,
     scaling_groups,
@@ -54,6 +62,7 @@ from ai.backend.manager.models import (
     vfolders,
 )
 from ai.backend.manager.models.base import pgsql_connect_opts, populate_fixture
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
@@ -107,8 +116,30 @@ def vfolder_host():
 
 
 @pytest.fixture(scope="session")
+def logging_config():
+    config = {
+        "drivers": ["console"],
+        "console": {"colored": None, "format": "verbose"},
+        "level": "DEBUG",
+        "pkg-ns": {
+            "": "INFO",
+            "ai.backend": "DEBUG",
+            "tests": "DEBUG",
+            "alembic": "INFO",
+            "aiotools": "INFO",
+            "aiohttp": "INFO",
+            "sqlalchemy": "WARNING",
+        },
+    }
+    logger = LocalLogger(config)
+    with logger:
+        yield config
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
@@ -141,6 +172,8 @@ def local_config(
                 "name": test_db,
                 "user": "postgres",
                 "password": "develove",
+                "pool-size": 8,
+                "max-overflow": 64,
             },
             "manager": {
                 "id": f"i-{test_id}",
@@ -148,6 +181,8 @@ def local_config(
                 "distributed-lock": "filelock",
                 "ipc-base-path": ipc_base_path,
                 "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+                "allowed-plugins": set(),
+                "disabled-plugins": set(),
             },
             "debug": {
                 "enabled": False,
@@ -155,10 +190,7 @@ def local_config(
                 "log-scheduler-ticks": False,
                 "periodic-sync-stats": False,
             },
-            "logging": {
-                "drivers": ["console"],
-                "console": {"colored": False, "format": "verbose"},
-            },
+            "logging": logging_config,
         }
     )
 
@@ -270,7 +302,7 @@ def database(request, local_config, test_db):
     db_user = local_config["db"]["user"]
     db_pass = local_config["db"]["password"]
 
-    # Create database using low-level psycopg2 API.
+    # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
     if db_pass:
         db_url = f"postgresql+asyncpg://{urlquote(db_user)}:{urlquote(db_pass)}@{db_addr}/testing"
@@ -283,8 +315,16 @@ def database(request, local_config, test_db):
             connect_args=pgsql_connect_opts,
             isolation_level="AUTOCOMMIT",
         )
-        async with engine.connect() as conn:
-            await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
+        while True:
+            try:
+                async with engine.connect() as conn:
+                    await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
+            except (asyncpg.exceptions.CannotConnectNowError, ConnectionError):
+                # Workaround intermittent test failures in GitHub Actions
+                await asyncio.sleep(0.1)
+                continue
+            else:
+                break
         await engine.dispose()
 
     asyncio.run(init_db())
@@ -343,7 +383,7 @@ def database(request, local_config, test_db):
         logger=init_logger(local_config, nested=True),
         local_config=local_config,
     )
-    sqlalchemy_url = f"postgresql://{db_user}:{db_pass}@{db_addr}/{test_db}"
+    sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
             sqlalchemy_url=sqlalchemy_url,
@@ -603,6 +643,7 @@ def get_headers(app, default_keypair):
         method,
         url,
         req_bytes,
+        allowed_ip="10.10.10.10",  # Same with fixture
         ctype="application/json",
         hash_type="sha256",
         api_version="v5.20191215",
@@ -616,6 +657,7 @@ def get_headers(app, default_keypair):
             "Content-Type": ctype,
             "Content-Length": str(len(req_bytes)),
             "X-BackendAI-Version": api_version,
+            "X-Forwarded-For": allowed_ip,
         }
         if api_version >= "v4.20181215":
             req_bytes = b""
@@ -713,15 +755,22 @@ async def registry_ctx(mocker):
     mock_shared_config.etcd = None
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
+    mock_dbsess = MagicMock()
     mock_dbconn_ctx = MagicMock()
+    mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
+    mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
     mock_dbconn_ctx.__aenter__ = AsyncMock(return_value=mock_dbconn)
     mock_dbconn_ctx.__aexit__ = AsyncMock()
+    mock_dbsess_ctx.__aenter__ = AsyncMock(return_value=mock_dbsess)
+    mock_dbsess_ctx.__aexit__ = AsyncMock()
     mock_dbconn.execute = AsyncMock(return_value=mock_dbresult)
     mock_dbconn.begin = MagicMock(return_value=mock_dbconn_ctx)
+    mock_dbsess.execute = AsyncMock(return_value=mock_dbresult)
+    mock_dbsess.begin_session = AsyncMock(return_value=mock_dbsess_ctx)
     mock_redis_stat = MagicMock()
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
@@ -749,6 +798,7 @@ async def registry_ctx(mocker):
         yield (
             registry,
             mock_dbconn,
+            mock_dbsess,
             mock_dbresult,
             mock_shared_config,
             mock_event_dispatcher,
@@ -761,59 +811,77 @@ async def registry_ctx(mocker):
 @pytest.fixture(scope="function")
 async def session_info(database_engine):
     user_uuid = str(uuid.uuid4()).replace("-", "")
+    user_password = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]
     domain_name = str(uuid.uuid4()).split("-")[0]
     group_id = str(uuid.uuid4()).replace("-", "")
     group_name = str(uuid.uuid4()).split("-")[0]
+    sgroup_name = str(uuid.uuid4()).split("-")[0]
     session_id = str(uuid.uuid4()).replace("-", "")
+    session_creation_id = str(uuid.uuid4()).replace("-", "")
 
-    async with database_engine.begin() as conn:
-        await conn.execute(
-            users.insert().values(
-                {
-                    "uuid": user_uuid,
-                    "username": f"TestCaseRunner-{postfix}",
-                    "email": f"tc.runner-{postfix}@lablup.com",
-                }
-            )
+    async with database_engine.begin_session() as db_sess:
+        scaling_group = ScalingGroupRow(
+            name=sgroup_name,
+            driver="test",
+            scheduler="test",
+            scheduler_opts=ScalingGroupOpts(),
         )
-        await conn.execute(
-            domains.insert().values(
-                {
-                    "name": domain_name,
-                    "total_resource_slots": {},
-                }
-            )
-        )
-        await conn.execute(
-            groups.insert().values(
-                {
-                    "id": group_id,
-                    "name": group_name,
-                    "domain_name": domain_name,
-                    "total_resource_slots": {},
-                }
-            )
-        )
-        await conn.execute(
-            kernels.insert().values(
-                {
-                    "session_id": session_id,
-                    "domain_name": domain_name,
-                    "group_id": group_id,
-                    "user_uuid": user_uuid,
-                    "occupied_slots": {},
-                    "repl_in_port": 0,
-                    "repl_out_port": 0,
-                    "stdin_port": 0,
-                    "stdout_port": 0,
-                }
-            )
-        )
+        db_sess.add(scaling_group)
 
-        yield session_id, conn
+        domain = DomainRow(name=domain_name, total_resource_slots={})
+        db_sess.add(domain)
 
-        await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
-        await conn.execute(groups.delete().where(groups.c.id == group_id))
-        await conn.execute(domains.delete().where(domains.c.name == domain_name))
-        await conn.execute(users.delete().where(users.c.uuid == user_uuid))
+        group = GroupRow(
+            id=group_id,
+            name=group_name,
+            domain_name=domain_name,
+            total_resource_slots={},
+        )
+        db_sess.add(group)
+
+        user = UserRow(
+            uuid=user_uuid,
+            email=f"tc.runner-{postfix}@lablup.com",
+            username=f"TestCaseRunner-{postfix}",
+            password=user_password,
+            domain_name=domain_name,
+        )
+        db_sess.add(user)
+
+        sess = SessionRow(
+            id=session_id,
+            creation_id=session_creation_id,
+            cluster_size=1,
+            domain_name=domain_name,
+            scaling_group_name=sgroup_name,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            vfolder_mounts={},
+        )
+        db_sess.add(sess)
+
+        kern = KernelRow(
+            session_id=session_id,
+            domain_name=domain_name,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            cluster_role=DEFAULT_ROLE,
+            occupied_slots={},
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+            vfolder_mounts={},
+        )
+        db_sess.add(kern)
+
+        await db_sess.commit()
+        yield session_id, db_sess
+
+        await db_sess.execute(sa.delete(KernelRow).where(KernelRow.session_id == session_id))
+        await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
+        await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+        await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))

@@ -2,7 +2,10 @@ import ipaddress
 import itertools
 import json
 import logging
+import os
 import re
+import sys
+from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -13,24 +16,32 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     Union,
 )
 
 import aiohttp
+import trafaret as t
 import yarl
 from packaging import version
 
+from . import validators as tx
+from .arch import arch_name_aliases
 from .etcd import AsyncEtcd
 from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
-from .exception import UnknownImageRegistry
+from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
+from .service_ports import parse_service_ports
 
 __all__ = (
     "arch_name_aliases",
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
+    "common_image_label_schema",
+    "inference_image_label_schema",
+    "validate_image_labels",
     "login",
     "get_known_registries",
     "is_known_registry",
@@ -40,13 +51,6 @@ __all__ = (
     "ImageRef",
 )
 
-arch_name_aliases: Final[Mapping[str, str]] = {
-    "arm64": "aarch64",  # macOS with LLVM
-    "amd64": "x86_64",  # Windows/Linux
-    "x64": "x86_64",  # Windows
-    "x32": "x86",  # Windows
-    "i686": "x86",  # Windows
-}
 # generalize architecture symbols to match docker API's norm
 docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "aarch64": "arm64",
@@ -60,13 +64,80 @@ docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "386": "386",
 }
 
-log = BraceStyleAdapter(logging.Logger("ai.backend.common.docker"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 default_registry = "index.docker.io"
 default_repository = "lablup"
 
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
+
+common_image_label_schema = t.Dict(
+    {
+        # Required labels
+        t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
+        t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
+        # ai.backend.resource.min.*
+        t.Key("ai.backend.base-distro"): t.String(),
+        t.Key("ai.backend.runtime-type"): t.String(),
+        t.Key("ai.backend.runtime-path"): tx.PurePath(),
+        # Optional labels
+        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE"),
+        t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
+    }
+).allow_extra("*")
+
+inference_image_label_schema = t.Dict(
+    {
+        t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
+        t.Key("ai.backend.model-path"): tx.PurePath(),
+        t.Key("ai.backend.model-format"): t.String(),
+    }
+).ignore_extra("*")
+
+
+def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
+    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
+        docker_host = yarl.URL(raw_docker_host)
+        match docker_host.scheme:
+            case "http" | "https":
+                return docker_host, aiohttp.TCPConnector()
+            case "unix":
+                search_paths = [Path(docker_host.path)]
+                connector_cls = aiohttp.UnixConnector
+            case "npipe":
+                search_paths = [Path(docker_host.path.replace("/", "\\"))]
+                connector_cls = aiohttp.NamedPipeConnector
+            case _ as unknown_scheme:
+                raise RuntimeError("unsupported connection scheme", unknown_scheme)
+    else:
+        match sys.platform:
+            case "linux" | "darwin":
+                search_paths = [
+                    Path("/run/docker.sock"),
+                    Path("/var/run/docker.sock"),
+                    Path.home() / ".docker/run/docker.sock",
+                ]
+                connector_cls = aiohttp.UnixConnector
+            case "win32":
+                search_paths = [
+                    Path(r"\\.\pipe\docker_engine"),
+                ]
+                connector_cls = aiohttp.NamedPipeConnector
+            case _ as platform_name:
+                raise RuntimeError("unsupported platform", platform_name)
+    for p in search_paths:
+        if p.exists() and (p.is_socket() or p.is_fifo()):
+            decoded_path = os.fsdecode(p)
+            return (
+                yarl.URL("http://localhost"),
+                connector_cls(decoded_path),
+            )
+    else:
+        raise RuntimeError("could not find the docker socket")
 
 
 async def login(
@@ -136,6 +207,7 @@ async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
         if isinstance(value, str):
             results[name] = yarl.URL(value)
         elif isinstance(value, Mapping):
+            assert isinstance(value[""], str)
             results[name] = yarl.URL(value[""])
     return results
 
@@ -162,6 +234,7 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
     registry_addr = item[""]
     if not registry_addr:
         raise UnknownImageRegistry(name)
+    assert isinstance(registry_addr, str)
     creds = {}
     username = item.get("username")
     if username is not None:
@@ -172,8 +245,31 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
     return yarl.URL(registry_addr), creds
 
 
-class PlatformTagSet(Mapping):
+def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
+    common_labels = common_image_label_schema.check(labels)
+    service_ports = {
+        item["name"]: item
+        for item in parse_service_ports(common_labels.get("ai.backend.service-ports", ""))
+    }
+    match common_labels["ai.backend.role"]:
+        case "INFERENCE":
+            inference_labels = inference_image_label_schema.check(labels)
+            for name in inference_labels["ai.backend.endpoint-ports"]:
+                if name not in service_ports:
+                    raise ValueError(
+                        f"ai.backend.endpoint-ports contains an undefined service port: {name}"
+                    )
+                # inference images should launch the serving daemons when they start as a container.
+                # TODO: enforce this restriction??
+                if service_ports[name]["protocol"] != "preopen":
+                    raise ValueError(f"The endpoint-port {name} must be a preopen service-port.")
+            common_labels.update(inference_labels)
+        case _:
+            pass
+    return common_labels
 
+
+class PlatformTagSet(Mapping):
     __slots__ = ("_data",)
     _data: Dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
@@ -181,14 +277,14 @@ class PlatformTagSet(Mapping):
     def __init__(self, tags: Iterable[str]):
         self._data = dict()
         rx = type(self)._rx_ver
-        for t in tags:
-            match = rx.search(t)
+        for tag in tags:
+            match = rx.search(tag)
             if match is None:
-                raise ValueError("invalid tag-version string", t)
+                raise InvalidImageTag(tag)
             key = match.group("tag")
             value = match.group("version")
             if key in self._data:
-                raise ValueError("duplicate platform tag with different versions", t)
+                raise InvalidImageTag(tag)
             if value is None:
                 value = ""
             self._data[key] = value
@@ -221,26 +317,28 @@ class ImageRef:
     will allow any repository on canonical string.
     """
 
-    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha")
+    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local")
 
     _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
     def __init__(
         self,
         value: str,
-        known_registries: Union[Mapping[str, Any], Sequence[str]] = None,
-        architecture="x86_64",
+        known_registries: Optional[Mapping[str, Any] | Sequence[str]] = None,
+        architecture: str = "x86_64",
+        is_local: bool = False,
     ):
+        self._is_local = is_local
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
         if "://" in value or value.startswith("//"):
-            raise ValueError("ImageRef should not contain the protocol scheme.")
+            raise InvalidImageName(value)
         parts = value.split("/", maxsplit=1)
         if len(parts) == 1:
             self._registry = default_registry
             self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise ValueError("Invalid image tag")
+                raise InvalidImageTag(self._tag)
         else:
             if is_known_registry(parts[0], known_registries):
                 self._registry = parts[0]
@@ -254,7 +352,7 @@ class ImageRef:
                 self._registry = default_registry
                 self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise ValueError("Invalid image tag")
+                raise InvalidImageTag(self._tag)
         self._update_tag_set()
 
     @staticmethod
@@ -267,7 +365,7 @@ class ImageRef:
             image = image_tag[0]
             tag = image_tag[1]
         if not image:
-            raise ValueError("Empty image repository/name")
+            raise InvalidImageName("Empty image repository/name")
         if ("/" not in image) and using_default_registry:
             image = default_repository + "/" + image
         return image, tag
@@ -354,6 +452,10 @@ class ImageRef:
     def tag_set(self) -> Tuple[str, PlatformTagSet]:
         # e.g., '3.6', {'ubuntu', 'cuda', ...}
         return self._tag_set
+
+    @property
+    def is_local(self) -> bool:
+        return self._is_local
 
     @property
     def short(self) -> str:

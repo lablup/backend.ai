@@ -9,58 +9,83 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 # cfebb0640f504b48ad07cc6a8bf4e3e5
-#: ../../client/func/agent.rst:2 cb66dc5008fe4db4af9cf3b493ac0423
+#: ../../client/func/agent.rst:2 44d91850eba24634bf510bde70012361
 msgid "Agent Functions"
 msgstr "에이전트 함수"
 
-# aee3c1ef25054aec88d6ec84917eff23
-#: 207fb29efdd64af1a9b3c0606319e3cb ai.backend.client.func.agent.Agent:1 of
+#: 2670acd7ab794875bef7ad3d879c4cac ai.backend.client.func.agent.Agent:1 of
 msgid ""
-"Provides a shortcut of :func:`Admin.query() <ai.backend.client.admin.Admin."
-"query>` that fetches various agent information."
+"Provides a shortcut of :func:`Admin.query() "
+"<ai.backend.client.admin.Admin.query>` that fetches various agent "
+"information."
 msgstr ""
-"서버측 에이전트들에 관한 정보를 조회하기 위한 :func:`Admin.query() <ai."
-"backend.client.admin.Admin.query>` 함수의 단축 버전입니다."
 
-# 8a10292301aa49c8b583ae050a9f61f6
-#: ai.backend.client.func.agent.Agent:7 f882f2685bac4dbeb6a6fb81ff8a8d1a of
+#: 06ea5ccb726c48ab928a2ddbe90634a5 ai.backend.client.func.agent.Agent:7 of
 msgid ""
-"All methods in this function class require your API access key to have the "
-"*admin* privilege."
+"All methods in this function class require your API access key to have "
+"the *admin* privilege."
 msgstr ""
-"이 함수 클래스의 모든 메소드들은 사용 중인 API access key가 관리자 권한을 가"
-"지고 있어야 작동합니다."
 
-#: 7bb95205f24642e29584ed7d3b6c490b
+#: 836daef0dcd448ca998cc1c5b248bcf9
 #: ai.backend.client.func.agent.Agent.paginated_list:1 of
 msgid "Lists the keypairs. You need an admin privilege for this operation."
 msgstr ""
 
-# 471ad03c5be7496e8bf724c33c311615
-# b6c8e828267f497e91ef8b242e6322d6
-#: 4d3c580fca8d4d338b2bb61e5baca75b ai.backend.client.func.agent.Agent.detail
-#: ai.backend.client.func.agent.Agent.paginated_list
-#: ebed8667d1a14c7cb2c304ef504b7e40 of
+#: 6c8e2ba52ff747b48fa781bda78d03b1 71fdeeee89a949fc954315bdaae79cff
+#: ai.backend.client.func.agent.Agent.detail
+#: ai.backend.client.func.agent.Agent.paginated_list of
 msgid "Return type"
 msgstr ""
 
 #: ai.backend.client.func.agent.Agent.paginated_list:5
-#: cce29b14dd24468d9e9582744d370fd2 of
+#: ee075ff9b6ca4ec8882179ad8e602fc9 of
 msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`"
 msgstr ""
 
-# 12112c0aec294c92b9604a0a8854e66c
-#: 7ad9c7bec76549b1b9ba5c4f97a1b233 ai.backend.client.func.agent.Agent.detail:2
+#: ai.backend.client.func.agent.Agent.detail:2 c3ab76f6fafc4461b79c5eb7b7725486
 #: of
 msgid ":py:class:`~typing.Sequence`\\[:py:class:`dict`]"
 msgstr ""
+
+# aee3c1ef25054aec88d6ec84917eff23
+#~ msgid ""
+#~ "Provides a shortcut of :func:`Admin.query()"
+#~ " <ai.backend.client.admin.Admin.query>` that fetches"
+#~ " various agent information."
+#~ msgstr ""
+#~ "서버측 에이전트들에 관한 정보를 조회하기 위한 "
+#~ ":func:`Admin.query() <ai.backend.client.admin.Admin.query>` "
+#~ "함수의 단축 버전입니다."
+
+# 8a10292301aa49c8b583ae050a9f61f6
+#~ msgid ""
+#~ "All methods in this function class "
+#~ "require your API access key to "
+#~ "have the *admin* privilege."
+#~ msgstr "이 함수 클래스의 모든 메소드들은 사용 중인 API access key가 관리자 권한을 가지고 있어야 작동합니다."
+
+#~ msgid "Lists the keypairs. You need an admin privilege for this operation."
+#~ msgstr ""
+
+# 471ad03c5be7496e8bf724c33c311615
+# b6c8e828267f497e91ef8b242e6322d6
+#~ msgid "Return type"
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`"
+#~ msgstr ""
+
+# 12112c0aec294c92b9604a0a8854e66c
+#~ msgid ":py:class:`~typing.Sequence`\\[:py:class:`dict`]"
+#~ msgstr ""
+

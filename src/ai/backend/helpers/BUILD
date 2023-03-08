@@ -1,5 +1,5 @@
 python_sources(
-    name="lib",
+    name="src",
     dependencies=[
         ":resources",
     ],
@@ -10,7 +10,7 @@ python_sources(
 python_distribution(
     name="dist",
     dependencies=[
-        ":lib",
+        ":src",
     ],
     provides=python_artifact(
         name="backend.ai-kernel-helper",

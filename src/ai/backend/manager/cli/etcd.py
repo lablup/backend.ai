@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 
 import click
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -28,7 +29,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()
@@ -194,7 +195,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
                 else:
                     val = await etcd.get(key, scope=scope)
                     if val is None:
-                        sys.exit(1)
+                        sys.exit(ExitCode.FAILURE)
                     print(val)
             except Exception:
                 log.exception("An error occurred.")
@@ -305,7 +306,7 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
     """
     with cli_ctx.logger:
         log.warn("etcd rescan-images command is deprecated, use image rescan instead")
-        asyncio.run(rescan_images_impl(cli_ctx, registry))
+        asyncio.run(rescan_images_impl(cli_ctx, registry, False))
 
 
 @cli.command()

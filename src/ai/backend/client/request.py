@@ -28,7 +28,7 @@ from typing import (
 import aiohttp
 import aiohttp.web
 import appdirs
-import attr
+import attrs
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
@@ -40,7 +40,7 @@ from .session import AsyncSession, BaseSession
 from .session import Session as SyncSession
 from .session import api_session
 
-log = logging.getLogger("ai.backend.client.request")
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 __all__ = [
     "Request",
@@ -144,7 +144,7 @@ class Request:
         :param BaseSession session: The session where this request is executed on.
 
         :param str path: The query path. When performing requests, the version number
-                         prefix will be automatically perpended if required.
+                         prefix will be automatically prepended if required.
 
         :param RequestContent content: The API query body which will be encoded as
                                        JSON.
@@ -348,6 +348,7 @@ class Request:
                 data=self._pack_content(),
                 timeout=timeout_config,
                 headers=self.headers,
+                allow_redirects=False,
             )
 
         return FetchContextManager(self.session, _rqst_ctx_builder, **kwargs)
@@ -417,7 +418,6 @@ class Request:
 
 
 class AsyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -436,7 +436,6 @@ class AsyncResponseMixin:
 
 
 class SyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -580,7 +579,7 @@ class FetchContextManager:
                 self._rqst_ctx = self.rqst_ctx_builder()
                 assert self._rqst_ctx is not None
                 raw_resp = await self._rqst_ctx.__aenter__()
-                if self.check_status and raw_resp.status // 100 != 2:
+                if self.check_status and raw_resp.status // 100 not in [2, 3]:
                     msg = await raw_resp.text()
                     await raw_resp.__aexit__(None, None, None)
                     raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
@@ -757,7 +756,7 @@ class WebSocketContextManager:
         return None
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class SSEMessage:
     event: str
     data: str
@@ -766,7 +765,6 @@ class SSEMessage:
 
 
 class SSEResponse(BaseResponse):
-
     __slots__ = (
         "_auto_reconnect",
         "_retry",
@@ -849,7 +847,6 @@ class SSEResponse(BaseResponse):
 
 
 class SSEContextManager:
-
     __slots__ = (
         "session",
         "rqst_ctx_builder",

@@ -16,11 +16,14 @@ import tabulate as tabulate_mod
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
+from ai.backend.cli.types import ExitCode
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+
 from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
 from ..exceptions import BackendError
 from ..session import AsyncSession
-from .main import main
 from .params import CommaSeparatedListType, RangeExprOptionType
 from .pretty import (
     format_info,
@@ -442,6 +445,15 @@ def prepare_mount_arg(
     multiple=True,
     help="Resource options for creating compute session. " "(e.g: shmem=64m)",
 )
+@click.option(
+    "--arch",
+    "--architecture",
+    "architecture",
+    metavar="ARCH_NAME",
+    type=str,
+    default=DEFAULT_IMAGE_ARCH,
+    help="Architecture of the image to use.",
+)
 # resource grouping
 @click.option(
     "-d",
@@ -500,6 +512,7 @@ def run(
     cluster_size,
     cluster_mode,
     resource_opts,
+    architecture,
     domain,
     group,
     preopen,
@@ -512,7 +525,7 @@ def run(
 
     \b
     IMAGE: The name (and version/platform tags appended after a colon) of session
-          runtime or programming language.')
+           runtime or programming language.
     FILES: The code file(s). Can be added multiple times.
     """
     if quiet:
@@ -525,14 +538,14 @@ def run(
         print(
             "You can run only either source files or command-line " "code snippet.", file=sys.stderr
         )
-        sys.exit(1)
+        sys.exit(ExitCode.INVALID_ARGUMENT)
     if not files and not code:
         print(
             "You should provide the command-line code snippet using "
             '"-c" option if run without files.',
             file=sys.stderr,
         )
-        sys.exit(1)
+        sys.exit(ExitCode.INVALID_ARGUMENT)
 
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
@@ -568,11 +581,9 @@ def run(
 
     if preopen is None:
         preopen = []  # noqa
-    if assign_agent is None:
-        assign_agent = []  # noqa
 
     preopen_ports = preopen
-    assigned_agent_list = assign_agent
+    assigned_agent_list = assign_agent  # should be None if not specified
     for env_vmap, build_vmap, exec_vmap in vmaps_product:
         interpolated_envs = tuple((k, vt.substitute(env_vmap)) for k, vt in env_templates.items())
         if build:
@@ -592,10 +603,10 @@ def run(
                 "The number maximum parallel sessions must be " "a positive integer.",
                 file=sys.stderr,
             )
-            sys.exit(1)
+            sys.exit(ExitCode.INVALID_ARGUMENT)
         if terminal:
             print("You cannot run multiple cases with terminal.", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(ExitCode.INVALID_ARGUMENT)
         if not quiet:
             vprint_info("Running multiple sessions for the following combinations:")
             for case in case_set.keys():
@@ -621,10 +632,11 @@ def run(
                 group_name=group,
                 scaling_group=scaling_group,
                 tag=tag,
+                architecture=architecture,
             )
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if compute_session.status == "PENDING":
             print_info("Session ID {0} is enqueued for scheduling.".format(name))
             return
@@ -690,7 +702,7 @@ def run(
             vprint_done("[{0}] Execution finished.".format(idx))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         finally:
             if rm:
                 vprint_wait("[{0}] Cleaning up the session...".format(idx))
@@ -726,6 +738,7 @@ def run(
                 scaling_group=scaling_group,
                 bootstrap_script=bootstrap_script.read() if bootstrap_script is not None else None,
                 tag=tag,
+                architecture=architecture,
                 preopen_ports=preopen_ports,
                 assign_agent=assigned_agent_list,
             )
@@ -888,7 +901,7 @@ def run(
             if any(map(lambda r: isinstance(r, Exception), results)):
                 if is_multi:
                     print_fail("There were failed cases!")
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
 
     try:
         asyncio_run(_run_cases())

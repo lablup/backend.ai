@@ -1,13 +1,16 @@
+import json
 import sys
 
 import click
 
 from ai.backend.cli.interaction import ask_yn
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.keypair_resource_policy import (
     _default_detail_fields,
     _default_list_fields,
 )
 from ai.backend.client.session import Session
+from ai.backend.common.types import VFolderHostPermission
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
@@ -39,7 +42,7 @@ def info(ctx: CLIContext, name: str) -> None:
             ctx.output.print_item(item, _default_detail_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @keypair_resource_policy.command()
@@ -55,7 +58,7 @@ def list(ctx):
             ctx.output.print_list(items, _default_list_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @keypair_resource_policy.command()
@@ -68,6 +71,9 @@ def list(ctx):
     help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
+@click.option(
+    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+)
 @click.option(
     "--max-concurrent-sessions", type=int, default=30, help="Number of maximum concurrent sessions."
 )
@@ -89,16 +95,23 @@ def list(ctx):
     default=1800,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-# @click.option('--allowed-vfolder-hosts', type=click.Tuple(str), default=['local'],
-#               help='Locations to create virtual folders.')
 @click.option(
-    "--allowed-vfolder-hosts", default=["local"], help="Locations to create virtual folders."
+    "--allowed-vfolder-hosts",
+    type=str,
+    default=json.dumps(
+        {
+            "local:volume1": [perm.value for perm in VFolderHostPermission],
+        }
+    ),
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 def add(
     ctx: CLIContext,
     name,
     default_for_unspecified,
     total_resource_slots,
+    max_session_lifetime,
     max_concurrent_sessions,
     max_containers_per_session,
     max_vfolder_count,
@@ -117,6 +130,7 @@ def add(
                 name,
                 default_for_unspecified=default_for_unspecified,
                 total_resource_slots=total_resource_slots,
+                max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
                 max_containers_per_session=max_containers_per_session,
                 max_vfolder_count=max_vfolder_count,
@@ -130,14 +144,14 @@ def add(
                 item_name="resource_policy",
                 action_name="add",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="resource_policy",
                 action_name="add",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             item_name="resource_policy",
@@ -153,6 +167,9 @@ def add(
     help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, help="Set total resource slots.")
+@click.option(
+    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+)
 @click.option("--max-concurrent-sessions", type=int, help="Number of maximum concurrent sessions.")
 @click.option(
     "--max-containers-per-session", type=int, help="Number of maximum containers per session."
@@ -164,12 +181,18 @@ def add(
     type=int,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-@click.option("--allowed-vfolder-hosts", help="Locations to create virtual folders.")
+@click.option(
+    "--allowed-vfolder-hosts",
+    type=str,
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
+)
 def update(
     ctx: CLIContext,
     name,
     default_for_unspecified,
     total_resource_slots,
+    max_session_lifetime,
     max_concurrent_sessions,
     max_containers_per_session,
     max_vfolder_count,
@@ -188,6 +211,7 @@ def update(
                 name,
                 default_for_unspecified=default_for_unspecified,
                 total_resource_slots=total_resource_slots,
+                max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
                 max_containers_per_session=max_containers_per_session,
                 max_vfolder_count=max_vfolder_count,
@@ -201,14 +225,14 @@ def update(
                 item_name="resource_policy",
                 action_name="update",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="resource_policy",
                 action_name="update",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -229,7 +253,7 @@ def delete(ctx: CLIContext, name):
     with Session() as session:
         if not ask_yn():
             print_info("Cancelled.")
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         try:
             data = session.KeypairResourcePolicy.delete(name)
         except Exception as e:
@@ -238,14 +262,14 @@ def delete(ctx: CLIContext, name):
                 item_name="resource_policy",
                 action_name="deletion",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="resource_policy",
                 action_name="deletion",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={

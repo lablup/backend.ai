@@ -1,8 +1,6 @@
 python_sources(
-    name="service",
-    sources=["**/*.py"],
+    name="src",
     dependencies=[
-        "src/ai/backend/client:lib",
         ":resources",
         "//:reqs#coloredlogs",  # indirectly referred by logging config string
     ],
@@ -11,7 +9,7 @@ python_sources(
 pex_binary(
     name="server",
     dependencies=[
-        ":service",
+        ":src",
     ],
     entry_point="server.py",
 )
@@ -19,7 +17,7 @@ pex_binary(
 python_distribution(
     name="dist",
     dependencies=[
-        ":service",
+        ":src",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -42,5 +40,6 @@ resources(
     sources=[
         "**/py.typed",
         "static/**/*",
+        "templates/**/*",
     ],
 )

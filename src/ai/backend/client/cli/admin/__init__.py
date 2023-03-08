@@ -1,4 +1,4 @@
-from ..main import main
+from ai.backend.cli.main import main
 
 
 @main.group()
@@ -9,6 +9,7 @@ def admin():
 
 
 from . import (  # noqa
+    acl,
     agent,
     domain,
     etcd,

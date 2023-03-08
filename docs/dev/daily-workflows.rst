@@ -57,14 +57,14 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/common:lib
+      $ ./pants dependencies --transitive src/ai/backend/common:src
 
 * Display all dependees of a specific target (i.e., all targets affected when
   this target is changed)
 
   .. code-block:: console
 
-      $ ./pants dependees --transitive src/ai/backend/common:lib
+      $ ./pants dependees --transitive src/ai/backend/common:src
 
 .. note::
 
@@ -118,6 +118,10 @@ Here are various methods to run tests:
     $ ./pants test ::
     $ ./pants test tests/manager/test_scheduler.py::
     $ ./pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
+    $ ./pants test tests/common::            # Run common/**/test_*.py
+    $ ./pants test tests/common:tests        # Run common/test_*.py
+    $ ./pants test tests/common/redis::      # Run common/redis/**/test_*.py
+    $ ./pants test tests/common/redis:tests  # Run common/redis/test_*.py
 
 You may also try ``--changed-since`` option like ``lint`` and ``check``.
 
@@ -173,12 +177,19 @@ To (re-)generate the virtualenv, run:
 
 .. code-block:: console
 
-    $ ./pants export ::
+    $ ./pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
+
+As of Pants 2.16, you may also export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option like:
+
+.. code-block:: console
+
+    $ ./pants export --resolve=python-default --resolve=mypy
 
 To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
@@ -189,20 +200,107 @@ For linters and formatters, configure the tool executable paths to indicate
 For example, flake8's executable path is
 ``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
 
-In VSCode, set ``python.linting.flake8Path`` and similar keys of the workspace settings.
-In Vim with `ALE <https://github.com/dense-analysis/ale>`_,
-add ``let g:ale_python_flake8_executable = '...'`` and alikes in the same way.
-To apply this Vim config value only to the local working copy, add ``set exrc`` in your user-level
-vimrc and put them in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build root directory.
+Currently we have four Python tools to configure in this way:
+
+* ``flake8``: Validates PEP-8 coding style
+
+* ``mypy``: Validates the type annotations
+
+* ``black``: Validates and reformats all Python codes by reconstructing it from AST,
+  just like ``gofmt``.
+
+  .. tip::
+
+     For a long list of arguments or list/tuple items, you could explicitly add a
+     trailing comma to force Black to insert line-breaks after every item even when
+     the line length does not exceed the limit (100 characters).
+
+  .. tip::
+
+     You may disable auto-formatting on a specific region of code using ``# fmt: off``
+     and ``# fmt: on`` comments, though this is strongly discouraged except when
+     manual formatting gives better readability, such as numpy matrix declarations.
+
+* ``isort``: Validates and reorders import statements in a fixed order depending on
+  the categories of imported packages (such as bulitins, first-parties, and
+  third-parties), the alphabetical order, and whether it uses ``from`` or not.
+
+VSCode
+~~~~~~
+
+Set the following keys in the workspace settings:
+
+* ``flake8``: ``python.linting.flake8Path``
+
+* ``mypy``: ``python.linting.mypyPath``
+
+* ``black``: ``python.formatting.blackPath``
+
+* ``isort``: ``python.sortImports.path``
+
+.. warning::
+
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export``
+   and manually update the Python interpreter path and mypy executable path configurations.
+
+Vim/NeoVim
+~~~~~~~~~~
+
+There are a large variety of plugins and usually heavy Vimmers should know what to do.
+
+We recommend using `ALE <https://github.com/dense-analysis/ale>`_ or
+`CoC <https://github.com/neoclide/coc.nvim>`_ plugins to have automatic lint highlights,
+auto-formatting on save, and auto-completion support with code navigation via LSP backends.
+
+.. warning::
+
+   Note that it is recommended to enable only one linter/formatter at a time (either ALE or CoC)
+   with proper configurations, to avoid duplicate suggestions and error reports.
+
+When using ALE, it is recommended to have a directory-local vimrc as follows.
+First, add ``set exrc`` in your user-level vimrc.
+Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build root directory:
+
+.. code-block:: vim
+
+   let s:cwd = getcwd()
+   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/tools/isort/bin/isort'  " requires absolute path
+   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/tools/black/bin/black'  " requires absolute path
+   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/tools/flake8/bin/flake8'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/tools/mypy/bin/mypy'
+   let g:ale_fixers = {'python': ['isort', 'black']}
+   let g:ale_fix_on_save = 1
+
+When using CoC, run ``:CocInstall coc-pyright`` and ``:CocLocalConfig`` after opening a file
+in the local working copy to initialize PyRight functionalities.
+In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
+just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_):
+
+.. code-block:: json
+
+   {
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.9/bin/python",
+     "python.formatting.provider": "black",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
+     "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
+     "python.linting.mypyEnabled": true,
+     "python.linting.flake8Enabled": true,
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
+     "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
+   }
+
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When each branch has different external package requirements, you should run ``./pants export ::``
+When each branch has different external package requirements, you should run ``./pants export``
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
-In that case, run ``killall -r pantsd`` and it will be fine.
+In that case, run ``pgrep pantsd | xargs kill`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -307,7 +405,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.9 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -354,7 +452,7 @@ Adding new external dependencies
   .. code-block:: console
 
      $ ./pants generate-lockfiles
-     $ ./pants export ::
+     $ ./pants export
 
 Merging lockfile conflicts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -382,11 +480,20 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall -r pantsd
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ pgrep pantsd | xargs kill
+   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
+
+Changing or updating the Python runtime for Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you run ``scripts/install-dev.sh``, it automatically creates ``.pants.bootstrap``
+to explicitly set a specific pyenv Python version to run Pants.
+
+If you have removed/upgraded this specific Python version from pyenv, you also need to
+update ``.pants.bootstrap`` accordingly.
 
 .. _debugging-tests:
 
@@ -431,7 +538,7 @@ In this case, we recommend to do it as follows:
 
    .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/client:lib \
+      $ ./pants dependencies --transitive src/ai/backend/client:src \
       >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
       cli
       client
@@ -483,7 +590,7 @@ Making a new release
 * Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesytem.
+    actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 

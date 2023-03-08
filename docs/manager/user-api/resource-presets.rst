@@ -104,4 +104,4 @@ Response
      - ``list[object]``
      - The list of :ref:`resource-preset-object`, but with an extra boolean field ``allocatable``
        which indicates if the given resource slot is actually allocatable considering
-       the keypair's resrouce limits and the scaling group's current usage.
+       the keypair's resource limits and the scaling group's current usage.

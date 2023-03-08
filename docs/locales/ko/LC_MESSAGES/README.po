@@ -9,138 +9,138 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 07:21+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../README.md:1 6185aa0056274060b297a3a96f93aff8
+#: ../../README.md:1 6a5123c1c45e451ca921f6c36ae5a7b2
 msgid "# Backend.AI Documentation"
 msgstr ""
 
-#: ../../README.md:3 06c64e9121b3492e9e107e2ff0fa7bec
+#: ../../README.md:3 a9320fda36384d43a13a484b8f6ed920
 msgid "Developer guide for Backend.AI documentation"
 msgstr ""
 
-#: ../../README.md:6 6d47379d33554292a9293fa235d7dfd3
+#: ../../README.md:6 de151d70aeda4b54af96b2249a074db9
 msgid "## Setting up the build environment for docs"
 msgstr ""
 
-#: ../../README.md:8 f1d854a731b144dea7ebc61422f54d1e
+#: ../../README.md:8 122a04475a2e41cbb3a20388f30b418e
 msgid "### Installing pyenv and pyenv-virtualenv"
 msgstr ""
 
-#: ../../README.md:10 a242285758d14652a283d7c85371a7da
+#: ../../README.md:10 7573283aef0040a68a72bafa71272121
 msgid ""
 "Please refer the official docs: - "
 "https://github.com/pyenv/pyenv#installation - https://github.com/pyenv"
 "/pyenv-virtualenv#installation"
 msgstr ""
 
-#: ../../README.md:14 d507c2714ed54e019a553d7ab1691975
+#: ../../README.md:14 bdce7953264744839d03886fbebae4ed
 msgid "### Setting up the documenting environment"
 msgstr ""
 
-#: ../../README.md:16 59a0dd385cbf438896e68da4fe726705
+#: ../../README.md:16 105d1788eaf949d9a947bca5435a1fe7
 msgid "Then, follow the instructions below:"
 msgstr ""
 
-#: ../../README.md:18 b0b1aee7e3374038bd633a383894d384
+#: ../../README.md:18 2b840efea0b4496db10c8bebbdc53773
 msgid ""
-"```console $ pyenv virtualenv 3.10.4 venv-bai-docs $ git clone "
+"```console $ pyenv virtualenv 3.10.8 venv-bai-docs $ git clone "
 "https://github.com/lablup/backend.ai backend.ai $ cd ~/backend.ai/docs $ "
 "pyenv local venv-bai-docs $ pip install -U pip setuptools wheel $ pip "
 "install -U -r requirements.txt   # docs/requirements.txt ```"
 msgstr ""
 
-#: ../../README.md:27 ba9edda055094816aca72b675c1497ae
+#: ../../README.md:27 0bdae1c0210841b6854bb709bcf8ab0f
 msgid "## Building HTML document"
 msgstr ""
 
-#: ../../README.md:29 6ed2e551e4384bcdbb771e17cc3081fb
+#: ../../README.md:29 2f59ef6c5ee04019bc5f14cb233cb16c
 msgid ""
 "> 📌 NOTE: Please ensure that you are inside the `docs` directory and the "
 "virtualenv is activated."
 msgstr ""
 
-#: ../../README.md:31 a1d05501b7654f76b83744dd64ae4b72
+#: ../../README.md:31 df50ce4603f94937931c89ef62b0fc97
 msgid "### Make the html version"
 msgstr ""
 
-#: ../../README.md:33 f2f8bb27fa974c12bf4919888731754c
+#: ../../README.md:33 b82145034a0445bdaf5a8385538dc94e
 msgid "```console $ make html ```"
 msgstr ""
 
-#: ../../README.md:37 359a967d88d446bd84bf95ebb643e4f0
+#: ../../README.md:37 ee22bfc5d12b4168a08601fcf5b79565
 msgid ""
 "The compiled documentation is under `_build/html/index.html`. You may "
 "serve it for local inspection using `python -m http.server --directory "
 "_build/html`."
 msgstr ""
 
-#: ../../README.md:40 1066fa247e0a42dea9a40aba68bca959
+#: ../../README.md:40 314a50973f824cc3b4e045857af149c0
 msgid "## Translation"
 msgstr ""
 
-#: ../../README.md:42 ac85986548c04d9ba4e17fff0bcea2e9
+#: ../../README.md:42 0b6cb84ff73d4979bd12d035c6e84a3b
 msgid "#### Generate/update pot (Portable Object Template) files"
 msgstr ""
 
-#: ../../README.md:44 4d94c7b7d44d4429927fe947c88444d7
+#: ../../README.md:44 0c3459d989c24014ac396ba9fe8047cb
 msgid "```console $ make gettext ```"
 msgstr ""
 
-#: ../../README.md:48 bd46ac8a2c1e47ff8731dad6b37969b6
+#: ../../README.md:48 a65e6b72005240c78f2a6d409ddfeb41
 msgid "#### Build po (Portable Object) files using sphinx-intl"
 msgstr ""
 
-#: ../../README.md:50 c69b78101e4e41ae9f0cb08de438e438
+#: ../../README.md:50 7e0cb0ac89b148eca19272921d10f3c9
 msgid "```console $ sphinx-intl update -p _build/locale/ -l ko ```"
 msgstr ""
 
-#: ../../README.md:54 bd4268ead7d24044914345f690777125
+#: ../../README.md:54 93e195eb90da407080fe0c5a32ba93b6
 msgid ""
 "The `.po` message files are under `locales/ko/LC_MESSAGES/`. Edit them by"
 " filling missing translations."
 msgstr ""
 
-#: ../../README.md:57 d029652b63464009860baf92b71f8a73
+#: ../../README.md:57 f927bc2f0d2b4febaa2e2e924e8840e7
 msgid "#### Build HTML files with translated version"
 msgstr ""
 
-#: ../../README.md:59 421e49e0b7824c0c851fa3c72867b311
+#: ../../README.md:59 0c98f4429f854dab9d4d14132e2aad32
 msgid ""
 "```console $ sphinx-intl build $ make -e SPHINXOPTS=\"-D language='ko'\" "
 "html ```"
 msgstr ""
 
-#: ../../README.md:65 4062184171684fe6a7880079bd898c74
+#: ../../README.md:65 0d078d6e309542c6b43c17a60c8dde84
 msgid "## 🚧 Building PDF document (WIP) 🚧"
 msgstr ""
 
-#: ../../README.md:67 6faf7f6a753946a0b00a48a3639372bd
+#: ../../README.md:67 3d5641c4bdb24945be2d812ad225aec2
 msgid "> Help wanted!"
 msgstr ""
 
-#: ../../README.md:69 01123ba1463e454882f78ca6b7104080
+#: ../../README.md:69 56cc103c83cd453996986e565391a4d0
 msgid ""
 "We are looking for people to help with a short guide for building PDF "
 "document based on html files derived from sphinx."
 msgstr ""
 
-#: ../../README.md:72 e70072614dec4652a24f5755838b6840
+#: ../../README.md:72 78d5f530f7b54ea19569bb3fba80bbca
 msgid "## Advanced Settings"
 msgstr ""
 
-#: ../../README.md:74 e37325c09e484b25bbe5a0a5fcf9a63e
-msgid "### Managing the hierachy of toctree (Table of Contents) of documentation"
+#: ../../README.md:74 d97995e9d6574804b95627bde6f0cbe6
+msgid "### Managing the hierarchy of toctree (Table of Contents) of documentation"
 msgstr ""
 
-#: ../../README.md:76 8cb8bbb88fa94e62acf13128bbdb15c4
+#: ../../README.md:76 99c7df1fb5934893be0389eab5d27dc4
 msgid ""
 "When documentation of each file gets too big to contain all things in one"
 " topic, It should be branched with proper sub-topics. The hierarchy of "
@@ -149,58 +149,80 @@ msgid ""
 " contain documentation you expected."
 msgstr ""
 
-#: ../../README.md:81 700f328b62aa431ab07bde6dfbbd86b3
+#: ../../README.md:81 222b68de079a4a298bbdad38b99000e9
 msgid ""
 "For More Information, Please check out "
 "[`index.rst`](https://github.com/lablup/backend.ai/blob/main/docs/index.rst)"
 " file."
 msgstr ""
 
-#: ../../README.md:83 f672b4c3392a4d23a6d49637d8570ab1
+#: ../../README.md:83 2cbe647d21174ed784f40494cf3e6931
 msgid "### Adding a new language translation"
 msgstr ""
 
-#: ../../README.md:85 ce939a48ea944f83882bb79e4131ffdd
+#: ../../README.md:85 076e21742ad44964b594379d22f1bb3a
 msgid ""
 "Add a new project in readthedocs.org with the \"-xx\" suffix where \"xx\""
 " is an ISO 639-1 language code, which targets the same GitHub address to "
 "the original project."
 msgstr ""
 
-#: ../../README.md:89 8d0aee58d36b4367b7f5d8df23fd658d
+#: ../../README.md:89 5fc8f4e6e3584c8fbf2e8e7da6c28647
 msgid ""
 "Then configure the main project in readthedocs.org to have the new "
 "project as a specific language translation."
 msgstr ""
 
-#: ../../README.md:92 8b498b4971144ebdbcf35f3de76824bb
+#: ../../README.md:92 e4db2adc0f1b4a62b7245620944b79f1
 msgid "Example:"
 msgstr ""
 
-#: ../../README.md:94 51c696f32e474a5d838cf403eba3393a
+#: ../../README.md:94 19039b57167f4b0ea5c8ded322530c98
 msgid "https://readthedocs.org/projects/sorna"
 msgstr ""
 
-#: ../../README.md:95 98f5f10434d54fea8a9704c3b2599680
+#: ../../README.md:95 9069d806b4644102ba80c22f53f907a7
 msgid "https://readthedocs.org/projects/sorna-ko"
 msgstr ""
 
-#: ../../README.md:97 fcbdc726ad5342ed96907309cc0dd41f
+#: ../../README.md:97 2655ec80e7d14550b5e825a092da3bcb
 msgid "Please ask the docs maintainer for help."
 msgstr ""
 
-#: ../../README.md:100 fdb3cc5bbf09466ab0af43da74c0998d
+#: ../../README.md:100 a194a5ab1782434a814b103fe66c7b1d
 msgid "## References for newcomers"
 msgstr ""
 
-#: ../../README.md:102 91ae4746efbe41fa8c331c22d4b25001
+#: ../../README.md:102 5c757f9d8bdf4caf9c494860beecb933
 msgid "http://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html"
 msgstr ""
 
-#: ../../README.md:103 8d2d2996cdf14892a8333651f8c2bfce
+#: ../../README.md:103 0cf348de6a5047deabeec7e8db19aa55
 msgid "https://poedit.net/"
 msgstr ""
 
 #~ msgid "```console $ sphinx-intl update -p _build/locale/ -l ko_KR ```"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "```console $ pyenv virtualenv 3.10.4 "
+#~ "venv-bai-docs $ git clone "
+#~ "https://github.com/lablup/backend.ai backend.ai $ cd"
+#~ " ~/backend.ai/docs $ pyenv local venv-"
+#~ "bai-docs $ pip install -U pip "
+#~ "setuptools wheel $ pip install -U "
+#~ "-r requirements.txt   # docs/requirements.txt "
+#~ "```"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "```console $ pyenv virtualenv 3.10.7 "
+#~ "venv-bai-docs $ git clone "
+#~ "https://github.com/lablup/backend.ai backend.ai $ cd"
+#~ " ~/backend.ai/docs $ pyenv local venv-"
+#~ "bai-docs $ pip install -U pip "
+#~ "setuptools wheel $ pip install -U "
+#~ "-r requirements.txt   # docs/requirements.txt "
+#~ "```"
 #~ msgstr ""
 

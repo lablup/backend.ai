@@ -3,8 +3,10 @@ import sys
 import click
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
+from ai.backend.cli.types import ExitCode
+
 from ..session import Session
-from .main import main
 from .pretty import print_error, print_info, print_warn
 
 
@@ -43,7 +45,7 @@ def dotfile():
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
+    help="Specify the group name or id of group dotfiles. "
     "(If group name is provided, domain name must be specified with option -d)",
 )
 def create(path, permission, dotfile_path, owner_access_key, domain, group):
@@ -76,7 +78,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
             print_info(f"Dotfile {dotfile_.path} created and ready")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -96,7 +98,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
+    help="Specify the group name or id of group dotfiles. "
     "(If group name is provided, domain name must be specified with option -d)",
 )
 def get(path, owner_access_key, domain, group):
@@ -112,7 +114,7 @@ def get(path, owner_access_key, domain, group):
             print(body["data"])
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -131,12 +133,12 @@ def get(path, owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
+    help="Specify the group name or id of group dotfiles. "
     "(If group name is provided, domain name must be specified with option -d)",
 )
 def list(owner_access_key, domain, group):
     """
-    List availabe user/domain/group dotfiles.
+    List available user/domain/group dotfiles.
     """
     fields = [
         ("Path", "path", None),
@@ -162,7 +164,7 @@ def list(owner_access_key, domain, group):
             print(tabulate(rows, hdrs))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -195,7 +197,7 @@ def list(owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
+    help="Specify the group name or id of group dotfiles. "
     "(If group name is provided, domain name must be specified with option -d)",
 )
 def update(path, permission, dotfile_path, owner_access_key, domain, group):
@@ -221,7 +223,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
             print_info(f"Dotfile {dotfile_.path} updated")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -242,7 +244,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
+    help="Specify the group name or id of group dotfiles. "
     "(If group name is provided, domain name must be specified with option -d)",
 )
 def delete(path, force, owner_access_key, domain, group):
@@ -264,4 +266,4 @@ def delete(path, force, owner_access_key, domain, group):
             print_info(f"Dotfile {dotfile_.path} deleted")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)

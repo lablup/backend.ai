@@ -5,11 +5,13 @@ import warnings
 
 import click
 
+from ai.backend.cli.main import main
+from ai.backend.cli.types import ExitCode
+
 from .. import __version__
 from ..config import get_config, local_state_path
 from ..exceptions import BackendClientError
 from ..session import Session
-from .main import main
 from .pretty import print_done, print_error, print_fail, print_warn
 
 
@@ -134,7 +136,7 @@ def login():
             result = session.Auth.login(user_id, password)
             if not result["authenticated"]:
                 print_fail("Login failed.")
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
             print_done("Login succeeded.")
 
             local_state_path.mkdir(parents=True, exist_ok=True)

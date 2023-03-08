@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
     ALL_COMPLETED,
@@ -35,7 +36,6 @@ class DummyPlugin(AbstractPlugin):
 
 @dataclass
 class DummyEntrypoint:
-
     name: str
     load_result: Type[AbstractPlugin] | Callable[..., AbstractPlugin]
     value: str = "dummy.mod.DummyPlugin"
@@ -127,6 +127,31 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
 
 
 @pytest.mark.asyncio
+async def test_plugin_context_config_allow_and_block_list(etcd, allow_and_block_list):
+    allowlist, blocklist = allow_and_block_list
+    ctx = BasePluginContext(
+        etcd,
+        {"local-key": "local-value"},
+    )
+    assert not ctx.plugins
+    await ctx.init(allowlist=allowlist, blocklist=blocklist)
+
+
+@pytest.mark.asyncio
+async def test_plugin_context_config_allow_and_block_list_has_union(
+    etcd, allow_and_block_list_has_union
+):
+    allowlist, blocklist = allow_and_block_list_has_union
+    ctx = BasePluginContext(
+        etcd,
+        {"local-key": "local-value"},
+    )
+    assert not ctx.plugins
+    with pytest.raises(ConfigurationError):
+        await ctx.init(allowlist=allowlist, blocklist=blocklist)
+
+
+@pytest.mark.asyncio
 async def test_plugin_context_config(etcd, mocker):
     mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
@@ -175,7 +200,6 @@ async def test_plugin_context_config_autoupdate(etcd, mocker):
 
 
 class DummyHookPassingPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-p"
@@ -207,7 +231,6 @@ class DummyHookPassingPlugin(HookPlugin):
 
 
 class DummyHookRejectingPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-r"
@@ -239,7 +262,6 @@ class DummyHookRejectingPlugin(HookPlugin):
 
 
 class DummyHookErrorPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-e"

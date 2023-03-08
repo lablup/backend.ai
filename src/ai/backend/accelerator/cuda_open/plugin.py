@@ -21,7 +21,6 @@ from typing import (
 
 import aiodocker
 import aiohttp
-import attr
 
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -42,9 +41,10 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
-from ai.backend.agent.types import Container
+from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
     BinarySize,
     DeviceId,
@@ -69,14 +69,17 @@ PREFIX = "cuda"
 log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
 
 
-@attr.s(auto_attribs=True)
 class CUDADevice(AbstractComputeDevice):
     model_name: str
     uuid: str
 
+    def __init__(self, model_name: str, uuid: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.model_name = model_name
+        self.uuid = uuid
+
 
 class CUDAPlugin(AbstractComputePlugin):
-
     config_watch_enabled = False
 
     key = DeviceName("cuda")
@@ -177,7 +180,7 @@ class CUDAPlugin(AbstractComputePlugin):
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
             dev_info = CUDADevice(
-                device_id=dev_id,
+                device_id=DeviceId(dev_id),
                 hw_location=raw_info["pciBusID_str"],
                 numa_node=node,
                 memory_size=raw_info["totalGlobalMem"],
@@ -265,6 +268,11 @@ class CUDAPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
+        return []
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
         return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:
@@ -433,7 +441,10 @@ class CUDAPlugin(AbstractComputePlugin):
             )
         else:
             alloc_map.allocations[SlotName("cuda.device")].update(
-                resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                resource_spec.allocations.get(
+                    DeviceName("cuda"),
+                    {},
+                ).get(
                     SlotName("cuda.device"),
                     {},
                 ),
@@ -457,3 +468,13 @@ class CUDAPlugin(AbstractComputePlugin):
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
         return data
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []

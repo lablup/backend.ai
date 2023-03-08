@@ -8,31 +8,23 @@ import random
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-import trafaret as t
 from aiohttp import web
-from aiohttp_session import STORAGE_KEY, get_session
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
+from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
-from .auth import get_anonymous_session, get_api_session
+from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
-
-extra_config_headers = t.Dict(
-    {
-        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
-        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
-    }
-).allow_extra("*")
 
 
 class WebSocketProxy:
@@ -127,22 +119,32 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request):
-    config = request.app["config"]
-    scheme = config["service"].get("force-endpoint-protocol")
-    if not request.content:
-        return request
-    if scheme is None:
-        scheme = request.scheme
-    api_endpoint = f"{scheme}://{request.host}"
-    payload = await request.text()
-    iv, real_payload = payload.split(":")  # Extract initial vector and actual payload
-    key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + iv + iv)[0:32]
-    crypt = AES.new(bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(iv, encoding="utf8"))
-    b64p = base64.b64decode(real_payload)
-    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-    result = dec.decode("UTF-8")
-    return result
+@web.middleware
+async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    if secure_context:
+        if not request.can_read_body:  # designated as encrypted but has an empty payload
+            request["payload"] = ""
+            return await handler(request)
+        config = request.app["config"]
+        scheme = config["service"]["force_endpoint_protocol"]
+        if scheme is None:
+            scheme = request.scheme
+        api_endpoint = f"{scheme}://{request.host}"
+        payload = await request.text()
+        initial_vector, real_payload = payload.split(":")
+        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
+        crypt = AES.new(
+            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
+        )
+        b64p = base64.b64decode(real_payload)
+        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
+    else:
+        # For all other requests without explicit encryption,
+        # let the handler decide how to read the body.
+        request["payload"] = ""
+    return await handler(request)
 
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
@@ -154,7 +156,6 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
-
     if first_path == "pipeline":
         pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
         api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
@@ -166,17 +167,13 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             request_headers = extra_config_headers.check(request.headers)
             request_api_version = request_headers.get("X-BackendAI-Version", None)
             secure_context = request_headers.get("X-BackendAI-Encoded", None)
+            decrypted_payload_length = 0
             if secure_context:
-                payload = await decrypt_payload(request)
-                payload_length = len(payload)
+                payload = request["payload"]
+                decrypted_payload_length = len(payload)
             else:
                 payload = request.content
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For")
-            if not client_ip:
-                client_ip = request.remote
-            _headers = {"X-Forwarded-For": client_ip}
-            api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
@@ -196,7 +193,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             if "Content-Length" in request.headers and not secure_context:
                 api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
-                api_rqst.headers["Content-Length"] = str(payload_length)
+                api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
@@ -269,12 +266,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
                 body["domain"] = request.app["config"]["api"]["domain"]
                 content = json.dumps(body).encode("utf8")
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For")
-            if not client_ip:
-                client_ip = request.remote
-            _headers = {"X-Forwarded-For": client_ip}
-            api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             api_rqst = Request(
@@ -342,16 +334,16 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     # Choose a specific Manager endpoint for persistent web app connection.
     api_endpoint = None
     should_save_session = False
-    _endpoints = request.app["config"]["api"]["endpoint"].split(",")
-    _endpoints = [e.strip() for e in _endpoints]
+    configured_endpoints = request.app["config"]["api"]["endpoint"]
     if session.get("api_endpoints", {}).get(app):
-        if session["api_endpoints"][app] in _endpoints:
+        stringified_endpoints = [str(e) for e in configured_endpoints]
+        if session["api_endpoints"][app] in stringified_endpoints:
             api_endpoint = session["api_endpoints"][app]
     if api_endpoint is None:
-        api_endpoint = random.choice(_endpoints)
+        api_endpoint = random.choice(configured_endpoints)
         if "api_endpoints" not in session:
             session["api_endpoints"] = {}
-        session["api_endpoints"][app] = api_endpoint
+        session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
     if is_anonymous:
@@ -361,12 +353,12 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     try:
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            params = request.query if request.query else None
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             api_rqst = Request(
                 request.method,
                 path,
                 request.content,
-                params=params,
+                params=request.query,
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )

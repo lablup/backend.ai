@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import urllib.parse
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Final, Mapping, MutableMapping, cast
 
@@ -26,7 +27,7 @@ from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
@@ -70,6 +71,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     secret=secret,
                     inner_iv=download_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
                 t.Key("archive", default=False): t.ToBool,
                 t.Key("no_cache", default=False): t.ToBool,
             },
@@ -83,7 +85,10 @@ async def download(request: web.Request) -> web.StreamResponse:
             else:
                 vfpath = volume.mangle_vfpath(token_data["vfid"])
             try:
-                file_path = (vfpath / token_data["relpath"]).resolve()
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                file_path = parent_dir / token_data["relpath"]
                 file_path.relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
@@ -104,11 +109,23 @@ async def download(request: web.Request) -> web.StreamResponse:
                 else:
                     raise InvalidAPIParameters("The file is not a regular file.")
             if request.method == "HEAD":
+                ifrange: datetime | None = request.if_range
+                mtime = os.stat(file_path).st_mtime
+                last_mdt = datetime.fromtimestamp(mtime)
+                resp_status = 200
+                if ifrange is not None and mtime <= ifrange.timestamp():
+                    # Return partial content.
+                    resp_status = 206
                 return web.Response(
-                    status=200,
+                    status=resp_status,
                     headers={
                         hdrs.ACCEPT_RANGES: "bytes",
                         hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
+                        hdrs.LAST_MODIFIED: (
+                            f'{last_mdt.strftime("%a")}, {last_mdt.day} '
+                            f'{last_mdt.strftime("%b")} {last_mdt.year} '
+                            f"{last_mdt.hour}:{last_mdt.minute}:{last_mdt.second} GMT"
+                        ),
                     },
                 )
     ascii_filename = (
@@ -208,6 +225,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     secret=secret,
                     inner_iv=upload_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
             },
         ),
         read_from=CheckParamSource.QUERY,
@@ -232,6 +250,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     secret=secret,
                     inner_iv=upload_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
             },
         ),
         read_from=CheckParamSource.QUERY,
@@ -253,7 +272,12 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             current_size = Path(upload_temp_path).stat().st_size
             if current_size >= int(token_data["size"]):
-                target_path = vfpath / token_data["relpath"]
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                if not parent_dir.exists():
+                    parent_dir.mkdir(parents=True, exist_ok=True)
+                target_path = parent_dir / token_data["relpath"]
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()

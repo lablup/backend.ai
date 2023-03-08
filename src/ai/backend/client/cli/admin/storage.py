@@ -4,6 +4,7 @@ import sys
 
 import click
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.session import Session
 
@@ -45,7 +46,7 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @storage.command()
@@ -53,7 +54,7 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
-@click.option("--limit", default=None, help="The page size for pagination.")
+@click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
     """
     List storage volumes.
@@ -80,4 +81,4 @@ def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)

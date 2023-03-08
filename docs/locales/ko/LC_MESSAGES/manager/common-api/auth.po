@@ -9,368 +9,353 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../manager/common-api/auth.rst:2 9df7fd8620fa4783bc5454f2ee85a677
+#: ../../manager/common-api/auth.rst:2 347cb6829699412a88f47f2318811817
 msgid "Authentication"
 msgstr "인증"
 
-#: ../../manager/common-api/auth.rst:5 cb69be9ba23c4fff85650fce14b7ad25
+#: ../../manager/common-api/auth.rst:5 01ac9ef94cda4cfbb960cba0116dfa89
 msgid "Access Tokens and Secret Key"
 msgstr "엑세스 토큰과 비밀 키"
 
-#: ../../manager/common-api/auth.rst:7 91e7207d44234fdd857c88ffd82696b0
+#: ../../manager/common-api/auth.rst:7 820b366f8f744d2f88d292380cd9b877
 msgid ""
-"To make requests to the API server, a client needs to have a pair of an API "
-"access key and a secret key.  You may get one from `our cloud service "
-"<https://cloud.backend.ai>`_ or from the administrator of your Backend.AI "
-"cluster."
+"To make requests to the API server, a client needs to have a pair of an "
+"API access key and a secret key.  You may get one from `our cloud service"
+" <https://cloud.backend.ai>`_ or from the administrator of your "
+"Backend.AI cluster."
 msgstr ""
-"API 서버에 요청하려면, 클라이언트에서는 API 엑세스 키와 비밀 키가 쌍으로 필요"
-"합니다. `클라우드 서비스 <https://cloud.backend.ai>`_ 나 Backend.AI 클러스터"
-"의 관리자에서 해당 키를 확인할 수 있습니다."
+"API 서버에 요청하려면, 클라이언트에서는 API 엑세스 키와 비밀 키가 쌍으로 필요합니다. `클라우드 서비스 "
+"<https://cloud.backend.ai>`_ 나 Backend.AI 클러스터의 관리자에서 해당 키를 확인할 수 있습니다."
 
-#: ../../manager/common-api/auth.rst:12 05ae8ed9afe74b1b8cfb17dae36b0fbe
+#: ../../manager/common-api/auth.rst:12 12c902b534b04c6592296844c7c6a29d
 msgid ""
 "The server uses the API keys to identify each client and secret keys to "
 "verify integrity of API requests as well as to authenticate clients."
 msgstr ""
-"서버는 각 클라이언트를 식별하기 위해 API 키를 사용하며, 클라이언트를 인증하"
-"고 API 요청의 무결성을 검증하기 위해 비밀 키를 사용합니다."
+"서버는 각 클라이언트를 식별하기 위해 API 키를 사용하며, 클라이언트를 인증하고 API 요청의 무결성을 검증하기 위해 비밀 키를 "
+"사용합니다."
 
-#: ../../manager/common-api/auth.rst:17 81abaab92c2b4cbfb34a42d7fe0cb6f0
+#: ../../manager/common-api/auth.rst:17 4c13875cbfae4f0c9ac480a345e7e8b8
 msgid ""
-"For security reasons (to avoid exposition of your API access key and secret "
-"keys to arbitrary Internet users), we highly recommend to setup a server-"
-"side proxy to our API service if you are building a public-facing front-end "
-"service using Backend.AI."
+"For security reasons (to avoid exposition of your API access key and "
+"secret keys to arbitrary Internet users), we highly recommend to setup a "
+"server-side proxy to our API service if you are building a public-facing "
+"front-end service using Backend.AI."
 msgstr ""
-"API 액세스 키와 비밀 키가 외부로 유출되는 것을 막기 위한 보안 조치로, "
-"Backend.AI 를 활용해 공개된 프론트엔드 서비스를 설계할 때는 가급적 API 서비스"
-"를 위한 서버사이드 프록시를 사용하는 것을 권장합니다."
+"API 액세스 키와 비밀 키가 외부로 유출되는 것을 막기 위한 보안 조치로, Backend.AI 를 활용해 공개된 프론트엔드 "
+"서비스를 설계할 때는 가급적 API 서비스를 위한 서버사이드 프록시를 사용하는 것을 권장합니다."
 
-#: ../../manager/common-api/auth.rst:21 47d1a255122b465cb8116d35944b64ff
+#: ../../manager/common-api/auth.rst:21 7767629c9fe24af5ae674bab4ea79588
 msgid ""
 "For local deployments, you may create a master dummy pair in the "
 "configuration (TODO)."
-msgstr ""
-"로컬 배포의 경우, 환경 설정에 마스터 더미 데이터(dummy data) 쌍을 만들 수 있"
-"습니다. (TODO)"
+msgstr "로컬 배포의 경우, 환경 설정에 마스터 더미 데이터(dummy data) 쌍을 만들 수 있습니다. (TODO)"
 
-#: ../../manager/common-api/auth.rst:24 1ffa22ffa3d743f49229152e1c9e2ea6
+#: ../../manager/common-api/auth.rst:24 81c5bf5f29294b1bbc489a4114c686eb
 msgid "Common Structure of API Requests"
 msgstr "API 요청의 공통 구조"
 
 #: ../../manager/common-api/auth.rst:30 ../../manager/common-api/auth.rst:72
-#: 3795957b4d59421a86f0ec024b0dea70 ca233943579442a4b9cc15df67897adf
+#: cb7931b50d75487eb3fe1d11862b6b5b edfcec5b3f364a7cb4a2f353106890c3
 msgid "HTTP Headers"
 msgstr "HTTP 헤더"
 
 #: ../../manager/common-api/auth.rst:31 ../../manager/common-api/auth.rst:73
-#: 2d950a8181524923a4da9c4843b095f5 466bcfecff2041d2883a80818b846dae
+#: 61adee60ba924795b07d21e224178747 6d1c568eae7742758d385e8a42f7e1f7
 msgid "Values"
 msgstr "값"
 
-#: ../../manager/common-api/auth.rst:32 92b65123b3a94d3c9d9b36057fb0d121
+#: ../../manager/common-api/auth.rst:32 a3137ad89fa346f58afc810e0f9f60ff
 msgid "Method"
 msgstr "메서드"
 
-#: ../../manager/common-api/auth.rst:33 42baedf38d114ce4ae03aee90ffe9bce
+#: ../../manager/common-api/auth.rst:33 370623a6cee54cebbdee5b2c33ff7862
 msgid "``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``"
 msgstr "``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``"
 
-#: ../../manager/common-api/auth.rst:34 5afb7a763951488980f345ffe3262b10
+#: ../../manager/common-api/auth.rst:34 1f745f1a18c448ef99174c7d658fc9b0
 msgid "Query String"
 msgstr "쿼리스트링"
 
-#: ../../manager/common-api/auth.rst:35 23240ab754d345b3a7aa4f2d8401bad1
+#: ../../manager/common-api/auth.rst:35 0b52ec643b4248369688d4d861b61f63
 msgid ""
 "If your access key has the administrator privilege, your client may "
 "optionally specify other user's access key as the ``owner_access_key`` "
-"parameter of the URL query string (in addition to other API-specific ones if "
-"any) to change the scope of access key applied to access and manipulation of "
-"keypair-specific resources such as kernels and vfolders."
+"parameter of the URL query string (in addition to other API-specific ones"
+" if any) to change the scope of access key applied to access and "
+"manipulation of keypair-specific resources such as kernels and vfolders."
 msgstr ""
 
 #: ../../manager/common-api/auth.rst:43 ../../manager/common-api/auth.rst:76
-#: 698513986d6f47849c2dad2f1d73701a aff53f0cdb624e4ba7532691101161c5
+#: c7e8cdc7bde045bcb1793a752b0f3e78 f99e3c016e344414b82dd1c0a2da2c3c
 msgid "``Content-Type``"
 msgstr "``Content-Type``"
 
-#: ../../manager/common-api/auth.rst:44 5984b920fce848cea05afd49a5ef41f5
+#: ../../manager/common-api/auth.rst:44 3b6825c91a3344c18d6b4232f988a29d
 msgid "Always should be ``application/json``"
 msgstr "항상 ``application/json``이어야 합니다"
 
-#: ../../manager/common-api/auth.rst:45 95220f565a0e442997e52db4781e152d
+#: ../../manager/common-api/auth.rst:45 d272ba0f1e7342ff9dc56342005f61e9
 msgid "``Authorization``"
 msgstr "``Authorization``"
 
-#: ../../manager/common-api/auth.rst:46 c6bf1246ac0140cb9832acb22e42e486
+#: ../../manager/common-api/auth.rst:46 c86f81a9515d4a0cba642e3c75039978
 msgid ""
 "Signature information generated as the section `Signing API Requests`_ "
 "describes."
 msgstr ""
 
-#: ../../manager/common-api/auth.rst:47 19f85443747d4dc69be5f056c0a862f1
+#: ../../manager/common-api/auth.rst:47 66918b8e2ff445379c657b3a5106f440
 msgid "``Date``"
 msgstr "``Date``"
 
-#: ../../manager/common-api/auth.rst:48 a8d224f45c994dc491aba65029558619
+#: ../../manager/common-api/auth.rst:48 cb62d5adec8740bbbf0e2427a66ce6c5
 msgid ""
 "The date/time of the request formatted in RFC 8022 or ISO 8601. If no "
-"timezone is specified, UTC is assumed. The deviation with the server-side "
-"clock must be within 15-minutes."
+"timezone is specified, UTC is assumed. The deviation with the server-side"
+" clock must be within 15-minutes."
 msgstr ""
-"요청의 날짜, 시간은 RFC 8022나 ISO 8601의 형식입니다. 만약 특별한 시간대가 명"
-"시되지 않았다면, UTC로 가정합니다. 서버의 시간과 요청의 시간의 차이는 15분 이"
-"내여야 합니다."
+"요청의 날짜, 시간은 RFC 8022나 ISO 8601의 형식입니다. 만약 특별한 시간대가 명시되지 않았다면, UTC로 가정합니다."
+" 서버의 시간과 요청의 시간의 차이는 15분 이내여야 합니다."
 
-#: ../../manager/common-api/auth.rst:51 4f89db7b94ce4b669450fbe4fa803798
+#: ../../manager/common-api/auth.rst:51 d75798a44c7d4b318d66797dd0dd168c
 msgid "``X-BackendAI-Date``"
 msgstr "``X-BackendAI-Date``"
 
-#: ../../manager/common-api/auth.rst:52 8eb5ee27eb934d378a1d0872f528b640
+#: ../../manager/common-api/auth.rst:52 bc4cc620cfd94d4a8f924067252f5ab6
 msgid "Same as ``Date``. May be omitted if ``Date`` is present."
 msgstr "``Date``와 동일합니다. 만약 ``Date`` 항목이 있다면 생략됩니다."
 
-#: ../../manager/common-api/auth.rst:53 22e3facf1dd8457bb57a9c8a6673cc3d
+#: ../../manager/common-api/auth.rst:53 ab9eab63948c4d50a704c267e4ea3938
 msgid "``X-BackendAI-Version``"
 msgstr "``X-BackendAI-Version``"
 
-#: ../../manager/common-api/auth.rst:54 863c17011ecd4092be6aafafb1981a23
+#: ../../manager/common-api/auth.rst:54 7718eff614914d0c9fa571657947fd3e
 msgid ""
 "``vX.yyymmdd`` where ``X`` is the major version and ``yyyymmdd`` is the "
 "minor release date of the specified API version. (e.g., 20160915)"
 msgstr ""
-"``vX.yyymmdd`` 에서 ``X``는 주 버전이고 ``yyyymmdd``는 특정 API 버전의 마이"
-"너 릴리스 날짜입니다. (예: 20160914)"
+"``vX.yyymmdd`` 에서 ``X``는 주 버전이고 ``yyyymmdd``는 특정 API 버전의 마이너 릴리스 날짜입니다. "
+"(예: 20160914)"
 
-#: ../../manager/common-api/auth.rst:57 c083954fb7254f79b9dc7e96437adc5f
+#: ../../manager/common-api/auth.rst:57 7c23d9fa44e045e3a37084f03aaf47c2
 msgid "``X-BackendAI-Client-Token``"
 msgstr "``X-BackendAI-Client-Token``"
 
-#: ../../manager/common-api/auth.rst:58 83033891490d4d70819c56e1688e3a23
+#: ../../manager/common-api/auth.rst:58 c645b929cf9240c98cacbb80b6bc0adb
 msgid ""
 "An optional, client-generated random string to allow the server to "
-"distinguish repeated duplicate requests. It is important to keep idempotent "
-"semantics with multiple retries for intermittent failures. (Not implemented "
-"yet)"
+"distinguish repeated duplicate requests. It is important to keep "
+"idempotent semantics with multiple retries for intermittent failures. "
+"(Not implemented yet)"
 msgstr ""
-"선택 사항: 반복된 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자"
-"열입니다.때때로 나타나는 장애에 대해 여러 번 재시도하여 멱등성을 유지하는 것"
-"이 중요합니다. (구현 중)*멱등성 : 연산을 여러 번 적용하더라도 결과가 달라지"
-"지 않는 성질"
+"선택 사항: 반복된 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다.때때로 나타나는 장애에 대해 여러 번 "
+"재시도하여 멱등성을 유지하는 것이 중요합니다. (구현 중)*멱등성 : 연산을 여러 번 적용하더라도 결과가 달라지지 않는 성질"
 
 #: ../../manager/common-api/auth.rst:61 ../../manager/common-api/auth.rst:82
-#: 79528580d353445e91e120bece8cb0ac 8b3547a0b0624e339b1c56d3f58b3cca
+#: aa12db8263a74751938ff1b73c75e380 c16ec9f2261e418fb91800e08ae383bd
 msgid "Body"
 msgstr "Body"
 
-#: ../../manager/common-api/auth.rst:62 b3c5f427874c453da0d21a3e1924b74f
+#: ../../manager/common-api/auth.rst:62 c3cf233add044b72afdec627aa7538a5
 msgid "JSON-encoded request parameters"
 msgstr "JSON 인코딩 요청 매개 변수"
 
-#: ../../manager/common-api/auth.rst:66 d34d92375e33432da48d1eb21315ce45
+#: ../../manager/common-api/auth.rst:66 239f9a1ac94445f6a879ed57631d07b8
 msgid "Common Structure of API Responses"
 msgstr "API 응답들의 공통 구조"
 
-#: ../../manager/common-api/auth.rst:74 ced0188792934ce9ba51a2e44fd25c1c
+#: ../../manager/common-api/auth.rst:74 bc731926dbae4ed2a057580351602997
 msgid "Status code"
 msgstr "상태 코드"
 
-#: ../../manager/common-api/auth.rst:75 164f76c3bd044e3da9a147e0de406c3f
+#: ../../manager/common-api/auth.rst:75 1fda2e523f554b3cafad2aa68a729c6e
 msgid ""
-"API-specific HTTP-standard status codes. Responses commonly used throughout "
-"all APIs include 200, 201, 204, 400, 401, 403, 404, 429, and 500, but not "
-"limited to."
+"API-specific HTTP-standard status codes. Responses commonly used "
+"throughout all APIs include 200, 201, 204, 400, 401, 403, 404, 429, and "
+"500, but not limited to."
 msgstr ""
-"API에 대한 HTTP 표준 상태 코드입니다. 모든 API에서 일반적으로 사용되는 응답에"
-"는 200, 201, 204, 400, 401, 403, 404, 429, 그리고 500이 포함되지만 이에 국한"
-"되지 않습니다."
+"API에 대한 HTTP 표준 상태 코드입니다. 모든 API에서 일반적으로 사용되는 응답에는 200, 201, 204, 400, "
+"401, 403, 404, 429, 그리고 500이 포함되지만 이에 국한되지 않습니다."
 
-#: ../../manager/common-api/auth.rst:77 dbd94e6cde3a44c29d9a735fb6c42498
+#: ../../manager/common-api/auth.rst:77 b6578716a6c44ac28306c5e8fada704a
 msgid ""
-"``application/json`` and its variants (e.g., ``application/problem+json`` "
-"for errors)"
+"``application/json`` and its variants (e.g., ``application/problem+json``"
+" for errors)"
 msgstr "``application/json`` 및 변형 (예: ``application/problem+json`` - 오류)"
 
-#: ../../manager/common-api/auth.rst:78 052a939163f24b0ba16605f6aa4256be
+#: ../../manager/common-api/auth.rst:78 2f9ea41ddebb4623b882ba7e105f6aab
 msgid "``Link``"
 msgstr "``Link``"
 
-#: ../../manager/common-api/auth.rst:79 52934730e74046cd88d804aa3c36045e
+#: ../../manager/common-api/auth.rst:79 56424370bfdd455388c001a164a6eec9
 msgid ""
-"Web link headers specified as in `RFC 5988 <https://tools.ietf.org/html/"
-"rfc5988>`_. Only optionally used when returning a collection of objects."
+"Web link headers specified as in `RFC 5988 "
+"<https://tools.ietf.org/html/rfc5988>`_. Only optionally used when "
+"returning a collection of objects."
 msgstr ""
 
-#: ../../manager/common-api/auth.rst:80 12fcad5f0f634c18ab1b6e57c21219dc
+#: ../../manager/common-api/auth.rst:80 3d71598c1f5a4c6e9c5ae0472c0e72c7
 msgid "``X-RateLimit-*``"
 msgstr "``X-RateLimit-*``"
 
-#: ../../manager/common-api/auth.rst:81 03eadff31812416d838d9bad9f5e4d48
-msgid "The rate-limiting information (see :doc:`/common-api/ratelimit`)."
+#: ../../manager/common-api/auth.rst:81 caf77a8f0812464f8865de95d7fb2994
+#, fuzzy
+msgid "The rate-limiting information (see :doc:`ratelimit`)."
 msgstr "속도 제한 정보 (:doc:`/common-api/ratelimit` 참조)"
 
-#: ../../manager/common-api/auth.rst:83 d30208252d06468ca939f06190122dfa
+#: ../../manager/common-api/auth.rst:83 2762a08794bc453cb17c79946521a044
 msgid "JSON-encoded results"
 msgstr "JSON 인코딩 결과"
 
-#: ../../manager/common-api/auth.rst:87 bbd6dd28f8f04c7e859ade08f679a98a
+#: ../../manager/common-api/auth.rst:87 5f09feac84f8455ebca745f1314a21b7
 msgid "Signing API Requests"
 msgstr "API 요청 서명"
 
-#: ../../manager/common-api/auth.rst:89 912e868d7424433b88e83b3d82cac349
+#: ../../manager/common-api/auth.rst:89 24d5cd98643b4c3dbc55bf5afdd1abf8
 msgid ""
-"Each API request must be signed with a signature. First, the client should "
-"generate a signing key derived from its API secret key and a string to sign "
-"by canonicalizing the HTTP request."
+"Each API request must be signed with a signature. First, the client "
+"should generate a signing key derived from its API secret key and a "
+"string to sign by canonicalizing the HTTP request."
 msgstr ""
-"각각의 API 요청은 서명과 함께 등록되어야 합니다. 먼저, 클라이언트는 API 비밀 "
-"키에서 파생된 서명 키와 HTTP 요청을 정규화하여 얻을 수 있는 서명할 문자열을 "
-"생성해야 합니다."
+"각각의 API 요청은 서명과 함께 등록되어야 합니다. 먼저, 클라이언트는 API 비밀 키에서 파생된 서명 키와 HTTP 요청을 "
+"정규화하여 얻을 수 있는 서명할 문자열을 생성해야 합니다."
 
-#: ../../manager/common-api/auth.rst:93 516caf5463d64e1d897a968c7cd27715
+#: ../../manager/common-api/auth.rst:93 6b1bc0c0844042c599f99a4b3056a8f2
 msgid "Generating a signing key"
 msgstr "서명 키 생성하기"
 
-#: ../../manager/common-api/auth.rst:95 3c324dde1d0f49d69f7f0f0fb97856d7
+#: ../../manager/common-api/auth.rst:95 e6243ab7d59c47f287b7e46d336a8ad8
 msgid ""
-"Here is a Python code that derives the signing key from the secret key. The "
-"key is nestedly signed against the current date (without time) and the API "
-"endpoint address."
+"Here is a Python code that derives the signing key from the secret key. "
+"The key is nestedly signed against the current date (without time) and "
+"the API endpoint address."
 msgstr ""
-"다음은 비밀 키로부터 파생된 서명 키를 생성하는 Python 코드 입니다. 키는 현재 "
-"날짜 (시간 제외) 및 API 엔드포인트 주소에 대해 중첩되어 생성됩니다."
+"다음은 비밀 키로부터 파생된 서명 키를 생성하는 Python 코드 입니다. 키는 현재 날짜 (시간 제외) 및 API 엔드포인트 "
+"주소에 대해 중첩되어 생성됩니다."
 
-#: ../../manager/common-api/auth.rst:116 1d07bb3bfb8647d2a9f31010cdf2aee6
+#: ../../manager/common-api/auth.rst:116 8ccb45061e8b4cab984d93c939c54a12
 msgid "Generating a string to sign"
 msgstr "서명할 문자열 생성하기"
 
-#: ../../manager/common-api/auth.rst:118 8b61203527f244f4a67ec9772c6a0fc8
-msgid ""
-"The string to sign is generated from the following request-related values:"
+#: ../../manager/common-api/auth.rst:118 37c50d96e18a4ab989d40ec13f32e5a8
+msgid "The string to sign is generated from the following request-related values:"
 msgstr "서명할 문자열은 다음과 같은 요청 정보 값에 의해 생성됩니다."
 
-#: ../../manager/common-api/auth.rst:120 8c6f9931386a496db07a3edaeff6b58a
+#: ../../manager/common-api/auth.rst:120 13ddfebb71a845a08eec24c5d8650409
 msgid "HTTP Method (uppercase)"
 msgstr "HTTP 메서드 (대문자)"
 
-#: ../../manager/common-api/auth.rst:121 13eeddf3f18b4f17b8a631baef5be929
+#: ../../manager/common-api/auth.rst:121 4e990f7c85404cbb8e40828feb57d18d
 msgid "URI including query strings"
 msgstr "쿼리스트링을 포함하는 URI"
 
-#: ../../manager/common-api/auth.rst:122 11ebf7faee184edeb1080fff2f85d859
+#: ../../manager/common-api/auth.rst:122 86bba6190e684ad8ac53ef2a0c7fbf81
 msgid ""
-"The value of ``Date`` (or ``X-BackendAI-Date`` if ``Date`` is not present) "
-"formatted in ISO 8601 (``YYYYmmddTHHMMSSZ``) using the UTC timezone."
+"The value of ``Date`` (or ``X-BackendAI-Date`` if ``Date`` is not "
+"present) formatted in ISO 8601 (``YYYYmmddTHHMMSSZ``) using the UTC "
+"timezone."
 msgstr ""
-"UTC 시간대를 활용하고 ISO 8601 형식으로 구성된 (``YYYYmmddTHHMMSSZ``) "
-"``Date`` 의 값 (단, 요청에서 ``Date`` 가 주어지지 않았다면, ``X-BackendAI-"
-"Date`` 를 사용함.)"
+"UTC 시간대를 활용하고 ISO 8601 형식으로 구성된 (``YYYYmmddTHHMMSSZ``) ``Date`` 의 값 (단, "
+"요청에서 ``Date`` 가 주어지지 않았다면, ``X-BackendAI-Date`` 를 사용함.)"
 
-#: ../../manager/common-api/auth.rst:123 7144f96d61264f389d116fe401d31032
+#: ../../manager/common-api/auth.rst:123 489bf7bf64a34e89a60640e40735bdd9
 msgid "The canonicalized header/value pair of ``Host``"
 msgstr "정규화 된 ``Host`` 의 헤더/값 쌍"
 
-#: ../../manager/common-api/auth.rst:124 fc7a71155c21441e90934cffe11e9cac
+#: ../../manager/common-api/auth.rst:124 7254e4eb51444eef83a072f6c0403e5b
 msgid "The canonicalized header/value pair of ``Content-Type``"
 msgstr "정규화 된 ``Content-Type`` 의 헤더/값 쌍"
 
-#: ../../manager/common-api/auth.rst:125 8179e443286347af8f3d75dd1a5d2235
+#: ../../manager/common-api/auth.rst:125 ad8bd341e15c4f94a813a6f65b1ad9cc
 msgid "The canonicalized header/value pair of ``X-BackendAI-Version``"
 msgstr "정규화 된 ``X-BackendAI-Version`` 의 헤더/값 쌍"
 
-#: ../../manager/common-api/auth.rst:126 85c0fb1423554e43b283a587256c6ca0
+#: ../../manager/common-api/auth.rst:126 a2ec58acce754c11a02ce0ef64d95273
 msgid ""
-"The hex-encoded hash value of body as-is. The hash function must be same to "
-"the one given in the ``Authorization`` header (e.g., SHA256)."
+"The hex-encoded hash value of body as-is. The hash function must be same "
+"to the one given in the ``Authorization`` header (e.g., SHA256)."
 msgstr ""
-"body 전체를 hex로 인코딩한 hash 값. 사용한 hash 함수는 반드시 "
-"``Authorization`` 헤더에 명시된 함수와 동일해야 합니다. (e.g., SHA256)."
+"body 전체를 hex로 인코딩한 hash 값. 사용한 hash 함수는 반드시 ``Authorization`` 헤더에 명시된 함수와"
+" 동일해야 합니다. (e.g., SHA256)."
 
-#: ../../manager/common-api/auth.rst:128 2cdf3907485a407aac74b0ca8ee3c23a
+#: ../../manager/common-api/auth.rst:128 21b612a5fc524da49f71b4ca90b6e321
 msgid ""
-"To generate a string to sign, the client should join the above values using "
-"the newline (``\"\\n\"``, ASCII 10) character. All non-ASCII strings must be "
-"encoded with UTF-8. To canonicalize a pair of HTTP header/value, first trim "
-"all leading/trailing whitespace characters (``\"\\n\"``, ``\"\\r\"``, ``\" "
-"\"``, ``\"\\t\"``; or ASCII 10, 13, 32, 9) of its value, and join the "
-"lowercased header name and the value with a single colon (``\":\"``, ASCII "
-"58) character."
+"To generate a string to sign, the client should join the above values "
+"using the newline (``\"\\n\"``, ASCII 10) character. All non-ASCII "
+"strings must be encoded with UTF-8. To canonicalize a pair of HTTP "
+"header/value, first trim all leading/trailing whitespace characters "
+"(``\"\\n\"``, ``\"\\r\"``, ``\" \"``, ``\"\\t\"``; or ASCII 10, 13, 32, "
+"9) of its value, and join the lowercased header name and the value with a"
+" single colon (``\":\"``, ASCII 58) character."
 msgstr ""
-"서명할 문자열을 생성하기 위해, 클라이언트는 위의 값들을 newline 문자열 (``"
-"\"\\n\"``, ASCII 10) 을 활용하여 합쳐야 합니다. 모든 non-ASCII 문자열은 반드"
-"시 UTF-8 형식으로 인코딩 되어야 합니다. HTTP 헤더/값 쌍을 정규화 하기 위해"
-"선, 먼저 맨 앞이나 맨 뒤에 붙어있는 공백 문자열 (``\"\\n\"``, ``\"\\r\"``, ``"
-"\" \"``, ``\"\\t\"``; 또는 ASCII 10, 13, 32, 9) 을 제거해야 하며, 소문자로 변"
-"경된 헤더의 이름과 값을 콜론 (``\":\"``, ASCII 58) 문자열을 통해 연결해야 합"
-"니다."
+"서명할 문자열을 생성하기 위해, 클라이언트는 위의 값들을 newline 문자열 (``\"\\n\"``, ASCII 10) 을 "
+"활용하여 합쳐야 합니다. 모든 non-ASCII 문자열은 반드시 UTF-8 형식으로 인코딩 되어야 합니다. HTTP 헤더/값 쌍을 "
+"정규화 하기 위해선, 먼저 맨 앞이나 맨 뒤에 붙어있는 공백 문자열 (``\"\\n\"``, ``\"\\r\"``, ``\" "
+"\"``, ``\"\\t\"``; 또는 ASCII 10, 13, 32, 9) 을 제거해야 하며, 소문자로 변경된 헤더의 이름과 값을"
+" 콜론 (``\":\"``, ASCII 58) 문자열을 통해 연결해야 합니다."
 
-#: ../../manager/common-api/auth.rst:132 38f9e7167223495ca9aa30e2d7583a97
+#: ../../manager/common-api/auth.rst:132 f485b52735ec4bff9f8d7b1076c09383
 msgid ""
-"The success example in `Example Requests and Responses`_ makes a string to "
-"sign as follows (where the newlines are ``\"\\n\"``):"
-msgstr ""
-"`요청과 응답 예시` 에 적힌 예시는 다음과 같은 방식으로 서명할 문자열을 생성 "
-"하였습니다."
+"The success example in `Example Requests and Responses`_ makes a string "
+"to sign as follows (where the newlines are ``\"\\n\"``):"
+msgstr "`요청과 응답 예시` 에 적힌 예시는 다음과 같은 방식으로 서명할 문자열을 생성 하였습니다."
 
-#: ../../manager/common-api/auth.rst:144 d007a4e973154948b84d87ba93cbd629
+#: ../../manager/common-api/auth.rst:144 4f3da6ad3ad9484b8b6dfa9c7eddbba5
 msgid ""
-"In this example, the hash value  ``e3b0c4...`` is generated from an empty "
-"string using the SHA256 hash function since there is no body for GET "
+"In this example, the hash value  ``e3b0c4...`` is generated from an empty"
+" string using the SHA256 hash function since there is no body for GET "
 "requests."
 msgstr ""
-"이 예시에서, 해시 값 ``e3b0c4...``는 GET 요청에 대한 본문이 없으므로 SHA256 "
-"해시 함수를사용하여 빈 문자열에서 생성됩니다."
+"이 예시에서, 해시 값 ``e3b0c4...``는 GET 요청에 대한 본문이 없으므로 SHA256 해시 함수를사용하여 빈 문자열에서"
+" 생성됩니다."
 
-#: ../../manager/common-api/auth.rst:146 1c97c817eeb64742939076d6f063e287
+#: ../../manager/common-api/auth.rst:146 abf42cf0019c49268f67417f65d65bb7
 msgid ""
-"Then, the client should calculate the signature using the derived signing "
-"key and the generated string with the hash function, as follows:"
-msgstr ""
-"그리고, 클라이언트는 서명 키와 hash 함수로 부터 생성된 문자열을 활용해 다음"
-"과 같이 서명해야 합니다."
+"Then, the client should calculate the signature using the derived signing"
+" key and the generated string with the hash function, as follows:"
+msgstr "그리고, 클라이언트는 서명 키와 hash 함수로 부터 생성된 문자열을 활용해 다음과 같이 서명해야 합니다."
 
-#: ../../manager/common-api/auth.rst:159 e581e45af1c14b61ac06f94575a3b5a9
+#: ../../manager/common-api/auth.rst:159 136d71d475fe44889fad7e58d451e0e2
 msgid "Attaching the signature"
 msgstr "서명 작성"
 
-#: ../../manager/common-api/auth.rst:161 f3d74eb7527e4b099e7dc13a7061196d
+#: ../../manager/common-api/auth.rst:161 c92dff3671834d89a1425d3d557f4492
 msgid ""
 "Finally, the client now should construct the following HTTP "
 "``Authorization`` header:"
-msgstr ""
-"마지막으로, 클라이언트는 이제 ``Authorization`` HTTP 헤더를 구성해야 합니다."
+msgstr "마지막으로, 클라이언트는 이제 ``Authorization`` HTTP 헤더를 구성해야 합니다."
 
-#: ../../manager/common-api/auth.rst:169 eba120f36e284a9caa968665918d3688
+#: ../../manager/common-api/auth.rst:169 60426a8f1fba45c3901f5180d80c10cd
 msgid "Example Requests and Responses"
 msgstr "요청과 응답 예시"
 
-#: ../../manager/common-api/auth.rst:171 cb10de4f57534ef9821ea5042ed74bf8
+#: ../../manager/common-api/auth.rst:171 9c4a3bca20814d5fa1fdfcb1b8b42851
 msgid "For the examples here, we use a dummy access key and secret key:"
-msgstr ""
-"이 예시에서, 우리는 다음과 같은 더미 엑세스 키와 비밀 키를 사용할 것입니다."
+msgstr "이 예시에서, 우리는 다음과 같은 더미 엑세스 키와 비밀 키를 사용할 것입니다."
 
-#: ../../manager/common-api/auth.rst:173 f9b60ac304c1451d83e70ecbf30c5082
+#: ../../manager/common-api/auth.rst:173 7d27739e05754ba5b3d9f754cc808a47
 msgid "Example access key: ``AKIAIOSFODNN7EXAMPLE``"
 msgstr "엑세스 키 예시: ``AKIAIOSFODNN7EXAMPLE``"
 
-#: ../../manager/common-api/auth.rst:174 3ed72ba4d38a45f793171195eaf98cda
+#: ../../manager/common-api/auth.rst:174 31568fe9ba82484c9554a1e4f91de50e
 msgid "Example secret key: ``wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY``"
 msgstr "비밀 키 예시: ``wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY``"
 
-#: ../../manager/common-api/auth.rst:177 51dd08d0e313478f8ab620ab4c3e41b4
+#: ../../manager/common-api/auth.rst:177 a2b12e69b7e445e4a61d7d3b043a9c6a
 msgid "Success example for checking the latest API version"
 msgstr "최신 API 버전을 확인하는 예시"
 
-#: ../../manager/common-api/auth.rst:204 75993c26975143cd858ccb951cdad8d1
+#: ../../manager/common-api/auth.rst:204 1d3f1c1d322d44f1be2c6c384942ba2f
 msgid "Failure example with a missing authorization header"
 msgstr "authorization 헤더를 포함하지 않아 발생하는 실패 예시"
+

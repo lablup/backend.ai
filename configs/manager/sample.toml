@@ -67,6 +67,19 @@ heartbeat-timeout = 30.0
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
 
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+# ipc-base-path = "/tmp/backend.ai/ipc"
+
+# Explicitly set allowed plugins in order to load only selected plugin.
+# If use this feature,
+#   1) Replace '# allowed-plugins = []' with 'allowed-plugins = ["example.plugin.what.you.want"]'
+#   2) Add allowlist parameters when plugin_ctx initiate like 'example_plugin_ctx.init(allowlist=local_config["manager"]["allowed-plugins"])
+# Note: If you set allowed-plugins, they could only be loaded. The others would be blocked.
+# allowed-plugins = []
+
 # The list of black-listed manager plugins.
 disabled-plugins = []
 
@@ -91,6 +104,14 @@ hide-agents = false
 # You need to change this if your are at offline environments so that the manager
 # uses an importer image from a private registry.
 importer-image = "lablup/importer:manylinux2010"
+
+# The maximum size of websocket messages in bytes.
+# max-wsmsg-size = 16777216  # 16 MiB
+
+# The starting port number for aiomonitor.
+# Since the manager is composed of multiple processes, each process will be exposed
+# via the port number of this base port number + pidx.
+# aiomonitor-port = 48100
 
 
 [docker-registry]
@@ -160,4 +181,12 @@ ssl-verify = true
 
 [debug]
 enabled = false
-periodic-sync-stats = false  # periodically sync container stat from Redis to the kernels.last_stat column.
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
+
+# Periodically sync container stat from Redis to the kernels.last_stat column.
+periodic-sync-stats = false

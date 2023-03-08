@@ -4,13 +4,17 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 2,
+//   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.10"
+//     "CPython<4,>=3.11"
 //   ],
 //   "generated_with_requirements": [
-//     "mypy>=0.961"
-//   ]
+//     "mypy==1.0.1"
+//   ],
+//   "manylinux": "manylinux2014",
+//   "requirement_constraints": [],
+//   "only_binary": [],
+//   "no_binary": []
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
@@ -27,125 +31,105 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0d054ef16b071149917085f51f89555a576e2618d5d9dd70bd6eea6410af3ac9",
-              "url": "https://files.pythonhosted.org/packages/6c/c6/20dd5b70962af557101b2d3a7052f8298a3e94708b62bc5ad7ca713b59bb/mypy-0.971-py3-none-any.whl"
+              "hash": "eda5c8b9949ed411ff752b9a01adda31afe7eae1e53e946dbdf9db23865e66c4",
+              "url": "https://files.pythonhosted.org/packages/d1/95/fa68816abbbc48f0ef213490cc4445e30365831576fb9427fd99fa771e6e/mypy-1.0.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "98e02d56ebe93981c41211c05adb630d1d26c14195d04d95e49cd97dbc046dc5",
-              "url": "https://files.pythonhosted.org/packages/18/e1/d3e577229691dae4c8039cd87ef981482812ba7c5f5999fd67127af0f8a1/mypy-0.971-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "48525aec92b47baed9b3380371ab8ab6e63a5aab317347dfe9e55e02aaad22e8",
+              "url": "https://files.pythonhosted.org/packages/27/2b/ebc13ecd6389ed1401f86f46bbb45737d68a08b28b2858ae66e865e2f784/mypy-1.0.1-cp311-cp311-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f2899a3cbd394da157194f913a931edfd4be5f274a88041c9dc2d9cdcb1c315c",
-              "url": "https://files.pythonhosted.org/packages/2c/97/ff71b0cdf61065db040ffe34ae88852d2a47de8b2b49c51608caf03771ed/mypy-0.971-cp310-cp310-macosx_10_9_universal2.whl"
+              "hash": "c96b8a0c019fe29040d520d9257d8c8f122a7343a8307bf8d6d4a43f5c5bfcc8",
+              "url": "https://files.pythonhosted.org/packages/4f/01/fbf84b7785916a75c80ccffd70b708600376b606af3bab4993f7da2208af/mypy-1.0.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "40b0f21484238269ae6a57200c807d80debc6459d444c0489a102d7c6a75fa56",
-              "url": "https://files.pythonhosted.org/packages/5e/66/00f7f751140fe6953603fb0cd56dee0314842cfe358884ca3025589ca81c/mypy-0.971.tar.gz"
+              "hash": "28cea5a6392bb43d266782983b5a4216c25544cd7d80be681a155ddcdafd152d",
+              "url": "https://files.pythonhosted.org/packages/52/56/afddb0a1654cf7f192419fbd9e46e01bceb11b1a6778a9d4257387f71dd8/mypy-1.0.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "25c5750ba5609a0c7550b73a33deb314ecfb559c350bb050b655505e8aed4103",
-              "url": "https://files.pythonhosted.org/packages/9e/01/a81de921bc3efde879f6eab5ff4d4bb33b037581f78eccfa28a47105d0b3/mypy-0.971-cp310-cp310-win_amd64.whl"
+              "hash": "448de661536d270ce04f2d7dddaa49b2fdba6e3bd8a83212164d4174ff43aa65",
+              "url": "https://files.pythonhosted.org/packages/9c/c5/0c287ccb5a70b4fb37f3d3025dd6a0d12616bb041c76068c813c33933c00/mypy-1.0.1-cp311-cp311-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "02ef476f6dcb86e6f502ae39a16b93285fef97e7f1ff22932b657d1ef1f28655",
-              "url": "https://files.pythonhosted.org/packages/f0/b7/d39405fb53e0ae99c26cba3c8ab50717eafb7aeb64beea6efbd42a17ef82/mypy-0.971-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "19830b7dba7d5356d3e26e2427a2ec91c994cd92d983142cbd025ebe81d69cf3",
-              "url": "https://files.pythonhosted.org/packages/f9/be/e5c50777159473c8dfb7cb512e62fbca19df4a6e9db711f17d77c14fb62b/mypy-0.971-cp310-cp310-macosx_11_0_arm64.whl"
+              "hash": "2013226d17f20468f34feddd6aae4635a55f79626549099354ce641bc7d40262",
+              "url": "https://files.pythonhosted.org/packages/a8/1c/b53620475d58a366d793c6b82e8d615ab38cd256937759949c905891da18/mypy-1.0.1-cp311-cp311-macosx_10_9_x86_64.whl"
             }
           ],
           "project_name": "mypy",
           "requires_dists": [
             "lxml; extra == \"reports\"",
             "mypy-extensions>=0.4.3",
+            "pip; extra == \"install-types\"",
             "psutil>=4.0; extra == \"dmypy\"",
             "tomli>=1.1.0; python_version < \"3.11\"",
             "typed-ast<2,>=1.4.0; extra == \"python2\"",
             "typed-ast<2,>=1.4.0; python_version < \"3.8\"",
             "typing-extensions>=3.10"
           ],
-          "requires_python": ">=3.6",
-          "version": "0.971"
+          "requires_python": ">=3.7",
+          "version": "1.0.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d",
-              "url": "https://files.pythonhosted.org/packages/5c/eb/975c7c080f3223a5cdaff09612f3a5221e4ba534f7039db34c35d95fa6a5/mypy_extensions-0.4.3-py2.py3-none-any.whl"
+              "hash": "4392f6c0eb8a5668a69e23d168ffa70f0be9ccfd32b5cc2d26a34ae5b844552d",
+              "url": "https://files.pythonhosted.org/packages/2a/e2/5d3f6ada4297caebe1a2add3b126fe800c96f56dbe5d1988a2cbe0b267aa/mypy_extensions-1.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8",
-              "url": "https://files.pythonhosted.org/packages/63/60/0582ce2eaced55f65a4406fc97beba256de4b7a95a0034c6576458c6519f/mypy_extensions-0.4.3.tar.gz"
+              "hash": "75dbf8955dc00442a438fc4d0666508a9a97b6bd41aa2f0ffe9d2f2725af0782",
+              "url": "https://files.pythonhosted.org/packages/98/a4/1ab47638b92648243faf97a5aeb6ea83059cc3624972ab6b8d2316078d3f/mypy_extensions-1.0.0.tar.gz"
             }
           ],
           "project_name": "mypy-extensions",
-          "requires_dists": [
-            "typing>=3.5.3; python_version < \"3.5\""
-          ],
-          "requires_python": null,
-          "version": "0.4.3"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc",
-              "url": "https://files.pythonhosted.org/packages/97/75/10a9ebee3fd790d20926a90a2547f0bf78f371b2f13aa822c759680ca7b9/tomli-2.0.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f",
-              "url": "https://files.pythonhosted.org/packages/c0/3f/d7af728f075fb08564c5949a9c95e44352e23dee646869fa104a3b2060a3/tomli-2.0.1.tar.gz"
-            }
-          ],
-          "project_name": "tomli",
           "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "2.0.1"
+          "requires_python": ">=3.5",
+          "version": "1.0.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "25642c956049920a5aa49edcdd6ab1e06d7e5d467fc00e0506c44ac86fbfca02",
-              "url": "https://files.pythonhosted.org/packages/ed/d6/2afc375a8d55b8be879d6b4986d4f69f01115e795e36827fd3a40166028b/typing_extensions-4.3.0-py3-none-any.whl"
+              "hash": "fb33085c39dd998ac16d1431ebc293a8b3eedd00fd4a32de0ff79002c19511b4",
+              "url": "https://files.pythonhosted.org/packages/31/25/5abcd82372d3d4a3932e1fa8c3dbf9efac10cc7c0d16e78467460571b404/typing_extensions-4.5.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6d2677a32f47fc7eb2795db1dd15c1f34eff616bcaf2cfb5e997f854fa1c4a6",
-              "url": "https://files.pythonhosted.org/packages/9e/1d/d128169ff58c501059330f1ad96ed62b79114a2eb30b8238af63a2e27f70/typing_extensions-4.3.0.tar.gz"
+              "hash": "5cb5f4a79139d699607b3ef622a1dedafa84e115ab0024e0d9c044a9479ca7cb",
+              "url": "https://files.pythonhosted.org/packages/d3/20/06270dac7316220643c32ae61694e451c98f8caf4c8eab3aa80a2bedf0df/typing_extensions-4.5.0.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "4.3"
+          "version": "4.5.0"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.99",
+  "pex_version": "2.1.122",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "mypy>=0.961"
+    "mypy==1.0.1"
   ],
   "requires_python": [
-    "<4,>=3.10"
+    "<4,>=3.11"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
-  "target_systems": [],
+  "target_systems": [
+    "linux",
+    "mac"
+  ],
   "transitive": true,
   "use_pep517": null
 }

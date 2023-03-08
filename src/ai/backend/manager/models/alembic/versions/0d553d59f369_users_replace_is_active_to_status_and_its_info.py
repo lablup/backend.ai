@@ -10,6 +10,7 @@ import textwrap
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "0d553d59f369"
@@ -38,11 +39,11 @@ def upgrade():
     query = textwrap.dedent(
         "UPDATE users SET status = 'active', status_info = 'migrated' WHERE is_active = 't';"
     )
-    conn.execute(query)
+    conn.execute(text(query))
     query = textwrap.dedent(
         "UPDATE users SET status = 'inactive', status_info = 'migrated' WHERE is_active <> 't';"
     )
-    conn.execute(query)
+    conn.execute(text(query))
 
     op.alter_column("users", column_name="status", nullable=False)
     op.drop_column("users", "is_active")
@@ -54,9 +55,9 @@ def downgrade():
     # Set user's is_active field.
     conn = op.get_bind()
     query = textwrap.dedent("UPDATE users SET is_active = 't' WHERE status = 'active';")
-    conn.execute(query)
+    conn.execute(text(query))
     query = textwrap.dedent("UPDATE users SET is_active = 'f' WHERE status <> 'active';")
-    conn.execute(query)
+    conn.execute(text(query))
 
     op.drop_column("users", "status_info")
     op.drop_column("users", "status")

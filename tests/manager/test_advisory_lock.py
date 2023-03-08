@@ -8,7 +8,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 @pytest.mark.asyncio
 async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
-
     enter_count = 0
     done_count = 0
 

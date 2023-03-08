@@ -13,7 +13,6 @@ DEFAULT_PYFLAGS: List[str] = []
 
 
 class Runner(BaseRunner):
-
     log_prefix = "h2o-kernel"
     default_runtime_path = "/opt/h2oai/dai/python/bin/python"
     default_child_env = {

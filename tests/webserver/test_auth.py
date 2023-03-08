@@ -2,6 +2,7 @@ from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import yarl
 from aiohttp import web
 
 from ai.backend.web.auth import get_anonymous_session, get_api_session
@@ -17,7 +18,11 @@ async def test_get_api_session(mocker):
     mock_request = DummyRequest(
         {
             "config": {
-                "api": {"domain": "default", "endpoint": "https://api.backend.ai"},
+                "api": {
+                    "domain": "default",
+                    "endpoint": [yarl.URL("https://api.backend.ai")],
+                    "ssl_verify": False,
+                },
             }
         }
     )
@@ -65,7 +70,11 @@ async def test_get_api_session_with_specific_api_endpoint(mocker):
     mock_request = DummyRequest(
         {
             "config": {
-                "api": {"domain": "default", "endpoint": "https://api.backend.ai"},
+                "api": {
+                    "domain": "default",
+                    "endpoint": [yarl.URL("https://api.backend.ai")],
+                    "ssl_verify": False,
+                },
             }
         }
     )
@@ -88,7 +97,11 @@ async def test_get_anonymous_session(mocker):
     mock_request = DummyRequest(
         {
             "config": {
-                "api": {"domain": "default", "endpoint": "https://api.backend.ai"},
+                "api": {
+                    "domain": "default",
+                    "endpoint": [yarl.URL("https://api.backend.ai")],
+                    "ssl_verify": False,
+                },
             }
         }
     )
@@ -109,7 +122,11 @@ async def test_get_anonymous_session_with_specific_api_endpoint(mocker):
     mock_request = DummyRequest(
         {
             "config": {
-                "api": {"domain": "default", "endpoint": "https://api.backend.ai"},
+                "api": {
+                    "domain": "default",
+                    "endpoint": [yarl.URL("https://api.backend.ai")],
+                    "ssl_verify": False,
+                },
             }
         }
     )

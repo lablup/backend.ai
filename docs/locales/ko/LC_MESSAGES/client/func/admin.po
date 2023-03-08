@@ -9,75 +9,113 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 # 8ec5acb8a5894dc4a4b2f89cdd1b1b39
-#: ../../client/func/admin.rst:2 fe6fd97ceb7940759a7ebf478154d4bb
+#: ../../client/func/admin.rst:2 fb3a7c91d9f44ae495c3fdee25f73606
 msgid "Admin Functions"
 msgstr "관리자용 함수"
 
-# a1dcc49b0ed142d49ca971734031a61a
-#: 39538a4f3c24428cb7eb6b71b0597496 ai.backend.client.func.admin.Admin:1 of
+#: a705387be3274e0c84e07e7a1fdaeb5a ai.backend.client.func.admin.Admin:1 of
 msgid "Provides the function interface for making admin GrapQL queries."
-msgstr "관리자 GraphQL 쿼리를 날리고 받아오는 함수형 인터페이스를 제공합니다."
-
-# 13a50fe212e046069fbddba698558897
-#: 15ece8b0be9d4acebf1d5bc770699bc1 ai.backend.client.func.admin.Admin:5 of
-msgid ""
-"Depending on the privilege of your API access key, you may or may not have "
-"access to querying/mutating server-side resources of other users."
 msgstr ""
 
-# 082a32b157d447f4880f244f72938709
-#: a6fdb1bb15ca442ea818ccd04e1d9394 ai.backend.client.func.admin.Admin.query:1
+#: ai.backend.client.func.admin.Admin:5 cb1a7702200e43eeada25730e511f8bd of
+msgid ""
+"Depending on the privilege of your API access key, you may or may not "
+"have access to querying/mutating server-side resources of other users."
+msgstr ""
+
+#: 6fe694bcc8824eeead10e7a88b76e30c ai.backend.client.func.admin.Admin.query:1
 #: of
 msgid "Sends the GraphQL query and returns the response."
 msgstr ""
 
-# 511a8c4b7a2445b080af63590db8802e
-#: ai.backend.client.func.admin.Admin.query b6bee5aca21f4a529ae2c6024ba02500 of
+#: 0f2f3282f53a400e833dcc945fafd90e ai.backend.client.func.admin.Admin.query of
 msgid "Parameters"
 msgstr ""
 
-# 0b38015ffff34c72963952e405b95f6d
-#: ai.backend.client.func.admin.Admin.query:4 b04749e480474386aba20564d30c2a95
+#: 9f578547c041482ba0f046d83992f1a0 ai.backend.client.func.admin.Admin.query:4
 #: of
 msgid "The GraphQL query string."
 msgstr ""
 
-# 3d4972b8a939441e80c778199bdd7d45
-#: 44888f665fe848abb18533118b7668e9 ai.backend.client.func.admin.Admin.query:6
+#: ai.backend.client.func.admin.Admin.query:6 db7a8734b0974ef4a6244c889326cead
 #: of
 msgid ""
-"An optional key-value dictionary to fill the interpolated template variables "
-"in the query."
+"An optional key-value dictionary to fill the interpolated template "
+"variables in the query."
 msgstr ""
 
-# 14e3ccd192db4f60a95d146bf2895524
-#: 7de3c772033b4b858c44d99123142b1b ai.backend.client.func.admin.Admin.query of
+#: 1db45ca429dd4df3a63cb33a193a05df ai.backend.client.func.admin.Admin.query of
 msgid "Return type"
 msgstr ""
 
-# af434556f94349efafc9e0bc028ddb9f
-#: 1a997d6609e646a7b1bfd3463254d1df ai.backend.client.func.admin.Admin.query:10
+#: ai.backend.client.func.admin.Admin.query:10 f88e9a539b1f498ba5fb330eb0138dd8
 #: of
 msgid ":py:data:`~typing.Any`"
 msgstr ""
 
-# a4064f5a0b084e78a728f2b52eeea05f
-#: 56bb0f0df1064d0181f80c0c1501bad7 ai.backend.client.func.admin.Admin.query of
+#: ai.backend.client.func.admin.Admin.query dcd6363e8ae04a0395ce21d312241331 of
 msgid "Returns"
 msgstr ""
 
-# 97c2859d02674e72a564e0c6c7e5267d
-#: 06288d1647fd4a8ba25a8d5f759e10a8 ai.backend.client.func.admin.Admin.query:11
+#: 9b05b96e59a04d2094dcbd373c626548 ai.backend.client.func.admin.Admin.query:11
 #: of
 msgid "The object parsed from the response JSON string."
 msgstr ""
+
+# a1dcc49b0ed142d49ca971734031a61a
+#~ msgid "Provides the function interface for making admin GrapQL queries."
+#~ msgstr "관리자 GraphQL 쿼리를 날리고 받아오는 함수형 인터페이스를 제공합니다."
+
+# 13a50fe212e046069fbddba698558897
+#~ msgid ""
+#~ "Depending on the privilege of your "
+#~ "API access key, you may or may "
+#~ "not have access to querying/mutating "
+#~ "server-side resources of other users."
+#~ msgstr ""
+
+# 082a32b157d447f4880f244f72938709
+#~ msgid "Sends the GraphQL query and returns the response."
+#~ msgstr ""
+
+# 511a8c4b7a2445b080af63590db8802e
+#~ msgid "Parameters"
+#~ msgstr ""
+
+# 0b38015ffff34c72963952e405b95f6d
+#~ msgid "The GraphQL query string."
+#~ msgstr ""
+
+# 3d4972b8a939441e80c778199bdd7d45
+#~ msgid ""
+#~ "An optional key-value dictionary to "
+#~ "fill the interpolated template variables "
+#~ "in the query."
+#~ msgstr ""
+
+# 14e3ccd192db4f60a95d146bf2895524
+#~ msgid "Return type"
+#~ msgstr ""
+
+# af434556f94349efafc9e0bc028ddb9f
+#~ msgid ":py:data:`~typing.Any`"
+#~ msgstr ""
+
+# a4064f5a0b084e78a728f2b52eeea05f
+#~ msgid "Returns"
+#~ msgstr ""
+
+# 97c2859d02674e72a564e0c6c7e5267d
+#~ msgid "The object parsed from the response JSON string."
+#~ msgstr ""
+

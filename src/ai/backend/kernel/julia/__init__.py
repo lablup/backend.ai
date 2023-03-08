@@ -11,7 +11,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "julia-kernel"
     default_runtime_path = "/usr/local/julia"
     default_child_env = {

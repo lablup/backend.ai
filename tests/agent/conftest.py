@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
 from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
@@ -21,12 +22,39 @@ def test_id():
 
 
 @pytest.fixture(scope="session")
-def local_config(test_id, etcd_container, redis_container):  # noqa: F811
+def logging_config():
+    config = {
+        "drivers": ["console"],
+        "console": {"colored": None, "format": "verbose"},
+        "level": "DEBUG",
+        "pkg-ns": {
+            "": "INFO",
+            "ai.backend": "DEBUG",
+            "tests": "DEBUG",
+            "alembic": "INFO",
+            "aiotools": "INFO",
+            "aiohttp": "INFO",
+            "sqlalchemy": "WARNING",
+        },
+    }
+    logger = LocalLogger(config)
+    with logger:
+        yield config
+
+
+@pytest.fixture(scope="session")
+def local_config(test_id, logging_config, etcd_container, redis_container):  # noqa: F811
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
     var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
+
+    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
+    try:
+        os.unlink(registry_state_path)
+    except FileNotFoundError:
+        pass
 
     cfg = {
         "agent": {
@@ -36,9 +64,11 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
             "ipc-base-path": ipc_base_path,
             "var-base-path": var_base_path,
             "backend": "docker",
-            "rpc-listen-addr": HostPortPair("", 6001),
-            "agent-sock-port": 6009,
+            "rpc-listen-addr": HostPortPair("", 6101 + get_parallel_slot()),
+            "agent-sock-port": 6109 + get_parallel_slot(),
+            "metadata-server-port": 40130 + get_parallel_slot(),
             "allow-compute-plugins": set(),
+            "block-compute-plugins": set(),
         },
         "container": {
             "scratch-type": "hostdir",
@@ -53,7 +83,7 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
             "reserved-mem": tx.BinarySize().check("256M"),
             "reserved-disk": tx.BinarySize().check("1G"),
         },
-        "logging": {},
+        "logging": logging_config,
         "debug": defaultdict(lambda: False),
         "etcd": {
             "addr": etcd_addr,
@@ -83,25 +113,19 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
         pass
     yield cfg
     shutil.rmtree(ipc_base_path)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(local_config, session_mocker, test_id):
-    var_base_path = local_config["agent"]["var-base-path"]
-    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
     try:
         os.unlink(registry_state_path)
     except FileNotFoundError:
         pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_local_instance_id(session_mocker, test_id):
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )
     mock_generate_local_instance_id.return_value = f"i-{test_id}"
     yield
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture(scope="session")
