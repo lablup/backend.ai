@@ -91,3 +91,11 @@ WebMiddleware = Callable[
     [web.Request, Handler],
     Awaitable[web.StreamResponse],
 ]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class AcceleratorMetadata:
+    description: str
+    resource_slot_name: str
+    number_format: str
+    icon_id: str

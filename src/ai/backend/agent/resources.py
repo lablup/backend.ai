@@ -48,6 +48,7 @@ from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
+from .types import AcceleratorMetadata
 from .types import Container as SessionContainer
 from .types import MountInfo
 
@@ -257,6 +258,14 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]
+
+    @abstractmethod
+    async def get_metadata(self) -> AcceleratorMetadata:
+        """
+        Return human-readable information of the accelerator managed
+        by the plugin.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
