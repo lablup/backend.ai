@@ -93,13 +93,26 @@ class BaseRunner(metaclass=ABCMeta):
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
     default_runtime_path: ClassVar[Optional[str]] = None
-    default_child_env: ClassVar[MutableMapping[str, str]] = {
+    default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
-        "SHELL": "/bin/sh",
+        "SHELL": "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash",
         "HOME": "/home/work",
+        "TERM": "xterm",
         "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
         "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
+        "SSH_AUTH_SOCK": os.environ.get("SSH_AUTH_SOCK", ""),
+        "SSH_AGENT_PID": os.environ.get("SSH_AGENT_PID", ""),
     }
+    default_child_env_path = ":".join(
+        [
+            "/usr/local/sbin",
+            "/usr/local/bin",
+            "/usr/sbin",
+            "/usr/bin",
+            "/sbin",
+            "/bin",
+        ]
+    )
     jupyter_kspec_name: ClassVar[str] = ""
     kernel_mgr: Optional[AsyncKernelManager] = None
     kernel_client: Optional[AsyncKernelClient] = None
@@ -121,12 +134,9 @@ class BaseRunner(metaclass=ABCMeta):
     def __init__(self, runtime_path: Path) -> None:
         self.subproc = None
         self.runtime_path = runtime_path
-
-        default_child_env_path = self.default_child_env.pop("PATH", None)
-        self.child_env = {**os.environ, **self.default_child_env}
-        if default_child_env_path is not None and "PATH" not in self.child_env:
+        if "PATH" not in self.child_env:
             # set the default PATH env-var only when it's missing from the image
-            self.child_env["PATH"] = default_child_env_path
+            self.child_env["PATH"] = self.default_child_env_path
         config_dir = Path("/home/config")
         try:
             evdata = (config_dir / "environ.txt").read_text()
@@ -139,9 +149,13 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception:
             log.exception("Reading /home/config/environ.txt failed!")
 
-        # Add ~/.local/bin to the default PATH
-        self.child_env["PATH"] += os.pathsep + "~/.local/bin"
-        os.environ["PATH"] += os.pathsep + "~/.local/bin"
+        path_env = self.child_env["PATH"]
+        if Path("/usr/local/cuda/bin").is_dir():
+            path_env = promote_path(path_env, "/usr/local/cuda/bin")
+        if Path("/usr/local/nvidia/bin").is_dir():
+            path_env = promote_path(path_env, "/usr/local/nvidia/bin")
+        path_env = promote_path(path_env, "/home/work/.local.bin")
+        self.child_env["PATH"] = path_env
 
         self.started_at: float = time.monotonic()
         self.services_running = {}

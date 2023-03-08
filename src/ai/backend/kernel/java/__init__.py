@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 from .. import BaseRunner
+from ..base import promote_path
 
 log = logging.getLogger()
 
@@ -25,23 +26,13 @@ DEFAULT_JFLAGS = [
 class Runner(BaseRunner):
     log_prefix = "java-kernel"
     default_runtime_path = "/usr/lib/jvm/java-1.8-openjdk/bin/java"
-    default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/ash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": (
-            "/usr/lib/jvm/java-1.8-openjdk/jre/bin:"
-            "/usr/lib/jvm/java-1.8-openjdk/bin:/usr/local/sbin:"
-            "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        ),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        path_env = self.child_env["PATH"]
+        path_env = promote_path(path_env, "/usr/lib/jvm/java-1.8-openjdk/jre/bin")
+        path_env = promote_path(path_env, "/usr/lib/jvm/java-1.8-openjdk/bin")
+        self.child_env["PATH"] = path_env
 
     def _code_for_user_input_server(self, code: str) -> str:
         # TODO: More elegant way of not touching user code? This method does not work

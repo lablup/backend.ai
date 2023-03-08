@@ -20,27 +20,8 @@ class Runner(BaseRunner):
     log_prefix = "python-kernel"
     default_runtime_path = "/usr/bin/python"
     default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": os.environ.get(
-            "PATH",
-            ":".join(
-                [
-                    "/usr/local/sbin",
-                    "/usr/local/bin",
-                    "/usr/sbin",
-                    "/usr/bin",
-                    "/sbin",
-                    "/bin",
-                ]
-            ),
-        ),
+        **BaseRunner.default_child_env,
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
     }
     jupyter_kspec_name = "python"
 
@@ -68,10 +49,6 @@ class Runner(BaseRunner):
         stdout, _ = await proc.communicate()
         user_site = stdout.decode("utf8").strip()
         self.child_env["PYTHONPATH"] = promote_path(self.child_env["PYTHONPATH"], user_site)
-        path_env = self.child_env["PATH"]
-        path_env = promote_path(path_env, "/usr/local/nvidia/bin")
-        path_env = promote_path(path_env, "/usr/local/cuda/bin")
-        self.child_env["PATH"] = path_env
 
         # Add support for interactive input in batch mode by copying
         # sitecustomize.py to USER_SITE of runtime python.
