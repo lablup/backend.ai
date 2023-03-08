@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 from .. import BaseRunner
-from ..base import promote_path
+from ..base import glob_path, promote_path
 
 log = logging.getLogger()
 
@@ -25,13 +25,13 @@ DEFAULT_JFLAGS = [
 
 class Runner(BaseRunner):
     log_prefix = "java-kernel"
-    default_runtime_path = "/usr/lib/jvm/java-1.8-openjdk/bin/java"
+    default_runtime_path = os.fsdecode(glob_path("/usr/lib/jvm", "java-*/bin/java") or "/usr/bin")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         path_env = self.child_env["PATH"]
-        path_env = promote_path(path_env, "/usr/lib/jvm/java-1.8-openjdk/jre/bin")
-        path_env = promote_path(path_env, "/usr/lib/jvm/java-1.8-openjdk/bin")
+        path_env = promote_path(path_env, glob_path("/usr/lib/jvm", "java-*/jre/bin"))
+        path_env = promote_path(path_env, glob_path("/usr/lib/jvm", "java-*/bin"))
         self.child_env["PATH"] = path_env
 
     def _code_for_user_input_server(self, code: str) -> str:
