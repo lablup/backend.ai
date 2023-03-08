@@ -104,7 +104,6 @@ class BaseRunner(metaclass=ABCMeta):
     default_runtime_path: ClassVar[Optional[str]] = None
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
-        "SHELL": "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash",
         "HOME": "/home/work",
         "TERM": "xterm",
         "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
@@ -122,6 +121,7 @@ class BaseRunner(metaclass=ABCMeta):
             "/bin",
         ]
     )
+    default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
     kernel_mgr: Optional[AsyncKernelManager] = None
     kernel_client: Optional[AsyncKernelClient] = None
@@ -144,9 +144,11 @@ class BaseRunner(metaclass=ABCMeta):
         self.subproc = None
         self.runtime_path = runtime_path
         self.child_env = {**os.environ, **self.default_child_env}
+        # set some defaults only when they are missing from the image
         if "PATH" not in self.child_env:
-            # set the default PATH env-var only when it's missing from the image
             self.child_env["PATH"] = self.default_child_env_path
+        if "SHELL" not in self.child_env:
+            self.child_env["SHELL"] = self.default_child_env_shell
         config_dir = Path("/home/config")
         try:
             evdata = (config_dir / "environ.txt").read_text()
