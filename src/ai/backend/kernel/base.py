@@ -143,6 +143,7 @@ class BaseRunner(metaclass=ABCMeta):
     def __init__(self, runtime_path: Path) -> None:
         self.subproc = None
         self.runtime_path = runtime_path
+        self.child_env = {**os.environ, **self.default_child_env}
         if "PATH" not in self.child_env:
             # set the default PATH env-var only when it's missing from the image
             self.child_env["PATH"] = self.default_child_env_path
