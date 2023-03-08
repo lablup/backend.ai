@@ -5,7 +5,7 @@ import time
 from decimal import Decimal
 from typing import Final, Iterable, Tuple
 
-import attr
+import attrs
 from aiohttp import web
 from aiotools import apartial
 
@@ -18,7 +18,7 @@ from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _time_prec: Final = Decimal("1e-3")  # msec
 _rlim_window: Final = 60 * 15
@@ -84,7 +84,7 @@ async def rlim_middleware(
         return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     redis_rlim: RedisConnectionInfo
     redis_rlim_script: str

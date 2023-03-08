@@ -1,10 +1,4 @@
-{%- if top_line -%}
-{{ top_line }}
-{%- elif versiondata.name -%}
-{{ versiondata.name }} {{ versiondata.version }} ({{ versiondata.date }})
-{%- else -%}
-{{ versiondata.version }} ({{ versiondata.date }})
-{%- endif -%}
+## {{ versiondata.version }} ({{ versiondata.date }})
 {%- for section, _ in sections.items() -%}
   {%- if section -%}
 ### {{ section }}{%- endif -%}

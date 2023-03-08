@@ -18,11 +18,9 @@ class BackendInputStream extends InputStream {
         File f = new File(scriptPath);
         if (!f.exists()) {
             String s = "import socket\n\n"
-                     + "host = '127.0.0.1'\n"
-                     + "port = 65000\n\n"
                      + "with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sk:\n"
                      + "  try:\n"
-                     + "    sk.connect((host, port))\n"
+                     + "    sk.connect('/tmp/bai-user-input.sock')\n"
                      + "    userdata = sk.recv(1024)\n"
                      + "  except ConnectRefusedError:\n"
                      + "    userdata = b'<user-input-unavailable>'\n"

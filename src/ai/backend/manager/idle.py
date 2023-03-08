@@ -41,6 +41,7 @@ from ai.backend.common.events import (
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
+    KernelLifecycleEventReason,
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
@@ -60,7 +61,7 @@ if TYPE_CHECKING:
     from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.idle"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class AppStreamingStatus(enum.Enum):
@@ -74,7 +75,6 @@ class ThresholdOperator(enum.Enum):
 
 
 class IdleCheckerHost:
-
     check_interval: ClassVar[float] = 15.0
 
     def __init__(
@@ -187,8 +187,17 @@ class IdleCheckerHost:
                             checker.name,
                             session["id"],
                         )
+                        if isinstance(checker, TimeoutIdleChecker):
+                            terminate_reason = KernelLifecycleEventReason.IDLE_TIMEOUT
+                        elif isinstance(checker, SessionLifetimeChecker):
+                            terminate_reason = KernelLifecycleEventReason.IDLE_SESSION_LIFETIME
+                        elif isinstance(checker, UtilizationIdleChecker):
+                            terminate_reason = KernelLifecycleEventReason.IDLE_UTILIZATION
                         await self._event_producer.produce_event(
-                            DoTerminateSessionEvent(session["id"], f"idle-{checker.name}"),
+                            DoTerminateSessionEvent(
+                                session["id"],
+                                terminate_reason,
+                            ),
                         )
                         # If any one of checkers decided to terminate the session,
                         # we can skip over remaining checkers.
@@ -196,7 +205,6 @@ class IdleCheckerHost:
 
 
 class BaseIdleChecker(metaclass=ABCMeta):
-
     name: ClassVar[str] = "base"
 
     def __init__(
@@ -376,7 +384,6 @@ class TimeoutIdleChecker(BaseIdleChecker):
 
 
 class SessionLifetimeChecker(BaseIdleChecker):
-
     name: ClassVar[str] = "session_lifetime"
 
     async def populate_config(self, config: Mapping[str, Any]) -> None:

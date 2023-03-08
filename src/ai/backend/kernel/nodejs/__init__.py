@@ -9,7 +9,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "nodejs-kernel"
     default_runtime_path = "/usr/bin/local/node"
     default_child_env = {

@@ -8,7 +8,7 @@
 # https://github.com/actions/labeler
 
 name: Labeler
-on: [pull_request]
+on: [pull_request_target]
 
 jobs:
   label:
@@ -19,6 +19,6 @@ jobs:
       pull-requests: write
 
     steps:
-    - uses: actions/labeler@v4
+    - uses: jsoref/labeler@v0-5.0.0
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"

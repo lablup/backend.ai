@@ -8,6 +8,9 @@ from ai.backend.common.types import BinarySize
 from ai.backend.storage.vfs import BaseVolume, run
 from ai.backend.storage.xfs import XfsVolume
 
+# module-level marker
+pytestmark = pytest.mark.integration
+
 
 def read_etc_projid():
     with open("/etc/projid") as fp:

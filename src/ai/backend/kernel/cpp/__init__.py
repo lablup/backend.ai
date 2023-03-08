@@ -12,7 +12,6 @@ DEFAULT_LDFLAGS = ["-lrt", "-lm", "-lpthread", "-ldl"]
 
 
 class Runner(BaseRunner):
-
     log_prefix = "cpp-kernel"
     default_runtime_path = "/usr/bin/g++"
     default_child_env = {

@@ -21,7 +21,7 @@ from typing import (
 from uuid import UUID
 
 import aiohttp
-import attr
+import attrs
 import graphene
 import yarl
 
@@ -42,10 +42,10 @@ __all__ = (
     "StorageVolume",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class StorageProxyInfo:
     session: aiohttp.ClientSession
     secret: str
@@ -67,7 +67,6 @@ class VolumeInfo(TypedDict):
 
 
 class StorageSessionManager:
-
     _proxies: Mapping[str, StorageProxyInfo]
 
     def __init__(self, storage_config: Mapping[str, Any]) -> None:

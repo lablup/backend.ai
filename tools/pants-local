@@ -8,15 +8,6 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-if [ -f '.pants.env' ]; then
-  source .pants.env
-fi
-if [ -z "$PY" ]; then
-  echo "The Python version for source-built Pants is not configured in ./.pants.env"
-  exit 1
-else
-  export PY=$PY
-fi
 PANTS_SOURCE="${PANTS_SOURCE:-$(pwd)/tools/pants-src}"
 
 # When running pants from sources you are likely to be modifying those sources, so

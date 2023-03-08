@@ -47,6 +47,7 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
 from ai.backend.common import config
@@ -104,7 +105,6 @@ _mock_config_iv = t.Dict(
 
 
 class CUDAPlugin(AbstractComputePlugin):
-
     config_watch_enabled = False
 
     key = DeviceName("cuda")
@@ -245,7 +245,7 @@ class CUDAPlugin(AbstractComputePlugin):
                 device_id = DeviceId(dev_info["mother_uuid"])
             all_devices.append(
                 CUDADevice(
-                    device_id=device_id,
+                    device_id=DeviceId(device_id),
                     hw_location=f"0000:99:{idx:02d}.0",
                     mother_uuid=dev_info["mother_uuid"],
                     numa_node=dev_info["numa_node"],
@@ -471,6 +471,11 @@ class CUDAPlugin(AbstractComputePlugin):
             ),
         ]
 
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
+
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         if self._mode == AllocationModes.DISCRETE:
@@ -620,7 +625,10 @@ class CUDAPlugin(AbstractComputePlugin):
             for slot_name, _ in self.slot_types:
                 alloc_map.apply_allocation(
                     {
-                        slot_name: resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                        slot_name: resource_spec.allocations.get(
+                            DeviceName("cuda"),
+                            {},
+                        ).get(
                             slot_name,
                             {
                                 dev_id: Decimal(0)
@@ -633,14 +641,20 @@ class CUDAPlugin(AbstractComputePlugin):
         else:  # older agents without lablup/backend.ai-agent#180
             if self._mode == AllocationModes.DISCRETE:
                 alloc_map.allocations[SlotName("cuda.device")].update(
-                    resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                    resource_spec.allocations.get(
+                        DeviceName("cuda"),
+                        {},
+                    ).get(
                         SlotName("cuda.device"),
                         {},
                     ),
                 )
             elif self._mode == AllocationModes.FRACTIONAL:
                 alloc_map.allocations[SlotName("cuda.shares")].update(
-                    resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                    resource_spec.allocations.get(
+                        DeviceName("cuda"),
+                        {},
+                    ).get(
                         SlotName("cuda.shares"),
                         {},
                     ),

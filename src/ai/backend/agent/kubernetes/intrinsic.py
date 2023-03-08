@@ -15,6 +15,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
 
 from .. import __version__
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -23,11 +24,11 @@ from ..resources import (
     DiscretePropertyAllocMap,
     MountInfo,
 )
-from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
+from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -143,6 +144,11 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[ContainerMeasurement]:
         # TODO: Implement Kubernetes-specific container metric collection
 
+        return []
+
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
         return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:
@@ -287,9 +293,15 @@ class MemoryPlugin(AbstractComputePlugin):
         # TODO: Implement Kubernetes-specific container metric collection
         return []
 
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
+
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
