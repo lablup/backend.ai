@@ -5,7 +5,7 @@ import logging
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, List, Mapping, NamedTuple, Optional, Sequence
 
 import aiohttp
 import aiotools
@@ -299,12 +299,12 @@ def verify_vfolder_name(folder: str) -> bool:
 
 async def _fetch_entry(
     conn: SAConnection,
-    _query,
+    _query: sa.sql.Select,
     *,
-    extra_vf_conds,
-    extra_vf_user_conds,
-    is_owner=True,
-    shared_type_func=None,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression],
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression],
+    is_owner: bool = True,
+    shared_type_func: Optional[Callable] = None,
 ):
     entries = []
     if shared_type_func is None:
@@ -352,8 +352,8 @@ async def _override_permission(
     entries: List[Mapping[str, Any]],
     user_uuid: uuid.UUID,
     group_ids: List[uuid.UUID],
-    extra_vf_conds,
-    extra_vf_user_conds,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression],
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression],
 ) -> List[Mapping[str, Any]]:
     # Override permissions, if exists, for group vfolders.
     j = sa.join(
@@ -392,8 +392,8 @@ async def _override_permission(
 async def _query_own_vfolder(
     conn: SAConnection,
     user_uuid: uuid.UUID,
-    extra_vf_conds,
-    extra_vf_user_conds,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression],
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression],
 ) -> List[Mapping[str, Any]]:
     from ai.backend.manager.models import users
 
@@ -464,9 +464,9 @@ async def _query_own_vfolder(
 async def _query_suadmin_vfolder(
     conn: SAConnection,
     user_uuid: uuid.UUID,
-    extra_vf_conds,
-    extra_vf_user_conds,
-    allowed_vfolder_types,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression],
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression],
+    allowed_vfolder_types: Sequence[str],
 ) -> List[Mapping[str, Any]]:
     from ai.backend.manager.models import association_groups_users as agus
     from ai.backend.manager.models import groups, users
@@ -509,12 +509,15 @@ async def _query_suadmin_vfolder(
 async def _query_admin_vfolder(
     conn: SAConnection,
     user_uuid: uuid.UUID,
-    domain_name,
-    extra_vf_conds,
-    extra_vf_user_conds,
-    allowed_vfolder_types,
+    domain_name: Optional[str],
+    extra_vf_conds: Optional[sa.sql.BinaryExpression],
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression],
+    allowed_vfolder_types: Sequence[str],
 ) -> List[Mapping[str, Any]]:
     from ai.backend.manager.models import groups
+
+    if domain_name is None:
+        raise InvalidAPIParameters("To fetch admin's vfolders, domain name should not be None.")
 
     entries: List[Mapping[str, Any]] = []
     if "user" in allowed_vfolder_types:
@@ -556,9 +559,9 @@ async def _query_admin_vfolder(
 async def _query_user_vfolder(
     conn: SAConnection,
     user_uuid: uuid.UUID,
-    extra_vf_conds,
-    extra_vf_user_conds,
-    allowed_vfolder_types,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression],
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression],
+    allowed_vfolder_types: Sequence[str],
 ) -> List[Mapping[str, Any]]:
     from ai.backend.manager.models import association_groups_users as agus
     from ai.backend.manager.models import groups, users
@@ -605,14 +608,14 @@ async def query_accessible_vfolders(
     user_uuid: uuid.UUID,
     *,
     # when enabled, skip vfolder ownership check if user role is admin or superadmin
-    allow_privileged_access=False,
-    user_role=None,
-    domain_name=None,
-    allowed_vfolder_types=None,
-    extra_vf_conds=None,
-    extra_invited_vf_conds=None,
-    extra_vf_user_conds=None,
-    extra_vf_group_conds=None,
+    allow_privileged_access: bool = False,
+    user_role: Optional[UserRole] = None,
+    domain_name: Optional[str] = None,
+    allowed_vfolder_types: Optional[Sequence[str]] = None,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_invited_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_user_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_group_conds: Optional[sa.sql.BinaryExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     if allowed_vfolder_types is None:
         allowed_vfolder_types = ["user"]  # legacy default
@@ -800,7 +803,7 @@ async def prepare_vfolder_mounts(
     accessible_vfolders = await query_accessible_vfolders(
         conn,
         user_scope.user_uuid,
-        user_role=user_scope.user_role,
+        user_role=UserRole(user_scope.user_role),
         domain_name=user_scope.domain_name,
         allowed_vfolder_types=allowed_vfolder_types,
         extra_vf_conds=extra_vf_conds,
