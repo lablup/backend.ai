@@ -80,7 +80,6 @@ class CUDADevice(AbstractComputeDevice):
 
 
 class CUDAPlugin(AbstractComputePlugin):
-
     config_watch_enabled = False
 
     key = DeviceName("cuda")
@@ -442,7 +441,10 @@ class CUDAPlugin(AbstractComputePlugin):
             )
         else:
             alloc_map.allocations[SlotName("cuda.device")].update(
-                resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                resource_spec.allocations.get(
+                    DeviceName("cuda"),
+                    {},
+                ).get(
                     SlotName("cuda.device"),
                     {},
                 ),

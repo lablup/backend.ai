@@ -9,7 +9,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "lua-kernel"
     default_runtime_path = "/usr/local/bin/lua"
     default_child_env = {

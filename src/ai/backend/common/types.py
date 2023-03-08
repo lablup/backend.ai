@@ -564,7 +564,6 @@ class BinarySize(int):
 
 
 class ResourceSlot(UserDict):
-
     __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:

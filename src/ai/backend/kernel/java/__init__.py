@@ -23,7 +23,6 @@ DEFAULT_JFLAGS = [
 
 
 class Runner(BaseRunner):
-
     log_prefix = "java-kernel"
     default_runtime_path = "/usr/lib/jvm/java-1.8-openjdk/bin/java"
     default_child_env = {

@@ -272,7 +272,6 @@ class Metric:
 
 
 class StatContext:
-
     agent: "AbstractAgent"
     mode: StatModes
     node_metrics: Mapping[MetricKey, Metric]

@@ -9,7 +9,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "octave-kernel"
     default_runtime_path = "/usr/bin/octave-cli"
     default_child_env = {

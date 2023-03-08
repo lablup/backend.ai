@@ -621,7 +621,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ):
             rollback_functions: List[Optional[functools.partial]] = []
 
-            for (rollup_function, future_rollback_function) in functions:
+            for rollup_function, future_rollback_function in functions:
                 try:
                     if rollup_function:
                         await rollup_function()
