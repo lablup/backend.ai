@@ -288,8 +288,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             starts_at = datetime.now(tzutc()) + _td
 
     # TODO: consider clustered inference session
-    # if params["cluster_size"] > 1:
-    #     log.debug(" -> cluster_mode:{} (replicate)", params["cluster_mode"])
+    if params["cluster_size"] > 1:
+        log.debug(" -> cluster_mode:{} (replicate)", params["cluster_mode"])
 
     session_creation_id = secrets.token_urlsafe(16)
 
