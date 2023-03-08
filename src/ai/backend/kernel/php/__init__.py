@@ -9,7 +9,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "php-kernel"
     default_runtime_path = "/usr/bin/php"
     default_child_env = {

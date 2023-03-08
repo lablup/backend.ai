@@ -160,7 +160,6 @@ _read_only_txn_opts = {
 
 class PeerInvoker(Peer):
     class _CallStub:
-
         _cached_funcs: Dict[str, Callable]
         order_key: ContextVar[Optional[str]]
 
@@ -303,7 +302,6 @@ class AgentRegistry:
             return row
 
     async def enumerate_instances(self, check_shadow=True):
-
         async with self.db.begin_readonly() as conn:
             query = sa.select("*").select_from(agents)
             if check_shadow:
@@ -367,7 +365,6 @@ class AgentRegistry:
         dependency_sessions: Sequence[SessionId] = None,
         callback_url: URL = None,
     ) -> SessionId:
-
         session_id = SessionId(uuid.uuid4())
 
         kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -386,7 +383,6 @@ class AgentRegistry:
             )
 
         async with self.db.begin_readonly() as conn:
-
             checked_scaling_group = await check_scaling_group(
                 conn,
                 scaling_group,
@@ -1627,7 +1623,6 @@ class AgentRegistry:
             session_id,
             set_error=True,
         ):
-
             async with self.db.begin_readonly_session() as db_sess:
                 query = (
                     sa.select(SessionRow)
@@ -2297,7 +2292,6 @@ class AgentRegistry:
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
         async with self.heartbeat_lock:
-
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking

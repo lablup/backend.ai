@@ -550,7 +550,6 @@ class TimeDuration(t.Trafaret):
 
 
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
-
     _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
     def __init__(
@@ -592,7 +591,6 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
 if jwt_available:
 
     class JsonWebToken(t.Trafaret):
-
         default_algorithms = ["HS256"]
 
         def __init__(
@@ -617,7 +615,6 @@ if jwt_available:
 
 
 class URL(t.Trafaret):
-
     rx_scheme = re.compile(r"^[-a-z0-9]+://")
 
     def __init__(

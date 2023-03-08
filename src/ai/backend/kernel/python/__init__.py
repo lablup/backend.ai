@@ -17,7 +17,6 @@ DEFAULT_PYFLAGS: List[str] = []
 
 
 class Runner(BaseRunner):
-
     log_prefix = "python-kernel"
     default_runtime_path = "/usr/bin/python"
     default_child_env = {

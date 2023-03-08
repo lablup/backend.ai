@@ -7,7 +7,6 @@ import aiohttp
 
 
 class NetAppClient:
-
     endpoint: str
     user: str
     password: str

@@ -46,7 +46,6 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
 
 
 class FileLock(AbstractDistributedLock):
-
     default_timeout: float = 3  # not allow infinite timeout for safety
 
     _file: IOBase | None
@@ -145,7 +144,6 @@ class FileLock(AbstractDistributedLock):
 
 
 class EtcdLock(AbstractDistributedLock):
-
     _con_mgr: Optional[EtcdConnectionManager]
     _debug: bool
 
@@ -194,7 +192,6 @@ class EtcdLock(AbstractDistributedLock):
 
 
 class RedisLock(AbstractDistributedLock):
-
     debug: bool
     _redis: Redis
     _timeout: Optional[float]

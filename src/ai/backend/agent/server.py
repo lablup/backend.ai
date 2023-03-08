@@ -139,7 +139,6 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-
     functions: Set[str]
 
     def __init__(self) -> None:
@@ -810,7 +809,6 @@ def main(
     log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
-
     # Delete this part when you remove --debug option
     if debug:
         click.echo("Please use --log-level options instead")
@@ -885,7 +883,6 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
