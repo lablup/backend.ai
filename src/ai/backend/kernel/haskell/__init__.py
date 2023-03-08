@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from .. import BaseRunner
-from ..base import promote_path
+from ..base import glob_path, promote_path
 
 log = logging.getLogger()
 
@@ -16,10 +16,10 @@ class Runner(BaseRunner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         path_env = self.child_env["PATH"]
-        path_env = promote_path(path_env, "/opt/happy/1.19.5/bin")
-        path_env = promote_path(path_env, "/opt/alex/3.1.7/bin")
-        path_env = promote_path(path_env, "/opt/cabal/2.0/bin")
-        path_env = promote_path(path_env, "/opt/ghc/8.2.1/bin")
+        path_env = promote_path(path_env, glob_path("/opt/happy", "*/bin"))
+        path_env = promote_path(path_env, glob_path("/opt/alex", "*/bin"))
+        path_env = promote_path(path_env, glob_path("/opt/cabal", "*/bin"))
+        path_env = promote_path(path_env, glob_path("/opt/ghc", "*/bin"))
         path_env = promote_path(path_env, "/home/work/.cabal/bin")
         self.child_env["PATH"] = path_env
 

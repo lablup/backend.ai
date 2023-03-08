@@ -80,7 +80,16 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
         pass
 
 
-def promote_path(path_env: str, path_to_promote: Union[Path, str]) -> str:
+def glob_path(base: Path | str, pattern: str) -> Path | None:
+    paths = [*Path(base).glob(pattern)]
+    if paths:
+        return paths[0]
+    return None
+
+
+def promote_path(path_env: str, path_to_promote: Path | str | None) -> str:
+    if not path_to_promote:
+        return path_env
     paths = path_env.split(":")
     path_to_promote = os.fsdecode(path_to_promote)
     result_paths = [p for p in paths if path_to_promote != p]
