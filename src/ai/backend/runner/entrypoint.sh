@@ -102,13 +102,7 @@ else
 
   # Start ssh-agent if it is available
   if command -v ssh-agent > /dev/null; then
-    SSH_ENV_PATH="/home/work/ssh-agent.env"
-
-    /opt/kernel/su-exec $USER_ID:$GROUP_ID ssh-agent > $SSH_ENV_PATH
-    chmod +x $SSH_ENV_PATH
-    . $SSH_ENV_PATH
-    rm $SSH_ENV_PATH
-
+    eval "$(/opt/kernel/su-exec $USER_ID:$GROUP_ID ssh-agent)"
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 
