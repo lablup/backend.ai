@@ -154,7 +154,7 @@ class BaseRunner(metaclass=ABCMeta):
             path_env = promote_path(path_env, "/usr/local/cuda/bin")
         if Path("/usr/local/nvidia/bin").is_dir():
             path_env = promote_path(path_env, "/usr/local/nvidia/bin")
-        path_env = promote_path(path_env, "/home/work/.local.bin")
+        path_env = promote_path(path_env, "/home/work/.local/bin")
         self.child_env["PATH"] = path_env
 
         self.started_at: float = time.monotonic()
