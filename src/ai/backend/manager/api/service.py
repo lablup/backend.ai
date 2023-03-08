@@ -10,7 +10,7 @@ import aiotools
 import attrs
 import sqlalchemy as sa
 import trafaret as t
-from aiohttp import web
+from aiohttp import ClientSession, web
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 
@@ -198,10 +198,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
         requested_image_ref = image_row.image_ref
         parsed_labels: dict[str, Any] = validate_image_labels(image_row.labels)
         model_mount_path = parsed_labels["ai.backend.model-path"]
-        service_ports: dict[str, ServicePort] = {
-            item["name"]: item for item in parsed_labels["ai.backend.service-ports"]
-        }
-        endpoints: Sequence[str] = parsed_labels["ai.backend.endpoint-ports"]
+        # service_ports: dict[str, ServicePort] = {
+        #     item["name"]: item for item in parsed_labels["ai.backend.service-ports"]
+        # }
+        # endpoints: Sequence[str] = parsed_labels["ai.backend.endpoint-ports"]
         # TODO: use endpoints & service_ports to populate the routing table
         async with root_ctx.db.begin_readonly_session() as db_sess:
             query = sa.select([domains.c.allowed_docker_registries]).where(
@@ -471,18 +471,22 @@ async def invoke(request: web.Request, params: Any) -> web.StreamResponse:
     # TODO: get the first attached endpoint and routing info
     #       If force_route is given, use that route.
     async with root_ctx.db.begin_readonly_session() as db_session:
-        endpoint_row = await db_session.get(EndpointRow, endpoint_id)
+        endpoint_row: EndpointRow = await db_session.get(EndpointRow, uuid.UUID(endpoint_id))
         if endpoint_row is None:
             raise EndpointNotFound()
+        url: str = endpoint_row.url
         if force_route is not None:
             routing = await RoutingRow.get(db_session, force_route)
         else:
             query = sa.select(RoutingRow).where(RoutingRow.endpoint_id == endpoint_id)
             routing = (await db_session.scalars(query)).first()
+        endpoint_port = routing.session_endpoint_port
 
     # TODO: make a direct HTTP request to the container's endpoint port.
-    response = web.StreamResponse(status=200)
-    return response
+    async with ClientSession() as session:
+        async with session.get(f"{url}:{endpoint_port}") as resp:
+            status = resp.status
+    return web.Response(status=status)
 
 
 @auth_required
