@@ -73,6 +73,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
+    CommitStatus,
     DeviceId,
     HardwareMetadata,
     KernelEnqueueingConfig,
@@ -2718,18 +2719,21 @@ class AgentRegistry:
         self,
         session: SessionRow,
     ) -> Mapping[str, str]:
-        kernel: KernelRow = session.main_kernel
-        if kernel.status != KernelStatus.RUNNING:
-            return {"status": "", "kernel": str(kernel.id)}
-        email = await self._get_user_email(kernel)
-        async with handle_session_exception(self.db, "commit_session", session.id):
-            async with RPCContext(
-                kernel.agent,
-                kernel.agent_addr,
-                invoke_timeout=None,
-                keepalive_timeout=self.rpc_keepalive_timeout,
-            ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel.id), email)
+        hash_name = "kernel_commit_status"
+        result: Mapping[bytes, bytes] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.hgetall(hash_name),
+        )
+        commit_status_map: Mapping[str, str] = {
+            str(k, "utf-8"): str(v, "utf-8") for k, v in result.items()
+        }
+        kern_id = str(session.main_kernel.id)
+        if commit_status_map is None:
+            return {"kernel": kern_id, "status": CommitStatus.READY.value}
+        return {
+            "kernel": kern_id,
+            "status": commit_status_map.get(kern_id, CommitStatus.READY.value),
+        }
 
     async def commit_session(
         self,
