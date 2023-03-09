@@ -2347,7 +2347,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         if "user" not in allowed_vfolder_types:
             raise InvalidAPIParameters("user vfolder cannot be created in this host")
 
-    task_id, trg_folder_id = await initiate_vfolder_clone(
+    task_id, target_folder_id = await initiate_vfolder_clone(
         root_ctx.db,
         VFolderCloneInfo(
             source_folder_id,
@@ -2366,7 +2366,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
     # Return the information about the destination vfolder.
     resp = {
-        "id": trg_folder_id.hex,
+        "id": target_folder_id.hex,
         "name": params["target_name"],
         "host": target_folder_host,
         "usage_mode": params["usage_mode"].value,
