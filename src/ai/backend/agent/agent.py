@@ -1252,16 +1252,9 @@ class AbstractAgent(
 
             hash_name = "abuse_report"
             abuse_report_script = textwrap.dedent(
-                f"""
-                local key = '{hash_name}'
-                local new_report = {{}}
-
-                -- Assign abusing report table to new_report
-                if next(KEYS) ~= nil then
-                    for i, v in ipairs(KEYS) do
-                        new_report[v] = ARGV[i]
-                    end
-                end
+                """
+                local key = KEYS[1]
+                local new_report = loadstring(ARGV[1])()
 
                 -- Delete dangling reports
                 local all_report = redis.call('HKEYS', key)
@@ -1281,12 +1274,15 @@ class AbstractAgent(
                 end
             """
             )
+            string_parsed_map: str = (
+                "return {" + ",".join([f"{k}='{v}'" for k, v in abuse_report.items()]) + "}"
+            )
             await redis_helper.execute_script(
                 self.redis_stat_pool,
                 "report_abusing_kernels",
                 abuse_report_script,
-                [*abuse_report.keys()],
-                [*abuse_report.values()],
+                [hash_name],
+                [string_parsed_map],
             )
 
     @abstractmethod
