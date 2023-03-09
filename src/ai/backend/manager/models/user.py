@@ -131,7 +131,7 @@ users = sa.Table(
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
     sa.Column("totp_key", sa.String(length=32)),
-    sa.Column("totp_activated", sa.Boolean),
+    sa.Column("totp_activated", sa.Boolean, server_default=sa.false(), default=False),
     sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
 )
 
@@ -481,6 +481,7 @@ class UserInput(graphene.InputObjectType):
     role = graphene.String(required=False, default=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
+    totp_activated = graphene.Boolean(required=False, default=False)
 
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
@@ -498,6 +499,7 @@ class ModifyUserInput(graphene.InputObjectType):
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
+    totp_activated = graphene.Boolean(required=False, default=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -541,6 +543,7 @@ class CreateUser(graphene.Mutation):
             "domain_name": props.domain_name,
             "role": UserRole(props.role),
             "allowed_client_ip": props.allowed_client_ip,
+            "totp_activated": props.totp_activated,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -628,6 +631,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "domain_name")
         set_if_set(props, data, "role", clean_func=UserRole)
         set_if_set(props, data, "allowed_client_ip")
+        set_if_set(props, data, "totp_activated")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
