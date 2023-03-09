@@ -134,7 +134,13 @@ def login():
     with Session() as session:
         try:
             result = session.Auth.login(user_id, password)
-            print(result)
+            if (
+                not result["authenticated"]
+                and result.get("data", {}).get("details") == "OTP not provided"
+            ):
+                otp = input("One-time Password: ")
+                result = session.Auth.login(user_id, password, otp=otp.strip())
+
             if not result["authenticated"]:
                 print_fail("Login failed.")
                 sys.exit(ExitCode.FAILURE)
