@@ -728,14 +728,11 @@ class AbstractAgent(
 
         hash_name = "kernel_commit_status"
         commit_status_script = textwrap.dedent(
-            f"""
-            local key = '{hash_name}'
-            local new_statuses = {{}}
-            if next(KEYS) ~= nil then
-                for i, v in ipairs(KEYS) do
-                    new_statuses[v] = ARGV[i]
-                end
-            end
+            """
+            local key = KEYS[1]
+            local new_statuses = loadstring(ARGV[1])()
+
+            -- Delete dangling statuses
             local all_commit_statuses = redis.call('HKEYS', key)
             if all_commit_statuses ~= nil and next(all_commit_statuses) ~= nil then
                 for _, v in ipairs(all_commit_statuses) do
@@ -744,6 +741,8 @@ class AbstractAgent(
                     end
                 end
             end
+
+            -- Update new statuses
             if next(new_statuses) ~= nil then
                 for kern_id, status in pairs(new_statuses) do
                     redis.call('HSET', key, kern_id, status)
@@ -751,12 +750,15 @@ class AbstractAgent(
             end
         """
         )
+        string_parsed_map: str = (
+            "return {" + ",".join([f"{k}='{v}'" for k, v in status_map.items()]) + "}"
+        )
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
             commit_status_script,
-            [*status_map.keys()],
-            [*status_map.values()],
+            [hash_name],
+            [string_parsed_map],
         )
 
     async def heartbeat(self, interval: float):
