@@ -1,20 +1,24 @@
 [general]
 #apiEndpoint = "http://127.0.0.1:8080"
 #apiEndpointText = "TEST"
-defaultSessionEnvironment = "cr.backend.ai/stable/python"
-#defaultSessionEnvironment = "cr.backend.ai/testing/python"
-siteDescription = "macOS"
+#defaultSessionEnvironment = "cr.backend.ai/stable/python"
+defaultSessionEnvironment = "cr.backend.ai/testing/python"
+#defaultSessionEnvironment = "cr.backend.ai/testing/wandb"
+siteDescription = "WebUI"
 connectionMode = "SESSION"
 #connectionMode = "API"
 allowChangeSigninMode = true
 signupSupport = true
 allowProjectResourceMonitor = true
-debug = true
+debug = false
 allowAnonymousChangePassword = true
 autoLogout = true
+#defaultImportEnvironment = "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
 defaultImportEnvironment = "cr.backend.ai/stable/python:3.8-ubuntu18.04"
 #defaultImportEnvironment = "cr.backend.ai/testing/julia"
 allowManualImageNameForSession = true
+alwaysEnqueueComputeSession = true
+enableContainerCommit = true
 
 [wsproxy]
 #proxyURL = "https://wsproxy.onprem.backend.ai:9443/"
@@ -23,11 +27,14 @@ proxyURL = "http://127.0.0.1:5050/"
 
 #proxyBaseURL = ""
 
+[server]
+#webServerURL = "https://cloud.backend.ai"
+
 [resources]
 openPortToPublic = false
 maxCPUCoresPerSession = 6
 maxCUDADevicesPerSession = 16
-maxShmPerSession = 1
+maxShmPerContainer = 16
 maxFileUploadSize = 1000000000 # 4GB. 4294967296
 
 [environments]
@@ -38,6 +45,7 @@ maxFileUploadSize = 1000000000 # 4GB. 4294967296
 
 [plugin]
 #login = "signup-cloud.js"
+#page = "saml-login"
 #page = "flash-blade,dgx-system"
 
 [license]

@@ -59,7 +59,7 @@
       "PleaseChangeYourPassword": "Please change your password.",
       "PasswordChangePlace": "Click the person icon on the top bar and go to the \"My Account\" menu.",
       "SetupTotp": "2FA Setup",
-      "TotpActivated": "2FA enabled"
+      "TotpActivated": "2FA Enabled"
     },
     "LOGINREQUIRED": "LOGIN REQUIRED",
     "YouAreOffline": "You are now offline",
