@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.17 (2023-03-09)
+
+### Features
+* Apply the `totp_activated` field in creating/updating user for admins to set the 2FA activation status. ([#1142](https://github.com/lablup/backend.ai/issues/1142))
+
+### Fixes
+* ssh-add not working bug due to permission issue ([#1141](https://github.com/lablup/backend.ai/issues/1141))
+
+
 ## 22.09.16 (2023-03-05)
 
 Now we officially provide a conda-pack zip distribution of the client SDK for Windows users. Check out our GitHub release artifacts.
