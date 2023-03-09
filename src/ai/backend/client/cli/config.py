@@ -134,6 +134,7 @@ def login():
     with Session() as session:
         try:
             result = session.Auth.login(user_id, password)
+            print(result)
             if not result["authenticated"]:
                 print_fail("Login failed.")
                 sys.exit(ExitCode.FAILURE)
