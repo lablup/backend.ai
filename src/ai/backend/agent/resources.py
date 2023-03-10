@@ -29,6 +29,7 @@ import attrs
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -48,7 +49,6 @@ from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
-from .types import AcceleratorMetadata
 from .types import Container as SessionContainer
 from .types import MountInfo
 
@@ -260,7 +260,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     exclusive_slot_types: Set[str]
 
     @abstractmethod
-    async def get_metadata(self) -> AcceleratorMetadata:
+    def get_metadata(self) -> AcceleratorMetadata:
         """
         Return human-readable information of the accelerator managed
         by the plugin.

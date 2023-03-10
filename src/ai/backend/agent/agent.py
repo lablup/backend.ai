@@ -781,6 +781,7 @@ class AbstractAgent(
                 "compute_plugins": {
                     key: {
                         "version": computer.instance.get_version(),
+                        "metadata": computer.instance.get_metadata(),
                         **(await computer.instance.extra_info()),
                     }
                     for key, computer in self.computers.items()
