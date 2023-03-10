@@ -490,6 +490,7 @@ all cached data as necessary.
 
    If you have run ``./pants`` or the installation script with ``sudo``, some of the above directories
    may be owned by root and running ``./pants`` as the user privilege would not work.
+   In such cases, remove the directories with ``sudo`` and retry.
 
 Changing or updating the Python runtime for Pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
