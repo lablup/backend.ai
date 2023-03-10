@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import (
     Any,
     AsyncContextManager,
-    Iterable,
     List,
     Mapping,
     MutableMapping,
@@ -28,7 +27,6 @@ from uuid import UUID
 import aiodocker
 import trafaret as t
 from aiodocker.docker import DockerContainer
-from ifaddr import netifaces
 from typing_extensions import Final
 
 from ai.backend.common import identity
@@ -316,16 +314,3 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
 async def container_pid_to_host_pid(container_id: str, container_pid: ContainerPID) -> HostPID:
     # TODO: implement
     return NotHostPID
-
-
-def fetch_local_ipaddrs(cidr: IPNetwork) -> Iterable[IPAddress]:
-    ifnames = netifaces.interfaces()
-    proto = netifaces.AF_INET if cidr.version == 4 else netifaces.AF_INET6
-    for ifname in ifnames:
-        addrs = netifaces.ifaddresses(ifname).get(proto, None)
-        if addrs is None:
-            continue
-        for entry in addrs:
-            addr = ipaddress.ip_address(entry["addr"])
-            if addr in cidr:
-                yield addr
