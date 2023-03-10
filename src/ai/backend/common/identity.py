@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Awaitable, Callable, Iterable, Optional
 
 import aiodns
-import netifaces
+from ifaddr import netifaces
 
 from .utils import curl
 

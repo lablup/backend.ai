@@ -26,9 +26,9 @@ from typing import (
 from uuid import UUID
 
 import aiodocker
-import netifaces
 import trafaret as t
 from aiodocker.docker import DockerContainer
+from ifaddr import netifaces
 from typing_extensions import Final
 
 from ai.backend.common import identity
