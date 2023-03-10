@@ -952,6 +952,7 @@ class ComputeSession(graphene.ObjectType):
     group_name = graphene.String()
     group_id = graphene.UUID()
     user_email = graphene.String()
+    user_name = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
     created_user_email = graphene.String()
@@ -1009,6 +1010,7 @@ class ComputeSession(graphene.ObjectType):
             "group_name": row["group_name"],
             "group_id": row["group_id"],
             "user_email": row["email"],
+            "user_name": row["username"],
             "user_id": row["user_uuid"],
             "access_key": row["access_key"],
             "created_user_email": None,  # TODO: implement
@@ -1202,6 +1204,7 @@ class ComputeSession(graphene.ObjectType):
                     kernels,
                     groups.c.name.label("group_name"),
                     users.c.email,
+                    users.c.username,
                 ]
             )
             .select_from(j)
@@ -1275,6 +1278,7 @@ class ComputeSession(graphene.ObjectType):
                     kernels,
                     groups.c.name.label("group_name"),
                     users.c.email,
+                    users.c.username,
                 ]
             )
             .select_from(j)
