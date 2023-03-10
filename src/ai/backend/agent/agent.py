@@ -716,8 +716,6 @@ class AbstractAgent(
             for subdir in base_commit_path.iterdir():
                 for commit_path in subdir.glob("./**/lock/*"):
                     kern = commit_path.name
-                    # if kern not in status_map:
-                    #     status_map[kern] = CommitStatus.ONGOING.value
                     if kern not in commit_kernels:
                         commit_kernels.add(kern)
 
