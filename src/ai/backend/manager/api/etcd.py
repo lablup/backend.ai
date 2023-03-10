@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple
 
 import aiohttp_cors
+import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
 from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import AcceleratorMetadata
+from ai.backend.manager.models import agents
 
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -21,11 +24,75 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
+    "cpu": {
+        "slot_name": "cpu",
+        "description": "CPU",
+        "human_readable_name": "CPU",
+        "display_unit": "Core",
+        "number_format": "#,###",
+        "display_icon": "cpu",
+    },
+    "mem": {
+        "slot_name": "ram",
+        "description": "Memory",
+        "human_readable_name": "RAM",
+        "display_unit": "GiB",
+        "number_format": "#,###",
+        "display_icon": "cpu",
+    },
+    "cuda": {
+        "slot_name": "cuda.device",
+        "human_readable_name": "GPU",
+        "description": "CUDA-capable GPU",
+        "display_unit": "GPU",
+        "number_format": "#,###",
+        "display_icon": "gpu1",
+    },
+    "rocm": {
+        "slot_name": "rocm.device",
+        "human_readable_name": "GPU",
+        "description": "ROCm-capable GPU",
+        "display_unit": "GPU",
+        "number_format": "#,###",
+        "display_icon": "gpu2",
+    },
+    "tpu": {
+        "slot_name": "tpu.device",
+        "human_readable_name": "TPU",
+        "description": "TPU device",
+        "display_unit": "GPU",
+        "number_format": "#,###",
+        "display_icon": "tpu",
+    },
+}
+
+
 async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
     known_slots = await root_ctx.shared_config.get_resource_slots()
     return web.json_response(known_slots, status=200)
+
+
+async def get_resource_metadata(request: web.Request) -> web.Response:
+    log.info("ETCD.GET_RESOURCE_METADATA ()")
+    root_ctx: RootContext = request.app["_root.context"]
+    available_slot_metadata: Dict[str, Any] = {}
+
+    async with root_ctx.db.begin_readonly() as conn:
+        query = sa.select([agents.c.compute_plugins]).select_from(agents).where()
+        result = await conn.execute(query)
+        for row in result:
+            for key, value in row["compute_plugins"].items():
+                # return empty dictionary as value when:
+                # 1) accelerator plugin does not expose plugin metadata
+                # 2) no known metadata exists for target accelerator
+                if _data := value.get("metadata", KNOWN_SLOT_METADATA.get(key)):
+                    available_slot_metadata[_data["slot_name"]] = _data
+                else:
+                    available_slot_metadata[key] = {}
+    return web.json_response(available_slot_metadata, status=200)
 
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
@@ -156,6 +223,7 @@ def create_app(
     app["api_versions"] = (3, 4)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", r"/resource-slots", get_resource_slots))
+    cors.add(app.router.add_route("GET", r"/resource-slots/details", get_resource_metadata))
     cors.add(app.router.add_route("GET", r"/vfolder-types", get_vfolder_types))
     cors.add(app.router.add_route("GET", r"/docker-registries", get_docker_registries))
     cors.add(app.router.add_route("POST", r"/get", get_config))

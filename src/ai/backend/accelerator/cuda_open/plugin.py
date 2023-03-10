@@ -46,6 +46,7 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -478,3 +479,13 @@ class CUDAPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": self.slot_types[0][0],
+            "human_readable_name": "GPU",
+            "description": "CUDA-capable GPU",
+            "display_unit": "GPU",
+            "number_format": "#,###",
+            "display_icon": "gpu1",
+        }
