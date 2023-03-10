@@ -34,7 +34,6 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
 
@@ -43,6 +42,7 @@ from ..models import (
     KernelStatus,
     UserRole,
     VFolderAccessStatus,
+    VFolderCloneInfo,
     VFolderDeletionInfo,
     VFolderInvitationState,
     VFolderOperationStatus,
@@ -54,6 +54,7 @@ from ..models import (
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     groups,
+    initiate_vfolder_clone,
     initiate_vfolder_removal,
     kernels,
     keypairs,
@@ -2085,6 +2086,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         params["permission"].value,
     )
     source_folder_host = row["host"]
+    source_folder_id = row["id"]
     target_folder_host = params["folder_host"]
     source_proxy_name, source_volume_name = root_ctx.storage_manager.split_host(source_folder_host)
     target_proxy_name, target_volume_name = root_ctx.storage_manager.split_host(target_folder_host)
@@ -2154,94 +2156,34 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         if "user" not in allowed_vfolder_types:
             raise InvalidAPIParameters("user vfolder cannot be created in this host")
 
-        # Generate the ID of the destination vfolder.
-        # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
-        #       the actual object (with RETURNING clause).  In that case, we need to temporarily
-        #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
-        #       vfolder.  After done, we need to make another transaction to clear the unusable state.
-        folder_id = uuid.uuid4()
-
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.CLONING)
-            .where(vfolders.c.name == row["name"])
-        )
-        await conn.execute(query)
-
-        # Create the destination vfolder.
-        # (assuming that this operation finishes quickly!)
-        # TODO: copy vfolder options
-        async with root_ctx.storage_manager.request(
-            target_folder_host,
-            "POST",
-            "folder/create",
-            json={
-                "volume": target_volume_name,
-                "vfid": str(folder_id),
-                # 'options': {'quota': params['quota']},
-            },
-        ):
-            pass
-
-        # Insert the row for the destination vfolder.
-        user_uuid = str(user_uuid)
-        group_uuid = None
-        ownership_type = "user"
-        insert_values = {
-            "id": folder_id,
-            "name": params["target_name"],
-            "usage_mode": params["usage_mode"],
-            "permission": params["permission"],
-            "last_used": None,
-            "host": target_folder_host,
-            "creator": request["user"]["email"],
-            "ownership_type": VFolderOwnershipType(ownership_type),
-            "user": user_uuid,
-            "group": group_uuid,
-            "unmanaged_path": "",
-            "cloneable": params["cloneable"],
-        }
-        insert_query = sa.insert(vfolders, insert_values)
-        try:
-            result = await conn.execute(insert_query)
-        except sa.exc.DataError:
-            # TODO: pass exception info
-            raise InvalidAPIParameters
-
-    # Start the clone operation as a background task.
-    async def _clone_bgtask(reporter: ProgressReporter) -> None:
-        async with root_ctx.storage_manager.request(
+    task_id, target_folder_id = await initiate_vfolder_clone(
+        root_ctx.db,
+        VFolderCloneInfo(
+            source_folder_id,
             source_folder_host,
-            "POST",
-            "folder/clone",
-            json={
-                "src_volume": source_volume_name,
-                "src_vfid": str(row["id"]),
-                "dst_volume": target_volume_name,
-                "dst_vfid": str(folder_id),
-            },
-        ):
-            async with root_ctx.db.begin() as conn:
-                query = (
-                    sa.update(vfolders)
-                    .values(status=VFolderOperationStatus.READY)
-                    .where(vfolders.c.name == row["name"])
-                )
-                await conn.execute(query)
-
-    task_id = await root_ctx.background_task_manager.start(_clone_bgtask)
+            params["target_name"],
+            target_folder_host,
+            params["usage_mode"],
+            params["permission"],
+            request["user"]["email"],
+            user_uuid,
+            params["cloneable"],
+        ),
+        root_ctx.storage_manager,
+        root_ctx.background_task_manager,
+    )
 
     # Return the information about the destination vfolder.
     resp = {
-        "id": folder_id.hex,
+        "id": target_folder_id.hex,
         "name": params["target_name"],
         "host": target_folder_host,
         "usage_mode": params["usage_mode"].value,
         "permission": params["permission"].value,
         "creator": request["user"]["email"],
-        "ownership_type": ownership_type,
-        "user": user_uuid,
-        "group": group_uuid,
+        "ownership_type": "user",
+        "user": str(user_uuid),
+        "group": None,
         "cloneable": params["cloneable"],
         "bgtask_id": str(task_id),
     }
