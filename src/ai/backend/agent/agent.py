@@ -28,6 +28,7 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    Final,
     FrozenSet,
     Generic,
     List,
@@ -154,6 +155,7 @@ DEAD_STATUS_SET = frozenset(
     ]
 )
 
+COMMIT_STATUS_EXPIRE: Final[int] = 13
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
@@ -723,18 +725,17 @@ class AbstractAgent(
 
         commit_status_script = textwrap.dedent(
             """
-            local key_and_value = {}
-            if next(KEYS) ~= nil then
-                for k in KEYS do
-                    key_and_value[k] = 'ongoing'
-                end
+        local key_and_value = {}
+        for i, k in pairs(KEYS) do
+            key_and_value[i*2-1] = k
+            key_and_value[i*2] = 'ongoing'
+        end
+        if next(key_and_value) ~= nil then
+            redis.call('MSET', unpack(key_and_value))
+            for i, k in pairs(KEYS) do
+                redis.call('EXPIRE', k, ARGV[1])
             end
-            redis.call('MSET', table.unpack(key_and_value))
-            if next(KEYS) ~= nil then
-                for k in pairs(KEYS) do
-                    redis.call('EXPIRE', k, ARGV[1])
-                end
-            end
+        end
         """
         )
         await redis_helper.execute_script(
@@ -742,7 +743,7 @@ class AbstractAgent(
             "check_kernel_commit_statuses",
             commit_status_script,
             [f"kernel.{kern}.commit" for kern in commit_kernels],
-            [13],
+            [COMMIT_STATUS_EXPIRE],
         )
 
     async def heartbeat(self, interval: float):
