@@ -91,7 +91,7 @@ async def get_resource_metadata(request: web.Request) -> web.Response:
                 if _data := value.get("metadata", KNOWN_SLOT_METADATA.get(key)):
                     available_slot_metadata[_data["slot_name"]] = _data
                 else:
-                    available_slot_metadata[_data["slot_name"]] = {}
+                    available_slot_metadata[key] = {}
     return web.json_response(available_slot_metadata, status=200)
 
 
