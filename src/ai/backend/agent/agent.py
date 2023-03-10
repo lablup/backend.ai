@@ -91,6 +91,7 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -584,12 +585,26 @@ class AbstractAgent(
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
-        all_devices: list[AbstractComputeDevice] = []
+        all_devices: List[AbstractComputeDevice] = []
+        metadatas: List[AcceleratorMetadata] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
             all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
+            metadatas.append(computer.get_metadata())
+
+        async def _pipeline(r: Redis):
+            pipe = r.pipeline()
+            for metadata in metadatas:
+                await pipe.hset(
+                    f"computer:{metadata['slot_name']}:metadata",
+                    mapping=cast(dict, metadata),
+                )
+            return pipe
+
+        await redis_helper.execute(self.redis_stat_pool, _pipeline)
+
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
@@ -781,7 +796,6 @@ class AbstractAgent(
                 "compute_plugins": {
                     key: {
                         "version": computer.instance.get_version(),
-                        "metadata": computer.instance.get_metadata(),
                         **(await computer.instance.extra_info()),
                     }
                     for key, computer in self.computers.items()

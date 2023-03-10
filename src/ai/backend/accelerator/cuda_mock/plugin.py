@@ -729,7 +729,7 @@ class CUDAPlugin(AbstractComputePlugin):
                 description = "CUDA-capable GPU (fractional)"
         return {
             "slot_name": self.slot_types[0][0],
-            "human_readable_name": "GPU",
+            "human_readable_name": unit,
             "description": description,
             "display_unit": unit,
             "number_format": number_format,
