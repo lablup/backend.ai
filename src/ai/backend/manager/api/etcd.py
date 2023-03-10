@@ -49,6 +49,22 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "number_format": "#,###",
         "display_icon": "gpu1",
     },
+    "rocm": {
+        "slot_name": "rocm.device",
+        "human_readable_name": "GPU",
+        "description": "ROCm-capable GPU",
+        "display_unit": "GPU",
+        "number_format": "#,###",
+        "display_icon": "gpu2",
+    },
+    "tpu": {
+        "slot_name": "tpu.device",
+        "human_readable_name": "TPU",
+        "description": "TPU device",
+        "display_unit": "GPU",
+        "number_format": "#,###",
+        "display_icon": "tpu",
+    },
 }
 
 
@@ -69,9 +85,13 @@ async def get_resource_metadata(request: web.Request) -> web.Response:
         result = await conn.execute(query)
         for row in result:
             for key, value in row["compute_plugins"].items():
+                # return empty dictionary as value when:
+                # 1) accelerator plugin does not expose plugin metadata
+                # 2) no known metadata exists for target accelerator
                 if _data := value.get("metadata", KNOWN_SLOT_METADATA.get(key)):
                     available_slot_metadata[_data["slot_name"]] = _data
-
+                else:
+                    available_slot_metadata[_data["slot_name"]] = {}
     return web.json_response(available_slot_metadata, status=200)
 
 
