@@ -17,7 +17,7 @@ Here are the description of each field:
 
 * ``device_plugin_name``: The class name to use as the actual implementation. Currently there are two: ``CUDADevice`` and ``MockDevice``.
 
-* ``human_readaable_name``: The device name displayed in the UI.
+* ``human_readable_name``: The device name displayed in the UI.
 
 * ``description``: The device description displayed in the UI.
 
