@@ -13,7 +13,33 @@ Check out the examples in |examples|_.
 
 Here are the description of each field:
 
-* ``slot_name``: The resource slot's main key name.  The plugin's resource slot name has the form of ``"<slot_name>.<subtype>"``, where the subtype may be something such as ``device``, ``shares`` (for fractionally-allocatable ones), or other arbitrary strings like ``10g-mig`` for CUDA MIG devices.
+* ``slot_name``: The resource slot's main key name.  The plugin's resource slot name has the form of ``"<slot_name>.<subtype>"``, where the subtype may be something such as ``device`` (default), ``shares`` (for the fractional allocation mode).
+  For CUDA MIG devices, it becomes a string including the slice size from the device memory size such as ``10g-mig``.
+
+  To configure the *fractional* allocation mode, you should also specify the **etcd** accelerator plugin configuration like the following JSON, where ``unit_mem`` and ``unit_proc`` is used as the divisor to calculate 1.0 fraction:
+
+  .. code-block:: json
+
+     {
+        "config": {
+          "plugins": {
+            "accelerator": {
+              "<slot_name>": {
+                "allocation_mode": "fractional",
+                "unit_mem": 1073741824,
+                "unit_proc": 10
+              }
+            }
+          }
+        }
+     }
+
+  In the above example, the 10 subprocessors and 1 GiB of device memory is regarded as 1.0 fractional device.
+  You may store it as a JSON file and put in the etcd configuration tree like:
+
+  .. code-block:: console
+
+     $ ./backend.ai mgr etcd put-json '' mydevice-fractional-mode.json
 
 * ``device_plugin_name``: The class name to use as the actual implementation. Currently there are two: ``CUDADevice`` and ``MockDevice``.
 
@@ -35,7 +61,7 @@ Here are the description of each field:
 
   * ``numa_node``: The NUMA node index to place this device.
 
-  * ``smp_count``: The number of processing cores (for instances, the number of SMPs of CUDA GPUs)
+  * ``subproc_count``: The number of sub-processing cores (e.g., the number of streaming multi-processors of CUDA GPUs)
 
   * ``memory_size``: The size of on-device memory represented as human-readable binary sizes
 
