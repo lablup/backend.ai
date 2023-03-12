@@ -103,7 +103,7 @@ _mock_config_iv = t.Dict(
                     t.Key("mother_uuid"): tx.UUID,
                     t.Key("model_name"): t.String,
                     t.Key("numa_node"): t.Int[0:],
-                    t.Key("smp_count"): t.Int[1:],
+                    t.Key("subproc_count"): t.Int[1:],
                     t.Key("memory_size"): tx.BinarySize,
                 }
             ).allow_extra("*")
@@ -282,7 +282,7 @@ class MockPlugin(AbstractComputePlugin):
                 "mother_uuid": dev_info["mother_uuid"],
                 "numa_node": dev_info["numa_node"],
                 "memory_size": dev_info["memory_size"],
-                "processing_units": dev_info["smp_count"],
+                "processing_units": dev_info["subproc_count"],
                 "model_name": dev_info["model_name"],
             }
             match self.key:
@@ -478,10 +478,10 @@ class MockPlugin(AbstractComputePlugin):
                             if device_info is None:
                                 continue
                             device_mem_size = device_info.memory_size
-                            device_smp_count = device_info.processing_units
+                            device_subproc_count = device_info.processing_units
                             device_capacity = self._get_share_raw(
                                 device_mem_size,
-                                device_smp_count,
+                                device_subproc_count,
                             )
                             if slot_name == SlotName(f"{self.key}.shares"):
                                 if alloc > 0:
@@ -611,9 +611,9 @@ class MockPlugin(AbstractComputePlugin):
             assert not device.is_mig_device
         return self._get_share_raw(device.memory_size, device.processing_units)
 
-    def _get_share_raw(self, memory_size: int, smp_count: int) -> Decimal:
+    def _get_share_raw(self, memory_size: int, subproc_count: int) -> Decimal:
         mem_shares = memory_size / self._unit_mem
-        proc_shares = smp_count / self._unit_proc
+        proc_shares = subproc_count / self._unit_proc
         common_shares = min(mem_shares, proc_shares)
         quantum = Decimal(".01")
         return Decimal(common_shares).quantize(quantum, ROUND_DOWN)
