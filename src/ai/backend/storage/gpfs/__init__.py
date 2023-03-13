@@ -18,7 +18,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class GPFSVolume(BaseVolume):
-
     api_client: GPFSAPIClient
 
     fs: str

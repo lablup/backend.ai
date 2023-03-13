@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import sys
+import textwrap
 import time
 import traceback
 import weakref
@@ -93,6 +94,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
+    CommitStatus,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -184,6 +186,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
             known_registries=[kernel_config["image"]["registry"]["name"]],
+            is_local=kernel_config["image"]["is_local"],
             architecture=kernel_config["image"].get("architecture", get_arch_name()),
         )
         self.internal_data = kernel_config["internal_data"] or {}
@@ -499,7 +502,6 @@ class ComputerContext:
 class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
-
     loop: asyncio.AbstractEventLoop
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
@@ -598,6 +600,7 @@ class AbstractAgent(
         # Prepare stat collector tasks.
         self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
         self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
+        self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
 
         # Prepare heartbeats.
         self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
@@ -611,6 +614,11 @@ class AbstractAgent(
             )
             abuse_report_path.mkdir(exist_ok=True, parents=True)
             self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
+
+        # Report commit status
+        self.timer_tasks.append(
+            aiotools.create_timer(self._report_all_kernel_commit_status_map, 7.0)
+        )
 
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
@@ -686,6 +694,71 @@ class AbstractAgent(
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
         await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
 
+    async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
+        """
+        Commit statuses are managed by `lock` file.
+        +- base_commit_path
+        |_ subdir1 (usually user's email)
+            |_ commit_file1 (named by timestamp)
+            |_ commit_file2
+            |_ lock
+                |_ kernel_id1 (means the user is currently committing the kernel)
+                |_ kernel_id2
+        |_ subdir2
+        ...
+        `status_map` is like below.
+        {
+            str(kernel_id1): CommitStatus.ONGOING.value,
+            str(kernel_id2): CommitStatus.ONGOING.value,
+            ...,
+        }
+        """
+        loop = current_loop()
+        base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        status_map: MutableMapping[str, str] = {}
+
+        def _map_commit_status() -> None:
+            for subdir in base_commit_path.iterdir():
+                for commit_path in subdir.glob("./**/lock/*"):
+                    kern = commit_path.name
+                    if kern not in status_map:
+                        status_map[kern] = CommitStatus.ONGOING.value
+
+        await loop.run_in_executor(None, _map_commit_status)
+
+        hash_name = "kernel_commit_status"
+        commit_status_script = textwrap.dedent(
+            f"""
+            local key = '{hash_name}'
+            local new_statuses = {{}}
+            if next(KEYS) ~= nil then
+                for i, v in ipairs(KEYS) do
+                    new_statuses[v] = ARGV[i]
+                end
+            end
+            local all_commit_statuses = redis.call('HKEYS', key)
+            if all_commit_statuses ~= nil and next(all_commit_statuses) ~= nil then
+                for _, v in ipairs(all_commit_statuses) do
+                    if next(new_statuses) == nil or not new_statuses[v] then
+                        redis.call('HDEL', key, v)
+                    end
+                end
+            end
+            if next(new_statuses) ~= nil then
+                for kern_id, status in pairs(new_statuses) do
+                    redis.call('HSET', key, kern_id, status)
+                end
+            end
+        """
+        )
+        await redis_helper.execute_script(
+            self.redis_stat_pool,
+            "check_kernel_commit_statuses",
+            commit_status_script,
+            [*status_map.keys()],
+            [*status_map.values()],
+        )
+
     async def heartbeat(self, interval: float):
         """
         Send my status information and available kernel images to the manager(s).
@@ -708,6 +781,7 @@ class AbstractAgent(
                 "compute_plugins": {
                     key: {
                         "version": computer.instance.get_version(),
+                        "metadata": computer.instance.get_metadata(),
                         **(await computer.instance.extra_info()),
                     }
                     for key, computer in self.computers.items()
@@ -806,6 +880,25 @@ class AbstractAgent(
             pass
         except Exception:
             log.exception("unhandled exception while syncing container stats")
+            await self.produce_error_event()
+
+    async def collect_process_stat(self, interval: float):
+        if self.local_config["debug"]["log-stats"]:
+            log.debug("collecting process statistics in container")
+        try:
+            updated_kernel_ids = []
+            container_ids = []
+            async with self.registry_lock:
+                for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
+                    if not kernel_obj.stats_enabled:
+                        continue
+                    updated_kernel_ids.append(kernel_id)
+                    container_ids.append(kernel_obj["container_id"])
+                await self.stat_ctx.collect_per_container_process_stat(container_ids)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1391,7 +1484,6 @@ class AbstractAgent(
 
     async def create_kernel(
         self,
-        creation_id: str,
         session_id: SessionId,
         kernel_id: KernelId,
         kernel_config: KernelCreationConfig,
@@ -1405,7 +1497,7 @@ class AbstractAgent(
 
         if not restarting:
             await self.produce_event(
-                KernelPreparingEvent(kernel_id, creation_id),
+                KernelPreparingEvent(kernel_id),
             )
 
         # Initialize the creation context
@@ -1438,20 +1530,20 @@ class AbstractAgent(
             )
 
         # Check if we need to pull the container image
-        do_pull = await self.check_image(
+        do_pull = (not ctx.image_ref.is_local) and await self.check_image(
             ctx.image_ref,
             kernel_config["image"]["digest"],
             AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
         )
         if do_pull:
             await self.produce_event(
-                KernelPullingEvent(kernel_id, creation_id, ctx.image_ref.canonical),
+                KernelPullingEvent(kernel_id, ctx.image_ref.canonical),
             )
             await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
         if not restarting:
             await self.produce_event(
-                KernelCreatingEvent(kernel_id, creation_id),
+                KernelCreatingEvent(kernel_id),
             )
 
         # Get the resource spec from existing kernel scratches
@@ -1748,7 +1840,6 @@ class AbstractAgent(
         await self.produce_event(
             KernelStartedEvent(
                 kernel_id,
-                creation_id,
                 creation_info={
                     **kernel_creation_info,
                     "id": str(KernelId(kernel_id)),
@@ -1852,7 +1943,6 @@ class AbstractAgent(
 
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: SessionId,
         kernel_id: KernelId,
         updating_kernel_config: KernelCreationConfig,
@@ -1898,7 +1988,6 @@ class AbstractAgent(
             else:
                 try:
                     await self.create_kernel(
-                        creation_id,
                         session_id,
                         kernel_id,
                         kernel_config,
@@ -2002,7 +2091,7 @@ class AbstractAgent(
     async def commit(self, reporter, kernel_id: KernelId, subdir: str, filename: str):
         return await self.kernel_registry[kernel_id].commit(kernel_id, subdir, filename)
 
-    async def get_commit_status(self, kernel_id: KernelId, subdir: str):
+    async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):

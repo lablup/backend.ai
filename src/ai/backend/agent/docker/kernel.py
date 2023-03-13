@@ -141,7 +141,7 @@ class DockerKernel(AbstractKernel):
         lock_path = commit_path / "lock" / str(kernel_id)
         return commit_path, lock_path
 
-    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str):
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         _, lock_path = self._get_commit_path(kernel_id, subdir)
         if lock_path.exists():
             return CommitStatus.ONGOING
@@ -336,7 +336,6 @@ class DockerKernel(AbstractKernel):
 
 
 class DockerCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int
@@ -507,10 +506,7 @@ LinuxKit_CMD_EXEC_PREFIX = [
 
 
 async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) -> None:
-    async with closing_async(Docker()) as docker:
-        kernel_version = (await docker.version())["KernelVersion"]
-    if "linuxkit" in kernel_version:
-        local_config["agent"]["docker-mode"] = "linuxkit"
+    if local_config["agent"]["docker-mode"] == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
         proxy_worker_binary = pkg_resources.resource_filename(
@@ -577,6 +573,3 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
             log.info("Inserted the iptables rules.")
         else:
             log.info("The iptables rule already exists.")
-    else:
-        # Linux Mode
-        local_config["agent"]["docker-mode"] = "native"

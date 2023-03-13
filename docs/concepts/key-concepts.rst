@@ -16,7 +16,7 @@ Here we describe the key concepts that are required to understand and follow thi
 
 Each border-connected group of components is intended to be run on the same server, but you may split them into multiple servers or merge different groups into a single server as you need.
 For example, you can run separate servers for the nginx reverse-proxy and the Backend.AI manager or run both on a single server.
-In the [[development setup]], all these components run on a single PC such as your laptop.
+In the :doc:`development setup </dev/development-setup>`, all these components run on a single PC such as your laptop.
 
 Manager and Agents
 ^^^^^^^^^^^^^^^^^^

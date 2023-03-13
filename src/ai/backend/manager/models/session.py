@@ -1055,6 +1055,7 @@ class ComputeSession(graphene.ObjectType):
     group_name = graphene.String()
     group_id = graphene.UUID()
     user_email = graphene.String()
+    user_name = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
     created_user_email = graphene.String()
@@ -1096,6 +1097,7 @@ class ComputeSession(graphene.ObjectType):
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         assert row is not None
         email = getattr(row, "email")
+        user_name = getattr(row, "username")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
         return {
@@ -1119,6 +1121,7 @@ class ComputeSession(graphene.ObjectType):
             "group_name": group_name,
             "group_id": row.group_id,
             "user_email": email,
+            "user_name": user_name,
             "user_id": row.user_uuid,
             "access_key": row.access_key,
             "created_user_email": None,  # TODO: implement
@@ -1324,6 +1327,7 @@ class ComputeSession(graphene.ObjectType):
                 SessionRow,
                 GroupRow.name.label("group_name"),
                 UserRow.email,
+                UserRow.username,
             )
             .select_from(j)
             .options(selectinload(SessionRow.kernels))
@@ -1366,6 +1370,7 @@ class ComputeSession(graphene.ObjectType):
                 SessionRow,
                 GroupRow.name.label("group_name"),
                 UserRow.email,
+                UserRow.username,
             )
             .select_from(j)
             .where(SessionRow.id.in_(session_ids))

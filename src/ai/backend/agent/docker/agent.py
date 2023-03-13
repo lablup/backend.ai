@@ -130,7 +130,6 @@ def _DockerContainerError_reduce(self):
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
-
     scratch_dir: Path
     tmp_dir: Path
     config_dir: Path
@@ -805,12 +804,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.computer_docker_args["HostConfig"]["MemorySwap"] -= shmem
             self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
+        image_service_ports = image_labels.get("ai.backend.service-ports", "")
         encoded_preopen_ports = ",".join(
             f"{port_no}:preopen:{port_no}" for port_no in preopen_ports
         )
         container_config["Labels"]["ai.backend.service-ports"] = (
-            image_labels["ai.backend.service-ports"] + "," + encoded_preopen_ports
-        )
+            image_service_ports + "," if image_service_ports else ""
+        ) + encoded_preopen_ports
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
         if self.local_config["debug"]["log-kernel-config"]:
@@ -926,7 +926,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
-
     docker_info: Mapping[str, Any]
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
@@ -965,13 +964,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 case _:
                     docker_host = "(unknown)"
             log.info("accessing the local Docker daemon via {}", docker_host)
-            if not self._skip_initial_scan:
-                docker_version = await docker.version()
-                log.info(
-                    "running with Docker {0} with API {1}",
-                    docker_version["Version"],
-                    docker_version["ApiVersion"],
-                )
+            docker_version = await docker.version()
+            log.info(
+                "running with Docker {0} with API {1}",
+                docker_version["Version"],
+                docker_version["ApiVersion"],
+            )
+            kernel_version = docker_version["KernelVersion"]
+            if "linuxkit" in kernel_version:
+                self.local_config["agent"]["docker-mode"] = "linuxkit"
+            else:
+                self.local_config["agent"]["docker-mode"] = "native"
             docker_info = await docker.system.info()
             docker_info = dict(docker_info)
             # Assume cgroup v1 if CgroupVersion key is absent

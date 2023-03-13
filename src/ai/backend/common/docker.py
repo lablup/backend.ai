@@ -26,6 +26,7 @@ import yarl
 from packaging import version
 
 from . import validators as tx
+from .arch import arch_name_aliases
 from .etcd import AsyncEtcd
 from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
@@ -50,13 +51,6 @@ __all__ = (
     "ImageRef",
 )
 
-arch_name_aliases: Final[Mapping[str, str]] = {
-    "arm64": "aarch64",  # macOS with LLVM
-    "amd64": "x86_64",  # Windows/Linux
-    "x64": "x86_64",  # Windows
-    "x32": "x86",  # Windows
-    "i686": "x86",  # Windows
-}
 # generalize architecture symbols to match docker API's norm
 docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "aarch64": "arm64",
@@ -276,7 +270,6 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
 
 
 class PlatformTagSet(Mapping):
-
     __slots__ = ("_data",)
     _data: Dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
@@ -324,16 +317,18 @@ class ImageRef:
     will allow any repository on canonical string.
     """
 
-    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha")
+    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local")
 
     _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
     def __init__(
         self,
         value: str,
-        known_registries: Union[Mapping[str, Any], Sequence[str]] = None,
-        architecture="x86_64",
+        known_registries: Optional[Mapping[str, Any] | Sequence[str]] = None,
+        architecture: str = "x86_64",
+        is_local: bool = False,
     ):
+        self._is_local = is_local
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
         if "://" in value or value.startswith("//"):
@@ -457,6 +452,10 @@ class ImageRef:
     def tag_set(self) -> Tuple[str, PlatformTagSet]:
         # e.g., '3.6', {'ubuntu', 'cuda', ...}
         return self._tag_set
+
+    @property
+    def is_local(self) -> bool:
+        return self._is_local
 
     @property
     def short(self) -> str:

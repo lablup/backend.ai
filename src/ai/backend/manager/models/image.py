@@ -4,7 +4,6 @@ import enum
 import functools
 import logging
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,7 +21,6 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-import yaml
 from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -64,7 +62,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 __all__ = (
     "rescan_images",
-    "update_aliases_from_file",
     "ImageType",
     "ImageAliasRow",
     "ImageRow",
@@ -83,25 +80,37 @@ async def rescan_images(
     etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
     registry: str = None,
+    local: bool = False,
     *,
     reporter: ProgressReporter = None,
 ) -> None:
     # cannot import ai.backend.manager.config at start due to circular import
     from ai.backend.manager.config import container_registry_iv
 
-    registry_config_iv = t.Mapping(t.String, container_registry_iv)
-    latest_registry_config = registry_config_iv.check(
-        await etcd.get_prefix("config/docker/registry"),
-    )
-    # TODO: delete images from registries removed from the previous config?
-    if registry is None:
-        # scan all configured registries
-        registries = latest_registry_config
+    if local:
+        registries = {
+            "local": {
+                "": "http://localhost",
+                "type": "local",
+                "username": None,
+                "password": None,
+                "project": None,
+            },
+        }
     else:
-        try:
-            registries = {registry: latest_registry_config[registry]}
-        except KeyError:
-            raise RuntimeError("It is an unknown registry.", registry)
+        registry_config_iv = t.Mapping(t.String, container_registry_iv)
+        latest_registry_config = registry_config_iv.check(
+            await etcd.get_prefix("config/docker/registry"),
+        )
+        # TODO: delete images from registries removed from the previous config?
+        if registry is None:
+            # scan all configured registries
+            registries = latest_registry_config
+        else:
+            try:
+                registries = {registry: latest_registry_config[registry]}
+            except KeyError:
+                raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
@@ -109,46 +118,6 @@ async def rescan_images(
             scanner = scanner_cls(db, registry_name, registry_info)
             tg.create_task(scanner.rescan_single_registry(reporter))
     # TODO: delete images removed from registry?
-
-
-async def update_aliases_from_file(session: AsyncSession, file: Path) -> List[ImageAliasRow]:
-    log.info('Updating image aliases from "{0}"', file)
-    ret: List[ImageAliasRow] = []
-    try:
-        data = yaml.safe_load(open(file, "r", encoding="utf-8"))
-    except IOError:
-        log.error('Cannot open "{0}".', file)
-        return []
-    for item in data["aliases"]:
-        alias = item[0]
-        target = item[1]
-        if len(item) >= 2:
-            architecture = item[2]
-        else:
-            log.warn(
-                "architecture not set for {} => {}, assuming as {}",
-                target,
-                alias,
-                DEFAULT_IMAGE_ARCH,
-            )
-            architecture = DEFAULT_IMAGE_ARCH
-        try:
-            image_row = await ImageRow.from_image_ref(
-                session,
-                ImageRef(target, ["*"], architecture),
-            )
-            image_alias = ImageAliasRow(
-                alias=alias,
-                image=image_row,
-            )
-            # let user call session.begin()
-            session.add(image_alias)
-            ret.append(image_alias)
-            print(f"{alias} -> {image_row.image_ref}")
-        except UnknownImageReference:
-            print(f"{alias} -> target image not found")
-    log.info("Done.")
-    return ret
 
 
 class ImageType(enum.Enum):
@@ -175,6 +144,12 @@ class ImageRow(Base):
     )
     config_digest = sa.Column("config_digest", sa.CHAR(length=72), nullable=False)
     size_bytes = sa.Column("size_bytes", sa.BigInteger, nullable=False)
+    is_local = sa.Column(
+        "is_local",
+        sa.Boolean,
+        nullable=False,
+        server_default=sa.sql.expression.false(),
+    )
     type = sa.Column("type", sa.Enum(ImageType), nullable=False)
     accelerators = sa.Column("accelerators", sa.String)
     labels = sa.Column("labels", sa.JSON, nullable=False)
@@ -202,6 +177,7 @@ class ImageRow(Base):
         self,
         name,
         architecture,
+        is_local=False,
         registry=None,
         image=None,
         tag=None,
@@ -217,6 +193,7 @@ class ImageRow(Base):
         self.image = image
         self.tag = tag
         self.architecture = architecture
+        self.is_local = is_local
         self.config_digest = config_digest
         self.size_bytes = size_bytes
         self.type = type
@@ -226,7 +203,7 @@ class ImageRow(Base):
 
     @property
     def image_ref(self):
-        return ImageRef(self.name, [self.registry], self.architecture)
+        return ImageRef(self.name, [self.registry], self.architecture, self.is_local)
 
     @classmethod
     async def from_alias(
@@ -489,6 +466,7 @@ class Image(graphene.ObjectType):
     tag = graphene.String()
     registry = graphene.String()
     architecture = graphene.String()
+    is_local = graphene.Boolean()
     digest = graphene.String()
     labels = graphene.List(KVPair)
     aliases = graphene.List(graphene.String)
@@ -516,6 +494,7 @@ class Image(graphene.ObjectType):
             tag=row.tag,
             registry=row.registry,
             architecture=row.architecture,
+            is_local=row.is_local,
             digest=row.config_digest,
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             aliases=[alias_row.alias for alias_row in row.aliases],
@@ -681,7 +660,6 @@ class Image(graphene.ObjectType):
 
 
 class PreloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -703,7 +681,6 @@ class PreloadImage(graphene.Mutation):
 
 
 class UnloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -725,7 +702,6 @@ class UnloadImage(graphene.Mutation):
 
 
 class RescanImages(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -755,7 +731,6 @@ class RescanImages(graphene.Mutation):
 
 
 class ForgetImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -787,7 +762,6 @@ class ForgetImage(graphene.Mutation):
 
 
 class AliasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -823,7 +797,6 @@ class AliasImage(graphene.Mutation):
 
 
 class DealiasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -854,7 +827,6 @@ class DealiasImage(graphene.Mutation):
 
 
 class ClearImages(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -892,6 +864,7 @@ class ModifyImageInput(graphene.InputObjectType):
     image = graphene.String(required=False)
     tag = graphene.String(required=False)
     architecture = graphene.String(required=False)
+    is_local = graphene.Boolean(required=False)
     size_bytes = graphene.Int(required=False)
     type = graphene.String(required=False)
 
@@ -902,7 +875,6 @@ class ModifyImageInput(graphene.InputObjectType):
 
 
 class ModifyImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -928,6 +900,7 @@ class ModifyImage(graphene.Mutation):
         set_if_set(props, data, "image")
         set_if_set(props, data, "tag")
         set_if_set(props, data, "architecture")
+        set_if_set(props, data, "is_local")
         set_if_set(props, data, "size_bytes")
         set_if_set(props, data, "type")
         set_if_set(props, data, "digest", target_key="config_digest")
