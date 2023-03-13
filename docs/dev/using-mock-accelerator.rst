@@ -53,6 +53,10 @@ Here are the description of each field:
 
 * ``number_format``: The number formatting string used for the UI.
 
+  * ``binary``: A boolean flag to indicate whether to use the binary suffixes (divided by 2^(10n) instead of 10^(3n))
+
+  * ``round_length``: The length of fixed points to wrap the numeric value of this resource slot. If zero, the number is treated as an integer.
+
 * ``devices``: The list of mocked device declarations
 
   * ``mother_uuid``: The unique ID of the device, which may be random-generated

@@ -2,11 +2,6 @@
 
 slot_name = "cuda"
 device_plugin_name = "CUDADevice"
-human_readable_name = "fGPU"
-description = "CUDA-capable GPU (fractional)"
-display_unit = "fGPU"
-number_format = "#,###.00"
-display_icon = "gpu1"
 
 devices = [
   { mother_uuid = "c59395cd-ac91-4cd3-a1b0-3d2568aa2d01", model_name = "CUDA GPU", numa_node = 0, subproc_count = 108, memory_size = "40G", is_mig_device = false },
@@ -23,3 +18,17 @@ devices = [
 [attributes]
 nvidia_driver = "450.0.0"
 cuda_runtime = "11.0"
+
+[formats.devices]
+display_unit = "GPU"
+display_icon = "gpu1"
+human_readable_name = "GPU"
+description = "CUDA-capable GPU"
+number_format = { binary = false, round_length = 0 }
+
+[formats."*-mig"]
+display_unit = "GPU"
+display_icon = "gpu1"
+human_readable_name = "GPU"
+description = "CUDA-capable GPU (MIG slice)"
+number_format = { binary = false, round_length = 0 }
