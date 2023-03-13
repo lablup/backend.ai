@@ -359,7 +359,7 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         raw_results = []
         coros = []
-        throttle_sema = asyncio.Semaphore(4)
+        throttle_sema = asyncio.Semaphore(4)  # TODO: make it configurable
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
