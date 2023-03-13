@@ -1,8 +1,10 @@
+import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any, Tuple
 
 import aiohttp_cors
+import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
@@ -11,6 +13,8 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
+    GitTokenRow,
+    git_tokens,
     keypairs,
     query_accessible_vfolders,
     query_bootstrap_script,
@@ -23,6 +27,7 @@ from .exceptions import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
+    InternalServerError,
     InvalidAPIParameters,
 )
 from .manager import READ_ALLOWED, server_status_required
@@ -241,6 +246,71 @@ async def get_bootstrap_script(request: web.Request) -> web.Response:
         return web.json_response(script)
 
 
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def get_git_tokens(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    user_uuid = request["user"]["uuid"]
+
+    log.info("get_git_tokens")
+
+    async with root_ctx.db.begin_readonly() as conn:
+        query = sa.select(GitTokenRow).where(GitTokenRow.user_id == user_uuid)
+        result = await conn.execute(query)
+        output = result.fetchall()
+        print(str(output))
+
+    return web.json_response(
+        [
+            {"domain": "github.com", "token": "aaaabbbb"},
+            {"domain": "gitlab.com", "token": "ccccdddd"},
+            {"domain": "gitlab.gnome.org", "token": "adsflasjdfadsj;l"},
+        ]
+    )
+
+
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("params"): t.String,
+        },
+    )
+)
+async def update_git_tokens(request: web.Request, params: Any) -> web.Response:
+    resp = []
+    root_ctx: RootContext = request.app["_root.context"]
+    user_uuid = request["user"]["uuid"]
+
+    print(type(params))
+    print("aaaa=====bbbb")
+    token_list = params["params"]
+    print(type(token_list))
+    result = json.loads(token_list)
+    print("bbbbb=====cccc")
+    for item in result:
+        print(item["domain"])
+        print(item["token"])
+        # first delete
+
+        # then, insert datas
+        data = {"user_id": user_uuid, "domain": item["domain"], "token": item["token"]}
+        async with root_ctx.db.begin() as conn:
+            query = git_tokens.insert().values(data)
+            result = await conn.execute(query)
+            if result.rowcount > 0:
+                log.info("success")
+            else:
+                raise InternalServerError("Error creating git tokens")
+
+        resp.append({"domain": item["domain"], "token": item["token"]})
+
+    resp.append({"domain": "github.com", "token": "aaaabbbb"})
+    resp.append({"domain": "gitlab.com", "token": "ccccdddd"})
+
+    return web.json_response(resp)
+
+
 async def init(app: web.Application) -> None:
     pass
 
@@ -264,5 +334,7 @@ def create_app(
     cors.add(app.router.add_route("DELETE", "/dotfiles", delete))
     cors.add(app.router.add_route("POST", "/bootstrap-script", update_bootstrap_script))
     cors.add(app.router.add_route("GET", "/bootstrap-script", get_bootstrap_script))
+    cors.add(app.router.add_route("GET", "/git-tokens", get_git_tokens))
+    cors.add(app.router.add_route("PATCH", "/git-tokens", update_git_tokens))
 
     return app, []

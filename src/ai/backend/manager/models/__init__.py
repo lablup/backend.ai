@@ -4,6 +4,7 @@ from . import domain as _domain
 from . import dotfile as _dotfile
 from . import endpoint as _endpoint
 from . import error_logs as _errorlogs
+from . import git_token as _gtoken
 from . import group as _group
 from . import image as _image
 from . import kernel as _kernel
@@ -40,6 +41,7 @@ __all__ = (
     *_sessiontemplate.__all__,
     *_storage.__all__,
     *_errorlogs.__all__,
+    *_gtoken.__all__,
 )
 
 from .acl import *  # noqa
@@ -48,6 +50,7 @@ from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .endpoint import *  # noqa
 from .error_logs import *  # noqa
+from .git_token import *  # noqa
 from .group import *  # noqa
 from .image import *  # noqa
 from .kernel import *  # noqa
