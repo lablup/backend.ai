@@ -28,6 +28,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, relationship, selectinload
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -37,6 +38,11 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     VFolderMount,
+)
+from ai.backend.manager.idle import (
+    SessionLifetimeChecker,
+    TimeoutIdleChecker,
+    UtilizationIdleChecker,
 )
 
 from ..api.exceptions import (
@@ -1074,6 +1080,7 @@ class ComputeSession(graphene.ObjectType):
     result = graphene.String()
     commit_status = graphene.String()
     abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -1219,6 +1226,29 @@ class ComputeSession(graphene.ObjectType):
         if containers is None:
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> dict[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        timeout = await redis_helper.execute(
+            graph_ctx.redis_live,
+            lambda r: r.get(TimeoutIdleChecker.report_key(self.session_id)),
+        )
+        lifetime = await redis_helper.execute(
+            graph_ctx.redis_live,
+            lambda r: r.get(SessionLifetimeChecker.report_key(self.session_id)),
+        )
+        raw_utilization = await redis_helper.execute(
+            graph_ctx.redis_live,
+            lambda r: r.get(UtilizationIdleChecker.report_key(self.session_id)),
+        )
+        return_val = {}
+        if raw_utilization is not None:
+            return_val[UtilizationIdleChecker.name] = msgpack.unpackb(raw_utilization)
+        if timeout is not None:
+            return_val[TimeoutIdleChecker.name] = timeout
+        if lifetime is not None:
+            return_val[SessionLifetimeChecker.name] = lifetime
+        return return_val
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),

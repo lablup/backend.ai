@@ -63,6 +63,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         access_key=request["keypair"]["access_key"],
         db=root_ctx.db,
         redis_stat=root_ctx.redis_stat,
+        redis_live=root_ctx.redis_live,
         redis_image=root_ctx.redis_image,
         manager_status=manager_status,
         known_slot_types=known_slot_types,
