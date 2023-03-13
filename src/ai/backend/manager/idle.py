@@ -6,6 +6,7 @@ import logging
 import math
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
@@ -87,6 +88,23 @@ class IdleCheckResult(NamedTuple):
     utilization: Optional[Mapping[str, bool]] = None
 
 
+@dataclass(kw_only=True)
+class IdleCheckReport:
+    timeout: Optional[float] = None
+    session_lifetime: Optional[float] = None
+    utilization: Optional[Mapping[str, bool]] = None
+
+    def to_json(self) -> Mapping[str, Any]:
+        d: Mapping[str, Any] = {}
+        if self.timeout is not None:
+            d = {"timeout": self.timeout}
+        if self.session_lifetime is not None:
+            d = {**d, "session_lifetime": self.session_lifetime}
+        if self.utilization is not None:
+            d = {**d, "utilization": self.utilization}
+        return d
+
+
 class AppStreamingStatus(enum.Enum):
     NO_ACTIVE_CONNECTIONS = 0
     HAS_ACTIVE_CONNECTIONS = 1
@@ -95,6 +113,28 @@ class AppStreamingStatus(enum.Enum):
 class ThresholdOperator(enum.Enum):
     AND = "and"
     OR = "or"
+
+
+async def report_idle_check(
+    redis_obj: RedisConnectionInfo,
+    session_id: SessionId,
+    report: IdleCheckReport,
+) -> None:
+    report_key = f"session.{session_id}.idle_report"
+    if report.timeout is None and report.session_lifetime is None and report.utilization is None:
+        return
+    await redis_helper.execute(
+        redis_obj, lambda r: r.set(report_key, msgpack.packb(report.to_json()))
+    )
+
+
+async def get_idle_check_report(
+    redis_obj: RedisConnectionInfo,
+    session_id: SessionId,
+) -> Mapping[str, Any]:
+    report_key = f"session.{session_id}.idle_report"
+    data = await redis_helper.execute(redis_obj, lambda r: r.get(report_key))
+    return msgpack.unpackb(data)
 
 
 class IdleCheckerHost:
@@ -208,6 +248,7 @@ class IdleCheckerHost:
                     checker.check_session(session, conn, policy) for checker in self._checkers
                 ]
                 check_results = await asyncio.gather(*check_task, return_exceptions=True)
+                report = IdleCheckReport()
                 terminated = False
                 errors = []
                 for checker, result in zip(self._checkers, check_results):
@@ -217,23 +258,13 @@ class IdleCheckerHost:
                             checker.name,
                             session["id"],
                         )
-                        key = checker.report_key(session["id"])
-                        if result.remaining_idle_time is not None:
-                            await redis_helper.execute(
-                                self._redis_live,
-                                lambda r: r.set(
-                                    key,
-                                    result.remaining_idle_time,
-                                ),
-                            )
-                        if result.utilization is not None:
-                            await redis_helper.execute(
-                                self._redis_live,
-                                lambda r: r.set(
-                                    key,
-                                    msgpack.packb(result.utilization),
-                                ),
-                            )
+                        if isinstance(checker, TimeoutIdleChecker):
+                            report.timeout = result.remaining_idle_time
+                        elif isinstance(checker, SessionLifetimeChecker):
+                            report.session_lifetime = result.remaining_idle_time
+                        elif isinstance(checker, UtilizationIdleChecker):
+                            report.utilization = result.utilization
+                        await report_idle_check(self._redis_live, session["id"], report)
                         if not terminated:
                             terminated = True
                             await self._event_producer.produce_event(
@@ -278,10 +309,6 @@ class BaseIdleChecker(metaclass=ABCMeta):
         status: AppStreamingStatus,
     ) -> None:
         pass
-
-    @classmethod
-    def report_key(cls, session_id: SessionId) -> str:
-        return f"session.{session_id}.{cls.name}.remaining"
 
     @abstractmethod
     async def check_session(
