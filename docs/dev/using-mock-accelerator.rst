@@ -43,19 +43,21 @@ Here are the description of each field:
 
 * ``device_plugin_name``: The class name to use as the actual implementation. Currently there are two: ``CUDADevice`` and ``MockDevice``.
 
-* ``human_readable_name``: The device name displayed in the UI.
+* ``formats.<subtype>``: The tables for per-subtype formatting details
 
-* ``description``: The device description displayed in the UI.
+  * ``display_icon``: The device icon type displayed in the UI.
 
-* ``display_icon``: The device icon type displayed in the UI.
+  * ``dispaly_unit``: The resource slot unit displayed in the UI, alongside the amount numbers.
 
-* ``dispaly_unit``: The resource slot unit displayed in the UI, alongside the amount numbers.
+  * ``human_readable_name``: The device name displayed in the UI.
 
-* ``number_format``: The number formatting string used for the UI.
+  * ``description``: The device description displayed in the UI.
 
-  * ``binary``: A boolean flag to indicate whether to use the binary suffixes (divided by 2^(10n) instead of 10^(3n))
+  * ``number_format``: The number formatting string used for the UI.
 
-  * ``round_length``: The length of fixed points to wrap the numeric value of this resource slot. If zero, the number is treated as an integer.
+    * ``binary``: A boolean flag to indicate whether to use the binary suffixes (divided by 2^(10n) instead of 10^(3n))
+
+    * ``round_length``: The length of fixed points to wrap the numeric value of this resource slot. If zero, the number is treated as an integer.
 
 * ``devices``: The list of mocked device declarations
 
