@@ -2695,7 +2695,94 @@ class AgentRegistry:
         session_id: SessionId,
         reason: str,
     ) -> None:
-        pass
+        async def _mark() -> tuple[SessionRow, list[KernelRow]]:
+            async with self.db.begin_session() as db_sess:
+                session = await SessionRow.get_session_with_kernels(
+                    session_id, allow_stale=True, db_session=db_sess
+                )
+                sibling_kernels = session.kernels
+                sess_status = determine_session_status(sibling_kernels)
+                now = datetime.now(tzutc())
+                values = {
+                    "status": sess_status,
+                    "status_info": reason,
+                    "terminated_at": now,
+                    "status_history": sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            sess_status.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
+                }
+                query = sa.update(SessionRow).values(**values).where(SessionRow.id == session_id)
+                await db_sess.execute(query)
+                return session, sibling_kernels
+
+        session, sibling_kernels = await execute_with_retry(_mark)
+
+        unsynced_kernels = [
+            k
+            for k in sibling_kernels
+            if k.status
+            not in (KernelStatus.TERMINATED, KernelStatus.TERMINATING, KernelStatus.CANCELLED)
+        ]
+        per_agent_tasks = []
+        to_be_terminated = []
+
+        async def _destroy_kernels_in_agent(
+            session: SessionRow, destroyed_kernels: List[KernelRow]
+        ) -> None:
+            async with RPCContext(
+                destroyed_kernels[0].agent,
+                destroyed_kernels[0].agent_addr,
+                invoke_timeout=None,
+                order_key=session.id,
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                rpc_coros = []
+                for kernel in destroyed_kernels:
+                    # internally it enqueues a "destroy" lifecycle event.
+                    if kernel.status != KernelStatus.SCHEDULED:
+                        rpc_coros.append(
+                            rpc.call.destroy_kernel(str(kernel.id), reason),
+                        )
+                try:
+                    await asyncio.gather(*rpc_coros)
+                except Exception:
+                    log.exception(
+                        "destroy_kernels_in_agent(a:{}, s:{}): unexpected error",
+                        destroyed_kernels[0].agent,
+                        session.id,
+                    )
+                for kernel in destroyed_kernels:
+                    last_stat: Optional[Dict[str, Any]]
+                    last_stat = None
+                    try:
+                        raw_last_stat = await redis_helper.execute(
+                            self.redis_stat, lambda r: r.get(str(kernel.id))
+                        )
+                        if raw_last_stat is not None:
+                            last_stat = msgpack.unpackb(raw_last_stat)
+                            last_stat["version"] = 2
+                    except asyncio.TimeoutError:
+                        pass
+
+        if unsynced_kernels:
+            per_agent_tasks.append(_destroy_kernels_in_agent(session, unsynced_kernels))
+            to_be_terminated.extend(unsynced_kernels)
+
+        if per_agent_tasks:
+            await asyncio.gather(*per_agent_tasks, return_exceptions=True)
+        for kernel in to_be_terminated:
+            await self.event_producer.produce_event(
+                KernelTerminatedEvent(kernel.id, KernelLifecycleEventReason(reason)),
+            )
+        await self.hook_plugin_ctx.notify(
+            "POST_DESTROY_SESSION",
+            (session_id, session.name, session.access_key),
+        )
+        await self.recalc_resource_usage()
 
     async def mark_session_terminated(
         self,

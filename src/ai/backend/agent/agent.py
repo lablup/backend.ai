@@ -83,6 +83,7 @@ from ai.backend.common.events import (
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
+    KernelTerminatingEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
 )
@@ -915,6 +916,10 @@ class AbstractAgent(
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
             self.terminating_kernels.add(ev.kernel_id)
             async with self.registry_lock:
+                reason = ev.reason
+                await self.produce_event(
+                    KernelTerminatingEvent(ev.kernel_id, reason),
+                )
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
                     log.warning(
@@ -922,12 +927,7 @@ class AbstractAgent(
                     )
                     if ev.container_id is None:
                         await self.rescan_resource_usage()
-                        if not ev.suppress_events:
-                            await self.produce_event(
-                                KernelTerminatedEvent(
-                                    ev.kernel_id, KernelLifecycleEventReason.ALREADY_TERMINATED
-                                ),
-                            )
+                        reason = KernelLifecycleEventReason.ALREADY_TERMINATED
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
                         return
@@ -944,17 +944,11 @@ class AbstractAgent(
                         ev.done_future.set_exception(e)
                     raise
                 finally:
+                    await self.produce_event(
+                        KernelTerminatedEvent(ev.kernel_id, reason),
+                    )
                     if ev.container_id is not None:
-                        await self.container_lifecycle_queue.put(
-                            ContainerLifecycleEvent(
-                                ev.kernel_id,
-                                ev.container_id,
-                                LifecycleEvent.CLEAN,
-                                ev.reason,
-                                suppress_events=ev.suppress_events,
-                                done_future=ev.done_future,
-                            ),
-                        )
+                        await self._handle_clean_event(ev)
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1010,10 +1004,9 @@ class AbstractAgent(
                         restart_tracker.destroy_event.set()
                     else:
                         await self.rescan_resource_usage()
-                        if not ev.suppress_events:
-                            await self.produce_event(
-                                KernelTerminatedEvent(ev.kernel_id, ev.reason),
-                            )
+                        await self.produce_event(
+                            KernelTerminatedEvent(ev.kernel_id, ev.reason),
+                        )
                     # Notify cleanup waiters after all state updates.
                     if kernel_obj is not None and kernel_obj.clean_event is not None:
                         kernel_obj.clean_event.set_result(None)

@@ -1517,7 +1517,9 @@ async def handle_kernel_termination_lifecycle(
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, KernelTerminatingEvent):
         # The destroy_kernel() API handler will set the "TERMINATING" status.
-        pass
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_by_kernel(db_sess, event.kernel_id)
+        await root_ctx.registry.mark_session_terminating(session.id, event.reason)
     elif isinstance(event, KernelTerminatedEvent):
         await root_ctx.registry.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code

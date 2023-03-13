@@ -31,6 +31,7 @@ from sqlalchemy.orm import noload, relationship, selectinload
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -949,6 +950,13 @@ class SessionRow(Base):
             return sessions[0]
         except IndexError:
             raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+
+    @classmethod
+    async def get_session_by_kernel(cls, db_session: SASession, kernel_id: KernelId) -> SessionRow:
+        j = sa.join(SessionRow, KernelRow, SessionRow.id == KernelRow.session_id)
+        query = sa.select(SessionRow).select_from(j).where(KernelRow.id == kernel_id)
+        result = await db_session.execute(query)
+        return result.scalars().first()
 
     @classmethod
     async def get_sgroup_managed_sessions(
