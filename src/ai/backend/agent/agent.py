@@ -592,7 +592,7 @@ class AbstractAgent(
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
             metadata: Dict[str, Any] = dict(computer.get_metadata())
-            metadata["number_format"]["binary"] = 1 if metadata["number_format"]["binary"] else 0
+            metadata["number_format"] = json.dumps(metadata["number_format"])
             redis_encodable_metadatas.append(metadata)
 
         async def _pipeline(r: Redis):

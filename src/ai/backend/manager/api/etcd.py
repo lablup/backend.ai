@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple, cast
 
@@ -102,7 +103,7 @@ async def get_resource_metadata(request: web.Request) -> web.Response:
     accelerator_metadatas: Dict[str, AcceleratorMetadata] = {}
     for redis_encoded_metadata in accelerator_metadatas_list:
         metadata = dict(redis_encoded_metadata)
-        metadata["number_format"]["binary"] = metadata["number_format"]["binary"] == 1
+        metadata["number_format"] = json.loads(metadata["number_format"])
         accelerator_metadatas[metadata["slot_name"]] = cast(AcceleratorMetadata, metadata)
     for key, value in KNOWN_SLOT_METADATA.items():
         if key not in accelerator_metadatas:
