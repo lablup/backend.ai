@@ -30,7 +30,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "description": "CPU",
         "human_readable_name": "CPU",
         "display_unit": "Core",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "cpu",
     },
     "mem": {
@@ -38,7 +38,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "description": "Memory",
         "human_readable_name": "RAM",
         "display_unit": "GiB",
-        "number_format": "#,###",
+        "number_format": {"binary": True, "round_length": 0},
         "display_icon": "cpu",
     },
     "cuda.device": {
@@ -46,7 +46,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "human_readable_name": "GPU",
         "description": "CUDA-capable GPU",
         "display_unit": "GPU",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "gpu1",
     },
     "cuda.shares": {
@@ -54,7 +54,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "human_readable_name": "fGPU",
         "description": "CUDA-capable GPU (fractional)",
         "display_unit": "fGPU",
-        "number_format": "#,###.00",
+        "number_format": {"binary": False, "round_length": 2},
         "display_icon": "gpu1",
     },
     "rocm.device": {
@@ -62,7 +62,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "human_readable_name": "GPU",
         "description": "ROCm-capable GPU",
         "display_unit": "GPU",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "gpu2",
     },
     "tpu.device": {
@@ -70,7 +70,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "human_readable_name": "TPU",
         "description": "TPU device",
         "display_unit": "GPU",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "tpu",
     },
 }
