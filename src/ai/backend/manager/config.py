@@ -417,7 +417,6 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
 class AbstractConfig(UserDict):
-
     _watch_callbacks: List[ConfigWatchCallback]
 
     def __init__(self, initial_data: Mapping[str, Any] = None) -> None:
@@ -442,7 +441,6 @@ class LocalConfig(AbstractConfig):
 
 
 def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 

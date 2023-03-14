@@ -20,6 +20,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
 
@@ -42,6 +43,7 @@ from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
+    from ..api.context import BackgroundTaskManager
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
@@ -58,8 +60,10 @@ __all__: Sequence[str] = (
     "VFolderOperationStatus",
     "VFolderAccessStatus",
     "DEAD_VFOLDER_STATUSES",
+    "VFolderCloneInfo",
     "VFolderDeletionInfo",
     "query_accessible_vfolders",
+    "initiate_vfolder_clone",
     "update_vfolder_status",
     "initiate_vfolder_removal",
     "get_allowed_vfolder_hosts_by_group",
@@ -167,6 +171,20 @@ DEAD_VFOLDER_STATUSES = (
 class VFolderDeletionInfo(NamedTuple):
     vfolder_id: uuid.UUID
     host: str
+
+
+class VFolderCloneInfo(NamedTuple):
+    source_vfolder_id: uuid.UUID
+    source_host: str
+
+    # Target Vfolder infos
+    target_vfolder_name: str
+    target_host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderPermission
+    email: str
+    user_id: uuid.UUID
+    cloneable: bool
 
 
 vfolders = sa.Table(
@@ -816,8 +834,109 @@ async def filter_host_allowed_permission(
     return allowed_hosts
 
 
+async def initiate_vfolder_clone(
+    db_engine: ExtendedAsyncSAEngine,
+    vfolder_info: VFolderCloneInfo,
+    storage_manager: StorageSessionManager,
+    background_task_manager: BackgroundTaskManager,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id
+
+    async def _update_status() -> None:
+        async with db_engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(status=VFolderOperationStatus.CLONING)
+                .where(source_vf_cond)
+            )
+            await db_session.execute(query)
+
+    await execute_with_retry(_update_status)
+
+    target_proxy, target_volume = storage_manager.split_host(vfolder_info.target_host)
+    source_proxy, source_volume = storage_manager.split_host(vfolder_info.source_host)
+
+    # Generate the ID of the destination vfolder.
+    # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
+    #       the actual object (with RETURNING clause).  In that case, we need to temporarily
+    #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
+    #       vfolder.  After done, we need to make another transaction to clear the unusable state.
+    target_folder_id = uuid.uuid4()
+
+    async def _clone(reporter: ProgressReporter) -> None:
+        try:
+            async with storage_manager.request(
+                target_proxy,
+                "POST",
+                "folder/create",
+                json={
+                    "volume": target_volume,
+                    "vfid": str(target_folder_id),
+                    # 'options': {'quota': params['quota']},
+                },
+            ):
+                pass
+        except aiohttp.ClientResponseError:
+            raise VFolderOperationFailed(extra_msg=str(target_folder_id))
+
+        async def _insert_vfolder() -> None:
+            async with db_engine.begin_session() as db_session:
+                insert_values = {
+                    "id": target_folder_id,
+                    "name": vfolder_info.target_vfolder_name,
+                    "usage_mode": vfolder_info.usage_mode,
+                    "permission": vfolder_info.permission,
+                    "last_used": None,
+                    "host": vfolder_info.target_host,
+                    "creator": vfolder_info.email,
+                    "ownership_type": VFolderOwnershipType("user"),
+                    "user": vfolder_info.user_id,
+                    "group": None,
+                    "unmanaged_path": "",
+                    "cloneable": vfolder_info.cloneable,
+                }
+                insert_query = sa.insert(vfolders, insert_values)
+                try:
+                    await db_session.execute(insert_query)
+                except sa.exc.DataError:
+                    # TODO: pass exception info
+                    raise InvalidAPIParameters
+
+        await execute_with_retry(_insert_vfolder)
+
+        try:
+            async with storage_manager.request(
+                source_proxy,
+                "POST",
+                "folder/clone",
+                json={
+                    "src_volume": source_volume,
+                    "src_vfid": str(vfolder_info.source_vfolder_id),
+                    "dst_volume": target_volume,
+                    "dst_vfid": str(target_folder_id),
+                },
+            ):
+                pass
+        except aiohttp.ClientResponseError:
+            raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
+
+        async def _update_source_vfolder() -> None:
+            async with db_engine.begin_session() as db_session:
+                query = (
+                    sa.update(vfolders)
+                    .values(status=VFolderOperationStatus.READY)
+                    .where(source_vf_cond)
+                )
+                await db_session.execute(query)
+
+        await execute_with_retry(_update_source_vfolder)
+
+    task_id = await background_task_manager.start(_clone)
+    return task_id, target_folder_id
+
+
 async def initiate_vfolder_removal(
-    engine: ExtendedAsyncSAEngine,
+    db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
     storage_ptask_group: aiotools.PersistentTaskGroup,
@@ -829,7 +948,7 @@ async def initiate_vfolder_removal(
         return 0
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
-    await update_vfolder_status(engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING)
+    await update_vfolder_status(db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING)
 
     async def _delete():
         for folder_id, host_name in requested_vfolders:
@@ -849,7 +968,7 @@ async def initiate_vfolder_removal(
                 raise VFolderOperationFailed(extra_msg=str(folder_id))
 
         async def _delete_row() -> None:
-            async with engine.begin_session() as db_session:
+            async with db_engine.begin_session() as db_session:
                 await db_session.execute(sa.delete(vfolders).where(cond))
 
         await execute_with_retry(_delete_row)

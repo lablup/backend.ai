@@ -15,6 +15,7 @@ from aiodocker.exceptions import DockerError
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -268,7 +269,6 @@ class CPUPlugin(AbstractComputePlugin):
             return None
 
         async def api_impl(cid: str, pids: List[int]) -> List[Optional[Decimal]]:
-
             return []
 
         per_process_cpu_util = {}
@@ -397,6 +397,16 @@ class CPUPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "cpu",
+            "description": "CPU",
+            "human_readable_name": "CPU",
+            "display_unit": "Core",
+            "number_format": "#,###",
+            "display_icon": "cpu",
+        }
 
 
 class MemoryDevice(AbstractComputeDevice):
@@ -688,7 +698,6 @@ class MemoryPlugin(AbstractComputePlugin):
         async def api_impl(
             cid: str, pids: List[int]
         ) -> List[Tuple[Optional[int], Optional[int], Optional[int]]]:
-
             return []
 
         per_process_mem_used_bytes = {}
@@ -817,3 +826,13 @@ class MemoryPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "ram",
+            "description": "Memory",
+            "human_readable_name": "RAM",
+            "display_unit": "GiB",
+            "number_format": "#,###",
+            "display_icon": "cpu",
+        }
