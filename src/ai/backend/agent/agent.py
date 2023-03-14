@@ -91,7 +91,6 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
-    AcceleratorMetadata,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -586,17 +585,19 @@ class AbstractAgent(
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
         all_devices: List[AbstractComputeDevice] = []
-        metadatas: List[AcceleratorMetadata] = []
+        redis_encodable_metadatas: List[Dict[str, Any]] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
             all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
-            metadatas.append(computer.get_metadata())
+            metadata: Dict[str, Any] = dict(computer.get_metadata())
+            metadata["number_format"]["binary"] = 1 if metadata["number_format"]["binary"] else 0
+            redis_encodable_metadatas.append(metadata)
 
         async def _pipeline(r: Redis):
             pipe = r.pipeline()
-            for metadata in metadatas:
+            for metadata in redis_encodable_metadatas:
                 await pipe.hset(
                     f"computer:{metadata['slot_name']}:metadata",
                     mapping=cast(dict, metadata),

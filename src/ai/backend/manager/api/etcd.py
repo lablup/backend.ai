@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple, cast
 
 import aiohttp_cors
 import trafaret as t
@@ -99,7 +99,11 @@ async def get_resource_metadata(request: web.Request) -> web.Response:
     accelerator_metadatas_list = await redis_helper.execute(
         root_ctx.redis_stat, _pipeline, encoding="utf-8"
     )
-    accelerator_metadatas = {x["slot_name"]: x for x in accelerator_metadatas_list}
+    accelerator_metadatas: Dict[str, AcceleratorMetadata] = {}
+    for redis_encoded_metadata in accelerator_metadatas_list:
+        metadata = dict(redis_encoded_metadata)
+        metadata["number_format"]["binary"] = metadata["number_format"]["binary"] == 1
+        accelerator_metadatas[metadata["slot_name"]] = cast(AcceleratorMetadata, metadata)
     for key, value in KNOWN_SLOT_METADATA.items():
         if key not in accelerator_metadatas:
             accelerator_metadatas[key] = value
