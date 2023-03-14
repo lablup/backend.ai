@@ -754,7 +754,7 @@ async def update_vfolder_status(
     engine: ExtendedAsyncSAEngine,
     vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
-):
+) -> None:
     vfolder_info_len = len(vfolder_ids)
     cond = vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:

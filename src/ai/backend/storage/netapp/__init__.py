@@ -111,7 +111,9 @@ class NetAppVolume(BaseVolume):
             io_usec_write=metric["latency"]["write"],
         )
 
-    async def _delete(self, vfpath: Path) -> None:
+    async def delete_vfolder(self, vfid: UUID) -> None:
+        vfpath = self.mangle_vfpath(vfid)
+
         # extract target_dir from vfpath
         target_dir = str(vfpath).split(self.netapp_qtree_name + "/", 1)[1].split("/")[0]
         nfs_path = (
@@ -150,11 +152,6 @@ class NetAppVolume(BaseVolume):
             await aiofile_os.rmdir(vfpath.parent.parent)
 
         await read_progress(nfs_path)
-
-    async def delete_vfolder(self, vfid: UUID) -> None:
-        vfpath = self.mangle_vfpath(vfid)
-        await self._delete(vfpath)
-        return None
 
     async def clone_vfolder(
         self,

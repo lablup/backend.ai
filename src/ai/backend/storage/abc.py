@@ -39,14 +39,11 @@ class AbstractVolume(metaclass=ABCMeta):
     async def shutdown(self) -> None:
         pass
 
-    def mangle_rel_path(self, vfid: UUID) -> Path:
+    def mangle_vfpath(self, vfid: UUID) -> Path:
         prefix1 = vfid.hex[0:2]
         prefix2 = vfid.hex[2:4]
         rest = vfid.hex[4:]
-        return Path(prefix1, prefix2, rest)
-
-    def mangle_vfpath(self, vfid: UUID) -> Path:
-        return Path(self.mount_path, self.mangle_rel_path(vfid))
+        return Path(self.mount_path, prefix1, prefix2, rest)
 
     def sanitize_vfpath(
         self,

@@ -391,7 +391,6 @@ shared_config_iv = t.Dict(
                 t.Key("token", default=_shdefs["watcher"]["token"]): t.Null | t.String,
             }
         ).allow_extra("*"),
-        t.Key("storage_check_interval_days", default=None): t.Null | t.Int,
     }
 ).allow_extra("*")
 

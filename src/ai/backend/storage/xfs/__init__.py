@@ -1,10 +1,9 @@
 import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
-from typing import AsyncIterator, Dict, FrozenSet, List
+from typing import Dict, FrozenSet, List
 from uuid import UUID
 
 from ai.backend.common.lock import FileLock
@@ -186,8 +185,7 @@ class XfsVolume(BaseVolume):
             await self.delete_vfolder(vfid)
             raise VFolderCreationError("problem in setting vfolder quota")
 
-    @asynccontextmanager
-    async def deletion_ctx(self, vfid: UUID) -> AsyncIterator:
+    async def delete_vfolder(self, vfid: UUID) -> None:
         async with FileLock(LOCK_FILE):
             await self.registry.read_project_info()
             if vfid in self.registry.name_id_map.keys():
@@ -202,13 +200,8 @@ class XfsVolume(BaseVolume):
                     pass  # Pass to delete the physical directlry anyway.
                 finally:
                     await self.registry.remove_project_entry(vfid)
-            yield
-
-    async def delete_vfolder(self, vfid: UUID) -> None:
-        async with self.deletion_ctx(vfid):
             await super().delete_vfolder(vfid)
             await self.registry.read_project_info()
-        return None
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         full_report = await run(
