@@ -50,7 +50,7 @@ def format_nested_dicts(value: Mapping[str, Mapping[str, Any]]) -> str:
                 else:
                     if outer_key == "shmem":
                         rows.append(
-                            f"- {outer_key}: {humanize.naturalsize(str(outer_value), binary=True)}"
+                            f"- {outer_key}: {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
                         )
                     else:
                         rows.append(f"- {outer_key}: {outer_value}")
@@ -122,11 +122,11 @@ class MiBytesOutputFormatter(OutputFormatter):
 
 class SizeBytesOutputFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        value = humanize.naturalsize(value, binary=True)
+        value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_console(value, field)
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        value = humanize.naturalsize(value, binary=True)
+        value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_json(value, field)
 
 
@@ -145,7 +145,7 @@ class ResourceSlotFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
         value = json.loads(value)
         if mem := value.get("mem"):
-            value["mem"] = humanize.naturalsize(mem, binary=True)
+            value["mem"] = humanize.naturalsize(mem, binary=True, gnu=True)
 
         return ", ".join(f"{k}:{v}" for k, v in value.items())
 
@@ -169,14 +169,14 @@ class AgentStatFormatter(OutputFormatter):
 
         value_formatters = {
             "bytes": lambda metric, binary: "{} / {}".format(
-                humanize.naturalsize(int(metric["current"]), binary),
-                humanize.naturalsize(int(metric["capacity"]), binary),
+                humanize.naturalsize(int(metric["current"]), binary, gnu=binary),
+                humanize.naturalsize(int(metric["capacity"]), binary, gnu=binary),
             ),
             "Celsius": lambda metric, _: "{:,} C".format(
                 float(metric["current"]),
             ),
-            "bps": lambda metric, binary: "{}/s".format(
-                humanize.naturalsize(float(metric["current"]), binary),
+            "bps": lambda metric, _: "{}/s".format(
+                humanize.naturalsize(float(metric["current"])),
             ),
             "pct": lambda metric, _: "{} %".format(
                 metric["pct"],
