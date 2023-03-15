@@ -258,16 +258,6 @@ jobs:
           dist/*.whl
           dist/*.tar.gz
         if-no-files-found: error
-    - uses: actions/checkout@v3
-    - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Extract Python version from pants.toml
-      shell: bash
-      run: |
-        export LANG=C.UTF-8
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
