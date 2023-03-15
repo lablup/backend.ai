@@ -454,6 +454,7 @@ class Queries(graphene.ObjectType):
         group_id=graphene.String(),
         access_key=graphene.String(),
         status=graphene.String(),
+        session_type=graphene.String(),
     )
 
     compute_container_list = graphene.Field(
@@ -1332,10 +1333,12 @@ class Queries(graphene.ObjectType):
         group_id: uuid.UUID = None,
         access_key: AccessKey = None,
         status: str = None,
+        session_type: Optional[str] = None,
     ) -> ComputeSessionList:
         total_count = await ComputeSession.load_count(
             info.context,
             status=status,  # filter
+            session_type=session_type,
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
             access_key=access_key,  # scope
@@ -1346,6 +1349,7 @@ class Queries(graphene.ObjectType):
             limit,
             offset,  # slice
             status=status,  # filter
+            session_type=session_type,
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
             access_key=access_key,  # scope

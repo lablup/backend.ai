@@ -5,6 +5,7 @@ from uuid import UUID
 
 from faker import Faker
 
+from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
@@ -14,9 +15,25 @@ from .base import BaseFunction, api_function
 
 __all__ = ("Service",)
 
-_default_list_fields: Sequence[FieldSpec] = tuple()
+_default_list_fields: Sequence[FieldSpec] = (
+    session_fields["session_id"],
+    session_fields["image"],
+    session_fields["type"],
+    session_fields["status"],
+    session_fields["status_info"],
+    session_fields["status_changed"],
+    session_fields["result"],
+)
 
-_default_detail_fields: Sequence[FieldSpec] = tuple()
+_default_detail_fields: Sequence[FieldSpec] = (
+    session_fields["session_id"],
+    session_fields["image"],
+    session_fields["type"],
+    session_fields["status"],
+    session_fields["status_info"],
+    session_fields["status_changed"],
+    session_fields["result"],
+)
 
 
 class Service(BaseFunction):
@@ -44,8 +61,9 @@ class Service(BaseFunction):
     ) -> PaginatedResult:
         """ """
         return await fetch_paginated_result(
-            "service_list",
+            "compute_session_list",
             {
+                "session_type": ("INFERENCE", "String"),
                 "filter": (filter, "String"),
                 "order": (order, "String"),
             },
@@ -64,7 +82,7 @@ class Service(BaseFunction):
         query = textwrap.dedent(
             """\
             query($service_id: UUID!) {
-                service(service_id: $service_id) {$fields}
+                compute_session(service_id: $service_id) {$fields}
             }
         """
         )

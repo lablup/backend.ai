@@ -48,7 +48,6 @@ from .exceptions import (
     UnknownImageReferenceError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
-from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes, undefined
 
@@ -169,6 +168,8 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def create(request: web.Request, params: Any) -> web.Response:
+    from .session import query_userinfo
+
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["service.context"]
     access_key = request["keypair"]["access_key"]

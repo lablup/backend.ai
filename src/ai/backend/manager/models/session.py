@@ -1274,6 +1274,7 @@ class ComputeSession(graphene.ObjectType):
         group_id: Optional[UUID] = None,
         access_key: Optional[str] = None,
         status: Optional[str] = None,
+        session_type: Optional[str] = None,
         filter: Optional[str] = None,
     ) -> int:
         if isinstance(status, str):
@@ -1292,6 +1293,8 @@ class ComputeSession(graphene.ObjectType):
             query = query.where(SessionRow.access_key == access_key)
         if status is not None:
             query = query.where(SessionRow.status.in_(status_list))
+        if session_type is not None:
+            query = query.where(SessionRow.session_type == SessionTypes[session_type])
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1310,6 +1313,7 @@ class ComputeSession(graphene.ObjectType):
         group_id: Optional[UUID] = None,
         access_key: Optional[str] = None,
         status: Optional[str] = None,
+        session_type: Optional[str] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[ComputeSession | None]:
@@ -1342,6 +1346,8 @@ class ComputeSession(graphene.ObjectType):
             query = query.where(SessionRow.access_key == access_key)
         if status is not None:
             query = query.where(SessionRow.status.in_(status_list))
+        if session_type is not None:
+            query = query.where(SessionRow.session_type == SessionTypes[session_type])
         if filter is not None:
             parser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = parser.append_filter(query, filter)
