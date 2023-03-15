@@ -989,10 +989,15 @@ class RedisConnectionInfo:
             await self.client.close()
 
 
+class AcceleratorNumberFormat(TypedDict):
+    binary: bool
+    round_length: int
+
+
 class AcceleratorMetadata(TypedDict):
     slot_name: str
     description: str
     human_readable_name: str
     display_unit: str
-    number_format: str
+    number_format: AcceleratorNumberFormat
     display_icon: str
