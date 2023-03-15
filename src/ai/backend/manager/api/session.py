@@ -2025,7 +2025,7 @@ async def get_info(request: web.Request) -> web.Response:
 
         resp["numQueriesExecuted"] = sess.num_queries
         resp["lastStat"] = sess.last_stat
-        resp["idle_checks"] = await get_idle_check_report(root_ctx.redis_live, sess.id)
+        resp["idleChecks"] = await get_idle_check_report(root_ctx.redis_live, sess.id)
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
