@@ -48,6 +48,7 @@ def format_nested_dicts(value: Mapping[str, Mapping[str, Any]]) -> str:
                 if outer_value is None:
                     rows.append(f"- {outer_key}: (null)")
                 else:
+                    # TODO: refactor as a formatter
                     if outer_key == "shmem":
                         rows.append(
                             f"- {outer_key}: {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
