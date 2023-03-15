@@ -11,12 +11,10 @@ import os.path
 import shutil
 import signal
 import sys
-from contextlib import suppress
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
-from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,7 +28,6 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    Type,
     cast,
 )
 from uuid import UUID
@@ -360,46 +357,35 @@ class AgentRPCServer(aobject):
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
+        coros = []
+        throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
+        for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
+            log.info(
+                "rpc::create_kernel(k:{0}, img:{1})",
+                raw_kernel_id,
+                raw_config["image"]["canonical"],
+            )
+            kernel_id = KernelId(UUID(raw_kernel_id))
+            kernel_config = cast(KernelCreationConfig, raw_config)
+            coros.append(
+                self.agent.create_kernel(
+                    session_id,
+                    kernel_id,
+                    kernel_config,
+                    cluster_info,
+                    throttle_sema=throttle_sema,
+                )
+            )
+
         results = []
         errors = []
 
-        async def kernel_creation_task_exception_handler(
-            exc_type: Type[Exception],
-            exc_obj: Exception,
-            tb: TracebackType,
-        ) -> None:
-            errors.append(exc_obj)
-
-        try:
-            async with aiotools.PersistentTaskGroup(
-                exception_handler=kernel_creation_task_exception_handler,
-            ) as tg:
-                futures = []
-                for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
-                    log.info(
-                        "rpc::create_kernel(k:{0}, img:{1})",
-                        raw_kernel_id,
-                        raw_config["image"]["canonical"],
-                    )
-                    kernel_id = KernelId(UUID(raw_kernel_id))
-                    kernel_config = cast(KernelCreationConfig, raw_config)
-                    futures.append(
-                        tg.create_task(
-                            self.agent.create_kernel(
-                                session_id,
-                                kernel_id,
-                                kernel_config,
-                                cluster_info,
-                            )
-                        )
-                    )
-                for future in futures:
-                    with suppress(Exception):
-                        results.append(await future)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            log.exception("unexpected error")
+        async with aclosing(aiotools.as_completed_safe(coros)) as ag:
+            async for result in ag:
+                try:
+                    results.append(await result)
+                except (BaseException, Exception) as e:
+                    errors.append(e)
 
         if errors:
             # Raise up the first error.
