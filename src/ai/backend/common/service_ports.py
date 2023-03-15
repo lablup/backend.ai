@@ -17,6 +17,7 @@ def parse_service_ports(
 ) -> Sequence[ServicePort]:
     items: List[ServicePort] = []
     used_ports: Set[int] = set()
+    inference_apps: Sequence[str]
     if isinstance(endpoint_ports_label, str):
         inference_apps = endpoint_ports_label.split(",")
     else:
