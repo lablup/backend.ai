@@ -8,6 +8,8 @@ Create Date: 2023-03-02 16:21:13.680443
 import sqlalchemy as sa
 from alembic import op
 
+from ai.backend.manager.models.base import GUID
+
 # revision identifiers, used by Alembic.
 revision = "25fc64df7326"
 down_revision = "10c58e701d87"
@@ -32,10 +34,10 @@ def upgrade():
     op.alter_column(
         "endpoints", column_name="resource_group", new_column_name="resource_group_name"
     )
+    op.alter_column("endpoints", "resource_slots", nullable=True, server_default="{}")
 
     op.alter_column("routings", column_name="endpoint", new_column_name="endpoint_id")
     op.alter_column("routings", column_name="session", new_column_name="session_id")
-    op.alter_column("routings", column_name="model", new_column_name="model_id")
 
     # Add columns
     op.add_column(
@@ -43,6 +45,7 @@ def upgrade():
     )
     op.add_column("routings", sa.Column("session_endpoint_port", sa.Integer(), nullable=True))
     op.add_column("routings", sa.Column("model_version", sa.String(length=64), nullable=False))
+    op.add_column("routings", sa.Column("model_id", GUID(), nullable=False))
 
     # Add constraints and indexes
     op.create_index(
@@ -146,6 +149,7 @@ def downgrade():
     op.drop_column("routings", "model_version")
     op.drop_column("routings", "session_endpoint_port")
     op.drop_column("routings", "session_endpoint_name")
+    op.drop_column("routings", "model_id")
 
     # Alter column name
     op.alter_column("endpoints", column_name="image_id", new_column_name="image")
@@ -155,10 +159,10 @@ def downgrade():
     op.alter_column(
         "endpoints", column_name="resource_group_name", new_column_name="resource_group"
     )
+    op.alter_column("endpoints", "resource_slots", nullable=False)
 
     op.alter_column("routings", column_name="endpoint_id", new_column_name="endpoint")
     op.alter_column("routings", column_name="session_id", new_column_name="session")
-    op.alter_column("routings", column_name="model_id", new_column_name="model")
 
     # Add constraints and indexes
     op.create_foreign_key(

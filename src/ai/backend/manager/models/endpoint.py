@@ -46,7 +46,7 @@ class EndpointRow(Base):
         nullable=False,
     )
 
-    resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
+    resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=True, default="{}")
     url = sa.Column("url", sa.String(length=1024), nullable=False, unique=True)
 
     routings = relationship("RoutingRow", back_populates="endpoint")

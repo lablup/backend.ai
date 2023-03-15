@@ -665,6 +665,7 @@ async def server_main(
         ".acl",
         ".etcd",
         ".events",
+        ".endpoint",
         ".auth",
         ".ratelimit",
         ".vfolder",

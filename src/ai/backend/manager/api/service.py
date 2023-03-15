@@ -34,7 +34,7 @@ from ..models import (
 from ..models.endpoint import EndpointRow
 from ..models.routing import RoutingRow
 from ..models.session import SessionRow, SessionStatus
-from ..models.utils import ExtendedAsyncSAEngine, execute_with_retry
+from ..models.utils import ExtendedAsyncSAEngine
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
@@ -143,7 +143,7 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"], default=None): tx.UUID | t.Null,
+            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID,
             tx.AliasedKey(["service_name", "serviceName"]): t.String,
             tx.AliasedKey(["model_id", "modelId"]): tx.UUID,
             tx.AliasedKey(["model_version", "modelVersion"]): t.String,
@@ -195,10 +195,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     params["image_ref"],
                 ],
             )
-            img_id = image_row.id
         requested_image_ref = image_row.image_ref
         parsed_labels: dict[str, Any] = validate_image_labels(image_row.labels)
-        model_mount_path = parsed_labels["ai.backend.model-path"]
+        parsed_labels["ai.backend.model-path"] = "model-path"
+        try:
+            model_mount_path = parsed_labels["ai.backend.model-path"]
+        except KeyError:
+            raise InvalidAPIParameters("Given image does not have model-path label")
         # service_ports: dict[str, ServicePort] = {
         #     item["name"]: item for item in parsed_labels["ai.backend.service-ports"]
         # }
@@ -255,30 +258,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
     }
     params["config"]["mounts"] = mounts
     params["config"]["mount_map"] = mount_map
-    for kern_config in params["config"]["kernel_configs"]:
-        kern_config["mounts"] = mounts
-        kern_config["mount_map"] = mount_map
 
-    # Create endpoint
-    # TODO: attach to existing endpoint
-    async def _create_endpoint() -> uuid.UUID:
-        async with root_ctx.db.begin_session() as db_sess:
-            endpoint_id = uuid.uuid4()
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                image=img_id,
-                model=model_id,
-                domain=domain_name,
-                project=group_id,
-                resource_group=params["config"]["scaling_group"],
-            )
-            db_sess.add(endpoint)
-            return endpoint_id
-
-    if params["endpoint_id"] is None:
-        endpoint_id = await execute_with_retry(_create_endpoint)
-    else:
-        endpoint_id = params["endpoint_id"]
+    endpoint_id = params["endpoint_id"]
 
     starts_at: Union[datetime, None] = None
     if params["starts_at"]:

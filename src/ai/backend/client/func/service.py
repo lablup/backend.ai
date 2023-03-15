@@ -114,6 +114,8 @@ class Service(BaseFunction):
         project: Optional[str],
         endpoint_id: Optional[str],
         service_name: Optional[str],
+        tag: Optional[str] = None,
+        scaling_group: Optional[str] = None,
     ):
         if service_name is None:
             faker = Faker()
@@ -122,6 +124,11 @@ class Service(BaseFunction):
         rqst = Request("POST", "/service")
         rqst.set_json(
             {
+                "tag": tag,
+                "config": {
+                    "resource_opts": resource_opts,
+                    "scaling_group": scaling_group,
+                },
                 "model_id": model_id,
                 "service_name": service_name,
                 "model_version": model_version,
