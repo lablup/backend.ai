@@ -1,6 +1,7 @@
 from . import admin  # noqa  # type: ignore
 from . import config  # noqa  # type: ignore
 from . import dotfile  # noqa  # type: ignore
+from . import endpoint  # noqa  # type: ignore
 from . import extensions  # noqa  # type: ignore
 from . import model  # noqa  # type: ignore
 from . import server_log  # noqa  # type: ignore

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from typing import TYPE_CHECKING, List, Optional, Sequence
 
@@ -9,10 +11,13 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ..api.exceptions import EndpointNotFound
 from .base import GUID, Base, EndpointIDColumn, Item, PaginatedList, ResourceSlotColumn
+from .image import ImageRow
 from .routing import Routing
 
 if TYPE_CHECKING:
-    pass  # from .gql import GraphQueryContext
+    from sqlalchemy.engine import Row
+
+    from .gql import GraphQueryContext
 
 __all__ = ("EndpointRow", "Endpoint", "EndpointList")
 
@@ -53,11 +58,15 @@ class EndpointRow(Base):
     image = relationship("ImageRow", back_populates="endpoints")
 
     @classmethod
-    async def get(cls, session: AsyncSession, endpoint_id: uuid.UUID) -> "EndpointRow":
+    async def get(cls, db_session: AsyncSession, endpoint_id: uuid.UUID) -> "EndpointRow":
         """
         :raises: ai.backend.manager.api.exceptions.EndpointNotFound
         """
-        endpoint_row = await session.get(EndpointRow, endpoint_id)
+        j = sa.join(EndpointRow, ImageRow, EndpointRow.image_id == ImageRow.id)
+        query = (
+            sa.select(Endpoint, ImageRow.name).select_from(j).where(EndpointRow.id == endpoint_id)
+        )
+        endpoint_row = (await db_session.execute(query)).scalars().first()
         if endpoint_row is None:
             raise EndpointNotFound()
         return endpoint_row
@@ -79,6 +88,7 @@ class Endpoint(graphene.ObjectType):
 
     endpoint_id = graphene.UUID()
     image_id = graphene.String()
+    image = graphene.String()
     model_id = graphene.UUID()
     domain_name = graphene.String()
     project_id = graphene.UUID()
@@ -90,12 +100,15 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def from_row(
         cls,
-        ctx,  # ctx: GraphQueryContext,
-        row: EndpointRow,
+        ctx: GraphQueryContext,
+        row: Row,
     ) -> "Endpoint":
+        image_ref = getattr(row, "image_name")
+        row = row.EndpointRow
         return cls(
             endpoint_id=row.id,
             image_id=row.image_id,
+            image=image_ref,
             model_id=row.model_id,
             domain_name=row.domain_name,
             project_id=row.project_id,
@@ -108,21 +121,21 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_count(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         project: uuid.UUID | None = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(EndpointRow)
         if project is not None:
             query = query.where(EndpointRow.project == project)
-        async with ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
+        async with ctx.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(query)
             return result.scalar()
 
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -130,7 +143,13 @@ class Endpoint(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence["Endpoint"]:
-        query = sa.select(EndpointRow).limit(limit).offset(offset)
+        j = sa.join(EndpointRow, ImageRow, EndpointRow.image_id == ImageRow.id)
+        query = (
+            sa.select(EndpointRow, ImageRow.name.label("image_name"))
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+        )
         if project is not None:
             query = query.where(EndpointRow.project == project)
         """
@@ -141,13 +160,13 @@ class Endpoint(graphene.ObjectType):
             parser = QueryOrderParser(cls._queryorder_colmap)
             query = parser.append_ordering(query, order)
         """
-        async with ctx.db.begin_readonly_session() as session:
-            return [await cls.from_row(ctx, row) async for row in (await session.stream(query))]
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return [await cls.from_row(ctx, row) async for row in (await db_sess.stream(query))]
 
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         project: uuid.UUID | None = None,
     ) -> Sequence["Endpoint"]:
@@ -158,7 +177,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_item(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx: GraphQueryContext,
         *,
         endpoint_id: uuid.UUID,
     ) -> "Endpoint":

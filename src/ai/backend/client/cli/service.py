@@ -171,7 +171,7 @@ def rm(ctx: CLIContext, service_id):
     Remove the service endpoint.
 
     \b
-    ENDPOINT: The endpoint ID"""
+    SERVICE_ID: The service ID"""
     with Session() as session:
         try:
             session.Service.delete(service_id)

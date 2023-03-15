@@ -271,6 +271,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Permission",
         "Service",
         "Model",
+        "Endpoint",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -298,6 +299,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.bgtask import BackgroundTask
         from .func.domain import Domain
         from .func.dotfile import Dotfile
+        from .func.endpoint import Endpoint
         from .func.etcd import EtcdConfig
         from .func.group import Group
         from .func.image import Image
@@ -341,6 +343,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Permission = Permission
         self.Service = Service
         self.Model = Model
+        self.Endpoint = Endpoint
 
     @property
     def proxy_mode(self) -> bool:

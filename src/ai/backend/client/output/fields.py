@@ -163,7 +163,6 @@ scaling_group_fields = FieldSet(
     ]
 )
 
-
 session_fields = FieldSet(
     [
         FieldSpec("id", "Session ID", alt_name="session_id"),
@@ -315,5 +314,19 @@ service_fields = FieldSet(
         FieldSpec("endpoint_id"),
         FieldSpec("service_id"),
         FieldSpec("service_name"),
+    ]
+)
+
+
+endpoint_fields = FieldSet(
+    [
+        FieldSpec("id"),
+        FieldSpec("image"),
+        FieldSpec("model_id"),
+        FieldSpec("domain_name"),
+        FieldSpec("project_id"),
+        FieldSpec("resource_group_name"),
+        FieldSpec("resource_slots"),
+        FieldSpec("url"),
     ]
 )
