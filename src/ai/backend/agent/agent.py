@@ -28,6 +28,7 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    Final,
     FrozenSet,
     Generic,
     List,
@@ -154,6 +155,7 @@ DEAD_STATUS_SET = frozenset(
     ]
 )
 
+COMMIT_STATUS_EXPIRE: Final[int] = 13
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
@@ -705,58 +707,41 @@ class AbstractAgent(
                 |_ kernel_id1 (means the user is currently committing the kernel)
                 |_ kernel_id2
         |_ subdir2
-        ...
-        `status_map` is like below.
-        {
-            str(kernel_id1): CommitStatus.ONGOING.value,
-            str(kernel_id2): CommitStatus.ONGOING.value,
-            ...,
-        }
         """
         loop = current_loop()
         base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
-        status_map: MutableMapping[str, str] = {}
+        commit_kernels: set[str] = set()
 
         def _map_commit_status() -> None:
             for subdir in base_commit_path.iterdir():
                 for commit_path in subdir.glob("./**/lock/*"):
                     kern = commit_path.name
-                    if kern not in status_map:
-                        status_map[kern] = CommitStatus.ONGOING.value
+                    if kern not in commit_kernels:
+                        commit_kernels.add(kern)
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        hash_name = "kernel_commit_status"
         commit_status_script = textwrap.dedent(
-            f"""
-            local key = '{hash_name}'
-            local new_statuses = {{}}
-            if next(KEYS) ~= nil then
-                for i, v in ipairs(KEYS) do
-                    new_statuses[v] = ARGV[i]
-                end
+            """
+        local key_and_value = {}
+        for i, k in pairs(KEYS) do
+            key_and_value[i*2-1] = k
+            key_and_value[i*2] = 'ongoing'
+        end
+        if next(key_and_value) ~= nil then
+            redis.call('MSET', unpack(key_and_value))
+            for i, k in pairs(KEYS) do
+                redis.call('EXPIRE', k, ARGV[1])
             end
-            local all_commit_statuses = redis.call('HKEYS', key)
-            if all_commit_statuses ~= nil and next(all_commit_statuses) ~= nil then
-                for _, v in ipairs(all_commit_statuses) do
-                    if next(new_statuses) == nil or not new_statuses[v] then
-                        redis.call('HDEL', key, v)
-                    end
-                end
-            end
-            if next(new_statuses) ~= nil then
-                for kern_id, status in pairs(new_statuses) do
-                    redis.call('HSET', key, kern_id, status)
-                end
-            end
+        end
         """
         )
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
             commit_status_script,
-            [*status_map.keys()],
-            [*status_map.values()],
+            [f"kernel.{kern}.commit" for kern in commit_kernels],
+            [COMMIT_STATUS_EXPIRE],
         )
 
     async def heartbeat(self, interval: float):
