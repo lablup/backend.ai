@@ -546,7 +546,11 @@ class AgentRegistry:
 
             labels = image_row.labels
             # Parse service ports to check for port errors
-            parse_service_ports(labels.get("ai.backend.service-ports", ""), BackendError)
+            parse_service_ports(
+                labels.get("ai.backend.service-ports", ""),
+                labels.get("ai.backend.endpoint-ports", ""),
+                BackendError,
+            )
 
             # Shared memory.
             # We need to subtract the amount of shared memory from the memory limit of
