@@ -359,6 +359,7 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         raw_results = []
         coros = []
+        throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
@@ -373,6 +374,7 @@ class AgentRPCServer(aobject):
                     kernel_id,
                     kernel_config,
                     cluster_info,
+                    throttle_sema=throttle_sema,
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)

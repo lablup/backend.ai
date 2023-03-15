@@ -54,6 +54,8 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AcceleratorMetadata,
+    AcceleratorNumberFormat,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -713,3 +715,25 @@ class CUDAPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        number_format: AcceleratorNumberFormat
+        match self._mode:
+            case AllocationModes.DISCRETE:
+                unit = "GPU"
+                number_format = {"binary": False, "round_length": 0}
+                description = "CUDA-capable GPU"
+            case AllocationModes.FRACTIONAL:
+                unit = "fGPU"
+                exponent = self.quantum_size.as_tuple().exponent
+                assert isinstance(exponent, int)
+                number_format = {"binary": False, "round_length": abs(exponent)}
+                description = "CUDA-capable GPU (fractional)"
+        return {
+            "slot_name": self.slot_types[0][0],
+            "human_readable_name": "GPU",
+            "description": description,
+            "display_unit": unit,
+            "number_format": number_format,
+            "display_icon": "gpu1",
+        }
