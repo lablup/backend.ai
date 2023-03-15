@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple, cast
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple
 
 import aiohttp_cors
 import trafaret as t
 from aiohttp import web
-from redis.asyncio import Redis
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import get_known_registries
@@ -87,24 +86,14 @@ async def get_resource_slots(request: web.Request) -> web.Response:
 async def get_resource_metadata(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_METADATA ()")
     root_ctx: RootContext = request.app["_root.context"]
-    metadata_available_accelerators = await redis_helper.execute(
-        root_ctx.redis_stat, lambda r: r.keys("computer:*:metadata")
-    )
-
-    async def _pipeline(r: Redis):
-        pipe = r.pipeline()
-        for key in metadata_available_accelerators:
-            await pipe.hgetall(key)
-        return pipe
-
-    accelerator_metadatas_list = await redis_helper.execute(
-        root_ctx.redis_stat, _pipeline, encoding="utf-8"
+    accelerator_metadata_jsons: Dict[str, str] = await redis_helper.execute(
+        root_ctx.redis_stat,
+        lambda r: r.hgetall("computer.metadata"),
+        encoding="utf-8",
     )
     accelerator_metadatas: Dict[str, AcceleratorMetadata] = {}
-    for redis_encoded_metadata in accelerator_metadatas_list:
-        metadata = dict(redis_encoded_metadata)
-        metadata["number_format"] = json.loads(metadata["number_format"])
-        accelerator_metadatas[metadata["slot_name"]] = cast(AcceleratorMetadata, metadata)
+    for slot_name, metadata_json in accelerator_metadata_jsons.items():
+        accelerator_metadatas[slot_name] = json.loads(metadata_json)
     for key, value in KNOWN_SLOT_METADATA.items():
         if key not in accelerator_metadatas:
             accelerator_metadatas[key] = value
