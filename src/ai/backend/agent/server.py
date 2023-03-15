@@ -376,17 +376,14 @@ class AgentRPCServer(aobject):
                     throttle_sema=throttle_sema,
                 )
             )
-
         results = []
         errors = []
-
         async with aclosing(aiotools.as_completed_safe(coros)) as ag:
             async for result in ag:
                 try:
                     results.append(await result)
                 except (BaseException, Exception) as e:
                     errors.append(e)
-
         if errors:
             # Raise up the first error.
             if len(errors) == 1:
