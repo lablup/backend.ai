@@ -14,6 +14,7 @@ from typing import (
     Any,
     ClassVar,
     DefaultDict,
+    Final,
     List,
     Mapping,
     MutableMapping,
@@ -54,8 +55,9 @@ from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionTypes
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
-from .models import kernels, keypair_resource_policies, keypairs
-from .models.kernel import LIVE_STATUS
+from .models.kernel import LIVE_STATUS, KernelRow
+from .models.keypair import keypairs
+from .models.resource_policy import keypair_resource_policies
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
@@ -67,6 +69,8 @@ if TYPE_CHECKING:
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+DEFAULT_CHECK_INTERVAL: Final = 15.0
 
 
 class IdleCheckerError(TaskGroupError):
@@ -115,30 +119,39 @@ class ThresholdOperator(enum.Enum):
     OR = "or"
 
 
+def get_idle_report_key(session_id: SessionId) -> str:
+    return f"session.{session_id}.idle_report"
+
+
 async def report_idle_check(
     redis_obj: RedisConnectionInfo,
     session_id: SessionId,
     report: IdleCheckReport,
 ) -> None:
-    report_key = f"session.{session_id}.idle_report"
+    report_key = get_idle_report_key(session_id)
     if report.timeout is None and report.session_lifetime is None and report.utilization is None:
         return
     await redis_helper.execute(
-        redis_obj, lambda r: r.set(report_key, msgpack.packb(report.to_json()))
+        redis_obj,
+        lambda r: r.set(
+            report_key,
+            msgpack.packb(report.to_json()),
+            ex=int(DEFAULT_CHECK_INTERVAL) * 2,
+        ),
     )
 
 
 async def get_idle_check_report(
     redis_obj: RedisConnectionInfo,
     session_id: SessionId,
-) -> Mapping[str, Any]:
-    report_key = f"session.{session_id}.idle_report"
+) -> Optional[Mapping[str, Any]]:
+    report_key = get_idle_report_key(session_id)
     data = await redis_helper.execute(redis_obj, lambda r: r.get(report_key))
-    return msgpack.unpackb(data)
+    return msgpack.unpackb(data) if data is not None else None
 
 
 class IdleCheckerHost:
-    check_interval: ClassVar[float] = 15.0
+    check_interval: ClassVar[float] = DEFAULT_CHECK_INTERVAL
 
     def __init__(
         self,
@@ -213,20 +226,33 @@ class IdleCheckerHost:
         source: AgentId,
         event: DoIdleCheckEvent,
     ) -> None:
+        from ai.backend.manager.models.session import SessionRow
+
         log.debug("do_idle_check(): triggered")
         policy_cache: dict[AccessKey, Row] = {}
         async with self._db.begin_readonly() as conn:
+            j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
             query = (
-                sa.select([kernels])
-                .select_from(kernels)
+                sa.select(
+                    [
+                        KernelRow.id,
+                        KernelRow.access_key,
+                        KernelRow.session_id,
+                        SessionRow.session_type,
+                        KernelRow.created_at,
+                        KernelRow.occupied_slots,
+                        SessionRow.cluster_size,
+                    ]
+                )
+                .select_from(j)
                 .where(
-                    (kernels.c.status.in_(LIVE_STATUS)) & (kernels.c.cluster_role == DEFAULT_ROLE),
+                    (KernelRow.status.in_(LIVE_STATUS)) & (KernelRow.cluster_role == DEFAULT_ROLE),
                 )
             )
             result = await conn.execute(query)
             rows = result.fetchall()
-            for session in rows:
-                policy = policy_cache.get(session["access_key"], None)
+            for kernel in rows:
+                policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
                         sa.select([keypair_resource_policies])
@@ -237,47 +263,45 @@ class IdleCheckerHost:
                                 keypair_resource_policies.c.name == keypairs.c.resource_policy,
                             ),
                         )
-                        .where(keypairs.c.access_key == session["access_key"])
+                        .where(keypairs.c.access_key == kernel["access_key"])
                     )
                     result = await conn.execute(query)
                     policy = result.first()
                     assert policy is not None
-                    policy_cache[session["access_key"]] = policy
+                    policy_cache[kernel["access_key"]] = policy
 
                 check_task = [
-                    checker.check_session(session, conn, policy) for checker in self._checkers
+                    checker.check_kernel(kernel, conn, policy) for checker in self._checkers
                 ]
                 check_results = await asyncio.gather(*check_task, return_exceptions=True)
                 report = IdleCheckReport()
                 terminated = False
                 errors = []
                 for checker, result in zip(self._checkers, check_results):
+                    if isinstance(result, aiotools.TaskGroupError):
+                        errors.extend(result.__errors__)
+                        continue
+                    elif isinstance(result, Exception):
+                        # mark to be destroyed afterwards
+                        errors.append(result)
+                        continue
+                    result = IdleCheckResult(True, remaining_idle_time=20.5)
+                    checker.assign_check_result_to_report(report, result)
                     if not result.let_alive:
                         log.info(
                             "The {} idle checker triggered termination of s:{}",
                             checker.name,
-                            session["id"],
+                            kernel["session_id"],
                         )
-                        if isinstance(checker, TimeoutIdleChecker):
-                            report.timeout = result.remaining_idle_time
-                        elif isinstance(checker, SessionLifetimeChecker):
-                            report.session_lifetime = result.remaining_idle_time
-                        elif isinstance(checker, UtilizationIdleChecker):
-                            report.utilization = result.utilization
-                        await report_idle_check(self._redis_live, session["id"], report)
                         if not terminated:
                             terminated = True
                             await self._event_producer.produce_event(
                                 DoTerminateSessionEvent(
-                                    session["id"],
+                                    kernel["session_id"],
                                     checker.terminate_reason,
                                 ),
                             )
-                    if isinstance(result, aiotools.TaskGroupError):
-                        errors.extend(result.__errors__)
-                    elif isinstance(result, Exception):
-                        # mark to be destroyed afterwards
-                        errors.append(result)
+                await report_idle_check(self._redis_live, kernel["session_id"], report)
                 if errors:
                     raise IdleCheckerError("idle checker(s) raise errors", errors=errors)
 
@@ -311,9 +335,13 @@ class BaseIdleChecker(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def check_session(
-        self, session: Row, dbconn: SAConnection, policy: Row
-    ) -> IdleCheckResult:
+    def assign_check_result_to_report(
+        self, report: IdleCheckReport, result: IdleCheckResult
+    ) -> None:
+        pass
+
+    @abstractmethod
+    async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
         return IdleCheckResult(True)
 
 
@@ -374,6 +402,11 @@ class TimeoutIdleChecker(BaseIdleChecker):
         elif status == AppStreamingStatus.NO_ACTIVE_CONNECTIONS:
             await self._update_timeout(session_id)
 
+    def assign_check_result_to_report(
+        self, report: IdleCheckReport, result: IdleCheckResult
+    ) -> None:
+        report.timeout = result.remaining_idle_time
+
     async def _disable_timeout(self, session_id: SessionId) -> None:
         log.debug(f"TimeoutIdleChecker._disable_timeout({session_id})")
         await redis_helper.execute(
@@ -422,11 +455,9 @@ class TimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         await self._update_timeout(event.session_id)
 
-    async def check_session(
-        self, session: Row, dbconn: SAConnection, policy: Row
-    ) -> IdleCheckResult:
-        session_id = session["id"]
-        if session["session_type"] == SessionTypes.BATCH:
+    async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
+        session_id = kernel["session_id"]
+        if kernel["session_type"] == SessionTypes.BATCH:
             return IdleCheckResult(True)
         active_streams = await redis_helper.execute(
             self._redis_live,
@@ -469,15 +500,18 @@ class SessionLifetimeChecker(BaseIdleChecker):
     async def populate_config(self, config: Mapping[str, Any]) -> None:
         pass
 
-    async def check_session(
-        self, session: Row, dbconn: SAConnection, policy: Row
-    ) -> IdleCheckResult:
+    def assign_check_result_to_report(
+        self, report: IdleCheckReport, result: IdleCheckResult
+    ) -> None:
+        report.session_lifetime = result.remaining_idle_time
+
+    async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
         now = await dbconn.scalar(sa.select(sa.func.now()))
         if policy["max_session_lifetime"] > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=policy["max_session_lifetime"])
-            idle_time = now - session["created_at"]
+            idle_time = now - kernel["created_at"]
             remaining = idle_timeout - idle_time
             result = True if remaining >= 0 else False
             return IdleCheckResult(result, remaining)
@@ -539,13 +573,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"time-window({self.time_window.total_seconds()}s)",
         )
 
-    async def check_session(
-        self, session: Row, dbconn: SAConnection, policy: Row
-    ) -> IdleCheckResult:
-        session_id = session["id"]
+    def assign_check_result_to_report(
+        self, report: IdleCheckReport, result: IdleCheckResult
+    ) -> None:
+        report.utilization = result.utilization
+
+    async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
+        session_id = kernel["session_id"]
         interval = IdleCheckerHost.check_interval
         window_size = int(self.time_window.total_seconds() / interval)
-        occupied_slots = session["occupied_slots"]
+        occupied_slots = kernel["occupied_slots"]
         unavailable_resources: Set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
@@ -564,7 +601,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Respect initial grace period (no termination of the session)
         now = datetime.now(tzutc())
-        if now - session["created_at"] <= self.initial_grace_period:
+        if now - kernel["created_at"] <= self.initial_grace_period:
             return IdleCheckResult(True)
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
@@ -587,19 +624,15 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return IdleCheckResult(True)
 
         # Get current utilization data from all containers of the session.
-        if session["cluster_size"] > 1:
-            query = (
-                sa.select([kernels.c.id])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
-                )
+        if kernel["cluster_size"] > 1:
+            query = sa.select([KernelRow.id]).where(
+                (KernelRow.session_id == session_id) & (KernelRow.status.in_(LIVE_STATUS)),
             )
             result = await dbconn.execute(query)
             rows = result.fetchall()
             kernel_ids = [k["id"] for k in rows]
         else:
-            kernel_ids = [session_id]
+            kernel_ids = [kernel["id"]]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
             return IdleCheckResult(True)

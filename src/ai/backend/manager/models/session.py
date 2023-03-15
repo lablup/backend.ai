@@ -1222,7 +1222,7 @@ class ComputeSession(graphene.ObjectType):
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
-    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         graph_ctx: GraphQueryContext = info.context
         return await get_idle_check_report(graph_ctx.redis_live, self.session_id)
 
