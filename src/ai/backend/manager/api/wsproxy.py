@@ -57,7 +57,6 @@ class ServiceProxy(metaclass=ABCMeta):
 
 
 class TCPProxy(ServiceProxy):
-
     __slots__ = (
         *ServiceProxy.__slots__,
         "down_task",

@@ -75,7 +75,6 @@ class ThresholdOperator(enum.Enum):
 
 
 class IdleCheckerHost:
-
     check_interval: ClassVar[float] = 15.0
 
     def __init__(
@@ -206,7 +205,6 @@ class IdleCheckerHost:
 
 
 class BaseIdleChecker(metaclass=ABCMeta):
-
     name: ClassVar[str] = "base"
 
     def __init__(
@@ -386,7 +384,6 @@ class TimeoutIdleChecker(BaseIdleChecker):
 
 
 class SessionLifetimeChecker(BaseIdleChecker):
-
     name: ClassVar[str] = "session_lifetime"
 
     async def populate_config(self, config: Mapping[str, Any]) -> None:

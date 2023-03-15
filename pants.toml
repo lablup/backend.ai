@@ -72,7 +72,7 @@ pants-plugins = "tools/pants-plugins.lock"
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [black]
-version = "black~=22.6"
+version = "black~=23.1"
 interpreter_constraints = ["CPython>=3.11,<4"]
 lockfile = "tools/black.lock"
 
