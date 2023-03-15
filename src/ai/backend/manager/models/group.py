@@ -391,7 +391,6 @@ class ModifyGroupInput(graphene.InputObjectType):
 
 
 class CreateGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -431,7 +430,6 @@ class CreateGroup(graphene.Mutation):
 
 
 class ModifyGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:

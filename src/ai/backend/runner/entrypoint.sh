@@ -102,7 +102,7 @@ else
 
   # Start ssh-agent if it is available
   if command -v ssh-agent > /dev/null; then
-    eval "$(ssh-agent -s)"
+    eval "$(/opt/kernel/su-exec $USER_ID:$GROUP_ID ssh-agent)"
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 

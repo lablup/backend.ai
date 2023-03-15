@@ -38,7 +38,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, ServicePort, aobject
+from ai.backend.common.types import CommitStatus, KernelId, ServicePort, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -103,7 +103,6 @@ default_api_version = 4
 
 
 class RunEvent(Exception):
-
     data: Any
 
     def __init__(self, data=None):
@@ -152,7 +151,6 @@ class NextResult(TypedDict, total=False):
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
-
     version: int
     agent_config: Mapping[str, Any]
     kernel_id: KernelId
@@ -280,7 +278,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir):
+    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
@@ -351,7 +349,6 @@ _zctx = None
 
 
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
-
     kernel_id: KernelId
     started_at: float
     finished_at: Optional[float]
@@ -644,9 +641,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     def aggregate_console(
         result: NextResult, records: Sequence[ResultRecord], api_ver: int
     ) -> None:
-
         if api_ver == 1:
-
             stdout_items = []
             stderr_items = []
             media_items = []
@@ -669,13 +664,11 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             result["html"] = html_items
 
         elif api_ver >= 2:
-
             console_items: List[Tuple[ConsoleItemType, Union[str, Tuple[str, str]]]] = []
             last_stdout = io.StringIO()
             last_stderr = io.StringIO()
 
             for rec in records:
-
                 if last_stdout.tell() and rec.msg_type != "stdout":
                     console_items.append(("stdout", last_stdout.getvalue()))
                     last_stdout.seek(0)

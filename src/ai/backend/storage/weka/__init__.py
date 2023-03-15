@@ -20,7 +20,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class WekaVolume(BaseVolume):
-
     api_client: WekaAPIClient
 
     _fs_uid: str

@@ -73,6 +73,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ClusterSSHKeyPair,
     ClusterSSHPortMapping,
+    CommitStatus,
     DeviceId,
     HardwareMetadata,
     KernelEnqueueingConfig,
@@ -159,7 +160,6 @@ _read_only_txn_opts = {
 
 class PeerInvoker(Peer):
     class _CallStub:
-
         _cached_funcs: Dict[str, Callable]
         order_key: ContextVar[Optional[str]]
 
@@ -302,7 +302,6 @@ class AgentRegistry:
             return row
 
     async def enumerate_instances(self, check_shadow=True):
-
         async with self.db.begin_readonly() as conn:
             query = sa.select("*").select_from(agents)
             if check_shadow:
@@ -366,7 +365,6 @@ class AgentRegistry:
         dependency_sessions: Sequence[SessionId] = None,
         callback_url: URL = None,
     ) -> SessionId:
-
         session_id = SessionId(uuid.uuid4())
 
         kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -385,7 +383,6 @@ class AgentRegistry:
             )
 
         async with self.db.begin_readonly() as conn:
-
             checked_scaling_group = await check_scaling_group(
                 conn,
                 scaling_group,
@@ -1626,7 +1623,6 @@ class AgentRegistry:
             session_id,
             set_error=True,
         ):
-
             async with self.db.begin_readonly_session() as db_sess:
                 query = (
                     sa.select(SessionRow)
@@ -2296,7 +2292,6 @@ class AgentRegistry:
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
         async with self.heartbeat_lock:
-
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
@@ -2724,18 +2719,16 @@ class AgentRegistry:
         self,
         session: SessionRow,
     ) -> Mapping[str, str]:
-        kernel: KernelRow = session.main_kernel
-        if kernel.status != KernelStatus.RUNNING:
-            return {"status": "", "kernel": str(kernel.id)}
-        email = await self._get_user_email(kernel)
-        async with handle_session_exception(self.db, "commit_session", session.id):
-            async with RPCContext(
-                kernel.agent,
-                kernel.agent_addr,
-                invoke_timeout=None,
-                keepalive_timeout=self.rpc_keepalive_timeout,
-            ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel.id), email)
+        kern_id = str(session.main_kernel.id)
+        key = f"kernel.{kern_id}.commit"
+        result: Optional[bytes] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.get(key),
+        )
+        return {
+            "kernel": kern_id,
+            "status": str(result, "utf-8") if result is not None else CommitStatus.READY.value,
+        }
 
     async def commit_session(
         self,

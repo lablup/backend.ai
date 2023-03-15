@@ -174,7 +174,6 @@ async def server_main(
 )
 @click.pass_context
 def main(cli_ctx, config_path, log_level, debug=False):
-
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")

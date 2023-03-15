@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple
 
 import aiohttp_cors
 import trafaret as t
 from aiohttp import web
 
+from ai.backend.common import redis_helper
 from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import AcceleratorMetadata
 
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -21,11 +24,80 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
+    "cpu": {
+        "slot_name": "cpu",
+        "description": "CPU",
+        "human_readable_name": "CPU",
+        "display_unit": "Core",
+        "number_format": {"binary": False, "round_length": 0},
+        "display_icon": "cpu",
+    },
+    "mem": {
+        "slot_name": "ram",
+        "description": "Memory",
+        "human_readable_name": "RAM",
+        "display_unit": "GiB",
+        "number_format": {"binary": True, "round_length": 0},
+        "display_icon": "cpu",
+    },
+    "cuda.device": {
+        "slot_name": "cuda.device",
+        "human_readable_name": "GPU",
+        "description": "CUDA-capable GPU",
+        "display_unit": "GPU",
+        "number_format": {"binary": False, "round_length": 0},
+        "display_icon": "gpu1",
+    },
+    "cuda.shares": {
+        "slot_name": "cuda.shares",
+        "human_readable_name": "fGPU",
+        "description": "CUDA-capable GPU (fractional)",
+        "display_unit": "fGPU",
+        "number_format": {"binary": False, "round_length": 2},
+        "display_icon": "gpu1",
+    },
+    "rocm.device": {
+        "slot_name": "rocm.device",
+        "human_readable_name": "GPU",
+        "description": "ROCm-capable GPU",
+        "display_unit": "GPU",
+        "number_format": {"binary": False, "round_length": 0},
+        "display_icon": "gpu2",
+    },
+    "tpu.device": {
+        "slot_name": "tpu.device",
+        "human_readable_name": "TPU",
+        "description": "TPU device",
+        "display_unit": "GPU",
+        "number_format": {"binary": False, "round_length": 0},
+        "display_icon": "tpu",
+    },
+}
+
+
 async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
     known_slots = await root_ctx.shared_config.get_resource_slots()
     return web.json_response(known_slots, status=200)
+
+
+async def get_resource_metadata(request: web.Request) -> web.Response:
+    log.info("ETCD.GET_RESOURCE_METADATA ()")
+    root_ctx: RootContext = request.app["_root.context"]
+    accelerator_metadata_jsons: Dict[str, str] = await redis_helper.execute(
+        root_ctx.redis_stat,
+        lambda r: r.hgetall("computer.metadata"),
+        encoding="utf-8",
+    )
+    accelerator_metadatas: Dict[str, AcceleratorMetadata] = {}
+    for slot_name, metadata_json in accelerator_metadata_jsons.items():
+        accelerator_metadatas[slot_name] = json.loads(metadata_json)
+    for key, value in KNOWN_SLOT_METADATA.items():
+        if key not in accelerator_metadatas:
+            accelerator_metadatas[key] = value
+    return web.json_response(accelerator_metadatas, status=200)
 
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
@@ -156,6 +228,7 @@ def create_app(
     app["api_versions"] = (3, 4)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("GET", r"/resource-slots", get_resource_slots))
+    cors.add(app.router.add_route("GET", r"/resource-slots/details", get_resource_metadata))
     cors.add(app.router.add_route("GET", r"/vfolder-types", get_vfolder_types))
     cors.add(app.router.add_route("GET", r"/docker-registries", get_docker_registries))
     cors.add(app.router.add_route("POST", r"/get", get_config))
