@@ -6,7 +6,7 @@ import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 
-from .base import Base, metadata
+from .base import GUID, Base, metadata
 
 __all__: Sequence[str] = (
     "git_tokens",
@@ -17,7 +17,14 @@ __all__: Sequence[str] = (
 git_tokens = sa.Table(
     "git_tokens",
     metadata,
-    sa.Column("user_id", sa.String(length=256), index=True, nullable=False, primary_key=True),
+    sa.Column(
+        "user_id",
+        GUID,
+        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+        primary_key=True,
+    ),
     sa.Column("domain", sa.String(length=200), unique=True, primary_key=True, nullable=False),
     sa.Column("token", sa.String(length=200)),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
