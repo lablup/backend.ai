@@ -15,7 +15,6 @@ from ai.backend.common.types import (
 
 @pytest.mark.asyncio
 async def test_aobject():
-
     init_count = 0
     ainit_count = 0
 
@@ -135,7 +134,6 @@ def test_binary_size():
 
 
 def test_resource_slot_serialization():
-
     # from_user_input() and from_policy() takes the explicit slot type information to
     # convert human-readable values to raw decimal values,
     # while from_json() treats those values as stringified decimal expressions "as-is".

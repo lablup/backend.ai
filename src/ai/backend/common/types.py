@@ -564,7 +564,6 @@ class BinarySize(int):
 
 
 class ResourceSlot(UserDict):
-
     __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:
@@ -988,3 +987,12 @@ class RedisConnectionInfo:
     async def close(self) -> None:
         if isinstance(self.client, Redis):
             await self.client.close()
+
+
+class AcceleratorMetadata(TypedDict):
+    slot_name: str
+    description: str
+    human_readable_name: str
+    display_unit: str
+    number_format: str
+    display_icon: str

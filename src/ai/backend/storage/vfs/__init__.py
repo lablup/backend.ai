@@ -48,7 +48,6 @@ async def run(cmd: Sequence[Union[str, Path]]) -> str:
 
 
 class BaseVolume(AbstractVolume):
-
     # ------ volume operations -------
 
     async def get_capabilities(self) -> FrozenSet[str]:

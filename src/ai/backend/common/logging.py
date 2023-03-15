@@ -363,7 +363,6 @@ def log_worker(
 
 
 class RelayHandler(logging.Handler):
-
     _sock: zmq.Socket | None
 
     def __init__(self, *, endpoint: str) -> None:
@@ -517,7 +516,6 @@ class LocalLogger(AbstractLogger):
 
 
 class Logger(AbstractLogger):
-
     is_master: bool
     log_endpoint: str
     logging_config: Mapping[str, Any]

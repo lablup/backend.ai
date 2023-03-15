@@ -54,7 +54,6 @@ class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):
         pass
 
     async def create_app(self) -> InitMetadataPluginResponse:
-
         app, global_middlewares = await self.prepare_app()
         routes = await self.routes()
 

@@ -51,6 +51,7 @@ agent_local_config_iv = (
                     t.Key("abuse-report-path", default=None): t.Null
                     | tx.Path(type="dir", allow_nonexisting=True),
                     t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
+                    t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
                 }
             ).allow_extra("*"),
             t.Key("container"): t.Dict(

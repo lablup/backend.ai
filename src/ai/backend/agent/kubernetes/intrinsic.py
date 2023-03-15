@@ -12,7 +12,14 @@ from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
+from ai.backend.common.types import (
+    AcceleratorMetadata,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    SlotName,
+    SlotTypes,
+)
 
 from .. import __version__
 from ..alloc_map import AllocationStrategy
@@ -220,6 +227,16 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> List[str]:
         return []
 
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "cpu",
+            "description": "CPU",
+            "human_readable_name": "CPU",
+            "display_unit": "Core",
+            "number_format": "#,###",
+            "display_icon": "cpu",
+        }
+
 
 class MemoryDevice(AbstractComputeDevice):
     pass
@@ -362,3 +379,13 @@ class MemoryPlugin(AbstractComputePlugin):
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[str]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "ram",
+            "description": "Memory",
+            "human_readable_name": "RAM",
+            "display_unit": "GiB",
+            "number_format": "#,###",
+            "display_icon": "cpu",
+        }

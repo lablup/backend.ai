@@ -1,3 +1,5 @@
+from typing import Optional
+
 from ..request import Request
 from .base import BaseFunction, api_function
 
@@ -11,7 +13,7 @@ class Auth(BaseFunction):
 
     @api_function
     @classmethod
-    async def login(cls, user_id: str, password: str) -> dict:
+    async def login(cls, user_id: str, password: str, otp: Optional[str] = None) -> dict:
         """
         Log-in into the endpoint with the given user ID and password.
         It creates a server-side web session and return
@@ -19,12 +21,13 @@ class Auth(BaseFunction):
         JSON-encoded raw cookie data.
         """
         rqst = Request("POST", "/server/login")
-        rqst.set_json(
-            {
-                "username": user_id,
-                "password": password,
-            }
-        )
+        body = {
+            "username": user_id,
+            "password": password,
+        }
+        if otp:
+            body["otp"] = otp
+        rqst.set_json(body)
         async with rqst.fetch(anonymous=True) as resp:
             data = await resp.json()
             data["cookies"] = resp.raw_response.cookies
