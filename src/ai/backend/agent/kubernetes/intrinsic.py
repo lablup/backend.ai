@@ -233,7 +233,7 @@ class CPUPlugin(AbstractComputePlugin):
             "description": "CPU",
             "human_readable_name": "CPU",
             "display_unit": "Core",
-            "number_format": "#,###",
+            "number_format": {"binary": False, "round_length": 0},
             "display_icon": "cpu",
         }
 
@@ -386,6 +386,6 @@ class MemoryPlugin(AbstractComputePlugin):
             "description": "Memory",
             "human_readable_name": "RAM",
             "display_unit": "GiB",
-            "number_format": "#,###",
+            "number_format": {"binary": True, "round_length": 0},
             "display_icon": "cpu",
         }
