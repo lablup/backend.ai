@@ -14,6 +14,16 @@ def test_parse_service_ports():
         "protocol": "http",
         "container_ports": (1230,),
         "host_ports": (None,),
+        "is_inference": False,
+    }
+    result = parse_service_ports("a:preopen:1230", "a,b")
+    assert len(result) == 1
+    assert result[0] == {
+        "name": "a",
+        "protocol": "preopen",
+        "container_ports": (1230,),
+        "host_ports": (None,),
+        "is_inference": True,
     }
 
     result = parse_service_ports("a:tcp:[5000,5005]", "")
@@ -23,6 +33,7 @@ def test_parse_service_ports():
         "protocol": "tcp",
         "container_ports": (5000, 5005),
         "host_ports": (None, None),
+        "is_inference": False,
     }
 
     result = parse_service_ports("a:tcp:[1230,1240,9000],x:http:3000,t:http:[5000,5001]", "")
@@ -32,18 +43,21 @@ def test_parse_service_ports():
         "protocol": "tcp",
         "container_ports": (1230, 1240, 9000),
         "host_ports": (None, None, None),
+        "is_inference": False,
     }
     assert result[1] == {
         "name": "x",
         "protocol": "http",
         "container_ports": (3000,),
         "host_ports": (None,),
+        "is_inference": False,
     }
     assert result[2] == {
         "name": "t",
         "protocol": "http",
         "container_ports": (5000, 5001),
         "host_ports": (None, None),
+        "is_inference": False,
     }
 
 
