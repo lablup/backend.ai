@@ -792,7 +792,7 @@ class AbstractAgent(
                 ),
                 "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
-                "abusing_container_auto_terminate": self.local_config["agent"][
+                "auto_terminate_abusing_kernel": self.local_config["agent"][
                     "force-terminate-abusing-containers"
                 ],
             }

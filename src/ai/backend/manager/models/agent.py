@@ -88,7 +88,13 @@ agents = sa.Table(
     sa.Column("version", sa.String(length=64), nullable=False),
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
-    sa.Column("auto_terminate", sa.Boolean(), nullable=False, server_default=true(), default=False),
+    sa.Column(
+        "auto_terminate_abusing_kernel",
+        sa.Boolean(),
+        nullable=False,
+        server_default=true(),
+        default=False,
+    ),
 )
 
 
@@ -131,7 +137,7 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
-    auto_terminate = graphene.Boolean()
+    auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
 
     # Legacy fields
@@ -172,7 +178,7 @@ class Agent(graphene.ObjectType):
             lost_at=row["lost_at"],
             version=row["version"],
             compute_plugins=row["compute_plugins"],
-            auto_terminate=row["auto_terminate"],
+            auto_terminate_abusing_kernel=row["auto_terminate_abusing_kernel"],
             # legacy fields
             mem_slots=BinarySize.from_str(row["available_slots"]["mem"]) // mega,
             cpu_slots=row["available_slots"]["cpu"],
@@ -228,7 +234,7 @@ class Agent(graphene.ObjectType):
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return {
             "agent": {
-                "auto_terminate": self.auto_terminate,
+                "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,
             },
         }
 

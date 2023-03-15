@@ -2292,7 +2292,7 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
-        auto_terminate = agent_info["abusing_container_auto_terminate"]
+        auto_terminate_abusing_kernel = agent_info["auto_terminate_abusing_kernel"]
         async with self.heartbeat_lock:
             instance_rejoin = False
 
@@ -2316,7 +2316,7 @@ class AgentRegistry:
                                 agents.c.version,
                                 agents.c.compute_plugins,
                                 agents.c.architecture,
-                                agents.c.auto_terminate,
+                                agents.c.auto_terminate_abusing_kernel,
                             ]
                         )
                         .select_from(agents)
@@ -2344,7 +2344,7 @@ class AgentRegistry:
                                 "version": agent_info["version"],
                                 "compute_plugins": agent_info["compute_plugins"],
                                 "architecture": agent_info.get("architecture", "x86_64"),
-                                "auto_terminate": auto_terminate,
+                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                             }
                         )
                         result = await conn.execute(insert_query)
@@ -2363,8 +2363,8 @@ class AgentRegistry:
                             updates["compute_plugins"] = agent_info["compute_plugins"]
                         if row["architecture"] != agent_info["architecture"]:
                             updates["architecture"] = agent_info["architecture"]
-                        if row["auto_terminate"] != auto_terminate:
-                            updates["auto_terminate"] = auto_terminate
+                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
+                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
                         # occupied_slots are updated when kernels starts/terminates
                         if updates:
                             await self.shared_config.update_resource_slots(slot_key_and_units)
@@ -2388,7 +2388,7 @@ class AgentRegistry:
                                     "version": agent_info["version"],
                                     "compute_plugins": agent_info["compute_plugins"],
                                     "architecture": agent_info["architecture"],
-                                    "auto_terminate": auto_terminate,
+                                    "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                                 }
                             )
                             .where(agents.c.id == agent_id)
