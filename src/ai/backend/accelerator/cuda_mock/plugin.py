@@ -55,7 +55,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
-    AcceleratorNumberformat,
+    AcceleratorNumberFormat,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -717,7 +717,7 @@ class CUDAPlugin(AbstractComputePlugin):
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
-        number_format: AcceleratorNumberformat
+        number_format: AcceleratorNumberFormat
         match self._mode:
             case AllocationModes.DISCRETE:
                 unit = "GPU"
