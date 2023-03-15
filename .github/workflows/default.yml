@@ -337,8 +337,8 @@ jobs:
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
-        pip install dist/backend.ai_client-*.whl
-        conda-pack -o backend.ai-client-${{ env.PKGVER }}-windows-conda.zip
+        pip install backend.ai-client==${{ github.ref_name }}
+        conda-pack -o backend.ai-client-${{ github.ref_name }}-windows-conda.zip
     - name: Upload conda-pack to GitHub release
       run: |
-        gh release upload ${{ env.PKGVER }} backend.ai-client-${{ env.PKGVER }}-windows-conda.zip
+        gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
