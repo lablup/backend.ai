@@ -69,6 +69,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         background_task_manager=root_ctx.background_task_manager,
         storage_manager=root_ctx.storage_manager,
         registry=root_ctx.registry,
+        idle_checker_host=root_ctx.idle_checker_host,
     )
     result = app_ctx.gql_schema.execute(
         params["query"],

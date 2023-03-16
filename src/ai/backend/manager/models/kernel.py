@@ -971,6 +971,7 @@ class ComputeSession(graphene.ObjectType):
     result = graphene.String()
     commit_status = graphene.String()
     abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -1089,6 +1090,14 @@ class ComputeSession(graphene.ObjectType):
         if containers is None:
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        idle_report = await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+        avg_utils = idle_report["utilization"]
+        if avg_utils is not None and "mem" in avg_utils:
+            avg_utils["mem"] = BinarySize.from_str(str(int(avg_utils["mem"])))
+        return idle_report
 
     _queryfilter_fieldspec = {
         "id": ("kernels_id", None),
