@@ -654,14 +654,31 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in allowed_hosts:
         default_host = None
-    volume_info = {
-        f"{proxy_name}:{volume_data['name']}": {
-            "backend": volume_data["backend"],
-            "capabilities": volume_data["capabilities"],
-        }
-        for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
-    }
+
+    volume_info = {}
+    for proxy_name, volume_data in all_volumes:
+        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts:
+            volume = {
+                "backend": volume_data["backend"],
+                "capabilities": volume_data["capabilities"],
+            }
+
+            async with root_ctx.storage_manager.request(
+                proxy_name,
+                "GET",
+                "folder/fs-usage",
+                json={
+                    "volume": volume_data["name"],
+                },
+            ) as (_, storage_resp):
+                storage_reply = await storage_resp.json()
+
+                volume["percentage"] = storage_reply["percentage"]
+                volume["used"] = storage_reply["used_bytes"]
+                volume["total"] = storage_reply["capacity_bytes"]
+
+            volume_info[f"{proxy_name}:{volume_data['name']}"] = volume
+
     resp = {
         "default": default_host,
         "allowed": sorted(allowed_hosts),
