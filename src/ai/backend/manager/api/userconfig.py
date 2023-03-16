@@ -252,21 +252,12 @@ async def get_git_tokens(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
 
-    log.info("get_git_tokens")
-
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select(GitTokenRow).where(GitTokenRow.user_id == user_uuid)
-        result = await conn.execute(query)
-        output = result.fetchall()
-        print(str(output))
-
-    return web.json_response(
-        [
-            {"domain": "github.com", "token": "aaaabbbb"},
-            {"domain": "gitlab.com", "token": "ccccdddd"},
-            {"domain": "gitlab.gnome.org", "token": "adsflasjdfadsj;l"},
-        ]
-    )
+        query_result = await conn.execute(query)
+        rows = query_result.fetchall()
+        result = [{"domain": row["domain"], "token": row["token"]} for row in rows]
+    return web.json_response(result, status=200)
 
 
 @auth_required
@@ -291,7 +282,7 @@ async def update_git_tokens(request: web.Request, params: Any) -> web.Response:
     for item in result:
         print(item["domain"])
         print(item["token"])
-        # first delete
+        # first delete (select * from user_id and not in )
 
         # then, insert datas
         data = {"user_id": user_uuid, "domain": item["domain"], "token": item["token"]}
