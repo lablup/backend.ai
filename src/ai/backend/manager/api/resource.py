@@ -339,6 +339,7 @@ async def get_container_stats_for_period(
                     kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
@@ -419,6 +420,7 @@ async def get_container_stats_for_period(
             "name": row["session_name"],
             "access_key": row["access_key"],
             "email": row["email"],
+            "full_name": row["full_name"],
             "agent": row["agent"],
             "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
             "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),

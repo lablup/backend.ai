@@ -546,7 +546,11 @@ class AgentRegistry:
 
             labels = image_row.labels
             # Parse service ports to check for port errors
-            parse_service_ports(labels.get("ai.backend.service-ports", ""), BackendError)
+            parse_service_ports(
+                labels.get("ai.backend.service-ports", ""),
+                labels.get("ai.backend.endpoint-ports", ""),
+                BackendError,
+            )
 
             # Shared memory.
             # We need to subtract the amount of shared memory from the memory limit of
@@ -1434,7 +1438,7 @@ class AgentRegistry:
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
 
-                async def _update_agent_resource():
+                async def _update_agent_resource() -> None:
                     async with self.db.begin_session() as db_sess:
                         select_query = sa.select(AgentRow.occupied_slots).where(
                             AgentRow.id == agent_id
