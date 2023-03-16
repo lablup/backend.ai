@@ -1477,11 +1477,13 @@ async def handle_kernel_creation_lifecycle(
     """
     root_ctx: RootContext = app["_root.context"]
     # ck_id = (event.creation_id, event.kernel_id)
-    ck_id = event.kernel_id
-    if ck_id in root_ctx.registry.kernel_creation_tracker:
+    session_id = event.session_id
+    if session_id in root_ctx.registry.session_creation_tracker:
+        # if ck_id in root_ctx.registry.kernel_creation_tracker:
         log.debug(
-            "handle_kernel_creation_lifecycle: ev:{} k:{}",
+            "handle_kernel_creation_lifecycle: ev:{} s:{} k:{}",
             event.name,
+            session_id,
             event.kernel_id,
         )
     if isinstance(event, KernelPreparingEvent):
@@ -1496,17 +1498,14 @@ async def handle_kernel_creation_lifecycle(
             root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
-        await root_ctx.registry.finalize_running(event.creation_info)
+        if session_id in root_ctx.registry.session_creation_tracker:
+            await root_ctx.registry.finalize_running(event.creation_info, session_id)
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            tracker.set_result(None)
         if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
-            session_id = event.creation_info.get("session_id")
-            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), session_id)
     elif isinstance(event, KernelCancelledEvent):
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
+        if session_id in root_ctx.registry.session_creation_tracker:
             log.warning(f"Kernel cancelled, {event.reason = }")
-            tracker.cancel()
 
 
 async def handle_kernel_termination_lifecycle(

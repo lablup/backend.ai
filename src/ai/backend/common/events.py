@@ -228,12 +228,14 @@ class KernelLifecycleEventReason(str, enum.Enum):
 @attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
     reason: str = attrs.field(default="")
     creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
+            str(self.session_id),
             self.reason,
             self.creation_info,
         )
@@ -242,8 +244,9 @@ class KernelCreationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
-            reason=value[1],
-            creation_info=value[2],
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
+            creation_info=value[3],
         )
 
 

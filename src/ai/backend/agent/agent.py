@@ -1501,7 +1501,7 @@ class AbstractAgent(
         async with throttle_sema:
             if not restarting:
                 await self.produce_event(
-                    KernelPreparingEvent(kernel_id),
+                    KernelPreparingEvent(kernel_id, session_id),
                 )
 
             # Initialize the creation context
@@ -1541,13 +1541,13 @@ class AbstractAgent(
             )
             if do_pull:
                 await self.produce_event(
-                    KernelPullingEvent(kernel_id, ctx.image_ref.canonical),
+                    KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
                 await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
             if not restarting:
                 await self.produce_event(
-                    KernelCreatingEvent(kernel_id),
+                    KernelCreatingEvent(kernel_id, session_id),
                 )
 
             # Get the resource spec from existing kernel scratches
@@ -1855,6 +1855,7 @@ class AbstractAgent(
             await self.produce_event(
                 KernelStartedEvent(
                     kernel_id,
+                    session_id,
                     creation_info={
                         **kernel_creation_info,
                         "id": str(KernelId(kernel_id)),

@@ -280,18 +280,16 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
 }
 
 
-def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionStatus:
-    try:
-        main_kern_status = [k.status for k in sibling_kernels if k.cluster_role == DEFAULT_ROLE][0]
-    except IndexError:
-        raise MainKernelNotFound("Cannot determine session status without status of main kernel")
-    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[main_kern_status]
+def determine_session_status(
+    kernel_statuses: Sequence[KernelStatus], main_kernel_status: KernelStatus
+) -> SessionStatus:
+    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[main_kernel_status]
     if candidate in LEADING_SESSION_STATUSES:
         return candidate
-    for k in sibling_kernels:
+    for status in kernel_statuses:
         match candidate:
             case SessionStatus.RUNNING:
-                match k.status:
+                match status:
                     case (
                         KernelStatus.PENDING
                         | KernelStatus.SCHEDULED
@@ -312,7 +310,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                     case KernelStatus.TERMINATING | KernelStatus.ERROR:
                         candidate = SessionStatus.RUNNING_DEGRADED
             case SessionStatus.TERMINATED:
-                match k.status:
+                match status:
                     case KernelStatus.PENDING | KernelStatus.CANCELLED:
                         # should not be it
                         pass
@@ -334,7 +332,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                     case KernelStatus.ERROR:
                         return SessionStatus.ERROR
             case SessionStatus.RUNNING_DEGRADED:
-                match k.status:
+                match status:
                     case (
                         KernelStatus.PENDING
                         | KernelStatus.SCHEDULED
