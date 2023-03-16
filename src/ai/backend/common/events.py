@@ -214,6 +214,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     TASK_FINISHED = "task-finished"
     TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
     UNKNOWN = "unknown"
+    CONTAINER_ERROR = "container-error"
     USER_REQUESTED = "user-requested"
 
     @classmethod
@@ -313,6 +314,10 @@ class KernelTerminationEventArgs:
             value[1],
             value[2],
         )
+
+
+class KernelErrorEvent(KernelTerminationEventArgs, AbstractEvent):
+    name = "kernel_error"
 
 
 class KernelTerminatingEvent(KernelTerminationEventArgs, AbstractEvent):

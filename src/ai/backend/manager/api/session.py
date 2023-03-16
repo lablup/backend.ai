@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelErrorEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -1512,7 +1513,7 @@ async def handle_kernel_creation_lifecycle(
 async def handle_kernel_termination_lifecycle(
     app: web.Application,
     source: AgentId,
-    event: KernelTerminatingEvent | KernelTerminatedEvent,
+    event: KernelTerminatingEvent | KernelTerminatedEvent | KernelErrorEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, KernelTerminatingEvent):
@@ -1521,10 +1522,9 @@ async def handle_kernel_termination_lifecycle(
             session = await SessionRow.get_session_by_kernel(db_sess, event.kernel_id)
         await root_ctx.registry.mark_session_terminating(session.id, event.reason)
     elif isinstance(event, KernelTerminatedEvent):
-        await root_ctx.registry.mark_kernel_terminated(
-            event.kernel_id, event.reason, event.exit_code
-        )
-        await root_ctx.registry.check_session_terminated(event.kernel_id, event.reason)
+        pass
+    elif isinstance(event, KernelErrorEvent):
+        await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
 
 
 async def handle_session_creation_lifecycle(
@@ -2610,6 +2610,12 @@ async def init(app: web.Application) -> None:
         app,
         handle_kernel_termination_lifecycle,
         name="api.session.kterm",
+    )
+    evd.consume(
+        KernelErrorEvent,
+        app,
+        handle_kernel_termination_lifecycle,
+        name="api.session.kerror",
     )
     evd.consume(
         SessionTerminatingEvent,

@@ -79,12 +79,12 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelErrorEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
-    KernelTerminatingEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
 )
@@ -917,17 +917,21 @@ class AbstractAgent(
             self.terminating_kernels.add(ev.kernel_id)
             async with self.registry_lock:
                 reason = ev.reason
-                await self.produce_event(
-                    KernelTerminatingEvent(ev.kernel_id, reason),
-                )
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
                     log.warning(
                         "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
                     )
                     if ev.container_id is None:
-                        await self.rescan_resource_usage()
                         reason = KernelLifecycleEventReason.ALREADY_TERMINATED
+                        await self.rescan_resource_usage()
+                        if not ev.suppress_events:
+                            await self.produce_event(
+                                KernelTerminatedEvent(
+                                    ev.kernel_id,
+                                    reason,
+                                ),
+                            )
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
                         return
@@ -939,16 +943,29 @@ class AbstractAgent(
                     kernel_obj.clean_event = ev.done_future
                 try:
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
+                    if ev.reason == KernelLifecycleEventReason.CONTAINER_ERROR:
+                        await self.produce_event(
+                            KernelErrorEvent(
+                                ev.kernel_id,
+                                reason,
+                            )
+                        )
                 except Exception as e:
                     if ev.done_future is not None:
                         ev.done_future.set_exception(e)
                     raise
                 finally:
-                    await self.produce_event(
-                        KernelTerminatedEvent(ev.kernel_id, reason),
-                    )
                     if ev.container_id is not None:
-                        await self._handle_clean_event(ev)
+                        await self.container_lifecycle_queue.put(
+                            ContainerLifecycleEvent(
+                                ev.kernel_id,
+                                ev.container_id,
+                                LifecycleEvent.CLEAN,
+                                ev.reason,
+                                suppress_events=ev.suppress_events,
+                                done_future=ev.done_future,
+                            ),
+                        )
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1771,7 +1788,7 @@ class AbstractAgent(
                 await self.inject_container_lifecycle_event(
                     kernel_id,
                     LifecycleEvent.DESTROY,
-                    KernelLifecycleEventReason.UNKNOWN,
+                    KernelLifecycleEventReason.CONTAINER_ERROR,
                     container_id=ContainerId(cid),
                 )
                 raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
@@ -1782,6 +1799,12 @@ class AbstractAgent(
                 )
                 async with self.registry_lock:
                     del self.kernel_registry[kernel_id]
+                await self.inject_container_lifecycle_event(
+                    kernel_id,
+                    LifecycleEvent.DESTROY,
+                    KernelLifecycleEventReason.CONTAINER_ERROR,
+                    container_id=ContainerId(cid),
+                )
                 raise
             async with self.registry_lock:
                 self.kernel_registry[ctx.kernel_id].data.update(container_data)
