@@ -952,7 +952,7 @@ class ComputeSession(graphene.ObjectType):
     group_name = graphene.String()
     group_id = graphene.UUID()
     user_email = graphene.String()
-    user_name = graphene.String()
+    full_name = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
     created_user_email = graphene.String()
@@ -1010,7 +1010,7 @@ class ComputeSession(graphene.ObjectType):
             "group_name": row["group_name"],
             "group_id": row["group_id"],
             "user_email": row["email"],
-            "user_name": row["username"],
+            "user_name": row["full_name"],
             "user_id": row["user_uuid"],
             "access_key": row["access_key"],
             "created_user_email": None,  # TODO: implement
@@ -1099,6 +1099,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("kernels_domain_name", None),
         "group_name": ("groups_group_name", None),
         "user_email": ("users_email", None),
+        "full_name": ("users_full_name", None),
         "access_key": ("kernels_access_key", None),
         "scaling_group": ("kernels_scaling_group", None),
         "cluster_mode": ("kernels_cluster_mode", lambda s: ClusterMode[s]),
@@ -1125,6 +1126,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": "kernels_domain_name",
         "group_name": "kernels_group_name",
         "user_email": "users_email",
+        "full_name": "users_full_name",
         "access_key": "kernels_access_key",
         "scaling_group": "kernels_scaling_group",
         "cluster_mode": "kernels_cluster_mode",
@@ -1204,7 +1206,7 @@ class ComputeSession(graphene.ObjectType):
                     kernels,
                     groups.c.name.label("group_name"),
                     users.c.email,
-                    users.c.username,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
@@ -1278,7 +1280,7 @@ class ComputeSession(graphene.ObjectType):
                     kernels,
                     groups.c.name.label("group_name"),
                     users.c.email,
-                    users.c.username,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
