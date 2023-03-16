@@ -164,6 +164,8 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
             ),
             t.Key("tag", default=None): t.Null | t.String,
             t.Key("config", default=dict): t.Mapping(t.String, t.Any),
+            t.Key("enqueue_only", default=False): t.ToBool,
+            t.Key("max_wait_seconds", default=0): t.Int[0:],
         }
     ),
 )
@@ -341,7 +343,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         resp["sessionId"] = str(session_id)  # changed since API v5
         resp["sessionName"] = str(params["service_name"])
         resp["status"] = SessionStatus.PENDING.name
-        resp["servicePorts"] = []
+        resp["servicePorts"] = parsed_labels["ai.backend.service-ports"]
         resp["created"] = True
     except asyncio.CancelledError:
         raise
@@ -511,12 +513,14 @@ async def delete(request: web.Request, params: Any) -> web.Response:
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
+    service_creation_tracker: dict[str, asyncio.Event]
     database_ptask_group: aiotools.PersistentTaskGroup
 
 
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["service.context"]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.service_creation_tracker = {}
 
 
 async def shutdown(app: web.Application) -> None:
