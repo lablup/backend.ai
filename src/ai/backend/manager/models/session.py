@@ -1093,6 +1093,8 @@ class ComputeSession(graphene.ObjectType):
     # relations
     dependencies = graphene.List(lambda: ComputeSession)
 
+    inference_metrics = graphene.JSONString()
+
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         assert row is not None
@@ -1170,6 +1172,15 @@ class ComputeSession(graphene.ObjectType):
             ),
             start=zero,
         ).to_json()
+
+    async def resolve_inference_metrics(
+        self, info: graphene.ResolveInfo
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
+        )
+        return await loader.load(self.id)
 
     # legacy
     async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
