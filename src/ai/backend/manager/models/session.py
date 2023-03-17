@@ -1234,9 +1234,7 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
-        val = await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
-        print(f"{val = }")
-        return val
+        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),
