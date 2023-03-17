@@ -255,7 +255,12 @@ class IdleCheckerHost:
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
-                        sa.select([keypair_resource_policies])
+                        sa.select(
+                            [
+                                keypair_resource_policies.c.max_session_lifetime,
+                                keypair_resource_policies.c.idle_timeout,
+                            ]
+                        )
                         .select_from(
                             sa.join(
                                 keypairs,
@@ -285,7 +290,6 @@ class IdleCheckerHost:
                         # mark to be destroyed afterwards
                         errors.append(result)
                         continue
-                    result = IdleCheckResult(True, remaining_idle_time=20.5)
                     checker.assign_check_result_to_report(report, result)
                     if not result.let_alive:
                         log.info(
@@ -303,7 +307,7 @@ class IdleCheckerHost:
                             )
                 await report_idle_check(self._redis_live, kernel["session_id"], report)
                 if errors:
-                    raise IdleCheckerError("idle checker(s) raise errors", errors=errors)
+                    raise IdleCheckerError("idle checker(s) raise errors", errors)
 
 
 class BaseIdleChecker(metaclass=ABCMeta):
@@ -479,7 +483,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
             return IdleCheckResult(True)
         last_access = float(raw_last_access)
         # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"
-        idle_timeout = self.idle_timeout.total_seconds()
+        idle_timeout: float = self.idle_timeout.total_seconds()
         # setting idle_timeout:
         # - zero/inf means "infinite"
         # - negative means "undefined"
@@ -487,9 +491,9 @@ class TimeoutIdleChecker(BaseIdleChecker):
             idle_timeout = float(policy["idle_timeout"])
         if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
             return IdleCheckResult(True)
-        idle_time = t - last_access
-        remaining = idle_timeout - idle_time
-        result = True if remaining >= 0 else False
+        idle_time: float = t - last_access
+        remaining: float = idle_timeout - idle_time
+        result = True if idle_timeout > idle_time else False
         return IdleCheckResult(result, remaining_idle_time=remaining)
 
 
@@ -506,15 +510,15 @@ class SessionLifetimeChecker(BaseIdleChecker):
         report.session_lifetime = result.remaining_idle_time
 
     async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
-        now = await dbconn.scalar(sa.select(sa.func.now()))
-        if policy["max_session_lifetime"] > 0:
+        if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
-            idle_timeout = timedelta(seconds=policy["max_session_lifetime"])
-            idle_time = now - kernel["created_at"]
-            remaining = idle_timeout - idle_time
-            result = True if remaining >= 0 else False
-            return IdleCheckResult(result, remaining)
+            idle_timeout = timedelta(seconds=max_session_lifetime)
+            now = await dbconn.scalar(sa.select(sa.func.now()))
+            idle_time: timedelta = now - kernel["created_at"]
+            remaining: timedelta = idle_timeout - idle_time
+            result = True if idle_time < idle_timeout else False
+            return IdleCheckResult(result, float(remaining.seconds))
         return IdleCheckResult(True)
 
 
