@@ -65,6 +65,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         redis_stat=root_ctx.redis_stat,
         redis_live=root_ctx.redis_live,
         redis_image=root_ctx.redis_image,
+        redis_live=root_ctx.redis_live,
         manager_status=manager_status,
         known_slot_types=known_slot_types,
         background_task_manager=root_ctx.background_task_manager,
