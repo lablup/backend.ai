@@ -338,11 +338,11 @@ async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             fs_usage = await volume.get_fs_usage()
-            hide_vfolder_usage = ctx.local_config["storage-proxy"]["hide_vfolder_usage"]
+            hide_vfolder_usage = ctx.local_config["storage-proxy"]["hide-vfolder-usage"]
 
             return web.json_response(
                 {
-                    "percentage": fs_usage.used_bytes / fs_usage.capacity_bytes,
+                    "percentage": (fs_usage.used_bytes / fs_usage.capacity_bytes) * 100,
                     "capacity_bytes": None if hide_vfolder_usage else fs_usage.capacity_bytes,
                     "used_bytes": None if hide_vfolder_usage else fs_usage.used_bytes,
                 }

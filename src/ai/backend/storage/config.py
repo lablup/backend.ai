@@ -30,7 +30,7 @@ local_config_iv = (
                     t.Key("max-upload-size", default="100g"): tx.BinarySize,
                     t.Key("secret"): t.String,  # used to generate JWT tokens
                     t.Key("session-expire"): tx.TimeDuration,
-                    t.Key("hide_vfolder_usage", default=True): t.ToBool,
+                    t.Key("hide-vfolder-usage", default=True): t.ToBool,
                     t.Key("user", default=None): tx.UserID(
                         default_uid=_file_perm.st_uid,
                     ),
