@@ -1,35 +1,27 @@
 import logging
-import os
 import shlex
 import tempfile
 from pathlib import Path
 
 from .. import BaseRunner
+from ..base import glob_path, promote_path
 
 log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "haskell-kernel"
     default_runtime_path = "/usr/bin/ghc"
-    default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/bash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": (
-            "/root/.cabal/bin:/root/.local/bin:/opt/cabal/2.0/bin:"
-            "/opt/ghc/8.2.1/bin:/opt/happy/1.19.5/bin:/opt/alex/3.1.7/bin:"
-            "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        ),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        path_env = self.child_env["PATH"]
+        path_env = promote_path(path_env, glob_path("/opt/happy", "*/bin"))
+        path_env = promote_path(path_env, glob_path("/opt/alex", "*/bin"))
+        path_env = promote_path(path_env, glob_path("/opt/cabal", "*/bin"))
+        path_env = promote_path(path_env, glob_path("/opt/ghc", "*/bin"))
+        path_env = promote_path(path_env, "/home/work/.cabal/bin")
+        self.child_env["PATH"] = path_env
 
     async def init_with_loop(self):
         pass

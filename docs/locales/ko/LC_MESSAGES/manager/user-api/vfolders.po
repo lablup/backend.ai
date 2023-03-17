@@ -1120,7 +1120,7 @@ msgstr "가상 폴더에 파일 업로드"
 msgid ""
 "Upload a local file to a virtual folder associated with the current "
 "keypair. Internally, the Manager will deligate the upload to a Backend.AI"
-" Storage-Proxy service. JSON web token is used for the authenticaiton of "
+" Storage-Proxy service. JSON web token is used for the authentication of "
 "the request."
 msgstr ""
 "현재 키페어와 연결된 가상 폴더에 로컬 파일을 업로드합니다. Manager는 내부적으로 Backend.AI Storage-Proxy"
@@ -1242,7 +1242,7 @@ msgid ""
 "Download a file or a directory from a virtual folder associated with the "
 "current keypair. Internally, the Manager will deligate the download to a "
 "Backend.AI Storage-Proxy service. JSON web token is used for the "
-"authenticaiton of the request."
+"authentication of the request."
 msgstr ""
 "현재 keypair에서 연결된 가상 폴더에 있는 파일 또는 디렉토리를 다운로드합니다. 내부적으로, Manager는 "
 "Backend.AI Storage-Proxy 서비스에 다운로드를 위임합니다. JSON 웹 토큰은 요청의 인증에 사용됩니다."
@@ -1747,7 +1747,7 @@ msgstr "``shared_emails``"
 
 #: ../../manager/user-api/vfolders.rst:1228 cf7eb89952974aa9acf8de6295a42aae
 #, fuzzy
-msgid "A list of user emails those are succesfully shared the virtual folder."
+msgid "A list of user emails those are successfully shared the virtual folder."
 msgstr "가상 폴더를 공유중인 사용자의 이메일 목록"
 
 #: ../../manager/user-api/vfolders.rst:1232 e767b302d18c49cdac261a9983070174
@@ -1781,7 +1781,7 @@ msgstr "``unshared_emails``"
 #: ../../manager/user-api/vfolders.rst:1354 9e67c12b5da04f969891cc7c4485a345
 #: b3bf2a75bb5546708b3348d1ececcc8b
 #, fuzzy
-msgid "A list of user emails those are succesfully unshared the virtual folder."
+msgid "A list of user emails those are successfully unshared the virtual folder."
 msgstr "가상 폴더 공유 해제를 완료한 사용자의 이메일 목록"
 
 #: ../../manager/user-api/vfolders.rst:1287 850301aa414e48cea9d96de1338bc9c9

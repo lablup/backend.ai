@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Awaitable, Callable, Iterable, Optional
 
 import aiodns
-import netifaces
+import ifaddr
 
 from .utils import curl
 
@@ -23,7 +23,7 @@ __all__ = (
     "get_instance_region",
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 def is_containerized() -> bool:
@@ -78,14 +78,19 @@ def detect_cloud() -> Optional[str]:
 
 
 def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
-    ifnames = netifaces.interfaces()
-    proto = netifaces.AF_INET if cidr.version == 4 else netifaces.AF_INET6
-    for ifname in ifnames:
-        addrs = netifaces.ifaddresses(ifname).get(proto, None)
-        if addrs is None:
+    proto = socket.AF_INET if cidr.version == 4 else socket.AF_INET6
+    for adapter in ifaddr.get_adapters():
+        if not adapter.ips:
             continue
-        for entry in addrs:
-            addr = ip_address(entry["addr"])
+        for entry in adapter.ips:
+            if entry.is_IPv4 and proto == socket.AF_INET:
+                assert isinstance(entry.ip, str)
+                addr = ip_address(entry.ip)
+            elif entry.is_IPv6 and proto == socket.AF_INET6:
+                assert isinstance(entry.ip, tuple)
+                addr = ip_address(entry.ip[0])
+            else:
+                continue
             if addr in cidr:
                 yield addr
 

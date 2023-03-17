@@ -11,7 +11,6 @@ import ssl
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -41,6 +40,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -94,6 +94,8 @@ VALID_VERSIONS: Final = frozenset(
         "v6.20220315",
         # added payload encryption / decryption on selected transfer
         "v6.20220615",
+        # added config/resource-slots/details, model mgmt & serving APIs
+        "v6.20230315",
     ]
 )
 LATEST_REV_DATES: Final = {
@@ -102,11 +104,11 @@ LATEST_REV_DATES: Final = {
     3: "20181215",
     4: "20190615",
     5: "20191215",
-    6: "20220615",
+    6: "20230315",
 }
-LATEST_API_VERSION: Final = "v6.20220615"
+LATEST_API_VERSION: Final = "v6.20230315"
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PUBLIC_INTERFACES: Final = [
     "pidx",
@@ -668,6 +670,7 @@ async def server_main(
         ".vfolder",
         ".filebrowser",
         ".admin",
+        ".service",
         ".session",
         ".stream",
         ".manager",
@@ -697,11 +700,16 @@ async def server_main(
     # Add some useful console_locals for ease of debugging
     m.console_locals["root_app"] = root_app
     m.console_locals["root_ctx"] = root_ctx
-    m.start()
+    aiomon_started = False
+    try:
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     # Plugin webapps should be loaded before runner.setup(),
     # which freezes on_startup event.
-    with closing(m):
+    try:
         async with (
             shared_config_ctx(root_ctx),
             webapp_plugin_ctx(root_app),
@@ -743,6 +751,9 @@ async def server_main(
             finally:
                 log.info("shutting down...")
                 await runner.cleanup()
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @actxmgr
@@ -774,15 +785,27 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
+def main(
+    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> None:
     """
     Start the manager service as a foreground process.
     """
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
-    cfg = load_config(config_path, debug)
+    cfg = load_config(config_path, log_level.value)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

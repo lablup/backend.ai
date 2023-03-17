@@ -32,7 +32,6 @@ def api_version():
 @pytest.mark.asyncio
 async def test_upload_jwt_generation(tmp_path):
     with aioresponses() as m:
-
         async with AsyncSession() as session:
             mock_file = tmp_path / "example.bin"
             mock_file.write_bytes(secrets.token_bytes(32))
@@ -71,13 +70,11 @@ async def test_upload_jwt_generation(tmp_path):
 
 @pytest.mark.asyncio
 async def test_tus_upload(tmp_path: Path):
-
     basedir = tmp_path / "example.bin"
     mock_file = basedir
     mock_file.write_bytes(secrets.token_bytes(1024))
     vfolder_name = "fake-vfolder-name"
     with aioresponses() as m:
-
         tus_client = client.TusClient()
         input_file = open(basedir, "rb")
         print(f"Uploading {basedir} ...")
@@ -142,7 +139,6 @@ async def test_vfolder_download(mocker):
 
     today_timestamp = time()
     with aioresponses() as m:
-
         async with AsyncSession() as session:
             vfolder_name = "fake-vfolder-name"
             # client to manager
