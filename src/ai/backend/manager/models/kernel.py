@@ -1010,7 +1010,7 @@ class ComputeSession(graphene.ObjectType):
             "group_name": row["group_name"],
             "group_id": row["group_id"],
             "user_email": row["email"],
-            "user_name": row["full_name"],
+            "full_name": row["full_name"],
             "user_id": row["user_uuid"],
             "access_key": row["access_key"],
             "created_user_email": None,  # TODO: implement
