@@ -89,14 +89,14 @@ class IdleCheckResult(NamedTuple):
 
     let_alive: bool
     remaining_idle_time: Optional[float] = None
-    utilization: Optional[Mapping[str, bool]] = None
+    avg_utilization: Optional[Mapping[str, float]] = None
 
 
 @dataclass(kw_only=True)
 class IdleCheckReport:
     timeout: Optional[float] = None
     session_lifetime: Optional[float] = None
-    utilization: Optional[Mapping[str, bool]] = None
+    avg_utilization: Optional[Mapping[str, float]] = None
 
     def to_json(self) -> Mapping[str, Any]:
         d: Mapping[str, Any] = {}
@@ -104,8 +104,8 @@ class IdleCheckReport:
             d = {"timeout": self.timeout}
         if self.session_lifetime is not None:
             d = {**d, "session_lifetime": self.session_lifetime}
-        if self.utilization is not None:
-            d = {**d, "utilization": self.utilization}
+        if self.avg_utilization is not None:
+            d = {**d, "utilization": self.avg_utilization}
         return d
 
 
@@ -117,37 +117,6 @@ class AppStreamingStatus(enum.Enum):
 class ThresholdOperator(enum.Enum):
     AND = "and"
     OR = "or"
-
-
-def get_idle_report_key(session_id: SessionId) -> str:
-    return f"session.{session_id}.idle_report"
-
-
-async def report_idle_check(
-    redis_obj: RedisConnectionInfo,
-    session_id: SessionId,
-    report: IdleCheckReport,
-) -> None:
-    report_key = get_idle_report_key(session_id)
-    if report.timeout is None and report.session_lifetime is None and report.utilization is None:
-        return
-    await redis_helper.execute(
-        redis_obj,
-        lambda r: r.set(
-            report_key,
-            msgpack.packb(report.to_json()),
-            ex=int(DEFAULT_CHECK_INTERVAL) * 2,
-        ),
-    )
-
-
-async def get_idle_check_report(
-    redis_obj: RedisConnectionInfo,
-    session_id: SessionId,
-) -> Optional[Mapping[str, Any]]:
-    report_key = get_idle_report_key(session_id)
-    data = await redis_helper.execute(redis_obj, lambda r: r.get(report_key))
-    return msgpack.unpackb(data) if data is not None else None
 
 
 class IdleCheckerHost:
@@ -279,7 +248,6 @@ class IdleCheckerHost:
                     checker.check_kernel(kernel, conn, policy) for checker in self._checkers
                 ]
                 check_results = await asyncio.gather(*check_task, return_exceptions=True)
-                report = IdleCheckReport()
                 terminated = False
                 errors = []
                 for checker, result in zip(self._checkers, check_results):
@@ -290,7 +258,9 @@ class IdleCheckerHost:
                         # mark to be destroyed afterwards
                         errors.append(result)
                         continue
-                    checker.assign_check_result_to_report(report, result)
+                    await checker.report_check_result(
+                        self._redis_live, kernel["session_id"], result
+                    )
                     if not result.let_alive:
                         log.info(
                             "The {} idle checker triggered termination of s:{}",
@@ -305,9 +275,17 @@ class IdleCheckerHost:
                                     checker.terminate_reason,
                                 ),
                             )
-                await report_idle_check(self._redis_live, kernel["session_id"], report)
                 if errors:
                     raise IdleCheckerError("idle checker(s) raise errors", errors)
+
+    async def get_idle_check_report(
+        self,
+        session_id: SessionId,
+    ) -> Mapping[str, Any]:
+        report = IdleCheckReport()
+        for checker in self._checkers:
+            await checker.assign_check_result(self._redis_live, report, session_id)
+        return report.to_json()
 
 
 class BaseIdleChecker(metaclass=ABCMeta):
@@ -338,9 +316,25 @@ class BaseIdleChecker(metaclass=ABCMeta):
     ) -> None:
         pass
 
+    @classmethod
+    def get_report_key(cls, session_id: SessionId) -> str:
+        return f"session.{session_id}.{cls.name}.report"
+
     @abstractmethod
-    def assign_check_result_to_report(
-        self, report: IdleCheckReport, result: IdleCheckResult
+    async def report_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        session_id: SessionId,
+        result: IdleCheckResult,
+    ) -> None:
+        pass
+
+    @abstractmethod
+    async def assign_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        report: IdleCheckReport,
+        session_id: SessionId,
     ) -> None:
         pass
 
@@ -405,11 +399,6 @@ class TimeoutIdleChecker(BaseIdleChecker):
             await self._disable_timeout(session_id)
         elif status == AppStreamingStatus.NO_ACTIVE_CONNECTIONS:
             await self._update_timeout(session_id)
-
-    def assign_check_result_to_report(
-        self, report: IdleCheckReport, result: IdleCheckResult
-    ) -> None:
-        report.timeout = result.remaining_idle_time
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
         log.debug(f"TimeoutIdleChecker._disable_timeout({session_id})")
@@ -496,6 +485,33 @@ class TimeoutIdleChecker(BaseIdleChecker):
         result = True if idle_timeout > idle_time else False
         return IdleCheckResult(result, remaining_idle_time=remaining)
 
+    async def report_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        session_id: SessionId,
+        result: IdleCheckResult,
+    ) -> None:
+        key = self.get_report_key(session_id)
+        if (val := result.remaining_idle_time) is not None:
+            await redis_helper.execute(
+                redis_obj,
+                lambda r: r.set(
+                    key,
+                    val,
+                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+                ),
+            )
+
+    async def assign_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        report: IdleCheckReport,
+        session_id: SessionId,
+    ) -> None:
+        key = self.get_report_key(session_id)
+        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        report.timeout = float(data) if data is not None else None
+
 
 class SessionLifetimeChecker(BaseIdleChecker):
     terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_SESSION_LIFETIME
@@ -503,11 +519,6 @@ class SessionLifetimeChecker(BaseIdleChecker):
 
     async def populate_config(self, config: Mapping[str, Any]) -> None:
         pass
-
-    def assign_check_result_to_report(
-        self, report: IdleCheckReport, result: IdleCheckResult
-    ) -> None:
-        report.session_lifetime = result.remaining_idle_time
 
     async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
         if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
@@ -520,6 +531,33 @@ class SessionLifetimeChecker(BaseIdleChecker):
             result = True if idle_time < idle_timeout else False
             return IdleCheckResult(result, float(remaining.seconds))
         return IdleCheckResult(True)
+
+    async def report_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        session_id: SessionId,
+        result: IdleCheckResult,
+    ) -> None:
+        key = self.get_report_key(session_id)
+        if (val := result.remaining_idle_time) is not None:
+            await redis_helper.execute(
+                redis_obj,
+                lambda r: r.set(
+                    key,
+                    val,
+                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+                ),
+            )
+
+    async def assign_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        report: IdleCheckReport,
+        session_id: SessionId,
+    ) -> None:
+        key = self.get_report_key(session_id)
+        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        report.timeout = float(data) if data is not None else None
 
 
 class UtilizationIdleChecker(BaseIdleChecker):
@@ -576,11 +614,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '
             f"time-window({self.time_window.total_seconds()}s)",
         )
-
-    def assign_check_result_to_report(
-        self, report: IdleCheckReport, result: IdleCheckResult
-    ) -> None:
-        report.utilization = result.utilization
 
     async def check_kernel(self, kernel: Row, dbconn: SAConnection, policy: Row) -> IdleCheckResult:
         session_id = kernel["session_id"]
@@ -699,7 +732,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 avg_utils,
                 self.thresholds_check_operator,
             )
-        return IdleCheckResult(check_result, utilization=sufficiently_utilized)
+        return IdleCheckResult(check_result, avg_utilization=avg_utils)
 
     async def get_current_utilization(
         self,
@@ -743,6 +776,35 @@ class UtilizationIdleChecker(BaseIdleChecker):
         except Exception as e:
             log.warning("Unable to collect utilization for idleness check", exc_info=e)
             return None
+
+    async def report_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        session_id: SessionId,
+        result: IdleCheckResult,
+    ) -> None:
+        key = self.get_report_key(session_id)
+        if result.avg_utilization is None:
+            return
+        assert result.avg_utilization is not None
+        await redis_helper.execute(
+            redis_obj,
+            lambda r: r.set(
+                key,
+                msgpack.packb(result.avg_utilization),
+                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+            ),
+        )
+
+    async def assign_check_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        report: IdleCheckReport,
+        session_id: SessionId,
+    ) -> None:
+        key = self.get_report_key(session_id)
+        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        report.avg_utilization = msgpack.unpackb(data) if data is not None else None
 
 
 checker_registry: Mapping[str, Type[BaseIdleChecker]] = {

@@ -94,7 +94,6 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
-from ai.backend.manager.idle import get_idle_check_report
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -2025,7 +2024,7 @@ async def get_info(request: web.Request) -> web.Response:
 
         resp["numQueriesExecuted"] = sess.num_queries
         resp["lastStat"] = sess.last_stat
-        resp["idleChecks"] = await get_idle_check_report(root_ctx.redis_live, sess.id)
+        resp["idleChecks"] = await root_ctx.idle_checker_host.get_idle_check_report(sess.id)
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
