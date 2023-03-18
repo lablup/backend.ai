@@ -169,7 +169,8 @@ class KernelStatusCache:
 class SessionStatusCache:
     session_id: SessionId
     session_status: SessionStatus
-    kernels: dict[KernelId, KernelStatusCache] = attrs.Factory(dict)
+    kernels: dict[KernelId, KernelStatusCache]
+    start_event: asyncio.Event = attrs.Factory(asyncio.Event)
 
     @property
     def main_kernel(self) -> KernelStatusCache:
@@ -270,10 +271,6 @@ class AgentRegistry:
     """
 
     session_creation_tracker: dict[SessionId, SessionStatusCache]
-
-    # kernel_creation_tracker: Dict[KernelId, asyncio.Future]
-    # _post_kernel_creation_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
-    # _post_kernel_creation_infos: dict[KernelId, asyncio.Future]
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
     def __init__(
@@ -299,9 +296,6 @@ class AgentRegistry:
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
         self.session_creation_tracker = {}
-        # self.kernel_creation_tracker = {}
-        # self._post_kernel_creation_tasks = weakref.WeakValueDictionary()
-        # self._post_kernel_creation_infos = {}
         self._kernel_actual_allocated_resources = {}
         self.rpc_keepalive_timeout = int(
             shared_config.get("config/network/rpc/keepalive-timeout", "60")
@@ -551,6 +545,7 @@ class AgentRegistry:
         }
 
         kernel_data = []
+        kernel_status_map = {}
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
             kernel_id = KernelId(uuid.uuid4())
@@ -717,6 +712,9 @@ class AgentRegistry:
                     "preopen_ports": creation_config.get("preopen_ports", []),
                 }
             )
+            kernel_status_map[kernel_id] = KernelStatusCache(
+                kernel_id, KernelStatus.PENDING, kernel["cluster_role"] == DEFAULT_ROLE
+            )
 
         try:
 
@@ -764,6 +762,10 @@ class AgentRegistry:
                     raise InvalidAPIParameters("No such agent")
             raise
 
+        self.session_creation_tracker[session_id] = SessionStatusCache(
+            session_id, SessionStatus.PENDING, kernel_status_map
+        )
+
         await self.hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
             (session_id, session_name, access_key),
@@ -779,14 +781,6 @@ class AgentRegistry:
         scheduled_session: SessionRow,
     ) -> None:
         from .scheduler.types import AgentAllocationContext, KernelAgentBinding
-
-        kernel_status_map = {
-            k.id: KernelStatusCache(k.id, k.status, k.cluster_role == DEFAULT_ROLE)
-            for k in scheduled_session.kernels
-        }
-        self.session_creation_tracker[scheduled_session.id] = SessionStatusCache(
-            scheduled_session.id, scheduled_session.status, kernel_status_map
-        )
 
         kernel_agent_bindings: Sequence[KernelAgentBinding] = [
             KernelAgentBinding(
@@ -1053,7 +1047,7 @@ class AgentRegistry:
     async def finalize_running(
         self, created_info: Mapping[str, Any], session_id: SessionId
     ) -> None:
-        kernel_id = created_info["id"]
+        kernel_id = KernelId(uuid.UUID(created_info["id"]))
         session_cache = self.session_creation_tracker[session_id]
         current_kernel_status = session_cache.kernels[kernel_id].kernel_status
 
@@ -1063,18 +1057,6 @@ class AgentRegistry:
                 if KernelStatus.RUNNING not in KERNEL_STATUS_TRANSITION_MAP[current_kernel_status]:
                     return
                 async with self.db.begin() as conn:
-                    # kernel_query = (
-                    #     sa.select(kernels.c.status)
-                    #     .where(kernels.c.id == kernel_id)
-                    #     .with_for_update(skip_locked=True)
-                    # )
-                    # current_status = (await conn.execute(kernel_query)).scalar()
-                    # # current_status is None when kernel_query is locked by concurrent query.
-                    # if (
-                    #     current_status is None
-                    #     or KernelStatus.RUNNING not in KERNEL_STATUS_TRANSITION_MAP[current_status]
-                    # ):
-                    #     return None
                     agent_host = URL(created_info["agent_addr"]).host
                     kernel_host = created_info.get("kernel_host", agent_host)
                     service_ports = created_info.get("service_ports", [])
@@ -1140,39 +1122,97 @@ class AgentRegistry:
                 session_cache.session_status = SessionStatus.RUNNING
 
         await execute_with_retry(_check_session)
+        self.session_creation_tracker[session_id].start_event.set()
 
-    # async def _post_create_kernel(
-    #     self,
-    #     agent_alloc_ctx: AgentAllocationContext,
-    #     kernel_id: KernelId,
-    # ) -> None:
-    #     # Wait until the kernel_started event.
-    #     try:
-    #         created_info, _ = await asyncio.gather(
-    #             self._post_kernel_creation_infos[kernel_id],
-    #             self.kernel_creation_tracker[kernel_id],
-    #         )
-    #     except asyncio.CancelledError:
-    #         log.warning("post_create_kernel(k:{}) cancelled", kernel_id)
-    #         return
-    #     except Exception:
-    #         log.exception("post_create_kernel(k:{}) unexpected error", kernel_id)
-    #         return
-    #     else:
-    #         await self.finalize_running(
-    #             {
-    #                 **created_info,
-    #                 "scaling_group": agent_alloc_ctx.scaling_group,
-    #                 "agent_addr": agent_alloc_ctx.agent_addr,
-    #             }
-    #         )
+    async def update_session_kernel_status_cache(
+        self,
+        session_id: SessionId,
+        kernel_ids: Sequence[KernelId],
+        kernel_status: KernelStatus,
+        status_data: Optional[Mapping[str, Any]] = None,
+        reason: Optional[str] = None,
+        update_db: bool = False,
+    ) -> None:
+        try:
+            session_cache = self.session_creation_tracker[session_id]
+        except KeyError:
+            log.error(f"Session cache not found, {session_id = }")
+            return
+        kernel_map = session_cache.kernels
+        try:
+            for k in kernel_ids:
+                kernel_map[k]
+        except KeyError:
+            expected = ", ".join([str(k) for k in session_cache.kernels])
+            got = ", ".join([str(k) for k in kernel_ids])
+            log.error(f"Session (id: {session_id}) has kernels (id: ({expected})), got {got}")
+            return
+        now = datetime.now(tzutc())
+        updated_kernels = []
+        for k in kernel_ids:
+            if kernel_status in KERNEL_STATUS_TRANSITION_MAP[kernel_map[k].kernel_status]:
+                kernel_map[k].kernel_status = kernel_status
+                updated_kernels.append(k)
+        if update_db and updated_kernels:
+            kernel_data = {
+                "status": kernel_status,
+                "status_changed": now,
+                "status_history": sql_json_merge(
+                    KernelRow.status_history,
+                    (),
+                    {
+                        kernel_status.name: now.isoformat(),
+                    },
+                ),
+            }
+            if kernel_status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+                kernel_data["terminated_at"] = now
+            if status_data is not None:
+                kernel_data["status_data"] = status_data
+            if reason is not None:
+                kernel_data["status_info"] = reason
+            query = (
+                sa.update(KernelRow).where(KernelRow.id.in_(updated_kernels)).values(**kernel_data)
+            )
 
-    #     finally:
-    #         try:
-    #             await asyncio.sleep(1)
-    #         finally:
-    #             del self._post_kernel_creation_infos[kernel_id]
-    #             del self.kernel_creation_tracker[kernel_id]
+            async def _update_session_status() -> None:
+                async with self.db.begin_session() as db_sess:
+                    await db_sess.execute(query)
+
+            await execute_with_retry(_update_session_status)
+        new_session_status = determine_session_status(
+            [k.kernel_status for k in session_cache.kernels.values()],
+            session_cache.main_kernel.kernel_status,
+        )
+        if new_session_status in SESSION_STATUS_TRANSITION_MAP[session_cache.session_status]:
+            session_cache.session_status = new_session_status
+            if update_db:
+                session_data = {
+                    "status": new_session_status,
+                    "status_changed": now,
+                    "status_history": sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            new_session_status.name: now.isoformat(),
+                        },
+                    ),
+                }
+                if new_session_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+                    session_data["terminated_at"] = now
+                if status_data is not None:
+                    session_data["status_data"] = status_data
+                if reason is not None:
+                    session_data["status_info"] = reason
+                query = (
+                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**session_data)
+                )
+
+                async def _update_session_status() -> None:
+                    async with self.db.begin_session() as db_sess:
+                        await db_sess.execute(query)
+
+                await execute_with_retry(_update_session_status)
 
     async def _create_kernels_in_one_agent(
         self,
@@ -1182,7 +1222,6 @@ class AgentRegistry:
         image_info: Mapping[str, Any],
         cluster_info,
     ) -> None:
-        # loop = asyncio.get_running_loop()
         registry_url = image_info["registry_url"]
         registry_creds = image_info["registry_creds"]
         image_infos = image_info["image_infos"]
@@ -1191,6 +1230,21 @@ class AgentRegistry:
         auto_pull = image_info["auto_pull"]
         assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
+
+        async def _update_kernel() -> None:
+            async with self.db.begin_session() as db_sess:
+                kernel_query = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.id.in_([binding.kernel.id for binding in items]))
+                    .values(
+                        agent=agent_alloc_ctx.agent_id,
+                        agent_addr=agent_alloc_ctx.agent_addr,
+                    )
+                )
+                await db_sess.execute(kernel_query)
+
+        await execute_with_retry(_update_kernel)
+
         async with RPCContext(
             agent_alloc_ctx.agent_id,
             agent_alloc_ctx.agent_addr,
@@ -1198,21 +1252,6 @@ class AgentRegistry:
             order_key=str(scheduled_session.id),
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            # # Prepare kernel_started event handling
-            # for binding in items:
-            #     self.kernel_creation_tracker[binding.kernel.id] = loop.create_future()
-            # # Spawn post-processing tasks
-            # post_tasks = []
-            # for binding in items:
-            #     self._post_kernel_creation_infos[binding.kernel.id] = loop.create_future()
-            #     post_task = asyncio.create_task(
-            #         self._post_create_kernel(
-            #             agent_alloc_ctx,
-            #             binding.kernel.id,
-            #         )
-            #     )
-            #     self._post_kernel_creation_tasks[binding.kernel.id] = post_task
-            #     post_tasks.append(post_task)
             try:
                 get_image_ref = lambda k: image_infos[str(k.image_ref)].image_ref
                 # Issue a batched RPC call to create kernels on this agent
@@ -1281,82 +1320,34 @@ class AgentRegistry:
                     agent_alloc_ctx.agent_id,
                 )
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                for binding in items:
-                    session_id = binding.kernel.session_id
-                    del self.session_creation_tracker[session_id]
-                #     if not self.kernel_creation_tracker[kernel_id].done():
-                #         self.kernel_creation_tracker[kernel_id].cancel()
-                #         self._post_kernel_creation_infos[kernel_id].set_exception(e)
-                # await asyncio.gather(*post_tasks, return_exceptions=True)
+                log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
+                await self.update_session_kernel_status_cache(
+                    scheduled_session.id,
+                    [binding.kernel.id for binding in items],
+                    KernelStatus.ERROR,
+                    reason="cancelled",
+                    update_db=True,
+                )
             except Exception as e:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
-                now = datetime.now(tzutc())
                 ex = e
-
-                async def _update_failure() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        query = (
-                            sa.update(KernelRow)
-                            .where(KernelRow.id.in_([binding.kernel.id for binding in items]))
-                            .value(
-                                status=KernelStatus.ERROR,
-                                status_info=f"other-error ({ex!r})",
-                                status_changed=now,
-                                terminated_at=now,
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.ERROR.name: now.isoformat(),  # ["PULLING", "PREPARING"]
-                                    },
-                                ),
-                                agent=binding.agent_alloc_ctx.agent_id,
-                                agent_addr=binding.agent_alloc_ctx.agent_addr,
-                                scaling_group=binding.agent_alloc_ctx.scaling_group,
-                                status_data={
-                                    "error": {
-                                        "src": "other",
-                                        "name": ex.__class__.__name__,
-                                        "repr": repr(ex),
-                                    },
-                                },
-                            )
-                        )
-                        await db_sess.execute(query)
-
-                await execute_with_retry(_update_failure)
-
-                async def _update_session_failure() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        query = (
-                            sa.update(SessionRow)
-                            .where(SessionRow.id == scheduled_session.id)
-                            .value(
-                                status=SessionStatus.ERROR,
-                                status_info=f"other-error ({ex!r})",
-                                status_changed=now,
-                                terminated_at=now,
-                                status_history=sql_json_merge(
-                                    SessionRow.status_history,
-                                    (),
-                                    {
-                                        SessionStatus.ERROR.name: now.isoformat(),  # ["PULLING", "PREPARING"]
-                                    },
-                                ),
-                                scaling_group_name=binding.agent_alloc_ctx.scaling_group,
-                                status_data={
-                                    "error": {
-                                        "src": "other",
-                                        "name": ex.__class__.__name__,
-                                        "repr": repr(ex),
-                                    },
-                                },
-                            )
-                        )
-                        await db_sess.execute(query)
-
-                await execute_with_retry(_update_session_failure)
+                reason = f"other-error ({ex!r})"
+                status_data = {
+                    "error": {
+                        "src": "other",
+                        "name": ex.__class__.__name__,
+                        "repr": repr(ex),
+                    },
+                }
+                await self.update_session_kernel_status_cache(
+                    scheduled_session.id,
+                    [binding.kernel.id for binding in items],
+                    KernelStatus.ERROR,
+                    status_data,
+                    reason,
+                    update_db=True,
+                )
                 raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -1643,6 +1634,8 @@ class AgentRegistry:
                         ),
                     )
                 await asyncio.gather(*rpc_coros)
+        if session_id in self.session_creation_tracker:
+            del self.session_creation_tracker[session_id]
 
     async def destroy_session(
         self,
@@ -1939,6 +1932,8 @@ class AgentRegistry:
             )
             if forced:
                 await self.recalc_resource_usage()
+            if session_id in self.session_creation_tracker:
+                del self.session_creation_tracker[session_id]
             return main_stat
 
     async def clean_session(
@@ -2571,13 +2566,6 @@ class AgentRegistry:
         Mark the kernel (individual worker) terminated and release
         the resource slots occupied by it.
         """
-        # post_task = self._post_kernel_creation_tasks.get(kernel_id, None)
-        # if post_task is not None and not post_task.done():
-        #     post_task.cancel()
-        #     try:
-        #         await post_task
-        #     except asyncio.CancelledError:
-        #         pass
 
         kern_stat = await redis_helper.execute(
             self.redis_stat,

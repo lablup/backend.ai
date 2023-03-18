@@ -560,9 +560,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         params["dependencies"] = []
 
     session_creation_id = secrets.token_urlsafe(16)
-    start_event = asyncio.Event()
-    session_creation_tracker = app_ctx.session_creation_tracker
-    session_creation_tracker[session_creation_id] = start_event
 
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
@@ -618,6 +615,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         resp["status"] = "PENDING"
         resp["servicePorts"] = []
         resp["created"] = True
+        start_event = root_ctx.registry.session_creation_tracker[session_id].start_event
 
         if not params["enqueue_only"]:
             app_ctx.pending_waits.add(current_task)
@@ -669,7 +667,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         raise InternalServerError
     finally:
         app_ctx.pending_waits.discard(current_task)
-        del session_creation_tracker[session_creation_id]
     return web.json_response(resp, status=201)
 
 
