@@ -264,11 +264,15 @@ class Agent(graphene.ObjectType):
         raw_status: str = None,
         filter: str = None,
     ) -> int:
+        if isinstance(raw_status, str):
+            status_list = [AgentStatus[s] for s in raw_status.split(",")]
+        elif isinstance(raw_status, AgentStatus):
+            status_list = [raw_status]
         query = sa.select([sa.func.count()]).select_from(agents)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
-            query = query.where(agents.c.status == AgentStatus[raw_status])
+            query = query.where(agents.c.status.in_(status_list))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -288,11 +292,15 @@ class Agent(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[Agent]:
+        if isinstance(raw_status, str):
+            status_list = [AgentStatus[s] for s in raw_status.split(",")]
+        elif isinstance(raw_status, AgentStatus):
+            status_list = [raw_status]
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
-            query = query.where(agents.c.status == AgentStatus[raw_status])
+            query = query.where(agents.c.status.in_(status_list))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
