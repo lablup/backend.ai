@@ -237,7 +237,11 @@
       "BatchModeConfig": "__NOT_TRANSLATED__",
       "StartUpCommand": "__NOT_TRANSLATED__",
       "ScheduleTime": "__NOT_TRANSLATED__",
-      "Architecture": "__NOT_TRANSLATED__"
+      "Architecture": "__NOT_TRANSLATED__",
+      "StartModelServing": "__NOT_TRANSLATED__",
+      "InferenceMode": "__NOT_TRANSLATED__",
+      "ImageDoesNotProvideModelPath": "__NOT_TRANSLATED__",
+      "ModelStorageToMount": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -273,7 +277,8 @@
       "AppMustBeRun": "Запускать только тогда, когда приложение уже запущено",
       "AppMustBeRunDialog": "Доступ к этому приложению и его использование возможно только в том случае, если оно уже запущено через терминал. В противном случае вы будете перенаправлены на страницу с ошибкой, которая возникает, когда приложение не запущено.",
       "ConfirmAndRun": "Я проверил и начну",
-      "Prepared": "Готовый"
+      "Prepared": "Готовый",
+      "App": "__NOT_TRANSLATED__"
     },
     "TensorboardPath": "Каталог журналов для TensorBoard",
     "InputTensorboardPath": "Введите каталог журнала, на который будет ссылаться TensorBoard. Обратите внимание, что каталог журналов не будет создан автоматически.",
@@ -320,7 +325,16 @@
     "DescCommitSession": "__NOT_TRANSLATED__",
     "Message": "сообщение",
     "EnvironmentInfo": "__NOT_TRANSLATED__",
-    "DownloadingSessionLogs": "__NOT_TRANSLATED__"
+    "DownloadingSessionLogs": "__NOT_TRANSLATED__",
+    "Inference": "__NOT_TRANSLATED__",
+    "UseSubdomain": "__NOT_TRANSLATED__",
+    "BypassAuthentication": "__NOT_TRANSLATED__",
+    "App": "__NOT_TRANSLATED__",
+    "SeeAppDialog": "__NOT_TRANSLATED__",
+    "ExecuteTerminalApp": "__NOT_TRANSLATED__",
+    "TerminateSession": "__NOT_TRANSLATED__",
+    "SeeContainerLogs": "__NOT_TRANSLATED__",
+    "RequestContainerCommit": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Отмена",
@@ -560,7 +574,8 @@
       "NoFolderToDisplay": "__NOT_TRANSLATED__",
       "FolderInfo": "__NOT_TRANSLATED__",
       "OpenAFolder": "__NOT_TRANSLATED__",
-      "Status": "__NOT_TRANSLATED__"
+      "Status": "__NOT_TRANSLATED__",
+      "Serve": "__NOT_TRANSLATED__"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -621,7 +636,8 @@
       "NoChanges": "Никаких изменений не внесено",
       "PermissionModified": "Разрешение обновлено"
     },
-    "NoStorageDescriptionFound": "Нет описания."
+    "NoStorageDescriptionFound": "Нет описания.",
+    "DialogModelFolder": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {

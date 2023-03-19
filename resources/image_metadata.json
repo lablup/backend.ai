@@ -334,9 +334,10 @@
     },
     "ngc-triton": {
       "name": "Triton Server (NGC)",
-      "description": "PyTorch is an open source machine learning framework that accelerates the path from research prototyping to production deployment. This environment is integrated with Nvidia GPU Cloud.",
+      "description": "NVIDIA Triton Inference Server is an open-source, high-performance server that simplifies the deployment of AI models for inference in production environments..This environment is integrated with Nvidia GPU Cloud.",
       "group": "Machine Learning / Deep Learning",
       "tags": [],
+      "icon": "nvidia.png",
       "label": [
         {
           "category": "Env",
@@ -789,7 +790,7 @@
     "tf2.10": "TensorFlow 2.10",
     "tf2.11": "TensorFlow 2.11",
     "tf2.12": "TensorFlow 2.12",
-    "tf2.13": "TensorFlow 2.13",                  
+    "tf2.13": "TensorFlow 2.13",
     "py3": "Python 3",
     "py2": "Python 2",
     "py27": "Python 2.7",

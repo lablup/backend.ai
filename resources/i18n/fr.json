@@ -237,7 +237,11 @@
       "BatchModeConfig": "__NOT_TRANSLATED__",
       "StartUpCommand": "__NOT_TRANSLATED__",
       "ScheduleTime": "__NOT_TRANSLATED__",
-      "Architecture": "__NOT_TRANSLATED__"
+      "Architecture": "__NOT_TRANSLATED__",
+      "StartModelServing": "__NOT_TRANSLATED__",
+      "InferenceMode": "__NOT_TRANSLATED__",
+      "ImageDoesNotProvideModelPath": "__NOT_TRANSLATED__",
+      "ModelStorageToMount": "__NOT_TRANSLATED__"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -273,7 +277,8 @@
       "AppMustBeRun": "Démarrer uniquement lorsque l'application est déjà en cours d'exécution",
       "AppMustBeRunDialog": "Cette application n'est accessible et utilisée que si elle est déjà en cours d'exécution via le terminal. Sinon, vous serez dirigé vers une page d'erreur qui se produit lorsque l'application n'est pas en cours d'exécution.",
       "ConfirmAndRun": "j'ai vérifié et je vais commencer",
-      "Prepared": "Préparé"
+      "Prepared": "Préparé",
+      "App": "__NOT_TRANSLATED__"
     },
     "TensorboardPath": "Répertoire des journaux pour TensorBoard",
     "InputTensorboardPath": "Veuillez saisir le répertoire de journal auquel TensorBoard fera référence. Notez que le répertoire des journaux ne sera pas automatiquement créé.",
@@ -320,7 +325,16 @@
     "DescCommitSession": "__NOT_TRANSLATED__",
     "Message": "Message",
     "EnvironmentInfo": "__NOT_TRANSLATED__",
-    "DownloadingSessionLogs": "__NOT_TRANSLATED__"
+    "DownloadingSessionLogs": "__NOT_TRANSLATED__",
+    "Inference": "__NOT_TRANSLATED__",
+    "UseSubdomain": "__NOT_TRANSLATED__",
+    "BypassAuthentication": "__NOT_TRANSLATED__",
+    "App": "__NOT_TRANSLATED__",
+    "SeeAppDialog": "__NOT_TRANSLATED__",
+    "ExecuteTerminalApp": "__NOT_TRANSLATED__",
+    "TerminateSession": "__NOT_TRANSLATED__",
+    "SeeContainerLogs": "__NOT_TRANSLATED__",
+    "RequestContainerCommit": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Annuler",
@@ -560,7 +574,8 @@
       "NoFolderToDisplay": "__NOT_TRANSLATED__",
       "FolderInfo": "__NOT_TRANSLATED__",
       "OpenAFolder": "__NOT_TRANSLATED__",
-      "Status": "__NOT_TRANSLATED__"
+      "Status": "__NOT_TRANSLATED__",
+      "Serve": "__NOT_TRANSLATED__"
     },
     "explorer": {
       "Delete": "Effacer...",
@@ -621,7 +636,8 @@
       "NoChanges": "Aucune modification apportée",
       "PermissionModified": "Autorisation mise à jour"
     },
-    "NoStorageDescriptionFound": "Pas de description."
+    "NoStorageDescriptionFound": "Pas de description.",
+    "DialogModelFolder": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
