@@ -1,7 +1,7 @@
 """add_session_table
 
 Revision ID: b6b884fbae1f
-Revises: 213a04e90ecf
+Revises: cace152eefac
 Create Date: 2022-12-05 16:12:53.275671
 
 """
@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = "b6b884fbae1f"
-down_revision = "213a04e90ecf"
+down_revision = "cace152eefac"
 branch_labels = None
 depends_on = None
 
