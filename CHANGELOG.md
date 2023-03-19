@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.18 (2023-03-19)
+
+### Features
+* Add support for OTP based 2FA login on Backend.AI CLI ([#1147](https://github.com/lablup/backend.ai/issues/1147))
+* Expose `user_name` field to `compute_session` (and also `compute_session_list`) GQL query. ([#1149](https://github.com/lablup/backend.ai/issues/1149))
+* Add a `force_2FA` option to force the use of 2-Factor-Authenticaiton. ([#1161](https://github.com/lablup/backend.ai/issues/1161))
+* Replace `username` in the `compute_session` (and `compute_session_list`) GQL query with `full_name` and expose `full_name` to `get_container_stats_for_period` so that administrators can easily recognize users. ([#1167](https://github.com/lablup/backend.ai/issues/1167))
+
+### Fixes
+* Use SI bytesize unit where it is not mem size. ([#1098](https://github.com/lablup/backend.ai/issues/1098))
+* Update vfolder clone status by vfolder id rather vfolder name. ([#1145](https://github.com/lablup/backend.ai/issues/1145))
+* Correct `user_name` to `full_name` in kernel model's gql parser which prevented fetching session list. ([#1173](https://github.com/lablup/backend.ai/issues/1173))
+
+### External Dependency Updates
+* Replace `netifaces` (now unmaintained) with `ifaddr` in favor of better maintained one with a pure Python implementation ([#1155](https://github.com/lablup/backend.ai/issues/1155))
+
+
 ## 22.09.17 (2023-03-09)
 
 ### Features

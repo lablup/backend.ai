@@ -1,1 +1,0 @@
-Correct `user_name` to `full_name` in kernel model's gql parser which prevented fetching session list.
