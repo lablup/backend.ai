@@ -236,7 +236,11 @@
       "NumOpenMPthreads": "OpenMP 쓰레드 수",
       "NumOpenBLASthreads": "OpenBLAS 쓰레드 수",
       "SwitchOpenMPoptimization": "OpenMP 자동 최적화 사용",
-      "Architecture": "아키텍쳐"
+      "Architecture": "아키텍쳐",
+      "StartModelServing": "모델 서비스 시작",
+      "InferenceMode": "Inference",
+      "ImageDoesNotProvideModelPath": "모델 경로를 지정하지 않은 컨테이너 이미지입니다. 수정이 필요합니다.",
+      "ModelStorageToMount": "마운트할 모델 스토리지 폴더"
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -246,7 +250,7 @@
     "Finished": "종료",
     "Others": "기타",
     "exportCSV": "CSV로 내보내기",
-    "Terminate": "강제종료",
+    "Terminate": "종료",
     "SessionInfo": "세션 정보",
     "Status": "상태",
     "StatusInfo": "상태 정보",
@@ -282,7 +286,8 @@
       "AppMustBeRun": "이미 앱이 실행중일 때만 시작하세요",
       "AppMustBeRunDialog": "이 앱은 터미널을 통해 미리 실행되고 있는 경우에만 접근 및 사용할 수 있습니다. 그렇지 않은 경우, 앱이 실행중이 아닐때 발생하는 오류 페이지에 접속될 것입니다.",
       "ConfirmAndRun": "확인하였으며 시작하겠습니다",
-      "Prepared": "준비되었습니다"
+      "Prepared": "준비되었습니다",
+      "App": "앱"
     },
     "TensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로",
     "InputTensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로를 입력하세요. 로그 디렉토리는 자동으로 생성되지 않는다는 점에 주의하십시오.",
@@ -319,7 +324,16 @@
     "CommitFailed": "세션 커밋 작업 실패",
     "DescCommitSession": "다음 세션에 대응하는 컨테이너를 커밋하려고 합니다: ",
     "EnvironmentInfo": "환경 정보",
-    "DownloadingSessionLogs": "세션 로그를 다운받습니다."
+    "DownloadingSessionLogs": "세션 로그를 다운받습니다.",
+    "Inference": "INFERENCE",
+    "UseSubdomain": "서브도메인 주소 입력",
+    "BypassAuthentication": "인증 바이패스",
+    "App": "앱",
+    "SeeAppDialog": "앱 다이얼로그 보기",
+    "ExecuteTerminalApp": "터미널 앱 실행하기",
+    "TerminateSession": "세션 종료하기",
+    "SeeContainerLogs": "컨테이너 로그 보기",
+    "RequestContainerCommit": "컨테이너 커밋하기"
   },
   "button": {
     "Cancel": "취소",
@@ -559,7 +573,8 @@
       "FolderUsage": "폴더 사용량",
       "FolderUsing": "사용량",
       "FolderQuota": "가용량",
-      "MaxFolderQuota": "최대 할당 가능 용량"
+      "MaxFolderQuota": "최대 할당 가능 용량",
+      "Serve": "__NOT_TRANSLATED__"
     },
     "explorer": {
       "Delete": "삭제...",
@@ -620,7 +635,8 @@
       "NoChanges": "변경 사항이 없습니다",
       "PermissionModified": "권한이 변경되었습니다"
     },
-    "NoStorageDescriptionFound": "별도 정보가 없습니다."
+    "NoStorageDescriptionFound": "별도 정보가 없습니다.",
+    "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다."
   },
   "dialog": {
     "warning": {
@@ -882,7 +898,7 @@
     "TimeoutSeconds": "초",
     "ResourceGroupDetail": "자원 그룹 세부 정보",
     "RetriesToSkip": "회",
-    "NoGroupToDisplay": "__NOT_TRANSLATED__"
+    "NoGroupToDisplay": "해당되는 그룹이 없습니다."
   },
   "maintenance": {
     "General": "일반",

@@ -156,6 +156,7 @@
       "Start": "Start",
       "FolderToMount": "Folder to mount",
       "FolderToMountList": "Folder to mount",
+      "ModelStorageToMount": "Model storage to mount",
       "MountedFolders": "Mounted folders",
       "ResourceAllocation": "Resource allocation",
       "NoSuitablePreset": "No suitable preset",
@@ -246,7 +247,10 @@
       "NumOpenMPthreads": "Number of OpenMP threads",
       "NumOpenBLASthreads": "Number of OpenBLAS threads",
       "SwitchOpenMPoptimization": "Use automatic OpenMP optimization",
-      "Architecture": "Architecture"
+      "Architecture": "Architecture",
+      "StartModelServing": "Start Model Serving",
+      "InferenceMode": "Inference",
+      "ImageDoesNotProvideModelPath": "Container image does not provide model path. It should be modified."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -298,7 +302,8 @@
       "AppMustBeRun": "Start only when the app is already running",
       "AppMustBeRunDialog": "This app can only be accessed and used if it is already running through the terminal. If not, you will be directed to an error page that occurs when the app is not running.",
       "ConfirmAndRun": "I checked and I'll start",
-      "Prepared": "Prepared"
+      "Prepared": "Prepared",
+      "App": "App"
     },
     "TensorboardPath": "Log directory for TensorBoard",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",
@@ -327,7 +332,16 @@
     },
     "EnterValidSessionName": "EnterValidSessionName",
     "EnvironmentInfo": "Environment Info",
-    "DownloadingSessionLogs": "Downloading session logs."
+    "DownloadingSessionLogs": "Downloading session logs.",
+    "Inference": "Inference",
+    "UseSubdomain": "UseSubdomain",
+    "BypassAuthentication": "Bypass authentication",
+    "App": "App",
+    "SeeAppDialog": "See App Dialog",
+    "ExecuteTerminalApp": "Execute Terminal App",
+    "TerminateSession": "Terminate Session",
+    "SeeContainerLogs": "See Container Logs",
+    "RequestContainerCommit": "Request Container Commit"
   },
   "button": {
     "Cancel": "Cancel",
@@ -567,7 +581,8 @@
       "FolderUsage": "Folder usage",
       "FolderUsing": "Using",
       "FolderQuota": "Capacity",
-      "MaxFolderQuota": "Max Folder Quota"
+      "MaxFolderQuota": "Max Folder Quota",
+      "Serve": "Serve"
     },
     "explorer": {
       "Delete": "Delete...",
@@ -628,7 +643,8 @@
       "NoChanges": "No changes made",
       "PermissionModified": "Permission updated"
     },
-    "NoStorageDescriptionFound": "No description."
+    "NoStorageDescriptionFound": "No description.",
+    "DialogModelFolder": "You can serve and manage models."
   },
   "dialog": {
     "warning": {
