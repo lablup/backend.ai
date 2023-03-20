@@ -15,6 +15,7 @@ from sqlalchemy.orm import registry
 
 from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
+from ai.backend.manager.models.session import SessionDependencyRow
 
 # revision identifiers, used by Alembic.
 revision = "b6b884fbae1f"
@@ -354,6 +355,30 @@ def upgrade():
         connection.execute(SessionRow.__table__.insert(), creates)
 
     # Session dependency table
+    kern_ids = list(single_kernel_ids.keys())
+    sess_dep_query = sa.select(SessionDependencyRow)
+    insert_values = []
+    for row in connection.execute(sess_dep_query).fetchall():
+        val = {}
+        if row["session_id"] in single_kernel_ids:
+            val["session_id"] = single_kernel_ids[row["session_id"]]
+        else:
+            val["session_id"] = row["session_id"]
+
+        if row["depends_on"] in single_kernel_ids:
+            val["depends_on"] = single_kernel_ids[row["depends_on"]]
+        else:
+            val["depends_on"] = row["depends_on"]
+        insert_values.append(val)
+    dep_delete_query = sa.delete(SessionDependencyRow).where(
+        SessionDependencyRow.session_id.in_(kern_ids)
+    )
+    connection.execute(dep_delete_query)
+    dep_delete_query = sa.delete(SessionDependencyRow).where(
+        SessionDependencyRow.depends_on.in_(kern_ids)
+    )
+    connection.execute(dep_delete_query)
+
     op.create_foreign_key(
         op.f("fk_session_dependencies_session_id_sessions"),
         "session_dependencies",
@@ -372,12 +397,15 @@ def upgrade():
         onupdate="CASCADE",
         ondelete="CASCADE",
     )
+
     op.drop_constraint(
         "fk_session_dependencies_depends_on_kernels", "session_dependencies", type_="foreignkey"
     )
     op.drop_constraint(
         "fk_session_dependencies_session_id_kernels", "session_dependencies", type_="foreignkey"
     )
+    if insert_values:
+        connection.execute(sa.insert(SessionDependencyRow), insert_values)
 
     # Kernel table
     sess_query = (
@@ -506,11 +534,13 @@ def downgrade():
         .values({kernels.c.session_id: sa.bindparam("session_id")})
     )
     sess_update_params = []
+    single_kern_sess = {}
     for sess_id, num_kern in num_kernel_sess.items():
         if num_kern == 1:
             # it is single kernel session.
             # session_id must be same with kernel_id.
             kernel_id = sess_kern_map[sess_id]
+            single_kern_sess[sess_id] = kernel_id
             sess_update_params.append(
                 {
                     "kernel_id": kernel_id,
@@ -523,6 +553,31 @@ def downgrade():
     op.drop_column("kernels", "requested_slots")
 
     # Session dependency table
+    sess_ids = list(single_kern_sess.keys())
+    sess_dep_query = sa.select(SessionDependencyRow)
+    insert_values = []
+    for row in connection.execute(sess_dep_query).fetchall():
+        val = {}
+        if row["session_id"] in single_kern_sess:
+            val["session_id"] = single_kern_sess[row["session_id"]]
+        else:
+            val["session_id"] = row["session_id"]
+
+        if row["depends_on"] in single_kern_sess:
+            val["depends_on"] = single_kern_sess[row["depends_on"]]
+        else:
+            val["depends_on"] = row["depends_on"]
+        insert_values.append(val)
+
+    dep_delete_query = sa.delete(SessionDependencyRow).where(
+        SessionDependencyRow.session_id.in_(sess_ids)
+    )
+    connection.execute(dep_delete_query)
+    dep_delete_query = sa.delete(SessionDependencyRow).where(
+        SessionDependencyRow.depends_on.in_(sess_ids)
+    )
+    connection.execute(dep_delete_query)
+
     op.create_foreign_key(
         "fk_session_dependencies_session_id_kernels",
         "session_dependencies",
@@ -551,6 +606,8 @@ def downgrade():
         "session_dependencies",
         type_="foreignkey",
     )
+    if insert_values:
+        connection.execute(sa.insert(SessionDependencyRow), insert_values)
 
     # Session table
     op.drop_index(op.f("ix_sessions_terminated_at"), table_name="sessions")
