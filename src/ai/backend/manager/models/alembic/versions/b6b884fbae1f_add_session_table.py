@@ -250,9 +250,17 @@ def upgrade():
         "fk_session_dependencies_session_id_kernels", "session_dependencies", type_="foreignkey"
     )
 
-    kernel_cnt = connection.execute(sa.select([sa.func.count()]).select_from(kernels)).scalar()
-    for chunk in range(0, kernel_cnt, QUERY_CHUNK_SIZE):
-        query = sa.select([kernels]).slice(chunk, chunk + QUERY_CHUNK_SIZE)
+    subquery = sa.select([sa.func.count()]).select_from(kernels).group_by(kernels.c.session_id)
+    session_cnt = connection.execute(sa.select([sa.func.count()])).select_from(subquery).scalar()
+    for chunk in range(0, session_cnt, QUERY_CHUNK_SIZE):
+        query = (
+            sa.select([kernels.c.session_id])
+            .group_by(kernels.c.session_id)
+            .slice(chunk, chunk + QUERY_CHUNK_SIZE)
+        )
+        session_ids = [row["session_id"] for row in connection.execute(query).fetchall()]
+
+        query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
         kernel_rows = connection.execute(query).fetchall()
 
         # imgs = db_session.query(ImageRow).all()
@@ -467,9 +475,23 @@ def downgrade():
         "session_dependencies",
         type_="foreignkey",
     )
-    kernel_cnt = connection.execute(sa.select([sa.func.count()]).select_from(kernels)).scalar()
-    for chunk in range(0, kernel_cnt, QUERY_CHUNK_SIZE):
-        query = sa.select([kernels]).slice(chunk, chunk + QUERY_CHUNK_SIZE)
+
+    class SessionRow(Base):
+        __tablename__ = "sessions"
+        id = sa.Column(
+            "id",
+            GUID(),
+            server_default=sa.text("uuid_generate_v4()"),
+            nullable=False,
+            primary_key=True,
+        )
+
+    session_cnt = connection.execute(sa.select([sa.func.count()])).select_from(SessionRow).scalar()
+    for chunk in range(0, session_cnt, QUERY_CHUNK_SIZE):
+        query = sa.select(SessionRow.id).slice(chunk, chunk + QUERY_CHUNK_SIZE)
+        session_ids = [row["id"] for row in connection.execute(query).fetchall()]
+
+        query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
         kernel_rows = connection.execute(query).fetchall()
 
         num_kernel_sess = defaultdict(int)
