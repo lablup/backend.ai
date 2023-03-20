@@ -641,7 +641,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
             except TypeError:
                 util_series = {k: [] for k in self.resource_thresholds.keys()}
 
-            avg_utils = {k: sum(v) / len(v) for k, v in util_series.items()}
+            def _avg(util_list: list[float]) -> float:
+                try:
+                    return sum(util_list) / len(util_list)
+                except ZeroDivisionError:
+                    return 0.0
+
+            avg_utils = {k: _avg(v) for k, v in util_series.items()}
             print(f"{avg_utils = }")
 
             # Respect idle_timeout, from keypair resource policy, over time_window.
