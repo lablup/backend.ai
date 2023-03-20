@@ -279,13 +279,13 @@ async def update_git_tokens(request: web.Request, params: Any) -> web.Response:
     print(type(token_list))
     result = json.loads(token_list)
     print("bbbbb=====cccc")
-    for item in result:
-        print(item["domain"])
-        print(item["token"])
+    for key, value in result.items():
+        print(key)
+        print(value)
         # first delete (select * from user_id and not in )
 
         # then, insert datas
-        data = {"user_id": user_uuid, "domain": item["domain"], "token": item["token"]}
+        data = {"user_id": user_uuid, "domain": key, "token": value}
         async with root_ctx.db.begin() as conn:
             query = git_tokens.insert().values(data)
             result = await conn.execute(query)
@@ -294,10 +294,7 @@ async def update_git_tokens(request: web.Request, params: Any) -> web.Response:
             else:
                 raise InternalServerError("Error creating git tokens")
 
-        resp.append({"domain": item["domain"], "token": item["token"]})
-
-    resp.append({"domain": "github.com", "token": "aaaabbbb"})
-    resp.append({"domain": "gitlab.com", "token": "ccccdddd"})
+        resp.append({"domain": key, "token": value})
 
     return web.json_response(resp)
 
