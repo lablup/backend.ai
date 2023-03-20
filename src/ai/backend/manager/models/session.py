@@ -30,6 +30,7 @@ from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
+    BinarySize,
     ClusterMode,
     ResourceSlot,
     SessionId,
@@ -1234,7 +1235,11 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+        idle_report = await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+        avg_utils = idle_report["utilization"]
+        if "mem" in avg_utils:
+            avg_utils["mem"] = BinarySize.from_str(str(int(avg_utils["mem"])))
+        return idle_report
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),

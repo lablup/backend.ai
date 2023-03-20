@@ -609,13 +609,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 lambda r: r.get(util_last_collected_key),
             )
             util_last_collected = float(raw_util_last_collected) if raw_util_last_collected else 0
-            print(f"{t - util_last_collected = }, {interval = }")
             if t - util_last_collected < interval:
                 return True, None
 
             # Respect initial grace period (no termination of the session)
             now = datetime.now(tzutc())
-            print(f'{now - kernel["created_at"] = }, {self.initial_grace_period = }')
             if now - kernel["created_at"] <= self.initial_grace_period:
                 return True, None
 
@@ -648,13 +646,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     return 0.0
 
             avg_utils = {k: _avg(v) for k, v in util_series.items()}
-            print(f"{avg_utils = }")
 
             # Respect idle_timeout, from keypair resource policy, over time_window.
-            print(f'{policy["idle_timeout"] = }')
             if policy["idle_timeout"] >= 0:
                 window_size = int(float(policy["idle_timeout"]) / interval)
-            print(f"{window_size = }")
             if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
                 return True, avg_utils
 
@@ -669,14 +664,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
             else:
                 kernel_ids = [kernel["id"]]
             current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
-            print(f"{current_utilizations = }")
             if current_utilizations is None:
                 return True, avg_utils
 
             # Update utilization time-series data.
             not_enough_data = False
 
-            print(f"{util_series = }")
             for k in util_series:
                 util_series[k].append(current_utilizations[k])
                 if len(util_series[k]) > window_size:
