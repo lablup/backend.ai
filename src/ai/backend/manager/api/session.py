@@ -2027,7 +2027,7 @@ async def get_info(request: web.Request) -> web.Response:
         resp["lastStat"] = sess.last_stat
         idle_report = await root_ctx.idle_checker_host.get_idle_check_report(sess.id)
         avg_utils = idle_report["utilization"]
-        if "mem" in avg_utils:
+        if avg_utils is not None and "mem" in avg_utils:
             avg_utils["mem"] = BinarySize.from_str(str(int(avg_utils["mem"])))
         resp["idleChecks"] = idle_report
 
