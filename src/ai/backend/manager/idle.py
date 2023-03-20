@@ -570,17 +570,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
     }
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
-        raw_config = {
-            "initial-grace-period": "300",
-            "resource-thresholds": {
-                "cpu_util": {"average": "10"},
-                "cuda_mem": {"average": "10"},
-                "cuda_util": {"average": "10"},
-                "mem": {"average": "10"},
-            },
-            "thresholds-check-operator": "or",
-            "time-window": "15",
-        }
         config = self._config_iv.check(raw_config)
         self.resource_thresholds = {
             k: nmget(v, "average") for k, v in config.get("resource-thresholds").items()
@@ -626,7 +615,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
             # Respect initial grace period (no termination of the session)
             now = datetime.now(tzutc())
-            print(f'{self.initial_grace_period = }, {now - kernel["created_at"]}')
+            print(f'{now - kernel["created_at"] = }, {self.initial_grace_period = }')
             if now - kernel["created_at"] <= self.initial_grace_period:
                 return None
 
