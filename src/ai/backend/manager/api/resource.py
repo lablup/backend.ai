@@ -682,6 +682,7 @@ async def get_container_stats_for_period(
                     kernels.c.mounts,
                     kernels.c.image,
                     kernels.c.status,
+                    kernels.c.status_info,
                     kernels.c.status_changed,
                     kernels.c.last_stat,
                     kernels.c.status_history,
@@ -690,6 +691,7 @@ async def get_container_stats_for_period(
                     kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
@@ -770,6 +772,7 @@ async def get_container_stats_for_period(
             "name": row["session_name"],
             "access_key": row["access_key"],
             "email": row["email"],
+            "full_name": row["full_name"],
             "agent": row["agent"],
             "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
             "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
@@ -792,6 +795,7 @@ async def get_container_stats_for_period(
             "created_at": str(row["created_at"]),
             "terminated_at": str(row["terminated_at"]),
             "status": row["status"].name,
+            "status_info": row["status_info"],
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
             "cluster_mode": row["cluster_mode"],

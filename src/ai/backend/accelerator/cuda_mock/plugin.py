@@ -54,6 +54,8 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AcceleratorMetadata,
+    AcceleratorNumberFormat,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -105,7 +107,6 @@ _mock_config_iv = t.Dict(
 
 
 class CUDAPlugin(AbstractComputePlugin):
-
     config_watch_enabled = False
 
     key = DeviceName("cuda")
@@ -626,7 +627,10 @@ class CUDAPlugin(AbstractComputePlugin):
             for slot_name, _ in self.slot_types:
                 alloc_map.apply_allocation(
                     {
-                        slot_name: resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                        slot_name: resource_spec.allocations.get(
+                            DeviceName("cuda"),
+                            {},
+                        ).get(
                             slot_name,
                             {
                                 dev_id: Decimal(0)
@@ -639,14 +643,20 @@ class CUDAPlugin(AbstractComputePlugin):
         else:  # older agents without lablup/backend.ai-agent#180
             if self._mode == AllocationModes.DISCRETE:
                 alloc_map.allocations[SlotName("cuda.device")].update(
-                    resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                    resource_spec.allocations.get(
+                        DeviceName("cuda"),
+                        {},
+                    ).get(
                         SlotName("cuda.device"),
                         {},
                     ),
                 )
             elif self._mode == AllocationModes.FRACTIONAL:
                 alloc_map.allocations[SlotName("cuda.shares")].update(
-                    resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                    resource_spec.allocations.get(
+                        DeviceName("cuda"),
+                        {},
+                    ).get(
                         SlotName("cuda.shares"),
                         {},
                     ),
@@ -705,3 +715,25 @@ class CUDAPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        number_format: AcceleratorNumberFormat
+        match self._mode:
+            case AllocationModes.DISCRETE:
+                unit = "GPU"
+                number_format = {"binary": False, "round_length": 0}
+                description = "CUDA-capable GPU"
+            case AllocationModes.FRACTIONAL:
+                unit = "fGPU"
+                exponent = self.quantum_size.as_tuple().exponent
+                assert isinstance(exponent, int)
+                number_format = {"binary": False, "round_length": abs(exponent)}
+                description = "CUDA-capable GPU (fractional)"
+        return {
+            "slot_name": self.slot_types[0][0],
+            "human_readable_name": "GPU",
+            "description": description,
+            "display_unit": unit,
+            "number_format": number_format,
+            "display_icon": "gpu1",
+        }

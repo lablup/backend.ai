@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import tempfile
 from pathlib import Path
 from typing import List
@@ -13,30 +12,8 @@ DEFAULT_PYFLAGS: List[str] = []
 
 
 class Runner(BaseRunner):
-
     log_prefix = "h2o-kernel"
     default_runtime_path = "/opt/h2oai/dai/python/bin/python"
-    default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/bash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": ":".join(
-            [
-                "/usr/local/nvidia/bin",
-                "/usr/local/cuda/bin",
-                "/usr/local/sbin",
-                "/usr/local/bin",
-                "/usr/sbin",
-                "/usr/bin",
-                "/sbin",
-                "/bin",
-            ]
-        ),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

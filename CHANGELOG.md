@@ -16,6 +16,44 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.0a4 (2023-03-16)
+
+### Features
+* Replace `username` in the `compute_session` (and `compute_session_list`) GQL query with `full_name` and expose `full_name` to `get_container_stats_for_period` so that administrators can easily recognize users. ([#1167](https://github.com/lablup/backend.ai/issues/1167))
+* Add new inference_metrics column to compute_session GQL query ([#1168](https://github.com/lablup/backend.ai/issues/1168))
+
+
+## 23.03.0a3 (2023-03-15)
+No significant changes.
+
+
+## 23.03.0a3 (2023-03-15)
+
+### Fixes
+* Use SI bytesize unit where it is not mem size. ([#1098](https://github.com/lablup/backend.ai/issues/1098))
+
+
+## 23.03.0a2 (2023-03-15)
+
+### Features
+* Report commit status through redis rather direct RPC call. ([#1015](https://github.com/lablup/backend.ai/issues/1015))
+* Add an `enable_2FA` option to enable/disable 2-Factor-Authenticaiton feature. ([#1126](https://github.com/lablup/backend.ai/issues/1126))
+* Apply the `totp_activated` field in creating/updating user for admins to set the 2FA activation status. ([#1142](https://github.com/lablup/backend.ai/issues/1142))
+* Add support for OTP based 2FA login on Backend.AI CLI ([#1147](https://github.com/lablup/backend.ai/issues/1147))
+* Expose `user_name` field to `compute_session` (and also `compute_session_list`) GQL query. ([#1149](https://github.com/lablup/backend.ai/issues/1149))
+* Expand accelerator plugin interface to show richer information about itself and add new `/config/resource-slots/details` API to show information collected by new interface ([#1153](https://github.com/lablup/backend.ai/issues/1153))
+* Increased the manager API version to `v6.20230315` ([#1154](https://github.com/lablup/backend.ai/issues/1154))
+* Allow setting the maximum concurrency of container creation tasks in the agent per RPC call ([#1159](https://github.com/lablup/backend.ai/issues/1159))
+* Add a `force_2FA` option to force the use of 2-Factor-Authenticaiton. ([#1161](https://github.com/lablup/backend.ai/issues/1161))
+
+### Fixes
+* ssh-add not working bug due to permission issue ([#1141](https://github.com/lablup/backend.ai/issues/1141))
+* Update vfolder clone status by vfolder id rather vfolder name. ([#1145](https://github.com/lablup/backend.ai/issues/1145))
+
+### External Dependency Updates
+* Replace `netifaces` (now unmaintained) with `ifaddr` in favor of better maintained one with a pure Python implementation ([#1155](https://github.com/lablup/backend.ai/issues/1155))
+
+
 ## 23.03.0a1 (2023-03-02)
 
 ### Breaking Changes

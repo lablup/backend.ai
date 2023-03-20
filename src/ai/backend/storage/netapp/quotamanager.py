@@ -7,7 +7,6 @@ from aiohttp.client_reqrep import ClientResponse
 
 
 class QuotaManager:
-
     endpoint: str
     user: str
     password: str
@@ -121,7 +120,6 @@ class QuotaManager:
             ssl=False,
             raise_for_status=True,
         ) as resp:
-
             msg = await resp.json()
         return msg
 

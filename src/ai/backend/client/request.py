@@ -418,7 +418,6 @@ class Request:
 
 
 class AsyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -437,7 +436,6 @@ class AsyncResponseMixin:
 
 
 class SyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -767,7 +765,6 @@ class SSEMessage:
 
 
 class SSEResponse(BaseResponse):
-
     __slots__ = (
         "_auto_reconnect",
         "_retry",
@@ -850,7 +847,6 @@ class SSEResponse(BaseResponse):
 
 
 class SSEContextManager:
-
     __slots__ = (
         "session",
         "rqst_ctx_builder",

@@ -52,6 +52,7 @@ config_iv = t.Dict(
                 t.Key("hide_agents", default=True): t.ToBool,
                 t.Key("app_download_url", default=""): t.String(allow_blank=True),
                 t.Key("enable_2FA", default=False): t.ToBool(),
+                t.Key("force_2FA", default=False): t.ToBool(),
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(
