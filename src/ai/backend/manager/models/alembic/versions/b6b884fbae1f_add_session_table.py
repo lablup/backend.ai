@@ -360,9 +360,12 @@ def upgrade():
             connection.execute(SessionRow.__table__.insert(), creates)
 
         # Session dependency table
-        sess_dep_query = sa.select(SessionDependencyRow)
         kern_ids = list(single_kernel_ids.keys())
         insert_values = []
+        sess_dep_query = sa.select(SessionDependencyRow).where(
+            SessionDependencyRow.session_id.in_(kern_ids)
+            | SessionDependencyRow.depends_on.in_(kern_ids)
+        )
         for row in connection.execute(sess_dep_query).fetchall():
             val = {}
             if row["session_id"] in single_kernel_ids:
@@ -375,16 +378,13 @@ def upgrade():
             else:
                 val["depends_on"] = row["depends_on"]
             insert_values.append(val)
-        if insert_values:
-            connection.execute(sa.insert(SessionDependencyRow), insert_values)
         dep_delete_query = sa.delete(SessionDependencyRow).where(
             SessionDependencyRow.session_id.in_(kern_ids)
+            | SessionDependencyRow.depends_on.in_(kern_ids)
         )
         connection.execute(dep_delete_query)
-        dep_delete_query = sa.delete(SessionDependencyRow).where(
-            SessionDependencyRow.depends_on.in_(kern_ids)
-        )
-        connection.execute(dep_delete_query)
+        if insert_values:
+            connection.execute(sa.insert(SessionDependencyRow), insert_values)
 
         # Kernel table
         sess_query = (
@@ -506,7 +506,10 @@ def downgrade():
 
         # Session dependency table
         sess_ids = list(single_kern_sess.keys())
-        sess_dep_query = sa.select(SessionDependencyRow)
+        sess_dep_query = sa.select(SessionDependencyRow).where(
+            SessionDependencyRow.session_id.in_(sess_ids)
+            | SessionDependencyRow.depends_on.in_(sess_ids)
+        )
         insert_values = []
         for row in connection.execute(sess_dep_query).fetchall():
             val = {}
@@ -520,16 +523,13 @@ def downgrade():
             else:
                 val["depends_on"] = row["depends_on"]
             insert_values.append(val)
-        if insert_values:
-            connection.execute(sa.insert(SessionDependencyRow), insert_values)
         dep_delete_query = sa.delete(SessionDependencyRow).where(
             SessionDependencyRow.session_id.in_(sess_ids)
+            | SessionDependencyRow.depends_on.in_(sess_ids)
         )
         connection.execute(dep_delete_query)
-        dep_delete_query = sa.delete(SessionDependencyRow).where(
-            SessionDependencyRow.depends_on.in_(sess_ids)
-        )
-        connection.execute(dep_delete_query)
+        if insert_values:
+            connection.execute(sa.insert(SessionDependencyRow), insert_values)
 
     op.create_foreign_key(
         "fk_session_dependencies_session_id_kernels",
