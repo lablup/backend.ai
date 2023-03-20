@@ -11,11 +11,17 @@ _rx_service_ports = re.compile(
 
 
 def parse_service_ports(
-    s: str | Sequence[str],
+    service_ports_label: str | Sequence[str],
+    endpoint_ports_label: str | Sequence[str],
     exception_cls: Type[Exception] = ValueError,
 ) -> Sequence[ServicePort]:
     items: List[ServicePort] = []
     used_ports: Set[int] = set()
+    inference_apps: Sequence[str]
+    if isinstance(endpoint_ports_label, str):
+        inference_apps = endpoint_ports_label.split(",")
+    else:
+        inference_apps = endpoint_ports_label
 
     def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match]:
         if isinstance(s, Sequence) and not isinstance(s, str):
@@ -36,7 +42,7 @@ def parse_service_ports(
                         raise exception_cls("Invalid service-ports format")
                     break
 
-    for match in _iter_ports(s):
+    for match in _iter_ports(service_ports_label):
         name = match.group("name")
         if not name:
             raise exception_cls("Service port name must be not empty.")
@@ -69,6 +75,7 @@ def parse_service_ports(
                 "protocol": ServicePortProtocols(protocol),
                 "container_ports": ports,
                 "host_ports": (None,) * len(ports),
+                "is_inference": name in inference_apps,
             }
         )
 

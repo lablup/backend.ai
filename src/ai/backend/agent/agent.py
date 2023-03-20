@@ -1705,6 +1705,7 @@ class AbstractAgent(
                     "protocol": ServicePortProtocols.TCP,
                     "container_ports": (2200,),
                     "host_ports": (None,),
+                    "is_inference": False,
                 }
             )
             service_ports.append(
@@ -1713,11 +1714,15 @@ class AbstractAgent(
                     "protocol": ServicePortProtocols.HTTP,
                     "container_ports": (7681,),
                     "host_ports": (None,),
+                    "is_inference": False,
                 }
             )
 
             if ctx.kernel_config["cluster_role"] in ("main", "master"):
-                for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
+                for sport in parse_service_ports(
+                    image_labels.get("ai.backend.service-ports", ""),
+                    image_labels.get("ai.backend.endpoint-ports", ""),
+                ):
                     port_map[sport["name"]] = sport
                 for port_no in preopen_ports:
                     preopen_sport: ServicePort = {
@@ -1725,6 +1730,7 @@ class AbstractAgent(
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (port_no,),
                         "host_ports": (None,),
+                        "is_inference": False,
                     }
                     service_ports.append(preopen_sport)
                     for cport in preopen_sport["container_ports"]:
@@ -1740,6 +1746,7 @@ class AbstractAgent(
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
+                            "is_inference": False,
                         }
                     )
                     exposed_ports.append(port)

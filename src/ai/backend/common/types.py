@@ -869,6 +869,7 @@ class ServicePort(TypedDict):
     protocol: ServicePortProtocols
     container_ports: Sequence[int]
     host_ports: Sequence[Optional[int]]
+    is_inference: bool
 
 
 ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])

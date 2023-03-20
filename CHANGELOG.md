@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.0a4 (2023-03-16)
+
+### Features
+* Replace `username` in the `compute_session` (and `compute_session_list`) GQL query with `full_name` and expose `full_name` to `get_container_stats_for_period` so that administrators can easily recognize users. ([#1167](https://github.com/lablup/backend.ai/issues/1167))
+* Add new inference_metrics column to compute_session GQL query ([#1168](https://github.com/lablup/backend.ai/issues/1168))
+
+
+## 23.03.0a3 (2023-03-15)
+No significant changes.
+
+
+## 23.03.0a3 (2023-03-15)
+
+### Fixes
+* Use SI bytesize unit where it is not mem size. ([#1098](https://github.com/lablup/backend.ai/issues/1098))
+
+
 ## 23.03.0a2 (2023-03-15)
 
 ### Features
