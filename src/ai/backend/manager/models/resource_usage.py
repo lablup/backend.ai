@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Mapping, Optional, Sequence
 from uuid import UUID
 
-import attr
+import attrs
 import msgpack
 import sqlalchemy as sa
 from dateutil.tz.tz import tzfile
@@ -41,28 +41,28 @@ class ResourceGroupUnit(str, Enum):
     TOTAL = "total"
 
 
-@attr.define(slots=True)
+@attrs.define(slots=True)
 class ResourceUsage:
-    nfs: set = attr.field(factory=set)
-    cpu_allocated: float = attr.field(default=0.0)
-    cpu_used: float = attr.field(default=0.0)
-    mem_allocated: int = attr.field(default=0)
-    mem_used: int = attr.field(default=0)
-    shared_memory: int = attr.field(default=0)
-    disk_allocated: int = attr.field(default=0)  # TODO: disk quota limit
-    disk_used: int = attr.field(default=0)
-    io_read: int = attr.field(default=0)
-    io_write: int = attr.field(default=0)
-    device_type: set = attr.field(factory=set)
-    smp: float = attr.field(default=0.0)
-    gpu_mem_allocated: float = attr.field(default=0.0)
-    gpu_allocated: float = attr.field(default=0.0)
+    nfs: set = attrs.field(factory=set)
+    cpu_allocated: float = attrs.field(default=0.0)
+    cpu_used: float = attrs.field(default=0.0)
+    mem_allocated: int = attrs.field(default=0)
+    mem_used: int = attrs.field(default=0)
+    shared_memory: int = attrs.field(default=0)
+    disk_allocated: int = attrs.field(default=0)  # TODO: disk quota limit
+    disk_used: int = attrs.field(default=0)
+    io_read: int = attrs.field(default=0)
+    io_write: int = attrs.field(default=0)
+    device_type: set = attrs.field(factory=set)
+    smp: float = attrs.field(default=0.0)
+    gpu_mem_allocated: float = attrs.field(default=0.0)
+    gpu_allocated: float = attrs.field(default=0.0)
 
-    agent_ids: set = attr.field(factory=set)
+    agent_ids: set[str] = attrs.field(factory=set)
 
     def __add__(self, other: Any) -> ResourceUsage:
         if not isinstance(other, ResourceUsage):
-            raise ValueError(
+            raise TypeError(
                 "ResourceUsage should only be added to `ResourceUsage` type,"
                 f" not `{type(other)}` type."
             )
@@ -86,7 +86,7 @@ class ResourceUsage:
 
     def to_json(self) -> Mapping[str, Any]:
         return {
-            "nfs": self.nfs,
+            "nfs": list(self.nfs),
             "cpu_allocated": self.cpu_allocated,
             "cpu_used": self.cpu_used,
             "mem_allocated": self.mem_allocated,
@@ -96,42 +96,46 @@ class ResourceUsage:
             "disk_used": self.disk_used,
             "io_read": self.io_read,
             "io_write": self.io_write,
-            "device_type": self.device_type,
+            "device_type": list(self.device_type),
             "smp": self.smp,
             "gpu_mem_allocated": self.gpu_mem_allocated,
             "gpu_allocated": self.gpu_allocated,
         }
 
 
-@attr.define(slots=True)
+def to_str(val: Optional[Any]) -> Optional[str]:
+    return str(val) if val is not None else None
+
+
+@attrs.define(slots=True)
 class BaseResourceUsageGroup:
     group_unit: ResourceGroupUnit
-    child_usage_group: dict = attr.field(factory=dict)
+    child_usage_group: dict = attrs.field(factory=dict)
 
-    project_row: Optional[GroupRow] = attr.field(default=None)
-    session_row: Optional[SessionRow] = attr.field(default=None)
-    kernel_row: Optional[KernelRow] = attr.field(default=None)
+    project_row: Optional[GroupRow] = attrs.field(default=None)
+    session_row: Optional[SessionRow] = attrs.field(default=None)
+    kernel_row: Optional[KernelRow] = attrs.field(default=None)
 
-    created_at: Optional[datetime] = attr.field(default=None)
-    terminated_at: Optional[datetime] = attr.field(default=None)
-    used_time: Optional[str] = attr.field(default=None)
-    used_days: Optional[int] = attr.field(default=None)
+    created_at: Optional[datetime] = attrs.field(default=None)
+    terminated_at: Optional[datetime] = attrs.field(default=None)
+    used_time: Optional[str] = attrs.field(default=None)
+    used_days: Optional[int] = attrs.field(default=None)
 
-    user_id: Optional[UUID] = attr.field(default=None)
-    user_email: Optional[str] = attr.field(default=None)
-    access_key: Optional[UUID] = attr.field(default=None)
-    project_id: Optional[UUID] = attr.field(default=None)
-    project_name: Optional[str] = attr.field(default=None)
-    kernel_id: Optional[UUID] = attr.field(default=None)
-    container_id: Optional[UUID] = attr.field(default=None)
-    session_id: Optional[UUID] = attr.field(default=None)
-    session_name: Optional[str] = attr.field(default=None)
-    domain_name: Optional[str] = attr.field(default=None)
+    user_id: Optional[UUID] = attrs.field(default=None)
+    user_email: Optional[str] = attrs.field(default=None)
+    access_key: Optional[UUID] = attrs.field(default=None)
+    project_id: Optional[UUID] = attrs.field(default=None)
+    project_name: Optional[str] = attrs.field(default=None)
+    kernel_id: Optional[UUID] = attrs.field(default=None)
+    container_id: Optional[UUID] = attrs.field(default=None)
+    session_id: Optional[UUID] = attrs.field(default=None)
+    session_name: Optional[str] = attrs.field(default=None)
+    domain_name: Optional[str] = attrs.field(default=None)
 
-    last_stat: Optional[Mapping[str, Any]] = attr.field(default=None)
-    extra_info: Mapping[str, Any] = attr.field(factory=dict)
+    last_stat: Optional[Mapping[str, Any]] = attrs.field(default=None)
+    extra_info: Mapping[str, Any] = attrs.field(factory=dict)
 
-    total_usage: ResourceUsage = attr.field(factory=ResourceUsage)
+    total_usage: ResourceUsage = attrs.field(factory=ResourceUsage)
 
     # def to_json(self, child: bool = False) -> dict[str, Any]:
     #     return_val = {
@@ -174,11 +178,32 @@ class BaseResourceUsageGroup:
             "total_usage": self.total_usage,
         }
 
+    def to_json_base(self) -> dict[str, Any]:
+        return {
+            "created_at": to_str(self.created_at),
+            "terminated_at": to_str(self.terminated_at),
+            "used_time": self.used_time,
+            "used_days": self.used_days,
+            "user_id": to_str(self.user_id),
+            "user_email": self.user_email,
+            "access_key": self.access_key,
+            "project_id": to_str(self.project_id),
+            "project_name": self.project_name,
+            "kernel_id": to_str(self.kernel_id),
+            "container_id": to_str(self.container_id),
+            "session_id": to_str(self.session_id),
+            "session_name": self.session_name,
+            "domain_name": self.domain_name,
+            "last_stat": self.last_stat,
+            "extra_info": self.extra_info,
+            "total_usage": self.total_usage.to_json(),
+        }
 
-@attr.define(slots=True, kw_only=True)
+
+@attrs.define(slots=True, kw_only=True)
 class KernelResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.KERNEL
-    # child_usage_group: dict = attr.field(factory=dict)
+    # child_usage_group: dict = attrs.field(factory=dict)
     kernel_id: UUID
     project_row: GroupRow
     session_row: SessionRow
@@ -186,8 +211,8 @@ class KernelResourceUsage(BaseResourceUsageGroup):
 
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return {
-            **self.to_map(),
-            "agents": self.total_usage.agent_ids,
+            **self.to_json_base(),
+            "agents": list(self.total_usage.agent_ids),
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -221,18 +246,18 @@ class KernelResourceUsage(BaseResourceUsageGroup):
         return True
 
 
-@attr.define(slots=True, kw_only=True)
+@attrs.define(slots=True, kw_only=True)
 class SessionResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.SESSION
-    child_usage_group: dict[UUID, KernelResourceUsage] = attr.field(default=dict)
+    child_usage_group: dict[UUID, KernelResourceUsage] = attrs.Factory(dict)
     session_id: UUID
     project_row: GroupRow
     session_row: SessionRow
 
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return_val = {
-            **self.to_map(),
-            "agents": self.total_usage.agent_ids,
+            **self.to_json_base(),
+            "agents": list(self.total_usage.agent_ids),
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -274,17 +299,17 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         return is_registered
 
 
-@attr.define(slots=True, kw_only=True)
+@attrs.define(slots=True, kw_only=True)
 class ProjectResourceUsage(BaseResourceUsageGroup):
     group_unit: ResourceGroupUnit = ResourceGroupUnit.PROJECT
-    child_usage_group: dict[UUID, SessionResourceUsage] = attr.field(default=dict)
+    child_usage_group: dict[UUID, SessionResourceUsage] = attrs.Factory(dict)
     project_id: UUID
     project_row: GroupRow
 
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return_val = {
-            **self.to_map(),
-            "agents": self.total_usage.agent_ids,
+            **self.to_json_base(),
+            "agents": list(self.total_usage.agent_ids),
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
         }
@@ -321,10 +346,10 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
         return is_registered
 
 
-# @attr.define(slots=True, kw_only=True)
+# @attrs.define(slots=True, kw_only=True)
 # class DomainResourceUsage(BaseResourceUsageGroup):
-#     group_unit: ResourceGroupUnit = attr.field(default=ResourceGroupUnit.DOMAIN)
-#     child_usage_group: dict[UUID, ProjectResourceUsage] = attr.field(default=dict)
+#     group_unit: ResourceGroupUnit = attrs.field(default=ResourceGroupUnit.DOMAIN)
+#     child_usage_group: dict[UUID, ProjectResourceUsage] = attrs.Factory(dict)
 
 
 def parse_total_resource_group(
@@ -416,6 +441,7 @@ async def parse_resource_usage_groups(
 
     return [
         BaseResourceUsageGroup(
+            kernel_row=kern,
             project_row=kern.session.group,
             session_row=kern.session,
             created_at=kern.created_at,
@@ -458,6 +484,7 @@ PROJECT_RESOURCE_SELECT_COLS = (
 )
 
 KERNEL_RESOURCE_SELECT_COLS = (
+    KernelRow.agent,
     KernelRow.created_at,
     KernelRow.terminated_at,
     KernelRow.last_stat,
@@ -486,12 +513,10 @@ def _parse_query(
         project_load = joinedload(SessionRow.group.and_(project_cond))
     query = sa.select(KernelRow).options(
         load_only(*KERNEL_RESOURCE_SELECT_COLS),
-        (
-            session_load.options(
-                load_only(*SESSION_RESOURCE_SELECT_COLS),
-                joinedload(SessionRow.user).options(load_only(UserRow.email, UserRow.username)),
-                project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
-            )
+        session_load.options(
+            load_only(*SESSION_RESOURCE_SELECT_COLS),
+            joinedload(SessionRow.user).options(load_only(UserRow.email, UserRow.username)),
+            project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
         ),
     )
     if kernel_cond is not None:
@@ -522,7 +547,7 @@ async def fetch_resource_usage(
             )
             |
             # Or, filter running sessions which created before requested end_date
-            ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS))),
+            ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS)))
         ),
         session_cond=session_cond,
         project_cond=project_cond,

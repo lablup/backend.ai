@@ -21,8 +21,7 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
-from dateutil.tz.tz import tzfile
+from dateutil.tz import tzfile, tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
