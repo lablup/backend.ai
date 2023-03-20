@@ -1,6 +1,6 @@
 ARG PYTHON_VERSION
-ARG PKGVER
 FROM python:${PYTHON_VERSION} AS builder
+ARG PKGVER
 RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-client==${PKGVER}
 
 FROM python:${PYTHON_VERSION}
