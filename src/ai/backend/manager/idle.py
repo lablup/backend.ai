@@ -592,7 +592,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     ) -> bool:
         session_id = kernel["session_id"]
 
-        async def _check_kernel() -> Optional[tuple[bool, dict[str, float]]]:
+        async def _check_kernel() -> tuple[bool, Optional[dict[str, float]]]:
             interval = IdleCheckerHost.check_interval
             window_size = int(self.time_window.total_seconds() / interval)
             occupied_slots = kernel["occupied_slots"]
@@ -611,13 +611,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
             util_last_collected = float(raw_util_last_collected) if raw_util_last_collected else 0
             print(f"{t - util_last_collected = }, {interval = }")
             if t - util_last_collected < interval:
-                return None
+                return True, None
 
             # Respect initial grace period (no termination of the session)
             now = datetime.now(tzutc())
             print(f'{now - kernel["created_at"] = }, {self.initial_grace_period = }')
             if now - kernel["created_at"] <= self.initial_grace_period:
-                return None
+                return True, None
 
             # Merge same type of (exclusive) resources as a unique resource with the values added.
             # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
@@ -632,13 +632,25 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 if unique_res_map[slot] == 0:
                     unavailable_resources.update(self.slot_resource_map[slot])
 
+            raw_util_series = await redis_helper.execute(
+                self._redis_live, lambda r: r.get(util_series_key)
+            )
+
+            try:
+                util_series = msgpack.unpackb(raw_util_series, use_list=True)
+            except TypeError:
+                util_series = {k: [] for k in self.resource_thresholds.keys()}
+
+            avg_utils = {k: sum(v) / len(v) for k, v in util_series.items()}
+            print(f"{avg_utils = }")
+
             # Respect idle_timeout, from keypair resource policy, over time_window.
             print(f'{policy["idle_timeout"] = }')
             if policy["idle_timeout"] >= 0:
                 window_size = int(float(policy["idle_timeout"]) / interval)
             print(f"{window_size = }")
             if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
-                return None
+                return True, avg_utils
 
             # Get current utilization data from all containers of the session.
             if kernel["cluster_size"] > 1:
@@ -653,18 +665,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
             current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
             print(f"{current_utilizations = }")
             if current_utilizations is None:
-                return None
+                return True, avg_utils
 
             # Update utilization time-series data.
             not_enough_data = False
-            raw_util_series = await redis_helper.execute(
-                self._redis_live, lambda r: r.get(util_series_key)
-            )
-
-            try:
-                util_series = msgpack.unpackb(raw_util_series, use_list=True)
-            except TypeError:
-                util_series = {k: [] for k in self.resource_thresholds.keys()}
 
             print(f"{util_series = }")
             for k in util_series:
@@ -691,45 +695,42 @@ class UtilizationIdleChecker(BaseIdleChecker):
             )
 
             if not_enough_data:
-                return None
+                return True, avg_utils
 
             # Check over-utilized (not to be collected) resources.
-            avg_utils = {k: sum(v) / len(v) for k, v in util_series.items()}
-            print(f"{avg_utils = }")
             sufficiently_utilized = {
                 k: (float(avg_utils[k]) >= float(threshold))
                 for k, threshold in self.resource_thresholds.items()
                 if (threshold is not None) and (k not in unavailable_resources)
             }
 
+            check_result = True
             if len(sufficiently_utilized) < 1:
                 check_result = True
             elif self.thresholds_check_operator == ThresholdOperator.OR:
                 check_result = all(sufficiently_utilized.values())
             else:  # "and" operation is the default
                 check_result = any(sufficiently_utilized.values())
-            if not check_result:
-                log.info(
-                    "utilization timeout: {} ({}, {})",
-                    session_id,
-                    avg_utils,
-                    self.thresholds_check_operator,
-                )
             return check_result, avg_utils
 
-        result = await _check_kernel()
-        if result is None:
-            return True
-        is_idle, avg_utils = result
-        await redis_helper.execute(
-            redis_obj,
-            lambda r: r.set(
-                self.get_report_key(session_id),
-                msgpack.packb(avg_utils),
-                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-            ),
-        )
-        return is_idle
+        is_alive, avg_utils = await _check_kernel()
+        if avg_utils is not None:
+            await redis_helper.execute(
+                redis_obj,
+                lambda r: r.set(
+                    self.get_report_key(session_id),
+                    msgpack.packb(avg_utils),
+                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+                ),
+            )
+        if not is_alive:
+            log.info(
+                "utilization timeout: {} ({}, {})",
+                session_id,
+                avg_utils,
+                self.thresholds_check_operator,
+            )
+        return is_alive
 
     async def get_current_utilization(
         self,
