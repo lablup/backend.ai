@@ -564,7 +564,6 @@ class BinarySize(int):
 
 
 class ResourceSlot(UserDict):
-
     __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:
@@ -864,6 +863,7 @@ class ServicePort(TypedDict):
     protocol: ServicePortProtocols
     container_ports: Sequence[int]
     host_ports: Sequence[Optional[int]]
+    is_inference: bool
 
 
 ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
@@ -988,3 +988,17 @@ class RedisConnectionInfo:
     async def close(self) -> None:
         if isinstance(self.client, Redis):
             await self.client.close()
+
+
+class AcceleratorNumberFormat(TypedDict):
+    binary: bool
+    round_length: int
+
+
+class AcceleratorMetadata(TypedDict):
+    slot_name: str
+    description: str
+    human_readable_name: str
+    display_unit: str
+    number_format: AcceleratorNumberFormat
+    display_icon: str

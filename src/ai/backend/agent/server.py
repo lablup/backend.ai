@@ -139,7 +139,6 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-
     functions: Set[str]
 
     def __init__(self) -> None:
@@ -360,6 +359,7 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         raw_results = []
         coros = []
+        throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
@@ -374,6 +374,7 @@ class AgentRPCServer(aobject):
                     kernel_id,
                     kernel_config,
                     cluster_info,
+                    throttle_sema=throttle_sema,
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
@@ -810,7 +811,6 @@ def main(
     log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
-
     # Delete this part when you remove --debug option
     if debug:
         click.echo("Please use --log-level options instead")
@@ -885,7 +885,6 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(

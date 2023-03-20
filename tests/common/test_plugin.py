@@ -36,7 +36,6 @@ class DummyPlugin(AbstractPlugin):
 
 @dataclass
 class DummyEntrypoint:
-
     name: str
     load_result: Type[AbstractPlugin] | Callable[..., AbstractPlugin]
     value: str = "dummy.mod.DummyPlugin"
@@ -201,7 +200,6 @@ async def test_plugin_context_config_autoupdate(etcd, mocker):
 
 
 class DummyHookPassingPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-p"
@@ -233,7 +231,6 @@ class DummyHookPassingPlugin(HookPlugin):
 
 
 class DummyHookRejectingPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-r"
@@ -265,7 +262,6 @@ class DummyHookRejectingPlugin(HookPlugin):
 
 
 class DummyHookErrorPlugin(HookPlugin):
-
     config_watch_enabled = False
 
     _entrypoint_name = "hook-e"
