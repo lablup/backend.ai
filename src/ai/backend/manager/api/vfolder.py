@@ -668,6 +668,8 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             show_total = root_ctx.shared_config["expose-host-volume"]["capacity-bytes"]
 
             if show_percentage or show_used or show_total:
+                volume_usage = {}
+
                 async with root_ctx.storage_manager.request(
                     proxy_name,
                     "GET",
@@ -676,8 +678,6 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
                         "volume": volume_data["name"],
                     },
                 ) as (_, storage_resp):
-                    volume_usage = {}
-
                     storage_reply = await storage_resp.json()
 
                     if show_used:
