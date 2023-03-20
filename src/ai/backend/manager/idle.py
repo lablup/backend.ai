@@ -642,8 +642,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     unavailable_resources.update(self.slot_resource_map[slot])
 
             # Respect idle_timeout, from keypair resource policy, over time_window.
+            print(f'{policy["idle_timeout"] = }')
             if policy["idle_timeout"] >= 0:
                 window_size = int(float(policy["idle_timeout"]) / interval)
+            print(f"{window_size = }")
             if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
                 return None
 
@@ -658,6 +660,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             else:
                 kernel_ids = [kernel["id"]]
             current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
+            print(f"{current_utilizations = }")
             if current_utilizations is None:
                 return None
 
@@ -672,6 +675,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             except TypeError:
                 util_series = {k: [] for k in self.resource_thresholds.keys()}
 
+            print(f"{util_series = }")
             for k in util_series:
                 util_series[k].append(current_utilizations[k])
                 if len(util_series[k]) > window_size:
@@ -700,6 +704,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
             # Check over-utilized (not to be collected) resources.
             avg_utils = {k: sum(v) / len(v) for k, v in util_series.items()}
+            print(f"{avg_utils = }")
             sufficiently_utilized = {
                 k: (float(avg_utils[k]) >= float(threshold))
                 for k, threshold in self.resource_thresholds.items()
