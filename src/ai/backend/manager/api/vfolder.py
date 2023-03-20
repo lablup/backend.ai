@@ -658,7 +658,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     volume_info = {}
     for proxy_name, volume_data in all_volumes:
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts:
-            volume = {
+            volume: Dict[str, Any] = {
                 "backend": volume_data["backend"],
                 "capabilities": volume_data["capabilities"],
             }
@@ -676,20 +676,24 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
                         "volume": volume_data["name"],
                     },
                 ) as (_, storage_resp):
+                    volume_usage = {}
+
                     storage_reply = await storage_resp.json()
 
                     if show_used:
-                        volume["used"] = storage_reply["used_bytes"]
+                        volume_usage["used"] = storage_reply["used_bytes"]
 
                     if show_total:
-                        volume["total"] = storage_reply["capacity_bytes"]
+                        volume_usage["total"] = storage_reply["capacity_bytes"]
 
                     if show_percentage:
-                        volume["percentage"] = (
+                        volume_usage["percentage"] = (
                             storage_reply["used_bytes"] / storage_reply["capacity_bytes"]
                         ) * 100
 
-                volume_info[f"{proxy_name}:{volume_data['name']}"] = volume
+                volume["usage"] = volume_usage
+
+            volume_info[f"{proxy_name}:{volume_data['name']}"] = volume
 
     resp = {
         "default": default_host,
