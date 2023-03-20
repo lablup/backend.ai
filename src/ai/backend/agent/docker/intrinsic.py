@@ -14,6 +14,7 @@ from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -597,9 +598,29 @@ class MemoryPlugin(AbstractComputePlugin):
                     e,
                 )
                 return None
+            async with closing_async(Docker()) as docker:
+                container = DockerContainer(docker, id=container_id)
+                data = await container.show()
+                sandbox_key = data["NetworkSettings"]["SandboxKey"]
+            net_rx_bytes = 0
+            net_tx_bytes = 0
+            with nsenter(sandbox_key):
+                nstat = psutil.net_io_counters(pernic=True)
+            for name, stat in nstat.items():
+                if name == "lo":
+                    continue
+                net_rx_bytes += stat.bytes_recv
+                net_tx_bytes += stat.bytes_sent
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-            return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
+            return (
+                mem_cur_bytes,
+                io_read_bytes,
+                io_write_bytes,
+                net_rx_bytes,
+                net_tx_bytes,
+                scratch_sz,
+            )
 
         async def api_impl(container_id):
             async with closing_async(Docker()) as docker:
@@ -619,9 +640,21 @@ class MemoryPlugin(AbstractComputePlugin):
                         io_read_bytes += item["value"]
                     elif item["op"] == "Write":
                         io_write_bytes += item["value"]
+                net_rx_bytes = 0
+                net_tx_bytes = 0
+                for name, stat in ret["networks"].items():
+                    net_rx_bytes += stat["rx_bytes"]
+                    net_tx_bytes += stat["tx_bytes"]
                 loop = current_loop()
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-                return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
+                return (
+                    mem_cur_bytes,
+                    io_read_bytes,
+                    io_write_bytes,
+                    net_rx_bytes,
+                    net_tx_bytes,
+                    scratch_sz,
+                )
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -633,6 +666,8 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_mem_used_bytes = {}
         per_container_io_read_bytes = {}
         per_container_io_write_bytes = {}
+        per_container_net_rx_bytes = {}
+        per_container_net_tx_bytes = {}
         per_container_io_scratch_size = {}
         tasks = []
         for cid in container_ids:
@@ -644,7 +679,9 @@ class MemoryPlugin(AbstractComputePlugin):
             per_container_mem_used_bytes[cid] = Measurement(Decimal(result[0]))
             per_container_io_read_bytes[cid] = Measurement(Decimal(result[1]))
             per_container_io_write_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[3]))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[3]))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[4]))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result[5]))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
@@ -666,6 +703,20 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_write_bytes,
+            ),
+            ContainerMeasurement(
+                MetricKey("net_rx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_container=per_container_net_rx_bytes,
+            ),
+            ContainerMeasurement(
+                MetricKey("net_tx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_container=per_container_net_tx_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),
