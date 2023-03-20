@@ -51,7 +51,6 @@ class ServiceDefinition:
 
 
 class ServiceParser:
-
     variables: MutableMapping[str, str]
     services: MutableMapping[str, ServiceDefinition]
 

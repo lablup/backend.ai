@@ -67,7 +67,6 @@ class VolumeInfo(TypedDict):
 
 
 class StorageSessionManager:
-
     _proxies: Mapping[str, StorageProxyInfo]
 
     def __init__(self, storage_config: Mapping[str, Any]) -> None:

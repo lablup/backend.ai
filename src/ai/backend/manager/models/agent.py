@@ -599,7 +599,6 @@ async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: Agent
 
 
 class ModifyAgent(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

@@ -395,7 +395,6 @@ class ModifyProjectInput(graphene.InputObjectType):
 
 
 class CreateProject(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -435,7 +434,6 @@ class CreateProject(graphene.Mutation):
 
 
 class ModifyProject(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:

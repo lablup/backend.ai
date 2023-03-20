@@ -26,11 +26,15 @@ _default_list_fields = (
     user_fields["role"],
     user_fields["username"],
     user_fields["email"],
+    user_fields["need_password_change"],
+    user_fields["status"],
+    user_fields["status_info"],
     user_fields["is_active"],
     user_fields["created_at"],
     user_fields["domain_name"],
     user_fields["projects"],
     user_fields["allowed_client_ip"],
+    user_fields["totp_activated"],
 )
 
 _default_detail_fields = (
@@ -45,6 +49,7 @@ _default_detail_fields = (
     user_fields["role"],
     user_fields["projects"],
     user_fields["allowed_client_ip"],
+    user_fields["totp_activated"],
 )
 
 
@@ -261,6 +266,7 @@ class User(BaseFunction):
         need_password_change: bool = False,
         description: str = "",
         allowed_client_ip: Iterable[str] = None,
+        totp_activated: bool = False,
         project_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -296,6 +302,7 @@ class User(BaseFunction):
                 "need_password_change": need_password_change,
                 "description": description,
                 "domain_name": domain_name,
+                "totp_activated": totp_activated,
                 "project_ids": project_ids,
                 "allowed_client_ip": allowed_client_ip,
             },
@@ -317,6 +324,7 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         allowed_client_ip: Iterable[str] = None,
+        totp_activated: bool = False,
         project_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -345,6 +353,7 @@ class User(BaseFunction):
                 "need_password_change": need_password_change,
                 "description": description,
                 "allowed_client_ip": allowed_client_ip,
+                "totp_activated": totp_activated,
                 "project_ids": project_ids,
             },
         }

@@ -268,6 +268,7 @@ user_fields = FieldSet(
         FieldSpec("role"),
         FieldSpec("projects { id name }", formatter=ProjectListFormatter()),
         FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
     ]
 )
 

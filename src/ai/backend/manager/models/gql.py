@@ -117,6 +117,7 @@ class GraphQueryContext:
     access_key: str
     db: ExtendedAsyncSAEngine
     redis_stat: RedisConnectionInfo
+    redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]

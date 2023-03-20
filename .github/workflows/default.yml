@@ -179,7 +179,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  build:
+  build-wheels:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -225,11 +225,12 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Install local dependencies for packaging
       run: |
-        pip install -U 'packaging>=21.3'
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: Build packages
       run: |
         # Normalize the package version
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+        echo "PKGVER=$PKGVER" >> $GITHUB_ENV
         # Build non-platform-specific wheels
         ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
         # Build x86_64 wheels
@@ -249,14 +250,25 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Upload wheels and sdists
-      uses: actions/upload-artifact@v3
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `./pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
       with:
-        name: wheels-and-sdists
-        path: |
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        files: |
           dist/*.whl
-          dist/*.tar.gz
-        if-no-files-found: error
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -265,8 +277,8 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  windows-conda-package:
-    needs: [build]
+  build-conda-pack-for-windows:
+    needs: [build-wheels]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     steps:
@@ -293,14 +305,6 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Normalize package version
-      run: |
-        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
-    - name: Download built wheels and sdists
-      uses: actions/download-artifact@v3
-      with:
-        name: wheels-and-sdists
-        path: dist
     - name: Install conda-pack
       uses: s-weigand/setup-conda@v1
       with:
@@ -310,67 +314,8 @@ jobs:
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
-        pip install dist/backend.ai_client-*.whl
-        conda-pack -o backend.ai-client-{PKGVER}-windows-conda.zip
-    - name: Upload conda-pack
-      uses: actions/upload-artifact@v3
-      with:
-        name: windows-conda
-        path: backend.ai-client-{PKGVER}-windows-conda.zip
-        if-no-files-found: error
-
-
-  deploy-to-pypi:
-    needs: [windows-conda-package]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
-    - name: Extract Python version from pants.toml
-      shell: bash
+        pip install backend.ai-client==${{ github.ref_name }}
+        conda-pack -o backend.ai-client-${{ github.ref_name }}-windows-conda.zip
+    - name: Upload conda-pack to GitHub release
       run: |
-        export LANG=C.UTF-8
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
-    - name: Install local dependencies for publishing
-      run: |
-        pip install -U 'twine~=4.0'
-    - name: Download built wheels and sdists
-      uses: actions/download-artifact@v3
-      with:
-        name: wheels-and-sdists
-        path: dist
-    - name: Download conda-pack
-      uses: actions/download-artifact@v3
-      with:
-        name: windows-conda
-        path: windows-conda
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `./pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
-      run: |
-        twine upload dist/*.whl dist/*.tar.gz
-    - name: Extract the release changelog
-      run: |
-        python ./scripts/extract-release-changelog.py
-        python ./scripts/determine-release-type.py
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
-      with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*.whl
-          dist/*.tar.gz
-          windows-conda/backend.ai-client-*.zip
+        gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
