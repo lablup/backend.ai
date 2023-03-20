@@ -620,11 +620,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 lambda r: r.get(util_last_collected_key),
             )
             util_last_collected = float(raw_util_last_collected) if raw_util_last_collected else 0
+            print(f"{t - util_last_collected = }, {interval = }")
             if t - util_last_collected < interval:
                 return None
 
             # Respect initial grace period (no termination of the session)
             now = datetime.now(tzutc())
+            print(f'{self.initial_grace_period = }, {now - kernel["created_at"]}')
             if now - kernel["created_at"] <= self.initial_grace_period:
                 return None
 
