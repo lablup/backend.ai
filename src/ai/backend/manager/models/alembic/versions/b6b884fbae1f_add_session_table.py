@@ -345,8 +345,8 @@ def upgrade():
                 try:
                     sinfo = json.loads(sinfo)
                 except json.decoder.JSONDecodeError:
-                    sinfo = {sess["id"]: sinfo}
-                sinfo = {**sinfo, row["id"]: row["status_info"]}
+                    sinfo = {str(sess["id"]): sinfo}
+                sinfo = {**sinfo, str(row["id"]): row["status_info"]}
                 sess["status_info"] = json.dumps(sinfo)
 
     if all_kernel_sessions:
