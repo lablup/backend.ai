@@ -319,6 +319,11 @@ _shdefs: Mapping[str, Any] = {
     "watcher": {
         "token": None,
     },
+    "expose-host-volume": {
+        "percentage": True,
+        "used-bytes": False,
+        "capacity-bytes": False,
+    },
 }
 
 container_registry_iv = t.Dict(
@@ -342,6 +347,15 @@ shared_config_iv = t.Dict(
         t.Key("api", default=_shdefs["api"]): t.Dict(
             {
                 t.Key("allow-origins", default=_shdefs["api"]["allow-origins"]): t.String,
+            }
+        ).allow_extra("*"),
+        t.Key("expose-host-volume", default=_shdefs["expose-host-volume"]): t.Dict(
+            {
+                t.Key("percentage", default=_shdefs["expose-host-volume"]["percentage"]): t.Bool,
+                t.Key("used-bytes", default=_shdefs["expose-host-volume"]["used-bytes"]): t.Bool,
+                t.Key(
+                    "capacity-bytes", default=_shdefs["expose-host-volume"]["capacity-bytes"]
+                ): t.Bool,
             }
         ).allow_extra("*"),
         t.Key("redis", default=_shdefs["redis"]): t.Dict(
