@@ -85,14 +85,11 @@ class IdleCheckReport:
     avg_utilization: Optional[Mapping[str, float]] = None
 
     def to_json(self) -> Mapping[str, Any]:
-        d: Mapping[str, Any] = {}
-        if self.timeout is not None:
-            d = {"timeout": self.timeout}
-        if self.session_lifetime is not None:
-            d = {**d, "session_lifetime": self.session_lifetime}
-        if self.avg_utilization is not None:
-            d = {**d, "utilization": self.avg_utilization}
-        return d
+        return {
+            "timeout": self.timeout,
+            "session_lifetime": self.session_lifetime,
+            "utilization": self.avg_utilization,
+        }
 
 
 class AppStreamingStatus(enum.Enum):
@@ -547,7 +544,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
-            t.Key("resource-thresholds"): t.Dict(
+            t.Key("resource-thresholds", default=None): t.Null
+            | t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
@@ -558,7 +556,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         },
     ).allow_extra("*")
 
-    resource_thresholds: MutableMapping[str, Union[int, float, Decimal]]
+    resource_thresholds: MutableMapping[str, Union[int, float, Decimal, None]]
     thresholds_check_operator: str
     time_window: timedelta
     initial_grace_period: timedelta
@@ -571,9 +569,18 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
-        self.resource_thresholds = {
-            k: nmget(v, "average") for k, v in config.get("resource-thresholds").items()
-        }
+        raw_resource_thresholds = config.get("resource-thresholds")
+        if raw_resource_thresholds is not None:
+            self.resource_thresholds = {
+                k: nmget(v, "average") for k, v in raw_resource_thresholds.items()
+            }
+        else:
+            self.resource_thresholds = {
+                "cpu_util": None,
+                "mem": None,
+                "cuda_util": None,
+                "cuda_mem": None,
+            }
         self.thresholds_check_operator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
