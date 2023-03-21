@@ -8,6 +8,7 @@ import math
 import stat
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -618,17 +619,23 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     return web.Response(status=204)
 
 
+class ExposedVolumeInfoField(StrEnum):
+    percentage = "percentage"
+    used_bytes = "used_bytes"
+    capacity_bytes = "capacity_bytes"
+
+
 async def fetch_allowed_volume_usage(
     storage_manager: StorageSessionManager,
     redis_connection: RedisConnectionInfo,
     proxy_name: str,
     volume_name: str,
-):
+) -> Dict[ExposedVolumeInfoField, bool]:
     volume_usage = {}
 
-    show_percentage = "percentage" in storage_manager._allowed_volume_info
-    show_used = "used_bytes" in storage_manager._allowed_volume_info
-    show_total = "capacity_bytes" in storage_manager._allowed_volume_info
+    show_percentage = ExposedVolumeInfoField.percentage in storage_manager._exposed_volume_info
+    show_used = ExposedVolumeInfoField.used_bytes in storage_manager._exposed_volume_info
+    show_total = ExposedVolumeInfoField.capacity_bytes in storage_manager._exposed_volume_info
 
     if show_percentage or show_used or show_total:
         volume_usage_cache = await redis_helper.execute(
@@ -650,14 +657,15 @@ async def fetch_allowed_volume_usage(
                 storage_reply = await storage_resp.json()
 
                 if show_used:
-                    volume_usage["used"] = storage_reply["used_bytes"]
+                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
 
                 if show_total:
-                    volume_usage["total"] = storage_reply["capacity_bytes"]
+                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
 
                 if show_percentage:
                     volume_usage["percentage"] = (
-                        storage_reply["used_bytes"] / storage_reply["capacity_bytes"]
+                        storage_reply[ExposedVolumeInfoField.used_bytes]
+                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
                     ) * 100
 
             await redis_helper.execute(

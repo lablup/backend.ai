@@ -12,5 +12,5 @@
       "ssl_verify": "false"
     }
   },
-  "allowed_volume_info": "percentage"
+  "exposed_volume_info": "percentage"
 }
