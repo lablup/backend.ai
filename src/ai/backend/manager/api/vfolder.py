@@ -625,7 +625,7 @@ class ExposedVolumeInfoField(StrEnum):
     capacity_bytes = "capacity_bytes"
 
 
-async def fetch_allowed_volume_usage(
+async def fetch_exposed_volume_fields(
     storage_manager: StorageSessionManager,
     redis_connection: RedisConnectionInfo,
     proxy_name: str,
@@ -727,7 +727,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         f"{proxy_name}:{volume_data['name']}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
-            "usage": await fetch_allowed_volume_usage(
+            "usage": await fetch_exposed_volume_fields(
                 storage_manager=root_ctx.storage_manager,
                 redis_connection=root_ctx.redis_stat,
                 proxy_name=proxy_name,
