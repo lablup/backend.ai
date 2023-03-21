@@ -251,7 +251,7 @@ def upgrade():
     )
 
     subquery = sa.select([sa.func.count()]).select_from(kernels).group_by(kernels.c.session_id)
-    session_cnt = connection.execute(sa.select([sa.func.count()])).select_from(subquery).scalar()
+    session_cnt = connection.execute(sa.select([sa.func.count()]).select_from(subquery)).scalar()
     for chunk in range(0, session_cnt, QUERY_CHUNK_SIZE):
         query = (
             sa.select([kernels.c.session_id])
@@ -486,7 +486,7 @@ def downgrade():
             primary_key=True,
         )
 
-    session_cnt = connection.execute(sa.select([sa.func.count()])).select_from(SessionRow).scalar()
+    session_cnt = connection.execute(sa.select([sa.func.count()]).select_from(SessionRow)).scalar()
     for chunk in range(0, session_cnt, QUERY_CHUNK_SIZE):
         query = sa.select(SessionRow.id).slice(chunk, chunk + QUERY_CHUNK_SIZE)
         session_ids = [row["id"] for row in connection.execute(query).fetchall()]
