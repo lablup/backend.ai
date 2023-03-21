@@ -36,6 +36,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
+from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     AgentStatus,
@@ -612,6 +613,42 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     return web.Response(status=204)
 
 
+@aiotools.lru_cache(expire_after=60)
+async def fetch_allowed_volume_usage(
+    storage_manager: StorageSessionManager,
+    proxy_name: str,
+    volume_name: str,
+):
+    show_percentage = "percentage" in storage_manager._allowed_volume_info
+    show_used = "used-bytes" in storage_manager._allowed_volume_info
+    show_total = "capacity-bytes" in storage_manager._allowed_volume_info
+
+    volume_usage = {}
+    if show_percentage or show_total or show_used:
+        async with storage_manager.request(
+            proxy_name,
+            "GET",
+            "folder/fs-usage",
+            json={
+                "volume": volume_name,
+            },
+        ) as (_, storage_resp):
+            storage_reply = await storage_resp.json()
+
+            if show_used:
+                volume_usage["used"] = storage_reply["used_bytes"]
+
+            if show_total:
+                volume_usage["total"] = storage_reply["capacity_bytes"]
+
+            if show_percentage:
+                volume_usage["percentage"] = (
+                    storage_reply["used_bytes"] / storage_reply["capacity_bytes"]
+                ) * 100
+
+    return volume_usage
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -655,45 +692,19 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     if default_host not in allowed_hosts:
         default_host = None
 
-    volume_info = {}
-    for proxy_name, volume_data in all_volumes:
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts:
-            volume: Dict[str, Any] = {
-                "backend": volume_data["backend"],
-                "capabilities": volume_data["capabilities"],
-            }
-
-            show_percentage = "percentage" in root_ctx.storage_manager._allowed_volume_info
-            show_used = "used-bytes" in root_ctx.storage_manager._allowed_volume_info
-            show_total = "capacity-bytes" in root_ctx.storage_manager._allowed_volume_info
-
-            if show_percentage or show_used or show_total:
-                volume_usage = {}
-
-                async with root_ctx.storage_manager.request(
-                    proxy_name,
-                    "GET",
-                    "folder/fs-usage",
-                    json={
-                        "volume": volume_data["name"],
-                    },
-                ) as (_, storage_resp):
-                    storage_reply = await storage_resp.json()
-
-                    if show_used:
-                        volume_usage["used"] = storage_reply["used_bytes"]
-
-                    if show_total:
-                        volume_usage["total"] = storage_reply["capacity_bytes"]
-
-                    if show_percentage:
-                        volume_usage["percentage"] = (
-                            storage_reply["used_bytes"] / storage_reply["capacity_bytes"]
-                        ) * 100
-
-                volume["usage"] = volume_usage
-
-            volume_info[f"{proxy_name}:{volume_data['name']}"] = volume
+    volume_info = {
+        f"{proxy_name}:{volume_data['name']}": {
+            "backend": volume_data["backend"],
+            "capabilities": volume_data["capabilities"],
+            "usage": await fetch_allowed_volume_usage(
+                storage_manager=root_ctx.storage_manager,
+                proxy_name=proxy_name,
+                volume_name=volume_data["name"],
+            ),
+        }
+        for proxy_name, volume_data in all_volumes
+        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+    }
 
     resp = {
         "default": default_host,
