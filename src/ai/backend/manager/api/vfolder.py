@@ -669,7 +669,7 @@ async def fetch_allowed_volume_usage(
                 ),
             )
 
-        return volume_usage
+    return volume_usage
 
 
 @auth_required
