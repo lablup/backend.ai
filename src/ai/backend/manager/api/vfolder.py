@@ -627,8 +627,8 @@ async def fetch_allowed_volume_usage(
     volume_usage = {}
 
     show_percentage = "percentage" in storage_manager._allowed_volume_info
-    show_used = "used-bytes" in storage_manager._allowed_volume_info
-    show_total = "capacity-bytes" in storage_manager._allowed_volume_info
+    show_used = "used_bytes" in storage_manager._allowed_volume_info
+    show_total = "capacity_bytes" in storage_manager._allowed_volume_info
 
     if show_percentage or show_used or show_total:
         volume_usage_cache = await redis_helper.execute(
