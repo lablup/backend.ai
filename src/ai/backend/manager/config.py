@@ -321,11 +321,6 @@ _shdefs: Mapping[str, Any] = {
     "watcher": {
         "token": None,
     },
-    "expose-host-volume": {
-        "percentage": True,
-        "used-bytes": False,
-        "capacity-bytes": False,
-    },
 }
 
 container_registry_iv = t.Dict(
