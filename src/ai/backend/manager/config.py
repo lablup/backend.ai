@@ -410,7 +410,7 @@ volume_config_iv = t.Dict(
                 }
             ),
         ),
-        t.Key("allowed_volume_info", default="percentage"): tx.StringList(delimiter=","),
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 
