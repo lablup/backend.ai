@@ -33,9 +33,14 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
+from ai.backend.common.types import (
+    RedisConnectionInfo,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
@@ -613,40 +618,58 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     return web.Response(status=204)
 
 
-@aiotools.lru_cache(expire_after=60)
 async def fetch_allowed_volume_usage(
     storage_manager: StorageSessionManager,
+    redis_connection: RedisConnectionInfo,
     proxy_name: str,
     volume_name: str,
 ):
+    volume_usage = {}
+
     show_percentage = "percentage" in storage_manager._allowed_volume_info
     show_used = "used-bytes" in storage_manager._allowed_volume_info
     show_total = "capacity-bytes" in storage_manager._allowed_volume_info
 
-    volume_usage = {}
-    if show_percentage or show_total or show_used:
-        async with storage_manager.request(
-            proxy_name,
-            "GET",
-            "folder/fs-usage",
-            json={
-                "volume": volume_name,
-            },
-        ) as (_, storage_resp):
-            storage_reply = await storage_resp.json()
+    if show_percentage or show_used or show_total:
+        volume_usage_cache = await redis_helper.execute(
+            redis_connection,
+            lambda r: r.get(f"volume.usage.{proxy_name}.{volume_name}"),
+        )
 
-            if show_used:
-                volume_usage["used"] = storage_reply["used_bytes"]
+        if volume_usage_cache:
+            volume_usage = msgpack.unpackb(volume_usage_cache)
+        else:
+            async with storage_manager.request(
+                proxy_name,
+                "GET",
+                "folder/fs-usage",
+                json={
+                    "volume": volume_name,
+                },
+            ) as (_, storage_resp):
+                storage_reply = await storage_resp.json()
 
-            if show_total:
-                volume_usage["total"] = storage_reply["capacity_bytes"]
+                if show_used:
+                    volume_usage["used"] = storage_reply["used_bytes"]
 
-            if show_percentage:
-                volume_usage["percentage"] = (
-                    storage_reply["used_bytes"] / storage_reply["capacity_bytes"]
-                ) * 100
+                if show_total:
+                    volume_usage["total"] = storage_reply["capacity_bytes"]
 
-    return volume_usage
+                if show_percentage:
+                    volume_usage["percentage"] = (
+                        storage_reply["used_bytes"] / storage_reply["capacity_bytes"]
+                    ) * 100
+
+            await redis_helper.execute(
+                redis_connection,
+                lambda r: r.set(
+                    f"volume.usage.{proxy_name}.{volume_name}",
+                    msgpack.packb(volume_usage),
+                    ex=60,
+                ),
+            )
+
+        return volume_usage
 
 
 @auth_required
@@ -698,6 +721,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             "capabilities": volume_data["capabilities"],
             "usage": await fetch_allowed_volume_usage(
                 storage_manager=root_ctx.storage_manager,
+                redis_connection=root_ctx.redis_stat,
                 proxy_name=proxy_name,
                 volume_name=volume_data["name"],
             ),
