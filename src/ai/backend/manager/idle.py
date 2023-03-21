@@ -454,7 +454,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
             # setting idle_timeout:
             # - zero/inf means "infinite"
             # - negative means "undefined"
-            if policy["idle_timeout"] >= 0:
+            if policy["idle_timeout"] > 0:
                 idle_timeout = float(policy["idle_timeout"])
             if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
                 return None
@@ -503,7 +503,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
                 now = await dbconn.scalar(sa.select(sa.func.now()))
                 idle_time: timedelta = now - kernel["created_at"]
                 remaining: timedelta = idle_timeout - idle_time
-                return remaining.seconds
+                return remaining.total_seconds()
             return None
 
         result = await _check_kernel()
