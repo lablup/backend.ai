@@ -11,5 +11,6 @@
       "secret": "some-secret-shared-with-storage-proxy",
       "ssl_verify": "false"
     }
-  }
+  },
+  "allowed-volume-info": ["percentage"]
 }

@@ -46,10 +46,5 @@
         "num_retries_to_skip": 3
       }
     }
-  },
-  "expose-host-volume": {
-    "percentage": true,
-    "used-bytes": false,
-    "capacity-bytes": false
   }
 }

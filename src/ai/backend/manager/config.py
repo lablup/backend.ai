@@ -139,6 +139,8 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+     # 23.03 and later
+       + allowed_volume_info: "percentage"
        ...
      ...
    ...
@@ -349,15 +351,6 @@ shared_config_iv = t.Dict(
                 t.Key("allow-origins", default=_shdefs["api"]["allow-origins"]): t.String,
             }
         ).allow_extra("*"),
-        t.Key("expose-host-volume", default=_shdefs["expose-host-volume"]): t.Dict(
-            {
-                t.Key("percentage", default=_shdefs["expose-host-volume"]["percentage"]): t.Bool,
-                t.Key("used-bytes", default=_shdefs["expose-host-volume"]["used-bytes"]): t.Bool,
-                t.Key(
-                    "capacity-bytes", default=_shdefs["expose-host-volume"]["capacity-bytes"]
-                ): t.Bool,
-            }
-        ).allow_extra("*"),
         t.Key("redis", default=_shdefs["redis"]): t.Dict(
             {
                 t.Key("addr", default=_shdefs["redis"]["addr"]): t.Null | tx.HostPortPair,
@@ -422,6 +415,7 @@ volume_config_iv = t.Dict(
                 }
             ),
         ),
+        t.Key("allowed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 

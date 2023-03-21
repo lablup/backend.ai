@@ -663,9 +663,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
                 "capabilities": volume_data["capabilities"],
             }
 
-            show_percentage = root_ctx.shared_config["expose-host-volume"]["percentage"]
-            show_used = root_ctx.shared_config["expose-host-volume"]["used-bytes"]
-            show_total = root_ctx.shared_config["expose-host-volume"]["capacity-bytes"]
+            show_percentage = "percentage" in root_ctx.storage_manager._allowed_volume_info
+            show_used = "used-bytes" in root_ctx.storage_manager._allowed_volume_info
+            show_total = "capacity-bytes" in root_ctx.storage_manager._allowed_volume_info
 
             if show_percentage or show_used or show_total:
                 volume_usage = {}
