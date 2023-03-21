@@ -5,14 +5,16 @@ Revises: cace152eefac
 Create Date: 2022-12-05 16:12:53.275671
 
 """
+import textwrap
 from collections import defaultdict
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from alembic import op
 from more_itertools import chunked
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import registry
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
@@ -33,7 +35,7 @@ metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
 Base = mapper_registry.generate_base()
 
-QUERY_CHUNK_SIZE = 100
+QUERY_CHUNK_SIZE = 10
 
 
 def default_hostname(context) -> str:
@@ -250,21 +252,31 @@ def upgrade():
         "fk_session_dependencies_session_id_kernels", "session_dependencies", type_="foreignkey"
     )
 
-    subquery = sa.select([sa.func.count()]).select_from(kernels).group_by(kernels.c.session_id)
+    subquery = sa.select([kernels.c.session_id]).group_by(kernels.c.session_id)
     session_cnt = connection.execute(sa.select([sa.func.count()]).select_from(subquery)).scalar()
-    for chunk in range(0, session_cnt, QUERY_CHUNK_SIZE):
+
+    for offset in range(0, session_cnt + QUERY_CHUNK_SIZE, QUERY_CHUNK_SIZE):
         query = (
             sa.select([kernels.c.session_id])
+            .order_by(kernels.c.session_id)
             .group_by(kernels.c.session_id)
-            .slice(chunk, chunk + QUERY_CHUNK_SIZE)
+            .offset(offset)
+            .limit(QUERY_CHUNK_SIZE)
         )
-        session_ids = [row["session_id"] for row in connection.execute(query).fetchall()]
-
+        rows = connection.execute(query).fetchall()
+        session_ids = [row["session_id"] for row in rows]
+        # query = textwrap.dedent(
+        #     f"""
+        #     SELECT session_id
+        #     FROM kernels
+        #     ORDER BY session_id
+        #     OFFSET {offset} ROWS
+        #     FETCH NEXT {QUERY_CHUNK_SIZE} ROWS ONLY
+        #     """
+        # )
+        # session_ids = connection.execute(text(query)).scalars().all()
         query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
         kernel_rows = connection.execute(query).fetchall()
-
-        # imgs = db_session.query(ImageRow).all()
-        # img_map = {img.name: img.id for img in imgs}
 
         all_kernel_sessions = {}
         # kernel_id and session_id are the same if it is a single kernel session.
@@ -273,7 +285,7 @@ def upgrade():
         for row in kernel_rows:
             sess_id = row["session_id"]
             if sess_id not in all_kernel_sessions:
-                if sess_id == row["id"]:
+                if row["cluster_size"] == 1:
                     # create session with new id if the kernel_id and session_id are the same.
                     sess_id = uuid4()
                     single_kernel_ids[row["id"]] = sess_id
@@ -369,30 +381,31 @@ def upgrade():
 
         # Session dependency table
         kern_ids = list(single_kernel_ids.keys())
-        insert_values = []
-        sess_dep_query = sa.select(SessionDependencyRow).where(
-            SessionDependencyRow.session_id.in_(kern_ids)
-            | SessionDependencyRow.depends_on.in_(kern_ids)
-        )
-        for row in connection.execute(sess_dep_query).fetchall():
-            val = {}
-            if row["session_id"] in single_kernel_ids:
-                val["session_id"] = single_kernel_ids[row["session_id"]]
-            else:
-                val["session_id"] = row["session_id"]
+        if kern_ids:
+            insert_values = []
+            sess_dep_query = sa.select(SessionDependencyRow).where(
+                SessionDependencyRow.session_id.in_(kern_ids)
+                | SessionDependencyRow.depends_on.in_(kern_ids)
+            )
+            for row in connection.execute(sess_dep_query).fetchall():
+                val = {}
+                if row["session_id"] in single_kernel_ids:
+                    val["session_id"] = single_kernel_ids[row["session_id"]]
+                else:
+                    val["session_id"] = row["session_id"]
 
-            if row["depends_on"] in single_kernel_ids:
-                val["depends_on"] = single_kernel_ids[row["depends_on"]]
-            else:
-                val["depends_on"] = row["depends_on"]
-            insert_values.append(val)
-        dep_delete_query = sa.delete(SessionDependencyRow).where(
-            SessionDependencyRow.session_id.in_(kern_ids)
-            | SessionDependencyRow.depends_on.in_(kern_ids)
-        )
-        connection.execute(dep_delete_query)
-        if insert_values:
-            connection.execute(sa.insert(SessionDependencyRow), insert_values)
+                if row["depends_on"] in single_kernel_ids:
+                    val["depends_on"] = single_kernel_ids[row["depends_on"]]
+                else:
+                    val["depends_on"] = row["depends_on"]
+                insert_values.append(val)
+            dep_delete_query = sa.delete(SessionDependencyRow).where(
+                SessionDependencyRow.session_id.in_(kern_ids)
+                | SessionDependencyRow.depends_on.in_(kern_ids)
+            )
+            connection.execute(dep_delete_query)
+            if insert_values:
+                connection.execute(sa.insert(SessionDependencyRow), insert_values)
 
         # Kernel table
         sess_query = (
