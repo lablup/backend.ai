@@ -54,7 +54,7 @@ from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionTypes
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
-from .models.kernel import LIVE_STATUS, KernelRow
+from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
 from .types import DistributedLockFactory
@@ -178,27 +178,24 @@ class IdleCheckerHost:
         source: AgentId,
         event: DoIdleCheckEvent,
     ) -> None:
-        from ai.backend.manager.models.session import SessionRow
-
         log.debug("do_idle_check(): triggered")
         policy_cache: dict[AccessKey, Row] = {}
         async with self._db.begin_readonly() as conn:
-            j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
             query = (
                 sa.select(
                     [
-                        KernelRow.id,
-                        KernelRow.access_key,
-                        KernelRow.session_id,
-                        SessionRow.session_type,
-                        KernelRow.created_at,
-                        KernelRow.occupied_slots,
-                        SessionRow.cluster_size,
+                        kernels.c.id,
+                        kernels.c.access_key,
+                        kernels.c.session_id,
+                        kernels.c.session_type,
+                        kernels.c.created_at,
+                        kernels.c.occupied_slots,
+                        kernels.c.cluster_size,
                     ]
                 )
-                .select_from(j)
+                .select_from(kernels)
                 .where(
-                    (KernelRow.status.in_(LIVE_STATUS)) & (KernelRow.cluster_role == DEFAULT_ROLE),
+                    (kernels.c.status.in_(LIVE_STATUS)) & (kernels.c.cluster_role == DEFAULT_ROLE),
                 )
             )
             result = await conn.execute(query)
@@ -662,8 +659,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
             # Get current utilization data from all containers of the session.
             if kernel["cluster_size"] > 1:
-                query = sa.select([KernelRow.id]).where(
-                    (KernelRow.session_id == session_id) & (KernelRow.status.in_(LIVE_STATUS)),
+                query = sa.select([kernels.c.id]).where(
+                    (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
                 )
                 result = await dbconn.execute(query)
                 rows = result.fetchall()
