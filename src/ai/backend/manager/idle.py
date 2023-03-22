@@ -17,7 +17,6 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
-    Optional,
     Sequence,
     Set,
     Type,
@@ -494,7 +493,6 @@ class SessionLifetimeChecker(BaseIdleChecker):
         And save remaining time until `max_session_lifetime` of kernel to Redis.
         """
 
-        result: Optional[float] = None
         if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
@@ -504,7 +502,6 @@ class SessionLifetimeChecker(BaseIdleChecker):
             remaining: timedelta = idle_timeout - idle_time
             result = remaining.total_seconds()
 
-        if result is not None:
             await redis_helper.execute(
                 redis_obj,
                 lambda r: r.set(
@@ -513,7 +510,8 @@ class SessionLifetimeChecker(BaseIdleChecker):
                     ex=int(DEFAULT_CHECK_INTERVAL) * 10,
                 ),
             )
-        return result is not None and result > 0
+            return result > 0
+        return True
 
     async def get_checker_result(
         self,
