@@ -8,6 +8,7 @@ import math
 import stat
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -33,9 +34,15 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
+from ai.backend.common.types import (
+    RedisConnectionInfo,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+)
+from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     AgentStatus,
@@ -612,6 +619,67 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     return web.Response(status=204)
 
 
+class ExposedVolumeInfoField(StrEnum):
+    percentage = "percentage"
+    used_bytes = "used_bytes"
+    capacity_bytes = "capacity_bytes"
+
+
+async def fetch_exposed_volume_fields(
+    storage_manager: StorageSessionManager,
+    redis_connection: RedisConnectionInfo,
+    proxy_name: str,
+    volume_name: str,
+) -> Dict[str, int | float]:
+    volume_usage = {}
+
+    show_percentage = ExposedVolumeInfoField.percentage in storage_manager._exposed_volume_info
+    show_used = ExposedVolumeInfoField.used_bytes in storage_manager._exposed_volume_info
+    show_total = ExposedVolumeInfoField.capacity_bytes in storage_manager._exposed_volume_info
+
+    if show_percentage or show_used or show_total:
+        volume_usage_cache = await redis_helper.execute(
+            redis_connection,
+            lambda r: r.get(f"volume.usage.{proxy_name}.{volume_name}"),
+        )
+
+        if volume_usage_cache:
+            volume_usage = msgpack.unpackb(volume_usage_cache)
+        else:
+            async with storage_manager.request(
+                proxy_name,
+                "GET",
+                "folder/fs-usage",
+                json={
+                    "volume": volume_name,
+                },
+            ) as (_, storage_resp):
+                storage_reply = await storage_resp.json()
+
+                if show_used:
+                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
+
+                if show_total:
+                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+
+                if show_percentage:
+                    volume_usage["percentage"] = (
+                        storage_reply[ExposedVolumeInfoField.used_bytes]
+                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
+                    ) * 100
+
+            await redis_helper.execute(
+                redis_connection,
+                lambda r: r.set(
+                    f"volume.usage.{proxy_name}.{volume_name}",
+                    msgpack.packb(volume_usage),
+                    ex=60,
+                ),
+            )
+
+    return volume_usage
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -654,14 +722,22 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in allowed_hosts:
         default_host = None
+
     volume_info = {
         f"{proxy_name}:{volume_data['name']}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
+            "usage": await fetch_exposed_volume_fields(
+                storage_manager=root_ctx.storage_manager,
+                redis_connection=root_ctx.redis_stat,
+                proxy_name=proxy_name,
+                volume_name=volume_data["name"],
+            ),
         }
         for proxy_name, volume_data in all_volumes
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
     }
+
     resp = {
         "default": default_host,
         "allowed": sorted(allowed_hosts),

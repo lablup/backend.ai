@@ -58,6 +58,7 @@ config_iv = t.Dict(
         t.Key("resources"): t.Dict(
             {
                 t.Key("open_port_to_public", default=False): t.ToBool,
+                t.Key("allow_preferred_port", default=False): t.ToBool,
                 t.Key("max_cpu_cores_per_container", default=64): t.ToInt,
                 t.Key("max_memory_per_container", default=64): t.ToInt,
                 t.Key("max_cuda_devices_per_container", default=16): t.ToInt,

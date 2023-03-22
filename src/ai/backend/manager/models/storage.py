@@ -68,9 +68,11 @@ class VolumeInfo(TypedDict):
 
 class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
+    _exposed_volume_info: List[str]
 
     def __init__(self, storage_config: Mapping[str, Any]) -> None:
         self.config = storage_config
+        self._exposed_volume_info = self.config["exposed_volume_info"]
         self._proxies = {}
         for proxy_name, proxy_config in self.config["proxies"].items():
             connector = aiohttp.TCPConnector(ssl=proxy_config["ssl_verify"])
