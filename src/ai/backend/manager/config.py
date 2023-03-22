@@ -139,6 +139,8 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+     # 23.03 and later
+       + exposed_volume_info: "percentage"
        ...
      ...
    ...
@@ -402,6 +404,7 @@ volume_config_iv = t.Dict(
                 }
             ),
         ),
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 
