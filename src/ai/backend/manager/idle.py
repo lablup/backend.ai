@@ -435,52 +435,47 @@ class TimeoutIdleChecker(BaseIdleChecker):
         """
         session_id = kernel["session_id"]
 
-        async def _check_kernel() -> Optional[float]:
-            if kernel["session_type"] == SessionTypes.BATCH:
-                return None
-            active_streams = await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.zcount(
-                    f"session.{session_id}.active_app_connections",
-                    float("-inf"),
-                    float("+inf"),
-                ),
-            )
-            if active_streams is not None and active_streams > 0:
-                return None
-            t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-            t = t[0] + (t[1] / (10**6))
-            raw_last_access = await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.get(f"session.{session_id}.last_access"),
-            )
-            if raw_last_access is None or raw_last_access == "0":
-                return None
-            last_access = float(raw_last_access)
-            # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"
-            idle_timeout: float = self.idle_timeout.total_seconds()
-            # setting idle_timeout:
-            # - zero/inf means "infinite"
-            # - negative means "undefined"
-            if policy["idle_timeout"] > 0:
-                idle_timeout = float(policy["idle_timeout"])
-            if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
-                return None
-            idle_time: float = t - last_access
-            remaining: float = idle_timeout - idle_time
-            return remaining
-
-        result = await _check_kernel()
-        if result is not None:
-            await redis_helper.execute(
-                redis_obj,
-                lambda r: r.set(
-                    self.get_report_key(session_id),
-                    msgpack.packb(result),
-                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-                ),
-            )
-        return result is not None and result > 0
+        if kernel["session_type"] == SessionTypes.BATCH:
+            return True
+        active_streams = await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.zcount(
+                f"session.{session_id}.active_app_connections",
+                float("-inf"),
+                float("+inf"),
+            ),
+        )
+        if active_streams is not None and active_streams > 0:
+            return True
+        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
+        t = t[0] + (t[1] / (10**6))
+        raw_last_access = await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.get(f"session.{session_id}.last_access"),
+        )
+        if raw_last_access is None or raw_last_access == "0":
+            return True
+        last_access = float(raw_last_access)
+        # serves as the default fallback if keypair resource policy's idle_timeout is "undefined"
+        idle_timeout: float = self.idle_timeout.total_seconds()
+        # setting idle_timeout:
+        # - zero/inf means "infinite"
+        # - negative means "undefined"
+        if policy["idle_timeout"] > 0:
+            idle_timeout = float(policy["idle_timeout"])
+        if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
+            return True
+        idle_time: float = t - last_access
+        remaining: float = idle_timeout - idle_time
+        await redis_helper.execute(
+            redis_obj,
+            lambda r: r.set(
+                self.get_report_key(session_id),
+                msgpack.packb(remaining),
+                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+            ),
+        )
+        return remaining >= 0
 
     async def get_checker_result(
         self,
@@ -509,18 +504,16 @@ class SessionLifetimeChecker(BaseIdleChecker):
         And save remaining time until `max_session_lifetime` of kernel to Redis.
         """
 
-        async def _check_kernel() -> Optional[float]:
-            if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
-                # TODO: once per-status time tracking is implemented, let's change created_at
-                #       to the timestamp when the session entered PREPARING status.
-                idle_timeout = timedelta(seconds=max_session_lifetime)
-                now = await dbconn.scalar(sa.select(sa.func.now()))
-                idle_time: timedelta = now - kernel["created_at"]
-                remaining: timedelta = idle_timeout - idle_time
-                return remaining.total_seconds()
-            return None
+        result: Optional[float] = None
+        if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
+            # TODO: once per-status time tracking is implemented, let's change created_at
+            #       to the timestamp when the session entered PREPARING status.
+            idle_timeout = timedelta(seconds=max_session_lifetime)
+            now = await dbconn.scalar(sa.select(sa.func.now()))
+            idle_time: timedelta = now - kernel["created_at"]
+            remaining: timedelta = idle_timeout - idle_time
+            result = remaining.total_seconds()
 
-        result = await _check_kernel()
         if result is not None:
             await redis_helper.execute(
                 redis_obj,
@@ -609,6 +602,18 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"time-window({self.time_window.total_seconds()}s)",
         )
 
+    async def _report_redis(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId, avg_utils: dict[str, float]
+    ) -> None:
+        await redis_helper.execute(
+            redis_obj,
+            lambda r: r.set(
+                self.get_report_key(session_id),
+                msgpack.packb(avg_utils),
+                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+            ),
+        )
+
     async def report_idle_check(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
     ) -> bool:
@@ -618,144 +623,134 @@ class UtilizationIdleChecker(BaseIdleChecker):
         """
         session_id = kernel["session_id"]
 
-        async def _check_kernel() -> tuple[bool, Optional[dict[str, float]]]:
-            interval = IdleCheckerHost.check_interval
-            window_size = int(self.time_window.total_seconds() / interval)
-            occupied_slots = kernel["occupied_slots"]
-            unavailable_resources: Set[str] = set()
+        interval = IdleCheckerHost.check_interval
+        window_size = int(self.time_window.total_seconds() / interval)
+        occupied_slots = kernel["occupied_slots"]
+        unavailable_resources: Set[str] = set()
 
-            util_series_key = f"session.{session_id}.util_series"
-            util_last_collected_key = f"session.{session_id}.util_last_collected"
+        util_series_key = f"session.{session_id}.util_series"
+        util_last_collected_key = f"session.{session_id}.util_last_collected"
 
-            # Wait until the time "interval" is passed after the last udpated time.
-            t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-            t = t[0] + (t[1] / (10**6))
-            raw_util_last_collected = await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.get(util_last_collected_key),
-            )
-            util_last_collected = float(raw_util_last_collected) if raw_util_last_collected else 0
-            if t - util_last_collected < interval:
-                return True, None
+        # Wait until the time "interval" is passed after the last udpated time.
+        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
+        t = t[0] + (t[1] / (10**6))
+        raw_util_last_collected = await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.get(util_last_collected_key),
+        )
+        util_last_collected = float(raw_util_last_collected) if raw_util_last_collected else 0
+        if t - util_last_collected < interval:
+            return True
 
-            # Respect initial grace period (no termination of the session)
-            now = datetime.now(tzutc())
-            if now - kernel["created_at"] <= self.initial_grace_period:
-                return True, None
+        # Respect initial grace period (no termination of the session)
+        now = datetime.now(tzutc())
+        if now - kernel["created_at"] <= self.initial_grace_period:
+            return True
 
-            # Merge same type of (exclusive) resources as a unique resource with the values added.
-            # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
-            unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
-            for k, v in occupied_slots.items():
-                unique_key = k.split(".")[0]
-                unique_res_map[unique_key] += v
+        # Merge same type of (exclusive) resources as a unique resource with the values added.
+        # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
+        unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
+        for k, v in occupied_slots.items():
+            unique_key = k.split(".")[0]
+            unique_res_map[unique_key] += v
 
-            # Do not take into account unallocated resources. For example, do not garbage collect
-            # a session without GPU even if cuda_util is configured in resource-thresholds.
-            for slot in unique_res_map:
-                if unique_res_map[slot] == 0:
-                    unavailable_resources.update(self.slot_resource_map[slot])
+        # Do not take into account unallocated resources. For example, do not garbage collect
+        # a session without GPU even if cuda_util is configured in resource-thresholds.
+        for slot in unique_res_map:
+            if unique_res_map[slot] == 0:
+                unavailable_resources.update(self.slot_resource_map[slot])
 
-            raw_util_series = await redis_helper.execute(
-                self._redis_live, lambda r: r.get(util_series_key)
-            )
+        raw_util_series = await redis_helper.execute(
+            self._redis_live, lambda r: r.get(util_series_key)
+        )
 
+        try:
+            util_series = msgpack.unpackb(raw_util_series, use_list=True)
+        except TypeError:
+            util_series = {k: [] for k in self.resource_thresholds.keys()}
+
+        def _avg(util_list: list[float]) -> float:
             try:
-                util_series = msgpack.unpackb(raw_util_series, use_list=True)
-            except TypeError:
-                util_series = {k: [] for k in self.resource_thresholds.keys()}
+                return sum(util_list) / len(util_list)
+            except ZeroDivisionError:
+                return 0.0
 
-            def _avg(util_list: list[float]) -> float:
-                try:
-                    return sum(util_list) / len(util_list)
-                except ZeroDivisionError:
-                    return 0.0
+        avg_utils = {k: _avg(v) for k, v in util_series.items()}
 
-            avg_utils = {k: _avg(v) for k, v in util_series.items()}
+        # Respect idle_timeout, from keypair resource policy, over time_window.
+        if policy["idle_timeout"] >= 0:
+            window_size = int(float(policy["idle_timeout"]) / interval)
+        if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
+            await self._report_redis(redis_obj, session_id, avg_utils)
+            return True
 
-            # Respect idle_timeout, from keypair resource policy, over time_window.
-            if policy["idle_timeout"] >= 0:
-                window_size = int(float(policy["idle_timeout"]) / interval)
-            if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
-                return True, avg_utils
+        # Get current utilization data from all containers of the session.
+        if kernel["cluster_size"] > 1:
+            query = sa.select([kernels.c.id]).where(
+                (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
+            )
+            rows = (await dbconn.execute(query)).fetchall()
+            kernel_ids = [k["id"] for k in rows]
+        else:
+            kernel_ids = [kernel["id"]]
+        current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
+        if current_utilizations is None:
+            await self._report_redis(redis_obj, session_id, avg_utils)
+            return True
 
-            # Get current utilization data from all containers of the session.
-            if kernel["cluster_size"] > 1:
-                query = sa.select([kernels.c.id]).where(
-                    (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
-                )
-                result = await dbconn.execute(query)
-                rows = result.fetchall()
-                kernel_ids = [k["id"] for k in rows]
+        # Update utilization time-series data.
+        not_enough_data = False
+
+        for k in util_series:
+            util_series[k].append(current_utilizations[k])
+            if len(util_series[k]) > window_size:
+                util_series[k].pop(0)
             else:
-                kernel_ids = [kernel["id"]]
-            current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
-            if current_utilizations is None:
-                return True, avg_utils
+                not_enough_data = True
+        await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.set(
+                util_series_key,
+                msgpack.packb(util_series),
+                ex=max(86400, int(self.time_window.total_seconds() * 2)),
+            ),
+        )
+        await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.set(
+                util_last_collected_key,
+                f"{t:.06f}",
+                ex=max(86400, int(self.time_window.total_seconds() * 2)),
+            ),
+        )
 
-            # Update utilization time-series data.
-            not_enough_data = False
+        if not_enough_data:
+            await self._report_redis(redis_obj, session_id, avg_utils)
+            return True
 
-            for k in util_series:
-                util_series[k].append(current_utilizations[k])
-                if len(util_series[k]) > window_size:
-                    util_series[k].pop(0)
-                else:
-                    not_enough_data = True
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.set(
-                    util_series_key,
-                    msgpack.packb(util_series),
-                    ex=max(86400, int(self.time_window.total_seconds() * 2)),
-                ),
-            )
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.set(
-                    util_last_collected_key,
-                    f"{t:.06f}",
-                    ex=max(86400, int(self.time_window.total_seconds() * 2)),
-                ),
-            )
+        # Check over-utilized (not to be collected) resources.
+        sufficiently_utilized = {
+            k: (float(avg_utils[k]) >= float(threshold))
+            for k, threshold in self.resource_thresholds.items()
+            if (threshold is not None) and (k not in unavailable_resources)
+        }
 
-            if not_enough_data:
-                return True, avg_utils
-
-            # Check over-utilized (not to be collected) resources.
-            sufficiently_utilized = {
-                k: (float(avg_utils[k]) >= float(threshold))
-                for k, threshold in self.resource_thresholds.items()
-                if (threshold is not None) and (k not in unavailable_resources)
-            }
-
+        check_result = True
+        if len(sufficiently_utilized) < 1:
             check_result = True
-            if len(sufficiently_utilized) < 1:
-                check_result = True
-            elif self.thresholds_check_operator == ThresholdOperator.OR:
-                check_result = all(sufficiently_utilized.values())
-            else:  # "and" operation is the default
-                check_result = any(sufficiently_utilized.values())
-            return check_result, avg_utils
-
-        should_alive, avg_utils = await _check_kernel()
-        if avg_utils is not None:
-            await redis_helper.execute(
-                redis_obj,
-                lambda r: r.set(
-                    self.get_report_key(session_id),
-                    msgpack.packb(avg_utils),
-                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-                ),
-            )
-        if not should_alive:
+        elif self.thresholds_check_operator == ThresholdOperator.OR:
+            check_result = all(sufficiently_utilized.values())
+        else:  # "and" operation is the default
+            check_result = any(sufficiently_utilized.values())
+        if not check_result:
             log.info(
                 "utilization timeout: {} ({}, {})",
                 session_id,
                 avg_utils,
                 self.thresholds_check_operator,
             )
-        return should_alive
+        await self._report_redis(redis_obj, session_id, avg_utils)
+        return check_result
 
     async def get_current_utilization(
         self,
