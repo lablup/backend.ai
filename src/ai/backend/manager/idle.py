@@ -513,7 +513,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
                     ex=int(DEFAULT_CHECK_INTERVAL) * 10,
                 ),
             )
-        return result is not None and result > 0
+        return result is None or result > 0
 
     async def get_checker_result(
         self,
