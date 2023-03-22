@@ -630,7 +630,7 @@ async def fetch_exposed_volume_fields(
     redis_connection: RedisConnectionInfo,
     proxy_name: str,
     volume_name: str,
-) -> Dict[ExposedVolumeInfoField, int | float]:
+) -> Dict[str, int | float]:
     volume_usage = {}
 
     show_percentage = ExposedVolumeInfoField.percentage in storage_manager._exposed_volume_info
