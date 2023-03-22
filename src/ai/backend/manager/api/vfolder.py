@@ -2985,6 +2985,48 @@ async def storage_task_exception_handler(
     log.exception("Error while removing vFolder", exc_info=exc_obj)
 
 
+@superadmin_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("vfolder"): tx.UUID,
+            t.Key("user"): tx.UUID,
+        }
+    ),
+)
+async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
+    """
+    Change the ownership of vfolder
+    For now, we only provide changing the ownership of user-folder
+    """
+    access_key = request["keypair"]["access_key"]
+    vfolder_id = params["vfolder"]
+    user_uuid = params["user"]
+    root_ctx: RootContext = request.app["_root.context"]
+
+    # TODO: Implement Change ownership using DB transaction
+    log.info(
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(emial:{}, ak:{}, vfid:{}, uid:{})",
+        request["user"]["email"],
+        access_key,
+        vfolder_id,
+        user_uuid,
+    )
+    async with root_ctx.db.begin() as conn:
+        # TODO: we need to implement migration from project to other project
+        #       for now we only support migration btw user folder only
+        #
+        query = (
+            sa.update(vfolders)
+            .values(user=user_uuid)
+            .where(vfolders.c.id == vfolder_id)
+            .where(vfolders.c.ownership_type == VFolderOwnershipType.USER)
+        )
+        await conn.execute(query)
+    return web.json_response({}, status=200)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -3055,6 +3097,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
     cors.add(add_route("DELETE", r"/_/mounts", umount_host))
+    cors.add(add_route("POST", r"/_/change_ownership", change_vfolder_ownership))
     cors.add(add_route("GET", r"/_/quota", get_quota))
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))
