@@ -248,7 +248,7 @@ class IdleCheckerHost:
         report = {
             "timeout": None,
             "session_lifetime": None,
-            "avg_utilization": None,
+            "utilization": None,
         }
         for checker in self._checkers:
             result = await checker.get_checker_result(self._redis_live, session_id)
@@ -532,7 +532,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
     terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_UTILIZATION
     name: ClassVar[str] = "utilization"
-    report_key: ClassVar[str] = "avg_utilization"
+    report_key: ClassVar[str] = "utilization"
 
     _config_iv = t.Dict(
         {
