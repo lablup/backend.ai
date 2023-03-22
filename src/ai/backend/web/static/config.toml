@@ -36,6 +36,7 @@ proxyListenIP = "[Websocket proxy configuration IP.]"
 
 [resources]
 openPortToPublic = false            # Show option to open app proxy port to anyone.
+allowPreferredPort = false          # Preferred web service port number. Backend.AI try to assign the entered port number first for the web service.
 maxCPUCoresPerContainer = 256       # Maximum CPU per container.
 maxMemoryPerContainer = 64          # Maximum memory per container.
 maxCUDADevicesPerContainer = 8      # Maximum CUDA devices per container.

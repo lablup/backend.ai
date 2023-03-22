@@ -59,7 +59,8 @@
       "PasswordChangePlace": "__NOT_TRANSLATED__",
       "AgentSummary": "__NOT_TRANSLATED__",
       "SetupTotp": "__NOT_TRANSLATED__",
-      "TotpActivated": "__NOT_TRANSLATED__"
+      "TotpActivated": "__NOT_TRANSLATED__",
+      "AIAccelerator": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "LOGIN DIBUTUHKAN",
     "YouAreOffline": "Anda sekarang offline",
@@ -111,7 +112,9 @@
     "AcceptSharedVFolder": "Anda sekarang dapat mengakses folder: ",
     "DeclineSharedVFolder": "Undangan folder dihapus: ",
     "connectingToCluster": "Menghubungkan ke Cluster Backend.AI...",
-    "DownloadWebUIApp": "__NOT_TRANSLATED__"
+    "DownloadWebUIApp": "__NOT_TRANSLATED__",
+    "IPUEnabled": "__NOT_TRANSLATED__",
+    "ATOMEnabled": "__NOT_TRANSLATED__"
   },
   "session": {
     "launcher": {
@@ -241,7 +244,9 @@
       "StartModelServing": "__NOT_TRANSLATED__",
       "InferenceMode": "__NOT_TRANSLATED__",
       "ImageDoesNotProvideModelPath": "__NOT_TRANSLATED__",
-      "ModelStorageToMount": "__NOT_TRANSLATED__"
+      "ModelStorageToMount": "__NOT_TRANSLATED__",
+      "AIAccelerator": "__NOT_TRANSLATED__",
+      "DescAIAccelerator": "__NOT_TRANSLATED__"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -326,6 +331,9 @@
     "Message": "Pesan",
     "EnvironmentInfo": "__NOT_TRANSLATED__",
     "DownloadingSessionLogs": "__NOT_TRANSLATED__",
+    "ElapsedTime": "__NOT_TRANSLATED__",
+    "Timeout": "__NOT_TRANSLATED__",
+    "SessionLifetime": "__NOT_TRANSLATED__",
     "Inference": "__NOT_TRANSLATED__",
     "UseSubdomain": "__NOT_TRANSLATED__",
     "BypassAuthentication": "__NOT_TRANSLATED__",
@@ -334,7 +342,8 @@
     "ExecuteTerminalApp": "__NOT_TRANSLATED__",
     "TerminateSession": "__NOT_TRANSLATED__",
     "SeeContainerLogs": "__NOT_TRANSLATED__",
-    "RequestContainerCommit": "__NOT_TRANSLATED__"
+    "RequestContainerCommit": "__NOT_TRANSLATED__",
+    "TimeoutExceeded": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -637,7 +646,16 @@
       "PermissionModified": "Izin diperbarui"
     },
     "NoStorageDescriptionFound": "Tidak ada deskripsi.",
-    "DialogModelFolder": "__NOT_TRANSLATED__"
+    "DialogModelFolder": "__NOT_TRANSLATED__",
+    "usage": {
+      "adequate": "__NOT_TRANSLATED__",
+      "Adequate": "__NOT_TRANSLATED__",
+      "Caution": "__NOT_TRANSLATED__",
+      "Insufficient": "__NOT_TRANSLATED__",
+      "StatusOfSelectedHost": "__NOT_TRANSLATED__",
+      "Status": "__NOT_TRANSLATED__",
+      "used": "__NOT_TRANSLATED__"
+    }
   },
   "dialog": {
     "warning": {
@@ -1037,7 +1055,13 @@
     "OverlayNetworkSettings": "__NOT_TRANSLATED__",
     "OverlayNetworkSettingsDescription": "__NOT_TRANSLATED__",
     "MTUDescription": "__NOT_TRANSLATED__",
-    "OutOfRange": "__NOT_TRANSLATED__"
+    "OutOfRange": "__NOT_TRANSLATED__",
+    "IPUsupport": "__NOT_TRANSLATED__",
+    "DescIPUsupport": "__NOT_TRANSLATED__",
+    "ATOMsupport": "__NOT_TRANSLATED__",
+    "DescATOMsupport": "__NOT_TRANSLATED__",
+    "RequireIPUPlugin": "__NOT_TRANSLATED__",
+    "RequireATOMPlugin": "__NOT_TRANSLATED__"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
