@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.19 (2023-03-23)
+
+### Features
+* Report idle checker their idle remaining time and utilization to `Redis` and let Gql fetch the report. ([#1160](https://github.com/lablup/backend.ai/issues/1160))
+* Replace `username` in the `compute_session` (and `compute_session_list`) GQL query with `full_name` and expose `full_name` to `get_container_stats_for_period` so that administrators can easily recognize users. ([#1167](https://github.com/lablup/backend.ai/issues/1167))
+* Provide status information about usage, capacity of storage volume to `list-hosts` API ([#1170](https://github.com/lablup/backend.ai/issues/1170))
+* Return `status_info` in session usage statistics API. ([#1176](https://github.com/lablup/backend.ai/issues/1176))
+
+
 ## 22.09.18 (2023-03-19)
 
 ### Features
