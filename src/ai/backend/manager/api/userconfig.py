@@ -13,7 +13,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
-    GitTokenRow,
+    git_token,
     git_tokens,
     keypairs,
     query_accessible_vfolders,
@@ -27,7 +27,6 @@ from .exceptions import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
     DotfileNotFound,
-    InternalServerError,
     InvalidAPIParameters,
 )
 from .manager import READ_ALLOWED, server_status_required
@@ -253,7 +252,9 @@ async def get_git_tokens(request: web.Request) -> web.Response:
     user_uuid = request["user"]["uuid"]
 
     async with root_ctx.db.begin_readonly() as conn:
-        query = sa.select(GitTokenRow).where(GitTokenRow.user_id == user_uuid)
+        query = sa.select([git_tokens.c.domain, git_tokens.c.token]).where(
+            git_tokens.c.user_id == user_uuid
+        )
         query_result = await conn.execute(query)
         rows = query_result.fetchall()
         result = [{"domain": row["domain"], "token": row["token"]} for row in rows]
@@ -273,27 +274,13 @@ async def update_git_tokens(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
 
-    print(type(params))
-    print("aaaa=====bbbb")
+    # get token list then
     token_list = params["params"]
-    print(type(token_list))
-    result = json.loads(token_list)
-    print("bbbbb=====cccc")
-    for key, value in result.items():
-        print(key)
-        print(value)
-        # first delete (select * from user_id and not in )
+    async with root_ctx.db.begin() as conn:
+        await git_token.insert_update_git_tokens(conn, user_uuid, token_list)
 
-        # then, insert datas
-        data = {"user_id": user_uuid, "domain": key, "token": value}
-        async with root_ctx.db.begin() as conn:
-            query = git_tokens.insert().values(data)
-            result = await conn.execute(query)
-            if result.rowcount > 0:
-                log.info("success")
-            else:
-                raise InternalServerError("Error creating git tokens")
-
+    token_list_json = json.loads(token_list)
+    for key, value in token_list_json.items():
         resp.append({"domain": key, "token": value})
 
     return web.json_response(resp)
