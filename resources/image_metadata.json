@@ -749,6 +749,20 @@
           "color": "blue"
         }
       ]
+    },
+    "atom-orbit": {
+      "name": "Orbit Inference",
+      "description": "Orbit Inference Service",
+      "group": "Inference",
+      "tags": [],
+      "icon": "orbit.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Orbit",
+          "color": "red"
+        }
+      ]
     }
   },
   "tagAlias": {
@@ -857,7 +871,8 @@
     "alpine3.8": "Alpine Linux 3.8",
     "alpine3.12": "Alpine Linux 3.12",
     "ngc": "Nvidia GPU Cloud",
-    "ff": "Research Env."
+    "ff": "Research Env.",
+    "atom-orbit": "Orbit"
   },
   "tagReplace": {
     "^(tf)([0-9.]*)$": "TensorFlow $2",
