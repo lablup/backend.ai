@@ -523,7 +523,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
     ) -> None:
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
-        report.timeout = msgpack.unpackb(data) if data is not None else None
+        report.session_lifetime = msgpack.unpackb(data) if data is not None else None
 
 
 class UtilizationIdleChecker(BaseIdleChecker):
