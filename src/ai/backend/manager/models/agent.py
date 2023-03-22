@@ -261,7 +261,7 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         scaling_group: str = None,
-        raw_status: str = None,
+        raw_status: Optional[str | AgentStatus] = None,
         filter: str = None,
     ) -> int:
         if isinstance(raw_status, str):
