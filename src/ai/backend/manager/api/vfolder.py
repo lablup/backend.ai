@@ -48,6 +48,7 @@ from ..models import (
     AgentStatus,
     KernelStatus,
     UserRole,
+    UserStatus,
     VFolderAccessStatus,
     VFolderCloneInfo,
     VFolderDeletionInfo,
@@ -3021,7 +3022,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         query = (
             sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
             .select_from(j)
-            .where(users.c.uuid == user_uuid & users.c.status == users.UserStatus.ACTIVE)
+            .where(users.c.uuid == user_uuid & users.c.status == UserStatus.ACTIVE)
         )
         try:
             result = await conn.execute(query)
