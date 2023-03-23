@@ -67,6 +67,7 @@ from ..models import (
     initiate_vfolder_clone,
     initiate_vfolder_removal,
     kernels,
+    keypair_resource_policies,
     keypairs,
     query_accessible_vfolders,
     query_owned_dotfiles,
@@ -3022,7 +3023,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         query = (
             sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
             .select_from(j)
-            .where(users.c.uuid == user_uuid & users.c.status == UserStatus.ACTIVE)
+            .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.ACTIVE))
         )
         try:
             result = await conn.execute(query)
@@ -3031,9 +3032,16 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         user_info = result.first()
         if user_info is None:
             raise ObjectNotFound(object_name="user")
+        resource_policy_name = user_info.resource_policy
+        result = await conn.execute(
+            sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
+                keypair_resource_policies.c.name == resource_policy_name
+            )
+        )
+        resource_policy = result.first()
         allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
             conn=conn,
-            resource_policy=user_info.resource_policy,
+            resource_policy=resource_policy,
             domain_name=user_info.domain_name,
             user_uuid=user_uuid,
         )
