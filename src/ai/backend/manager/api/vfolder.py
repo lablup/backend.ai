@@ -3020,8 +3020,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         query = (
             sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
             .select_from(j)
-            .where(users.c.uuid == user_uuid)
-            .where(users.c.status == users.UserStatus.ACTIVE)
+            .where(users.c.uuid == user_uuid & users.c.status == users.UserStatus.ACTIVE)
         )
         try:
             result = await conn.execute(query)
@@ -3043,18 +3042,27 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         folder_host = await conn.scalar(query)
     if folder_host not in allowed_hosts_by_user:
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
-    async with root_ctx.db.begin() as conn:
-        # TODO: we need to implement migration from project to other project
-        #       for now we only support migration btw user folder only
-        #
-        query = (
-            sa.update(vfolders)
-            .values(user=user_uuid)
-            .where(vfolders.c.id == vfolder_id)
-            .where(vfolders.c.ownership_type == VFolderOwnershipType.USER)
-        )
-        await conn.execute(query)
-    return web.json_response({}, status=200)
+
+    async def _update() -> None:
+        from ..models.utils import execute_with_retry
+
+        async with root_ctx.db.begin() as conn:
+            # TODO: we need to implement migration from project to other project
+            #       for now we only support migration btw user folder only
+            #
+            query = (
+                sa.update(vfolders)
+                .values(user=user_uuid)
+                .where(
+                    vfolders.c.id
+                    == vfolder_id & vfolders.c.ownership_type
+                    == VFolderOwnershipType.USER
+                )
+            )
+            await conn.execute(query)
+        await execute_with_retry(_update)
+
+    return web.Response(status=200)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
