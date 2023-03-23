@@ -48,6 +48,7 @@ from ..models import (
     AgentStatus,
     KernelStatus,
     UserRole,
+    UserStatus,
     VFolderAccessStatus,
     VFolderCloneInfo,
     VFolderDeletionInfo,
@@ -64,6 +65,7 @@ from ..models import (
     initiate_vfolder_clone,
     initiate_vfolder_removal,
     kernels,
+    keypair_resource_policies,
     keypairs,
     query_accessible_vfolders,
     query_owned_dotfiles,
@@ -73,6 +75,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
+from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -89,6 +92,7 @@ from .exceptions import (
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -2794,6 +2798,90 @@ async def storage_task_exception_handler(
     log.exception("Error while removing vFolder", exc_info=exc_obj)
 
 
+@superadmin_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("vfolder"): tx.UUID,
+            t.Key("user"): tx.UUID,
+        }
+    ),
+)
+async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
+    """
+    Change the ownership of vfolder
+    For now, we only provide changing the ownership of user-folder
+    """
+    access_key = request["keypair"]["access_key"]
+    vfolder_id = params["vfolder"]
+    user_uuid = params["user"]
+    root_ctx: RootContext = request.app["_root.context"]
+
+    # TODO: Implement Change ownership using DB transaction
+    log.info(
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+        request["user"]["email"],
+        access_key,
+        vfolder_id,
+        user_uuid,
+    )
+    allowed_hosts_by_user = VFolderHostPermissionMap()
+    async with root_ctx.db.begin_readonly() as conn:
+        j = sa.join(users, keypairs, users.c.uuid == keypairs.c.user)
+        query = (
+            sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
+            .select_from(j)
+            .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.ACTIVE))
+        )
+        try:
+            result = await conn.execute(query)
+        except sa.exc.DataError:
+            raise InvalidAPIParameters
+        user_info = result.first()
+        if user_info is None:
+            raise ObjectNotFound(object_name="user")
+        resource_policy_name = user_info.resource_policy
+        result = await conn.execute(
+            sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
+                keypair_resource_policies.c.name == resource_policy_name
+            )
+        )
+        resource_policy = result.first()
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            conn=conn,
+            resource_policy=resource_policy,
+            domain_name=user_info.domain_name,
+            user_uuid=user_uuid,
+        )
+    async with root_ctx.db.begin_readonly() as conn:
+        query = (
+            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
+        )
+        folder_host = await conn.scalar(query)
+    if folder_host not in allowed_hosts_by_user:
+        raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
+
+    async def _update() -> None:
+        async with root_ctx.db.begin() as conn:
+            # TODO: we need to implement migration from project to other project
+            #       for now we only support migration btw user folder only
+            #
+            query = (
+                sa.update(vfolders)
+                .values(user=user_uuid)
+                .where(
+                    (vfolders.c.id == vfolder_id)
+                    & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                )
+            )
+            await conn.execute(query)
+
+    await execute_with_retry(_update)
+
+    return web.json_response({}, status=200)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -2864,6 +2952,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
     cors.add(add_route("DELETE", r"/_/mounts", umount_host))
+    cors.add(add_route("POST", r"/_/change-ownership", change_vfolder_ownership))
     cors.add(add_route("GET", r"/_/quota", get_quota))
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))
