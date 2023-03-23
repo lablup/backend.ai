@@ -208,6 +208,7 @@ session_fields = FieldSet(
             formatter=DependencyListFormatter(),
         ),
         FieldSpec("abusing_reports"),
+        FieldSpec("idle_checks"),
     ]
 )
 
@@ -269,6 +270,7 @@ user_fields = FieldSet(
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
         FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
     ]
 )
 

@@ -102,7 +102,7 @@ else
 
   # Start ssh-agent if it is available
   if command -v ssh-agent > /dev/null; then
-    eval "$(ssh-agent -s)"
+    eval "$(/opt/kernel/su-exec $USER_ID:$GROUP_ID ssh-agent)"
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 
@@ -114,6 +114,8 @@ else
     echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
   fi
 
+  # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
+  # Note that we also need to use our own patched version of su-exec to support multiple gids.
   echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
   exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
 

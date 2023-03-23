@@ -249,7 +249,10 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
     common_labels = common_image_label_schema.check(labels)
     service_ports = {
         item["name"]: item
-        for item in parse_service_ports(common_labels.get("ai.backend.service-ports", ""))
+        for item in parse_service_ports(
+            common_labels.get("ai.backend.service-ports", ""),
+            common_labels.get("ai.backend.endpoint-ports", ""),
+        )
     }
     match common_labels["ai.backend.role"]:
         case "INFERENCE":
@@ -270,7 +273,6 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
 
 
 class PlatformTagSet(Mapping):
-
     __slots__ = ("_data",)
     _data: Dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")

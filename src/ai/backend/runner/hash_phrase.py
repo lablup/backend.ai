@@ -38,7 +38,6 @@ def hash_phrase(
     separator="",
     capitalize=True,
 ):
-
     if dictionary is None:
         dictionary = load_dictionary()
 

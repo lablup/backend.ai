@@ -48,7 +48,6 @@ class AsyncContextManagerMock:
 
 
 class MockableZMQAsyncSock:
-
     # Since zmq.Socket/zmq.asyncio.Socket uses a special AttributeSetter mixin which
     # breaks mocking of those instances as-is, we define a dummy socket interface
     # which does not have such side effects.

@@ -47,7 +47,6 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    kernels,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
@@ -112,7 +111,6 @@ StartTaskArgs = Tuple[
 
 
 class SchedulerDispatcher(aobject):
-
     config: LocalConfig
     shared_config: SharedConfig
     registry: AgentRegistry
@@ -282,11 +280,10 @@ class SchedulerDispatcher(aobject):
                         sa.update(SessionRow)
                         .values(
                             status=SessionStatus.CANCELLED,
-                            status_changed=now,
                             status_info="pending-timeout",
                             terminated_at=now,
                             status_history=sql_json_merge(
-                                kernels.c.status_history,
+                                SessionRow.status_history,
                                 (),
                                 {
                                     SessionStatus.CANCELLED.name: now.isoformat(),
@@ -317,7 +314,6 @@ class SchedulerDispatcher(aobject):
         zero = ResourceSlot()
         num_scheduled = 0
         while len(pending_sessions) > 0:
-
             async with self.db.begin_readonly_session() as db_sess:
                 candidate_agents = await list_schedulable_agents_by_sgroup(db_sess, sgroup_name)
             total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)

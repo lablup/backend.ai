@@ -128,7 +128,6 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-
     work_queue: queue.Queue[
         Union[
             Tuple[Union[AsyncIterator, Coroutine], Context],

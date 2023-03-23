@@ -139,6 +139,8 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+     # 23.03 and later
+       + exposed_volume_info: "percentage"
        ...
      ...
    ...
@@ -413,6 +415,7 @@ volume_config_iv = t.Dict(
                 }
             ),
         ),
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 
@@ -421,7 +424,6 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
 class AbstractConfig(UserDict):
-
     _watch_callbacks: List[ConfigWatchCallback]
 
     def __init__(self, initial_data: Mapping[str, Any] = None) -> None:
@@ -446,7 +448,6 @@ class LocalConfig(AbstractConfig):
 
 
 def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
