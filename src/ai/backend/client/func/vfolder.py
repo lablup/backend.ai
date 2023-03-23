@@ -625,7 +625,7 @@ class VFolder(BaseFunction):
     @api_function
     @classmethod
     async def change_vfolder_ownership(cls, vfolder: str, user: str):
-        rqst = Request("POST", "/folders/_/change_ownership")
+        rqst = Request("POST", "/folders/_/change-ownership")
         rqst.set_json(
             {
                 "vfolder": vfolder,
