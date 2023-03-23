@@ -30,6 +30,7 @@ from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
+    BinarySize,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -613,9 +614,6 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    # status_changed = sa.Column(
-    #     "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
-    # )
     status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
 
     status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
@@ -1082,6 +1080,7 @@ class ComputeSession(graphene.ObjectType):
     result = graphene.String()
     commit_status = graphene.String()
     abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -1238,6 +1237,14 @@ class ComputeSession(graphene.ObjectType):
         if containers is None:
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        idle_report = await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+        avg_utils = idle_report["utilization"]
+        if avg_utils is not None and "mem" in avg_utils:
+            avg_utils["mem"] = BinarySize.from_str(str(int(avg_utils["mem"])))
+        return idle_report
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),
