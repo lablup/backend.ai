@@ -618,16 +618,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
         return msgpack.unpackb(data) if data is not None else None
 
-    async def report_expire_time(self, policy: Row, session_id: SessionId) -> None:
-        expire_time = await self.get_expire_time(policy, session_id)
-        if expire_time is None:
-            return
+    async def report_expire_time(self, session_id: SessionId, interval: float) -> None:
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
                 self.get_report_key(session_id),
-                msgpack.packb(expire_time),
-                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+                msgpack.packb(interval),
+                ex=int(interval) * 2,
             ),
         )
 
@@ -639,21 +636,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
     def get_last_collected_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.util_last_collected"
-
-    async def get_expire_time(self, policy: Row, session_id: SessionId) -> Optional[float]:
-        timeout = self.get_time_window(policy)
-        if (timeout <= 0) or (math.isinf(timeout) and timeout > 0):
-            return None
-        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-        now = t[0] + (t[1] / (10**6))
-        raw_util_last_collected = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(self.get_last_collected_key(session_id)),
-        )
-        util_last_collected: float = (
-            float(raw_util_last_collected) if raw_util_last_collected else 0
-        )
-        return timeout - (now - util_last_collected)
 
     async def check_idleness(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
@@ -689,17 +671,25 @@ class UtilizationIdleChecker(BaseIdleChecker):
         if util_now - util_last_collected < interval:
             return True
 
-        # Respect initial grace period (no termination of the session)
+        # Report time remaining until the first time window is full as expire time
         now = datetime.now(tzutc())
-        if now - kernel["created_at"] <= self.initial_grace_period:
+        initial_period: timedelta = now - kernel["created_at"]
+        if (
+            first_expire_time := self.initial_grace_period.total_seconds()
+            + time_window
+            - initial_period.total_seconds()
+        ) >= 0:
             await redis_helper.execute(
                 self._redis_live,
                 lambda r: r.set(
                     self.get_report_key(session_id),
-                    msgpack.packb(self.initial_grace_period.total_seconds() + time_window),
+                    msgpack.packb(first_expire_time),
                     ex=int(DEFAULT_CHECK_INTERVAL) * 10,
                 ),
             )
+
+        # Respect initial grace period (no termination of the session)
+        if initial_period <= self.initial_grace_period:
             return True
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
@@ -726,7 +716,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             kernel_ids = [kernel["id"]]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
-            await self.report_expire_time(policy, session_id)
+            await self.report_expire_time(session_id, interval)
             return True
 
         # Update utilization time-series data.
@@ -771,6 +761,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 return 0.0
 
         avg_utils: Mapping[str, float] = {k: _avg(v) for k, v in util_series.items()}
+
         # util_avg_thresholds's key is resource name
         # and value is `(avg_util, threshold)`
         util_avg_thresholds: Mapping[str, tuple[float, float]] = {
@@ -788,7 +779,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
         if not_enough_data:
-            await self.report_expire_time(policy, session_id)
+            await self.report_expire_time(session_id, interval)
             return True
 
         # Check over-utilized (not to be collected) resources.
@@ -809,13 +800,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 avg_utils,
                 self.thresholds_check_operator,
             )
-            await self.report_expire_time(policy, session_id)
         else:
             await redis_helper.execute(
                 redis_obj,
                 lambda r: r.set(
                     self.get_report_key(session_id),
-                    msgpack.packb(self.get_time_window(policy)),
+                    msgpack.packb(interval),
                     ex=int(DEFAULT_CHECK_INTERVAL) * 10,
                 ),
             )
