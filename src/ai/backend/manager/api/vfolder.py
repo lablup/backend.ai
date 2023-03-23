@@ -91,6 +91,7 @@ from .exceptions import (
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -3013,6 +3014,35 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         vfolder_id,
         user_uuid,
     )
+    allowed_hosts_by_user = VFolderHostPermissionMap()
+    async with root_ctx.db.begin_readonly() as conn:
+        j = sa.join(users, keypairs, users.c.uuid == keypairs.c.user)
+        query = (
+            sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
+            .select_from(j)
+            .where(users.c.uuid == user_uuid)
+            .where(users.c.status == users.UserStatus.ACTIVE)
+        )
+        try:
+            result = await conn.execute(query)
+        except sa.exc.DataError:
+            raise InvalidAPIParameters
+        user_info = result.first()
+        if user_info is None:
+            raise ObjectNotFound(object_name="user")
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            conn=conn,
+            resource_policy=user_info.resource_policy,
+            domain_name=user_info.domain_name,
+            user_uuid=user_uuid,
+        )
+    async with root_ctx.db.begin_readonly() as conn:
+        query = (
+            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
+        )
+        folder_host = await conn.scalar(query)
+    if folder_host not in allowed_hosts_by_user:
+        raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
     async with root_ctx.db.begin() as conn:
         # TODO: we need to implement migration from project to other project
         #       for now we only support migration btw user folder only
