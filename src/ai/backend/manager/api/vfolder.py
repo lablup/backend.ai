@@ -3008,7 +3008,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
 
     # TODO: Implement Change ownership using DB transaction
     log.info(
-        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(emial:{}, ak:{}, vfid:{}, uid:{})",
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
         request["user"]["email"],
         access_key,
         vfolder_id,
