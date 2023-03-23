@@ -633,4 +633,4 @@ class VFolder(BaseFunction):
             }
         )
         async with rqst.fetch() as resp:
-            return await resp.text()
+            return await resp.json()

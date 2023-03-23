@@ -3070,7 +3070,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
 
     await execute_with_retry(_update)
 
-    return web.Response(status=200)
+    return web.json_response({}, status=200)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
