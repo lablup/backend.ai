@@ -97,7 +97,7 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
-from ai.backend.manager.defs import REDIS_EVENT_STREAM_DB
+from ai.backend.manager.defs import PluginDatabaseID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -1675,7 +1675,7 @@ async def invoke_session_callback(
     async def _dispatch() -> None:
         hook_result = await root_ctx.hook_plugin_ctx.dispatch(
             "PUBLISH_EVENT",
-            (event, etcd_redis_config, REDIS_EVENT_STREAM_DB, stream_key, token),
+            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
         )
         if hook_result.status != HookResults.PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
