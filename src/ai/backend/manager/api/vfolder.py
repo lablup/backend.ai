@@ -75,6 +75,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
+from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -3044,8 +3045,6 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
 
     async def _update() -> None:
-        from ..models.utils import execute_with_retry
-
         async with root_ctx.db.begin() as conn:
             # TODO: we need to implement migration from project to other project
             #       for now we only support migration btw user folder only
@@ -3054,13 +3053,13 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                 sa.update(vfolders)
                 .values(user=user_uuid)
                 .where(
-                    vfolders.c.id
-                    == vfolder_id & vfolders.c.ownership_type
-                    == VFolderOwnershipType.USER
+                    (vfolders.c.id == vfolder_id)
+                    & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
                 )
             )
             await conn.execute(query)
-        await execute_with_retry(_update)
+
+    await execute_with_retry(_update)
 
     return web.Response(status=200)
 
