@@ -17,6 +17,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NamedTuple,
     Optional,
     Sequence,
     Set,
@@ -49,7 +50,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
@@ -75,6 +76,11 @@ class IdleCheckerError(TaskGroupError):
     """
     An exception that is a collection of multiple idle checkers.
     """
+
+
+class UtilizationExtraInfo(NamedTuple):
+    avg_util: float
+    threshold: float
 
 
 class AppStreamingStatus(enum.Enum):
@@ -618,14 +624,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
         return msgpack.unpackb(data) if data is not None else None
 
-    async def report_expire_time(self, session_id: SessionId, interval: float) -> None:
+    async def delete_expire_time_report(self, session_id: SessionId) -> None:
         await redis_helper.execute(
             self._redis_live,
-            lambda r: r.set(
-                self.get_report_key(session_id),
-                msgpack.packb(interval),
-                ex=int(interval) * 2,
-            ),
+            lambda r: r.delete(self.get_report_key(session_id)),
         )
 
     def get_time_window(self, policy: Row) -> float:
@@ -716,7 +718,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             kernel_ids = [kernel["id"]]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
-            await self.report_expire_time(session_id, interval)
+            await self.delete_expire_time_report(session_id)
             return True
 
         # Update utilization time-series data.
@@ -749,7 +751,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             self._redis_live,
             lambda r: r.set(
                 util_last_collected_key,
-                f"{t:.06f}",
+                f"{util_now:.06f}",
                 ex=max(86400, int(self.time_window.total_seconds() * 2)),
             ),
         )
@@ -764,11 +766,18 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # util_avg_thresholds's key is resource name
         # and value is `(avg_util, threshold)`
-        util_avg_thresholds: Mapping[str, tuple[float, float]] = {
-            k: (float(avg_utils[k]), float(threshold))
+        util_avg_thresholds: dict[str, UtilizationExtraInfo] = {
+            k: UtilizationExtraInfo(float(avg_utils[k]), float(threshold))
             for k, threshold in self.resource_thresholds.items()
             if (threshold is not None) and (k not in unavailable_resources)
         }
+        for k in util_avg_thresholds:
+            if k in ("mem", "cuda_mem"):
+                avg_mem, mem_threshold = util_avg_thresholds[k]
+                util_avg_thresholds[k] = UtilizationExtraInfo(
+                    BinarySize(int(avg_mem)),
+                    BinarySize(int(mem_threshold)),
+                )
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
@@ -779,7 +788,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
         if not_enough_data:
-            await self.report_expire_time(session_id, interval)
+            await self.delete_expire_time_report(session_id)
             return True
 
         # Check over-utilized (not to be collected) resources.
@@ -801,14 +810,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 self.thresholds_check_operator,
             )
         else:
-            await redis_helper.execute(
-                redis_obj,
-                lambda r: r.set(
-                    self.get_report_key(session_id),
-                    msgpack.packb(interval),
-                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-                ),
-            )
+            await self.delete_expire_time_report(session_id)
         return check_result
 
     async def get_current_utilization(
