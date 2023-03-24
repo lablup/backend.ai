@@ -139,6 +139,8 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+     # 23.03 and later
+       + exposed_volume_info: "percentage"
        ...
      ...
    ...
@@ -269,6 +271,11 @@ manager_local_config_iv = (
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
+            ).allow_extra("*"),
+            t.Key("pipeline"): t.Dict(
+                {
+                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
+                },
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
@@ -408,6 +415,7 @@ volume_config_iv = t.Dict(
                 }
             ),
         ),
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 
