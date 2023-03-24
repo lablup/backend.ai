@@ -195,8 +195,9 @@ def main(
 
     if cli_ctx.invoked_subcommand is None:
         local_config["storage-proxy"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
         log_sockpath = Path(
-            f"/tmp/backend.ai/ipc/storage-proxy-logger-{os.getpid()}.sock",
+            ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
