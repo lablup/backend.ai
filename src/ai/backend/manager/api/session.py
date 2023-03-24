@@ -83,17 +83,20 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.plugin.hook import HookResults
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    EtcdRedisConfig,
     KernelEnqueueingConfig,
     KernelId,
     SessionTypes,
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
+from ai.backend.manager.defs import PluginDatabaseID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -134,6 +137,7 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
+    RejectedByHook,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1643,27 +1647,39 @@ async def invoke_session_callback(
     | SessionSuccessEvent
     | SessionFailureEvent,
 ) -> None:
-    app_ctx: PrivateContext = app["session.context"]
+    log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     root_ctx: RootContext = app["_root.context"]
-    data = {
-        "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
     try:
+        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess
+                event.session_id, db_session=db_sess, allow_stale=allow_stale
             )
     except SessionNotFound:
         return
     url = session.callback_url
     if url is None:
         return
-    app_ctx.webhook_ptask_group.create_task(
-        _make_session_callback(data, url),
-    )
+    if (addr := root_ctx.local_config.get("pipeline", {}).get("event-queue")) is None:
+        return
+    etcd_redis_config: EtcdRedisConfig = {
+        "addr": addr,
+        "sentinel": None,
+        "service_name": None,
+        "password": None,
+    }
+    stream_key = "events"
+    token = url.query.get("token")
+
+    async def _dispatch() -> None:
+        hook_result = await root_ctx.hook_plugin_ctx.dispatch(
+            "PUBLISH_EVENT",
+            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
+        )
+        if hook_result.status != HookResults.PASSED:
+            raise RejectedByHook.from_hook_result(hook_result)
+
+    await execute_with_retry(_dispatch)
 
 
 async def handle_batch_result(
@@ -1680,7 +1696,12 @@ async def handle_batch_result(
     elif isinstance(event, SessionFailureEvent):
         await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
     async with root_ctx.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+        try:
+            session = await SessionRow.get_session_with_kernels(
+                event.session_id, db_session=db_sess
+            )
+        except SessionNotFound:
+            return
     await root_ctx.registry.destroy_session(
         session,
         reason=KernelLifecycleEventReason.TASK_FINISHED,
