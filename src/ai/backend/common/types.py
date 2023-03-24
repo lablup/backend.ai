@@ -779,6 +779,9 @@ class VFolderID:
     quota_scope_id: str
     folder_id: uuid.UUID
 
+    def __str__(self) -> str:
+        return f"{self.quota_scope_id}/{self.folder_id.hex}"
+
 
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):

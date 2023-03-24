@@ -470,7 +470,15 @@ class UUID(t.Trafaret):
 
 class VFolderID(t.Trafaret):
     def check_and_return(self, value: Any) -> _VFolderID:
-        converted = t.Tuple(t.String, UUID).check(value)
+        tuple_t = t.Tuple(t.Regexp(r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"), UUID())
+        match value:
+            case str():
+                pieces = value.partition("/")
+                converted = tuple_t.check((pieces[0], pieces[2]))
+            case tuple():
+                converted = tuple_t.check(value)
+            case _:
+                self._failure("cannot convert value to VFolderID", value=value)
         return _VFolderID(
             quota_scope_id=converted[0],
             folder_id=converted[1],
