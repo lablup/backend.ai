@@ -4,13 +4,26 @@ import enum
 from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Any, Final, Mapping, Optional
-from uuid import UUID
 
 import attrs
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, VFolderID
+
+__all__ = (
+    "Sentinel",
+    "SENTINEL",
+    "FSPerfMetric",
+    "FSUsage",
+    "VolumeInfo",
+    "VFolderCreationOptions",
+    "VFolderID",
+    "VFolderUsage",
+    "Stat",
+    "DirEntry",
+    "DirEntryType",
+)
 
 
 class Sentinel(enum.Enum):
@@ -18,12 +31,6 @@ class Sentinel(enum.Enum):
 
 
 SENTINEL: Final = Sentinel.token
-
-
-@attrs.define(slots=True, frozen=True)
-class VFolderID:
-    quota_scope_id: str
-    folder_id: UUID
 
 
 @attrs.define(slots=True, frozen=True)
