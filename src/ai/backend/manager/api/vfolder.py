@@ -2995,7 +2995,7 @@ async def storage_task_exception_handler(
     t.Dict(
         {
             t.Key("vfolder"): tx.UUID,
-            t.Key("user"): tx.UUID,
+            t.Key("user_email"): t.String,
         }
     ),
 )
@@ -3004,26 +3004,17 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     Change the ownership of vfolder
     For now, we only provide changing the ownership of user-folder
     """
-    access_key = request["keypair"]["access_key"]
     vfolder_id = params["vfolder"]
-    user_uuid = params["user"]
+    user_email = params["user_email"]
     root_ctx: RootContext = request.app["_root.context"]
 
-    # TODO: Implement Change ownership using DB transaction
-    log.info(
-        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
-        request["user"]["email"],
-        access_key,
-        vfolder_id,
-        user_uuid,
-    )
     allowed_hosts_by_user = VFolderHostPermissionMap()
     async with root_ctx.db.begin_readonly() as conn:
-        j = sa.join(users, keypairs, users.c.uuid == keypairs.c.user)
+        j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
         query = (
-            sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
+            sa.select([users.c.uuid, users.c.domain_name, keypairs.c.resource_policy])
             .select_from(j)
-            .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.ACTIVE))
+            .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
         )
         try:
             result = await conn.execute(query)
@@ -3043,8 +3034,15 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             conn=conn,
             resource_policy=resource_policy,
             domain_name=user_info.domain_name,
-            user_uuid=user_uuid,
+            user_uuid=user_info.uuid,
         )
+    log.info(
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        vfolder_id,
+        user_info.uuid,
+    )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
@@ -3060,7 +3058,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             #
             query = (
                 sa.update(vfolders)
-                .values(user=user_uuid)
+                .values(user=user_info.uuid)
                 .where(
                     (vfolders.c.id == vfolder_id)
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
@@ -3074,14 +3072,14 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         async with root_ctx.db.begin() as conn:
             # delete vfolder_invitation if the new owner user has already been shared with the vfolder
             query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == user_info.email)
+                (vfolder_invitations.c.invitee == user_email)
                 & (vfolder_invitations.c.vfolder == vfolder_id)
             )
             await conn.execute(query)
             # delete vfolder_permission if the new owner user has already been shared with the vfolder
             query = sa.delete(vfolder_permissions).where(
                 (vfolder_permissions.c.vfolder == vfolder_id)
-                & (vfolder_permissions.c.user == user_uuid)
+                & (vfolder_permissions.c.user == user_info.uuid)
             )
             await conn.execute(query)
 
