@@ -272,7 +272,8 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
             ).allow_extra("*"),
-            t.Key("pipeline"): t.Dict(
+            t.Key("pipeline", default=None): t.Null
+            | t.Dict(
                 {
                     t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
                 },

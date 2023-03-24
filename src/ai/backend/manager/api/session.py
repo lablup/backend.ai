@@ -1661,7 +1661,7 @@ async def invoke_session_callback(
     url = session.callback_url
     if url is None:
         return
-    if (addr := root_ctx.local_config["pipeline"]["event-queue"]) is None:
+    if (addr := root_ctx.local_config.get("pipeline", {}).get("event-queue")) is None:
         return
     etcd_redis_config: EtcdRedisConfig = {
         "addr": addr,
