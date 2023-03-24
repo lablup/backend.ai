@@ -41,7 +41,7 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50200): t.ToInt[1:65535],
+                    t.Key("aiomonitor-port", default=48200): t.ToInt[1:65535],
                     t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
@@ -51,6 +51,7 @@ agent_local_config_iv = (
                     t.Key("abuse-report-path", default=None): t.Null
                     | tx.Path(type="dir", allow_nonexisting=True),
                     t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
+                    t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
                 }
             ).allow_extra("*"),
             t.Key("container"): t.Dict(

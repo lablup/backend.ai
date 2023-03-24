@@ -79,7 +79,7 @@ logging_config_iv = t.Dict(
                 t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
                 t.Key("ssl-enabled", default=True): t.Bool,
                 t.Key("ssl-verify", default=True): t.Bool,
-                # NOTE: logstash does not have format optoin.
+                # NOTE: logstash does not have format option.
             }
         ).allow_extra("*"),
     }
@@ -363,7 +363,6 @@ def log_worker(
 
 
 class RelayHandler(logging.Handler):
-
     _sock: zmq.Socket | None
 
     def __init__(self, *, endpoint: str) -> None:
@@ -517,7 +516,6 @@ class LocalLogger(AbstractLogger):
 
 
 class Logger(AbstractLogger):
-
     is_master: bool
     log_endpoint: str
     logging_config: Mapping[str, Any]

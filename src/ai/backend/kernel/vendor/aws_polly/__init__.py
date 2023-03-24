@@ -13,7 +13,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "vendor.aws_polly-kernel"
 
     def __init__(self, *args, **kwargs):

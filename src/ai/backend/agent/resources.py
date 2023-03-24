@@ -29,6 +29,7 @@ import attrs
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -47,7 +48,7 @@ from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
 from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
-from .stats import ContainerMeasurement, NodeMeasurement, StatContext
+from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import Container as SessionContainer
 from .types import MountInfo
 
@@ -56,7 +57,7 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.resources"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
@@ -254,10 +255,17 @@ class AbstractComputeDevice:
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
-
     key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]
+
+    @abstractmethod
+    def get_metadata(self) -> AcceleratorMetadata:
+        """
+        Return human-readable information of the accelerator managed
+        by the plugin.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
@@ -309,6 +317,15 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     ) -> Sequence[ContainerMeasurement]:
         """
         Return the container-level statistic metrics.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        """
+        Return the process statistic metrics in container.
         """
         raise NotImplementedError
 

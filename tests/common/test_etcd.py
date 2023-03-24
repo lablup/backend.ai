@@ -8,7 +8,6 @@ from ai.backend.common.etcd import ConfigScopes
 
 @pytest.mark.asyncio
 async def test_basic_crud(etcd):
-
     await etcd.put("wow", "abc")
 
     v = await etcd.get("wow")
@@ -171,7 +170,6 @@ async def test_scope_dict(etcd):
 
 @pytest.mark.asyncio
 async def test_multi(etcd):
-
     v = await etcd.get("foo")
     assert v is None
     v = await etcd.get("bar")
@@ -192,7 +190,6 @@ async def test_multi(etcd):
 
 @pytest.mark.asyncio
 async def test_watch(etcd):
-
     records = []
     records_prefix = []
     r_ready = asyncio.Event()
@@ -254,7 +251,6 @@ async def test_watch(etcd):
 
 @pytest.mark.asyncio
 async def test_watch_once(etcd):
-
     records = []
     records_prefix = []
     r_ready = asyncio.Event()

@@ -65,11 +65,69 @@ def info(ctx: CLIContext, email: str) -> None:
     default=None,
     help="Filter users in a specific state (active, inactive, deleted, before-verification).",
 )
-@click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
-@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
-@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option(
+    "-g",
+    "--group",
+    type=str,
+    default=None,
+    help="""
+    Filter by group ID.
+
+    \b
+    EXAMPLE
+        --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
+    """,
+)
+@click.option(
+    "--filter",
+    "filter_",
+    default=None,
+    help="""
+    Set the query filter expression.
+
+    \b
+    COLUMNS
+        uuid, username, role, email, full_name, need_password_change,
+        status, status_info, created_at, modified_at, domain_name, allowed_client_ip
+
+    \b
+    OPERATORS
+        Binary Operators: ==, !=, <, <=, >, >=, is, isnot, like, ilike(case-insensitive), in, contains
+        Condition Operators: &, |
+        Special Symbol: % (wildcard for like and ilike operators)
+
+    \b
+    EXAMPLE QUERIES
+        --filter 'status == "ACTIVE" & role in ["ADMIN", "SUPERADMIN"]'
+        --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
+        --filter 'email ilike "%@example.com"'
+    """,
+)
+@click.option(
+    "--order",
+    default=None,
+    help="""
+    Set the query ordering expression.
+
+    \b
+    COLUMNS
+        uuid, username, role, email, full_name, need_password_change,
+        status, status_info, created_at, modified_at, domain_name
+
+    \b
+    OPTIONS
+        ascending order (default): (+)column_name
+        descending order: -column_name
+
+    \b
+    EXAMPLE
+        --order 'uuid'
+        --order '+uuid'
+        --order '-created_at'
+    """,
+)
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
-@click.option("--limit", default=None, help="The page size for pagination.")
+@click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     """
     List users.
@@ -249,6 +307,7 @@ def update(
     """
     Update an existing user.
 
+    \b
     EMAIL: Email of user to update.
     """
     with Session() as session:
@@ -294,6 +353,7 @@ def delete(ctx: CLIContext, email):
     """
     Inactivate an existing user.
 
+    \b
     EMAIL: Email of user to inactivate.
     """
     with Session() as session:
@@ -336,6 +396,7 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
     """
     Delete an existing user. This action cannot be undone.
 
+    \b
     NAME: Name of a domain to delete.
     """
     with Session() as session:

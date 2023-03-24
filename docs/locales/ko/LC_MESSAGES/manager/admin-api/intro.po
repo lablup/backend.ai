@@ -108,7 +108,7 @@ msgid ""
 "Currently the API gateway does not support schema discovery which is often "
 "used by API development tools such as Insomnia and GraphiQL."
 msgstr ""
-"현재 API 게이트웨이는 Insomina와 GraphiQL과 같은 API 개발 도구에서 자주 사용"
+"현재 API 게이트웨이는 Insomnia와 GraphiQL과 같은 API 개발 도구에서 자주 사용"
 "되는 스키마 검색을 지원하지 않습니다."
 
 #: ../../manager/admin-api/intro.rst:65 0dbfd1909ca243c5bb1a9fd4ddd5432f

@@ -161,7 +161,7 @@ msgstr "400 Bad Request"
 
 #: ../../manager/user-api/exec-batch.rst:58 64739824b04f48d28363d0aa5add7b3e
 msgid ""
-"Returned when one of the uploaded file exeeds the size limit or there are"
+"Returned when one of the uploaded file exceeds the size limit or there are"
 " too many files."
 msgstr "업로드된 파일 중 하나가 크기 제한을 초과하거나 파일이 너무 많을 때 반환됩니다."
 

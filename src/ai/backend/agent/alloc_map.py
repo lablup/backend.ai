@@ -37,7 +37,7 @@ from .exception import (
 if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 log_alloc_map: bool = False
 T = TypeVar("T")
 
@@ -72,7 +72,6 @@ def round_down(from_dec: Decimal, with_dec: Decimal):
 
 
 class AbstractAllocMap(metaclass=ABCMeta):
-
     device_slots: Mapping[DeviceId, DeviceSlotInfo]
     device_mask: FrozenSet[DeviceId]
     exclusive_slot_types: Iterable[SlotName]
@@ -554,7 +553,6 @@ class FractionAllocMap(AbstractAllocMap):
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-
         # higher value means more even with 0 being the highest value
         def measure_evenness(
             alloc_map: Mapping[DeviceId, Decimal],

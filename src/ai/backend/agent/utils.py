@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import (
     Any,
     AsyncContextManager,
-    Iterable,
     List,
     Mapping,
     MutableMapping,
@@ -26,18 +25,18 @@ from typing import (
 from uuid import UUID
 
 import aiodocker
-import netifaces
 import trafaret as t
 from aiodocker.docker import DockerContainer
 from typing_extensions import Final
 
 from ai.backend.common import identity
+from ai.backend.common.cgroup import get_cgroup_of_pid, get_container_id_of_cgroup
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.utils"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
@@ -297,42 +296,21 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 await docker.close()
 
     try:
-        for p in Path("/sys/fs/cgroup/pids/docker").iterdir():
-            if not p.is_dir():
-                continue
-            tasks_path = p / "tasks"
-            cgtasks = [*map(int, tasks_path.read_text().splitlines())]
-            if host_pid not in cgtasks:
-                continue
-            if p.name == container_id:
-                proc_path = Path(f"/proc/{host_pid}/status")
-                proc_status = {
-                    k: v
-                    for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
-                }
-                nspids = [
-                    *map(lambda pid: ContainerPID(PID(int(pid))), proc_status["NSpid"].split())
-                ]
-                return nspids[1]
-            return InOtherContainerPID
-        return NotContainerPID
-    except (ValueError, KeyError, IOError):
+        cgroup = get_cgroup_of_pid("pids", host_pid)
+        cgroup_container_id = get_container_id_of_cgroup(cgroup)
+        if cgroup_container_id is None:
+            return NotContainerPID
+        if cgroup_container_id == container_id:
+            for line in Path(f"/proc/{host_pid}/status").read_text().splitlines():
+                key, value = line.split(":\t", 1)
+                if key == "NSpid":
+                    pid = value.split()[1]
+                    return ContainerPID(PID(int(pid)))
+        return InOtherContainerPID
+    except OSError:
         return NotContainerPID
 
 
 async def container_pid_to_host_pid(container_id: str, container_pid: ContainerPID) -> HostPID:
     # TODO: implement
     return NotHostPID
-
-
-def fetch_local_ipaddrs(cidr: IPNetwork) -> Iterable[IPAddress]:
-    ifnames = netifaces.interfaces()
-    proto = netifaces.AF_INET if cidr.version == 4 else netifaces.AF_INET6
-    for ifname in ifnames:
-        addrs = netifaces.ifaddresses(ifname).get(proto, None)
-        if addrs is None:
-            continue
-        for entry in addrs:
-            addr = ipaddress.ip_address(entry["addr"])
-            if addr in cidr:
-                yield addr

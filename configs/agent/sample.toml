@@ -58,7 +58,7 @@ scaling-group = "default"
 metadata-server-port = 40128
 
 # The port number for aiomonitor.
-# aiomonitor-port = 50200
+# aiomonitor-port = 48200
 
 # Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
 # open-source CUDA plugins in the mono-repo source installation.
@@ -83,6 +83,12 @@ metadata-server-port = 40128
 # | Not set           | true                               | No abuse detection
 # | Set               | false                              | Abuse detection only
 # | Set               | true                               | Abuse detection & auto-termination
+
+# Limit the maximum concurrency of kernel creation tasks per each `create_kernels()` RPC call (1 to 32, default 4)
+# If this value is set too high, the container runtime (Docker) may fail with "context deadline exceeded" under
+# certain conditions such as spawning a large number of containers for a multi-node cluster session.
+# kernel-creation-concurrency = 4
+
 
 [container]
 # The port range to expose public service ports.

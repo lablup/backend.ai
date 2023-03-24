@@ -80,28 +80,48 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
         pass
 
 
-def promote_path(path_env: str, path_to_promote: Union[Path, str]) -> str:
+def glob_path(base: Path | str, pattern: str) -> Path | None:
+    paths = [*Path(base).glob(pattern)]
+    if paths:
+        return paths[0]
+    return None
+
+
+def promote_path(path_env: str, path_to_promote: Path | str | None) -> str:
+    if not path_to_promote:
+        return path_env
     paths = path_env.split(":")
-    print(f"promote_path: {path_to_promote=} {path_env=}", file=sys.stderr)
-    path_to_promote = str(path_to_promote)
+    path_to_promote = os.fsdecode(path_to_promote)
     result_paths = [p for p in paths if path_to_promote != p]
     result_paths.insert(0, path_to_promote)
     return ":".join(result_paths)
 
 
 class BaseRunner(metaclass=ABCMeta):
-
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
     default_runtime_path: ClassVar[Optional[str]] = None
-    default_child_env: ClassVar[MutableMapping[str, str]] = {
+    default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
-        "SHELL": "/bin/sh",
         "HOME": "/home/work",
+        "TERM": "xterm",
         "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
         "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
+        "SSH_AUTH_SOCK": os.environ.get("SSH_AUTH_SOCK", ""),
+        "SSH_AGENT_PID": os.environ.get("SSH_AGENT_PID", ""),
     }
+    default_child_env_path = ":".join(
+        [
+            "/usr/local/sbin",
+            "/usr/local/bin",
+            "/usr/sbin",
+            "/usr/bin",
+            "/sbin",
+            "/bin",
+        ]
+    )
+    default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
     kernel_mgr: Optional[AsyncKernelManager] = None
     kernel_client: Optional[AsyncKernelClient] = None
@@ -123,12 +143,12 @@ class BaseRunner(metaclass=ABCMeta):
     def __init__(self, runtime_path: Path) -> None:
         self.subproc = None
         self.runtime_path = runtime_path
-
-        default_child_env_path = self.default_child_env.pop("PATH", None)
         self.child_env = {**os.environ, **self.default_child_env}
-        if default_child_env_path is not None and "PATH" not in self.child_env:
-            # set the default PATH env-var only when it's missing from the image
-            self.child_env["PATH"] = default_child_env_path
+        # set some defaults only when they are missing from the image
+        if "PATH" not in self.child_env:
+            self.child_env["PATH"] = self.default_child_env_path
+        if "SHELL" not in self.child_env:
+            self.child_env["SHELL"] = self.default_child_env_shell
         config_dir = Path("/home/config")
         try:
             evdata = (config_dir / "environ.txt").read_text()
@@ -141,9 +161,13 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception:
             log.exception("Reading /home/config/environ.txt failed!")
 
-        # Add ~/.local/bin to the default PATH
-        self.child_env["PATH"] += os.pathsep + "~/.local/bin"
-        os.environ["PATH"] += os.pathsep + "~/.local/bin"
+        path_env = self.child_env["PATH"]
+        if Path("/usr/local/cuda/bin").is_dir():
+            path_env = promote_path(path_env, "/usr/local/cuda/bin")
+        if Path("/usr/local/nvidia/bin").is_dir():
+            path_env = promote_path(path_env, "/usr/local/nvidia/bin")
+        path_env = promote_path(path_env, "/home/work/.local/bin")
+        self.child_env["PATH"] = path_env
 
         self.started_at: float = time.monotonic()
         self.services_running = {}
@@ -171,7 +195,6 @@ class BaseRunner(metaclass=ABCMeta):
 
         intrinsic_host_ports_mapping_path = Path("/home/config/intrinsic-ports.json")
         if intrinsic_host_ports_mapping_path.is_file():
-
             intrinsic_host_ports_mapping = json.loads(
                 await asyncio.get_running_loop().run_in_executor(
                     None,
@@ -279,7 +302,7 @@ class BaseRunner(metaclass=ABCMeta):
             self.kernel_mgr = None
 
     async def _shutdown_jupyter_kernel(self):
-        if self.kernel_mgr and self.kernel_mgr.is_alive():
+        if self.kernel_mgr and await self.kernel_mgr.is_alive():
             assert self.kernel_client is not None
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
             await self.kernel_mgr.shutdown_kernel()
