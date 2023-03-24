@@ -3070,6 +3070,23 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
 
     await execute_with_retry(_update)
 
+    async def _delete_vfolder_related_rows() -> None:
+        async with root_ctx.db.begin() as conn:
+            # delete vfolder_invitation if the new owner user has already been shared with the vfolder
+            query = sa.delete(vfolder_invitations).where(
+                (vfolder_invitations.c.invitee == user_info.email)
+                & (vfolder_invitations.c.vfolder == vfolder_id)
+            )
+            await conn.execute(query)
+            # delete vfolder_permission if the new owner user has already been shared with the vfolder
+            query = sa.delete(vfolder_permissions).where(
+                (vfolder_permissions.c.vfolder == vfolder_id)
+                & (vfolder_permissions.c.user == user_uuid)
+            )
+            await conn.execute(query)
+
+    await execute_with_retry(_delete_vfolder_related_rows)
+
     return web.json_response({}, status=200)
 
 
