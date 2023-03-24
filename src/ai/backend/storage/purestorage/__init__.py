@@ -4,14 +4,13 @@ import asyncio
 import json
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, FrozenSet, Sequence
-from uuid import UUID
 
 from aiotools import aclosing
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER
-from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderUsage
+from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderID, VFolderUsage
 from ..utils import fstime2datetime
 from ..vfs import BaseVolume
 from .purity import PurityClient
@@ -96,10 +95,10 @@ class FlashBladeVolume(BaseVolume):
         if proc.returncode != 0:
             raise RuntimeError(f'"pcp" command failed: {stderr.decode()}')
 
-    async def get_quota(self, vfid: UUID) -> BinarySize:
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
         raise NotImplementedError
 
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
         raise NotImplementedError
 
     async def get_performance_metric(self) -> FSPerfMetric:
@@ -123,7 +122,7 @@ class FlashBladeVolume(BaseVolume):
 
     async def get_usage(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
@@ -158,7 +157,7 @@ class FlashBladeVolume(BaseVolume):
             await proc.wait()
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
 
-    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
         proc = await asyncio.create_subprocess_exec(
             b"pdu",
@@ -175,7 +174,7 @@ class FlashBladeVolume(BaseVolume):
 
     # ------ vfolder internal operations -------
 
-    def scandir(self, vfid: UUID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
         raw_target_path = bytes(target_path)
 
@@ -223,7 +222,7 @@ class FlashBladeVolume(BaseVolume):
 
     async def copy_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -243,7 +242,7 @@ class FlashBladeVolume(BaseVolume):
 
     async def delete_files(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpaths: Sequence[PurePosixPath],
         recursive: bool = False,
     ) -> None:

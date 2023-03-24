@@ -66,6 +66,7 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "VFolderID",
     "VFolderMount",
     "KernelCreationConfig",
     "KernelCreationResult",
@@ -771,6 +772,12 @@ class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
     def as_trafaret(cls) -> t.Trafaret:
         raise NotImplementedError
+
+
+@attrs.define(slots=True, frozen=True)
+class VFolderID:
+    quota_scope_id: str
+    folder_id: uuid.UUID
 
 
 @attrs.define(slots=True)

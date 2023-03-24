@@ -4,6 +4,7 @@ import enum
 from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Any, Final, Mapping, Optional
+from uuid import UUID
 
 import attrs
 import trafaret as t
@@ -17,6 +18,12 @@ class Sentinel(enum.Enum):
 
 
 SENTINEL: Final = Sentinel.token
+
+
+@attrs.define(slots=True, frozen=True)
+class VFolderID:
+    quota_scope_id: str
+    folder_id: UUID
 
 
 @attrs.define(slots=True, frozen=True)

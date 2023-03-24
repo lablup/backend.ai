@@ -2,13 +2,12 @@ import asyncio
 import os
 import shutil
 from typing import Dict, FrozenSet, List
-from uuid import UUID
 
 from ai.backend.common.types import BinarySize
 from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..exception import ExecutionError
-from ..types import FSUsage, Optional, VFolderCreationOptions
+from ..types import FSUsage, Optional, VFolderCreationOptions, VFolderID
 from ..vfs import BaseVolume
 
 
@@ -48,7 +47,7 @@ class CephFSVolume(BaseVolume):
     # ----- volume operations -----
     async def create_vfolder(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         options: Optional[VFolderCreationOptions] = None,
         *,
         exist_ok: bool = False

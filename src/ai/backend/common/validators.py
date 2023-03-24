@@ -45,6 +45,7 @@ from trafaret.lib import _empty
 
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
+from .types import VFolderID as _VFolderID
 
 __all__ = (
     "AliasedKey",
@@ -63,6 +64,7 @@ __all__ = (
     "UserID",
     "GroupID",
     "UUID",
+    "VFolderID",
     "TimeZone",
     "TimeDuration",
     "Slug",
@@ -464,6 +466,15 @@ class UUID(t.Trafaret):
                 self._failure("value must be string or bytes", value=value)
         except ValueError:
             self._failure("cannot convert value to UUID", value=value)
+
+
+class VFolderID(t.Trafaret):
+    def check_and_return(self, value: Any) -> _VFolderID:
+        converted = t.Tuple(t.String, UUID).check(value)
+        return _VFolderID(
+            quota_scope_id=converted[0],
+            folder_id=converted[1],
+        )
 
 
 class TimeZone(t.Trafaret):

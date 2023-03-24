@@ -10,7 +10,6 @@ import time
 import warnings
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, FrozenSet, Sequence, Union
-from uuid import UUID
 
 import janus
 
@@ -28,6 +27,7 @@ from ..types import (
     Sentinel,
     Stat,
     VFolderCreationOptions,
+    VFolderID,
     VFolderUsage,
 )
 from ..utils import fstime2datetime
@@ -62,7 +62,7 @@ class BaseVolume(AbstractVolume):
 
     async def create_vfolder(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         options: VFolderCreationOptions = None,
         *,
         exist_ok: bool = False,
@@ -74,7 +74,7 @@ class BaseVolume(AbstractVolume):
             lambda: vfpath.mkdir(0o755, parents=True, exist_ok=exist_ok),
         )
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()
 
@@ -99,9 +99,9 @@ class BaseVolume(AbstractVolume):
 
     async def clone_vfolder(
         self,
-        src_vfid: UUID,
+        src_vfid: VFolderID,
         dst_volume: AbstractVolume,
-        dst_vfid: UUID,
+        dst_vfid: VFolderID,
         options: VFolderCreationOptions = None,
     ) -> None:
         # check if there is enough space in the destination
@@ -139,17 +139,17 @@ class BaseVolume(AbstractVolume):
             ),
         )
 
-    async def get_vfolder_mount(self, vfid: UUID, subpath: str) -> Path:
+    async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         self.sanitize_vfpath(vfid, PurePosixPath(subpath))
         return self.mangle_vfpath(vfid).resolve()
 
-    async def put_metadata(self, vfid: UUID, payload: bytes) -> None:
+    async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, metadata_path.write_bytes, payload)
 
-    async def get_metadata(self, vfid: UUID) -> bytes:
+    async def get_metadata(self, vfid: VFolderID) -> bytes:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
         loop = asyncio.get_running_loop()
@@ -163,10 +163,10 @@ class BaseVolume(AbstractVolume):
             return b""
         # Other IO errors should be bubbled up.
 
-    async def get_quota(self, vfid: UUID) -> BinarySize:
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
         raise NotImplementedError
 
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
         raise NotImplementedError
 
     async def get_performance_metric(self) -> FSPerfMetric:
@@ -182,7 +182,7 @@ class BaseVolume(AbstractVolume):
 
     async def get_usage(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
@@ -217,7 +217,7 @@ class BaseVolume(AbstractVolume):
             total_count = -1
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
 
-    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
         info = await run(["du", "-hs", vfpath])
         used_bytes, _ = info.split()
@@ -225,7 +225,7 @@ class BaseVolume(AbstractVolume):
 
     # ------ vfolder internal operations -------
 
-    def scandir(self, vfid: UUID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
         q: janus.Queue[Union[Sentinel, DirEntry]] = janus.Queue()
         loop = asyncio.get_running_loop()
@@ -287,7 +287,7 @@ class BaseVolume(AbstractVolume):
 
     async def mkdir(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         parents: bool = False,
@@ -302,7 +302,7 @@ class BaseVolume(AbstractVolume):
 
     async def rmdir(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         recursive: bool = False,
@@ -313,7 +313,7 @@ class BaseVolume(AbstractVolume):
 
     async def move_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -327,7 +327,7 @@ class BaseVolume(AbstractVolume):
 
     async def move_tree(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -351,7 +351,7 @@ class BaseVolume(AbstractVolume):
 
     async def copy_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -369,7 +369,7 @@ class BaseVolume(AbstractVolume):
             lambda: shutil.copyfile(str(src_path), str(dst_path)),
         )
 
-    async def prepare_upload(self, vfid: UUID) -> str:
+    async def prepare_upload(self, vfid: VFolderID) -> str:
         vfpath = self.mangle_vfpath(vfid)
         session_id = secrets.token_hex(16)
 
@@ -385,7 +385,7 @@ class BaseVolume(AbstractVolume):
 
     async def add_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         payload: AsyncIterator[bytes],
     ) -> None:
@@ -417,7 +417,7 @@ class BaseVolume(AbstractVolume):
 
     def read_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         chunk_size: int = 0,
@@ -470,7 +470,7 @@ class BaseVolume(AbstractVolume):
 
     async def delete_files(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpaths: Sequence[PurePosixPath],
         recursive: bool = False,
     ) -> None:

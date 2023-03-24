@@ -7,7 +7,6 @@ import os
 import time
 from pathlib import Path, PurePosixPath
 from typing import FrozenSet
-from uuid import UUID
 
 import aiofiles
 
@@ -15,7 +14,7 @@ from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractVolume
 from ..exception import ExecutionError, StorageProxyError, VFolderCreationError
-from ..types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
+from ..types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID, VFolderUsage
 from ..vfs import BaseVolume
 from .netappclient import NetAppClient
 from .quotamanager import QuotaManager
@@ -111,7 +110,7 @@ class NetAppVolume(BaseVolume):
             io_usec_write=metric["latency"]["write"],
         )
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
 
         # extract target_dir from vfpath
@@ -155,9 +154,9 @@ class NetAppVolume(BaseVolume):
 
     async def clone_vfolder(
         self,
-        src_vfid: UUID,
+        src_vfid: VFolderID,
         dst_volume: AbstractVolume,
-        dst_vfid: UUID,
+        dst_vfid: VFolderID,
         options: VFolderCreationOptions = None,
     ) -> None:
         # check if there is enough space in destination
@@ -267,15 +266,15 @@ class NetAppVolume(BaseVolume):
             raise ExecutionError("api error")
         return resp
 
-    async def get_quota(self, vfid: UUID) -> BinarySize:
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
         raise NotImplementedError
 
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
         raise NotImplementedError
 
     async def get_usage(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
@@ -389,6 +388,6 @@ class NetAppVolume(BaseVolume):
 
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
 
-    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         usage = await self.get_usage(vfid)
         return BinarySize(usage.used_bytes)

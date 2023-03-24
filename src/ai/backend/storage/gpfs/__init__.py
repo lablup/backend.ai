@@ -2,12 +2,11 @@ import json
 import logging
 from pathlib import Path, PurePath
 from typing import Any, FrozenSet, Mapping, Optional
-from uuid import UUID
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractVolume
-from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
+from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID
 from ai.backend.storage.vfs import BaseVolume
 
 from ..exception import VFolderCreationError
@@ -119,7 +118,7 @@ class GPFSVolume(BaseVolume):
 
     async def create_vfolder(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         options: Optional[VFolderCreationOptions] = None,
         *,
         exist_ok: bool = False,
@@ -140,9 +139,9 @@ class GPFSVolume(BaseVolume):
 
     async def clone_vfolder(
         self,
-        src_vfid: UUID,
+        src_vfid: VFolderID,
         dst_volume: AbstractVolume,
-        dst_vfid: UUID,
+        dst_vfid: VFolderID,
         options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         assert isinstance(dst_volume, GPFSVolume)
@@ -161,10 +160,10 @@ class GPFSVolume(BaseVolume):
             dst_volume.mangle_vfpath(dst_vfid),
         )
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
         await self.api_client.remove_fileset(self.fs, str(vfid))
 
-    async def get_quota(self, vfid: UUID) -> BinarySize:
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
         quotas = await self.api_client.list_fileset_quotas(self.fs, str(vfid))
         custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
         if len(custom_defined_quotas) == 0:
@@ -172,5 +171,5 @@ class GPFSVolume(BaseVolume):
         assert custom_defined_quotas[0].blockLimit is not None
         return BinarySize(custom_defined_quotas[0].blockLimit)
 
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
         await self.api_client.set_quota(self.fs, str(vfid), size_bytes)

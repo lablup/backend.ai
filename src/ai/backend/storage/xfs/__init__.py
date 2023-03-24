@@ -12,7 +12,7 @@ from ai.backend.common.types import BinarySize
 from ai.backend.storage.abc import CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER
 
 from ..exception import ExecutionError, VFolderCreationError
-from ..types import VFolderCreationOptions, VFolderUsage
+from ..types import VFolderCreationOptions, VFolderID, VFolderUsage
 from ..vfs import BaseVolume, run
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -55,7 +55,7 @@ class XfsProjectRegistry:
     async def add_project_entry(
         self,
         *,
-        vfid: UUID,
+        vfid: VFolderID,
         quota: int,
         project_id: int = None,
     ) -> None:
@@ -83,7 +83,7 @@ class XfsProjectRegistry:
                 _projid_content = Path(self.file_projid).read_text()
                 if _projid_content.strip() != "" and not _projid_content.endswith("\n"):
                     _projid_content += "\n"
-                _projid_content += f"{str(vfid)}:{project_id}\n"
+                _projid_content += f"{str(vfid.folder_id)}:{project_id}\n"
                 _tmp_projid.write(_projid_content.encode("ascii"))
                 temp_name_projid = _tmp_projid.name
             finally:
@@ -108,9 +108,9 @@ class XfsProjectRegistry:
         finally:
             await loop.run_in_executor(None, _delete_temp_files)
 
-    async def remove_project_entry(self, vfid: UUID) -> None:
-        await run(["sudo", "sed", "-i.bak", f"/{vfid.hex[4:]}/d", self.file_projects])
-        await run(["sudo", "sed", "-i.bak", f"/{vfid}/d", self.file_projid])
+    async def remove_project_entry(self, vfid: VFolderID) -> None:
+        await run(["sudo", "sed", "-i.bak", f"/{vfid.folder_id.hex[4:]}/d", self.file_projects])
+        await run(["sudo", "sed", "-i.bak", f"/{vfid.folder_id}/d", self.file_projid])
 
     def get_project_id(self) -> int:
         """
@@ -152,7 +152,7 @@ class XfsVolume(BaseVolume):
     # ----- volume opeartions -----
     async def create_vfolder(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         options: VFolderCreationOptions = None,
         *,
         exist_ok: bool = False,
@@ -185,7 +185,7 @@ class XfsVolume(BaseVolume):
             await self.delete_vfolder(vfid)
             raise VFolderCreationError("problem in setting vfolder quota")
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
         async with FileLock(LOCK_FILE):
             await self.registry.read_project_info()
             if vfid in self.registry.name_id_map.keys():
@@ -203,7 +203,7 @@ class XfsVolume(BaseVolume):
             await super().delete_vfolder(vfid)
             await self.registry.read_project_info()
 
-    async def get_quota(self, vfid: UUID) -> BinarySize:
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
         full_report = await run(
             ["sudo", "xfs_quota", "-x", "-c", "report -h", self.mount_path],
         )
@@ -218,7 +218,7 @@ class XfsVolume(BaseVolume):
             raise ExecutionError("vfid and project name does not match")
         return BinarySize.finite_from_str(quota)
 
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
         if vfid not in self.registry.name_id_map.keys():
             await run(
                 [
@@ -241,7 +241,7 @@ class XfsVolume(BaseVolume):
             ],
         )
 
-    async def get_usage(self, vfid: UUID, relpath: PurePosixPath = PurePosixPath(".")):
+    async def get_usage(self, vfid: VFolderID, relpath: PurePosixPath = PurePosixPath(".")):
         full_report = await run(
             ["sudo", "xfs_quota", "-x", "-c", "report -pbih", self.mount_path],
         )
@@ -259,6 +259,6 @@ class XfsVolume(BaseVolume):
             raise ExecutionError("vfid and project name does not match")
         return VFolderUsage(file_count=inode_count, used_bytes=used_bytes)
 
-    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         usage = await self.get_usage(vfid)
         return BinarySize(usage.used_bytes)

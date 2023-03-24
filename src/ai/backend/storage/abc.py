@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from pathlib import Path, PurePath, PurePosixPath
-from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Sequence
-from uuid import UUID
+from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
-from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
+from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID, VFolderUsage
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
@@ -25,8 +24,8 @@ class AbstractVolume(metaclass=ABCMeta):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
-        fsprefix: PurePath = None,
-        options: Mapping[str, Any] = None,
+        fsprefix: Optional[PurePath] = None,
+        options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
@@ -39,15 +38,16 @@ class AbstractVolume(metaclass=ABCMeta):
     async def shutdown(self) -> None:
         pass
 
-    def mangle_vfpath(self, vfid: UUID) -> Path:
-        prefix1 = vfid.hex[0:2]
-        prefix2 = vfid.hex[2:4]
-        rest = vfid.hex[4:]
-        return Path(self.mount_path, prefix1, prefix2, rest)
+    def mangle_vfpath(self, vfid: VFolderID) -> Path:
+        folder_id_hex = vfid.folder_id.hex
+        prefix1 = folder_id_hex[0:2]
+        prefix2 = folder_id_hex[2:4]
+        rest = folder_id_hex[4:]
+        return Path(self.mount_path, vfid.quota_scope_id, prefix1, prefix2, rest)
 
     def sanitize_vfpath(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> Path:
         vfpath = self.mangle_vfpath(vfid).resolve()
@@ -58,7 +58,7 @@ class AbstractVolume(metaclass=ABCMeta):
             raise InvalidSubpathError(vfid, relpath)
         return target_path
 
-    def strip_vfpath(self, vfid: UUID, target_path: Path) -> PurePosixPath:
+    def strip_vfpath(self, vfid: VFolderID, target_path: Path) -> PurePosixPath:
         vfpath = self.mangle_vfpath(vfid).resolve()
         return PurePosixPath(target_path.relative_to(vfpath))
 
@@ -75,7 +75,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def create_vfolder(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         options: VFolderCreationOptions = None,
         *,
         exist_ok: bool = False,
@@ -83,15 +83,15 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
         pass
 
     @abstractmethod
     async def clone_vfolder(
         self,
-        src_vfid: UUID,
+        src_vfid: VFolderID,
         dst_volume: AbstractVolume,
-        dst_vfid: UUID,
+        dst_vfid: VFolderID,
         options: VFolderCreationOptions = None,
     ) -> None:
         """
@@ -116,15 +116,15 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def get_vfolder_mount(self, vfid: UUID, subpath: str) -> Path:
+    async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         pass
 
     @abstractmethod
-    async def put_metadata(self, vfid: UUID, payload: bytes) -> None:
+    async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
         pass
 
     @abstractmethod
-    async def get_metadata(self, vfid: UUID) -> bytes:
+    async def get_metadata(self, vfid: VFolderID) -> bytes:
         pass
 
     @abstractmethod
@@ -132,11 +132,11 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def get_quota(self, vfid: UUID) -> BinarySize:
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
         pass
 
     @abstractmethod
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
         pass
 
     @abstractmethod
@@ -146,25 +146,25 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def get_usage(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         pass
 
     @abstractmethod
-    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         pass
 
     # ------ vfolder operations -------
 
     @abstractmethod
-    def scandir(self, vfid: UUID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
         pass
 
     @abstractmethod
     async def mkdir(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         parents: bool = False,
@@ -175,7 +175,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def rmdir(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         recursive: bool = False,
@@ -185,7 +185,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def move_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -194,7 +194,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def move_tree(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
@@ -203,14 +203,14 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def copy_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
         pass
 
     @abstractmethod
-    async def prepare_upload(self, vfid: UUID) -> str:
+    async def prepare_upload(self, vfid: VFolderID) -> str:
         """
         Prepare an upload session by creating a dedicated temporary directory.
         Returns a unique session identifier.
@@ -220,7 +220,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def add_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         payload: AsyncIterator[bytes],
     ) -> None:
@@ -229,7 +229,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     def read_file(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpath: PurePosixPath,
         *,
         chunk_size: int = 0,
@@ -239,7 +239,7 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def delete_files(
         self,
-        vfid: UUID,
+        vfid: VFolderID,
         relpaths: Sequence[PurePosixPath],
         recursive: bool = False,
     ) -> None:

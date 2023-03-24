@@ -8,7 +8,6 @@ from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path
 from typing import Awaitable, Callable, Iterator, List, cast
-from uuid import UUID
 
 import attr
 import jwt
@@ -22,7 +21,7 @@ from ai.backend.storage.exception import ExecutionError
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import InvalidSubpathError, VFolderNotFoundError
-from ..types import VFolderCreationOptions
+from ..types import VFolderCreationOptions, VFolderID
 from ..utils import check_params, log_manager_api_entry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -55,7 +54,7 @@ async def get_status(request: web.Request) -> web.Response:
 @ctxmgr
 def handle_fs_errors(
     volume: AbstractVolume,
-    vfid: UUID,
+    vfid: VFolderID,
 ) -> Iterator[None]:
     try:
         yield
@@ -125,7 +124,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
         ),
@@ -144,7 +143,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
             },
         ),
     ) as params:
@@ -161,9 +160,9 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("src_volume"): t.String(),
-                t.Key("src_vfid"): tx.UUID(),
+                t.Key("src_vfid"): tx.VFolderID(),
                 t.Key("dst_volume"): t.String(),
-                t.Key("dst_vfid"): tx.UUID(),
+                t.Key("dst_vfid"): tx.VFolderID(),
                 t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
         ),
@@ -186,7 +185,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("subpath", default="."): t.String(),
             },
         ),
@@ -257,7 +256,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
             },
         ),
@@ -294,7 +293,7 @@ async def get_metadata(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
             },
         ),
     ) as params:
@@ -312,7 +311,7 @@ async def set_metadata(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("payload"): t.Bytes(),
             },
         ),
@@ -352,7 +351,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
             },
         ),
     ) as params:
@@ -380,7 +379,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
             },
         ),
     ) as params:
@@ -407,7 +406,7 @@ async def get_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | tx.UUID,
+                t.Key("vfid", default=None): t.Null | tx.VFolderID,
             },
         ),
     ) as params:
@@ -424,7 +423,7 @@ async def set_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | tx.UUID,
+                t.Key("vfid", default=None): t.Null | tx.VFolderID,
                 t.Key("size_bytes"): tx.BinarySize,
             },
         ),
@@ -442,7 +441,7 @@ async def mkdir(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("parents", default=True): t.ToBool,
                 t.Key("exist_ok", default=False): t.ToBool,
@@ -468,7 +467,7 @@ async def list_files(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
             },
         ),
@@ -507,7 +506,7 @@ async def rename_file(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("new_name"): t.String(),
                 t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
@@ -532,7 +531,7 @@ async def move_file(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("src_relpath"): tx.PurePath(relative_only=True),
                 t.Key("dst_relpath"): tx.PurePath(relative_only=True),
             },
@@ -556,7 +555,7 @@ async def create_download_session(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("archive", default=False): t.ToBool,
                 t.Key("unmanaged_path", default=None): t.Null | t.String,
@@ -590,7 +589,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("size"): t.ToInt,
             },
@@ -627,7 +626,7 @@ async def delete_files(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
+                t.Key("vfid"): tx.VFolderID(),
                 t.Key("relpaths"): t.List(tx.PurePath(relative_only=True)),
                 t.Key("recursive", default=False): t.ToBool,
             },
