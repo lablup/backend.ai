@@ -78,16 +78,10 @@ class IdleCheckerError(TaskGroupError):
     """
 
 
-RESOURCE_UNIT_MAP = {
-    "mem": lambda v: BinarySize(int(v)),
-    "cuda_mem": lambda v: BinarySize(int(v)),
-}
-
-
 def parse_unit(resource_name: str, value: float | int) -> float | int:
-    if (func := RESOURCE_UNIT_MAP.get(resource_name)) is not None:
-        return func(value)
-    return value
+    if resource_name.find("mem") == -1:
+        return value
+    return BinarySize(int(value))
 
 
 class UtilizationExtraInfo(NamedTuple):
