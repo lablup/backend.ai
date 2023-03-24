@@ -5,7 +5,7 @@ import enum
 import logging
 import math
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
+from collections import UserDict, defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
@@ -78,9 +78,53 @@ class IdleCheckerError(TaskGroupError):
     """
 
 
+RESOURCE_UNIT_MAP = {
+    "mem": lambda v: BinarySize(int(v)),
+    "cuda_mem": lambda v: BinarySize(int(v)),
+}
+
+
+def parse_unit(resource_name: str, value: float | int) -> float | int:
+    if (func := RESOURCE_UNIT_MAP.get(resource_name)) is not None:
+        return func(value)
+    return value
+
+
 class UtilizationExtraInfo(NamedTuple):
     avg_util: float
     threshold: float
+
+
+class UtilizationResourceReport(UserDict):
+    __slots__ = ("data",)
+
+    data: dict[str, UtilizationExtraInfo]
+
+    @classmethod
+    def from_avg_threshold(
+        cls,
+        avg_utils: Mapping[str, float],
+        thresholds: Mapping[str, Union[int, float, Decimal, None]],
+        exclusions: set[str],
+    ) -> UtilizationResourceReport:
+        data: dict[str, UtilizationExtraInfo] = {
+            k: UtilizationExtraInfo(float(avg_utils[k]), float(threshold))
+            for k, threshold in thresholds.items()
+            if (threshold is not None) and (k not in exclusions)
+        }
+        return cls(data)
+
+    def to_dict(self, apply_unit: bool = True) -> dict[str, UtilizationExtraInfo]:
+        if apply_unit:
+            return {
+                k: UtilizationExtraInfo(parse_unit(k, v[0]), parse_unit(k, v[1]))
+                for k, v in self.data.items()
+            }
+        return {**self.data}
+
+    @property
+    def utilizion_result(self) -> dict[str, bool]:
+        return {k: (v.avg_util >= v.threshold) for k, v in self.data.items()}
 
 
 class AppStreamingStatus(enum.Enum):
@@ -764,25 +808,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         avg_utils: Mapping[str, float] = {k: _avg(v) for k, v in util_series.items()}
 
-        # util_avg_thresholds's key is resource name
-        # and value is `(avg_util, threshold)`
-        util_avg_thresholds: dict[str, UtilizationExtraInfo] = {
-            k: UtilizationExtraInfo(float(avg_utils[k]), float(threshold))
-            for k, threshold in self.resource_thresholds.items()
-            if (threshold is not None) and (k not in unavailable_resources)
-        }
-        for k in util_avg_thresholds:
-            if k in ("mem", "cuda_mem"):
-                avg_mem, mem_threshold = util_avg_thresholds[k]
-                util_avg_thresholds[k] = UtilizationExtraInfo(
-                    BinarySize(int(avg_mem)),
-                    BinarySize(int(mem_threshold)),
-                )
+        util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
+            avg_utils, self.resource_thresholds, unavailable_resources
+        )
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
                 self.get_extra_info_key(session_id),
-                msgpack.packb(util_avg_thresholds),
+                msgpack.packb(util_avg_thresholds.to_dict()),
                 ex=int(DEFAULT_CHECK_INTERVAL) * 10,
             ),
         )
@@ -792,9 +825,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Check over-utilized (not to be collected) resources.
-        sufficiently_utilized: Mapping[str, bool] = {
-            k: (v[0] >= v[1]) for k, v in util_avg_thresholds.items()
-        }
+        sufficiently_utilized = util_avg_thresholds.utilizion_result
         check_result = True
         if len(sufficiently_utilized) < 1:
             check_result = True
