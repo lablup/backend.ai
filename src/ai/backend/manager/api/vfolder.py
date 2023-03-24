@@ -3008,12 +3008,6 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     user_email = params["user_email"]
     root_ctx: RootContext = request.app["_root.context"]
 
-    # TODO: Implement Change ownership using DB transaction
-    log.info(
-        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(new owner email:{}, vfid:{})",
-        user_email,
-        vfolder_id,
-    )
     allowed_hosts_by_user = VFolderHostPermissionMap()
     async with root_ctx.db.begin_readonly() as conn:
         j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
@@ -3042,6 +3036,13 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             domain_name=user_info.domain_name,
             user_uuid=user_info.uuid,
         )
+    log.info(
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        vfolder_id,
+        user_info.uuid,
+    )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
