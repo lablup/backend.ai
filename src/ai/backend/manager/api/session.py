@@ -91,13 +91,13 @@ from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
     EtcdRedisConfig,
+    HostPortPair,
     KernelEnqueueingConfig,
     KernelId,
     SessionTypes,
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
-from ai.backend.manager.defs import PluginDatabaseID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -1658,24 +1658,23 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
-    url = session.callback_url
-    if url is None:
-        return
-    if (addr := root_ctx.local_config.get("pipeline", {}).get("event-queue")) is None:
+    # TODO: DO NOT expose redis hostname.
+    if (callback_url := session.callback_url) is None:  # redis://redis:6379/1?token=...
         return
     etcd_redis_config: EtcdRedisConfig = {
-        "addr": addr,
+        "addr": HostPortPair(callback_url.host, callback_url.port),
         "sentinel": None,
         "service_name": None,
         "password": None,
     }
     stream_key = "events"
-    token = url.query.get("token")
+    token = callback_url.query.get("token")
+    db = callback_url.path.removeprefix("/")
 
     async def _dispatch() -> None:
         hook_result = await root_ctx.hook_plugin_ctx.dispatch(
             "PUBLISH_EVENT",
-            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
+            (event, etcd_redis_config, int(db), stream_key, token),
         )
         if hook_result.status != HookResults.PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
