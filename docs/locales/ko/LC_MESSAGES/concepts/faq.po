@@ -48,7 +48,7 @@ msgstr "Apache Zeppelin, Jupyter Notebook"
 
 #: ../../concepts/faq.rst:14 f7b972764a1345f6841972b102b00230
 msgid "Notebook-style document + code *frontends*"
-msgstr "Notebook-style document + code *frontends*"
+msgstr "노트북의 문서 양식 + 코드 *프론트엔드*"
 
 #: ../../concepts/faq.rst:15 3b95e0e752e44d35879aedc91c740e83
 msgid "Insecure host resource sharing"
@@ -138,7 +138,7 @@ msgstr "MLaaS 관리"
 
 #: ../../concepts/faq.rst:57 d1d25c7f372d441cb390f37794fdd9fc
 msgid "Still complicated for scientists, too restrictive for engineers"
-msgstr "과학자에게는 여전히 복잡하고, 엔지니어 들에게는 너무 제한적 입니다"
+msgstr "과학자에게는 여전히 복잡하고, 엔지니어 들에게는 너무 제한적임"
 
 #: ../../concepts/faq.rst:60 dd9a52d91cee4bf29a1553cd7e53ba73
 msgid "Host of computation runtimes"
