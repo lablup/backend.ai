@@ -40,7 +40,7 @@ msgstr "역할"
 #: ../../concepts/faq.rst:11 ../../concepts/faq.rst:49
 #: 6a524bc6c58d47d5995b3c688eaa7eaa f73422c6ae7845df94b0d9f79fff906c
 msgid "Problem and Solution"
-msgstr "문제 및 "
+msgstr "문제 및 해결방법"
 
 #: ../../concepts/faq.rst:13 0959e18cbd42458e90d894552006ceb9
 msgid "Apache Zeppelin, Jupyter Notebook"
@@ -62,7 +62,7 @@ msgstr "**Backend.AI**"
 
 #: ../../concepts/faq.rst:18 46cfa7de594e4e388da2d1d143e0576a
 msgid "Pluggable *backend* to any frontends"
-msgstr "Pluggable *backend* to any frontends"
+msgstr "모든 프론트엔드에 *backend* 연결 가능"
 
 #: ../../concepts/faq.rst:19 ec2b4bf5c7c94c0d86df38e32552dcdb
 msgid "Built for multi-tenancy: scalable and better isolation"
@@ -74,11 +74,11 @@ msgstr "vs. Orchestration Frameworks"
 
 #: ../../concepts/faq.rst:27 5a961b4114694a57857120bc2d78e6b6
 msgid "Target"
-msgstr "Target"
+msgstr "대상"
 
 #: ../../concepts/faq.rst:28 d641399d41144159940477ce36bb08ec
 msgid "Value"
-msgstr "Value"
+msgstr "값"
 
 #: ../../concepts/faq.rst:30 47860450a24246cc9c649c1da474e02c
 msgid "Amazon ECS, Kubernetes"
@@ -98,7 +98,7 @@ msgstr "Stateful compute sessions"
 
 #: ../../concepts/faq.rst:36 fcaeed5b0b9349438a4a86331b3c2acb
 msgid "Low-cost high-density computation"
-msgstr "Low-cost high-density computation"
+msgstr "저비용 고밀도 계산"
 
 #: ../../concepts/faq.rst:38 93692148af6c47c088134290b9ce466c
 msgid "Amazon Lambda, Azure Functions"
@@ -122,11 +122,11 @@ msgstr "TensorFlow, Apache Spark, Apache Hive"
 
 #: ../../concepts/faq.rst:52 50c0bfbd3bb34719b1ecc10b9237218b
 msgid "Computation runtime"
-msgstr "Computation runtime"
+msgstr "런타임 계산"
 
 #: ../../concepts/faq.rst:53 dfe9a11366b246a39256df99fb48f864
 msgid "Difficult to install, configure, and operate"
-msgstr "Difficult to install, configure, and operate"
+msgstr "설치, 구성, 및 운용의 어려움"
 
 #: ../../concepts/faq.rst:55 1072859cbf934c16ad754bfdf61ba2b3
 msgid "Amazon ML, Azure ML, GCP ML"
@@ -134,15 +134,15 @@ msgstr "Amazon ML, Azure ML, GCP ML"
 
 #: ../../concepts/faq.rst:56 d553672f76ec401a96d02d8bfa8f5eb6
 msgid "Managed MLaaS"
-msgstr "Managed MLaaS"
+msgstr "MLaaS 관리"
 
 #: ../../concepts/faq.rst:57 d1d25c7f372d441cb390f37794fdd9fc
 msgid "Still complicated for scientists, too restrictive for engineers"
-msgstr "Still complicated for scientists, too restrictive for engineers"
+msgstr "과학자에게는 여전히 복잡하고, 엔지니어 들에게는 너무 제한적 입니다"
 
 #: ../../concepts/faq.rst:60 dd9a52d91cee4bf29a1553cd7e53ba73
 msgid "Host of computation runtimes"
-msgstr "Host of computation runtimes"
+msgstr "런타임 계산의 주최"
 
 #: ../../concepts/faq.rst:61 2b9ad00a67f0432b914e2988198057fb
 msgid "Pre-configured, versioned, reproducible, customizable (open-source)"
