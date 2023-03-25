@@ -30,17 +30,17 @@ msgstr "vs. Notebooks"
 #: 79105172721e4098a6d25ad4e039fb0e 99950a9acda8452eaffe27fcc30be06f
 #: c4e968ca8763497aba424dfe7f1ead7c
 msgid "Product"
-msgstr "Product"
+msgstr "제품"
 
 #: ../../concepts/faq.rst:10 ../../concepts/faq.rst:48
 #: 4142161b719541aab385b8b9476f2ff5 d505e1d8df484222bc733ea135673e36
 msgid "Role"
-msgstr "Role"
+msgstr "역할"
 
 #: ../../concepts/faq.rst:11 ../../concepts/faq.rst:49
 #: 6a524bc6c58d47d5995b3c688eaa7eaa f73422c6ae7845df94b0d9f79fff906c
 msgid "Problem and Solution"
-msgstr "Problem and Solution"
+msgstr "문제 및 "
 
 #: ../../concepts/faq.rst:13 0959e18cbd42458e90d894552006ceb9
 msgid "Apache Zeppelin, Jupyter Notebook"
