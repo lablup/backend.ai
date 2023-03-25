@@ -1,0 +1,46 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/prepare-config-service.rst:2
+#: 2be9f733167340df802e57d50fbfc7f5
+msgid "Prepare Config Service"
+msgstr ""
+
+#: ../../install/install-from-package/prepare-config-service.rst:4
+#: ad46196edd7e4f63a66e1aab97784cbe
+msgid ""
+"Backend.AI makes use of Etcd as its main config service. Launch the "
+"service using docker compose by generating the file ``$HOME/halfstack"
+"/docker-compose.hs.etcd.yaml`` and populating it with the following YAML."
+" Feel free to adjust the volume paths and port settings. Please refer "
+"`the latest configuration <https://github.com/lablup/backend.ai/blob/main"
+"/docker-compose.halfstack-main.yml>`_ (it's a symbolic link so follow the"
+" filename in it) if needed."
+msgstr ""
+
+#: ../../install/install-from-package/prepare-config-service.rst:57
+#: 3134f50cf84a4a3eb97aa051af6cbb3d
+msgid ""
+"Execute the following command to start the service container. The project"
+" ``${USER}`` is added for operational convenience."
+msgstr ""
+
