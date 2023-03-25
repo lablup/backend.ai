@@ -3,6 +3,14 @@
 USER_ID=${LOCAL_USER_ID:-9001}
 GROUP_ID=${LOCAL_GROUP_ID:-9001}
 
+create_linuxbrew_symlink() {
+  mkdir -p /home/linuxbrew
+  if [ -d "/home/work/.linuxbrew" ]; then
+    ln -s /home/work/.linuxbrew /home/linuxbrew/.linuxbrew
+  fi
+  chown $USER_ID:$GROUP_ID /home/linuxbrew
+}
+
 echo "Kernel started at: $(date -Iseconds -u)"
 
 if [ $USER_ID -eq 0 ]; then
@@ -41,6 +49,8 @@ if [ $USER_ID -eq 0 ]; then
     chmod 0644 "$HOME/.password"
     echo "work:$ALPHA_NUMERIC_VAL" | chpasswd
   fi
+
+  create_linuxbrew_symlink
 
   echo "Executing the main program..."
   exec "$@"
@@ -113,6 +123,8 @@ else
     chmod 0644 "$HOME/.password"
     echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
   fi
+
+  create_linuxbrew_symlink
 
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
