@@ -1,0 +1,1 @@
+Automatically create `/home/linuxbrew` directory owned by `work` user inside a container to suport OS packages with Homebrew. If a user created a `.linuxbrew` automount folder, it will be symlinked by `/home/linuxbrew/.linuxbrew`.
