@@ -48,7 +48,7 @@ msgstr "Apache Zeppelin, Jupyter Notebook"
 
 #: ../../concepts/faq.rst:14 f7b972764a1345f6841972b102b00230
 msgid "Notebook-style document + code *frontends*"
-msgstr "노트북 스타일 문서 + *프론트엔드* 코드"
+msgstr "노트북 스타일의 문서 + 코드 *프론트엔드*"
 
 #: ../../concepts/faq.rst:15 3b95e0e752e44d35879aedc91c740e83
 msgid "Insecure host resource sharing"
@@ -78,7 +78,7 @@ msgstr "대상"
 
 #: ../../concepts/faq.rst:28 d641399d41144159940477ce36bb08ec
 msgid "Value"
-msgstr "값"
+msgstr "특"
 
 #: ../../concepts/faq.rst:30 47860450a24246cc9c649c1da474e02c
 msgid "Amazon ECS, Kubernetes"
@@ -86,7 +86,7 @@ msgstr "Amazon ECS, Kubernetes"
 
 #: ../../concepts/faq.rst:31 76cf1c529c534ab6949a62e87f66ea8b
 msgid "Long-running service daemons"
-msgstr "오래 실행되는 데몬 서비스"
+msgstr "장시 실행되는 서비스 데몬"
 
 #: ../../concepts/faq.rst:32 e35c4de5610043b2ab0602d9329e4da9
 msgid "Load balancing, fault tolerance, incremental deployment"
@@ -94,7 +94,7 @@ msgstr "Load balancing, fault tolerance, incremental deployment"
 
 #: ../../concepts/faq.rst:35 4348c99fed4047a8bc6a9fe2188c687d
 msgid "Stateful compute sessions"
-msgstr "연결 상태를 추적할 수 있는 컴퓨팅 세션"
+msgstr "상태를 보관하는 컴퓨팅 세션"
 
 #: ../../concepts/faq.rst:36 fcaeed5b0b9349438a4a86331b3c2acb
 msgid "Low-cost high-density computation"
@@ -122,11 +122,11 @@ msgstr "TensorFlow, Apache Spark, Apache Hive"
 
 #: ../../concepts/faq.rst:52 50c0bfbd3bb34719b1ecc10b9237218b
 msgid "Computation runtime"
-msgstr "Computation 런타임"
+msgstr "연산 런타임"
 
 #: ../../concepts/faq.rst:53 dfe9a11366b246a39256df99fb48f864
 msgid "Difficult to install, configure, and operate"
-msgstr "설치, 구성, 및 운용 하기 어려움"
+msgstr "설치, 구성, 및 운용이 어려움"
 
 #: ../../concepts/faq.rst:55 1072859cbf934c16ad754bfdf61ba2b3
 msgid "Amazon ML, Azure ML, GCP ML"
@@ -142,7 +142,7 @@ msgstr "과학자에게는 여전히 복잡하고, 엔지니어 들에게는 너
 
 #: ../../concepts/faq.rst:60 dd9a52d91cee4bf29a1553cd7e53ba73
 msgid "Host of computation runtimes"
-msgstr "Computation 런타임 호스트"
+msgstr "연산 런타임의 호스트"
 
 #: ../../concepts/faq.rst:61 2b9ad00a67f0432b914e2988198057fb
 msgid "Pre-configured, versioned, reproducible, customizable (open-source)"
