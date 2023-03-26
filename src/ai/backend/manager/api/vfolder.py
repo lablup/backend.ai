@@ -452,7 +452,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             vfid = VFolderID(quota_scope_id, folder_id)
             if not unmanaged_path:
                 # Create the vfolder only when it is a managed one
-                # TODO: create the quota scope if not exists
+                # TODO: Create the quota scope with an unlimited quota config if not exists
+                #       The quota may be set later by the admin...
+                # TODO: Introduce "default quota config" for users and projects (which cannot be
+                #       modified by users)
                 # async with root_ctx.storage_manager.request(
                 #     folder_host,
                 #     "POST",
@@ -460,7 +463,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 #     json={
                 #         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
                 #         "qsid": str(quota_scope_id),
-                #         "options": {"quota": params["quota"]},  # TODO: fit with QuotaConfig
+                #         "options": None,
                 #     },
                 # ):
                 #     pass
