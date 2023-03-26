@@ -459,7 +459,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 # async with root_ctx.storage_manager.request(
                 #     folder_host,
                 #     "POST",
-                #     "quota-scope/create",
+                #     "quota-scope",
                 #     json={
                 #         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
                 #         "qsid": str(quota_scope_id),

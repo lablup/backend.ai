@@ -857,6 +857,24 @@ class QuotaConfig:
     soft_limit: int  # in bytes  # TODO: refactor using DecimalSize
     hard_limit: int  # in bytes  # TODO: refactor using DecimalSize
 
+    class Validator(t.Trafaret):
+        def check_and_return(self, value: Any) -> QuotaConfig:
+            validator = t.Dict(
+                {
+                    t.Key("soft_limit"): t.ToInt(),  # TODO: refactor using DecimalSize
+                    t.Key("hard_limit"): t.ToInt(),  # TODO: refactor using DecimalSize
+                }
+            )
+            converted = validator.check(value)
+            return QuotaConfig(
+                soft_limit=converted["soft_limit"],
+                hard_limit=converted["hard_limit"],
+            )
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return cls.Validator()
+
 
 class ImageRegistry(TypedDict):
     name: str

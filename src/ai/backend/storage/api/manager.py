@@ -21,7 +21,7 @@ from ai.backend.storage.exception import ExecutionError
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import InvalidSubpathError, VFolderNotFoundError
-from ..types import VFolderCreationOptions, VFolderID
+from ..types import QuotaConfig, VFolderCreationOptions, VFolderID
 from ..utils import check_params, log_manager_api_entry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -116,6 +116,24 @@ async def get_hwinfo(request: web.Request) -> web.Response:
         async with ctx.get_volume(params["volume"]) as volume:
             data = await volume.get_hwinfo()
             return web.json_response(data)
+
+
+async def create_quota_scope(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+                t.Key("qsid"): tx.QuotaScopeID(),
+                t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
+            },
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "create_quota_scope", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            await volume.create_quota_scope(params["qsid"], params["options"])
+            return web.Response(status=204)
 
 
 async def create_vfolder(request: web.Request) -> web.Response:
@@ -658,6 +676,10 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/", get_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
+    app.router.add_route("POST", "/quota-scope", create_quota_scope)
+    # TODO: app.router.add_route("GET", "/quota-scope", get_quota_scope)
+    # TODO: app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
+    # TODO: app.router.add_route("DELETE", "/quota-scope", delete_quota_scope)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
     app.router.add_route("POST", "/folder/clone", clone_vfolder)
