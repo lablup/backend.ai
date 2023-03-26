@@ -7,7 +7,15 @@ from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequ
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
-from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID, VFolderUsage
+from .types import (
+    DirEntry,
+    FSPerfMetric,
+    FSUsage,
+    QuotaOption,
+    VFolderCreationOptions,
+    VFolderID,
+    VFolderUsage,
+)
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
@@ -66,11 +74,57 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     async def get_capabilities(self) -> FrozenSet[str]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def get_hwinfo(self) -> HardwareMetadata:
-        pass
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create_quota_scope(
+        self,
+        quota_scope_id: str,
+        options: Optional[QuotaOption] = None,
+    ) -> None:
+        """
+        Creates a new quota scope.
+
+        Raises `AlreadyExists` error if there is the quota scope with the same name.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> tuple[QuotaOption, VFolderUsage]:
+        """
+        Get the information about the given quota scope.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_quota_scope(
+        self,
+        quota_scope_id: str,
+        options: Optional[QuotaOption] = None,
+    ) -> QuotaOption:
+        """
+        Update the quota option of the given quota scope.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> None:
+        """
+        Deletes the given quota scope.
+
+        Raises `NotEmpty` error if there are one or more vfolders inside the quota scope.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def create_vfolder(
@@ -80,11 +134,11 @@ class AbstractVolume(metaclass=ABCMeta):
         *,
         exist_ok: bool = False,
     ) -> None:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def delete_vfolder(self, vfid: VFolderID) -> None:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def clone_vfolder(
@@ -99,7 +153,7 @@ class AbstractVolume(metaclass=ABCMeta):
         ``exist_ok=True`` option and copy all contents of the source
         vfolder into it, preserving file permissions and timestamps.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def copy_tree(
@@ -113,11 +167,11 @@ class AbstractVolume(metaclass=ABCMeta):
         The source and destination are in the same filesystem namespace
         but they may be on different physical media.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
@@ -133,10 +187,27 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     async def get_quota(self, vfid: VFolderID) -> BinarySize:
+        """
+        Gets the currently configured quota size of the given folder.
+
+        .. versionchanged:: 23.03
+
+           Use the quota scopes intead of per-folder quota.
+           As of 23.03, this return the quota limit of the quota scope where the given vfolder
+           belongs to.
+        """
         pass
 
     @abstractmethod
     async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
+        """
+        Sets the quota size of the given folder.
+
+        .. versionremoved:: 23.03
+
+           Use the quota scopes intead of per-folder quota.
+           As of 23.03, this becomes a no-op.
+        """
         pass
 
     @abstractmethod

@@ -9,7 +9,7 @@ import attrs
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import BinarySize, VFolderID
+from ai.backend.common.types import BinarySize, QuotaOption, VFolderID
 
 __all__ = (
     "Sentinel",
@@ -20,6 +20,7 @@ __all__ = (
     "VFolderCreationOptions",
     "VFolderID",
     "VFolderUsage",
+    "QuotaOption",
     "Stat",
     "DirEntry",
     "DirEntryType",
@@ -90,8 +91,8 @@ class VFolderCreationOptions:
 
 @attrs.define(slots=True, frozen=True)
 class VFolderUsage:
-    file_count: int
-    used_bytes: int
+    file_count: int  # TODO: refactor using DecimalSize
+    used_bytes: int  # TODO: refactor using DecimalSize
 
 
 @attrs.define(slots=True, frozen=True)

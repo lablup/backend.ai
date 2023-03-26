@@ -68,6 +68,7 @@ __all__ = (
     "MountTypes",
     "VFolderID",
     "VFolderMount",
+    "QuotaOption",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -849,6 +850,12 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class QuotaOption:
+    soft_limit: int  # in bytes  # TODO: refactor using DecimalSize
+    hard_limit: int  # in bytes  # TODO: refactor using DecimalSize
 
 
 class ImageRegistry(TypedDict):
