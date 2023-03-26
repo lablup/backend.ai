@@ -343,7 +343,10 @@
     "TerminateSession": "__NOT_TRANSLATED__",
     "SeeContainerLogs": "__NOT_TRANSLATED__",
     "RequestContainerCommit": "__NOT_TRANSLATED__",
-    "TimeoutExceeded": "__NOT_TRANSLATED__"
+    "TimeoutExceeded": "__NOT_TRANSLATED__",
+    "UtilizationIdleChecks": "__NOT_TRANSLATED__",
+    "Utilization": "__NOT_TRANSLATED__",
+    "Threshold": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -504,7 +507,9 @@
     "InvalidRateLimitValue": "__NOT_TRANSLATED__",
     "WarningLessRateLimit": "__NOT_TRANSLATED__",
     "KeypairDetail": "__NOT_TRANSLATED__",
-    "AdminCanOnlyRemoveTotp": "__NOT_TRANSLATED__"
+    "AdminCanOnlyRemoveTotp": "__NOT_TRANSLATED__",
+    "KeySeccessfullyDeleted": "__NOT_TRANSLATED__",
+    "SignoutSeccessfullyFinished": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Folder",

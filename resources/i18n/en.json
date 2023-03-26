@@ -350,7 +350,10 @@
     "ExecuteTerminalApp": "Execute Terminal App",
     "TerminateSession": "Terminate Session",
     "SeeContainerLogs": "See Container Logs",
-    "RequestContainerCommit": "Request Container Commit"
+    "RequestContainerCommit": "Request Container Commit",
+    "UtilizationIdleChecks": "Utilization Idle Checks",
+    "Utilization": "Utilization",
+    "Threshold": "Threshold"
   },
   "button": {
     "Cancel": "Cancel",
@@ -511,7 +514,9 @@
     "UserNotFound": "Credential creation failed, since the following user ID could't be found : ",
     "UserIDRequired": "User ID is required.",
     "KeypairDetail": "Keypair Detail",
-    "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible."
+    "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
+    "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
+    "SignoutSeccessfullyFinished": "Signout is seccessfully finished"
   },
   "data": {
     "Folders": "Folders",
