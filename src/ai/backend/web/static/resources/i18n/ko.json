@@ -342,7 +342,10 @@
     "TerminateSession": "세션 종료하기",
     "SeeContainerLogs": "컨테이너 로그 보기",
     "RequestContainerCommit": "컨테이너 커밋하기",
-    "TimeoutExceeded": "제한 시간 초과"
+    "TimeoutExceeded": "제한 시간 초과",
+    "UtilizationIdleChecks": "사용률 유휴 상태 점검",
+    "Utilization": "사용률",
+    "Threshold": "임계값"
   },
   "button": {
     "Cancel": "취소",
@@ -503,7 +506,9 @@
     "UserNotFound": "다음 사용자 계정을 찾을 수 없어 자격 증명 생성에 실패하였습니다. : ",
     "UserIDRequired": "사용자 계정(email)은 필수 입력입니다.",
     "KeypairDetail": "키페어 정보",
-    "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다."
+    "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다.",
+    "KeySeccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
+    "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다."
   },
   "data": {
     "Folders": "폴더",
