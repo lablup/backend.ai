@@ -1,36 +1,10 @@
 from __future__ import annotations
 
-import enum
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Callable,
-    Coroutine,
-    Dict,
-    Generic,
-    Iterable,
-    List,
-    Optional,
-    Protocol,
-    TypeVar,
-)
+from abc import ABCMeta, abstractmethod
+from enum import StrEnum
+from typing import Awaitable, Callable, Coroutine, Generic, Optional, Protocol, Sequence, TypeVar
 
-import attrs
-
-if TYPE_CHECKING:
-    from ai.backend.common.bgtask import BackgroundTaskManager
-    from ai.backend.common.events import EventDispatcher, EventProducer
-
-    # from .models.utils import ExtendedAsyncSAEngine
-
-
-@attrs.define(slots=True, auto_attribs=True, init=False)
-class MachineContext:
-    # db: ExtendedAsyncSAEngine
-    event_dispatcher: EventDispatcher
-    event_producer: EventProducer
-    background_task_manager: BackgroundTaskManager
+from tenacity import AsyncRetrying
 
 
 class UnregisteredState(Exception):
@@ -43,47 +17,71 @@ class StateRegisterErr(Exception):
     pass
 
 
-class DuplicateTransitionEvent(Exception):
+class BaseMachineContext:
     """
-    The event that trigger an event is already registered in the state machine
+    The context of state machine which does not change during the life cycle.
+    Every context of one manager are the same.
     """
 
 
-class BaseStateName(str, enum.Enum):
+class BaseStateContext:
+    """
+    The context of a state which contains extra information of a state.
+    """
+
+
+class BaseStateName(StrEnum):
     pass
 
 
-class TransitionEvent:
+class BaseTrigger(StrEnum):
     pass
+
+
+class StateCoroutine(Protocol):
+    def __call__(
+        self, ctx: BaseMachineContext, state_ctx: Optional[BaseStateContext]
+    ) -> Awaitable[Optional[BaseStateContext]]:
+        ...
 
 
 class TransitionGuard(Protocol):
-    def __call__(self, *, ctx: MachineContext) -> Awaitable[bool]:
+    def __call__(
+        self, *, ctx: BaseMachineContext, state_ctx: Optional[BaseStateContext]
+    ) -> Awaitable[bool]:
         ...
 
 
 class TransitionAction(Protocol):
-    def __call__(self, *, ctx: MachineContext) -> Awaitable[None]:
+    def __call__(
+        self, *, ctx: BaseMachineContext, state_ctx: Optional[BaseStateContext]
+    ) -> Awaitable[None]:
         ...
 
 
+# StateCoroutine = Callable[
+#     [BaseMachineContext, Optional[BaseStateContext]], Awaitable[Optional[BaseStateContext]]
+# ]
 StateNameType = TypeVar("StateNameType", bound=BaseStateName)
 
 
 class State(Generic[StateNameType]):
     state_name: BaseStateName
-    data: Dict[str, Any]
-    coro_factory: Optional[Callable[..., Coroutine[None, None, bool]]]
+    data: Optional[BaseStateContext]
+    coro_factory: Optional[StateCoroutine]
+    retry: Optional[AsyncRetrying]
 
     def __init__(
         self,
         state_name: BaseStateName,
-        coro_factory: Optional[Callable[..., Coroutine[None, None, bool]]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        coro_factory: Optional[StateCoroutine] = None,
+        data: Optional[BaseStateContext] = None,
+        retry: Optional[AsyncRetrying] = None,
     ) -> None:
         self.state_name = state_name
         self.coro_factory = coro_factory
-        self.data = data or dict()
+        self.data = data
+        self.retry = retry
 
     def __str__(self) -> str:
         return str(self.state_name)
@@ -100,77 +98,113 @@ class State(Generic[StateNameType]):
 
 
 class Transition:
-    src: State
+    src: Sequence[tuple[State, BaseTrigger]]
     dst: State
-    event: TransitionEvent
     guard: Optional[TransitionGuard]
     action: Optional[TransitionAction]
 
     def __init__(
         self,
-        src: State[StateNameType],
+        src: Sequence[tuple[State, BaseTrigger]],
         dst: State[StateNameType],
-        event: TransitionEvent,
         guard: Optional[TransitionGuard] = None,
         action: Optional[TransitionAction] = None,
     ) -> None:
         self.src = src
         self.dst = dst
-        self.event = event
         self.guard = guard
         self.action = action
 
     def __str__(self) -> str:
-        return f"src: {self.src}, dst: {self.dst}, event: {self.event}"
+        return f"src: {self.src}, dst: {self.dst}"
 
 
-class AsyncStateMachine:
-    ctx: MachineContext
-    states: List[State]
-    transitions: List[Transition]
-    transition_map: Dict[TransitionEvent, Transition]
+class AsyncStateMachine(metaclass=ABCMeta):
+    ctx: BaseMachineContext
+    states: set[State]
+    initial_state: State
+    success_state: State
+    failure_state: State
+    current_state: State
+    fallback_exception_handler: Optional[Callable[..., Coroutine[None, None, None]]]
+    transition_map: dict[State, dict[BaseTrigger, Transition]]
 
     def __init__(
         self,
-        ctx: MachineContext,
-        states: Iterable[State[StateNameType]],
-        transitions: Iterable[Transition],
+        ctx: BaseMachineContext,
+        states: Sequence[State[StateNameType]],
+        transitions: Sequence[Transition],
+        *,
+        initial_state: State,
+        success_state: State,
+        failure_state: State,
+        fallback_exception_handler: Optional[Callable[..., Coroutine[None, None, None]]],
     ) -> None:
         self.ctx = ctx
 
         self._register_state(states)
         self._register_transition(transitions)
+        self._init_states(initial_state, success_state, failure_state)
+        self.fallback_exception_handler = fallback_exception_handler
 
-    def _register_state(self, states: Iterable[State[StateNameType]]) -> None:
+    def _register_state(self, states: Sequence[State[StateNameType]]) -> None:
         for s in states:
             if s in self.states:
                 raise StateRegisterErr(f"State {s} is already registered")
-        self.states.extend(states)
+            self.states.add(s)
 
-    def _register_transition(self, transitions: Iterable[Transition]) -> None:
+    def _register_transition(self, transitions: Sequence[Transition]) -> None:
         for t in transitions:
-            if t.src not in self.states or t.dst not in self.states:
-                raise UnregisteredState(
-                    f"{t.src} or {t.dst} is not registered in this state machine"
-                )
-            if t.event in self.transition_map:
-                raise DuplicateTransitionEvent(
-                    f"Event {t.event} is already registered with transition {t}"
-                )
-        self.transitions.extend(transitions)
-        self.transition_map = {t.event: t for t in self.transitions}
+            if t.dst not in self.states:
+                raise UnregisteredState(f"{t.dst} is not registered in this state machine")
+            if t.dst not in self.transition_map:
+                self.transition_map[t.dst] = {}
+            sources = t.src
+            for src, trigger in sources:
+                if src not in self.states:
+                    raise UnregisteredState(f"{src} is not registered in this state machine")
+                if src not in self.transition_map:
+                    self.transition_map[src] = {}
+                if trigger not in self.transition_map[src]:
+                    self.transition_map[src][trigger] = t
 
-    async def trigger(self, state: State, event: TransitionEvent) -> Optional[State]:
-        if state not in self.states:
-            return None
-        trsn = self.transition_map.get(event)
+    def _init_states(
+        self, initial_state: State, success_state: State, failure_state: State
+    ) -> None:
+        def _check(cand_state: State) -> State:
+            if cand_state not in self.states:
+                raise UnregisteredState(f"{cand_state} is not registered in this state machine")
+            return cand_state
+
+        self.initial_state = _check(initial_state)
+        self.success_state = _check(success_state)
+        self.failure_state = _check(failure_state)
+        self.current_state = initial_state
+
+    async def trigger(
+        self, trigger: BaseTrigger, new_state_ctx: Optional[BaseStateContext] = None
+    ) -> State:
+        """
+        Trigger a transition from current state.
+        If there is no transition for the current state, raise error.
+        `new_state_ctx` is the result of the current state's coroutine, which is passed to a destination state.
+        """
+        cand_transitions = self.transition_map.get(self.current_state)
+        if cand_transitions is None:
+            raise UnregisteredState
+        trsn = cand_transitions.get(trigger)
         if trsn is None:
-            return None
-        assert isinstance(trsn, Transition)
-        if trsn.guard is not None:
-            if not (await trsn.guard(ctx=self.ctx)):
-                # TODO: log the result of guard
-                return None
+            raise UnregisteredState
         if trsn.action is not None:
-            await trsn.action(ctx=self.ctx)
-        return trsn.dst
+            await trsn.action(ctx=self.ctx, state_ctx=self.current_state.data)
+        dst = trsn.dst
+        if new_state_ctx is not None:
+            dst.data = new_state_ctx
+        return dst
+
+    @abstractmethod
+    async def run(self) -> None:
+        """
+        Run state machine from initial state.
+        """
+        raise NotImplementedError
