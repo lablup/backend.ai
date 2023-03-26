@@ -86,7 +86,6 @@ from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    BinarySize,
     ClusterMode,
     KernelEnqueueingConfig,
     KernelId,
@@ -1976,11 +1975,9 @@ async def get_info(request: web.Request) -> web.Response:
 
         resp["numQueriesExecuted"] = kern["num_queries"]
         resp["lastStat"] = kern["last_stat"]
-        idle_report = await root_ctx.idle_checker_host.get_idle_check_report(kern["session_id"])
-        avg_utils = idle_report["utilization"]
-        if avg_utils is not None and "mem" in avg_utils:
-            avg_utils["mem"] = BinarySize.from_str(str(int(avg_utils["mem"])))
-        resp["idleChecks"] = idle_report
+        resp["idleChecks"] = await root_ctx.idle_checker_host.get_idle_check_report(
+            kern["session_id"]
+        )
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
