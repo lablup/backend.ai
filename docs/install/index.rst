@@ -9,3 +9,4 @@ Installation Guides
    install-on-clouds
    install-on-premise
    install-monitoring-and-logging-tools
+   install-from-multipass

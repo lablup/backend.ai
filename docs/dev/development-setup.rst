@@ -96,6 +96,14 @@ is that how you launch the Web UI from the mono-repo.
        Rel(manager, halfstack, "Native protocols", "")
        Rel(agent, halfstack, "Native protocols", "")
 
+Installation on multipass
+-------------------------
+
+For the ease of on-boarding developer experience, we provide an automated
+script that installs all server-side components in editable states with just
+one command.
+
+Check out :doc:`/install/install-from-multipass`.
 
 Installation from Source
 ------------------------
