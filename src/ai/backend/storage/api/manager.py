@@ -150,8 +150,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            obj_opts = VFolderCreationOptions.as_object(params["options"])
-            await volume.create_vfolder(params["vfid"], obj_opts)
+            await volume.create_vfolder(params["vfid"], params["options"])
             return web.Response(status=204)
 
 

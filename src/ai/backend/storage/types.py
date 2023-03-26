@@ -76,17 +76,15 @@ class VolumeInfo:
 class VFolderCreationOptions:
     quota: Optional[BinarySize]
 
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({t.Key("quota", default=None): t.Null | tx.BinarySize})
+    class Validator(t.Trafaret):
+        def check_and_return(self, value: Any) -> VFolderCreationOptions:
+            validator = t.Dict({t.Key("quota", default=None): t.Null | tx.BinarySize})
+            converted = validator.check(value)
+            return VFolderCreationOptions(converted["quota"])
 
     @classmethod
-    def as_object(cls, dict_opts: Mapping | None) -> VFolderCreationOptions:
-        if dict_opts is None:
-            quota = None
-        else:
-            quota = dict_opts.get("quota")
-        return VFolderCreationOptions(quota=quota)
+    def as_trafaret(cls) -> t.Trafaret:
+        return cls.Validator()
 
 
 @attrs.define(slots=True, frozen=True)
