@@ -96,7 +96,7 @@ class BaseVolume(AbstractVolume):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
-            lambda: qspath.rmdir(),
+            lambda: shutil.rmtree(qspath),
         )
 
     async def create_vfolder(
