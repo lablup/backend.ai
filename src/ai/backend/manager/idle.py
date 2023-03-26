@@ -727,6 +727,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     ex=int(DEFAULT_CHECK_INTERVAL) * 10,
                 ),
             )
+        else:
+            await self.delete_expire_time_report(session_id)
 
         # Respect initial grace period (no termination of the session)
         if initial_period <= self.initial_grace_period:
@@ -756,7 +758,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
             kernel_ids = [kernel["id"]]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
-            await self.delete_expire_time_report(session_id)
             return True
 
         # Update utilization time-series data.
@@ -815,7 +816,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
         if not_enough_data:
-            await self.delete_expire_time_report(session_id)
             return True
 
         # Check over-utilized (not to be collected) resources.
@@ -834,8 +834,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 avg_utils,
                 self.thresholds_check_operator,
             )
-        else:
-            await self.delete_expire_time_report(session_id)
         return check_result
 
     async def get_current_utilization(
@@ -888,7 +886,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
-        return msgpack.unpackb(data) if data is not None else None
+        if data is not None:
+            if (unpacked := msgpack.unpackb(data)) > 0:
+                return unpacked
+            return None
+        return None
 
 
 checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
