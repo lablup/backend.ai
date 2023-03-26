@@ -468,9 +468,16 @@ class UUID(t.Trafaret):
             self._failure("cannot convert value to UUID", value=value)
 
 
+class QuotaScopeID(t.Trafaret):
+    regex = r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"
+
+    def check_and_return(self, value: Any) -> str:
+        return t.Regexp(self.regex).check(value)
+
+
 class VFolderID(t.Trafaret):
     def check_and_return(self, value: Any) -> _VFolderID:
-        tuple_t = t.Tuple(t.Regexp(r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"), UUID())
+        tuple_t = t.Tuple(QuotaScopeID(), UUID())
         match value:
             case str():
                 pieces = value.partition("/")

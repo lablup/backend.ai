@@ -20,7 +20,7 @@ async def vfs(local_volume):
 
 @pytest.fixture
 async def empty_vfolder(vfs):
-    qsid = f"qs-{secrets.token_urlsafe(16)}-0"
+    qsid = f"qs-{secrets.token_hex(16)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
     await vfs.create_quota_scope(qsid)
     await vfs.create_vfolder(vfid)
@@ -31,7 +31,7 @@ async def empty_vfolder(vfs):
 
 @pytest.mark.asyncio
 async def test_vfs_vfolder_mgmt(vfs):
-    qsid = f"qs-{secrets.token_urlsafe(16)}-0"
+    qsid = f"qs-{secrets.token_hex(16)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
     await vfs.create_quota_scope(qsid)
     await vfs.create_vfolder(vfid)
@@ -97,8 +97,8 @@ async def test_vfs_get_usage(vfs, empty_vfolder):
 
 @pytest.mark.asyncio
 async def test_vfs_clone(vfs):
-    qsid1 = f"qs-{secrets.token_urlsafe(16)}-0"
-    qsid2 = f"qs-{secrets.token_urlsafe(16)}-1"
+    qsid1 = f"qs-{secrets.token_hex(16)}-0"
+    qsid2 = f"qs-{secrets.token_hex(16)}-1"
     await vfs.create_quota_scope(qsid1)
     await vfs.create_quota_scope(qsid2)
 

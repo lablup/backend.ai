@@ -4,6 +4,7 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path, PurePath, PurePosixPath
 from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
 
+from ai.backend.common import validators as tx
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
@@ -49,8 +50,10 @@ class AbstractVolume(metaclass=ABCMeta):
     def mangle_qspath(self, ref: VFolderID | str) -> Path:
         match ref:
             case VFolderID():
+                tx.QuotaScopeID().check(ref.quota_scope_id)
                 return Path(self.mount_path, ref.quota_scope_id)
             case str():
+                tx.QuotaScopeID().check(ref)
                 return Path(self.mount_path, ref)
             case _:
                 raise ValueError(f"Invalid reference value for quota scope ID: {ref!r}")
