@@ -30,7 +30,7 @@ msgstr "vs. Notebooks"
 #: 79105172721e4098a6d25ad4e039fb0e 99950a9acda8452eaffe27fcc30be06f
 #: c4e968ca8763497aba424dfe7f1ead7c
 msgid "Product"
-msgstr "제품 이름"
+msgstr "제품명"
 
 #: ../../concepts/faq.rst:10 ../../concepts/faq.rst:48
 #: 4142161b719541aab385b8b9476f2ff5 d505e1d8df484222bc733ea135673e36
