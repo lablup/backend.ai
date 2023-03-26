@@ -5,7 +5,7 @@ import enum
 import logging
 import math
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
+from collections import UserDict, defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
@@ -17,6 +17,8 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NamedTuple,
+    Optional,
     Sequence,
     Set,
     Type,
@@ -48,7 +50,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
@@ -74,6 +76,49 @@ class IdleCheckerError(TaskGroupError):
     """
     An exception that is a collection of multiple idle checkers.
     """
+
+
+def parse_unit(resource_name: str, value: float | int) -> float | int:
+    if resource_name.find("mem") == -1:
+        return value
+    return BinarySize(int(value))
+
+
+class UtilizationExtraInfo(NamedTuple):
+    avg_util: float
+    threshold: float
+
+
+class UtilizationResourceReport(UserDict):
+    __slots__ = ("data",)
+
+    data: dict[str, UtilizationExtraInfo]
+
+    @classmethod
+    def from_avg_threshold(
+        cls,
+        avg_utils: Mapping[str, float],
+        thresholds: Mapping[str, Union[int, float, Decimal, None]],
+        exclusions: set[str],
+    ) -> UtilizationResourceReport:
+        data: dict[str, UtilizationExtraInfo] = {
+            k: UtilizationExtraInfo(float(avg_utils[k]), float(threshold))
+            for k, threshold in thresholds.items()
+            if (threshold is not None) and (k not in exclusions)
+        }
+        return cls(data)
+
+    def to_dict(self, apply_unit: bool = True) -> dict[str, UtilizationExtraInfo]:
+        if apply_unit:
+            return {
+                k: UtilizationExtraInfo(parse_unit(k, v[0]), parse_unit(k, v[1]))
+                for k, v in self.data.items()
+            }
+        return {**self.data}
+
+    @property
+    def utilizion_result(self) -> dict[str, bool]:
+        return {k: (v.avg_util >= v.threshold) for k, v in self.data.items()}
 
 
 class AppStreamingStatus(enum.Enum):
@@ -243,15 +288,17 @@ class IdleCheckerHost:
     async def get_idle_check_report(
         self,
         session_id: SessionId,
-    ) -> Mapping[str, Any]:
-        report = {
+    ) -> dict[str, Any]:
+        report: dict[str, Any] = {
             "timeout": None,
             "session_lifetime": None,
             "utilization": None,
         }
         for checker in self._checkers:
-            result = await checker.get_checker_result(self._redis_live, session_id)
-            report[checker.report_key] = result
+            report[checker.report_key] = await checker.get_checker_result(
+                self._redis_live, session_id
+            )
+            report[checker.extra_info_key] = await checker.get_extra_info(session_id)
         return report
 
 
@@ -259,6 +306,7 @@ class BaseIdleChecker(metaclass=ABCMeta):
     terminate_reason: KernelLifecycleEventReason
     name: ClassVar[str] = "base"
     report_key: ClassVar[str] = "base"
+    extra_info_key: ClassVar[str] = "base_extra"
 
     def __init__(
         self,
@@ -289,6 +337,10 @@ class BaseIdleChecker(metaclass=ABCMeta):
         return f"session.{session_id}.{cls.name}.report"
 
     @abstractmethod
+    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+        return None
+
+    @abstractmethod
     async def check_idleness(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
     ) -> bool:
@@ -303,7 +355,7 @@ class BaseIdleChecker(metaclass=ABCMeta):
         self,
         redis_obj: RedisConnectionInfo,
         session_id: SessionId,
-    ) -> Any:
+    ) -> Optional[float]:
         """
         Get check result of the given session.
         """
@@ -320,6 +372,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
     terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_TIMEOUT
     name: ClassVar[str] = "timeout"
     report_key: ClassVar[str] = "timeout"
+    extra_info_key: ClassVar[str] = "timeout_extra"
 
     _config_iv = t.Dict(
         {
@@ -416,6 +469,9 @@ class TimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         await self._update_timeout(event.session_id)
 
+    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+        return None
+
     async def check_idleness(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
     ) -> bool:
@@ -471,7 +527,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
         self,
         redis_obj: RedisConnectionInfo,
         session_id: SessionId,
-    ) -> Any:
+    ) -> Optional[float]:
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
         return msgpack.unpackb(data) if data is not None else None
@@ -481,9 +537,13 @@ class SessionLifetimeChecker(BaseIdleChecker):
     terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_SESSION_LIFETIME
     name: ClassVar[str] = "session_lifetime"
     report_key: ClassVar[str] = "session_lifetime"
+    extra_info_key: ClassVar[str] = "session_lifetime_extra"
 
     async def populate_config(self, config: Mapping[str, Any]) -> None:
         pass
+
+    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+        return None
 
     async def check_idleness(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
@@ -517,7 +577,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
         self,
         redis_obj: RedisConnectionInfo,
         session_id: SessionId,
-    ) -> Any:
+    ) -> Optional[float]:
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
         return msgpack.unpackb(data) if data is not None else None
@@ -531,6 +591,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.IDLE_UTILIZATION
     name: ClassVar[str] = "utilization"
     report_key: ClassVar[str] = "utilization"
+    extra_info_key: ClassVar[str] = "utilization_extra"
 
     _config_iv = t.Dict(
         {
@@ -589,17 +650,32 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"time-window({self.time_window.total_seconds()}s)",
         )
 
-    async def _report_redis(
-        self, redis_obj: RedisConnectionInfo, session_id: SessionId, avg_utils: dict[str, float]
-    ) -> None:
-        await redis_helper.execute(
-            redis_obj,
-            lambda r: r.set(
-                self.get_report_key(session_id),
-                msgpack.packb(avg_utils),
-                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+    def get_extra_info_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.{self.extra_info_key}"
+
+    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+        data = await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.get(
+                self.get_extra_info_key(session_id),
             ),
         )
+        return msgpack.unpackb(data) if data is not None else None
+
+    async def delete_expire_time_report(self, session_id: SessionId) -> None:
+        await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.delete(self.get_report_key(session_id)),
+        )
+
+    def get_time_window(self, policy: Row) -> float:
+        # Respect idle_timeout, from keypair resource policy, over time_window.
+        if (idle_timeout := policy["idle_timeout"]) >= 0:
+            return float(idle_timeout)
+        return self.time_window.total_seconds()
+
+    def get_last_collected_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.util_last_collected"
 
     async def check_idleness(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
@@ -611,27 +687,49 @@ class UtilizationIdleChecker(BaseIdleChecker):
         session_id = kernel["session_id"]
 
         interval = IdleCheckerHost.check_interval
-        window_size = int(self.time_window.total_seconds() / interval)
+        time_window = self.get_time_window(policy)
         occupied_slots = kernel["occupied_slots"]
         unavailable_resources: Set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
-        util_last_collected_key = f"session.{session_id}.util_last_collected"
+        util_last_collected_key = self.get_last_collected_key(session_id)
+
+        window_size = int(time_window / interval)
+        if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
+            return True
 
         # Wait until the time "interval" is passed after the last udpated time.
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-        t = t[0] + (t[1] / (10**6))
+        util_now: float = t[0] + (t[1] / (10**6))
         raw_util_last_collected = await redis_helper.execute(
             self._redis_live,
             lambda r: r.get(util_last_collected_key),
         )
-        util_last_collected = float(raw_util_last_collected) if raw_util_last_collected else 0
-        if t - util_last_collected < interval:
+        util_last_collected: float = (
+            float(raw_util_last_collected) if raw_util_last_collected else 0.0
+        )
+        if util_now - util_last_collected < interval:
             return True
 
-        # Respect initial grace period (no termination of the session)
+        # Report time remaining until the first time window is full as expire time
         now = datetime.now(tzutc())
-        if now - kernel["created_at"] <= self.initial_grace_period:
+        initial_period: timedelta = now - kernel["created_at"]
+        if (
+            first_expire_time := self.initial_grace_period.total_seconds()
+            + time_window
+            - initial_period.total_seconds()
+        ) >= 0:
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.set(
+                    self.get_report_key(session_id),
+                    msgpack.packb(first_expire_time),
+                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+                ),
+            )
+
+        # Respect initial grace period (no termination of the session)
+        if initial_period <= self.initial_grace_period:
             return True
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
@@ -647,30 +745,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
             if unique_res_map[slot] == 0:
                 unavailable_resources.update(self.slot_resource_map[slot])
 
-        raw_util_series = await redis_helper.execute(
-            self._redis_live, lambda r: r.get(util_series_key)
-        )
-
-        try:
-            util_series = msgpack.unpackb(raw_util_series, use_list=True)
-        except TypeError:
-            util_series = {k: [] for k in self.resource_thresholds.keys()}
-
-        def _avg(util_list: list[float]) -> float:
-            try:
-                return sum(util_list) / len(util_list)
-            except ZeroDivisionError:
-                return 0.0
-
-        avg_utils = {k: _avg(v) for k, v in util_series.items()}
-
-        # Respect idle_timeout, from keypair resource policy, over time_window.
-        if policy["idle_timeout"] >= 0:
-            window_size = int(float(policy["idle_timeout"]) / interval)
-        if (window_size <= 0) or (math.isinf(window_size) and window_size > 0):
-            await self._report_redis(redis_obj, session_id, avg_utils)
-            return True
-
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
             query = sa.select([kernels.c.id]).where(
@@ -682,10 +756,19 @@ class UtilizationIdleChecker(BaseIdleChecker):
             kernel_ids = [kernel["id"]]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
-            await self._report_redis(redis_obj, session_id, avg_utils)
+            await self.delete_expire_time_report(session_id)
             return True
 
         # Update utilization time-series data.
+        raw_util_series = await redis_helper.execute(
+            self._redis_live, lambda r: r.get(util_series_key)
+        )
+
+        try:
+            util_series: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
+        except TypeError:
+            util_series = {k: [] for k in self.resource_thresholds.keys()}
+
         not_enough_data = False
 
         for k in util_series:
@@ -706,22 +789,37 @@ class UtilizationIdleChecker(BaseIdleChecker):
             self._redis_live,
             lambda r: r.set(
                 util_last_collected_key,
-                f"{t:.06f}",
+                f"{util_now:.06f}",
                 ex=max(86400, int(self.time_window.total_seconds() * 2)),
             ),
         )
 
+        def _avg(util_list: list[float]) -> float:
+            try:
+                return sum(util_list) / len(util_list)
+            except ZeroDivisionError:
+                return 0.0
+
+        avg_utils: Mapping[str, float] = {k: _avg(v) for k, v in util_series.items()}
+
+        util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
+            avg_utils, self.resource_thresholds, unavailable_resources
+        )
+        await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.set(
+                self.get_extra_info_key(session_id),
+                msgpack.packb(util_avg_thresholds.to_dict()),
+                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+            ),
+        )
+
         if not_enough_data:
-            await self._report_redis(redis_obj, session_id, avg_utils)
+            await self.delete_expire_time_report(session_id)
             return True
 
         # Check over-utilized (not to be collected) resources.
-        sufficiently_utilized = {
-            k: (float(avg_utils[k]) >= float(threshold))
-            for k, threshold in self.resource_thresholds.items()
-            if (threshold is not None) and (k not in unavailable_resources)
-        }
-
+        sufficiently_utilized = util_avg_thresholds.utilizion_result
         check_result = True
         if len(sufficiently_utilized) < 1:
             check_result = True
@@ -736,7 +834,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 avg_utils,
                 self.thresholds_check_operator,
             )
-        await self._report_redis(redis_obj, session_id, avg_utils)
+        else:
+            await self.delete_expire_time_report(session_id)
         return check_result
 
     async def get_current_utilization(
@@ -786,7 +885,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self,
         redis_obj: RedisConnectionInfo,
         session_id: SessionId,
-    ) -> Any:
+    ) -> Optional[float]:
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
         return msgpack.unpackb(data) if data is not None else None
@@ -818,6 +917,7 @@ async def init_idle_checkers(
     enabled_checkers = await shared_config.etcd.get("config/idle/enabled")
     if enabled_checkers:
         for checker_name in enabled_checkers.split(","):
+            checker_name = checker_name.strip()
             checker_cls = checker_registry.get(checker_name, None)
             if checker_cls is None:
                 log.warning("ignoring an unknown idle checker name: {}", checker_name)
