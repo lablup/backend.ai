@@ -225,7 +225,7 @@ Plugins
   - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
     - This emulates the presence of CUDA devices without actual CUDA devices,
       so that developers can work on CUDA integration without real GPUs.
-  - [`ai.backend.accelerator.rocm`](): ROCM accelerator plugin
+  - [`ai.backend.accelerator.rocm`](): ROCm accelerator plugin
   - More available in the enterprise edition!
 * `backendai_monitor_stats_v10`
   - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)
