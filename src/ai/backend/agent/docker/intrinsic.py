@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import platform
+from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
@@ -50,6 +51,26 @@ from .agent import Container
 from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def netstat_ns_work(ns_path: Path):
+    with nsenter(ns_path):
+        result = psutil.net_io_counters(pernic=True)
+    return result
+
+
+async def netstat_ns(ns_path: Path):
+    loop = asyncio.get_running_loop()
+    # Linux namespace is per-thread state. Therefore we need to ensure
+    # IO is executed in the same thread where we switched the namespace.
+    # Go provides runtime.LockOSThread() to do this.
+    #
+    # Unfortunately, CPython drops GIL while running IO and does not
+    # provide any similar functionality. Therefore we execute namespace
+    # dependent operation in the new process.
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
+    return result
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -604,8 +625,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 sandbox_key = data["NetworkSettings"]["SandboxKey"]
             net_rx_bytes = 0
             net_tx_bytes = 0
-            with nsenter(sandbox_key):
-                nstat = psutil.net_io_counters(pernic=True)
+            nstat = await netstat_ns(sandbox_key)
             for name, stat in nstat.items():
                 if name == "lo":
                     continue
