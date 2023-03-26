@@ -17,7 +17,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_VFOLDER, AbstractVolume
-from ..exception import ExecutionError, InvalidAPIParameters, NotEmptyError
+from ..exception import ExecutionError, InvalidAPIParameters, InvalidQuotaScopeError, NotEmptyError
 from ..types import (
     SENTINEL,
     DirEntry,
@@ -96,7 +96,7 @@ class BaseVolume(AbstractVolume):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
-            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+            lambda: qspath.rmdir(),
         )
 
     async def create_vfolder(
@@ -106,6 +106,9 @@ class BaseVolume(AbstractVolume):
         *,
         exist_ok: bool = False,
     ) -> None:
+        qspath = self.mangle_qspath(vfid)
+        if not qspath.exists():
+            raise InvalidQuotaScopeError(vfid.quota_scope_id)
         vfpath = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

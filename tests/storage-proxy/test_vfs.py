@@ -22,15 +22,18 @@ async def vfs(local_volume):
 async def empty_vfolder(vfs):
     qsid = f"qs-{secrets.token_urlsafe(16)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
+    await vfs.create_quota_scope(qsid)
     await vfs.create_vfolder(vfid)
     yield vfid
     await vfs.delete_vfolder(vfid)
+    await vfs.delete_quota_scope(qsid)
 
 
 @pytest.mark.asyncio
 async def test_vfs_vfolder_mgmt(vfs):
     qsid = f"qs-{secrets.token_urlsafe(16)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
+    await vfs.create_quota_scope(qsid)
     await vfs.create_vfolder(vfid)
     vfpath = (
         vfs.mount_path
@@ -76,6 +79,9 @@ async def test_vfs_vfolder_mgmt(vfs):
     assert not vfpath2.parent.exists()
     assert not vfpath2.parent.parent.exists()
 
+    await vfs.delete_quota_scope(qsid)
+    assert not vfs.mangle_qspath(qsid).exists()
+
 
 @pytest.mark.asyncio
 async def test_vfs_get_usage(vfs, empty_vfolder):
@@ -93,6 +99,9 @@ async def test_vfs_get_usage(vfs, empty_vfolder):
 async def test_vfs_clone(vfs):
     qsid1 = f"qs-{secrets.token_urlsafe(16)}-0"
     qsid2 = f"qs-{secrets.token_urlsafe(16)}-1"
+    await vfs.create_quota_scope(qsid1)
+    await vfs.create_quota_scope(qsid2)
+
     vfid1 = VFolderID(qsid1, uuid.uuid4())
     vfid2 = VFolderID(qsid2, uuid.uuid4())
     vfpath1 = (
@@ -121,6 +130,11 @@ async def test_vfs_clone(vfs):
     assert (vfpath2 / "inner" / "hello.txt").is_file()
     await vfs.delete_vfolder(vfid1)
     await vfs.delete_vfolder(vfid2)
+
+    await vfs.delete_quota_scope(qsid1)
+    await vfs.delete_quota_scope(qsid2)
+    assert not vfs.mangle_qspath(qsid1).exists()
+    assert not vfs.mangle_qspath(qsid2).exists()
 
 
 @pytest.mark.asyncio

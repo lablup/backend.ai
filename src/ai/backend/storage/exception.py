@@ -28,6 +28,10 @@ class InvalidSubpathError(StorageProxyError):
     pass
 
 
+class InvalidQuotaScopeError(StorageProxyError):
+    pass
+
+
 class InvalidVolumeError(StorageProxyError):
     pass
 
