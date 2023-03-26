@@ -11,7 +11,7 @@ from .types import (
     DirEntry,
     FSPerfMetric,
     FSUsage,
-    QuotaOption,
+    QuotaConfig,
     VFolderCreationOptions,
     VFolderID,
     VFolderUsage,
@@ -93,7 +93,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def create_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaOption] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         """
         Creates a new quota scope.
@@ -106,7 +106,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def get_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> tuple[QuotaOption, VFolderUsage]:
+    ) -> tuple[QuotaConfig, VFolderUsage]:
         """
         Get the information about the given quota scope.
         """
@@ -116,8 +116,8 @@ class AbstractVolume(metaclass=ABCMeta):
     async def update_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaOption] = None,
-    ) -> QuotaOption:
+        options: Optional[QuotaConfig] = None,
+    ) -> QuotaConfig:
         """
         Update the quota option of the given quota scope.
         """

@@ -24,7 +24,7 @@ from ..types import (
     DirEntryType,
     FSPerfMetric,
     FSUsage,
-    QuotaOption,
+    QuotaConfig,
     Sentinel,
     Stat,
     VFolderCreationOptions,
@@ -64,7 +64,7 @@ class BaseVolume(AbstractVolume):
     async def create_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaOption] = None,
+        config: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -76,14 +76,14 @@ class BaseVolume(AbstractVolume):
     async def get_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> tuple[QuotaOption, VFolderUsage]:
-        return QuotaOption(0, 0), VFolderUsage(-1, -1)
+    ) -> tuple[QuotaConfig, VFolderUsage]:
+        return QuotaConfig(0, 0), VFolderUsage(-1, -1)
 
     async def update_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaOption] = None,
-    ) -> QuotaOption:
+        options: Optional[QuotaConfig] = None,
+    ) -> QuotaConfig:
         raise NotImplementedError
 
     async def delete_quota_scope(

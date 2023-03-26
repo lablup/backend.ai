@@ -9,7 +9,7 @@ import attrs
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import BinarySize, QuotaOption, VFolderID
+from ai.backend.common.types import BinarySize, QuotaConfig, VFolderID
 
 __all__ = (
     "Sentinel",
@@ -20,7 +20,7 @@ __all__ = (
     "VFolderCreationOptions",
     "VFolderID",
     "VFolderUsage",
-    "QuotaOption",
+    "QuotaConfig",
     "Stat",
     "DirEntry",
     "DirEntryType",

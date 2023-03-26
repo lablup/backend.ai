@@ -68,7 +68,7 @@ __all__ = (
     "MountTypes",
     "VFolderID",
     "VFolderMount",
-    "QuotaOption",
+    "QuotaConfig",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -853,7 +853,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
 
 
 @attrs.define(auto_attribs=True, slots=True)
-class QuotaOption:
+class QuotaConfig:
     soft_limit: int  # in bytes  # TODO: refactor using DecimalSize
     hard_limit: int  # in bytes  # TODO: refactor using DecimalSize
 
