@@ -4,10 +4,12 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path, PurePath, PurePosixPath
 from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
 
+import trafaret as t
+
 from ai.backend.common import validators as tx
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from .exception import InvalidSubpathError, VFolderNotFoundError
+from .exception import InvalidQuotaScopeError, InvalidSubpathError, VFolderNotFoundError
 from .types import (
     DirEntry,
     FSPerfMetric,
@@ -48,22 +50,27 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     def mangle_qspath(self, ref: VFolderID | str) -> Path:
-        match ref:
-            case VFolderID():
-                tx.QuotaScopeID().check(ref.quota_scope_id)
-                return Path(self.mount_path, ref.quota_scope_id)
-            case str():
-                tx.QuotaScopeID().check(ref)
-                return Path(self.mount_path, ref)
-            case _:
-                raise ValueError(f"Invalid reference value for quota scope ID: {ref!r}")
+        try:
+            match ref:
+                case VFolderID():
+                    tx.QuotaScopeID().check(ref.quota_scope_id)
+                    return Path(self.mount_path, ref.quota_scope_id)
+                case str():
+                    tx.QuotaScopeID().check(ref)
+                    return Path(self.mount_path, ref)
+                case _:
+                    raise InvalidQuotaScopeError(
+                        f"Invalid value format for quota scope ID: {ref!r}"
+                    )
+        except t.DataError:
+            raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}")
 
     def mangle_vfpath(self, vfid: VFolderID) -> Path:
         folder_id_hex = vfid.folder_id.hex
         prefix1 = folder_id_hex[0:2]
         prefix2 = folder_id_hex[2:4]
         rest = folder_id_hex[4:]
-        return Path(self.mount_path, vfid.quota_scope_id, prefix1, prefix2, rest)
+        return self.mangle_qspath(vfid.quota_scope_id) / prefix1 / prefix2 / rest
 
     def sanitize_vfpath(
         self,
