@@ -9,7 +9,15 @@ import os
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, Mapping, MutableMapping, cast
+from typing import (
+    Any,
+    AsyncContextManager,
+    Final,
+    Mapping,
+    MutableMapping,
+    TypedDict,
+    cast,
+)
 
 import aiohttp_cors
 import janus
@@ -63,20 +71,30 @@ upload_token_data_iv = t.Dict(
 async def download(request: web.Request) -> web.StreamResponse:
     ctx: Context = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=download_token_data_iv,
-                ),
-                t.Key("dst_dir", default=None): t.Null | t.String,
-                t.Key("archive", default=False): t.ToBool,
-                t.Key("no_cache", default=False): t.ToBool,
-            },
+
+    class Params(TypedDict):
+        token: dict[str, Any]
+        dst_dir: str
+        archive: bool
+        no_cache: bool
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=download_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                    t.Key("archive", default=False): t.ToBool,
+                    t.Key("no_cache", default=False): t.ToBool,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         async with ctx.get_volume(params["token"]["volume"]) as volume:
             token_data = params["token"]
@@ -217,18 +235,26 @@ async def tus_check_session(request: web.Request) -> web.Response:
     """
     ctx: Context = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=upload_token_data_iv,
-                ),
-                t.Key("dst_dir", default=None): t.Null | t.String,
-            },
+
+    class Params(TypedDict):
+        token: dict[str, Any]
+        dst_dir: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
@@ -242,18 +268,26 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     """
     ctx: Context = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=upload_token_data_iv,
-                ),
-                t.Key("dst_dir", default=None): t.Null | t.String,
-            },
+
+    class Params(TypedDict):
+        token: dict[str, Any]
+        dst_dir: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
