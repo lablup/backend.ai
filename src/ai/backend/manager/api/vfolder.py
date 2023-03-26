@@ -41,6 +41,7 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderID,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -441,28 +442,44 @@ async def create(request: web.Request, params: Any) -> web.Response:
         else:
             if "user" not in allowed_vfolder_types:
                 raise InvalidAPIParameters("user vfolder cannot be created in this host")
+        user_uuid = str(user_uuid) if group_id is None else None
+        group_uuid = str(group_id) if group_id is not None else None
+        ownership_type = "group" if group_uuid is not None else "user"
+        # TODO: generate a quota scope ID if required, depending on ownership_type.
+        quota_scope_id = "default"
         try:
             folder_id = uuid.uuid4()
+            vfid = VFolderID(quota_scope_id, folder_id)
             if not unmanaged_path:
-                # Try to create actual only if vFolder is managed one
+                # Create the vfolder only when it is a managed one
+                # TODO: create the quota scope if not exists
+                # async with root_ctx.storage_manager.request(
+                #     folder_host,
+                #     "POST",
+                #     "quota-scope/create",
+                #     json={
+                #         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                #         "qsid": str(quota_scope_id),
+                #         "options": {"quota": params["quota"]},  # TODO: fit with QuotaConfig
+                #     },
+                # ):
+                #     pass
                 async with root_ctx.storage_manager.request(
                     folder_host,
                     "POST",
                     "folder/create",
                     json={
                         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                        "vfid": str(folder_id),
-                        "options": {"quota": params["quota"]},
+                        "vfid": str(vfid),
                     },
                 ):
                     pass
         except aiohttp.ClientResponseError:
             raise VFolderCreationFailed
-        user_uuid = str(user_uuid) if group_id is None else None
-        group_uuid = str(group_id) if group_id is not None else None
-        ownership_type = "group" if group_uuid is not None else "user"
+        # TODO: include quota scope ID in the database
+        # TODO: include quota scope ID in the API response
         insert_values = {
-            "id": folder_id.hex,
+            "id": vfid.folder_id.hex,
             "name": params["name"],
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
@@ -478,7 +495,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "status": VFolderOperationStatus.READY,
         }
         resp = {
-            "id": folder_id.hex,
+            "id": vfid.folder_id.hex,
             "name": params["name"],
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
