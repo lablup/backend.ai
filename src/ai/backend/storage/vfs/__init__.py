@@ -9,7 +9,7 @@ import shutil
 import time
 import warnings
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet, Sequence, Union
+from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union
 
 import janus
 
@@ -17,13 +17,14 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_VFOLDER, AbstractVolume
-from ..exception import ExecutionError, InvalidAPIParameters
+from ..exception import ExecutionError, InvalidAPIParameters, NotEmptyError
 from ..types import (
     SENTINEL,
     DirEntry,
     DirEntryType,
     FSPerfMetric,
     FSUsage,
+    QuotaOption,
     Sentinel,
     Stat,
     VFolderCreationOptions,
@@ -60,10 +61,48 @@ class BaseVolume(AbstractVolume):
             "metadata": {},
         }
 
+    async def create_quota_scope(
+        self,
+        quota_scope_id: str,
+        options: Optional[QuotaOption] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+        )
+
+    async def get_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> tuple[QuotaOption, VFolderUsage]:
+        return QuotaOption(0, 0), VFolderUsage(-1, -1)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: str,
+        options: Optional[QuotaOption] = None,
+    ) -> QuotaOption:
+        raise NotImplementedError
+
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
+        )
+
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: VFolderCreationOptions = None,
+        options: Optional[VFolderCreationOptions] = None,
         *,
         exist_ok: bool = False,
     ) -> None:
@@ -102,7 +141,7 @@ class BaseVolume(AbstractVolume):
         src_vfid: VFolderID,
         dst_volume: AbstractVolume,
         dst_vfid: VFolderID,
-        options: VFolderCreationOptions = None,
+        options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         # check if there is enough space in the destination
         fs_usage = await dst_volume.get_fs_usage()

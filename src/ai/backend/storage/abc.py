@@ -46,6 +46,15 @@ class AbstractVolume(metaclass=ABCMeta):
     async def shutdown(self) -> None:
         pass
 
+    def mangle_qspath(self, ref: VFolderID | str) -> Path:
+        match ref:
+            case VFolderID():
+                return Path(self.mount_path, ref.quota_scope_id)
+            case str():
+                return Path(self.mount_path, ref)
+            case _:
+                raise ValueError(f"Invalid reference value for quota scope ID: {ref!r}")
+
     def mangle_vfpath(self, vfid: VFolderID) -> Path:
         folder_id_hex = vfid.folder_id.hex
         prefix1 = folder_id_hex[0:2]

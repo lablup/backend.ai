@@ -12,6 +12,10 @@ class ExecutionError(StorageProxyError):
     pass
 
 
+class NotEmptyError(StorageProxyError):
+    pass
+
+
 class VFolderCreationError(StorageProxyError):
     pass
 
