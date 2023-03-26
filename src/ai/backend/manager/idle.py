@@ -662,10 +662,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
         return msgpack.unpackb(data) if data is not None else None
 
-    async def delete_expire_time_report(self, session_id: SessionId) -> None:
+    async def set_expire_time_report(self, session_id: SessionId, expire_time: float) -> None:
         await redis_helper.execute(
             self._redis_live,
-            lambda r: r.delete(self.get_report_key(session_id)),
+            lambda r: r.set(
+                self.get_report_key(session_id),
+                msgpack.packb(expire_time),
+                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+            ),
         )
 
     def get_time_window(self, policy: Row) -> float:
@@ -719,16 +723,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
             + time_window
             - initial_period.total_seconds()
         ) >= 0:
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.set(
-                    self.get_report_key(session_id),
-                    msgpack.packb(first_expire_time),
-                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-                ),
-            )
+            await self.set_expire_time_report(session_id, first_expire_time)
         else:
-            await self.delete_expire_time_report(session_id)
+            await self.set_expire_time_report(session_id, -1.0)
 
         # Respect initial grace period (no termination of the session)
         if initial_period <= self.initial_grace_period:
@@ -886,11 +883,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     ) -> Optional[float]:
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
-        if data is not None:
-            if (unpacked := msgpack.unpackb(data)) > 0:
-                return unpacked
-            return None
-        return None
+        return msgpack.unpackb(data) if data is not None else None
 
 
 checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
