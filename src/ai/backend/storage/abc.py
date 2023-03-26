@@ -130,7 +130,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: VFolderCreationOptions = None,
+        options: Optional[VFolderCreationOptions] = None,
         *,
         exist_ok: bool = False,
     ) -> None:
@@ -146,7 +146,7 @@ class AbstractVolume(metaclass=ABCMeta):
         src_vfid: VFolderID,
         dst_volume: AbstractVolume,
         dst_vfid: VFolderID,
-        options: VFolderCreationOptions = None,
+        options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         """
         Create a new vfolder on the destination volume with
