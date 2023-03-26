@@ -16,6 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.20 (2023-03-26)
+
+### Features
+* Query agent list with multiple statuses. For example, CLI query like this is now possible: `backend.ai admin agent list -s "TERMINATED,LOST"`. ([#1174](https://github.com/lablup/backend.ai/issues/1174))
+* Gather per-container network statistics. ([#1179](https://github.com/lablup/backend.ai/issues/1179))
+* Support to change the owner of (user) vfolder to only among users with an access to the vfolder's storage host ([#1182](https://github.com/lablup/backend.ai/issues/1182))
+* Add possible expire time of utilization checker to idle check result. ([#1185](https://github.com/lablup/backend.ai/issues/1185))
+* Add `[storage-proxy].ipc-base-path` configuration option to the storage proxy like other service daemons ([#1189](https://github.com/lablup/backend.ai/issues/1189))
+* Automatically mount `.linuxbrew` dot-folder, if exists, at `/home/linuxbrew/.linuxbrew` inside a container to support OS package installation with Homebrew. ([#1195](https://github.com/lablup/backend.ai/issues/1195))
+
+### Improvements
+* Automatically set the proper webui build artifact path in `webserver.conf` when installed with `--editable-webui` and document it in the sample configuration ([#1190](https://github.com/lablup/backend.ai/issues/1190))
+
+### Fixes
+* Fix session ls not working bug ([#1100](https://github.com/lablup/backend.ai/issues/1100))
+* Add delete transactions vfolder_invitations and vfolder_permissions table when new owner and invitee of vfolder are same ([#1186](https://github.com/lablup/backend.ai/issues/1186))
+* Change input field of change vfolder ownership from `user_id` to `user_email` ([#1188](https://github.com/lablup/backend.ai/issues/1188))
+
+
 ## 22.09.19 (2023-03-23)
 
 ### Features
