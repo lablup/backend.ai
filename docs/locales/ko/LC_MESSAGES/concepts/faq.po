@@ -30,7 +30,7 @@ msgstr "vs. Notebooks"
 #: 79105172721e4098a6d25ad4e039fb0e 99950a9acda8452eaffe27fcc30be06f
 #: c4e968ca8763497aba424dfe7f1ead7c
 msgid "Product"
-msgstr "제품 내용"
+msgstr "제품 이름"
 
 #: ../../concepts/faq.rst:10 ../../concepts/faq.rst:48
 #: 4142161b719541aab385b8b9476f2ff5 d505e1d8df484222bc733ea135673e36
@@ -52,7 +52,7 @@ msgstr "노트북 스타일 문서 + *프론트엔드* 코드"
 
 #: ../../concepts/faq.rst:15 3b95e0e752e44d35879aedc91c740e83
 msgid "Insecure host resource sharing"
-msgstr "Insecure host resource sharing"
+msgstr "보안상 취약한 호스트 리소스 공유"
 
 #: ../../concepts/faq.rst:17 ../../concepts/faq.rst:34
 #: ../../concepts/faq.rst:59 141096fc36e74ac2b75538d6ac114806
@@ -70,7 +70,7 @@ msgstr "Built for multi-tenancy: scalable and better isolation"
 
 #: ../../concepts/faq.rst:22 afd7dfbcfde74ba4a1d5dcec662f60f1
 msgid "vs. Orchestration Frameworks"
-msgstr "vs. Orchestration Frameworks"
+msgstr "vs. 오케스트레이션 프레임워크"
 
 #: ../../concepts/faq.rst:27 5a961b4114694a57857120bc2d78e6b6
 msgid "Target"
@@ -86,7 +86,7 @@ msgstr "Amazon ECS, Kubernetes"
 
 #: ../../concepts/faq.rst:31 76cf1c529c534ab6949a62e87f66ea8b
 msgid "Long-running service daemons"
-msgstr "Long-running service daemons"
+msgstr "오래 실행되는 데몬 서비스"
 
 #: ../../concepts/faq.rst:32 e35c4de5610043b2ab0602d9329e4da9
 msgid "Load balancing, fault tolerance, incremental deployment"
@@ -114,7 +114,7 @@ msgstr "관리가 필요없는 서버리스 구조"
 
 #: ../../concepts/faq.rst:43 53259dfd98fe4c4691133716b9e3a9a5
 msgid "vs. Big-data and AI Frameworks"
-msgstr "vs. Big-data and AI Frameworks"
+msgstr "vs. 빅데이터와 AI 프레임워크"
 
 #: ../../concepts/faq.rst:51 41d2326e38054e3186f0661a22e98b8a
 msgid "TensorFlow, Apache Spark, Apache Hive"
@@ -126,7 +126,7 @@ msgstr "Computation 런타임"
 
 #: ../../concepts/faq.rst:53 dfe9a11366b246a39256df99fb48f864
 msgid "Difficult to install, configure, and operate"
-msgstr "설치, 구성, 및 운용의 어려움"
+msgstr "설치, 구성, 및 운용 하기 어려움"
 
 #: ../../concepts/faq.rst:55 1072859cbf934c16ad754bfdf61ba2b3
 msgid "Amazon ML, Azure ML, GCP ML"
