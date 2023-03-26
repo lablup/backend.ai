@@ -1,8 +1,10 @@
+import secrets
 import uuid
 from pathlib import Path, PurePath
 
 import pytest
 
+from ai.backend.storage.types import VFolderID
 from ai.backend.storage.vfs import BaseVolume
 
 
@@ -18,7 +20,8 @@ async def vfs(local_volume):
 
 @pytest.fixture
 async def empty_vfolder(vfs):
-    vfid = uuid.uuid4()
+    qsid = f"qs-{secrets.token_urlsafe(16)}-0"
+    vfid = VFolderID(qsid, uuid.uuid4())
     await vfs.create_vfolder(vfid)
     yield vfid
     await vfs.delete_vfolder(vfid)
@@ -26,21 +29,40 @@ async def empty_vfolder(vfs):
 
 @pytest.mark.asyncio
 async def test_vfs_vfolder_mgmt(vfs):
-    vfid = uuid.uuid4()
+    qsid = f"qs-{secrets.token_urlsafe(16)}-0"
+    vfid = VFolderID(qsid, uuid.uuid4())
     await vfs.create_vfolder(vfid)
-    vfpath = vfs.mount_path / vfid.hex[0:2] / vfid.hex[2:4] / vfid.hex[4:]
+    vfpath = (
+        vfs.mount_path
+        / vfid.quota_scope_id
+        / vfid.folder_id.hex[0:2]
+        / vfid.folder_id.hex[2:4]
+        / vfid.folder_id.hex[4:]
+    )
     assert vfpath.is_dir()
     await vfs.delete_vfolder(vfid)
     assert not vfpath.exists()
     assert not vfpath.parent.exists()
     assert not vfpath.parent.parent.exists()
 
-    vfid1 = uuid.UUID(hex="82a6ba2b7b8e41deb5ee2c909ce34bcb")
-    vfid2 = uuid.UUID(hex="82a6ba2b7b8e41deb5ee2c909ce34bcc")
+    vfid1 = VFolderID(qsid, uuid.UUID(hex="82a6ba2b7b8e41deb5ee2c909c00000b"))
+    vfid2 = VFolderID(qsid, uuid.UUID(hex="82a6ba2b7b8e41deb5ee2c909c00000c"))
     await vfs.create_vfolder(vfid1)
     await vfs.create_vfolder(vfid2)
-    vfpath1 = vfs.mount_path / vfid1.hex[0:2] / vfid1.hex[2:4] / vfid1.hex[4:]
-    vfpath2 = vfs.mount_path / vfid2.hex[0:2] / vfid2.hex[2:4] / vfid2.hex[4:]
+    vfpath1 = (
+        vfs.mount_path
+        / qsid
+        / vfid1.folder_id.hex[0:2]
+        / vfid1.folder_id.hex[2:4]
+        / vfid1.folder_id.hex[4:]
+    )
+    vfpath2 = (
+        vfs.mount_path
+        / qsid
+        / vfid2.folder_id.hex[0:2]
+        / vfid2.folder_id.hex[2:4]
+        / vfid2.folder_id.hex[4:]
+    )
     assert vfpath2.relative_to(vfpath1.parent).name == vfpath2.name
     assert vfpath1.is_dir()
     await vfs.delete_vfolder(vfid1)
@@ -69,10 +91,24 @@ async def test_vfs_get_usage(vfs, empty_vfolder):
 
 @pytest.mark.asyncio
 async def test_vfs_clone(vfs):
-    vfid1 = uuid.uuid4()
-    vfid2 = uuid.uuid4()
-    vfpath1 = vfs.mount_path / vfid1.hex[0:2] / vfid1.hex[2:4] / vfid1.hex[4:]
-    vfpath2 = vfs.mount_path / vfid2.hex[0:2] / vfid2.hex[2:4] / vfid2.hex[4:]
+    qsid1 = f"qs-{secrets.token_urlsafe(16)}-0"
+    qsid2 = f"qs-{secrets.token_urlsafe(16)}-1"
+    vfid1 = VFolderID(qsid1, uuid.uuid4())
+    vfid2 = VFolderID(qsid2, uuid.uuid4())
+    vfpath1 = (
+        vfs.mount_path
+        / vfid1.quota_scope_id
+        / vfid1.folder_id.hex[0:2]
+        / vfid1.folder_id.hex[2:4]
+        / vfid1.folder_id.hex[4:]
+    )
+    vfpath2 = (
+        vfs.mount_path
+        / vfid2.quota_scope_id
+        / vfid2.folder_id.hex[0:2]
+        / vfid2.folder_id.hex[2:4]
+        / vfid2.folder_id.hex[4:]
+    )
     await vfs.create_vfolder(vfid1)
     assert vfpath1.is_dir()
     (vfpath1 / "test.txt").write_bytes(b"12345")
