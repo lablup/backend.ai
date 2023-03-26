@@ -662,10 +662,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
         return msgpack.unpackb(data) if data is not None else None
 
-    async def delete_expire_time_report(self, session_id: SessionId) -> None:
+    async def set_expire_time_report(self, session_id: SessionId, expire_time: float) -> None:
         await redis_helper.execute(
             self._redis_live,
-            lambda r: r.delete(self.get_report_key(session_id)),
+            lambda r: r.set(
+                self.get_report_key(session_id),
+                msgpack.packb(expire_time),
+                ex=int(DEFAULT_CHECK_INTERVAL) * 10,
+            ),
         )
 
     def get_time_window(self, policy: Row) -> float:
@@ -719,14 +723,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
             + time_window
             - initial_period.total_seconds()
         ) >= 0:
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.set(
-                    self.get_report_key(session_id),
-                    msgpack.packb(first_expire_time),
-                    ex=int(DEFAULT_CHECK_INTERVAL) * 10,
-                ),
-            )
+            await self.set_expire_time_report(session_id, first_expire_time)
+        else:
+            await self.set_expire_time_report(session_id, -1.0)
 
         # Respect initial grace period (no termination of the session)
         if initial_period <= self.initial_grace_period:
@@ -756,7 +755,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
             kernel_ids = [kernel["id"]]
         current_utilizations = await self.get_current_utilization(kernel_ids, occupied_slots)
         if current_utilizations is None:
-            await self.delete_expire_time_report(session_id)
             return True
 
         # Update utilization time-series data.
@@ -815,7 +813,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
         if not_enough_data:
-            await self.delete_expire_time_report(session_id)
             return True
 
         # Check over-utilized (not to be collected) resources.
@@ -834,8 +831,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 avg_utils,
                 self.thresholds_check_operator,
             )
-        else:
-            await self.delete_expire_time_report(session_id)
         return check_result
 
     async def get_current_utilization(
