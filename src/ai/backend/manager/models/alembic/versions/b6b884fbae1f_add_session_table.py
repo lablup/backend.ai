@@ -392,13 +392,16 @@ def upgrade() -> None:
                 connection.execute(sess_query, sess_update_params)
 
     # Multi-kernel session migration
-    subquery = sa.select([kernels.c.session_id]).group_by(kernels.c.session_id)
-    session_cnt = connection.execute(sa.select([sa.func.count()]).select_from(subquery)).scalar()
+    session_cnt = connection.execute(
+        sa.select([sa.func.count(sa.distinct(kernels.c.session_id))]).where(
+            kernels.c.cluster_size > 1
+        )
+    ).scalar()
     for offset in range(0, session_cnt, PAGE_SIZE):
         _query = (
-            sa.select([kernels.c.session_id])
+            sa.select([sa.distinct(kernels.c.session_id)])
+            .where(kernels.c.cluster_size > 1)
             .order_by(kernels.c.session_id)
-            .group_by(kernels.c.session_id)
             .offset(offset)
             .limit(PAGE_SIZE)
         )
@@ -411,7 +414,7 @@ def upgrade() -> None:
         sa.select([sa.func.count()]).select_from(kernels).where(kernels.c.cluster_size == 1)
     ).scalar()
     for offset in range(0, kernel_cnt, PAGE_SIZE):
-        query = sa.select([kernels]).offset(offset).limit(PAGE_SIZE)
+        query = sa.select([kernels]).order_by(kernels.c.id).offset(offset).limit(PAGE_SIZE)
         migrate_kernel_to_session(query, is_single_kernel=True)
 
     op.create_foreign_key(
@@ -491,7 +494,7 @@ def downgrade():
 
     session_cnt = connection.execute(sa.select([sa.func.count()]).select_from(SessionRow)).scalar()
     for page in range(0, session_cnt, PAGE_SIZE):
-        query = sa.select(SessionRow.id).offset(page).limit(PAGE_SIZE)
+        query = sa.select(SessionRow.id).order_by(SessionRow.id).offset(page).limit(PAGE_SIZE)
         session_ids = [row["id"] for row in connection.execute(query).fetchall()]
 
         query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
