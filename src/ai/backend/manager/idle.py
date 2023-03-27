@@ -143,6 +143,7 @@ class IdleCheckerHost:
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
     ) -> None:
+        self._initial_checker: Optional[InitialChecker] = None
         self._checkers: list[BaseIdleChecker] = []
         self._frozen = False
         self._db = db
@@ -165,6 +166,13 @@ class IdleCheckerHost:
                 "Cannot add a new idle checker after the idle checker host is frozen."
             )
         self._checkers.append(checker)
+
+    def assign_initial_checker(self, checker: InitialChecker):
+        if self._frozen or self._initial_checker is not None:
+            raise RuntimeError(
+                "Cannot add a new idle checker after the idle checker host is frozen."
+            )
+        self._initial_checker = checker
 
     async def start(self) -> None:
         self._frozen = True
@@ -233,6 +241,9 @@ class IdleCheckerHost:
             result = await conn.execute(query)
             rows = result.fetchall()
             for kernel in rows:
+                if self._initial_checker is not None:
+                    if await self._initial_checker.early_check(kernel, conn, self._redis_live):
+                        continue
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
@@ -292,11 +303,11 @@ class IdleCheckerHost:
         self,
         session_id: SessionId,
     ) -> dict[str, Any]:
-        report: dict[str, Any] = {
-            "timeout": None,
-            "session_lifetime": None,
-            "utilization": None,
-        }
+        report: dict[str, Any] = {checker.name: None for checker in self._checkers}
+        if self._initial_checker is not None:
+            report[self._initial_checker.name] = await self._initial_checker.get_checker_result(
+                self._redis_live, session_id
+            )
         for checker in self._checkers:
             report[checker.report_key] = await checker.get_checker_result(
                 self._redis_live, session_id
@@ -310,7 +321,6 @@ class BaseIdleChecker(metaclass=ABCMeta):
     name: ClassVar[str] = "base"
     report_key: ClassVar[str] = "base"
     extra_info_key: ClassVar[str] = "base_extra"
-    user_initial_grace_period: Optional[timedelta]
 
     def __init__(
         self,
@@ -377,17 +387,81 @@ class BaseIdleChecker(metaclass=ABCMeta):
             ),
         )
 
-    async def calc_user_grace_period(self, kernel: Row, dbconn: SAConnection) -> Optional[float]:
+
+class InitialChecker(BaseIdleChecker):
+    terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+    name: ClassVar[str] = "initial"
+    report_key: ClassVar[str] = "initial"
+
+    async def check_idleness(
+        self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
+    ) -> bool:
+        return True
+
+    @abstractmethod
+    async def early_check(
+        self, kernel: Row, dbconn: SAConnection, redis_obj: RedisConnectionInfo
+    ) -> bool:
+        pass
+
+
+class UserInitialGracePeriodChecker(InitialChecker):
+    name: ClassVar[str] = "user_grace_period"
+    report_key: ClassVar[str] = "user_grace_period"
+    user_initial_grace_period: Optional[timedelta]
+
+    _config_iv = t.Dict(
+        {
+            t.Key("user-initial-grace-period", default=None): t.Null | tx.TimeDuration(),
+        },
+    ).allow_extra("*")
+
+    async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
+        config = self._config_iv.check(raw_config)
+        self.user_initial_grace_period = config["user-initial-grace-period"]
+        _grace_period = (
+            self.user_initial_grace_period.total_seconds()
+            if self.user_initial_grace_period is not None
+            else None
+        )
+
+        log.info(
+            "UserInitialGracePeriodChecker: default period = {0:,} seconds",
+            _grace_period,
+        )
+
+    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+        return None
+
+    async def early_check(
+        self, kernel: Row, dbconn: SAConnection, redis_obj: RedisConnectionInfo
+    ) -> bool:
         """
         Calculate the user's initial grace period for idle checkers.
         During the user's initial grace period, the checker does not calculate the time remaining until expiration
         and does not yield any extra information such as average utilization.
+
+        Return True if there is remaining grace period.
+        Return False if user_initial_grace_period is None or there is no remaining grace period.
         """
         if self.user_initial_grace_period is None:
-            return None
+            return False
         db_now = await dbconn.scalar(sa.select(sa.func.now()))
-        result: timedelta = self.user_initial_grace_period - (db_now - kernel["user_created_at"])
-        return result.total_seconds()
+        remaining: timedelta = self.user_initial_grace_period - (db_now - kernel["user_created_at"])
+        result = remaining.total_seconds()
+        await self.set_remaining_time_report(
+            redis_obj, kernel["session_id"], result if result > 0 else -1
+        )
+        return result > 0
+
+    async def get_checker_result(
+        self,
+        redis_obj: RedisConnectionInfo,
+        session_id: SessionId,
+    ) -> Optional[float]:
+        key = self.get_report_key(session_id)
+        data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
+        return msgpack.unpackb(data) if data is not None else None
 
 
 class TimeoutIdleChecker(BaseIdleChecker):
@@ -405,7 +479,6 @@ class TimeoutIdleChecker(BaseIdleChecker):
     _config_iv = t.Dict(
         {
             t.Key("threshold", default="10m"): tx.TimeDuration(),
-            t.Key("user-initial-grace-period", default=None): t.Null | tx.TimeDuration(),
         },
     ).allow_extra("*")
 
@@ -435,17 +508,9 @@ class TimeoutIdleChecker(BaseIdleChecker):
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
         self.idle_timeout = config["threshold"]
-        self.user_initial_grace_period = config.get("user-initial-grace-period")
-        _grace_period = (
-            self.user_initial_grace_period.total_seconds()
-            if self.user_initial_grace_period is not None
-            else None
-        )
         log.info(
-            "TimeoutIdleChecker: default idle_timeout = {0:,} seconds, "
-            "user initial grace period = {1:,}",
+            "TimeoutIdleChecker: default idle_timeout = {0:,} seconds",
             self.idle_timeout.total_seconds(),
-            _grace_period,
         )
 
     async def update_app_streaming_status(
@@ -521,11 +586,6 @@ class TimeoutIdleChecker(BaseIdleChecker):
         if kernel["session_type"] == SessionTypes.BATCH:
             return True
 
-        user_grace_period = await self.calc_user_grace_period(kernel, dbconn)
-        if user_grace_period is not None and user_grace_period > 0:
-            await self.set_remaining_time_report(redis_obj, session_id, user_grace_period)
-            return True
-
         active_streams = await redis_helper.execute(
             self._redis_live,
             lambda r: r.zcount(
@@ -575,21 +635,8 @@ class SessionLifetimeChecker(BaseIdleChecker):
     report_key: ClassVar[str] = "session_lifetime"
     extra_info_key: ClassVar[str] = "session_lifetime_extra"
 
-    _config_iv = t.Dict(
-        {
-            t.Key("user-initial-grace-period", default=None): t.Null | tx.TimeDuration(),
-        },
-    ).allow_extra("*")
-
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
-        config = self._config_iv.check(raw_config)
-        self.user_initial_grace_period = config.get("user-initial-grace-period")
-        _grace_period = (
-            self.user_initial_grace_period.total_seconds()
-            if self.user_initial_grace_period is not None
-            else None
-        )
-        log.info(f"SessionLifetimeChecker: user_initial_grace_period = {_grace_period} seconds.")
+        pass
 
     async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
         return None
@@ -603,11 +650,6 @@ class SessionLifetimeChecker(BaseIdleChecker):
         """
 
         session_id = kernel["session_id"]
-        user_grace_period = await self.calc_user_grace_period(kernel, dbconn)
-        if user_grace_period is not None and user_grace_period > 0:
-            await self.set_remaining_time_report(redis_obj, session_id, user_grace_period)
-            return True
-
         if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
@@ -644,7 +686,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
         {
             t.Key("time-window", default="10m"): tx.TimeDuration(),
             t.Key("initial-grace-period", default="5m"): tx.TimeDuration(),
-            t.Key("user-initial-grace-period", default=None): t.Null | tx.TimeDuration(),
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
@@ -688,12 +729,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self.thresholds_check_operator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
-        self.user_initial_grace_period = config.get("user-initial-grace-period")
-        _grace_period = (
-            self.user_initial_grace_period.total_seconds()
-            if self.user_initial_grace_period is not None
-            else None
-        )
 
         thresholds_log = " ".join(
             [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
@@ -701,8 +736,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '
-            f"time-window({self.time_window.total_seconds()}s), "
-            f"user-initial-grace-period({_grace_period}s)"
+            f"time-window({self.time_window.total_seconds()}s)"
         )
 
     def get_extra_info_key(self, session_id: SessionId) -> str:
@@ -739,11 +773,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
         time_window = self.get_time_window(policy)
         occupied_slots = kernel["occupied_slots"]
         unavailable_resources: Set[str] = set()
-
-        user_grace_period = await self.calc_user_grace_period(kernel, dbconn)
-        if user_grace_period is not None and user_grace_period > 0:
-            await self.set_remaining_time_report(redis_obj, session_id, user_grace_period)
-            return True
 
         util_series_key = f"session.{session_id}.util_series"
         util_last_collected_key = self.get_last_collected_key(session_id)
@@ -957,7 +986,10 @@ async def init_idle_checkers(
         db, shared_config, event_dispatcher, event_producer, lock_factory
     )
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
-    log.info("Initializing idle checker: session_lifetime")
+    log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
+    checker_host.assign_initial_checker(
+        UserInitialGracePeriodChecker(*checker_init_args)
+    )  # enabled by default
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
     enabled_checkers = await shared_config.etcd.get("config/idle/enabled")
     if enabled_checkers:
