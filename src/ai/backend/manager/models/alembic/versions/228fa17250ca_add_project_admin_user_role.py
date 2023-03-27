@@ -1,26 +1,24 @@
 """add_project_admin_user_role
 
-Revision ID: b43752739fbc
-Revises: 213a04e90ecf
-Create Date: 2022-12-29 12:38:50.250943
+Revision ID: 228fa17250ca
+Revises: 10c58e701d87
+Create Date: 2023-03-27 14:36:32.432853
 
 """
 import enum
 import textwrap
 
-import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.sql import text
 
-from ai.backend.manager.models.base import metadata
 from ai.backend.manager.models.user import UserRole, users
 
 # revision identifiers, used by Alembic.
-revision = "b43752739fbc"
-down_revision = "213a04e90ecf"
+revision = "228fa17250ca"
+down_revision = "10c58e701d87"
 branch_labels = None
 depends_on = None
+
 
 enum_name = UserRole.__name__.lower()
 
