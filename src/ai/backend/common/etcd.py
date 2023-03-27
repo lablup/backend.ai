@@ -51,7 +51,7 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ConfigScopes(enum.Enum):
@@ -98,9 +98,10 @@ def _slash(v: str):
 P = ParamSpec("P")
 R = TypeVar("R")
 
+GetPrefixValue = Mapping[str, Union["GetPrefixValue", Optional[str]]]
+
 
 class AsyncEtcd:
-
     etcd: EtcdClient
 
     _creds: Optional[EtcdCredential]
@@ -303,7 +304,7 @@ class AsyncEtcd:
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
         scope_prefix_map: Mapping[ConfigScopes, str] = None,
-    ) -> Mapping[str, Optional[str]]:
+    ) -> GetPrefixValue:
         """
         Retrieves all key-value pairs under the given key prefix as a nested dictionary.
         All dictionary keys are automatically unquoted.

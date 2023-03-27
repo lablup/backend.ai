@@ -19,7 +19,7 @@ from ai.backend.common.types import KernelId, aobject
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class MetadataPluginContext(BasePluginContext[MetadataPlugin]):
@@ -81,7 +81,6 @@ async def list_versions(request: web.Request) -> web.Response:
 
 
 class MetadataServer(aobject):
-
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]

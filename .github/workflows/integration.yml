@@ -14,7 +14,6 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-        submodules: true
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -47,7 +46,7 @@ jobs:
       # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
       with:
         pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
+        gha-cache-key: pants-cache0-integration-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test

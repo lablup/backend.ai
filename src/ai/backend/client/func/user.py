@@ -3,12 +3,12 @@ from __future__ import annotations
 import enum
 import textwrap
 import uuid
-from typing import Iterable, Sequence, Union
+from typing import Any, Iterable, Mapping, Sequence, Union
 
 from ai.backend.client.auth import AuthToken, AuthTokenTypes
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
@@ -26,11 +26,15 @@ _default_list_fields = (
     user_fields["role"],
     user_fields["username"],
     user_fields["email"],
+    user_fields["need_password_change"],
+    user_fields["status"],
+    user_fields["status_info"],
     user_fields["is_active"],
     user_fields["created_at"],
     user_fields["domain_name"],
     user_fields["groups"],
     user_fields["allowed_client_ip"],
+    user_fields["totp_activated"],
 )
 
 _default_detail_fields = (
@@ -45,6 +49,7 @@ _default_detail_fields = (
     user_fields["role"],
     user_fields["groups"],
     user_fields["allowed_client_ip"],
+    user_fields["totp_activated"],
 )
 
 
@@ -79,7 +84,12 @@ class User(BaseFunction):
     @api_function
     @classmethod
     async def authorize(
-        cls, username: str, password: str, *, token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
+        cls,
+        username: str,
+        password: str,
+        *,
+        extra_args: Mapping[str, Any] = {},
+        token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR,
     ) -> AuthToken:
         """
         Authorize the given credentials and get the API authentication token.
@@ -90,14 +100,15 @@ class User(BaseFunction):
         of authentication methods.
         """
         rqst = Request("POST", "/auth/authorize")
-        rqst.set_json(
-            {
-                "type": token_type.value,
-                "domain": api_session.get().config.domain,
-                "username": username,
-                "password": password,
-            }
-        )
+        body = {
+            "type": token_type.value,
+            "domain": api_session.get().config.domain,
+            "username": username,
+            "password": password,
+        }
+        for k, v in extra_args.items():
+            body[k] = v
+        rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
             return AuthToken(
@@ -157,7 +168,7 @@ class User(BaseFunction):
         :param group: Fetch users in a specific group.
         :param fields: Additional per-user query fields to fetch.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "user_list",
             {
                 "status": (status, "String"),
@@ -256,6 +267,7 @@ class User(BaseFunction):
         need_password_change: bool = False,
         description: str = "",
         allowed_client_ip: Iterable[str] = None,
+        totp_activated: bool = False,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -291,6 +303,7 @@ class User(BaseFunction):
                 "need_password_change": need_password_change,
                 "description": description,
                 "domain_name": domain_name,
+                "totp_activated": totp_activated,
                 "group_ids": group_ids,
                 "allowed_client_ip": allowed_client_ip,
             },
@@ -312,6 +325,7 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         allowed_client_ip: Iterable[str] = None,
+        totp_activated: bool = False,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -340,6 +354,7 @@ class User(BaseFunction):
                 "need_password_change": need_password_change,
                 "description": description,
                 "allowed_client_ip": allowed_client_ip,
+                "totp_activated": totp_activated,
                 "group_ids": group_ids,
             },
         }

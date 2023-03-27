@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import lzma
+import os
 import re
 import shutil
 import textwrap
@@ -25,11 +26,10 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernel(AbstractKernel):
-
     deployment_name: str
 
     def __init__(
@@ -63,7 +63,6 @@ class KubernetesKernel(AbstractKernel):
     async def create_code_runner(
         self, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
-
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
             log.error("Scaling failed! Response body: {0}", scale)
@@ -272,11 +271,10 @@ class KubernetesKernel(AbstractKernel):
         core_api = kube_client.CoreV1Api()
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
@@ -324,7 +322,6 @@ class KubernetesKernel(AbstractKernel):
 
 
 class KubernetesCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int

@@ -14,7 +14,6 @@ from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisCluster
 
 
 class NativeRedisNode(AbstractRedisNode):
-
     proc: asyncio.subprocess.Process | None
 
     def __init__(self, node_type: str, port: int, start_args: Sequence[str | bytes]) -> None:

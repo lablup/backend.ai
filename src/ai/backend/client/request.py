@@ -40,7 +40,7 @@ from .session import AsyncSession, BaseSession
 from .session import Session as SyncSession
 from .session import api_session
 
-log = logging.getLogger("ai.backend.client.request")
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 __all__ = [
     "Request",
@@ -144,7 +144,7 @@ class Request:
         :param BaseSession session: The session where this request is executed on.
 
         :param str path: The query path. When performing requests, the version number
-                         prefix will be automatically perpended if required.
+                         prefix will be automatically prepended if required.
 
         :param RequestContent content: The API query body which will be encoded as
                                        JSON.
@@ -418,7 +418,6 @@ class Request:
 
 
 class AsyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -437,7 +436,6 @@ class AsyncResponseMixin:
 
 
 class SyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -767,7 +765,6 @@ class SSEMessage:
 
 
 class SSEResponse(BaseResponse):
-
     __slots__ = (
         "_auto_reconnect",
         "_retry",
@@ -850,7 +847,6 @@ class SSEResponse(BaseResponse):
 
 
 class SSEContextManager:
-
     __slots__ = (
         "session",
         "rqst_ctx_builder",

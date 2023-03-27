@@ -8,7 +8,7 @@ from ai.backend.agent.types import WebMiddleware
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 NewMetadataPluginResponse = NamedTuple(
     "NewMetadataPluginResponse",
@@ -54,7 +54,6 @@ class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):
         pass
 
     async def create_app(self) -> InitMetadataPluginResponse:
-
         app, global_middlewares = await self.prepare_app()
         routes = await self.routes()
 

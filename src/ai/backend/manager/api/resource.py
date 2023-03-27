@@ -23,6 +23,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -35,6 +36,8 @@ from ..models import (
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     AgentStatus,
+    KernelRow,
+    SessionRow,
     agents,
     association_groups_users,
     domains,
@@ -53,7 +56,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -130,7 +133,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
+        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(
+            access_key, db_sess=SASession(conn)
+        )
         keypair_remaining = keypair_limits - keypair_occupied
 
         # Check group resource limit and get group_id.
@@ -145,7 +150,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             .where(
                 (association_groups_users.c.user_id == request["user"]["uuid"])
                 & (groups.c.name == params["group"])
-                & (domains.c.name == domain_name),
+                & (groups.c.domain_name == domain_name),
             )
         )
         result = await conn.execute(query)
@@ -159,7 +164,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(group_id, conn=conn)
+        group_occupied = await root_ctx.registry.get_group_occupancy(
+            group_id, db_sess=SASession(conn)
+        )
         group_remaining = group_limits - group_occupied
 
         # Check domain resource limit.
@@ -170,7 +177,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name, conn=conn)
+        domain_occupied = await root_ctx.registry.get_domain_occupancy(
+            domain_name, db_sess=SASession(conn)
+        )
         domain_remaining = domain_limits - domain_occupied
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.
@@ -198,17 +207,18 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         }
 
         # Per scaling group resource using from resource occupying kernels.
+        j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
         query = (
-            sa.select([kernels.c.occupied_slots, kernels.c.scaling_group])
-            .select_from(kernels)
+            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
+            .select_from(j)
             .where(
-                (kernels.c.user_uuid == request["user"]["uuid"])
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (kernels.c.scaling_group.in_(sgroup_names)),
+                (KernelRow.user_uuid == request["user"]["uuid"])
+                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.scaling_group_name.in_(sgroup_names)),
             )
         )
         async for row in (await conn.stream(query)):
-            per_sgroup[row["scaling_group"]]["using"] += row["occupied_slots"]
+            per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
         sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
@@ -308,6 +318,7 @@ async def get_container_stats_for_period(
                 [
                     kernels.c.id,
                     kernels.c.container_id,
+                    kernels.c.session_id,
                     kernels.c.session_name,
                     kernels.c.access_key,
                     kernels.c.agent,
@@ -320,13 +331,16 @@ async def get_container_stats_for_period(
                     kernels.c.mounts,
                     kernels.c.image,
                     kernels.c.status,
+                    kernels.c.status_info,
                     kernels.c.status_changed,
                     kernels.c.last_stat,
                     kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
+                    kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
@@ -399,6 +413,7 @@ async def get_container_stats_for_period(
             gpu_allocated = row.occupied_slots["cuda.shares"]
         c_info = {
             "id": str(row["id"]),
+            "session_id": str(row["session_id"]),
             "container_id": row["container_id"],
             "domain_name": row["domain_name"],
             "group_id": str(row["group_id"]),
@@ -406,6 +421,7 @@ async def get_container_stats_for_period(
             "name": row["session_name"],
             "access_key": row["access_key"],
             "email": row["email"],
+            "full_name": row["full_name"],
             "agent": row["agent"],
             "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
             "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
@@ -428,8 +444,10 @@ async def get_container_stats_for_period(
             "created_at": str(row["created_at"]),
             "terminated_at": str(row["terminated_at"]),
             "status": row["status"].name,
+            "status_info": row["status_info"],
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
+            "cluster_mode": row["cluster_mode"],
         }
         if group_id not in objs_per_group:
             objs_per_group[group_id] = {

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import enum
+import logging
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
 
+import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
@@ -14,10 +17,12 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.types import VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
-from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
+from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
 from ..types import UserScope
 from .base import (
     GUID,
@@ -32,8 +37,10 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
+from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
+    from ..api.context import BackgroundTaskManager
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
@@ -49,12 +56,21 @@ __all__: Sequence[str] = (
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
     "VFolderAccessStatus",
+    "VFolderCloneInfo",
+    "VFolderDeletionInfo",
     "query_accessible_vfolders",
+    "initiate_vfolder_clone",
+    "initiate_vfolder_removal",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
+    "filter_host_allowed_permission",
+    "ensure_host_permission_allowed",
 )
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class VFolderUsageMode(str, enum.Enum):
@@ -130,6 +146,26 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
+    DELETABLE = "deletable"
+
+
+class VFolderDeletionInfo(NamedTuple):
+    vfolder_id: uuid.UUID
+    host: str
+
+
+class VFolderCloneInfo(NamedTuple):
+    source_vfolder_id: uuid.UUID
+    source_host: str
+
+    # Target Vfolder infos
+    target_vfolder_name: str
+    target_host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderPermission
+    email: str
+    user_id: uuid.UUID
+    cloneable: bool
 
 
 vfolders = sa.Table(
@@ -288,6 +324,7 @@ async def query_accessible_vfolders(
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
         vfolders.c.status,
+        vfolders.c.cur_size,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -326,6 +363,7 @@ async def query_accessible_vfolders(
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
                     "status": row.vfolders_status,
+                    "cur_size": row.vfolders_cur_size,
                 }
             )
 
@@ -472,7 +510,7 @@ async def get_allowed_vfolder_hosts_by_group(
 
 async def get_allowed_vfolder_hosts_by_user(
     conn: SAConnection,
-    resource_policy,
+    resource_policy: Mapping[str, Any],
     domain_name: str,
     user_uuid: uuid.UUID,
     group_id: Optional[uuid.UUID] = None,
@@ -513,7 +551,7 @@ async def get_allowed_vfolder_hosts_by_user(
         sa.select([groups.c.allowed_vfolder_hosts])
         .select_from(j)
         .where(
-            (domains.c.name == domain_name) & (groups.c.is_active),
+            (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
     )
     if rows := (await conn.execute(query)).fetchall():
@@ -529,6 +567,7 @@ async def prepare_vfolder_mounts(
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
+    resource_policy: Mapping[str, Any],
     requested_mounts: Sequence[str],
     requested_mount_map: Mapping[str, str],
 ) -> Sequence[VFolderMount]:
@@ -602,6 +641,16 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        await ensure_host_permission_allowed(
+            conn,
+            vfolder["host"],
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_scope.user_uuid,
+            resource_policy=resource_policy,
+            domain_name=user_scope.domain_name,
+            group_id=user_scope.group_id,
+            permission=VFolderHostPermission.MOUNT_IN_SESSION,
+        )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
             # if not belong to the execution kernel.
@@ -616,6 +665,8 @@ async def prepare_vfolder_mounts(
             )
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
+        if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
+            requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
@@ -674,6 +725,206 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
+async def ensure_host_permission_allowed(
+    db_conn,
+    folder_host: str,
+    *,
+    permission: VFolderHostPermission,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> None:
+    allowed_hosts = await filter_host_allowed_permission(
+        db_conn,
+        allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid=user_uuid,
+        resource_policy=resource_policy,
+        domain_name=domain_name,
+        group_id=group_id,
+    )
+    if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
+
+
+async def filter_host_allowed_permission(
+    db_conn,
+    *,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> VFolderHostPermissionMap:
+    allowed_hosts = VFolderHostPermissionMap()
+    if "user" in allowed_vfolder_types:
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            db_conn, resource_policy, domain_name, user_uuid
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_user
+    if "group" in allowed_vfolder_types and group_id is not None:
+        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+            db_conn, resource_policy, domain_name, group_id
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+    return allowed_hosts
+
+
+async def initiate_vfolder_clone(
+    db_engine: ExtendedAsyncSAEngine,
+    vfolder_info: VFolderCloneInfo,
+    storage_manager: StorageSessionManager,
+    background_task_manager: BackgroundTaskManager,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id
+
+    async def _update_status() -> None:
+        async with db_engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(status=VFolderOperationStatus.CLONING)
+                .where(source_vf_cond)
+            )
+            await db_session.execute(query)
+
+    await execute_with_retry(_update_status)
+
+    target_proxy, target_volume = storage_manager.split_host(vfolder_info.target_host)
+    source_proxy, source_volume = storage_manager.split_host(vfolder_info.source_host)
+
+    # Generate the ID of the destination vfolder.
+    # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
+    #       the actual object (with RETURNING clause).  In that case, we need to temporarily
+    #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
+    #       vfolder.  After done, we need to make another transaction to clear the unusable state.
+    target_folder_id = uuid.uuid4()
+
+    async def _clone(reporter: ProgressReporter) -> None:
+        try:
+            async with storage_manager.request(
+                target_proxy,
+                "POST",
+                "folder/create",
+                json={
+                    "volume": target_volume,
+                    "vfid": str(target_folder_id),
+                    # 'options': {'quota': params['quota']},
+                },
+            ):
+                pass
+        except aiohttp.ClientResponseError:
+            raise VFolderOperationFailed(extra_msg=str(target_folder_id))
+
+        async def _insert_vfolder() -> None:
+            async with db_engine.begin_session() as db_session:
+                insert_values = {
+                    "id": target_folder_id,
+                    "name": vfolder_info.target_vfolder_name,
+                    "usage_mode": vfolder_info.usage_mode,
+                    "permission": vfolder_info.permission,
+                    "last_used": None,
+                    "host": vfolder_info.target_host,
+                    "creator": vfolder_info.email,
+                    "ownership_type": VFolderOwnershipType("user"),
+                    "user": vfolder_info.user_id,
+                    "group": None,
+                    "unmanaged_path": "",
+                    "cloneable": vfolder_info.cloneable,
+                }
+                insert_query = sa.insert(vfolders, insert_values)
+                try:
+                    await db_session.execute(insert_query)
+                except sa.exc.DataError:
+                    # TODO: pass exception info
+                    raise InvalidAPIParameters
+
+        await execute_with_retry(_insert_vfolder)
+
+        try:
+            async with storage_manager.request(
+                source_proxy,
+                "POST",
+                "folder/clone",
+                json={
+                    "src_volume": source_volume,
+                    "src_vfid": str(vfolder_info.source_vfolder_id),
+                    "dst_volume": target_volume,
+                    "dst_vfid": str(target_folder_id),
+                },
+            ):
+                pass
+        except aiohttp.ClientResponseError:
+            raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
+
+        async def _update_source_vfolder() -> None:
+            async with db_engine.begin_session() as db_session:
+                query = (
+                    sa.update(vfolders)
+                    .values(status=VFolderOperationStatus.READY)
+                    .where(source_vf_cond)
+                )
+                await db_session.execute(query)
+
+        await execute_with_retry(_update_source_vfolder)
+
+    task_id = await background_task_manager.start(_clone)
+    return task_id, target_folder_id
+
+
+async def initiate_vfolder_removal(
+    db_engine: ExtendedAsyncSAEngine,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    storage_manager: StorageSessionManager,
+    storage_ptask_group: aiotools.PersistentTaskGroup,
+) -> int:
+    vfolder_info_len = len(requested_vfolders)
+    vfolder_ids = tuple(vf_id for vf_id, _ in requested_vfolders)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return 0
+    elif vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
+
+    async with db_engine.begin_session() as db_session:
+
+        async def _update_vfolder_status() -> None:
+            query = sa.update(vfolders).values(status=VFolderOperationStatus.DELETING).where(cond)
+            await db_session.execute(query)
+
+        await execute_with_retry(_update_vfolder_status)
+
+    async def _delete():
+        for folder_id, host_name in requested_vfolders:
+            proxy_name, volume_name = storage_manager.split_host(host_name)
+            try:
+                async with storage_manager.request(
+                    proxy_name,
+                    "POST",
+                    "folder/delete",
+                    json={
+                        "volume": volume_name,
+                        "vfid": str(folder_id),
+                    },
+                ):
+                    pass
+            except aiohttp.ClientResponseError:
+                raise VFolderOperationFailed(extra_msg=str(folder_id))
+
+        async with db_engine.begin_session() as db_session:
+
+            async def _delete_row() -> None:
+                await db_session.execute(sa.delete(vfolders).where(cond))
+
+            await execute_with_retry(_delete_row)
+        log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+
+    storage_ptask_group.create_task(_delete())
+    log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
+
+    return vfolder_info_len
+
+
 class VirtualFolder(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -724,13 +975,10 @@ class VirtualFolder(graphene.ObjectType):
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
             status=row["status"],
+            cur_size=row["cur_size"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
-        # TODO: measure on-the-fly
-        return 0
-
-    async def resolve_cur_size(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly
         return 0
 
@@ -763,6 +1011,7 @@ class VirtualFolder(graphene.ObjectType):
         "group_name": "groups_name",
         "user": "vfolders_user",
         "user_email": "users_email",
+        "creator": "vfolders_creator",
         "usage_mode": "vfolders_usage_mode",
         "permission": "vfolders_permission",
         "ownership_type": "vfolders_ownership_type",
@@ -772,6 +1021,7 @@ class VirtualFolder(graphene.ObjectType):
         "last_used": "vfolders_last_used",
         "cloneable": "vfolders_cloneable",
         "status": "vfolders_status",
+        "cur_size": "vfolders_cur_size",
     }
 
     @classmethod

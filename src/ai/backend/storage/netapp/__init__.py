@@ -22,7 +22,6 @@ from .quotamanager import QuotaManager
 
 
 class NetAppVolume(BaseVolume):
-
     endpoint: str
     netapp_admin: str
     netapp_password: str
@@ -33,7 +32,6 @@ class NetAppVolume(BaseVolume):
     netapp_qtree_id: str
 
     async def init(self) -> None:
-
         self.endpoint = self.config["netapp_endpoint"]
         self.netapp_admin = self.config["netapp_admin"]
         self.netapp_password = str(self.config["netapp_password"])
@@ -390,3 +388,7 @@ class NetAppVolume(BaseVolume):
             )
 
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
+
+    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+        usage = await self.get_usage(vfid)
+        return BinarySize(usage.used_bytes)
