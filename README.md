@@ -3,13 +3,15 @@ Backend.AI
 
 [![PyPI release version](https://badge.fury.io/py/backend.ai-manager.svg)](https://pypi.org/project/backend.ai-manager/)
 ![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai-manager.svg)
+![Wheels](https://img.shields.io/pypi/wheel/backend.ai-manager.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
-Backend.AI is a streamlined, container-based computing cluster orchestrator
-that hosts diverse programming languages and popular computing/ML frameworks,
-with pluggable heterogeneous accelerator support including CUDA and ROCM.
+Backend.AI is a streamlined, container-based computing cluster platform 
+that hosts popular computing/ML frameworks and diverse programming languages, 
+with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU, TPU, IPU and other NPUs.
+
 It allocates and isolates the underlying computing resources for multi-tenant
-computation sessions on-demand or in batches with customizable job schedulers.
+computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator.
 All its functions are exposed as REST/GraphQL/WebSocket APIs.
 
 
