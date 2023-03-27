@@ -8,6 +8,7 @@ import math
 import stat
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -33,14 +34,21 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
+from ai.backend.common.types import (
+    RedisConnectionInfo,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+)
+from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
     AgentStatus,
     KernelStatus,
     UserRole,
+    UserStatus,
     VFolderAccessStatus,
     VFolderCloneInfo,
     VFolderDeletionInfo,
@@ -58,6 +66,7 @@ from ..models import (
     initiate_vfolder_clone,
     initiate_vfolder_removal,
     kernels,
+    keypair_resource_policies,
     keypairs,
     projects,
     query_accessible_vfolders,
@@ -68,6 +77,7 @@ from ..models import (
     vfolder_permissions,
     vfolders,
 )
+from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -84,6 +94,7 @@ from .exceptions import (
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -619,6 +630,67 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     return web.Response(status=204)
 
 
+class ExposedVolumeInfoField(StrEnum):
+    percentage = "percentage"
+    used_bytes = "used_bytes"
+    capacity_bytes = "capacity_bytes"
+
+
+async def fetch_exposed_volume_fields(
+    storage_manager: StorageSessionManager,
+    redis_connection: RedisConnectionInfo,
+    proxy_name: str,
+    volume_name: str,
+) -> Dict[str, int | float]:
+    volume_usage = {}
+
+    show_percentage = ExposedVolumeInfoField.percentage in storage_manager._exposed_volume_info
+    show_used = ExposedVolumeInfoField.used_bytes in storage_manager._exposed_volume_info
+    show_total = ExposedVolumeInfoField.capacity_bytes in storage_manager._exposed_volume_info
+
+    if show_percentage or show_used or show_total:
+        volume_usage_cache = await redis_helper.execute(
+            redis_connection,
+            lambda r: r.get(f"volume.usage.{proxy_name}.{volume_name}"),
+        )
+
+        if volume_usage_cache:
+            volume_usage = msgpack.unpackb(volume_usage_cache)
+        else:
+            async with storage_manager.request(
+                proxy_name,
+                "GET",
+                "folder/fs-usage",
+                json={
+                    "volume": volume_name,
+                },
+            ) as (_, storage_resp):
+                storage_reply = await storage_resp.json()
+
+                if show_used:
+                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
+
+                if show_total:
+                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+
+                if show_percentage:
+                    volume_usage["percentage"] = (
+                        storage_reply[ExposedVolumeInfoField.used_bytes]
+                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
+                    ) * 100
+
+            await redis_helper.execute(
+                redis_connection,
+                lambda r: r.set(
+                    f"volume.usage.{proxy_name}.{volume_name}",
+                    msgpack.packb(volume_usage),
+                    ex=60,
+                ),
+            )
+
+    return volume_usage
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -663,14 +735,22 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in allowed_hosts:
         default_host = None
+
     volume_info = {
         f"{proxy_name}:{volume_data['name']}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
+            "usage": await fetch_exposed_volume_fields(
+                storage_manager=root_ctx.storage_manager,
+                redis_connection=root_ctx.redis_stat,
+                proxy_name=proxy_name,
+                volume_name=volume_data["name"],
+            ),
         }
         for proxy_name, volume_data in all_volumes
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
     }
+
     resp = {
         "default": default_host,
         "allowed": sorted(allowed_hosts),
@@ -2924,6 +3004,105 @@ async def storage_task_exception_handler(
     log.exception("Error while removing vFolder", exc_info=exc_obj)
 
 
+@superadmin_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("vfolder"): tx.UUID,
+            t.Key("user_email"): t.String,
+        }
+    ),
+)
+async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Response:
+    """
+    Change the ownership of vfolder
+    For now, we only provide changing the ownership of user-folder
+    """
+    vfolder_id = params["vfolder"]
+    user_email = params["user_email"]
+    root_ctx: RootContext = request.app["_root.context"]
+
+    allowed_hosts_by_user = VFolderHostPermissionMap()
+    async with root_ctx.db.begin_readonly() as conn:
+        j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
+        query = (
+            sa.select([users.c.uuid, users.c.domain_name, keypairs.c.resource_policy])
+            .select_from(j)
+            .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
+        )
+        try:
+            result = await conn.execute(query)
+        except sa.exc.DataError:
+            raise InvalidAPIParameters
+        user_info = result.first()
+        if user_info is None:
+            raise ObjectNotFound(object_name="user")
+        resource_policy_name = user_info.resource_policy
+        result = await conn.execute(
+            sa.select([keypair_resource_policies.c.allowed_vfolder_hosts]).where(
+                keypair_resource_policies.c.name == resource_policy_name
+            )
+        )
+        resource_policy = result.first()
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            conn=conn,
+            resource_policy=resource_policy,
+            domain_name=user_info.domain_name,
+            user_uuid=user_info.uuid,
+        )
+    log.info(
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        vfolder_id,
+        user_info.uuid,
+    )
+    async with root_ctx.db.begin_readonly() as conn:
+        query = (
+            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
+        )
+        folder_host = await conn.scalar(query)
+    if folder_host not in allowed_hosts_by_user:
+        raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
+
+    async def _update() -> None:
+        async with root_ctx.db.begin() as conn:
+            # TODO: we need to implement migration from project to other project
+            #       for now we only support migration btw user folder only
+            #
+            query = (
+                sa.update(vfolders)
+                .values(user=user_info.uuid)
+                .where(
+                    (vfolders.c.id == vfolder_id)
+                    & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                )
+            )
+            await conn.execute(query)
+
+    await execute_with_retry(_update)
+
+    async def _delete_vfolder_related_rows() -> None:
+        async with root_ctx.db.begin() as conn:
+            # delete vfolder_invitation if the new owner user has already been shared with the vfolder
+            query = sa.delete(vfolder_invitations).where(
+                (vfolder_invitations.c.invitee == user_email)
+                & (vfolder_invitations.c.vfolder == vfolder_id)
+            )
+            await conn.execute(query)
+            # delete vfolder_permission if the new owner user has already been shared with the vfolder
+            query = sa.delete(vfolder_permissions).where(
+                (vfolder_permissions.c.vfolder == vfolder_id)
+                & (vfolder_permissions.c.user == user_info.uuid)
+            )
+            await conn.execute(query)
+
+    await execute_with_retry(_delete_vfolder_related_rows)
+
+    return web.json_response({}, status=200)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -2994,6 +3173,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
     cors.add(add_route("DELETE", r"/_/mounts", umount_host))
+    cors.add(add_route("POST", r"/_/change-ownership", change_vfolder_ownership))
     cors.add(add_route("GET", r"/_/quota", get_quota))
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))

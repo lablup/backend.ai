@@ -255,6 +255,7 @@ def _info_cmd(docs: str = None):
                     session_fields["status_info"],
                     session_fields["status_data"],
                     session_fields["occupying_slots"],
+                    session_fields["idle_checks"],
                 ]
             )
             if session_.api_version[0] >= 6:

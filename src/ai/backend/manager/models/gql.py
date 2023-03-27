@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from ..registry import AgentRegistry
     from ..models.utils import ExtendedAsyncSAEngine
     from .storage import StorageSessionManager
+    from ..idle import IdleCheckerHost
 
 from ..api.exceptions import (
     ImageNotFound,
@@ -124,6 +125,7 @@ class GraphQueryContext:
     background_task_manager: BackgroundTaskManager
     storage_manager: StorageSessionManager
     registry: AgentRegistry
+    idle_checker_host: IdleCheckerHost
 
 
 class Mutations(graphene.ObjectType):
