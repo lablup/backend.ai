@@ -326,6 +326,7 @@ class IdleCheckerHost:
                 "extra": (await checker.get_checker_result(self._redis_live, session_id)),
             }
             for checker in self._checkers
+            if checker is not self._grace_period_checker
         }
 
 
