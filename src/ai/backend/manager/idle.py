@@ -412,13 +412,13 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
 
     _config_iv = t.Dict(
         {
-            t.Key("user-initial-grace-period", default=None): t.Null | tx.TimeDuration(),
+            t.Key("user_initial_grace_period", default=None): t.Null | tx.TimeDuration(),
         },
     ).allow_extra("*")
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
-        self.user_initial_grace_period = config["user-initial-grace-period"]
+        self.user_initial_grace_period = config["user_initial_grace_period"]
         _grace_period = (
             self.user_initial_grace_period.total_seconds()
             if self.user_initial_grace_period is not None
@@ -456,7 +456,8 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
             return True
         session_id = kernel["session_id"]
         db_now = await dbconn.scalar(sa.select(sa.func.now()))
-        remaining: timedelta = self.user_initial_grace_period - (db_now - kernel["user_created_at"])
+        user_created_at = kernel["user_created_at"]
+        remaining: timedelta = self.user_initial_grace_period - (db_now - user_created_at)
         result = remaining.total_seconds()
         if result > 0:
             await self.set_remaining_time_report(redis_obj, session_id, result)
