@@ -323,7 +323,7 @@ class IdleCheckerHost:
             checker.name: {
                 "remaining": (await add_period_to_result(checker, user_grace_period)),
                 "remaining_time_type": checker.remaining_time_type.value,
-                "extra": (await checker.get_checker_result(self._redis_live, session_id)),
+                "extra": (await checker.get_extra_info(session_id)),
             }
             for checker in self._checkers
             if checker is not self._grace_period_checker
