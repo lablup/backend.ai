@@ -432,6 +432,16 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
     async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
         return None
 
+    async def del_remaining_time_report(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+    ) -> None:
+        await redis_helper.execute(
+            redis_obj,
+            lambda r: r.delete(
+                self.get_report_key(session_id),
+            ),
+        )
+
     async def check_idleness(
         self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
     ) -> bool:
@@ -444,12 +454,14 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
         """
         if self.user_initial_grace_period is None:
             return True
+        session_id = kernel["session_id"]
         db_now = await dbconn.scalar(sa.select(sa.func.now()))
         remaining: timedelta = self.user_initial_grace_period - (db_now - kernel["user_created_at"])
         result = remaining.total_seconds()
-        await self.set_remaining_time_report(
-            redis_obj, kernel["session_id"], result if result > 0 else -1
-        )
+        if result > 0:
+            await self.set_remaining_time_report(redis_obj, session_id, result)
+        else:
+            await self.del_remaining_time_report(redis_obj, session_id)
         return True
 
     async def get_checker_result(
@@ -462,7 +474,7 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
         return msgpack.unpackb(data) if data is not None else None
 
 
-class TimeoutIdleChecker(BaseIdleChecker):
+class NetworkTimeoutIdleChecker(BaseIdleChecker):
     """
     Checks the idleness of a session by the elapsed time since last used.
     The usage means processing of any computation requests, such as
@@ -473,7 +485,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
     remaining_time_type: RemainingTimeType = RemainingTimeType.EXPIRE_AFTER
     name: ClassVar[str] = "network_timeout"
     report_key: ClassVar[str] = "network_timeout"
-    extra_info_key: ClassVar[str] = "timeout_extra"
+    extra_info_key: ClassVar[str] = "network_timeout_timeout_extra"
 
     _config_iv = t.Dict(
         {
@@ -508,7 +520,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
         config = self._config_iv.check(raw_config)
         self.idle_timeout = config["threshold"]
         log.info(
-            "TimeoutIdleChecker: default idle_timeout = {0:,} seconds",
+            "NetworkTimeoutIdleChecker: default idle_timeout = {0:,} seconds",
             self.idle_timeout.total_seconds(),
         )
 
@@ -523,7 +535,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
             await self._update_timeout(session_id)
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"TimeoutIdleChecker._disable_timeout({session_id})")
+        log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
@@ -534,7 +546,7 @@ class TimeoutIdleChecker(BaseIdleChecker):
         )
 
     async def _update_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"TimeoutIdleChecker._update_timeout({session_id})")
+        log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         t = t[0] + (t[1] / (10**6))
         await redis_helper.execute(
@@ -967,7 +979,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
 
 checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
-    TimeoutIdleChecker.name: TimeoutIdleChecker,
+    NetworkTimeoutIdleChecker.name: NetworkTimeoutIdleChecker,
     UtilizationIdleChecker.name: UtilizationIdleChecker,
 }
 
