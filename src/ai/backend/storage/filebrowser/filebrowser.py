@@ -33,6 +33,7 @@ __all__ = (
     "get_container_by_id",
     "get_filebrowsers",
     "get_network_stats",
+    "check_container_existance",
 )
 
 
@@ -165,7 +166,7 @@ async def recreate_container(container_name: str, config: dict[str, Any]) -> Non
                 name=container_name,
             )
             await container.start()
-        except Exception as e:
+        except aiodocker.exceptions.DockerError as e:
             logger.error(f"Failure to recreate container: {container_name}. Error: {e}")
 
 
@@ -200,7 +201,7 @@ async def destroy_container(ctx: Context, container_id: str) -> None:
                 await container.stop()
                 await container.delete(force=True)
                 await tracker_db.delete_container_record(container_id)
-            except Exception as e:
+            except aiodocker.exceptions.DockerError as e:
                 log.error(f"Failure to destroy container {container_id[0:7]} ", e)
 
 

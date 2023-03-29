@@ -25,16 +25,15 @@ async def network_monitor(
         current_time = time.monotonic()
         if container_id not in await get_filebrowsers():
             break
-        try:
-            stats = await get_network_stats(container_id)
-        except Exception as e:
-            log.error("Failed to get network stats ", e)
-            await asyncio.sleep(idle_timeout)
+        for attempt in range(2):
             try:
                 stats = await get_network_stats(container_id)
+                break
             except Exception as e:
                 log.error("Failed to get network stats ", e)
-                raise e
+                if attempt == 1:
+                    raise e
+                await asyncio.sleep(idle_timeout)
         network_total_transfer = stats[0] + stats[1]
         network_window.append(network_total_transfer)
         if current_time - start_time > activity_check_timeout:
@@ -68,6 +67,7 @@ async def idle_timeout_monitor(
         if current_time - start_time >= idle_timeout:
             try:
                 await destroy_container(ctx, container_id)
+                break
             except Exception as e:
                 log.error(f"Failure to destroy container based on Idle timeout {container_id}", e)
                 break
