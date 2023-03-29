@@ -7,13 +7,11 @@ import aiofiles
 async def prepare_filebrowser_app_config(
     settings_path: Path,
     service_port: int,
+    filebrowser_key: str,
 ) -> None:
     filebrowser_config = {
         "settings": {
-            "key": (
-                "cdsnV117a7KLMN3GAbNWIB/b4w/P1zsVxmAZxAU"
-                "AKidhZG9418Fn5wjE+Zcv6C9eCEDlajcINFkvV+BFSWtVZw=="
-            ),
+            "key": filebrowser_key,
             "signup": False,
             "createUserDir": False,
             "defaults": {
@@ -26,7 +24,7 @@ async def prepare_filebrowser_app_config(
                     "asc": False,
                 },
                 "perm": {
-                    "admin": True,
+                    "admin": False,
                     "execute": True,
                     "create": True,
                     "rename": True,
@@ -42,7 +40,7 @@ async def prepare_filebrowser_app_config(
             "branding": {
                 "name": "BACKEND.AI Web Browser",
                 "disableExternal": True,
-                "files": "/filebrowser_dir/branding/",
+                "files": "/filebrowser_app/branding/",
                 "theme": "",
             },
             "commands": {
@@ -84,7 +82,7 @@ async def prepare_filebrowser_app_config(
         "baseURL": "",
         "address": "",
         "log": "stdout",
-        "database": f"/filebrowser_dir/filebrowser_{service_port}.db",
+        "database": f"/filebrowser_app/filebrowser_{service_port}.db",
         "root": "/data/",
     }
     async with aiofiles.open(settings_path / "settings.json", mode="w") as file:

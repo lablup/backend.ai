@@ -33,7 +33,6 @@ def filebrowser():
 )
 def create(host: str, vfolders: List[str]) -> None:
     """Create or update filebrowser session"""
-    print(host, vfolders)
     vfolder = list(vfolders)
 
     with Session() as session:

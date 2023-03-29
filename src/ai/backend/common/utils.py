@@ -7,6 +7,7 @@ import re
 import sys
 import uuid
 from collections import OrderedDict
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
@@ -283,3 +284,11 @@ class Fstab:
         if entry:
             return await self.remove_entry(entry)
         return False
+
+
+@asynccontextmanager
+async def closing_async(thing):
+    try:
+        yield thing
+    finally:
+        await thing.close()

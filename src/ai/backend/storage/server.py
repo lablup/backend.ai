@@ -30,6 +30,7 @@ from .api.client import init_client_app
 from .api.manager import init_manager_app
 from .config import local_config_iv
 from .context import Context
+from .filebrowser.filebrowser import close_all_filebrowser_containers
 from .filebrowser.monitor import keep_monitors_running
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -125,8 +126,10 @@ async def server_main(
                 await file_lock.acquire()
                 if file_lock.locked:
                     asyncio.create_task(keep_monitors_running(ctx))
+            except asyncio.TimeoutError:
+                log.debug("File lock is already acquired by another process.")
             except Exception as e:
-                print(e)
+                log.error("Failed to acquire file lock", exc_info=e)
         client_service_addr = local_config["api"]["client"]["service-addr"]
         manager_service_addr = local_config["api"]["manager"]["service-addr"]
         client_api_site = web.TCPSite(
@@ -163,9 +166,11 @@ async def server_main(
             log.info("Shutting down...")
             await manager_api_runner.cleanup()
             await client_api_runner.cleanup()
+
             if monitor_lock_path.exists() and file_lock.locked:
                 file_lock.release()
                 monitor_lock_path.unlink()
+                await close_all_filebrowser_containers(ctx)
     finally:
         if aiomon_started:
             m.close()
@@ -276,7 +281,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
                 local_config["filebrowser"]["db_path"].unlink()
             if (local_config["filebrowser"]["settings_path"] / "db/").exists():
                 rmtree((local_config["filebrowser"]["settings_path"] / "db/"))
-
     return 0
 
 

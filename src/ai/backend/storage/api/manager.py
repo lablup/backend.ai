@@ -661,6 +661,7 @@ async def create_or_update_filebrowser(request: web.Request) -> web.Response:
         params["host"],
         params["vfolders"],
     )
+    log.info("Filebrowser created at %s:%d", host, port)
     return web.json_response(
         {
             "addr": f"http://{host}:{port}",  # TODO: SSL?
