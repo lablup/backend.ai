@@ -11,7 +11,6 @@ class FileBrowser(BaseFunction):
     @api_function
     @classmethod
     async def create_or_update_browser(self, host: str, vfolders: list[str]) -> str:
-
         rqst = Request("POST", "/storage/filebrowser/create")
         rqst.set_json({"host": host, "vfolders": vfolders})
         async with rqst.fetch() as resp:
