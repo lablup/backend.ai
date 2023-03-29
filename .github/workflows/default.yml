@@ -258,6 +258,11 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
+    - name: Upload wheels
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels
+        path: dist/*.whl
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -281,6 +286,8 @@ jobs:
     needs: [build-wheels]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - uses: actions/checkout@v3
     - name: Create LFS file hash list
@@ -305,16 +312,26 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
+    - name: Normalize the package version
+      run: |
+        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+        echo "PKGVER=$PKGVER" >> $GITHUB_ENV
     - name: Install conda-pack
       uses: s-weigand/setup-conda@v1
       with:
         activate-conda: false
+    - name: Download wheels
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels
+        path: dist
     - name: Create conda environment
+      # FIXME: Let's think about resolving dependency of backend.ai-client package programmatically, instead of hardcoding it.
       run: |
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
-        pip install backend.ai-client==${{ github.ref_name }}
+        pip install dist/backend.ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend.ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend.ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend.ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
         conda-pack -o backend.ai-client-${{ github.ref_name }}-windows-conda.zip
     - name: Upload conda-pack to GitHub release
       run: |
