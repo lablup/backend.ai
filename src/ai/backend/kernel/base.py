@@ -166,6 +166,8 @@ class BaseRunner(metaclass=ABCMeta):
             path_env = promote_path(path_env, "/usr/local/cuda/bin")
         if Path("/usr/local/nvidia/bin").is_dir():
             path_env = promote_path(path_env, "/usr/local/nvidia/bin")
+        if Path("/home/linuxbrew/.linuxbrew").is_dir():
+            path_env = promote_path(path_env, "/home/linuxbrew/.linuxbrew/bin")
         path_env = promote_path(path_env, "/home/work/.local/bin")
         self.child_env["PATH"] = path_env
 

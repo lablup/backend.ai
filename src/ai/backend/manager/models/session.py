@@ -612,9 +612,6 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    # status_changed = sa.Column(
-    #     "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
-    # )
     status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
 
     status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
@@ -1074,6 +1071,7 @@ class ComputeSession(graphene.ObjectType):
     result = graphene.String()
     commit_status = graphene.String()
     abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -1230,6 +1228,10 @@ class ComputeSession(graphene.ObjectType):
         if containers is None:
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),

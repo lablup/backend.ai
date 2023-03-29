@@ -1,10 +1,20 @@
 import os
+import sys
 from pathlib import Path
+from pprint import pformat
+from typing import Any
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.config import etcd_config_iv
+from ai.backend.common.config import (
+    ConfigurationError,
+    check,
+    etcd_config_iv,
+    override_key,
+    override_with_env,
+    read_from_file,
+)
 from ai.backend.common.logging import logging_config_iv
 
 from .types import VolumeInfo
@@ -18,6 +28,9 @@ local_config_iv = (
         {
             t.Key("storage-proxy"): t.Dict(
                 {
+                    t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
+                        type="dir", auto_create=True
+                    ),
                     t.Key("node-id"): t.String,
                     t.Key("num-proc", default=_max_cpu_count): t.Int[1:_max_cpu_count],
                     t.Key("pid-file", default=os.devnull): tx.Path(
@@ -111,3 +124,27 @@ local_config_iv = (
     .merge(etcd_config_iv)
     .allow_extra("*")
 )
+
+
+def load_local_config(config_path: Path, debug: bool = False) -> dict[str, Any]:
+    # Determine where to read configuration.
+    raw_cfg, cfg_src_path = read_from_file(config_path, "storage-proxy")
+
+    override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+    override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+    override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+    override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+    if debug:
+        override_key(raw_cfg, ("debug", "enabled"), True)
+
+    try:
+        local_config = check(raw_cfg, local_config_iv)
+        local_config["_src"] = cfg_src_path
+        return local_config
+    except ConfigurationError as e:
+        print(
+            "ConfigurationError: Validation of agent configuration has failed:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise
