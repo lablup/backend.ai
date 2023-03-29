@@ -226,10 +226,8 @@ async def get_filebrowsers() -> List[str]:
 
 
 async def get_network_stats(container_id: str) -> NetworkStatsResult:
-
     async with closing_async(aiodocker.Docker()) as docker:
         try:
-
             container = aiodocker.docker.DockerContainers(docker).container(
                 container_id=container_id,
             )
