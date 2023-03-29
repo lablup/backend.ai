@@ -410,7 +410,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
             ownership_type = "user"
             quota_scope_id = user_uuid.hex
         if ownership_type not in allowed_vfolder_types:
-            raise InvalidAPIParameters(f"{ownership_type} vfolder cannot be created in this host")
+            raise InvalidAPIParameters(
+                f"{ownership_type}-owned vfolder is not allowed in this cluster"
+            )
 
         if not unmanaged_path:
             await ensure_host_permission_allowed(
