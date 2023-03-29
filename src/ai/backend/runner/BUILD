@@ -42,6 +42,7 @@ resources(
         "*.css",
         "*.ttf",
         "*.dockerfile",
+        "*.json",
         ".bash_profile",
         ".bashrc",
         ".tmux.conf",

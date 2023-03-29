@@ -1,0 +1,1 @@
+Query agent list with multiple statuses. For example, CLI query like this is now possible: `backend.ai admin agent list -s "TERMINATED,LOST"`.
