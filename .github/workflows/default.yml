@@ -326,6 +326,7 @@ jobs:
         name: wheels
         path: dist
     - name: Create conda environment
+      # FIXME: Let's think about resolving dependency of backend.ai-client package programmatically, instead of hardcoding it.
       run: |
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
