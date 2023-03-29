@@ -240,7 +240,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                 invited_perm_cond = vfolder_permissions.c.permission == perm
                 if not request["is_admin"]:
                     vf_group_cond = vfolders.c.permission == perm
-            async with root_ctx.db.begin() as conn:
+            async with root_ctx.db.begin_readonly() as conn:
                 entries = await query_accessible_vfolders(
                     conn,
                     user_uuid,

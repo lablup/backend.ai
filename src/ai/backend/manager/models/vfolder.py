@@ -174,6 +174,7 @@ vfolders = sa.Table(
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False),
+    sa.Column("quota_scope_id", sa.String(length=64), nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
         "usage_mode",
@@ -312,6 +313,7 @@ async def query_accessible_vfolders(
         vfolders.c.name,
         vfolders.c.id,
         vfolders.c.host,
+        vfolders.c.quota_scope_id,
         vfolders.c.usage_mode,
         vfolders.c.created_at,
         vfolders.c.last_used,
@@ -347,6 +349,7 @@ async def query_accessible_vfolders(
                     "name": row.vfolders_name,
                     "id": row.vfolders_id,
                     "host": row.vfolders_host,
+                    "quota_scope_id": row.quota_scope_id,
                     "usage_mode": row.vfolders_usage_mode,
                     "created_at": row.vfolders_created_at,
                     "last_used": row.vfolders_last_used,
@@ -825,6 +828,7 @@ async def initiate_vfolder_clone(
                     "permission": vfolder_info.permission,
                     "last_used": None,
                     "host": vfolder_info.target_host,
+                    # TODO: add quota_scope_id
                     "creator": vfolder_info.email,
                     "ownership_type": VFolderOwnershipType("user"),
                     "user": vfolder_info.user_id,
@@ -930,6 +934,7 @@ class VirtualFolder(graphene.ObjectType):
         interfaces = (Item,)
 
     host = graphene.String()
+    quota_socpe_id = graphene.String()
     name = graphene.String()
     user = graphene.UUID()  # User.id (current owner, null in project vfolders)
     user_email = graphene.String()  # User.email (current owner, null in project vfolders)
@@ -958,6 +963,7 @@ class VirtualFolder(graphene.ObjectType):
         return cls(
             id=row["id"],
             host=row["host"],
+            quota_scope_id=row["quota_scope_id"],
             name=row["name"],
             user=row["user"],
             user_email=row["users_email"],
@@ -985,6 +991,7 @@ class VirtualFolder(graphene.ObjectType):
     _queryfilter_fieldspec = {
         "id": ("vfolders_id", uuid.UUID),
         "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
         "name": ("vfolders_name", None),
         "group": ("vfolders_group", uuid.UUID),
         "group_name": ("groups_name", None),
@@ -1006,6 +1013,7 @@ class VirtualFolder(graphene.ObjectType):
     _queryorder_colmap = {
         "id": "vfolders_id",
         "host": "vfolders_host",
+        "quota_scope_id": "vfolders_quota_scope_id",
         "name": "vfolders_name",
         "group": "vfolders_group",
         "group_name": "groups_name",
