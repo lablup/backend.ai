@@ -88,7 +88,6 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    ServerMisconfiguredError,
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderCreationFailed,
@@ -355,13 +354,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     "You must specify the vfolder host "
                     "because the default host is not configured."
                 )
+
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    for vf_type in allowed_vfolder_types:
-        if vf_type not in ("user", "group"):
-            raise ServerMisconfiguredError(
-                f"Invalid vfolder type(s): {str(allowed_vfolder_types)}."
-                ' Only "user" or "group" is allowed.'
-            )
 
     if not verify_vfolder_name(params["name"]):
         raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
@@ -372,9 +366,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
     group_uuid: uuid.UUID | None = None
 
     async with root_ctx.db.begin() as conn:
-        # Convert group name to uuid if group name is given.
         match group_id_or_name:
             case str():
+                # Convert the group name to group uuid.
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)
@@ -410,15 +404,13 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if group_uuid is not None:
             ownership_type = "group"
             quota_scope_id = group_uuid.hex
-            if "group" not in allowed_vfolder_types:
-                raise InvalidAPIParameters("group vfolder cannot be created in this host")
             if not request["is_admin"]:
                 raise GenericForbidden("no permission")
         else:
             ownership_type = "user"
             quota_scope_id = user_uuid.hex
-            if "user" not in allowed_vfolder_types:
-                raise InvalidAPIParameters("user vfolder cannot be created in this host")
+        if ownership_type not in allowed_vfolder_types:
+            raise InvalidAPIParameters(f"{ownership_type} vfolder cannot be created in this host")
 
         if not unmanaged_path:
             await ensure_host_permission_allowed(
@@ -2399,12 +2391,6 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             )
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    for vf_type in allowed_vfolder_types:
-        if vf_type not in ("user", "group"):
-            raise ServerMisconfiguredError(
-                f"Invalid vfolder type(s): {str(allowed_vfolder_types)}."
-                ' Only "user" or "group" is allowed.'
-            )
 
     if not verify_vfolder_name(params["target_name"]):
         raise InvalidAPIParameters(f'{params["target_name"]} is reserved for internal operations.')

@@ -614,6 +614,11 @@ class SharedConfig(AbstractConfig):
                 vf_types = {"user": ""}
             ret = list(vf_types.keys())
             current_vfolder_types.set(ret)
+        for vf_type in ret:
+            if vf_type not in ("user", "group"):
+                raise ServerMisconfiguredError(
+                    f'Invalid vfolder type: {vf_type}. Only "user" or "group" is allowed.'
+                )
         return ret
 
     @aiotools.lru_cache(maxsize=1, expire_after=5.0)
