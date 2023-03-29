@@ -326,7 +326,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
+    user_uuid: uuid.UUID = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
@@ -369,18 +369,57 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if params["group"] is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
+    group_uuid: uuid.UUID | None = None
+
     async with root_ctx.db.begin() as conn:
         # Convert group name to uuid if group name is given.
-        if isinstance(group_id_or_name, str):
-            query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.name == group_id_or_name)
-            )
-            group_id = await conn.scalar(query)
+        match group_id_or_name:
+            case str():
+                query = (
+                    sa.select([groups.c.id])
+                    .select_from(groups)
+                    .where(groups.c.domain_name == domain_name)
+                    .where(groups.c.name == group_id_or_name)
+                )
+                _gid = await conn.scalar(query)
+                if _gid is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
+                group_uuid = _gid
+            case uuid.UUID():
+                # Check if the group belongs to the current domain.
+                query = (
+                    sa.select([groups.c.id])
+                    .select_from(groups)
+                    .where(groups.c.domain_name == domain_name)
+                    .where(groups.c.id == group_id_or_name)
+                )
+                _gid = await conn.scalar(query)
+                if _gid is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
+                group_uuid = group_id_or_name
+            case None:
+                pass
+            case _:
+                raise GroupNotFound(extra_data=group_id_or_name)
+
+        # Check if group exists when it's given a non-empty value.
+        if group_id_or_name and group_uuid is None:
+            raise GroupNotFound(extra_data=group_id_or_name)
+
+        # Determine the ownership type and the quota scope ID.
+        if group_uuid is not None:
+            ownership_type = "group"
+            quota_scope_id = group_uuid.hex
+            if "group" not in allowed_vfolder_types:
+                raise InvalidAPIParameters("group vfolder cannot be created in this host")
+            if not request["is_admin"]:
+                raise GenericForbidden("no permission")
         else:
-            group_id = group_id_or_name
+            ownership_type = "user"
+            quota_scope_id = user_uuid.hex
+            if "user" not in allowed_vfolder_types:
+                raise InvalidAPIParameters("user vfolder cannot be created in this host")
+
         if not unmanaged_path:
             await ensure_host_permission_allowed(
                 conn,
@@ -389,7 +428,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 user_uuid=user_uuid,
                 resource_policy=resource_policy,
                 domain_name=domain_name,
-                group_id=group_id,
+                group_id=group_uuid,
                 permission=VFolderHostPermission.CREATE,
             )
 
@@ -400,12 +439,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
             if result >= resource_policy["max_vfolder_count"]:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
-        # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
-        max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
-        if max_vfolder_size > 0 and (
-            params["quota"] is None or params["quota"] <= 0 or params["quota"] > max_vfolder_size
-        ):
-            params["quota"] = max_vfolder_size
+        # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
+        # max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
+        # if max_vfolder_size > 0 and (
+        #     params["quota"] is None or params["quota"] <= 0 or params["quota"] > max_vfolder_size
+        # ):
+        #     params["quota"] = max_vfolder_size
 
         # Prevent creation of vfolder with duplicated name.
         extra_vf_conds = [vfolders.c.name == params["name"]]
@@ -420,33 +459,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
         if len(entries) > 0:
-            raise VFolderAlreadyExists
-
-        # Check if group exists.
-        if group_id_or_name and group_id is None:
-            raise GroupNotFound
-        if group_id is not None:
-            if "group" not in allowed_vfolder_types:
-                raise InvalidAPIParameters("group vfolder cannot be created in this host")
-            if not request["is_admin"]:
-                raise GenericForbidden("no permission")
-            query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.id == group_id)
-            )
-            _gid = await conn.scalar(query)
-            if str(_gid) != str(group_id):
-                raise InvalidAPIParameters("No such group.")
-        else:
-            if "user" not in allowed_vfolder_types:
-                raise InvalidAPIParameters("user vfolder cannot be created in this host")
-        user_uuid = str(user_uuid) if group_id is None else None
-        group_uuid = str(group_id) if group_id is not None else None
-        ownership_type = "group" if group_uuid is not None else "user"
-        # TODO: generate a quota scope ID if required, depending on ownership_type.
-        quota_scope_id = "default"
+            raise VFolderAlreadyExists(extra_data=params["name"])
         try:
             folder_id = uuid.uuid4()
             vfid = VFolderID(quota_scope_id, folder_id)
@@ -491,8 +504,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "host": folder_host,
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
-            "user": user_uuid,
-            "group": group_uuid,
+            "user": user_uuid if ownership_type == "user" else None,
+            "group": group_uuid if ownership_type == "group" else None,
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
@@ -506,8 +519,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "max_size": int(params["quota"] / (2**20)) if params["quota"] else None,  # in MBytes
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
-            "user": user_uuid,
-            "group": group_uuid,
+            "user": str(user_uuid) if ownership_type == "user" else None,
+            "group": str(group_uuid) if ownership_type == "group" else None,
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
         }

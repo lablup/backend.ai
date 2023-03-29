@@ -7,7 +7,15 @@ import logging
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import AsyncContextManager, Awaitable, Callable, Iterator, List, TypedDict, cast
+from typing import (
+    AsyncContextManager,
+    Awaitable,
+    Callable,
+    Iterator,
+    List,
+    TypedDict,
+    cast,
+)
 
 import attr
 import jwt
