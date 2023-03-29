@@ -153,7 +153,7 @@ async def create_or_update(
         "RUNNING",
         str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
     )
-    return service_ip, service_port, container_id
+    return FileBrowserResult(service_ip, service_port, container_id)
 
 
 async def recreate_container(container_name: str, config: dict[str, Any]) -> None:

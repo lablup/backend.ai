@@ -127,7 +127,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                     )
                     if len(entries) == 0:
                         raise VFolderNotFound("Your operation may be permission denied.")
-                return await handler(request, *args, **kwargs)
+            return await handler(request, *args, **kwargs)
 
         return _wrapped
 
