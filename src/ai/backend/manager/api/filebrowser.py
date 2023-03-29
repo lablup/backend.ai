@@ -39,7 +39,7 @@ async def get_vfid(root_ctx: RootContext, host: str, name: str) -> str:
         query = (
             sa.select([vfolders.c.id])
             .select_from(vfolders)
-            .where(vfolders.c.host == host and vfolders.c.name == name)
+            .where((vfolders.c.host == host) & (vfolders.c.name == name))
         )
         folder_id = await conn.scalar(query)
         return folder_id
