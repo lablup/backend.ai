@@ -23,6 +23,7 @@ from typing import (
     Set,
     Type,
     Union,
+    cast,
 )
 
 import aiotools
@@ -148,7 +149,6 @@ class IdleCheckerHost:
         event_producer: EventProducer,
         lock_factory: DistributedLockFactory,
     ) -> None:
-        self._grace_period_checker: Optional[NewUserGracePeriodChecker] = None
         self._checkers: list[BaseIdleChecker] = []
         self._frozen = False
         self._db = db
@@ -164,14 +164,9 @@ class IdleCheckerHost:
             self._shared_config.data["redis"],
             db=REDIS_STAT_DB,
         )
-
-    def assign_grace_period_checker(self, checker: NewUserGracePeriodChecker) -> None:
-        if self._frozen or self._grace_period_checker is not None:
-            raise RuntimeError(
-                "Cannot add a new idle checker after the idle checker host is frozen."
-            )
-        self._grace_period_checker = checker
-        self._checkers.append(checker)
+        self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
+            event_dispatcher, self._redis_live, self._redis_stat
+        )
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
@@ -182,11 +177,15 @@ class IdleCheckerHost:
 
     async def start(self) -> None:
         self._frozen = True
+        raw_config = await self._shared_config.etcd.get_prefix_dict(
+            "config/idle/checkers",
+        )
+        raw_config = cast(Mapping[str, Mapping[str, Any]], raw_config)
+        await self._grace_period_checker.populate_config(
+            raw_config.get(self._grace_period_checker.name) or {}
+        )
         for checker in self._checkers:
-            raw_config = await self._shared_config.etcd.get_prefix_dict(
-                f"config/idle/checkers/{checker.name}",
-            )
-            await checker.populate_config(raw_config or {})
+            await checker.populate_config(raw_config.get(checker.name) or {})
         self.timer = GlobalTimer(
             self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
             self._event_producer,
@@ -247,6 +246,7 @@ class IdleCheckerHost:
             result = await conn.execute(query)
             rows = result.fetchall()
             for kernel in rows:
+                await self._grace_period_checker.report_grace_period(kernel, conn, self._redis_live)
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
@@ -314,11 +314,9 @@ class IdleCheckerHost:
                 return remaining
             return remaining + grace_period if remaining is not None else grace_period
 
-        user_grace_period = None
-        if self._grace_period_checker is not None:
-            user_grace_period = await self._grace_period_checker.get_checker_result(
-                self._redis_live, session_id
-            )
+        user_grace_period = await self._grace_period_checker.get_checker_result(
+            self._redis_live, session_id
+        )
         return {
             checker.name: {
                 "remaining": (await add_period_to_result(checker, user_grace_period)),
@@ -326,12 +324,10 @@ class IdleCheckerHost:
                 "extra": (await checker.get_extra_info(session_id)),
             }
             for checker in self._checkers
-            if checker is not self._grace_period_checker
         }
 
 
-class BaseIdleChecker(metaclass=ABCMeta):
-    terminate_reason: KernelLifecycleEventReason
+class AbstractIdleCheckReporter(metaclass=ABCMeta):
     remaining_time_type: RemainingTimeType
     name: ClassVar[str] = "base"
     report_key: ClassVar[str] = "base"
@@ -370,16 +366,6 @@ class BaseIdleChecker(metaclass=ABCMeta):
         return None
 
     @abstractmethod
-    async def check_idleness(
-        self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
-    ) -> bool:
-        """
-        Check the kernel is whether idle or not.
-        And report the result to Redis.
-        """
-        return True
-
-    @abstractmethod
     async def get_checker_result(
         self,
         redis_obj: RedisConnectionInfo,
@@ -403,12 +389,25 @@ class BaseIdleChecker(metaclass=ABCMeta):
         )
 
 
-class NewUserGracePeriodChecker(BaseIdleChecker):
-    terminate_reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+class AbstractIdleChecker(metaclass=ABCMeta):
+    terminate_reason: KernelLifecycleEventReason
+
+    @abstractmethod
+    async def check_idleness(
+        self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
+    ) -> bool:
+        """
+        Check the kernel is whether idle or not.
+        And report the result to Redis.
+        """
+        return True
+
+
+class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
     remaining_time_type: RemainingTimeType = RemainingTimeType.GRACE_PERIOD
     name: ClassVar[str] = "user_grace_period"
     report_key: ClassVar[str] = "user_grace_period"
-    user_initial_grace_period: Optional[timedelta]
+    user_initial_grace_period: Optional[timedelta] = None
 
     _config_iv = t.Dict(
         {
@@ -442,9 +441,9 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
             ),
         )
 
-    async def check_idleness(
-        self, kernel: Row, dbconn: SAConnection, policy: Row, redis_obj: RedisConnectionInfo
-    ) -> bool:
+    async def report_grace_period(
+        self, kernel: Row, dbconn: SAConnection, redis_obj: RedisConnectionInfo
+    ) -> None:
         """
         Calculate the user's initial grace period for idle checkers.
         During the user's initial grace period, the checker does not calculate the time remaining until expiration
@@ -453,7 +452,7 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
         Return True always because this checker does not terminate any session.
         """
         if self.user_initial_grace_period is None:
-            return True
+            return
         session_id = kernel["session_id"]
         db_now = await dbconn.scalar(sa.select(sa.func.now()))
         user_created_at = kernel["user_created_at"]
@@ -463,7 +462,6 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
             await self.set_remaining_time_report(redis_obj, session_id, result)
         else:
             await self.del_remaining_time_report(redis_obj, session_id)
-        return True
 
     async def get_checker_result(
         self,
@@ -473,6 +471,10 @@ class NewUserGracePeriodChecker(BaseIdleChecker):
         key = self.get_report_key(session_id)
         data = await redis_helper.execute(redis_obj, lambda r: r.get(key))
         return msgpack.unpackb(data) if data is not None else None
+
+
+class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
+    pass
 
 
 class NetworkTimeoutIdleChecker(BaseIdleChecker):
@@ -997,11 +999,14 @@ async def init_idle_checkers(
     from the given configuration and using the given event dispatcher.
     """
     checker_host = IdleCheckerHost(
-        db, shared_config, event_dispatcher, event_producer, lock_factory
+        db,
+        shared_config,
+        event_dispatcher,
+        event_producer,
+        lock_factory,
     )
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
     log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
-    checker_host.assign_grace_period_checker(NewUserGracePeriodChecker(*checker_init_args))
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default
     enabled_checkers = await shared_config.etcd.get("config/idle/enabled")
     if enabled_checkers:
