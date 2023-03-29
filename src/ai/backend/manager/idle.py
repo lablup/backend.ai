@@ -448,8 +448,6 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         Calculate the user's initial grace period for idle checkers.
         During the user's initial grace period, the checker does not calculate the time remaining until expiration
         and does not yield any extra information such as average utilization.
-
-        Return True always because this checker does not terminate any session.
         """
         if self.user_initial_grace_period is None:
             return
