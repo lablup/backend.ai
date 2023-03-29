@@ -7,7 +7,7 @@ import pwd
 import ssl
 import sys
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pprint
 from shutil import rmtree
 from typing import Any, AsyncIterator, Sequence
 
