@@ -248,7 +248,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                     extra_vf_group_conds=vf_group_cond,
                 )
                 if len(entries) == 0:
-                    raise VFolderNotFound("Your operation may be permission denied.")
+                    raise VFolderNotFound(extra_data=folder_name)
             return await handler(request, entries[0], *args, **kwargs)
 
         return _wrapped
@@ -944,8 +944,8 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=(sa.and_(*extra_vf_conds)),
             )
-        if len(entries) < 0:
-            raise VFolderNotFound("no such accessible vfolder")
+        if len(entries) == 0:
+            raise VFolderNotFound(extra_data=params["id"])
 
     async with root_ctx.storage_manager.request(
         proxy_name,
@@ -1014,8 +1014,8 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=(sa.and_(*extra_vf_conds)),
             )
-        if len(entries) < 0:
-            raise VFolderNotFound("no such accessible vfolder")
+        if len(entries) == 0:
+            raise VFolderNotFound(extra_data=params["id"])
 
     # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
     max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
@@ -2233,7 +2233,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
                 extra_data=None,
             )
         elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
+            raise VFolderNotFound(extra_data=folder_name)
         # query_accesible_vfolders returns list
         entry = entries[0]
         folder_host = entry["host"]
