@@ -16,13 +16,15 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Concatenate,
     Dict,
     List,
     Mapping,
     MutableMapping,
+    ParamSpec,
     Sequence,
     Tuple,
-    Type,
+    TypeAlias,
 )
 
 import aiohttp
@@ -104,7 +106,8 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-VFolderRow = Mapping[str, Any]
+VFolderRow: TypeAlias = Mapping[str, Any]
+P = ParamSpec("P")
 
 
 async def ensure_vfolder_status(
@@ -172,7 +175,12 @@ async def ensure_vfolder_status(
         return entries
 
 
-def vfolder_permission_required(perm: VFolderPermission):
+def vfolder_permission_required(
+    perm: VFolderPermission,
+) -> Callable[
+    [Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]],
+    Callable[Concatenate[web.Request, P], Awaitable[web.Response]],
+]:
     """
     Checks if the target vfolder exists and is either:
     - owned by the current access key, or
@@ -182,10 +190,11 @@ def vfolder_permission_required(perm: VFolderPermission):
     which contains a dict object describing the matched VirtualFolder table row.
     """
 
-    # FIXME: replace ... with [web.Request, VFolderRow, Any...] in the future mypy
-    def _wrapper(handler: Callable[..., Awaitable[web.Response]]):
+    def _wrapper(
+        handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]
+    ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
         @functools.wraps(handler)
-        async def _wrapped(request: web.Request, *args, **kwargs) -> web.Response:
+        async def _wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> web.Response:
             root_ctx: RootContext = request.app["_root.context"]
             domain_name = request["user"]["domain_name"]
             user_role = request["user"]["role"]
@@ -256,8 +265,9 @@ def vfolder_permission_required(perm: VFolderPermission):
     return _wrapper
 
 
-# FIXME: replace ... with [web.Request, VFolderRow, Any...] in the future mypy
-def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
+def vfolder_check_exists(
+    handler: Callable[Concatenate[web.Request, VFolderRow, P], Awaitable[web.Response]]
+) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
     """
     Checks if the target vfolder exists and is owned by the current user.
 
@@ -266,7 +276,7 @@ def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
     """
 
     @functools.wraps(handler)
-    async def _wrapped(request: web.Request, *args, **kwargs) -> web.Response:
+    async def _wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> web.Response:
         root_ctx: RootContext = request.app["_root.context"]
         user_uuid = request["user"]["uuid"]
         folder_name = request.match_info["name"]
@@ -2979,7 +2989,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
 
 
 async def storage_task_exception_handler(
-    exc_type: Type[Exception],
+    exc_type: type[Exception],
     exc_obj: Exception,
     tb: TracebackType,
 ):
