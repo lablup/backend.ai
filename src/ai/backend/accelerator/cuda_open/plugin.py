@@ -486,6 +486,6 @@ class CUDAPlugin(AbstractComputePlugin):
             "human_readable_name": "GPU",
             "description": "CUDA-capable GPU",
             "display_unit": "GPU",
-            "number_format": "#,###",
+            "number_format": {"binary": False, "round_length": 0},
             "display_icon": "gpu1",
         }

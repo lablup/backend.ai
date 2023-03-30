@@ -208,6 +208,7 @@ session_fields = FieldSet(
             formatter=DependencyListFormatter(),
         ),
         FieldSpec("abusing_reports"),
+        FieldSpec("idle_checks"),
     ]
 )
 

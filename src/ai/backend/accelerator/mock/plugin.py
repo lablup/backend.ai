@@ -57,6 +57,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    AcceleratorNumberFormat,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -786,11 +787,24 @@ class MockPlugin(AbstractComputePlugin):
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
+        number_format: AcceleratorNumberFormat
+        match self._mode:
+            case AllocationModes.DISCRETE:
+                display_unit = "GPU"
+                number_format = {"binary": False, "round_length": 0}
+                description = "CUDA-capable GPU"
+            case AllocationModes.FRACTIONAL:
+                display_unit = "fGPU"
+                exponent = self.quantum_size.as_tuple().exponent
+                assert isinstance(exponent, int)
+                number_format = {"binary": False, "round_length": abs(exponent)}
+                description = "CUDA-capable GPU (fractional)"
+        # TODO: get format info depending on the slot name
         return {
             "slot_name": self.mock_config["slot_name"],
             "human_readable_name": self.mock_config["human_readable_name"],
-            "description": self.mock_config["description"],
-            "display_unit": self.mock_config["display_unit"],
-            "number_format": self.mock_config["number_format"],
+            "description": description,
+            "display_unit": display_unit,
+            "number_format": number_format,
             "display_icon": self.mock_config["display_icon"],
         }
