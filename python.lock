@@ -23,7 +23,7 @@
 //     "aiomonitor-ng~=0.7.0",
 //     "aioresponses>=0.7.3",
 //     "aiosqlite~=0.17.0",
-//     "aiotools~=1.5.9",
+//     "aiotools~=1.6.0",
 //     "aiotusclient~=0.1.4",
 //     "alembic~=1.8.1",
 //     "appdirs~=1.4.4",
@@ -434,24 +434,25 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3a9946f047cfb33e1fca0d39845c3d6d10aeda69a6602c06a8f7dcb67c12171d",
-              "url": "https://files.pythonhosted.org/packages/e0/6b/8b7b1c5dfcb1ab49ac0baa0e59f1edb437a05b3fe618b5c5ec931e15ec56/aiotools-1.5.9-py3-none-any.whl"
+              "hash": "a3d04d32952d3633f8a4f392da4a035c079efb22ff50ef4108a2937b0f31d9b2",
+              "url": "https://files.pythonhosted.org/packages/dc/ce/5f68a65ddb32f445284a1e85412a3a2e43c49b5a98316d28ffce07c214d2/aiotools-1.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "44e7b5f50cef692e177ad37231f0d6fa058465ea93c8759da7ee06a2b5cfac97",
-              "url": "https://files.pythonhosted.org/packages/83/b9/915ad8fa49f8834841bd7ca387db3c374ba8d953e949ef2f185e86ffd652/aiotools-1.5.9.tar.gz"
+              "hash": "50f0337eb3aa3e02c9264e2853c1fbdd11382690a1a0340d789d32dc0d5f6779",
+              "url": "https://files.pythonhosted.org/packages/89/75/10776c11516f7c4920944dad34b437cb436ad4db84fa7e8f226d1cd601a6/aiotools-1.6.0.tar.gz"
             }
           ],
           "project_name": "aiotools",
           "requires_dists": [
+            "async-timeout~=4.0.2; extra == \"test\"",
             "codecov; extra == \"test\"",
             "flake8>=4.0.1; extra == \"lint\"",
             "mypy>=0.920; extra == \"typecheck\"",
-            "pytest-asyncio~=0.16.0; extra == \"test\"",
+            "pytest-asyncio~=0.20.3; extra == \"test\"",
             "pytest-cov; extra == \"test\"",
             "pytest-mock; extra == \"test\"",
-            "pytest~=6.2.5; extra == \"test\"",
+            "pytest~=7.2.2; extra == \"test\"",
             "setuptools>=51.2.0; extra == \"build\"",
             "sphinx-rtd-theme~=1.0; extra == \"docs\"",
             "sphinx~=4.3; extra == \"docs\"",
@@ -461,7 +462,7 @@
             "wheel>=0.37.0; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "1.5.9"
+          "version": "1.6.0"
         },
         {
           "artifacts": [
@@ -855,36 +856,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5374c409d0153e5da4ccde3a0f7e3efac81ce7c60e4e18ffc9acc87c67e0c0a3",
-              "url": "https://files.pythonhosted.org/packages/4a/ab/92d35739748e7cf94f315a408f3861cc075cecc0a40f2b455972639b6500/boto3-1.26.88-py3-none-any.whl"
+              "hash": "3ce2225a61832d69831d669d912424ea3863268ca1cfa2a82203bb90952acefa",
+              "url": "https://files.pythonhosted.org/packages/bd/3b/b59a11ea95f73b78ccd6474909d3bc05b6aebf10983421c60e6f37d00755/boto3-1.26.91-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f4839565feeaaca4ef775b74a8df996b79b61d988db62c90571bcc948a9f24c5",
-              "url": "https://files.pythonhosted.org/packages/5a/f0/5e9144029ac56e7dc966a92b2d2181a81b57ab7965500d213cd3f9220780/boto3-1.26.88.tar.gz"
+              "hash": "278d896e9090a976f41ec68da5c572bc4e5b7cb1e515f1898fee8cb2fadfb50d",
+              "url": "https://files.pythonhosted.org/packages/0d/f2/b64fa41a705e01c4325e1537306d1dc910b6692e6d1626567a512a924969/boto3-1.26.91.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.30.0,>=1.29.88",
+            "botocore<1.30.0,>=1.29.91",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.26.88"
+          "version": "1.26.91"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c320275d18ee140005ace4d04e9e720d5b1e30625cfde5267b1fc5133fd4d44d",
-              "url": "https://files.pythonhosted.org/packages/72/33/aeed379b1b44ccb6dea8cc4d427fe045ea69a1104f999efe1d4788c09b66/botocore-1.29.88-py3-none-any.whl"
+              "hash": "4ed6a488aee1b42367eace71f7d0993dda05b02eebd7dcdd78db5c9ce3d80da5",
+              "url": "https://files.pythonhosted.org/packages/5a/32/92642d3f17b11d3498caf644abd41b43f44b87ff02de0c215b31c0aa555e/botocore-1.29.91-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "48ed2af0a10e7c15a3445eda62f665b106a2aba4ffa1ce730d7083022fd9596f",
-              "url": "https://files.pythonhosted.org/packages/26/b7/ba1676a574200bfc0a8f99e41daaf4b454917eaf7eeb09c8512bf36193d4/botocore-1.29.88.tar.gz"
+              "hash": "a8a800a2a945da807758cace539fc5b5ec1d5082ce363799d3a3870c2c4ed6fc",
+              "url": "https://files.pythonhosted.org/packages/df/8d/9f006c2647f65a6278b7ec19257b1e9e9411f29e6423c08767c71ca01974/botocore-1.29.91.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -895,7 +896,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.29.88"
+          "version": "1.29.91"
         },
         {
           "artifacts": [
@@ -2618,13 +2619,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "13b08a53ed71021350c9e300d4ea8668438fb0046ab3937ac9a29913a1a1350a",
-              "url": "https://files.pythonhosted.org/packages/ca/de/a33823fe54d52ea72fdae011115d737a2642d441c93b68ed17455a328e4c/platformdirs-3.1.0-py3-none-any.whl"
+              "hash": "e5986afb596e4bb5bde29a79ac9061aa955b94fca2399b7aaac4090860920dd8",
+              "url": "https://files.pythonhosted.org/packages/7b/e1/593f693096c50411a2bf9571f66bc3be9d0f79a4a50e95aab581458b0e3c/platformdirs-3.1.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "accc3665857288317f32c7bebb5a8e482ba717b474f3fc1d18ca7f9214be0cef",
-              "url": "https://files.pythonhosted.org/packages/8f/5f/01180534cebac14f3a792bf2f74fc99d34531c950c308fdebd9721e85550/platformdirs-3.1.0.tar.gz"
+              "hash": "024996549ee88ec1a9aa99ff7f8fc819bb59e2c3477b410d90a16d32d6e707aa",
+              "url": "https://files.pythonhosted.org/packages/79/c4/f98a05535344f79699bbd494e56ac9efc986b7a253fe9f4dba7414a7f505/platformdirs-3.1.1.tar.gz"
             }
           ],
           "project_name": "platformdirs",
@@ -2641,7 +2642,7 @@
             "typing-extensions>=4.4; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.1.0"
+          "version": "3.1.1"
         },
         {
           "artifacts": [
@@ -3944,13 +3945,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "75edcdc2f7d85b137124a6c3c9fc3933cdeaa12ecb9a6a959f22797a0feca7e1",
-              "url": "https://files.pythonhosted.org/packages/fe/ca/466766e20b767ddb9b951202542310cba37ea5f2d792dae7589f1741af58/urllib3-1.26.14-py2.py3-none-any.whl"
+              "hash": "aa751d169e23c7479ce47a0cb0da579e3ede798f994f5816a74e4f4500dcea42",
+              "url": "https://files.pythonhosted.org/packages/7b/f5/890a0baca17a61c1f92f72b81d3c31523c99bec609e60c292ea55b387ae8/urllib3-1.26.15-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "076907bf8fd355cde77728471316625a4d2f7e713c125f51953bb5b3eecf4f72",
-              "url": "https://files.pythonhosted.org/packages/c5/52/fe421fb7364aa738b3506a2d99e4f3a56e079c0a798e9f4fa5e14c60922f/urllib3-1.26.14.tar.gz"
+              "hash": "8a388717b9476f934a21484e8c8e61875ab60644d29b9b39e11e4b9dc1c6b305",
+              "url": "https://files.pythonhosted.org/packages/21/79/6372d8c0d0641b4072889f3ff84f279b738cd8595b64c8e0496d4e848122/urllib3-1.26.15.tar.gz"
             }
           ],
           "project_name": "urllib3",
@@ -3967,7 +3968,7 @@
             "urllib3-secure-extra; extra == \"secure\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "1.26.14"
+          "version": "1.26.15"
         },
         {
           "artifacts": [
@@ -4201,7 +4202,7 @@
     "aiomonitor-ng~=0.7.0",
     "aioresponses>=0.7.3",
     "aiosqlite~=0.17.0",
-    "aiotools~=1.5.9",
+    "aiotools~=1.6.0",
     "aiotusclient~=0.1.4",
     "alembic~=1.8.1",
     "appdirs~=1.4.4",
