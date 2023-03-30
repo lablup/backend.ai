@@ -19,7 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import (
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderID,
+    VFolderMount,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
@@ -150,15 +155,16 @@ class VFolderAccessStatus(str, enum.Enum):
 
 
 class VFolderDeletionInfo(NamedTuple):
-    vfolder_id: uuid.UUID
+    vfolder_id: VFolderID
     host: str
 
 
 class VFolderCloneInfo(NamedTuple):
-    source_vfolder_id: uuid.UUID
+    source_vfolder_id: VFolderID
     source_host: str
 
     # Target Vfolder infos
+    target_quota_scope_id: str
     target_vfolder_name: str
     target_host: str
     usage_mode: VFolderUsageMode
