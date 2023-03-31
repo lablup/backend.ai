@@ -47,7 +47,6 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    kernels,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
@@ -281,11 +280,10 @@ class SchedulerDispatcher(aobject):
                         sa.update(SessionRow)
                         .values(
                             status=SessionStatus.CANCELLED,
-                            status_changed=now,
                             status_info="pending-timeout",
                             terminated_at=now,
                             status_history=sql_json_merge(
-                                kernels.c.status_history,
+                                SessionRow.status_history,
                                 (),
                                 {
                                     SessionStatus.CANCELLED.name: now.isoformat(),

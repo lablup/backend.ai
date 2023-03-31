@@ -652,6 +652,38 @@ class KernelStatistics:
                 stats.append(None)
         return stats
 
+    @classmethod
+    async def batch_load_inference_metrics_by_kernel(
+        cls,
+        ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
+            pipe = redis.pipeline()
+            for sess_id in session_ids:
+                log.debug(
+                    "Getting {}",
+                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"],
+                )
+                await pipe.mget(
+                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
+                )
+            return pipe
+
+        stats = []
+        results = await redis_helper.execute(ctx.redis_live, _build_pipeline)
+        log.debug("results {}", results)
+        for result in results:
+            if result[0] is not None and result[1] is not None:
+                requests = int(result[0])
+                last_response_ms = int(result[1])
+            else:
+                requests = 0
+                last_response_ms = 0
+            stats.append({"requests": int(requests), "last_response_ms": last_response_ms})
+
+        return stats
+
 
 class ComputeContainer(graphene.ObjectType):
     class Meta:

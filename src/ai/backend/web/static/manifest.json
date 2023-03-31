@@ -3,7 +3,7 @@
   "manifest_version": 8,
   "name": "Backend.AI Web UI",
   "short_name": "BackendAIWebUI",
-  "version": "22.09.13",
+  "version": "22.09.14",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff",

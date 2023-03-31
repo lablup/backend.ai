@@ -29,6 +29,7 @@ import attrs
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -257,6 +258,14 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]
+
+    @abstractmethod
+    def get_metadata(self) -> AcceleratorMetadata:
+        """
+        Return human-readable information of the accelerator managed
+        by the plugin.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def list_devices(self) -> Collection[AbstractComputeDevice]:

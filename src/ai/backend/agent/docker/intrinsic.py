@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import platform
+from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
@@ -14,7 +15,9 @@ from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
@@ -48,6 +51,26 @@ from .agent import Container
 from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def netstat_ns_work(ns_path: Path):
+    with nsenter(ns_path):
+        result = psutil.net_io_counters(pernic=True)
+    return result
+
+
+async def netstat_ns(ns_path: Path):
+    loop = asyncio.get_running_loop()
+    # Linux namespace is per-thread state. Therefore we need to ensure
+    # IO is executed in the same thread where we switched the namespace.
+    # Go provides runtime.LockOSThread() to do this.
+    #
+    # Unfortunately, CPython drops GIL while running IO and does not
+    # provide any similar functionality. Therefore we execute namespace
+    # dependent operation in the new process.
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        result = await loop.run_in_executor(executor, netstat_ns_work, ns_path)
+    return result
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -397,6 +420,16 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> List[MountInfo]:
         return []
 
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "cpu",
+            "description": "CPU",
+            "human_readable_name": "CPU",
+            "display_unit": "Core",
+            "number_format": {"binary": False, "round_length": 0},
+            "display_icon": "cpu",
+        }
+
 
 class MemoryDevice(AbstractComputeDevice):
     pass
@@ -586,9 +619,28 @@ class MemoryPlugin(AbstractComputePlugin):
                     e,
                 )
                 return None
+            async with closing_async(Docker()) as docker:
+                container = DockerContainer(docker, id=container_id)
+                data = await container.show()
+                sandbox_key = data["NetworkSettings"]["SandboxKey"]
+            net_rx_bytes = 0
+            net_tx_bytes = 0
+            nstat = await netstat_ns(sandbox_key)
+            for name, stat in nstat.items():
+                if name == "lo":
+                    continue
+                net_rx_bytes += stat.bytes_recv
+                net_tx_bytes += stat.bytes_sent
             loop = current_loop()
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-            return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
+            return (
+                mem_cur_bytes,
+                io_read_bytes,
+                io_write_bytes,
+                net_rx_bytes,
+                net_tx_bytes,
+                scratch_sz,
+            )
 
         async def api_impl(container_id):
             async with closing_async(Docker()) as docker:
@@ -608,9 +660,21 @@ class MemoryPlugin(AbstractComputePlugin):
                         io_read_bytes += item["value"]
                     elif item["op"] == "Write":
                         io_write_bytes += item["value"]
+                net_rx_bytes = 0
+                net_tx_bytes = 0
+                for name, stat in ret["networks"].items():
+                    net_rx_bytes += stat["rx_bytes"]
+                    net_tx_bytes += stat["tx_bytes"]
                 loop = current_loop()
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
-                return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
+                return (
+                    mem_cur_bytes,
+                    io_read_bytes,
+                    io_write_bytes,
+                    net_rx_bytes,
+                    net_tx_bytes,
+                    scratch_sz,
+                )
 
         if ctx.mode == StatModes.CGROUP:
             impl = sysfs_impl
@@ -622,6 +686,8 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_mem_used_bytes = {}
         per_container_io_read_bytes = {}
         per_container_io_write_bytes = {}
+        per_container_net_rx_bytes = {}
+        per_container_net_tx_bytes = {}
         per_container_io_scratch_size = {}
         tasks = []
         for cid in container_ids:
@@ -633,7 +699,9 @@ class MemoryPlugin(AbstractComputePlugin):
             per_container_mem_used_bytes[cid] = Measurement(Decimal(result[0]))
             per_container_io_read_bytes[cid] = Measurement(Decimal(result[1]))
             per_container_io_write_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[3]))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[3]))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[4]))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result[5]))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
@@ -655,6 +723,20 @@ class MemoryPlugin(AbstractComputePlugin):
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_write_bytes,
+            ),
+            ContainerMeasurement(
+                MetricKey("net_rx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_container=per_container_net_rx_bytes,
+            ),
+            ContainerMeasurement(
+                MetricKey("net_tx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_container=per_container_net_tx_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),
@@ -815,3 +897,13 @@ class MemoryPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": "ram",
+            "description": "Memory",
+            "human_readable_name": "RAM",
+            "display_unit": "GiB",
+            "number_format": {"binary": True, "round_length": 0},
+            "display_icon": "cpu",
+        }
