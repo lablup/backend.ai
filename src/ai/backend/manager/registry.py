@@ -980,7 +980,7 @@ class AgentRegistry:
             if agent_errors:
                 raise MultiAgentError(
                     "agent(s) raise errors during kernel creation",
-                    errors=agent_errors,
+                    agent_errors,
                 )
             await self.settle_agent_alloc(kernel_agent_bindings)
         # If all is well, let's say the session is ready.
