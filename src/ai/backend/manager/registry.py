@@ -101,7 +101,7 @@ from .api.exceptions import (
 )
 from .config import SharedConfig
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError
+from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KERNEL_STATUS_TRANSITION_MAP,
@@ -264,6 +264,8 @@ class AgentRegistry:
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
+        *,
+        debug: bool = False,
     ) -> None:
         self.shared_config = shared_config
         self.docker = aiodocker.Docker()
@@ -279,6 +281,7 @@ class AgentRegistry:
         self._post_kernel_creation_tasks = weakref.WeakValueDictionary()
         self._post_kernel_creation_infos = {}
         self._kernel_actual_allocated_resources = {}
+        self.debug = debug
         self.rpc_keepalive_timeout = int(
             shared_config.get("config/network/rpc/keepalive-timeout", "60")
         )
@@ -980,7 +983,7 @@ class AgentRegistry:
             if agent_errors:
                 raise MultiAgentError(
                     "agent(s) raise errors during kernel creation",
-                    errors=agent_errors,
+                    agent_errors,
                 )
             await self.settle_agent_alloc(kernel_agent_bindings)
         # If all is well, let's say the session is ready.
@@ -1276,7 +1279,7 @@ class AgentRegistry:
                             query = (
                                 sa.update(KernelRow)
                                 .where(KernelRow.id == kernel_id)
-                                .value(
+                                .values(
                                     status=KernelStatus.ERROR,
                                     status_info=f"other-error ({ex!r})",
                                     status_changed=now,
@@ -1291,13 +1294,7 @@ class AgentRegistry:
                                     agent=binding.agent_alloc_ctx.agent_id,
                                     agent_addr=binding.agent_alloc_ctx.agent_addr,
                                     scaling_group=binding.agent_alloc_ctx.scaling_group,
-                                    status_data={
-                                        "error": {
-                                            "src": "other",
-                                            "name": ex.__class__.__name__,
-                                            "repr": repr(ex),
-                                        },
-                                    },
+                                    status_data=convert_to_status_data(ex, self.debug),
                                 )
                             )
                             await db_sess.execute(query)
