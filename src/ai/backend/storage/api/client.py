@@ -13,6 +13,7 @@ from typing import (
     Any,
     AsyncContextManager,
     Final,
+    Literal,
     Mapping,
     MutableMapping,
     TypedDict,
@@ -28,6 +29,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderID
 
 from ..abc import AbstractVolume
 from ..context import Context
@@ -41,11 +43,20 @@ DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
+class DownloadTokenData(TypedDict):
+    op: Literal["download"]
+    volume: str
+    vfid: VFolderID
+    relpath: str
+    archive: bool
+    unmanaged_path: str | None
+
+
 download_token_data_iv = t.Dict(
     {
         t.Key("op"): t.Atom("download"),
         t.Key("volume"): t.String,
-        t.Key("vfid"): tx.UUID,
+        t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("archive", default=False): t.Bool,
         t.Key("unmanaged_path", default=None): t.Null | t.String,
@@ -54,11 +65,21 @@ download_token_data_iv = t.Dict(
     "*",
 )  # allow JWT-intrinsic keys
 
+
+class UploadTokenData(TypedDict):
+    op: Literal["upload"]
+    volume: str
+    vfid: VFolderID
+    relpath: str
+    session: str
+    size: int
+
+
 upload_token_data_iv = t.Dict(
     {
         t.Key("op"): t.Atom("upload"),
         t.Key("volume"): t.String,
-        t.Key("vfid"): tx.UUID,
+        t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
@@ -73,7 +94,7 @@ async def download(request: web.Request) -> web.StreamResponse:
     secret = ctx.local_config["storage-proxy"]["secret"]
 
     class Params(TypedDict):
-        token: dict[str, Any]
+        token: DownloadTokenData
         dst_dir: str
         archive: bool
         no_cache: bool
@@ -237,7 +258,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
     secret = ctx.local_config["storage-proxy"]["secret"]
 
     class Params(TypedDict):
-        token: dict[str, Any]
+        token: UploadTokenData
         dst_dir: str
 
     async with cast(
@@ -270,7 +291,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     secret = ctx.local_config["storage-proxy"]["secret"]
 
     class Params(TypedDict):
-        token: dict[str, Any]
+        token: UploadTokenData
         dst_dir: str
 
     async with cast(

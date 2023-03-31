@@ -940,7 +940,7 @@ class VirtualFolder(graphene.ObjectType):
         interfaces = (Item,)
 
     host = graphene.String()
-    quota_socpe_id = graphene.String()
+    quota_scope_id = graphene.String()
     name = graphene.String()
     user = graphene.UUID()  # User.id (current owner, null in project vfolders)
     user_email = graphene.String()  # User.email (current owner, null in project vfolders)
