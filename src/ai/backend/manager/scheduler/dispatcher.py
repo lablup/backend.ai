@@ -1023,7 +1023,7 @@ class SchedulerDispatcher(aobject):
             await self.registry.start_session(sched_ctx, session)
         except Exception as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
-            log.warning(log_fmt + "failed-starting: {1!r}", *log_args, status_data)
+            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.
 
