@@ -264,6 +264,8 @@ class AgentRegistry:
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
+        *,
+        debug: bool = False,
     ) -> None:
         self.shared_config = shared_config
         self.docker = aiodocker.Docker()
@@ -279,6 +281,7 @@ class AgentRegistry:
         self._post_kernel_creation_tasks = weakref.WeakValueDictionary()
         self._post_kernel_creation_infos = {}
         self._kernel_actual_allocated_resources = {}
+        self.debug = debug
         self.rpc_keepalive_timeout = int(
             shared_config.get("config/network/rpc/keepalive-timeout", "60")
         )
@@ -1291,7 +1294,7 @@ class AgentRegistry:
                                     agent=binding.agent_alloc_ctx.agent_id,
                                     agent_addr=binding.agent_alloc_ctx.agent_addr,
                                     scaling_group=binding.agent_alloc_ctx.scaling_group,
-                                    status_data=convert_to_status_data(ex),
+                                    status_data=convert_to_status_data(ex, self.debug),
                                 )
                             )
                             await db_sess.execute(query)
