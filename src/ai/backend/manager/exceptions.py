@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Tuple, TypedDict
+import traceback
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    List,
+    Tuple,
+    TypedDict,
+)
 
 from aiotools import TaskGroupError
 
@@ -59,15 +66,21 @@ class ErrorDetail(TypedDict, total=False):
     src: str
     name: str
     repr: str
-    agent_id: str  # optional
-    collection: List[Any]  # optional; currently mypy cannot handle recursive types
+    agent_id: str
+    collection: List[ErrorDetail]
+    traceback: str
 
 
 class ErrorStatusInfo(TypedDict):
     error: ErrorDetail
 
 
-def convert_to_status_data(e: Exception, is_debug: bool = False) -> ErrorStatusInfo:
+def convert_to_status_data(
+    e: Exception,
+    is_debug: bool = False,
+    *,
+    src: str | None = None,
+) -> ErrorStatusInfo:
     data: ErrorStatusInfo
     match e:
         case MultiAgentError():
@@ -77,7 +90,7 @@ def convert_to_status_data(e: Exception, is_debug: bool = False) -> ErrorStatusI
                     "name": "MultiAgentError",
                     "repr": f"MultiAgentError({len(e.__errors__)})",
                     "collection": [
-                        convert_to_status_data(sub_error, is_debug)["error"]
+                        convert_to_status_data(sub_error, is_debug, src="agent")["error"]
                         for sub_error in e.__errors__
                     ],
                 },
@@ -92,12 +105,16 @@ def convert_to_status_data(e: Exception, is_debug: bool = False) -> ErrorStatusI
             }
             if is_debug:
                 data["error"]["agent_id"] = e.agent_id
+                data["error"]["traceback"] = e.exc_tb or ""
             return data
         case _:
-            return {
+            data = {
                 "error": {
-                    "src": "other",
+                    "src": "other" if src is None else src,
                     "name": e.__class__.__name__,
                     "repr": repr(e),
                 },
             }
+            if is_debug:
+                data["error"]["traceback"] = "\n".join(traceback.format_tb(e.__traceback__))
+            return data
