@@ -16,6 +16,33 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.0 (2023-03-30)
+
+### Features
+* Dispatch session related events to an external service when manager plugin with `PUBLISH_EVENT` implement exists ([#1094](https://github.com/lablup/backend.ai/issues/1094))
+* Report idle checker their idle remaining time and utilization to `Redis` and let Gql fetch the report. ([#1160](https://github.com/lablup/backend.ai/issues/1160))
+* Provide status information about usage, capacity of storage volume to `list-hosts` API ([#1170](https://github.com/lablup/backend.ai/issues/1170))
+* Query agent list with multiple statuses. For example, CLI query like this is now possible: `backend.ai admin agent list -s "TERMINATED,LOST"`. ([#1174](https://github.com/lablup/backend.ai/issues/1174))
+* Return `status_info` in session usage statistics API. ([#1176](https://github.com/lablup/backend.ai/issues/1176))
+* Add a `allow_preferred_port` config on webserver to hide/show Try preferred port. ([#1178](https://github.com/lablup/backend.ai/issues/1178))
+* Gather per-container network statistics. ([#1179](https://github.com/lablup/backend.ai/issues/1179))
+* Support to change the owner of (user) vfolder to only among users with an access to the vfolder's storage host ([#1182](https://github.com/lablup/backend.ai/issues/1182))
+* Add possible expire time of utilization checker to idle check result. ([#1185](https://github.com/lablup/backend.ai/issues/1185))
+* Add `[storage-proxy].ipc-base-path` configuration option to the storage proxy like other service daemons ([#1189](https://github.com/lablup/backend.ai/issues/1189))
+* Automatically mount `.linuxbrew` dot-folder, if exists, at `/home/linuxbrew/.linuxbrew` inside a container to support OS package installation with Homebrew. ([#1195](https://github.com/lablup/backend.ai/issues/1195))
+* Add a step to idle checkers to determine the initial grace period, which is calculated by the user's creation time. ([#1199](https://github.com/lablup/backend.ai/issues/1199))
+* Update libbaihook to latest version which includes fix to resolve fastertransformer crashing ([#1200](https://github.com/lablup/backend.ai/issues/1200))
+
+### Improvements
+* Automatically set the proper webui build artifact path in `webserver.conf` when installed with `--editable-webui` and document it in the sample configuration ([#1190](https://github.com/lablup/backend.ai/issues/1190))
+
+### Fixes
+* Fix session ls not working bug ([#1100](https://github.com/lablup/backend.ai/issues/1100))
+* Add delete transactions vfolder_invitations and vfolder_permissions table when new owner and invitee of vfolder are same ([#1186](https://github.com/lablup/backend.ai/issues/1186))
+* Make pipeline related configuration fields to be optional ([#1187](https://github.com/lablup/backend.ai/issues/1187))
+* Change input field of change vfolder ownership from `user_id` to `user_email` ([#1188](https://github.com/lablup/backend.ai/issues/1188))
+
+
 ## 23.03.0a4 (2023-03-16)
 
 ### Features
