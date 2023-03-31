@@ -313,6 +313,9 @@ _config_defaults: Mapping[str, Any] = {
             "agent": "0.0.0.0/0",
             "container": "0.0.0.0/0",
         },
+        "overlay": {
+            "mtu": "1500",
+        },
     },
     "plugins": {
         "accelerator": {},
@@ -389,10 +392,12 @@ shared_config_iv = t.Dict(
                         ): tx.IPNetwork,
                     }
                 ).allow_extra("*"),
-                t.Key("overlay", default=None): t.Null
+                t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null
                 | t.Dict(
                     {
-                        t.Key("mtu", default=1500): t.Int[1:],
+                        t.Key(
+                            "mtu", default=_config_defaults["network"]["overlay"]["mtu"]
+                        ): t.ToInt(gte=1),
                     }
                 ).allow_extra("*"),
             }
