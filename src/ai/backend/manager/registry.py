@@ -101,7 +101,7 @@ from .api.exceptions import (
 )
 from .config import SharedConfig
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError
+from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KERNEL_STATUS_TRANSITION_MAP,
@@ -1276,7 +1276,7 @@ class AgentRegistry:
                             query = (
                                 sa.update(KernelRow)
                                 .where(KernelRow.id == kernel_id)
-                                .value(
+                                .values(
                                     status=KernelStatus.ERROR,
                                     status_info=f"other-error ({ex!r})",
                                     status_changed=now,
@@ -1291,13 +1291,7 @@ class AgentRegistry:
                                     agent=binding.agent_alloc_ctx.agent_id,
                                     agent_addr=binding.agent_alloc_ctx.agent_addr,
                                     scaling_group=binding.agent_alloc_ctx.scaling_group,
-                                    status_data={
-                                        "error": {
-                                            "src": "other",
-                                            "name": ex.__class__.__name__,
-                                            "repr": repr(ex),
-                                        },
-                                    },
+                                    status_data=convert_to_status_data(ex),
                                 )
                             )
                             await db_sess.execute(query)
