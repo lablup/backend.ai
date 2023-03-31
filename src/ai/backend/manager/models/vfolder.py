@@ -662,13 +662,13 @@ async def prepare_vfolder_mounts(
         )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
-            # if not belong to the execution kernel.
+            # if they do not belong to the execution kernel.
             continue
         try:
             mount_base_path = PurePosixPath(
                 await storage_manager.get_mount_path(
                     vfolder["host"],
-                    vfolder["id"],
+                    VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
                     PurePosixPath(requested_vfolder_subpaths[key]),
                 ),
             )
@@ -684,7 +684,7 @@ async def prepare_vfolder_mounts(
                 "folder/file/mkdir",
                 params={
                     "volume": storage_manager.split_host(vfolder["host"])[1],
-                    "vfid": vfolder["id"],
+                    "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
                     "relpath": str(user_scope.user_uuid.hex),
                     "exist_ok": True,
                 },
@@ -694,7 +694,7 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=vfolder["id"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
                     vfsubpath=PurePosixPath(user_scope.user_uuid.hex),
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
@@ -713,7 +713,7 @@ async def prepare_vfolder_mounts(
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
-                    vfid=vfolder["id"],
+                    vfid=VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
                     vfsubpath=PurePosixPath(requested_vfolder_subpaths[key]),
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,

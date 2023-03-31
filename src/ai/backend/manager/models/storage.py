@@ -18,7 +18,6 @@ from typing import (
     Tuple,
     TypedDict,
 )
-from uuid import UUID
 
 import aiohttp
 import attrs
@@ -26,7 +25,7 @@ import graphene
 import yarl
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata
+from ai.backend.common.types import HardwareMetadata, VFolderID
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
@@ -125,7 +124,7 @@ class StorageSessionManager:
     async def get_mount_path(
         self,
         vfolder_host: str,
-        vfolder_id: UUID,
+        vfolder_id: VFolderID,
         subpath: PurePosixPath = PurePosixPath("."),
     ) -> str:
         async with self.request(
