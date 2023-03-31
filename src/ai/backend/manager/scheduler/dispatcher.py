@@ -625,7 +625,7 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e)
+            exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
 
             async def _update_generic_failure() -> None:
                 async with self.db.begin_session() as kernel_db_sess:
@@ -820,7 +820,7 @@ class SchedulerDispatcher(aobject):
                         log_fmt + "unexpected-error, during agent allocation",
                         *log_args,
                     )
-                    exc_data = convert_to_status_data(e)
+                    exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
 
                     async def _update_generic_failure() -> None:
                         async with self.db.begin_session() as kernel_db_sess:
