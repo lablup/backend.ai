@@ -6,12 +6,33 @@ import click
 
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 
+from .abc import AbstractVolume
 from .config import load_local_config
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-def migrate():
+def check_latest(volume: AbstractVolume):
+    version_path = volume.mount_path / "version.txt"
+    if version_path.exists():
+        version = int(version_path.read_text())
+    else:
+        version = 2
+
+    match version:
+        case 2:
+            # already the latest version
+            log.warning("{}: Detected an old vfolder structure (v{})", volume.mount_path, version)
+        case 3:
+            # already the latest version
+            pass
+
+
+def migrate(volume):
+    pass
+
+
+def upgrade(local_config):
     log.info("TODO: implement")
 
 
@@ -45,7 +66,7 @@ def main(config_path: Path, debug: bool) -> None:
         log_endpoint=log_endpoint,
     )
     with logger:
-        migrate()
+        upgrade(local_config)
 
 
 if __name__ == "__main__":

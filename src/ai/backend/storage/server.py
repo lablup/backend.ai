@@ -45,6 +45,15 @@ async def server_main_logwrapper(loop, pidx, _args):
             yield
 
 
+async def check_migration(ctx: Context):
+    from .migration import check_latest
+
+    volume_infos = ctx.list_volumes()
+    for name, info in volume_infos.items():
+        async with ctx.get_volume(name) as volume:
+            check_latest(volume)
+
+
 @aiotools.server
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -91,6 +100,9 @@ async def server_main(
         manager_api_app = await init_manager_app(ctx)
         m.console_locals["client_api_app"] = client_api_app
         m.console_locals["manager_api_app"] = manager_api_app
+
+        if pidx == 0:
+            await check_migration(ctx)
 
         client_ssl_ctx = None
         manager_ssl_ctx = None
