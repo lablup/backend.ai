@@ -106,7 +106,7 @@ def convert_to_status_data(
             }
             if is_debug:
                 data["error"]["agent_id"] = e.agent_id
-                data["error"]["traceback"] = e.exc_tb
+                data["error"]["traceback"] = e.exc_tb or ""
             return data
         case _:
             data = {
