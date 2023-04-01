@@ -716,7 +716,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     ).allow_extra("*")
 
     resource_thresholds: MutableMapping[str, Union[int, float, Decimal, None]]
-    thresholds_check_operator: str
+    thresholds_check_operator: ThresholdOperator
     time_window: timedelta
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
@@ -734,13 +734,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 k: nmget(v, "average") for k, v in raw_resource_thresholds.items()
             }
         else:
-            self.resource_thresholds = {
-                "cpu_util": None,
-                "mem": None,
-                "cuda_util": None,
-                "cuda_mem": None,
-            }
-        self.thresholds_check_operator = config.get("thresholds-check-operator")
+            resources: list[str] = []
+            for r in self.slot_resource_map.values():
+                resources = [*resources, *r]
+            self.resource_thresholds = {r: None for r in resources}
+        self.thresholds_check_operator: ThresholdOperator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
@@ -896,11 +894,15 @@ class UtilizationIdleChecker(BaseIdleChecker):
         util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
             avg_utils, self.resource_thresholds, unavailable_resources
         )
+        report = {
+            "thresholds_check_operator": self.thresholds_check_operator.value,
+            "resources": util_avg_thresholds.to_dict(),
+        }
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
                 self.get_extra_info_key(session_id),
-                msgpack.packb(util_avg_thresholds.to_dict()),
+                msgpack.packb(report),
                 ex=int(DEFAULT_CHECK_INTERVAL) * 10,
             ),
         )
