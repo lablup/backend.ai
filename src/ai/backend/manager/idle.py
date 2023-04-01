@@ -244,10 +244,8 @@ class IdleCheckerHost:
             )
             result = await conn.execute(query)
             rows = result.fetchall()
+            grace_period = self._grace_period_checker.grace_period_const
             for kernel in rows:
-                grace_period = await self._grace_period_checker.get_grace_period(
-                    kernel, conn, self._redis_live
-                )
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
@@ -440,7 +438,9 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         )
 
     async def get_grace_period(
-        self, kernel: Row, dbconn: SAConnection, redis_obj: RedisConnectionInfo
+        self,
+        kernel: Row,
+        dbconn: SAConnection,
     ) -> float:
         """
         Calculate the user's initial grace period for idle checkers.
@@ -454,6 +454,14 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         remaining: timedelta = self.user_initial_grace_period - (db_now - user_created_at)
         result = remaining.total_seconds()
         return result if result > 0 else 0
+
+    @property
+    def grace_period_const(self) -> float:
+        return (
+            self.user_initial_grace_period.total_seconds()
+            if self.user_initial_grace_period is not None
+            else 0
+        )
 
     async def get_checker_result(
         self,
