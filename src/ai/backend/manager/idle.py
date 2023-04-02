@@ -120,7 +120,7 @@ class UtilizationResourceReport(UserDict):
 
     @property
     def utilizion_result(self) -> dict[str, bool]:
-        return {k: (v.avg_util >= v.threshold) for k, v in self.data.items()}
+        return {k: v.avg_util >= v.threshold for k, v in self.data.items()}
 
 
 class AppStreamingStatus(enum.Enum):
@@ -319,9 +319,9 @@ class IdleCheckerHost:
         )
         return {
             checker.name: {
-                "remaining": (await add_period_to_result(checker, user_grace_period)),
+                "remaining": await add_period_to_result(checker, user_grace_period),
                 "remaining_time_type": checker.remaining_time_type.value,
-                "extra": (await checker.get_extra_info(session_id)),
+                "extra": await checker.get_extra_info(session_id),
             }
             for checker in self._checkers
         }
@@ -703,8 +703,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
-            t.Key("resource-thresholds", default=None): t.Null
-            | t.Dict(
+            t.Key("resource-thresholds", default=None): t.Null | t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
