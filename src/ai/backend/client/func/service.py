@@ -60,13 +60,11 @@ class Service(BaseFunction):
         service_id: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($service_id: UUID!) {
                 service(service_id: $service_id) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"service_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
