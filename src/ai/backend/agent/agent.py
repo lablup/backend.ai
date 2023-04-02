@@ -1052,9 +1052,11 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            "rescan_resoucre_usage(k:{}): "
-                            "failed to read kernel resource info; "
-                            "maybe already terminated",
+                            (
+                                "rescan_resoucre_usage(k:{}): "
+                                "failed to read kernel resource info; "
+                                "maybe already terminated"
+                            ),
                             kernel_id,
                         )
 
@@ -1509,7 +1511,7 @@ class AbstractAgent(
                         )
                     except ResourceError as e:
                         log.info(
-                            "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",
+                            "resource allocation failed ({}): {} of {}\n(alloc map: {})",
                             type(e).__name__,
                             device_specific_slots,
                             dev_name,

@@ -517,8 +517,7 @@ class SchedulerDispatcher(aobject):
         requested_architectures = set(x.image_ref.architecture for x in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architecture"
-                "on single node session",
+                "Cannot assign multiple kernels with different architectureon single node session",
             )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
@@ -531,7 +530,7 @@ class SchedulerDispatcher(aobject):
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        f"No agents found to be compatible with the image acrhitecture "
+                        "No agents found to be compatible with the image acrhitecture "
                         f"(image[0]: {sess_ctx.kernels[0].image_ref}, "
                         f"arch: {requested_architecture})"
                     ),
@@ -572,8 +571,8 @@ class SchedulerDispatcher(aobject):
                     if agent_id is None:
                         raise InstanceNotAvailable(
                             extra_msg=(
-                                f"Could not find a contiguous resource region in any agent "
-                                f"big enough to host the session "
+                                "Could not find a contiguous resource region in any agent "
+                                "big enough to host the session "
                                 f"({sess_ctx.session_id})"
                             ),
                         )
@@ -736,7 +735,7 @@ class SchedulerDispatcher(aobject):
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    f"No agents found to be compatible with the image acrhitecture "
+                                    "No agents found to be compatible with the image acrhitecture "
                                     f"(image: {kernel.image_ref}, "
                                     f"arch: {kernel.image_ref.architecture})"
                                 ),
@@ -748,8 +747,8 @@ class SchedulerDispatcher(aobject):
                         if agent_id is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    f"Could not find a contiguous resource region in any agent "
-                                    f"big enough to host a kernel in the session "
+                                    "Could not find a contiguous resource region in any agent "
+                                    "big enough to host a kernel in the session "
                                     f"({sess_ctx.session_id})"
                                 ),
                             )

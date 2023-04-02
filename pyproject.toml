@@ -76,6 +76,7 @@ python_executable = "dist/export/python/virtualenvs/python-default/3.10.9/bin/py
 
 [tool.black]
 line-length = 100
+preview = true
 
 [tool.isort]
 profile = "black"

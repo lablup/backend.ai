@@ -291,8 +291,7 @@ class DockerKernel(AbstractKernel):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -313,8 +312,7 @@ class DockerKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
         proc = await asyncio.create_subprocess_exec(
             *[
                 "docker",
@@ -530,9 +528,12 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                 "Cmd": [
                     "/bin/sh",
                     "-c",
-                    "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
-                    "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
+                    (
+                        "ctr -n services.linuxkit t kill --exec-id metaproxy docker;ctr -n"
+                        " services.linuxkit t exec --exec-id metaproxy docker"
+                        " /host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port"
+                        f" {server_port}"
+                    ),
                 ],
                 "HostConfig": {
                     "PidMode": "host",

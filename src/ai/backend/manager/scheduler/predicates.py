@@ -88,7 +88,7 @@ async def check_concurrency(
     if ok == 0:
         return PredicateResult(
             False,
-            "You cannot run more than " f"{max_concurrent_sessions} concurrent sessions",
+            f"You cannot run more than {max_concurrent_sessions} concurrent sessions",
         )
     log.debug(
         "number of concurrent sessions of ak:{0} = {1} / {2}",

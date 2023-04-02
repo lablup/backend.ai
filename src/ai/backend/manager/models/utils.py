@@ -72,7 +72,10 @@ class ExtendedAsyncSAEngine(SAEngine):
             self._readonly_txn_count += 1
             if self._readonly_txn_count >= self._txn_concurrency_threshold:
                 log.warning(
-                    "The number of concurrent read-only transaction ({}) exceeded the threshold {}.",
+                    (
+                        "The number of concurrent read-only transaction ({}) exceeded the"
+                        " threshold {}."
+                    ),
                     self._readonly_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -235,18 +238,20 @@ def sql_json_merge(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),
     ).concat(
-        sa.func.jsonb_build_object(
-            key[_depth],
-            (
-                sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
-                    sa.func.cast(obj, psql.JSONB)
-                )
-                if _depth == len(key) - 1
-                else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
-            ),
-        )
-        if key
-        else sa.func.cast(obj, psql.JSONB),
+        (
+            sa.func.jsonb_build_object(
+                key[_depth],
+                (
+                    sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
+                        sa.func.cast(obj, psql.JSONB)
+                    )
+                    if _depth == len(key) - 1
+                    else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
+                ),
+            )
+            if key
+            else sa.func.cast(obj, psql.JSONB)
+        ),
     )
     return expr
 

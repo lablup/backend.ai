@@ -47,7 +47,7 @@ def list(ctx: CLIContext, operation: bool) -> None:
     "--registry",
     type=str,
     default=None,
-    help='The name (usually hostname or "lablup") ' "of the Docker registry configured.",
+    help='The name (usually hostname or "lablup") of the Docker registry configured.',
 )
 def rescan(registry: str) -> None:
     """
@@ -84,7 +84,7 @@ def rescan(registry: str) -> None:
                                 )
                             elif ev.event == "bgtask_cancelled":
                                 completion_msg_func = lambda: print_warn(
-                                    "Registry scanning has been " "cancelled in the middle."
+                                    "Registry scanning has been cancelled in the middle."
                                 )
             finally:
                 completion_msg_func()

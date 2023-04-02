@@ -144,9 +144,7 @@ async def login(
         log.debug("docker-registry: {0} -> basic-auth", registry_url)
         return {"auth": basic_auth, "headers": {}}
     elif ping_status == 404:
-        raise RuntimeError(
-            f"Unsupported docker registry: {registry_url}! " "(API v2 not implemented)"
-        )
+        raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
     elif ping_status == 401:
         params = {
             "scope": scope,
@@ -165,7 +163,7 @@ async def login(
                         "Authorization": f"Bearer {token}",
                     },
                 }
-    raise RuntimeError("authentication for docker registry " f"{registry_url} failed")
+    raise RuntimeError(f"authentication for docker registry {registry_url} failed")
 
 
 async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:

@@ -209,9 +209,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                                 socks[0].close()
                             else:
                                 log.warning(
-                                    "stream_stdin({0}): "
-                                    "duplicate kernel restart request; "
-                                    "ignoring it.",
+                                    (
+                                        "stream_stdin({0}): "
+                                        "duplicate kernel restart request; "
+                                        "ignoring it."
+                                    ),
                                     stream_key,
                                 )
                 elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -401,8 +403,10 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             await ws.send_json(
                 {
                     "status": "server-restarting",
-                    "msg": "The API server is going to restart for maintenance. "
-                    "Please connect again with the same run ID.",
+                    "msg": (
+                        "The API server is going to restart for maintenance. "
+                        "Please connect again with the same run ID."
+                    ),
                 }
             )
         raise
@@ -503,13 +507,11 @@ async def stream_proxy(
     conn_tracker_key = f"session.{kernel['id']}.active_app_connections"
     conn_tracker_val = f"{kernel['id']}:{service}:{stream_id}"
 
-    _conn_tracker_script = textwrap.dedent(
-        """
+    _conn_tracker_script = textwrap.dedent("""
         local now = redis.call('TIME')
         now = now[1] + (now[2] / (10^6))
         redis.call('ZADD', KEYS[1], now, ARGV[1])
-    """
-    )
+    """)
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
@@ -695,7 +697,8 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn(
-                        "stream_conn_tracker_gc(): error while connecting to Etcd server, retrying..."
+                        "stream_conn_tracker_gc(): error while connecting to Etcd server,"
+                        " retrying..."
                     )
                 else:
                     raise e
@@ -721,8 +724,10 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
                     )
                     log.debug(
-                        f"conn_tracker: gc {session_id} "
-                        f"removed/remaining = {removed_count}/{remaining_count}",
+                        (
+                            f"conn_tracker: gc {session_id} "
+                            f"removed/remaining = {removed_count}/{remaining_count}"
+                        ),
                     )
                     if prev_remaining_count > 0 and remaining_count == 0:
                         await root_ctx.idle_checker_host.update_app_streaming_status(

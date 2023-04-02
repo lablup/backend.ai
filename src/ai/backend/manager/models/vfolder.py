@@ -206,8 +206,10 @@ vfolders = sa.Table(
         nullable=False,
     ),
     sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
+        (
+            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+            "(ownership_type = 'group' AND \"group\" IS NOT NULL)"
+        ),
         name="ownership_type_match_with_user_or_group",
     ),
     sa.CheckConstraint(
@@ -582,8 +584,7 @@ async def prepare_vfolder_mounts(
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
-                f"The subpath '{subpath}' should designate "
-                f"a subdirectory of the vfolder '{name}'.",
+                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
             )
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)

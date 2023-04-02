@@ -77,7 +77,7 @@ class ContainerLifecycleEvent:
         else:
             cid = "unknown"
         return (
-            f"LifecycleEvent("
+            "LifecycleEvent("
             f"{self.event.name}, "
             f"k:{self.kernel_id}, "
             f"c:{cid}, "

@@ -549,8 +549,8 @@ class CreateUser(graphene.Mutation):
                 email,
                 graph_ctx.schema.get_type("KeyPairInput").create_container(
                     {
-                        "is_active": (_status == UserStatus.ACTIVE),
-                        "is_admin": (user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]),
+                        "is_active": _status == UserStatus.ACTIVE,
+                        "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
                         "resource_policy": "default",
                         "rate_limit": 10000,
                     }
@@ -643,9 +643,9 @@ class ModifyUser(graphene.Mutation):
             prev_role = row.role
             user_update_data = data.copy()
             if "status" in data and row.status != data["status"]:
-                user_update_data[
-                    "status_info"
-                ] = "admin-requested"  # user mutation is only for admin
+                user_update_data["status_info"] = (
+                    "admin-requested"  # user mutation is only for admin
+                )
 
         update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()
             sa.update(users).values(user_update_data).where(users.c.email == email)
@@ -847,8 +847,10 @@ class PurgeUser(graphene.Mutation):
 
             if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
                 raise RuntimeError(
-                    "Some of user's virtual folders are mounted to active kernels. "
-                    "Terminate those kernels first.",
+                    (
+                        "Some of user's virtual folders are mounted to active kernels. "
+                        "Terminate those kernels first."
+                    ),
                 )
             if await cls.user_has_active_kernels(conn, user_uuid):
                 raise RuntimeError("User has some active kernels. Terminate them first.")
@@ -910,7 +912,7 @@ class PurgeUser(graphene.Mutation):
             .where(vfolders.c.user == deleted_user_uuid)
         )
         migrate_updates = []
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             name = row.name
             if name in existing_vfolder_names:
                 name += f"-{uuid4().hex[:10]}"
@@ -1022,7 +1024,7 @@ class PurgeUser(graphene.Mutation):
             .select_from(kernels)
             .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             for _mount in row["mounts"]:
                 try:
                     vfolder_id = UUID(_mount[2])

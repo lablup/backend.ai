@@ -200,7 +200,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     async def init(self) -> None:
         log.debug(
-            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): " "starting new runner",
+            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,
             default_api_version,
             default_client_features,
@@ -778,7 +778,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning("Execution timeout detected on kernel " f"{self.kernel_id}")
+            log.warning(f"Execution timeout detected on kernel {self.kernel_id}")
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result

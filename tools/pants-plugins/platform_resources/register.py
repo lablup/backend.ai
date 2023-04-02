@@ -36,7 +36,10 @@ class PlatformResourcesSusbystem(Subsystem):
 
 class PlatformDependencyMapField(DictStringToStringField):
     alias = "dependency_map"
-    help = "Specifies platform-specific dependencies as a dictionary from platform names to dependency lists."
+    help = (
+        "Specifies platform-specific dependencies as a dictionary from platform names to dependency"
+        " lists."
+    )
 
 
 class PlatformSpecificDependenciesField(Dependencies):

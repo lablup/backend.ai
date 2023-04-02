@@ -35,7 +35,7 @@ def parse_service_ports(s: str, exception_cls: Type[Exception] = None) -> Sequen
                 if p <= 1024:
                     raise exception_cls(
                         f"The service port number {p} must be "
-                        f"larger than 1024 to run without the root privilege."
+                        "larger than 1024 to run without the root privilege."
                     )
                 if p >= 65535:
                     raise exception_cls(f"The service port number {p} must be smaller than 65535.")

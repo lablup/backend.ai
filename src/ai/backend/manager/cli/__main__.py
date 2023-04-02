@@ -62,18 +62,20 @@ def main(ctx, config_path, debug):
     type=str,
     default=None,
     metavar="ID_OR_NAME",
-    help="Open a postgres client shell using the psql executable "
-    "shipped with the given postgres container. "
-    'If not set or set as an empty string "", it will auto-detect '
-    "the psql container from the halfstack. "
-    'If set "-", it will use the host-provided psql executable. '
-    "You may append additional arguments passed to the psql cli command. "
-    "[default: auto-detect from halfstack]",
+    help=(
+        "Open a postgres client shell using the psql executable "
+        "shipped with the given postgres container. "
+        'If not set or set as an empty string "", it will auto-detect '
+        "the psql container from the halfstack. "
+        'If set "-", it will use the host-provided psql executable. '
+        "You may append additional arguments passed to the psql cli command. "
+        "[default: auto-detect from halfstack]"
+    ),
 )
 @click.option(
     "--psql-help",
     is_flag=True,
-    help="Show the help text of the psql command instead of " "this dbshell command.",
+    help="Show the help text of the psql command instead of this dbshell command.",
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
@@ -97,8 +99,10 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         )
         if not candidate_container_names:
             click.echo(
-                "Could not find the halfstack postgres container. "
-                "Please set the container name explicitly.",
+                (
+                    "Could not find the halfstack postgres container. "
+                    "Please set the container name explicitly."
+                ),
                 err=True,
             )
             sys.exit(ExitCode.FAILURE)
@@ -160,11 +164,13 @@ def generate_keypair(cli_ctx: CLIContext):
     "--vacuum-full",
     type=bool,
     default=False,
-    help="Reclaim storage occupied by dead tuples."
-    "If not set or set False, it will run VACUUM without FULL. "
-    "If set True, it will run VACUUM FULL. "
-    "When VACUUM FULL is being processed, the database is locked. "
-    "[default: False]",
+    help=(
+        "Reclaim storage occupied by dead tuples."
+        "If not set or set False, it will run VACUUM without FULL. "
+        "If set True, it will run VACUUM FULL. "
+        "When VACUUM FULL is being processed, the database is locked. "
+        "[default: False]"
+    ),
 )
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:

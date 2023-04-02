@@ -226,7 +226,7 @@ async def RPCContext(
         deserializer=msgpack.unpackb,
     )
     try:
-        async with (_timeout(invoke_timeout), peer):
+        async with _timeout(invoke_timeout), peer:
             okey_token = peer.call.order_key.set("")
             try:
                 yield peer
@@ -308,7 +308,7 @@ class AgentRegistry:
             query = sa.select("*").select_from(agents)
             if check_shadow:
                 query = query.where(agents.c.status == AgentStatus.ALIVE)
-            async for row in (await conn.stream(query)):
+            async for row in await conn.stream(query):
                 yield row
 
     async def update_instance(self, inst_id, updated_fields):
@@ -821,8 +821,10 @@ class AgentRegistry:
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
-                f"You cannot create session with more than "
-                f"{resource_policy['max_containers_per_session']} containers.",
+                (
+                    "You cannot create session with more than "
+                    f"{resource_policy['max_containers_per_session']} containers."
+                ),
             )
 
         async with self.db.begin_readonly() as conn:
@@ -836,9 +838,11 @@ class AgentRegistry:
             )
             if scaling_group is None:
                 log.warning(
-                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                    f"The client did not specify the scaling group for session; "
-                    f"falling back to {checked_scaling_group}",
+                    (
+                        f"enqueue_session(s:{session_name}, ak:{access_key}): "
+                        "The client did not specify the scaling group for session; "
+                        f"falling back to {checked_scaling_group}"
+                    ),
                 )
 
             use_host_network_query = (
@@ -1016,7 +1020,7 @@ class AgentRegistry:
                     # (e.g., image does not support accelerators
                     #  requested by the client)
                     raise InvalidAPIParameters(
-                        "Your resource request has resource type(s) " "not supported by the image."
+                        "Your resource request has resource type(s) not supported by the image."
                     )
 
                 # If intrinsic resources are not specified,
@@ -1047,10 +1051,10 @@ class AgentRegistry:
                 )
                 gpu = creation_config.get("instanceGPUs")
                 if gpu is not None:
-                    raise InvalidAPIParameters("Client upgrade required " "to use GPUs (v19.03+).")
+                    raise InvalidAPIParameters("Client upgrade required to use GPUs (v19.03+).")
                 tpu = creation_config.get("instanceTPUs")
                 if tpu is not None:
-                    raise InvalidAPIParameters("Client upgrade required " "to use TPUs (v19.03+).")
+                    raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"
@@ -1820,7 +1824,7 @@ class AgentRegistry:
                     .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
-                async for row in (await conn.stream(query)):
+                async for row in await conn.stream(query):
                     occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
                 query = (
                     sa.select(
@@ -1834,7 +1838,7 @@ class AgentRegistry:
                     .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
-                async for row in (await conn.stream(query)):
+                async for row in await conn.stream(query):
                     concurrency_used_per_key[row.access_key].add(row.session_id)
 
                 if len(occupied_slots_per_agent) > 0:
@@ -2055,7 +2059,10 @@ class AgentRegistry:
                     ):
                         if not forced:
                             raise GenericForbidden(
-                                "Cannot destroy kernels in scheduled/preparing/terminating/error status",
+                                (
+                                    "Cannot destroy kernels in"
+                                    " scheduled/preparing/terminating/error status"
+                                ),
                             )
                         log.warning(
                             "force-terminating kernel (k:{}, status:{})",
@@ -2861,9 +2868,9 @@ class AgentRegistry:
         *,
         extra_data: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        assert status != KernelStatus.TERMINATED, (
-            "TERMINATED status update must be handled in " "mark_kernel_terminated()"
-        )
+        assert (
+            status != KernelStatus.TERMINATED
+        ), "TERMINATED status update must be handled in mark_kernel_terminated()"
         now = datetime.now(tzutc())
         data = {
             "status": status,

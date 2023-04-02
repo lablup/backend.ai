@@ -35,9 +35,9 @@ class JsonOutputHandler(BaseOutputHandler):
                     "total_count": 1,
                     "items": [
                         {
-                            field_map[k]
-                            .alt_name: field_map[k]
-                            .formatter.format_json(v, field_map[k])
+                            field_map[k].alt_name: field_map[k].formatter.format_json(
+                                v, field_map[k]
+                            )
                             for k, v in item.items()
                         },
                     ],
@@ -59,9 +59,9 @@ class JsonOutputHandler(BaseOutputHandler):
                     "total_count": len(items),
                     "items": [
                         {
-                            field_map[k]
-                            .alt_name: field_map[k]
-                            .formatter.format_json(v, field_map[k])
+                            field_map[k].alt_name: field_map[k].formatter.format_json(
+                                v, field_map[k]
+                            )
                             for k, v in item.items()
                         }
                         for item in items
@@ -122,9 +122,9 @@ class JsonOutputHandler(BaseOutputHandler):
                     "total_count": result.total_count,
                     "items": [
                         {
-                            field_map[k]
-                            .alt_name: field_map[k]
-                            .formatter.format_json(v, field_map[k])
+                            field_map[k].alt_name: field_map[k].formatter.format_json(
+                                v, field_map[k]
+                            )
                             for k, v in item.items()
                         }
                         for item in result.items

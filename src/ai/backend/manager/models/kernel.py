@@ -398,7 +398,7 @@ kernels = sa.Table(
         "session_name",
         unique=True,
         postgresql_where=sa.text(
-            "status NOT IN ('TERMINATED', 'CANCELLED') and " "cluster_role = 'main'"
+            "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
         ),
     ),
 )
@@ -459,7 +459,7 @@ async def match_session_ids(
     )
     if extra_cond is not None:
         cond_id = cond_id & extra_cond
-    cond_equal_name = (kernels.c.session_name == (f"{session_name_or_id}")) & (
+    cond_equal_name = (kernels.c.session_name == f"{session_name_or_id}") & (
         kernels.c.access_key == access_key
     )
     cond_prefix_name = (kernels.c.session_name.like(f"{session_name_or_id}%")) & (

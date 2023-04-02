@@ -302,8 +302,10 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[download_info["url"]]
                     else:
                         raise BackendClientError(
-                            "Overriding storage proxy addresses are given, "
-                            "but no url matches with any of them.\n",
+                            (
+                                "Overriding storage proxy addresses are given, "
+                                "but no url matches with any of them.\n"
+                            ),
                         )
 
                 download_url = URL(overriden_url).with_query(
@@ -347,8 +349,10 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[upload_info["url"]]
                     else:
                         raise BackendClientError(
-                            "Overriding storage proxy addresses are given, "
-                            "but no url matches with any of them.\n",
+                            (
+                                "Overriding storage proxy addresses are given, "
+                                "but no url matches with any of them.\n"
+                            ),
                         )
                 upload_url = URL(overriden_url).with_query(
                     {

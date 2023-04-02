@@ -52,7 +52,7 @@ def format_pretty(msg, status=PrintStatus.NONE, colored=True):
     if status == PrintStatus.NONE:
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
-        indicator = style("\u22EF", fg="bright_yellow", reset=False)
+        indicator = style("\u22ef", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
         indicator = style("\u2714", fg="bright_green", reset=False)
     elif status == PrintStatus.FAILED:
@@ -78,7 +78,7 @@ def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
         indicator = style("\u2219", fg="bright_cyan", reset=False)
     elif status == PrintStatus.WAITING:
         assert "\n" not in msg, "Waiting message must be a single line."
-        indicator = style("\u22EF", fg="bright_yellow", reset=False)
+        indicator = style("\u22ef", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
         indicator = style("\u2713", fg="bright_green", reset=False)
     elif status == PrintStatus.FAILED:

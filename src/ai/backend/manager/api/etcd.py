@@ -79,8 +79,8 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("key"): t.String,
-            t.Key("value"): (
-                t.String(allow_blank=True) | t.Mapping(t.String(allow_blank=True), t.Any)
+            t.Key("value"): t.String(allow_blank=True) | t.Mapping(
+                t.String(allow_blank=True), t.Any
             ),
         }
     )

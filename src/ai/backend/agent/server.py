@@ -118,7 +118,7 @@ async def get_extra_volumes(docker, lang):
             mount_list.append(vol)
         else:
             log.info(
-                "skipped attaching extra volume {0} " "to a kernel based on image {1}",
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
                 vol.name,
                 lang,
             )
@@ -806,7 +806,7 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. " "(default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
@@ -867,8 +867,10 @@ def main(
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            "ConfigurationError: "
-            "Cannot use link-local or unspecified IP address as the RPC listening host.",
+            (
+                "ConfigurationError: "
+                "Cannot use link-local or unspecified IP address as the RPC listening host."
+            ),
             file=sys.stderr,
         )
         raise click.Abort()
@@ -884,17 +886,18 @@ def main(
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
-                    "ConfigurationError: "
-                    "Storing container coredumps is only supported in Linux.",
+                    "ConfigurationError: Storing container coredumps is only supported in Linux.",
                     file=sys.stderr,
                 )
                 raise click.Abort()
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    "ConfigurationError: "
-                    "/proc/sys/kernel/core_pattern must be an absolute path "
-                    "to enable container coredumps.",
+                    (
+                        "ConfigurationError: "
+                        "/proc/sys/kernel/core_pattern must be an absolute path "
+                        "to enable container coredumps."
+                    ),
                     file=sys.stderr,
                 )
                 raise click.Abort()
