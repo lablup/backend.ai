@@ -69,9 +69,9 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "group_id", "group_name"], default=None): t.Null
-            | tx.UUID
-            | t.String,
+            tx.AliasedKey(["group", "group_id", "group_name"], default=None): (
+                t.Null | tx.UUID | t.String
+            ),
         }
     )
 )
