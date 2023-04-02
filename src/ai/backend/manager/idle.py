@@ -636,7 +636,9 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             return True
         idle_time: float = t - last_access
         remaining: float = grace_period + idle_timeout - idle_time
-        await self.set_remaining_time_report(redis_obj, session_id, remaining)
+        await self.set_remaining_time_report(
+            redis_obj, session_id, remaining if remaining > 0 else -1
+        )
         return remaining >= 0
 
     async def get_checker_result(
@@ -685,7 +687,9 @@ class SessionLifetimeChecker(BaseIdleChecker):
             idle_time: timedelta = now - kernel["created_at"]
             remaining: timedelta = idle_timeout - idle_time
             result = grace_period + remaining.total_seconds()
-            await self.set_remaining_time_report(redis_obj, session_id, result)
+            await self.set_remaining_time_report(
+                redis_obj, session_id, result if result > 0 else -1
+            )
             return result > 0
         return True
 
@@ -832,12 +836,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
         db_now = await dbconn.scalar(sa.select(sa.func.now()))
         initial_period: timedelta = db_now - kernel["created_at"]
         initial_period_sec: float = initial_period.total_seconds()
-        if (
-            first_expire_time := total_initial_grace_period + time_window - initial_period_sec
-        ) >= 0:
-            await self.set_remaining_time_report(redis_obj, session_id, first_expire_time)
-        else:
-            await self.set_remaining_time_report(redis_obj, session_id, -1.0)
+        first_expire_time = total_initial_grace_period + time_window - initial_period_sec
+        await self.set_remaining_time_report(
+            redis_obj, session_id, first_expire_time if first_expire_time > 0 else -1
+        )
 
         # Respect initial grace period (no calculation of utilization and no termination of the session)
         if initial_period_sec <= total_initial_grace_period:
