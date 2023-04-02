@@ -93,7 +93,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
     async with connect_database(ctx.dsn) as conn:
         await conn.execute("""\
             CREATE TABLE IF NOT EXISTS vfolder_migration_v3 (
-                volume_id VARCHAR(64),
+                volume_id VARCHAR(1024),
                 folder_id UUID,
                 status VARCHAR(16),
                 log TEXT DEFAULT NULL,
@@ -164,12 +164,11 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             orig_vfid = VFolderID(None, folder_id)
             dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
             try:
-                # TODO: create the target quota scope
-                pass
-                # await volume.copy_tree(
-                #     volume.mangle_vfpath(orig_Vfid),
-                #     volume.mangle_vfpath(dst_vfid),
-                # )
+                await volume.create_quota_scope(quota_scope_map[folder_id])
+                await volume.copy_tree(
+                    volume.mangle_vfpath(orig_vfid),
+                    volume.mangle_vfpath(dst_vfid),
+                )
             except Exception:
                 log.exception("error during migration of vfolder {}", folder_id)
                 async with (
@@ -197,17 +196,17 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                 ):
                     await conn.execute(
                         """\
-                            INSERT INTO vfolder_migration_v3
-                            (volume_id, folder_id, status)
-                            VALUES ($1, $2, $3)
-                            ON CONFLICT (volume_id, folder_id)
-                            DO UPDATE SET log = NULL, status = excluded.status;
-                            """,
+                        INSERT INTO vfolder_migration_v3
+                        (volume_id, folder_id, status)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (volume_id, folder_id)
+                        DO UPDATE SET log = NULL, status = excluded.status;
+                        """,
                         volume_id,
                         folder_id,
                         VFolderMigrationStatus.COMPLETE,
                     )
-                # TODO: delete the source folder
+                await volume.delete_vfolder(orig_vfid)
 
     async with connect_database(ctx.dsn) as conn:
         incomplete_count = await conn.fetchval(

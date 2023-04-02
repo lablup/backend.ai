@@ -9,7 +9,7 @@ import shutil
 import time
 import warnings
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union
+from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union, final
 
 import janus
 
@@ -139,48 +139,49 @@ class BaseVolume(AbstractVolume):
 
         await loop.run_in_executor(None, _delete_vfolder)
 
+    @final
     async def clone_vfolder(
         self,
         src_vfid: VFolderID,
-        dst_volume: AbstractVolume,
         dst_vfid: VFolderID,
         options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         # check if there is enough space in the destination
-        fs_usage = await dst_volume.get_fs_usage()
+        fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise ExecutionError("Not enough space available for clone.")
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
-        await dst_volume.create_vfolder(dst_vfid, options=options, exist_ok=True)
-        dst_vfpath = dst_volume.mangle_vfpath(dst_vfid)
+        await self.create_vfolder(dst_vfid, options=options, exist_ok=True)
+        dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
         try:
             await self.copy_tree(src_vfpath, dst_vfpath)
         except Exception:
-            await dst_volume.delete_vfolder(dst_vfid)
+            await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
             raise ExecutionError("Copying files from source directories failed.")
 
     async def copy_tree(
         self,
-        src_vfpath: Path,
-        dst_vfpath: Path,
+        src_path: Path,
+        dst_path: Path,
     ) -> None:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             functools.partial(
                 shutil.copytree,
-                src_vfpath,
-                dst_vfpath,
+                src_path,
+                dst_path,
                 dirs_exist_ok=True,
             ),
         )
 
+    @final
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         self.sanitize_vfpath(vfid, PurePosixPath(subpath))
         return self.mangle_vfpath(vfid).resolve()

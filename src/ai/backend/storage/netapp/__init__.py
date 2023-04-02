@@ -4,19 +4,20 @@ import asyncio
 import glob
 import json
 import os
-import shlex
-import subprocess
 import time
+from contextlib import aclosing
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet
+from typing import FrozenSet
 
 import aiofiles
+import aiofiles.os
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractVolume
-from ..exception import ExecutionError, StorageProxyError, VFolderCreationError
-from ..types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID, VFolderUsage
+from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER
+from ..exception import ExecutionError, StorageProxyError
+from ..subproc import spawn_and_watch
+from ..types import FSPerfMetric, FSUsage, VFolderID, VFolderUsage
 from ..vfs import BaseVolume
 from .netappclient import NetAppClient
 from .quotamanager import QuotaManager
@@ -70,7 +71,7 @@ class NetAppVolume(BaseVolume):
         self.netapp_qtree_id = await self.get_qtree_id_by_name(self.netapp_qtree_name)
 
         # adjust mount path (volume + qtree)
-        self.mount_path = (self.mount_path / Path(self.netapp_qtree_name)).resolve()
+        self.mount_path = (self.mount_path / self.netapp_qtree_name).resolve()
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_VFHOST_QUOTA, CAP_METRIC])
@@ -114,68 +115,22 @@ class NetAppVolume(BaseVolume):
 
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
-
-        # extract target_dir from vfpath
-        target_dir = str(vfpath).split(self.netapp_qtree_name + "/", 1)[1].split("/")[0]
-        nfs_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{target_dir}"
-        )
-
-        async def watch_delete_dir(root_dir):
-            delete_cmd = ["xcp", "delete", "-force", nfs_path]
-            if self.netapp_xcp_container_name is not None:
-                delete_cmd = [
-                    "docker",
-                    "exec",
-                    self.netapp_xcp_container_name,
-                ] + delete_cmd
-            # remove vfolder by xcp command
-            proc = await asyncio.create_subprocess_exec(
+        vf_relpath = vfpath.relative_to(self.mount_path)
+        nfs_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{vf_relpath}"
+        delete_cmd = [b"xcp", b"delete", b"-force", os.fsencode(nfs_path)]
+        if self.netapp_xcp_container_name is not None:
+            delete_cmd = [
+                b"docker",
+                b"exec",
+                self.netapp_xcp_container_name.encode(),
                 *delete_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            # readline and send
-            while True:
-                line = await proc.stdout.readline()
-                if not line:
-                    break
-                yield line.rstrip()
-
-        async def read_progress(root_dir):
-            async for line in watch_delete_dir(root_dir):
+            ]
+        async with aclosing(spawn_and_watch(delete_cmd)) as ag:
+            async for line in ag:
                 # TODO: line for bgtask
                 pass
-            # remove intermediate prefix directories if they become empty
-            from aiofiles import os as aiofile_os
-
-            await aiofile_os.rmdir(vfpath.parent.parent)
-
-        await read_progress(nfs_path)
-
-    async def clone_vfolder(
-        self,
-        src_vfid: VFolderID,
-        dst_volume: AbstractVolume,
-        dst_vfid: VFolderID,
-        options: VFolderCreationOptions = None,
-    ) -> None:
-        # check if there is enough space in destination
-        fs_usage = await dst_volume.get_fs_usage()
-        vfolder_usage = await self.get_usage(src_vfid)
-        if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
-            raise VFolderCreationError("Not enough space available for clone")
-
-        # create the target vfolder
-        await dst_volume.create_vfolder(dst_vfid, options=options, exist_ok=True)
-
-        # perform clone using xcp copy (exception handling needed)
-        try:
-            await self.copy_tree(nfs_src_path, nfs_dst_path)
-        except Exception:
-            await dst_volume.delete_vfolder(dst_vfid)
-            raise RuntimeError("Copying files from source directories failed.")
+        # remove intermediate prefix directories if they become empty
+        await aiofiles.os.rmdir(vfpath.parent.parent)
 
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
@@ -205,70 +160,33 @@ class NetAppVolume(BaseVolume):
 
     async def copy_tree(
         self,
-        src_vfpath: Path,
-        dst_vfpath: Path,
+        src_path: Path,
+        dst_path: Path,
     ) -> None:
-        """
-        The actual backend-specific implementation of copying
-        files from a directory to another in an efficient way.
-        The source and destination are in the same filesystem namespace
-        but they may be on different physical media.
-        """
+        if not src_path.is_relative_to(self.mount_path):
+            raise ValueError(f"Invalid path inside the volume: {src_path}")
+        if not dst_path.is_relative_to(self.mount_path):
+            raise ValueError(f"Invalid path inside the volume: {dst_path}")
 
-        # arrange directory based on nfs
-        src_vfpath = str(self.mangle_vfpath(src_vfid)).split(
-            self.netapp_qtree_name + "/",
-            1,
-        )[1]
-        dst_vfpath = str(dst_volume.mangle_vfpath(dst_vfid)).split(
-            self.netapp_qtree_name + "/",
-            1,
-        )[1]
+        # Rearrange the paths into the NFS absolute path.
+        # These relative paths contains the qtree (quota-scope) name as the first part.
+        src_relpath = src_path.relative_to(self.mount_path)
+        dst_relpath = dst_path.relative_to(self.mount_path)
+        nfs_src_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{src_relpath}"
+        nfs_dst_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{dst_relpath}"
 
-        nfs_src_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{src_vfpath}"
-        )
-        nfs_dst_path = (
-            f"{self.netapp_xcp_hostname}:/{dst_volume.config['netapp_volume_name']}/"
-            + f"{dst_volume.config['netapp_qtree_name']}/{dst_vfpath}"
-        )
-
-        async def _spawn_and_watch_xcp(src_path: str, dst_path: str) -> AsyncIterator[bytes]:
-            copy_cmd = ["xcp", "copy", src_path, dst_path]
-            if self.netapp_xcp_container_name is not None:
-                copy_cmd = [
-                    "docker",
-                    "exec",
-                    self.netapp_xcp_container_name,
-                ] + copy_cmd
-            last_lines: list[bytes] = []
-            proc = await asyncio.create_subprocess_exec(
+        copy_cmd = [b"xcp", b"copy", os.fsencode(nfs_src_path), os.fsencode(nfs_dst_path)]
+        if self.netapp_xcp_container_name is not None:
+            copy_cmd = [
+                b"docker",
+                b"exec",
+                self.netapp_xcp_container_name.encode(),
                 *copy_cmd,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            try:
-                assert proc.stdout is not None
-                while True:
-                    line = await proc.stdout.readline()
-                    if not line:
-                        break
-                    if len(last_lines) > 50:
-                        last_lines.pop(0)
-                    last_lines.append(line)
-                    yield line.rstrip()
-            finally:
-                exit_code = await proc.wait()
-            if exit_code != 0:
-                raise subprocess.CalledProcessError(
-                    exit_code, shlex.join(copy_cmd), b"".join(last_lines)
-                )
-
-        async for line in _spawn_and_watch_xcp(src_vfpath, dst_vfpath):
-            # TODO: line for bgtask
-            pass
+            ]
+        async with aclosing(spawn_and_watch(copy_cmd)) as ag:
+            async for line in ag:
+                # TODO: line for bgtask
+                pass
 
     # ------ qtree and quotas operations ------
     async def get_default_qtree_by_volume_id(self, volume_uuid):
@@ -298,13 +216,10 @@ class NetAppVolume(BaseVolume):
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
+        target_relpath = target_path.relative_to(self.mount_path)
+        nfs_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{target_relpath}"
         total_size = 0
         total_count = 0
-        raw_target_path = str(target_path).split(self.netapp_qtree_name + "/", 1)[1]
-        nfs_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{raw_target_path}"
-        )
         start_time = time.monotonic()
         available = True
 

@@ -5,7 +5,7 @@ from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
-from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractVolume
+from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID
 from ai.backend.storage.vfs import BaseVolume
 
@@ -137,27 +137,16 @@ class GPFSVolume(BaseVolume):
                 await self.api_client.remove_fileset(self.fs, str(vfid))
                 raise VFolderCreationError("Failed to set quota")
 
-    async def clone_vfolder(
+    async def copy_tree(
         self,
-        src_vfid: VFolderID,
-        dst_volume: AbstractVolume,
-        dst_vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
+        src_path: Path,
+        dst_path: Path,
     ) -> None:
-        assert isinstance(dst_volume, GPFSVolume)
-        await dst_volume.create_vfolder(dst_vfid, options=options)
-
-        fs_usage = await dst_volume.get_fs_usage()
-        vfolder_usage = await self.get_usage(src_vfid)
-        if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
-            raise VFolderCreationError("Not enough space available for clone")
-
-        # TODO: Wait until file operation is done
         await self.api_client.copy_folder(
             self.fs,
-            self.mangle_vfpath(src_vfid),
-            dst_volume.fs,
-            dst_volume.mangle_vfpath(dst_vfid),
+            src_path,
+            self.fs,
+            dst_path,
         )
 
     async def delete_vfolder(self, vfid: VFolderID) -> None:

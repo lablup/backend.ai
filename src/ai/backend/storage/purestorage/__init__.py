@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, FrozenSet, Sequence
 
@@ -81,15 +82,15 @@ class FlashBladeVolume(BaseVolume):
 
     async def copy_tree(
         self,
-        src_vfpath: Path,
-        dst_vfpath: Path,
+        src_path: Path,
+        dst_path: Path,
     ) -> None:
         proc = await asyncio.create_subprocess_exec(
             b"pcp",
             b"-r",
             b"-p",
-            bytes(src_vfpath / "."),
-            bytes(dst_vfpath),
+            os.fsencode(src_path / "."),
+            os.fsencode(dst_path),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

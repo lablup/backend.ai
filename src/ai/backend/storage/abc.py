@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from pathlib import Path, PurePath, PurePosixPath
-from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
+from typing import (
+    Any,
+    AsyncIterator,
+    Final,
+    FrozenSet,
+    Mapping,
+    Optional,
+    Sequence,
+    final,
+)
 
 import trafaret as t
 
@@ -49,6 +58,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def shutdown(self) -> None:
         pass
 
+    @final
     def mangle_qspath(self, ref: VFolderID | str | None) -> Path:
         try:
             match ref:
@@ -69,6 +79,7 @@ class AbstractVolume(metaclass=ABCMeta):
         except t.DataError:
             raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}")
 
+    @final
     def mangle_vfpath(self, vfid: VFolderID) -> Path:
         folder_id_hex = vfid.folder_id.hex
         prefix1 = folder_id_hex[0:2]
@@ -76,6 +87,7 @@ class AbstractVolume(metaclass=ABCMeta):
         rest = folder_id_hex[4:]
         return self.mangle_qspath(vfid.quota_scope_id) / prefix1 / prefix2 / rest
 
+    @final
     def sanitize_vfpath(
         self,
         vfid: VFolderID,
@@ -89,6 +101,7 @@ class AbstractVolume(metaclass=ABCMeta):
             raise InvalidSubpathError(vfid, relpath)
         return target_path
 
+    @final
     def strip_vfpath(self, vfid: VFolderID, target_path: Path) -> PurePosixPath:
         vfpath = self.mangle_vfpath(vfid).resolve()
         return PurePosixPath(target_path.relative_to(vfpath))
@@ -167,13 +180,11 @@ class AbstractVolume(metaclass=ABCMeta):
     async def clone_vfolder(
         self,
         src_vfid: VFolderID,
-        dst_volume: AbstractVolume,
         dst_vfid: VFolderID,
         options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         """
-        Create a new vfolder on the destination volume with
-        ``exist_ok=True`` option and copy all contents of the source
+        Create a new vfolder on the same volume and copy all contents of the source
         vfolder into it, preserving file permissions and timestamps.
         """
         raise NotImplementedError
@@ -181,8 +192,8 @@ class AbstractVolume(metaclass=ABCMeta):
     @abstractmethod
     async def copy_tree(
         self,
-        src_vfpath: Path,
-        dst_vfpath: Path,
+        src_path: Path,
+        dst_path: Path,
     ) -> None:
         """
         The actual backend-specific implementation of copying
