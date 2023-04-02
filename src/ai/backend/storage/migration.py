@@ -1,7 +1,9 @@
 import asyncio
+import enum
 import logging
 import os
 import re
+import traceback
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +30,13 @@ class VolumeUpgradeInfo:
     orig_version: int
     target_version: int
     volume: AbstractVolume
+
+
+class VFolderMigrationStatus(enum.StrEnum):
+    PENDING = "pending"
+    ONGOING = "ongoing"
+    FAILED = "failed"
+    COMPLETE = "complete"
 
 
 async def check_latest(ctx: Context) -> list[VolumeUpgradeInfo]:
@@ -66,7 +75,7 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
     await conn.close()
 
 
-async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume):
+async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
     assert ctx.dsn is not None
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
@@ -81,7 +90,20 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume):
                 if p.is_dir() and rx_rest_digits_hex.search(p.name):
                     yield p
 
-    targets = scan_vfolders(volume.mount_path / "f38dea2350fa42a0b5ae338f5f4693f4")
+    async with connect_database(ctx.dsn) as conn:
+        await conn.execute(
+            """\
+            CREATE TABLE IF NOT EXISTS vfolder_migration_v3 (
+                volume_id VARCHAR(64),
+                folder_id UUID,
+                status VARCHAR(16),
+                log TEXT DEFAULT NULL,
+                PRIMARY KEY (volume_id, folder_id)
+            );
+            """
+        )
+
+    targets = scan_vfolders(volume.mount_path)
     for target_chunk in more_itertools.ichunked(targets, 10):
         folder_ids: list[UUID] = []
         quota_scope_map: dict[UUID, str] = {}
@@ -90,16 +112,50 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume):
                 folder_id = path_to_uuid(target)
                 folder_ids.append(folder_id)
             rows = await conn.fetch(
-                'SELECT "id", "quota_scope_id" FROM vfolders WHERE "id" = ANY($1)',
+                """\
+                SELECT "id", "quota_scope_id" FROM vfolders
+                WHERE "id" = ANY($1);
+                """,
                 folder_ids,
             )
             for row in rows:
                 quota_scope_map[row["id"]] = row["quota_scope_id"]
 
+            log.info("checking {} ...", ", ".join(map(str, folder_ids)))
+
+            async with conn.transaction():
+                await conn.executemany(
+                    """\
+                    INSERT INTO vfolder_migration_v3
+                    (volume_id, folder_id, status)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (volume_id, folder_id)
+                    DO NOTHING;
+                    """,
+                    [
+                        (
+                            os.fsdecode(volume.mount_path),
+                            folder_id,
+                            VFolderMigrationStatus.PENDING,
+                        )
+                        for folder_id in folder_ids
+                    ],
+                )
+
+            rows = await conn.fetch(
+                """\
+                SELECT folder_id FROM vfolder_migration_v3
+                WHERE folder_id = ANY($1)
+                  AND status = $2;
+                """,
+                folder_ids,
+                VFolderMigrationStatus.COMPLETE,
+            )
+            completed_folder_ids = {row["folder_id"] for row in rows}
+
         for folder_id in folder_ids:
-            # TODO: keep track of completely migrated vfolders
-            #       so that we can resume the operation when interrupted.
-            # TODO: create the target quota scope
+            if folder_id in completed_folder_ids:
+                continue
             log.info(
                 "copying vfolder {} into quota_scope {}",
                 folder_id,
@@ -107,11 +163,79 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume):
             )
             orig_vfid = VFolderID(None, folder_id)
             dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
-            # await volume.copy_tree(
-            #     volume.mangle_vfpath(orig_Vfid),
-            #     volume.mangle_vfpath(dst_vfid),
-            # )
-            # TODO: delete the source folder
+            try:
+                # TODO: create the target quota scope
+                raise RuntimeError("oops")
+                # await volume.copy_tree(
+                #     volume.mangle_vfpath(orig_Vfid),
+                #     volume.mangle_vfpath(dst_vfid),
+                # )
+            except Exception:
+                log.exception("error during migration of vfolder {}", folder_id)
+                async with (
+                    connect_database(ctx.dsn) as conn,
+                    conn.transaction(),
+                ):
+                    await conn.execute(
+                        """\
+                        INSERT INTO vfolder_migration_v3
+                        (volume_id, folder_id, log, status)
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT (volume_id, folder_id)
+                        DO UPDATE SET log = excluded.log, status = excluded.status;
+                        """,
+                        os.fsdecode(volume.mount_path),
+                        folder_id,
+                        traceback.format_exc(),
+                        VFolderMigrationStatus.FAILED,
+                    )
+            else:
+                log.info("completed migration of vfolder {}", folder_id)
+                async with (
+                    connect_database(ctx.dsn) as conn,
+                    conn.transaction(),
+                ):
+                    await conn.execute(
+                        """\
+                            INSERT INTO vfolder_migration_v3
+                            (volume_id, folder_id, status)
+                            VALUES ($1, $2, $3)
+                            ON CONFLICT (volume_id, folder_id)
+                            DO UPDATE SET status = excluded.status;
+                            """,
+                        os.fsdecode(volume.mount_path),
+                        folder_id,
+                        VFolderMigrationStatus.COMPLETE,
+                    )
+                # TODO: delete the source folder
+
+    async with connect_database(ctx.dsn) as conn:
+        incomplete_count = await conn.fetchval(
+            """\
+            SELECT COUNT(*) FROM vfolder_migration_v3
+            WHERE status != $1;
+            """,
+            VFolderMigrationStatus.COMPLETE,
+        )
+        if incomplete_count == 0:
+            await conn.execute(
+                """\
+                DROP TABLE vfolder_migration_v3;
+                """
+            )
+            log.info("successfully upgraded {}", volume.mount_path)
+            (volume.mount_path / "version.txt").write_text("3")
+        else:
+            log.warning(
+                (
+                    "There were {} failed migrations. "
+                    "Check out vfolder_migration_v3 table in the database."
+                ),
+                incomplete_count,
+            )
+            log.warning(
+                "You may re-run the migration to retry the failed ones and remaining vfolders."
+            )
 
 
 upgrade_handlers = {
