@@ -34,7 +34,6 @@ class VolumeUpgradeInfo:
 
 class VFolderMigrationStatus(enum.StrEnum):
     PENDING = "pending"
-    ONGOING = "ongoing"
     FAILED = "failed"
     COMPLETE = "complete"
 
@@ -80,6 +79,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
     log.info("upgrading {} ...", volume.mount_path)
+    volume_id = os.fsdecode(volume.mount_path)
 
     def scan_vfolders(root: Path, *, depth: int = 0) -> Iterator[Path]:
         for p in root.iterdir():
@@ -134,7 +134,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                     """,
                     [
                         (
-                            os.fsdecode(volume.mount_path),
+                            volume_id,
                             folder_id,
                             VFolderMigrationStatus.PENDING,
                         )
@@ -145,9 +145,11 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             rows = await conn.fetch(
                 """\
                 SELECT folder_id FROM vfolder_migration_v3
-                WHERE folder_id = ANY($1)
-                  AND status = $2;
+                WHERE volume_id = $1
+                  AND folder_id = ANY($2)
+                  AND status = $3;
                 """,
+                volume_id,
                 folder_ids,
                 VFolderMigrationStatus.COMPLETE,
             )
@@ -165,7 +167,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
             try:
                 # TODO: create the target quota scope
-                raise RuntimeError("oops")
+                pass
                 # await volume.copy_tree(
                 #     volume.mangle_vfpath(orig_Vfid),
                 #     volume.mangle_vfpath(dst_vfid),
@@ -184,7 +186,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                         ON CONFLICT (volume_id, folder_id)
                         DO UPDATE SET log = excluded.log, status = excluded.status;
                         """,
-                        os.fsdecode(volume.mount_path),
+                        volume_id,
                         folder_id,
                         traceback.format_exc(),
                         VFolderMigrationStatus.FAILED,
@@ -203,7 +205,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                             ON CONFLICT (volume_id, folder_id)
                             DO UPDATE SET status = excluded.status;
                             """,
-                        os.fsdecode(volume.mount_path),
+                        volume_id,
                         folder_id,
                         VFolderMigrationStatus.COMPLETE,
                     )
@@ -213,16 +215,13 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
         incomplete_count = await conn.fetchval(
             """\
             SELECT COUNT(*) FROM vfolder_migration_v3
-            WHERE status != $1;
+            WHERE volume_id = $1
+              AND status != $2;
             """,
+            volume_id,
             VFolderMigrationStatus.COMPLETE,
         )
         if incomplete_count == 0:
-            await conn.execute(
-                """\
-                DROP TABLE vfolder_migration_v3;
-                """
-            )
             log.info("successfully upgraded {}", volume.mount_path)
             (volume.mount_path / "version.txt").write_text("3")
         else:
