@@ -76,7 +76,7 @@ async def list_presets(request: web.Request) -> web.Response:
         # if scaling_group is not None:
         #     query = query.where(resource_presets.c.scaling_group == scaling_group)
         resp: MutableMapping[str, Any] = {"presets": []}
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
             resp["presets"].append(
                 {
@@ -217,7 +217,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 & (SessionRow.scaling_group_name.in_(sgroup_names)),
             )
         )
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
@@ -230,7 +230,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             )
         )
         agent_slots = []
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             remaining = row["available_slots"] - row["occupied_slots"]
             remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
             sgroup_remaining += remaining
@@ -250,7 +250,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
         # Fetch all resource presets in the current scaling group.
         query = sa.select([resource_presets]).select_from(resource_presets)
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             # Check if there are any agent that can allocate each preset.
             allocatable = False
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
@@ -262,9 +262,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 {
                     "name": row["name"],
                     "resource_slots": preset_slots.to_json(),
-                    "shared_memory": str(row["shared_memory"])
-                    if row["shared_memory"] is not None
-                    else None,
+                    "shared_memory": (
+                        str(row["shared_memory"]) if row["shared_memory"] is not None else None
+                    ),
                     "allocatable": allocatable,
                 }
             )
@@ -429,7 +429,7 @@ async def get_container_stats_for_period(
             "mem_used": int(nmget(last_stat, "mem.capacity", 0)),
             "shared_memory": int(nmget(row.resource_opts, "shmem", 0)),
             "disk_allocated": 0,  # TODO: disk quota limit
-            "disk_used": (int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))),
+            "disk_used": int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
             "io_read": int(nmget(last_stat, "io_read.current", 0)),
             "io_write": int(nmget(last_stat, "io_write.current", 0)),
             "used_time": used_time,

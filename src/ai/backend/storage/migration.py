@@ -135,9 +135,11 @@ async def check_and_upgrade(local_config: dict[str, Any], dsn: str):
     "--config",
     type=Path,
     default=None,
-    help="The config file path. "
-    "[default: ./storage-proxy.toml, ~/.config/backend.ai/storage-proxy.toml, "
-    "/etc/backend.ai/storage-proxy.toml (uses the first found one)]",
+    help=(
+        "The config file path. "
+        "[default: ./storage-proxy.toml, ~/.config/backend.ai/storage-proxy.toml, "
+        "/etc/backend.ai/storage-proxy.toml (uses the first found one)]"
+    ),
 )
 @click.option(
     "--dsn",

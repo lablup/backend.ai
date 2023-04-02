@@ -263,8 +263,7 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
             ).allow_extra("*"),
-            t.Key("pipeline", default=None): t.Null
-            | t.Dict(
+            t.Key("pipeline", default=None): t.Null | t.Dict(
                 {
                     t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
                 },
@@ -352,8 +351,9 @@ shared_config_iv = t.Dict(
         t.Key("redis", default=_config_defaults["redis"]): t.Dict(
             {
                 t.Key("addr", default=_config_defaults["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null
-                | tx.DelimiterSeperatedList(tx.HostPortPair),
+                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                    tx.HostPortPair
+                ),
                 t.Key("service_name", default=None): t.Null | t.String,
                 t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
             }
@@ -392,8 +392,7 @@ shared_config_iv = t.Dict(
                         ): tx.IPNetwork,
                     }
                 ).allow_extra("*"),
-                t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null
-                | t.Dict(
+                t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null | t.Dict(
                     {
                         t.Key(
                             "mtu", default=_config_defaults["network"]["overlay"]["mtu"]
@@ -420,10 +419,12 @@ volume_config_iv = t.Dict(
     {
         t.Key("_types", default=_volume_defaults["_types"]): t.Dict(
             {
-                t.Key("user", optional=True): t.String(allow_blank=True)
-                | t.Dict({}).allow_extra("*"),
-                t.Key("group", optional=True): t.String(allow_blank=True)
-                | t.Dict({}).allow_extra("*"),
+                t.Key("user", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
+                    "*"
+                ),
+                t.Key("group", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
+                    "*"
+                ),
             }
         ).allow_extra("*"),
         t.Key("default_host"): t.String,
