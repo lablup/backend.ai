@@ -41,9 +41,9 @@ async def test_upload_jwt_generation(tmp_path):
             file_size = "1024"
             payload = {
                 "token": (
-                    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.            "
-                    " eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9."
-                    "            5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
+                    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                    "eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9."
+                    "5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
                 )
             }
 
@@ -82,9 +82,9 @@ async def test_tus_upload(tmp_path: Path):
         print(f"Uploading {basedir} ...")
         # TODO: refactor out the progress bar
         token = (
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9pwd.           "
-            " eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9."
-            "                5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9pwd."
+            "eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9."
+            "5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
         )
 
         storage_proxy_payload = {
@@ -155,9 +155,9 @@ async def test_vfolder_download(mocker):
 
             payload = {
                 "token": (
-                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.           "
-                    " eyJvcCI6ImRvd25sb2FkIiwidm9sdW1lIjoidm9sdW1lMSIsInZmaWQiOiI4ZGFlNjk5Mi1kMjIzLTQwM2MtYTUyZC1iYWRlNGYwMGFhMzIiLCJyZWxwYXRoIjoic2V0dXAuY2ZnIiwiZXhwIjoxNjAwMTM0MzI5fQ."
-                    "            -cirX1fTBVqDAuW6IPzwpHjtopnSdio_BeuD2DACsbQ"
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJvcCI6ImRvd25sb2FkIiwidm9sdW1lIjoidm9sdW1lMSIsInZmaWQiOiI4ZGFlNjk5Mi1kMjIzLTQwM2MtYTUyZC1iYWRlNGYwMGFhMzIiLCJyZWxwYXRoIjoic2V0dXAuY2ZnIiwiZXhwIjoxNjAwMTM0MzI5fQ."
+                    "-cirX1fTBVqDAuW6IPzwpHjtopnSdio_BeuD2DACsbQ"
                 ),
                 "url": storage_path,
             }
@@ -174,10 +174,9 @@ async def test_vfolder_download(mocker):
                     "Date": "2020-09-14T01:45:29.117351+00:00",
                     "Content-Type": "application/json",
                     "Authorization": (
-                        "BackendAI signMethod=HMAC-SHA256,                                      "
-                        " credential=AKIAIOSFODNN7EXAMPLE:                                      "
-                        " 623674bb421ff0c96a9fe78a4a8c6a                                      "
-                        " 45fc5c0a370257800310cd9c7826819b3c"
+                        "BackendAI signMethod=HMAC-SHA256,"
+                        "credential=AKIAIOSFODNN7EXAMPLE:"
+                        "623674bb421ff0c96a9fe78a4a8c6a45fc5c0a370257800310cd9c7826819b3c"
                     ),
                 },
             )
