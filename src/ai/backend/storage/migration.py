@@ -203,7 +203,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                             (volume_id, folder_id, status)
                             VALUES ($1, $2, $3)
                             ON CONFLICT (volume_id, folder_id)
-                            DO UPDATE SET status = excluded.status;
+                            DO UPDATE SET log = NULL, status = excluded.status;
                             """,
                         volume_id,
                         folder_id,
