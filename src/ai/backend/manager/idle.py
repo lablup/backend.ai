@@ -630,13 +630,16 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             idle_timeout = float(policy["idle_timeout"])
         if (idle_timeout <= 0) or (math.isinf(idle_timeout) and idle_timeout > 0):
             return True
-        if grace_period_end is not None and (
-            (grace_period_sec := grace_period_end.timestamp()) > now
-        ):
-            remaining = grace_period_sec - now + idle_timeout
-        else:
+        if grace_period_end is None:
             idle_time: float = now - last_access
             remaining = idle_timeout - idle_time
+        else:
+            idle_time_start = max(last_access, grace_period_end.timestamp())
+            if idle_time_start > now:
+                remaining = idle_time_start - now + idle_timeout
+            else:
+                idle_time = now - idle_time_start
+                remaining = idle_timeout - idle_time
         await self.set_remaining_time_report(
             redis_obj, session_id, remaining if remaining > 0 else -1
         )
@@ -685,11 +688,17 @@ class SessionLifetimeChecker(BaseIdleChecker):
             #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
             now: datetime = await dbconn.scalar(sa.select(sa.func.now()))
-            if grace_period_end is not None and grace_period_end > now:
-                remaining = grace_period_end - now + idle_timeout
-            else:
-                idle_time: timedelta = now - kernel["created_at"]
+            kernel_created_at: datetime = kernel["created_at"]
+            if grace_period_end is None:
+                idle_time: timedelta = now - kernel_created_at
                 remaining = idle_timeout - idle_time
+            else:
+                idle_time_start = max(kernel_created_at, grace_period_end)
+                if idle_time_start > now:
+                    remaining = idle_time_start - now + idle_timeout
+                else:
+                    idle_time = now - idle_time_start
+                    remaining = idle_timeout - idle_time
             result = remaining.total_seconds()
             await self.set_remaining_time_report(
                 redis_obj, session_id, result if result > 0 else -1
@@ -838,11 +847,15 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Report time remaining until the first time window is full as expire time
         db_now: datetime = await dbconn.scalar(sa.select(sa.func.now()))
         kernel_created_at: datetime = kernel["created_at"]
-        if grace_period_end is not None and grace_period_end > kernel_created_at:
-            total_initial_grace_period_end = grace_period_end + self.initial_grace_period
+        if grace_period_end is not None:
+            start_from = max(grace_period_end, kernel_created_at)
         else:
-            total_initial_grace_period_end = kernel_created_at + self.initial_grace_period
-        first_expire_after: timedelta = total_initial_grace_period_end - db_now + time_window
+            start_from = kernel_created_at
+        total_initial_grace_period_end = start_from + self.initial_grace_period
+        if total_initial_grace_period_end > db_now:
+            first_expire_after = total_initial_grace_period_end - db_now + time_window
+        else:
+            first_expire_after = time_window - (db_now - total_initial_grace_period_end)
         remaining = first_expire_after.total_seconds()
         await self.set_remaining_time_report(
             redis_obj, session_id, remaining if remaining > 0 else -1
