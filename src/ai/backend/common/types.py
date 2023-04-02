@@ -777,7 +777,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 
 @attrs.define(slots=True, frozen=True)
 class VFolderID:
-    quota_scope_id: str
+    quota_scope_id: str | None
     folder_id: uuid.UUID
 
     def __str__(self) -> str:

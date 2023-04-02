@@ -1,39 +1,131 @@
+import asyncio
 import logging
 import os
+import re
+from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, AsyncIterator, Iterator
+from uuid import UUID
 
+import asyncpg
 import click
+import more_itertools
+import yarl
 
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 
 from .abc import AbstractVolume
-from .config import load_local_config
+from .config import load_local_config, load_shared_config
+from .context import Context
+from .types import VFolderID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-def check_latest(volume: AbstractVolume):
-    version_path = volume.mount_path / "version.txt"
-    if version_path.exists():
-        version = int(version_path.read_text())
-    else:
-        version = 2
-
-    match version:
-        case 2:
-            # already the latest version
-            log.warning("{}: Detected an old vfolder structure (v{})", volume.mount_path, version)
-        case 3:
-            # already the latest version
-            pass
+@dataclass
+class VolumeUpgradeInfo:
+    orig_version: int
+    target_version: int
+    volume: AbstractVolume
 
 
-def migrate(volume):
-    pass
+async def check_latest(ctx: Context) -> list[VolumeUpgradeInfo]:
+    volumes_to_upgrade: list[VolumeUpgradeInfo] = []
+    volume_infos = ctx.list_volumes()
+    for name, info in volume_infos.items():
+        async with ctx.get_volume(name) as volume:
+            version_path = volume.mount_path / "version.txt"
+            if version_path.exists():
+                version = int(version_path.read_text().strip())
+            else:
+                version = 2
+            match version:
+                case 2:
+                    log.warning(
+                        "{}: Detected an old vfolder structure (v{})",
+                        volume.mount_path,
+                        version,
+                    )
+                    volumes_to_upgrade.append(VolumeUpgradeInfo(2, 3, volume))
+                case 3:
+                    # already the latest version
+                    pass
+    return volumes_to_upgrade
 
 
-def upgrade(local_config):
-    log.info("TODO: implement")
+def path_to_uuid(p: Path) -> UUID:
+    return UUID(f"{p.parent.parent.name}{p.parent.name}{p.name}")
+
+
+@actxmgr
+async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
+    db_dsn = yarl.URL(dsn).with_scheme("postgres")
+    conn = await asyncpg.connect(dsn=str(db_dsn))
+    yield conn
+    await conn.close()
+
+
+async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume):
+    assert ctx.dsn is not None
+    rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
+    rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
+    log.info("upgrading {} ...", volume.mount_path)
+
+    def scan_vfolders(root: Path, *, depth: int = 0) -> Iterator[Path]:
+        for p in root.iterdir():
+            if depth < 2:
+                if p.is_dir() and rx_two_digits_hex.search(p.name):
+                    yield from scan_vfolders(p, depth=depth + 1)
+            else:
+                if p.is_dir() and rx_rest_digits_hex.search(p.name):
+                    yield p
+
+    targets = scan_vfolders(volume.mount_path / "f38dea2350fa42a0b5ae338f5f4693f4")
+    for target_chunk in more_itertools.ichunked(targets, 10):
+        folder_ids: list[UUID] = []
+        quota_scope_map: dict[UUID, str] = {}
+        async with connect_database(ctx.dsn) as conn:
+            for target in target_chunk:
+                folder_id = path_to_uuid(target)
+                folder_ids.append(folder_id)
+            rows = await conn.fetch(
+                'SELECT "id", "quota_scope_id" FROM vfolders WHERE "id" = ANY($1)',
+                folder_ids,
+            )
+            for row in rows:
+                quota_scope_map[row["id"]] = row["quota_scope_id"]
+
+        for folder_id in folder_ids:
+            # TODO: keep track of completely migrated vfolders
+            #       so that we can resume the operation when interrupted.
+            # TODO: create the target quota scope
+            log.info(
+                "copying vfolder {} into quota_scope {}",
+                folder_id,
+                quota_scope_map[folder_id],
+            )
+            orig_vfid = VFolderID(None, folder_id)
+            dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
+            # await volume.copy_tree(
+            #     volume.mangle_vfpath(orig_Vfid),
+            #     volume.mangle_vfpath(dst_vfid),
+            # )
+            # TODO: delete the source folder
+
+
+upgrade_handlers = {
+    3: upgrade_2_to_3,
+}
+
+
+async def check_and_upgrade(local_config: dict[str, Any], dsn: str):
+    etcd = load_shared_config(local_config)
+    ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd, dsn=dsn)
+    volumes_to_upgrade = await check_latest(ctx)
+    for upgrade_info in volumes_to_upgrade:
+        handler = upgrade_handlers[upgrade_info.target_version]
+        await handler(ctx, upgrade_info.volume)
 
 
 @click.command()
@@ -44,14 +136,22 @@ def upgrade(local_config):
     type=Path,
     default=None,
     help="The config file path. "
-    "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)",
+    "[default: ./storage-proxy.toml, ~/.config/backend.ai/storage-proxy.toml, "
+    "/etc/backend.ai/storage-proxy.toml (uses the first found one)]",
+)
+@click.option(
+    "--dsn",
+    type=str,
+    default="postgres://postgres:develove@localhost:8101/backend",
+    help="The DSN of the database connection.",
+    show_default=True,
 )
 @click.option(
     "--debug",
     is_flag=True,
     help="This option will soon change to --log-level TEXT option.",
 )
-def main(config_path: Path, debug: bool) -> None:
+def main(config_path: Path, dsn: str, debug: bool) -> None:
     local_config = load_local_config(config_path, debug=debug)
     ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
     log_sockpath = Path(
@@ -66,7 +166,7 @@ def main(config_path: Path, debug: bool) -> None:
         log_endpoint=log_endpoint,
     )
     with logger:
-        upgrade(local_config)
+        asyncio.run(check_and_upgrade(local_config, dsn))
 
 
 if __name__ == "__main__":

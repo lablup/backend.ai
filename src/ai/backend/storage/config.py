@@ -15,6 +15,7 @@ from ai.backend.common.config import (
     override_with_env,
     read_from_file,
 )
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import logging_config_iv
 
 from .types import VolumeInfo
@@ -118,3 +119,23 @@ def load_local_config(config_path: Path, debug: bool = False) -> dict[str, Any]:
         )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise
+
+
+def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:
+    etcd_credentials = None
+    if local_config["etcd"]["user"]:
+        etcd_credentials = {
+            "user": local_config["etcd"]["user"],
+            "password": local_config["etcd"]["password"],
+        }
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
+    }
+    etcd = AsyncEtcd(
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["namespace"],
+        scope_prefix_map,
+        credentials=etcd_credentials,
+    )
+    return etcd

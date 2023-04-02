@@ -49,15 +49,19 @@ class AbstractVolume(metaclass=ABCMeta):
     async def shutdown(self) -> None:
         pass
 
-    def mangle_qspath(self, ref: VFolderID | str) -> Path:
+    def mangle_qspath(self, ref: VFolderID | str | None) -> Path:
         try:
             match ref:
                 case VFolderID():
+                    if ref.quota_scope_id is None:
+                        return self.mount_path  # for legacy vfolder paths during migration
                     tx.QuotaScopeID().check(ref.quota_scope_id)
                     return Path(self.mount_path, ref.quota_scope_id)
                 case str():
                     tx.QuotaScopeID().check(ref)
                     return Path(self.mount_path, ref)
+                case None:
+                    return self.mount_path  # for legacy vfolder paths during migration
                 case _:
                     raise InvalidQuotaScopeError(
                         f"Invalid value format for quota scope ID: {ref!r}"

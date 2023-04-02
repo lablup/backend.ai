@@ -4,9 +4,11 @@ import asyncio
 import glob
 import json
 import os
+import shlex
+import subprocess
 import time
 from pathlib import Path, PurePosixPath
-from typing import FrozenSet
+from typing import AsyncIterator, FrozenSet
 
 import aiofiles
 
@@ -168,58 +170,9 @@ class NetAppVolume(BaseVolume):
         # create the target vfolder
         await dst_volume.create_vfolder(dst_vfid, options=options, exist_ok=True)
 
-        # arrange directory based on nfs
-        src_vfpath = str(self.mangle_vfpath(src_vfid)).split(
-            self.netapp_qtree_name + "/",
-            1,
-        )[1]
-        dst_vfpath = str(dst_volume.mangle_vfpath(dst_vfid)).split(
-            self.netapp_qtree_name + "/",
-            1,
-        )[1]
-
-        nfs_src_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{src_vfpath}"
-        )
-        nfs_dst_path = (
-            f"{self.netapp_xcp_hostname}:/{dst_volume.config['netapp_volume_name']}/"
-            + f"{dst_volume.config['netapp_qtree_name']}/{dst_vfpath}"
-        )
-
         # perform clone using xcp copy (exception handling needed)
         try:
-
-            async def watch_copy_dir(src_path, dst_path):
-                copy_cmd = ["xcp", "copy", src_path, dst_path]
-                if self.netapp_xcp_container_name is not None:
-                    copy_cmd = [
-                        "docker",
-                        "exec",
-                        self.netapp_xcp_container_name,
-                    ] + copy_cmd
-                proc = await asyncio.create_subprocess_exec(
-                    *copy_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                )
-                stdout, stderr = await proc.communicate()
-                # readline and send
-                while True:
-                    line = await proc.stdout.readline()
-                    if not line:
-                        break
-                    if b"xcp: ERROR:" in line:
-                        raise Exception
-                    yield line.rstrip()
-
-            async def read_progress(src_path, dst_path):
-                async for line in watch_copy_dir(src_path, dst_path):
-                    # TODO: line for bgtask
-                    pass
-
-            await read_progress(nfs_src_path, nfs_dst_path)
-
+            await self.copy_tree(nfs_src_path, nfs_dst_path)
         except Exception:
             await dst_volume.delete_vfolder(dst_vfid)
             raise RuntimeError("Copying files from source directories failed.")
@@ -249,6 +202,73 @@ class NetAppVolume(BaseVolume):
         if "error" in resp:
             raise ExecutionError("api error")
         return resp
+
+    async def copy_tree(
+        self,
+        src_vfpath: Path,
+        dst_vfpath: Path,
+    ) -> None:
+        """
+        The actual backend-specific implementation of copying
+        files from a directory to another in an efficient way.
+        The source and destination are in the same filesystem namespace
+        but they may be on different physical media.
+        """
+
+        # arrange directory based on nfs
+        src_vfpath = str(self.mangle_vfpath(src_vfid)).split(
+            self.netapp_qtree_name + "/",
+            1,
+        )[1]
+        dst_vfpath = str(dst_volume.mangle_vfpath(dst_vfid)).split(
+            self.netapp_qtree_name + "/",
+            1,
+        )[1]
+
+        nfs_src_path = (
+            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
+            + f"{self.netapp_qtree_name}/{src_vfpath}"
+        )
+        nfs_dst_path = (
+            f"{self.netapp_xcp_hostname}:/{dst_volume.config['netapp_volume_name']}/"
+            + f"{dst_volume.config['netapp_qtree_name']}/{dst_vfpath}"
+        )
+
+        async def _spawn_and_watch_xcp(src_path: str, dst_path: str) -> AsyncIterator[bytes]:
+            copy_cmd = ["xcp", "copy", src_path, dst_path]
+            if self.netapp_xcp_container_name is not None:
+                copy_cmd = [
+                    "docker",
+                    "exec",
+                    self.netapp_xcp_container_name,
+                ] + copy_cmd
+            last_lines: list[bytes] = []
+            proc = await asyncio.create_subprocess_exec(
+                *copy_cmd,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            try:
+                assert proc.stdout is not None
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    if len(last_lines) > 50:
+                        last_lines.pop(0)
+                    last_lines.append(line)
+                    yield line.rstrip()
+            finally:
+                exit_code = await proc.wait()
+            if exit_code != 0:
+                raise subprocess.CalledProcessError(
+                    exit_code, shlex.join(copy_cmd), b"".join(last_lines)
+                )
+
+        async for line in _spawn_and_watch_xcp(src_vfpath, dst_vfpath):
+            # TODO: line for bgtask
+            pass
 
     # ------ qtree and quotas operations ------
     async def get_default_qtree_by_volume_id(self, volume_uuid):
