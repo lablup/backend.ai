@@ -91,8 +91,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                     yield p
 
     async with connect_database(ctx.dsn) as conn:
-        await conn.execute(
-            """\
+        await conn.execute("""\
             CREATE TABLE IF NOT EXISTS vfolder_migration_v3 (
                 volume_id VARCHAR(64),
                 folder_id UUID,
@@ -100,8 +99,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                 log TEXT DEFAULT NULL,
                 PRIMARY KEY (volume_id, folder_id)
             );
-            """
-        )
+            """)
 
     targets = scan_vfolders(volume.mount_path)
     for target_chunk in more_itertools.ichunked(targets, 10):
