@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.21 (2023-04-03)
+
+### Features
+* Add a step to idle checkers to determine the initial grace period, which is calculated by the user's creation time. ([#1199](https://github.com/lablup/backend.ai/issues/1199))
+* Utilization checker returns `thresholds_check_operator`. ([#1202](https://github.com/lablup/backend.ai/issues/1202))
+
+### Improvements
+* Improve `status_data` generation when the debug mode is enabled ([#1203](https://github.com/lablup/backend.ai/issues/1203))
+
+### Fixes
+* Calculate idle checker's remaining time to expire correctly. ([#1205](https://github.com/lablup/backend.ai/issues/1205))
+
+
 ## 22.09.20 (2023-03-26)
 
 ### Features
