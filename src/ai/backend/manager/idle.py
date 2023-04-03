@@ -71,6 +71,8 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 DEFAULT_CHECK_INTERVAL: Final = 15.0
+# idle checker's remaining time should be -1 when the remaining time is negative
+IDLE_TIMEOUT_VALUE: Final = -1
 
 
 class IdleCheckerError(TaskGroupError):
@@ -390,7 +392,7 @@ class AbstractIdleChecker(metaclass=ABCMeta):
         policy: Row,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime],
+        grace_period_end: Optional[datetime] = None,
     ) -> bool:
         """
         Check the kernel is whether idle or not.
@@ -591,7 +593,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         policy: Row,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime],
+        grace_period_end: Optional[datetime] = None,
     ) -> bool:
         """
         Check the kernel is timeout or not.
@@ -641,7 +643,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
                 idle_time = now - idle_time_start
                 remaining = idle_timeout - idle_time
         await self.set_remaining_time_report(
-            redis_obj, session_id, remaining if remaining > 0 else -1
+            redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
         )
         return remaining >= 0
 
@@ -675,7 +677,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
         policy: Row,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime],
+        grace_period_end: Optional[datetime] = None,
     ) -> bool:
         """
         Check the kernel has been living longer than resource policy's `max_session_lifetime`.
@@ -701,7 +703,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
                     remaining = idle_timeout - idle_time
             result = remaining.total_seconds()
             await self.set_remaining_time_report(
-                redis_obj, session_id, result if result > 0 else -1
+                redis_obj, session_id, result if result > 0 else IDLE_TIMEOUT_VALUE
             )
             return result > 0
         return True
@@ -809,7 +811,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         policy: Row,
         redis_obj: RedisConnectionInfo,
         *,
-        grace_period_end: Optional[datetime],
+        grace_period_end: Optional[datetime] = None,
     ) -> bool:
         """
         Check the the average utilization of kernel and whether it exceeds the threshold or not.
@@ -858,7 +860,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             first_expire_after = time_window - (db_now - total_initial_grace_period_end)
         remaining = first_expire_after.total_seconds()
         await self.set_remaining_time_report(
-            redis_obj, session_id, remaining if remaining > 0 else -1
+            redis_obj, session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
         )
 
         # Respect initial grace period (no calculation of utilization and no termination of the session)
