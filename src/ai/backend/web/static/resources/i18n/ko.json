@@ -205,6 +205,7 @@
       "DuplicatedSessionName": "동일한 이름의 연산 세션이 있습니다",
       "SessionNameAllowCondition": "세션 이름은 공백없이 4-64자  사이의 영문/숫자만 입력 가능합니다.",
       "NoFolderExists": "폴더가 없습니다",
+      "SessionAlreadyExists": "같은 이름의 세션이 이미 존재합니다",
       "sessionStillPreparing": "세션이 아직 준비중입니다. 세션이 시작된 후 직접 앱 아이콘을 눌러 앱을 시작해주세요.",
       "UnSelectAllVFolders": "모두 선택 해제",
       "ResourceMonitorToggle": "자원 모니터 보기",
@@ -342,10 +343,22 @@
     "TerminateSession": "세션 종료하기",
     "SeeContainerLogs": "컨테이너 로그 보기",
     "RequestContainerCommit": "컨테이너 커밋하기",
-    "TimeoutExceeded": "제한 시간 초과",
-    "UtilizationIdleChecks": "사용률 유휴 상태 점검",
+    "TimeoutExceeded": "유예 만료. 확인중...",
     "Utilization": "사용률",
-    "Threshold": "임계값"
+    "Threshold": "수거 기준값",
+    "IdleChecks": "유휴 상태 검사",
+    "IdleChecksDesc": "연산 세션을 자동 삭제하는 세 가지 기준을 제공합니다.",
+    "MaxSessionLifetime": "최대 세션 수명 시간",
+    "MaxSessionLifetimeDesc": "세션 생성 후 이 시간이 지나면 세션을 강제 종료합니다. 세션이 무한으로 실행되는 것을 막을 수 있습니다.",
+    "NetworkIdleTimeout": "네트워크 트래픽 기반 유휴 시간",
+    "NetworkIdleTimeoutDesc": "사용자(브라우저)와 연산 세션 사이에 이 시간 동안 아무런 네트워크 트래픽이 없을 경우 연산 세션을 삭제합니다. 사용자와 연산 세션 사이의 트래픽은 앱 (터미널, Jupyter 등)을 통해 상호작용(키보드 입력, Jupyter 셀 생성 등) 하는 경우 지속적으로 발생합니다. 만약, 연산 세션을 띄운 채 일정 시간 동안 아무런 입력을 하지 않으면 자동 삭제 조건을 만족하게 됩니다. 연산 세션에서 작업을 수행 중인 프로세스가 있더라도, 사용자와의 상호작용이 없는 경우에는 삭제 대상입니다.",
+    "UtilizationIdleTimeout": "사용량 기반 자원 수거",
+    "UtilizationIdleTimeoutDesc": "오직 연산 세션에 할당된 자원의 활용률을 기준으로 연산 세션을 삭제합니다.",
+    "GracePeriod": "유예 기간",
+    "GracePeriodDesc": "자원 사용량 기반 체커를 이 시간 동안 작동하지 않게 합니다. 이 시간이 지나기 전에는 사용량이 적더라도 연산 세션이 삭제되지 않습니다.",
+    "UtilizationThreshold": "자원 사용량 기준",
+    "UtilizationThresholdDesc": "연산 세션의 자원 사용량 기준입니다. 연산 세션의 자원 사용량이 일정 시간 동안 설정된 기준값을 넘지 못하면, 그 세션은 자동으로 삭제됩니다. 예를 들어, CUDA 사용률 기준을 1%로 설정했다면, 일정 시간 동안 1% 미만의 CUDA GPU 사용률을 보이는 연산 세션이 삭제됩니다. 값이 설정되지 않는 자원은 자동 삭제 기준에서 제외됩니다.",
+    "ExpiresAfter": "남은 시간"
   },
   "button": {
     "Cancel": "취소",
@@ -921,7 +934,8 @@
     "TimeoutSeconds": "초",
     "ResourceGroupDetail": "자원 그룹 세부 정보",
     "RetriesToSkip": "회",
-    "NoGroupToDisplay": "그룹이 없습니다."
+    "NoGroupToDisplay": "그룹이 없습니다.",
+    "AllowedSessionTypes": "허용된 세션 타입"
   },
   "maintenance": {
     "General": "일반",

@@ -216,6 +216,7 @@
       "DuplicatedSessionName": "Duplicated session name not allowed",
       "SessionNameAllowCondition": "Session name should have 4-64 alphabets/numbers without any whitespaces.",
       "NoFolderExists": "No Folder Exists",
+      "SessionAlreadyExists": "Session name already exists",
       "sessionStillPreparing": "The session is still in preparation. After the session starts, tap the app icon to start the app.",
       "UnSelectAllVFolders": "UNSELECT ALL",
       "ResourceMonitorToggle": "See resource monitor",
@@ -340,8 +341,7 @@
     "DownloadingSessionLogs": "Downloading session logs.",
     "ElapsedTime": "Elapsed Time",
     "Timeout": "Timeout",
-    "SessionLifetime": "Session Lifetime",
-    "TimeoutExceeded": "Timeout Exceeded",
+    "TimeoutExceeded": "Time reached. Checking...",
     "Inference": "Inference",
     "UseSubdomain": "UseSubdomain",
     "BypassAuthentication": "Bypass authentication",
@@ -351,9 +351,21 @@
     "TerminateSession": "Terminate Session",
     "SeeContainerLogs": "See Container Logs",
     "RequestContainerCommit": "Request Container Commit",
-    "UtilizationIdleChecks": "Utilization Idle Checks",
+    "MaxSessionLifetime": "Max Session Lifetime",
+    "NetworkIdleTimeout": "Network Idle Timeout",
+    "UtilizationIdleTimeout": "Utilization Checker",
+    "IdleChecks": "Idle Checks",
     "Utilization": "Utilization",
-    "Threshold": "Threshold"
+    "Threshold": "Threshold",
+    "UtilizationThreshold": "Utilization Threshold",
+    "ExpiresAfter": "Expires After",
+    "GracePeriod": "Grace Period",
+    "IdleChecksDesc": "Backend.AI supports three types of inactivity (idleness) criteria for automatic garbage collection of compute sessions.",
+    "MaxSessionLifetimeDesc": "Force-terminate sessions after this time from creation. It prevents the session from running infinitely.",
+    "NetworkIdleTimeoutDesc": "Force-terminate sessions that do not exchange data with the user (browser or web app) after this time. Traffic between the user and the compute session continuously occurs when the user interacts with an app, like terminal or Jupyter, by keyboard input, Jupyter cell creation, etc. Jupyter cell creation, etc. If there is no interaction for a certain period, the condition of garbage collection will be met. Even if there is a process executing a job in the compute session, it is subject to termination if there is no user interaction.",
+    "UtilizationIdleTimeoutDesc": "Force-terminate sessions based only on the utilization of resources allocated to them.",
+    "GracePeriodDesc": "Utilization idle checker will be activated after this initial grace time. During this time, sessions are not terminated even if utilization is low.",
+    "UtilizationThresholdDesc": "Threshold criteria of each compute resource. When one or more resource of a compute session does not exceed the configured threshold criteria for a certain time, the session will be garbage collected (terminated). For example, if you set 1% of CUDA utilization threshold, compute sessions that show less than 1% CUDA GPU utilization, for a certain duration of time, will be destroyed. Resources with empty values are excluded from the garbage collection criteria."
   },
   "button": {
     "Cancel": "Cancel",
@@ -929,7 +941,8 @@
     "TimeoutSeconds": "Seconds",
     "ResourceGroupDetail": "Resource Group Detail",
     "RetriesToSkip": "Times",
-    "NoGroupToDisplay": "NoGroupToDisplay"
+    "NoGroupToDisplay": "NoGroupToDisplay",
+    "AllowedSessionTypes": "Allowed session types"
   },
   "maintenance": {
     "General": "General",
