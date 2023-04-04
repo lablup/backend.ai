@@ -114,8 +114,7 @@ class KernelResourceSpec:
             for slot_name, per_device_alloc in slots.items():
                 if not (slot_name.startswith(f"{device_name}.") or slot_name == device_name):
                     raise ValueError(
-                        f"device_name ({device_name}) must be a prefix of "
-                        f"slot_name ({slot_name})"
+                        f"device_name ({device_name}) must be a prefix of slot_name ({slot_name})"
                     )
                 pieces = []
                 for dev_id, alloc in per_device_alloc.items():
@@ -163,8 +162,10 @@ class KernelResourceSpec:
                             alloc = Decimal(raw_alloc)
                     except KeyError as e:
                         log.warning(
-                            "A previously launched container has "
-                            "unknown slot type: {}. Ignoring it.",
+                            (
+                                "A previously launched container has "
+                                "unknown slot type: {}. Ignoring it."
+                            ),
                             e.args[0],
                         )
                         continue
@@ -461,7 +462,7 @@ class Mount:
                 type = MountTypes.VOLUME
             else:
                 raise ValueError(
-                    "Mount source must be an absolute path " "if it is not a volume name.", source
+                    "Mount source must be an absolute path if it is not a volume name.", source
                 )
         target = Path(target)
         if not target.is_absolute():

@@ -737,8 +737,7 @@ class AbstractAgent(
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        commit_status_script = textwrap.dedent(
-            """
+        commit_status_script = textwrap.dedent("""
         local key_and_value = {}
         for i, k in pairs(KEYS) do
             key_and_value[i*2-1] = k
@@ -750,8 +749,7 @@ class AbstractAgent(
                 redis.call('EXPIRE', k, ARGV[1])
             end
         end
-        """
-        )
+        """)
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
@@ -1146,9 +1144,11 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            "rescan_resoucre_usage(k:{}): "
-                            "failed to read kernel resource info; "
-                            "maybe already terminated",
+                            (
+                                "rescan_resoucre_usage(k:{}): "
+                                "failed to read kernel resource info; "
+                                "maybe already terminated"
+                            ),
                             kernel_id,
                         )
 
@@ -1530,7 +1530,10 @@ class AbstractAgent(
             if agent_architecture != ctx.image_ref.architecture:
                 # disable running different architecture's image
                 raise AgentError(
-                    f"cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine",
+                    (
+                        f"cannot run {ctx.image_ref.architecture} image on"
+                        f" {agent_architecture} machine"
+                    ),
                 )
 
             # Check if we need to pull the container image
@@ -1610,7 +1613,7 @@ class AbstractAgent(
                             )
                         except ResourceError as e:
                             log.info(
-                                "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",
+                                "resource allocation failed ({}): {} of {}\n(alloc map: {})",
                                 type(e).__name__,
                                 device_specific_slots,
                                 dev_name,
@@ -1661,6 +1664,7 @@ class AbstractAgent(
                     "protocol": ServicePortProtocols.TCP,
                     "container_ports": (2200,),
                     "host_ports": (None,),
+                    "is_inference": False,
                 }
             )
             service_ports.append(
@@ -1669,11 +1673,15 @@ class AbstractAgent(
                     "protocol": ServicePortProtocols.HTTP,
                     "container_ports": (7681,),
                     "host_ports": (None,),
+                    "is_inference": False,
                 }
             )
 
             if ctx.kernel_config["cluster_role"] in ("main", "master"):
-                for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
+                for sport in parse_service_ports(
+                    image_labels.get("ai.backend.service-ports", ""),
+                    image_labels.get("ai.backend.endpoint-ports", ""),
+                ):
                     port_map[sport["name"]] = sport
                 for port_no in preopen_ports:
                     preopen_sport: ServicePort = {
@@ -1681,6 +1689,7 @@ class AbstractAgent(
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (port_no,),
                         "host_ports": (None,),
+                        "is_inference": False,
                     }
                     service_ports.append(preopen_sport)
                     for cport in preopen_sport["container_ports"]:
@@ -1696,6 +1705,7 @@ class AbstractAgent(
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
+                            "is_inference": False,
                         }
                     )
                     exposed_ports.append(port)

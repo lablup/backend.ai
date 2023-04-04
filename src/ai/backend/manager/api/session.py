@@ -83,17 +83,20 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.plugin.hook import HookResults
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    EtcdRedisConfig,
     KernelEnqueueingConfig,
     KernelId,
     SessionTypes,
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
+from ai.backend.manager.defs import PluginDatabaseID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -134,6 +137,7 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
+    RejectedByHook,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -189,91 +193,98 @@ creation_config_v3 = t.Dict(
         tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
         tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
         t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-        | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
+            t.String, t.Any
+        ),
     }
 )
 creation_config_v3_template = t.Dict(
     {
         t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
         t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): UndefChecker
-        | t.Null
-        | t.Int[1:],
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): UndefChecker
-        | t.Null
-        | t.String,
+        tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): (
+            UndefChecker | t.Null | t.Int[1:]
+        ),
+        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
         t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): UndefChecker
-        | t.Null
-        | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+            UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        ),
     }
 )
 creation_config_v4 = t.Dict(
     {
         t.Key("mounts", default=None): t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null
-        | t.Mapping(t.String, t.String),
+        tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(
+            t.String, t.String
+        ),
         t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
         tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
         tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
         t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-        | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
-        | t.List(t.Int[1024:65535]),
+        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
+            t.String, t.Any
+        ),
+        tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null | t.List(
+            t.Int[1024:65535]
+        ),
     }
 )
 creation_config_v4_template = t.Dict(
     {
         t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=undefined): UndefChecker
-        | t.Null
-        | t.Mapping(t.String, t.String),
+        tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+            UndefChecker | t.Null | t.Mapping(t.String, t.String)
+        ),
         t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
-        tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): UndefChecker
-        | t.Null
-        | t.Int[1:],
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): UndefChecker
-        | t.Null
-        | t.String,
+        tx.AliasedKey(["cluster_size", "clusterSize"], default=undefined): (
+            UndefChecker | t.Null | t.Int[1:]
+        ),
+        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
         t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): UndefChecker
-        | t.Null
-        | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+            UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        ),
     }
 )
 creation_config_v5 = t.Dict(
     {
         t.Key("mounts", default=None): t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null
-        | t.Mapping(t.String, t.String),
+        tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(
+            t.String, t.String
+        ),
         t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
         # cluster_size is moved to the root-level parameters
         tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
         t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
-        | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
-        | t.List(t.Int[1024:65535]),
+        tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null | t.Mapping(
+            t.String, t.Any
+        ),
+        tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null | t.List(
+            t.Int[1024:65535]
+        ),
         tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
     }
 )
 creation_config_v5_template = t.Dict(
     {
         t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
-        tx.AliasedKey(["mount_map", "mountMap"], default=undefined): UndefChecker
-        | t.Null
-        | t.Mapping(t.String, t.String),
+        tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+            UndefChecker | t.Null | t.Mapping(t.String, t.String)
+        ),
         t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
         # cluster_size is moved to the root-level parameters
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): UndefChecker
-        | t.Null
-        | t.String,
+        tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
         t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
-        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): UndefChecker
-        | t.Null
-        | t.Mapping(t.String, t.Any),
+        tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+            UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+        ),
     }
 )
 
@@ -680,19 +691,18 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         {
             tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
             tx.AliasedKey(["name", "clientSessionToken"], default=undefined)
-            >> "session_name": UndefChecker
-            | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+            >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
             >> "architecture": t.String,
             tx.AliasedKey(["type", "sessionType"], default="interactive")
             >> "session_type": tx.Enum(SessionTypes),
-            tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): UndefChecker
-            | t.Null
-            | t.String,
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): UndefChecker
-            | t.Null
-            | t.String,
+            tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
+                UndefChecker | t.Null | t.String
+            ),
+            tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): (
+                UndefChecker | t.Null | t.String
+            ),
             tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
             tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
                 ClusterMode
@@ -703,21 +713,17 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
             tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
             t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
-            t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
-            | t.Null
-            | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): UndefChecker
-            | t.Null
-            | t.String,
-            t.Key("dependencies", default=None): UndefChecker
-            | t.Null
-            | t.List(tx.UUID)
-            | t.List(t.String),
-            tx.AliasedKey(
-                ["callback_url", "callbackUrl", "callbackURL"], default=None
-            ): UndefChecker
-            | t.Null
-            | tx.URL,
+            t.Key("startupCommand", default=None)
+            >> "startup_command": UndefChecker | t.Null | t.String,
+            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): (
+                UndefChecker | t.Null | t.String
+            ),
+            t.Key("dependencies", default=None): (
+                UndefChecker | t.Null | t.List(tx.UUID) | t.List(t.String)
+            ),
+            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+                UndefChecker | t.Null | tx.URL
+            ),
             t.Key("owner_access_key", default=undefined): UndefChecker | t.Null | t.String,
         },
     ),
@@ -892,8 +898,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
             tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
             t.Key("dependencies", default=None): t.Null | t.List(tx.UUID) | t.List(t.String),
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): t.Null
-            | tx.URL,
+            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+                t.Null | tx.URL
+            ),
             t.Key("owner_access_key", default=None): t.Null | t.String,
         }
     ),
@@ -932,15 +939,19 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             if params["cluster_mode"] == "multi-node":
                 if agent_count != params["cluster_size"]:
                     raise InvalidAPIParameters(
-                        "For multi-node cluster sessions, the number of manually assigned agents "
-                        "must be same to the clsuter size. "
-                        "Note that you may specify duplicate agents in the list.",
+                        (
+                            "For multi-node cluster sessions, the number of manually assigned"
+                            " agents must be same to the clsuter size. Note that you may specify"
+                            " duplicate agents in the list."
+                        ),
                     )
             else:
                 if agent_count != 1:
                     raise InvalidAPIParameters(
-                        "For non-cluster sessions and single-node cluster sessions, "
-                        "you may specify only one manually assigned agent.",
+                        (
+                            "For non-cluster sessions and single-node cluster sessions, "
+                            "you may specify only one manually assigned agent."
+                        ),
                     )
     return await _create(request, params)
 
@@ -1643,27 +1654,39 @@ async def invoke_session_callback(
     | SessionSuccessEvent
     | SessionFailureEvent,
 ) -> None:
-    app_ctx: PrivateContext = app["session.context"]
+    log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     root_ctx: RootContext = app["_root.context"]
-    data = {
-        "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
     try:
+        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess
+                event.session_id, db_session=db_sess, allow_stale=allow_stale
             )
     except SessionNotFound:
         return
     url = session.callback_url
     if url is None:
         return
-    app_ctx.webhook_ptask_group.create_task(
-        _make_session_callback(data, url),
-    )
+    if (addr := root_ctx.local_config.get("pipeline", {}).get("event-queue")) is None:
+        return
+    etcd_redis_config: EtcdRedisConfig = {
+        "addr": addr,
+        "sentinel": None,
+        "service_name": None,
+        "password": None,
+    }
+    stream_key = "events"
+    token = url.query.get("token")
+
+    async def _dispatch() -> None:
+        hook_result = await root_ctx.hook_plugin_ctx.dispatch(
+            "PUBLISH_EVENT",
+            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
+        )
+        if hook_result.status != HookResults.PASSED:
+            raise RejectedByHook.from_hook_result(hook_result)
+
+    await execute_with_retry(_dispatch)
 
 
 async def handle_batch_result(
@@ -1680,7 +1703,12 @@ async def handle_batch_result(
     elif isinstance(event, SessionFailureEvent):
         await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
     async with root_ctx.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+        try:
+            session = await SessionRow.get_session_with_kernels(
+                event.session_id, db_session=db_sess
+            )
+        except SessionNotFound:
+            return
     await root_ctx.registry.destroy_session(
         session,
         reason=KernelLifecycleEventReason.TASK_FINISHED,
@@ -2024,6 +2052,7 @@ async def get_info(request: web.Request) -> web.Response:
 
         resp["numQueriesExecuted"] = sess.num_queries
         resp["lastStat"] = sess.last_stat
+        resp["idleChecks"] = await root_ctx.idle_checker_host.get_idle_check_report(sess.id)
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository

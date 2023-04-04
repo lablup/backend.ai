@@ -76,7 +76,7 @@ async def list_presets(request: web.Request) -> web.Response:
         # if scaling_group is not None:
         #     query = query.where(resource_presets.c.scaling_group == scaling_group)
         resp: MutableMapping[str, Any] = {"presets": []}
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
             resp["presets"].append(
                 {
@@ -217,7 +217,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 & (SessionRow.scaling_group_name.in_(sgroup_names)),
             )
         )
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
@@ -230,7 +230,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             )
         )
         agent_slots = []
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             remaining = row["available_slots"] - row["occupied_slots"]
             remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
             sgroup_remaining += remaining
@@ -250,7 +250,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
         # Fetch all resource presets in the current scaling group.
         query = sa.select([resource_presets]).select_from(resource_presets)
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             # Check if there are any agent that can allocate each preset.
             allocatable = False
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
@@ -262,9 +262,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 {
                     "name": row["name"],
                     "resource_slots": preset_slots.to_json(),
-                    "shared_memory": str(row["shared_memory"])
-                    if row["shared_memory"] is not None
-                    else None,
+                    "shared_memory": (
+                        str(row["shared_memory"]) if row["shared_memory"] is not None else None
+                    ),
                     "allocatable": allocatable,
                 }
             )
@@ -331,6 +331,7 @@ async def get_container_stats_for_period(
                     kernels.c.mounts,
                     kernels.c.image,
                     kernels.c.status,
+                    kernels.c.status_info,
                     kernels.c.status_changed,
                     kernels.c.last_stat,
                     kernels.c.status_history,
@@ -339,6 +340,7 @@ async def get_container_stats_for_period(
                     kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
+                    users.c.full_name,
                 ]
             )
             .select_from(j)
@@ -419,6 +421,7 @@ async def get_container_stats_for_period(
             "name": row["session_name"],
             "access_key": row["access_key"],
             "email": row["email"],
+            "full_name": row["full_name"],
             "agent": row["agent"],
             "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
             "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
@@ -426,7 +429,7 @@ async def get_container_stats_for_period(
             "mem_used": int(nmget(last_stat, "mem.capacity", 0)),
             "shared_memory": int(nmget(row.resource_opts, "shmem", 0)),
             "disk_allocated": 0,  # TODO: disk quota limit
-            "disk_used": (int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))),
+            "disk_used": int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
             "io_read": int(nmget(last_stat, "io_read.current", 0)),
             "io_write": int(nmget(last_stat, "io_write.current", 0)),
             "used_time": used_time,
@@ -441,6 +444,7 @@ async def get_container_stats_for_period(
             "created_at": str(row["created_at"]),
             "terminated_at": str(row["terminated_at"]),
             "status": row["status"].name,
+            "status_info": row["status_info"],
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
             "cluster_mode": row["cluster_mode"],

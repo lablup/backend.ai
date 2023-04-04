@@ -731,6 +731,7 @@ configure_backendai() {
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./storage-proxy.toml
   # comment out all sample volumes
   sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
   sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
@@ -748,10 +749,10 @@ configure_backendai() {
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
   sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
   sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
-
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
+    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
   fi
 
   # configure tester

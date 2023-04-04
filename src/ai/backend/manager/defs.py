@@ -52,6 +52,11 @@ RESERVED_VFOLDERS = [
 ]
 RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 
+# Mapping between vfolder names and their in-container paths.
+VFOLDER_DSTPATHS_MAP = {
+    ".linuxbrew": "/home/linuxbrew/.linuxbrew",
+}
+
 # Redis database IDs depending on purposes
 REDIS_STAT_DB: Final = 0
 REDIS_RLIM_DB: Final = 1
@@ -59,6 +64,11 @@ REDIS_LIVE_DB: Final = 2
 REDIS_IMAGE_DB: Final = 3
 REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
+
+
+# Redis database IDs used for plugins
+class PluginDatabaseID(enum.IntEnum):
+    SESSION_EVENT = 1
 
 
 # The unique identifiers for distributed locks.
