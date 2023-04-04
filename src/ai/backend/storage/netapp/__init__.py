@@ -58,11 +58,11 @@ class NetAppVolume(BaseVolume):
         # nfspath:    192.168.1.7:/cj1nipacjssd1_02R10c1v2/quotascope1/vfid[0:2]/vfid[2:4]/vfid[4:]
         # xcp_host:   ^^^^^^^^^^^
         # volume_path:            ^^^^^^^^^^^^^^^^^^^^^^^^^
-        # vfpath:                           /vfroot/mydata/quotascope1/vfid[0:2]/vfid[2:4]/vfid[4:]
+        # vfpath: = mangle_vfpath(vfid)     /vfroot/mydata/quotascope1/vfid[0:2]/vfid[2:4]/vfid[4:]
         # vfroot:                           ^^^^^^^
         # mount_path:                       ^^^^^^^^^^^^^^
         # quota-scope path:                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-        # vf_relpath: =vfpath.relative_to(mount_path)      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        # vf_relpath: = vfpath.relative_to(mount_path)     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         # NOTE: QTree ID and name are per-volume.
         #       (i.e., Different volumes may have the same qtree ID and names
         #       for different QTree instances!)
