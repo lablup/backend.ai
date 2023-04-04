@@ -312,9 +312,9 @@ def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
             t.Key("usage_mode", default="general"): tx.Enum(VFolderUsageMode) | t.Null,
             t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
             tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
-            tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID
-            | t.String
-            | t.Null,
+            tx.AliasedKey(["group", "groupId", "group_id"], default=None): (
+                tx.UUID | t.String | t.Null
+            ),
             t.Key("quota", default=None): tx.BinarySize | t.Null,
             t.Key("cloneable", default=False): t.Bool,
         }
@@ -351,8 +351,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
             if not folder_host:
                 raise InvalidAPIParameters(
-                    "You must specify the vfolder host "
-                    "because the default host is not configured."
+                    "You must specify the vfolder host because the default host is not configured."
                 )
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     for vf_type in allowed_vfolder_types:
@@ -1118,13 +1117,13 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         for entry in entries:
             if entry["name"] == new_name:
                 raise InvalidAPIParameters(
-                    "One of your accessible vfolders already has " "the name you requested."
+                    "One of your accessible vfolders already has the name you requested."
                 )
         for entry in entries:
             if entry["name"] == old_name:
                 if not entry["is_owner"]:
                     raise InvalidAPIParameters(
-                        "Cannot change the name of a vfolder " "that is not owned by myself."
+                        "Cannot change the name of a vfolder that is not owned by myself."
                     )
                 await ensure_host_permission_allowed(
                     conn,
@@ -1185,7 +1184,7 @@ async def update_vfolder_options(
         updated_fields["permission"] = params["permission"]
     if not row["is_owner"]:
         raise InvalidAPIParameters(
-            "Cannot change the options of a vfolder " "that is not owned by myself."
+            "Cannot change the options of a vfolder that is not owned by myself."
         )
 
     if len(updated_fields) > 0:
@@ -2055,8 +2054,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < len(params["emails"]):
             users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
-                "Some user does not belong to folder's group: "
-                ",".join(users_not_in_vfolder_group),
+                "Some user does not belong to folder's group: ,".join(users_not_in_vfolder_group),
                 object_name="user",
             )
 
@@ -2362,7 +2360,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         target_folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
         if not target_folder_host:
             raise InvalidAPIParameters(
-                "You must specify the vfolder host " "because the default host is not configured."
+                "You must specify the vfolder host because the default host is not configured."
             )
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -2392,7 +2390,8 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             or VFolderHostPermission.CREATE not in allowed_hosts[target_folder_host]
         ):
             raise InvalidAPIParameters(
-                f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{target_folder_host}`)"
+                f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder"
+                f" host(`{target_folder_host}`)"
             )
         # TODO: handle legacy host lists assuming that volume names don't overlap?
         if target_folder_host not in allowed_hosts:
@@ -2630,15 +2629,19 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
             raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
         except Exception:
             log.exception(
-                "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
-                "unexpected error while reading from watcher (agent:{})",
+                (
+                    "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
+                    "unexpected error while reading from watcher (agent:{})"
+                ),
                 access_key,
                 params["agent_id"],
             )
             raise InternalServerError
     else:
         resp = {
-            "content": "# Since Backend.AI 20.09, reading the manager fstab is no longer supported.",
+            "content": (
+                "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
+            ),
             "node": "manager",
             "node_id": "manager",
         }
@@ -2718,8 +2721,10 @@ async def list_mounts(request: web.Request) -> web.Response:
                 raise
             except Exception:
                 log.exception(
-                    "VFOLDER.LIST_MOUNTS(u:{}): "
-                    "unexpected error while reading from watcher (agent:{})",
+                    (
+                        "VFOLDER.LIST_MOUNTS(u:{}): "
+                        "unexpected error while reading from watcher (agent:{})"
+                    ),
                     access_key,
                     agent_id,
                 )
@@ -2995,7 +3000,7 @@ async def storage_task_exception_handler(
     t.Dict(
         {
             t.Key("vfolder"): tx.UUID,
-            t.Key("user"): tx.UUID,
+            t.Key("user_email"): t.String,
         }
     ),
 )
@@ -3004,26 +3009,17 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     Change the ownership of vfolder
     For now, we only provide changing the ownership of user-folder
     """
-    access_key = request["keypair"]["access_key"]
     vfolder_id = params["vfolder"]
-    user_uuid = params["user"]
+    user_email = params["user_email"]
     root_ctx: RootContext = request.app["_root.context"]
 
-    # TODO: Implement Change ownership using DB transaction
-    log.info(
-        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
-        request["user"]["email"],
-        access_key,
-        vfolder_id,
-        user_uuid,
-    )
     allowed_hosts_by_user = VFolderHostPermissionMap()
     async with root_ctx.db.begin_readonly() as conn:
-        j = sa.join(users, keypairs, users.c.uuid == keypairs.c.user)
+        j = sa.join(users, keypairs, users.c.email == keypairs.c.user_id)
         query = (
-            sa.select([users.c.email, users.c.domain_name, keypairs.c.resource_policy])
+            sa.select([users.c.uuid, users.c.domain_name, keypairs.c.resource_policy])
             .select_from(j)
-            .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.ACTIVE))
+            .where((users.c.email == user_email) & (users.c.status == UserStatus.ACTIVE))
         )
         try:
             result = await conn.execute(query)
@@ -3043,8 +3039,15 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             conn=conn,
             resource_policy=resource_policy,
             domain_name=user_info.domain_name,
-            user_uuid=user_uuid,
+            user_uuid=user_info.uuid,
         )
+    log.info(
+        "VFOLDER.CHANGE_VFOLDER_OWNERSHIP(email:{}, ak:{}, vfid:{}, uid:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        vfolder_id,
+        user_info.uuid,
+    )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == vfolder_id)
@@ -3060,7 +3063,7 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             #
             query = (
                 sa.update(vfolders)
-                .values(user=user_uuid)
+                .values(user=user_info.uuid)
                 .where(
                     (vfolders.c.id == vfolder_id)
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
@@ -3074,14 +3077,14 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
         async with root_ctx.db.begin() as conn:
             # delete vfolder_invitation if the new owner user has already been shared with the vfolder
             query = sa.delete(vfolder_invitations).where(
-                (vfolder_invitations.c.invitee == user_info.email)
+                (vfolder_invitations.c.invitee == user_email)
                 & (vfolder_invitations.c.vfolder == vfolder_id)
             )
             await conn.execute(query)
             # delete vfolder_permission if the new owner user has already been shared with the vfolder
             query = sa.delete(vfolder_permissions).where(
                 (vfolder_permissions.c.vfolder == vfolder_id)
-                & (vfolder_permissions.c.user == user_uuid)
+                & (vfolder_permissions.c.user == user_info.uuid)
             )
             await conn.execute(query)
 

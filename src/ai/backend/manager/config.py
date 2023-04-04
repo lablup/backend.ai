@@ -272,6 +272,11 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
             ).allow_extra("*"),
+            t.Key("pipeline", default=None): t.Null | t.Dict(
+                {
+                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
+                },
+            ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
                     t.Key("ssl-verify", default=True): t.ToBool,
@@ -349,8 +354,9 @@ shared_config_iv = t.Dict(
         t.Key("redis", default=_shdefs["redis"]): t.Dict(
             {
                 t.Key("addr", default=_shdefs["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null
-                | tx.DelimiterSeperatedList(tx.HostPortPair),
+                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                    tx.HostPortPair
+                ),
                 t.Key("service_name", default=None): t.Null | t.String,
                 t.Key("password", default=_shdefs["redis"]["password"]): t.Null | t.String,
             }
@@ -380,8 +386,7 @@ shared_config_iv = t.Dict(
                         ): tx.IPNetwork,
                     }
                 ).allow_extra("*"),
-                t.Key("overlay", default=None): t.Null
-                | t.Dict(
+                t.Key("overlay", default=None): t.Null | t.Dict(
                     {
                         t.Key("mtu", default=1500): t.Int[1:],
                     }

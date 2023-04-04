@@ -62,7 +62,7 @@ services:
   backendai-half-redis-sentinel01:
     build:
       context: .
-      dockerfile: redis-sentinel.dockerfile
+      dockerfile: redis-sentinel.Dockerfile
       cache_from:
         - redis:5-alpine
     image: redis-sentinel:testing
@@ -83,7 +83,7 @@ services:
   backendai-half-redis-sentinel02:
     build:
       context: .
-      dockerfile: redis-sentinel.dockerfile
+      dockerfile: redis-sentinel.Dockerfile
       cache_from:
         - redis:6-alpine
     image: redis-sentinel:testing
@@ -104,7 +104,7 @@ services:
   backendai-half-redis-sentinel03:
     build:
       context: .
-      dockerfile: redis-sentinel.dockerfile
+      dockerfile: redis-sentinel.Dockerfile
       cache_from:
         - redis:6-alpine
     image: redis-sentinel:testing

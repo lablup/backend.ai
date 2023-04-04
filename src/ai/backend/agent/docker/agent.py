@@ -511,8 +511,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         "Target": str(mount.target),
                         "Source": str(mount.source),
                         "Type": mount.type.value,
-                        "ReadOnly": fix_unsupported_perm(mount.permission)
-                        == MountPermission.READ_ONLY,
+                        "ReadOnly": (
+                            fix_unsupported_perm(mount.permission) == MountPermission.READ_ONLY
+                        ),
                         f"{mount.type.value.capitalize()}Options": mount.opts if mount.opts else {},
                     }
                     for mount in mounts
@@ -724,9 +725,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
-                "ai.backend.internal.block-service-ports": "1"
-                if self.internal_data.get("block_service_ports", False)
-                else "0",
+                "ai.backend.internal.block-service-ports": (
+                    "1" if self.internal_data.get("block_service_ports", False) else "0"
+                ),
             },
             "HostConfig": {
                 "Init": True,
@@ -1316,7 +1317,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif e.status == 404:
                 # missing
                 log.warning(
-                    "destroy_kernel(k:{0}) kernel missing, " "forgetting this kernel", kernel_id
+                    "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
                 await self.rescan_resource_usage()
             else:
@@ -1477,8 +1478,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             if evdata is None:
                                 # Break out to the outermost loop when the connection is closed
                                 log.info(
-                                    "monitor_docker_events(): "
-                                    "restarting aiodocker event subscriber",
+                                    (
+                                        "monitor_docker_events(): "
+                                        "restarting aiodocker event subscriber"
+                                    ),
                                 )
                                 break
                             if evdata["Type"] != "container":

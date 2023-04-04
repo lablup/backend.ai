@@ -737,8 +737,7 @@ class AbstractAgent(
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        commit_status_script = textwrap.dedent(
-            """
+        commit_status_script = textwrap.dedent("""
         local key_and_value = {}
         for i, k in pairs(KEYS) do
             key_and_value[i*2-1] = k
@@ -750,8 +749,7 @@ class AbstractAgent(
                 redis.call('EXPIRE', k, ARGV[1])
             end
         end
-        """
-        )
+        """)
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
@@ -1146,9 +1144,11 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            "rescan_resoucre_usage(k:{}): "
-                            "failed to read kernel resource info; "
-                            "maybe already terminated",
+                            (
+                                "rescan_resoucre_usage(k:{}): "
+                                "failed to read kernel resource info; "
+                                "maybe already terminated"
+                            ),
                             kernel_id,
                         )
 
@@ -1530,7 +1530,10 @@ class AbstractAgent(
             if agent_architecture != ctx.image_ref.architecture:
                 # disable running different architecture's image
                 raise AgentError(
-                    f"cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine",
+                    (
+                        f"cannot run {ctx.image_ref.architecture} image on"
+                        f" {agent_architecture} machine"
+                    ),
                 )
 
             # Check if we need to pull the container image
@@ -1610,7 +1613,7 @@ class AbstractAgent(
                             )
                         except ResourceError as e:
                             log.info(
-                                "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",
+                                "resource allocation failed ({}): {} of {}\n(alloc map: {})",
                                 type(e).__name__,
                                 device_specific_slots,
                                 dev_name,

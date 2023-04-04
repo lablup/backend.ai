@@ -174,8 +174,10 @@ class StorageSessionManager:
                 except aiohttp.ClientResponseError:
                     # when the response body is not JSON, just raise with status info.
                     raise VFolderOperationFailed(
-                        extra_msg=f"Storage proxy responded with "
-                        f"{client_resp.status} {client_resp.reason}",
+                        extra_msg=(
+                            "Storage proxy responded with "
+                            f"{client_resp.status} {client_resp.reason}"
+                        ),
                         extra_data=None,
                     )
                 except VFolderOperationFailed as e:
