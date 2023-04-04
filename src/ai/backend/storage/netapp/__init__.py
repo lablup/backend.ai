@@ -101,8 +101,8 @@ class NetAppVolume(BaseVolume):
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        uuid = await self.get_volume_uuid_by_name()
-        volume_info = await self.get_volume_info(uuid)
+        uuid = await self.netapp_client.get_volume_uuid_by_name()
+        volume_info = await self.netapp_client.get_volume_info(uuid)
         metric = volume_info["metric"]
         return FSPerfMetric(
             iops_read=metric["iops"]["read"],
@@ -137,27 +137,6 @@ class NetAppVolume(BaseVolume):
         await self.quota_manager.aclose()
 
     # ------ volume operations ------
-    async def get_list_volumes(self):
-        resp = await self.netapp_client.get_list_volumes()
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
-    async def get_volume_uuid_by_name(self):
-        resp = await self.netapp_client.get_volume_uuid_by_name()
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
-    async def get_volume_info(self, volume_uuid):
-        resp = await self.netapp_client.get_volume_info(volume_uuid)
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
     async def copy_tree(
         self,
         src_path: Path,
