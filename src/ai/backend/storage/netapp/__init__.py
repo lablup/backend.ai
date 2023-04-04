@@ -19,109 +19,137 @@ from ..exception import ExecutionError, NotEmptyError, StorageProxyError
 from ..subproc import spawn_and_watch
 from ..types import FSPerfMetric, FSUsage, QuotaConfig, VFolderID, VFolderUsage
 from ..vfs import BaseVolume
-from .netappclient import NetAppClient
-from .quotamanager import QuotaManager
+from .netappclient import NetAppClient, VolumeID
+
+# from .quotamanager import QuotaManager
 
 
 class NetAppVolume(BaseVolume):
     endpoint: str
-    netapp_admin: str
+    netapp_user: str
     netapp_password: str
     netapp_svm: str
-    netapp_volume_name: str
-    netapp_volume_uuid: str
-    netapp_qtree_name: str
-    netapp_qtree_id: str
+    volume_id: VolumeID
+    volume_path: Path
 
     async def init(self) -> None:
         self.endpoint = self.config["netapp_endpoint"]
-        self.netapp_admin = self.config["netapp_admin"]
-        self.netapp_password = str(self.config["netapp_password"])
+        self.netapp_user = self.config["netapp_user"]
+        self.netapp_password = self.config["netapp_password"]
         self.netapp_svm = self.config["netapp_svm"]
-        self.netapp_volume_name = self.config["netapp_volume_name"]
-        self.netapp_xcp_hostname = self.config["netapp_xcp_hostname"]
+        self.volume_id = VolumeID(self.config["netapp_volume_id"])
+        self.netapp_xcp_host = self.config["netapp_xcp_host"]
         self.netapp_xcp_catalog_path = self.config["netapp_xcp_catalog_path"]
         self.netapp_xcp_container_name = self.config["netapp_xcp_container_name"]
-
         self.netapp_client = NetAppClient(
-            str(self.endpoint),
-            self.netapp_admin,
+            self.endpoint,
+            self.netapp_user,
             self.netapp_password,
-            str(self.netapp_svm),
-            self.netapp_volume_name,
         )
-
-        self.quota_manager = QuotaManager(
-            endpoint=str(self.endpoint),
-            user=self.netapp_admin,
-            password=self.netapp_password,
-            svm=str(self.netapp_svm),
-            volume_name=self.netapp_volume_name,
-        )
-
-        # assign qtree info after netapp_client and quotamanager are initiated
-        self.netapp_volume_uuid = await self.netapp_client.get_volume_uuid_by_name()
-        default_qtree = await self.netapp_client.get_default_qtree_by_volume_id(
-            self.netapp_volume_uuid,
-        )
-        self.netapp_qtree_name = default_qtree.get(
-            "name",
-            self.config["netapp_qtree_name"],
-        )
-        self.netapp_qtree_id = await self.netapp_client.get_qtree_id_by_name(self.netapp_qtree_name)
-
-        # adjust mount path (volume + qtree)
-        self.mount_path = (self.mount_path / self.netapp_qtree_name).resolve()
+        volume_info = await self.netapp_client.get_volume_by_id(self.volume_id)
+        self.volume_path = volume_info["path"].resolve()
+        assert self.volume_path.is_absolute()
+        # Example volume ID: 8a5c9938-a872-11ed-8519-d039ea42b802
+        # Example volume name: "cj1nipacjssd1_02R10c1v2"
+        # Example volume path: /cj1nipacjssd1_02R10c1v2/
+        # Example qtree ID: 3 (default: 0)
+        # Example qtree name: "quotascope1" (default: "")
+        # Example qtree path: /cj1nipacjssd1_02R10c1v2/quotascope1
+        # nfspath:    192.168.1.7:/cj1nipacjssd1_02R10c1v2/quotascope1/vfid[0:2]/vfid[2:4]/vfid[4:]
+        # xcp_host:   ^^^^^^^^^^^
+        # volume_path:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+        # vfpath:                           /vfroot/mydata/quotascope1/vfid[0:2]/vfid[2:4]/vfid[4:]
+        # vfroot:                           ^^^^^^^
+        # mount_path:                       ^^^^^^^^^^^^^^
+        # quota-scope path:                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        # vf_relpath:                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        # NOTE: QTree ID and name are per-volume.
+        #       (i.e., Different volumes may have the same qtree ID and names
+        #       for different QTree instances!)
+        # NOTE: The default qtree in the volume has no explicit path.
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_VFHOST_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:
-        raw_metadata = await self.netapp_client.get_metadata()
-        qtree_info = await self.netapp_client.get_default_qtree_by_volume_id(
-            self.netapp_volume_uuid
-        )
-        self.netapp_qtree_name = qtree_info["name"]
-        quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
-        # add quota in hwinfo
-        metadata = {"quota": json.dumps(quota), **raw_metadata}
+        raw_metadata = await self.netapp_client.get_volume_metadata(self.volume_id)
+        default_qtree_info = await self.netapp_client.get_default_qtree(self.volume_id)
+        # self.netapp_qtree_name = default_qtree_info["name"]
+        # quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
+        # # add quota in hwinfo
+        # metadata = {"quota": json.dumps(quota), **raw_metadata}
+        metadata = {}  # TODO: reimplement
         return {"status": "healthy", "status_info": None, "metadata": {**metadata}}
 
     async def get_fs_usage(self) -> FSUsage:
-        volume_usage = await self.netapp_client.get_usage()
-        qtree_info = await self.netapp_client.get_default_qtree_by_volume_id(
-            self.netapp_volume_uuid
-        )
-        self.netapp_qtree_name = qtree_info["name"]
-        quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
-        space = quota.get("space")
+        volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["space"])
+        assert "space" in volume_info
+        default_qtree_info = await self.netapp_client.get_default_qtree(self.volume_id)
+        # self.netapp_qtree_name = default_qtree_info["name"]
+        # quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
+        # space = quota.get("space")
+        space = {}  # TODO: reimplement
         if space and space.get("hard_limit"):
             capacity_bytes = space["hard_limit"]
         else:
-            capacity_bytes = volume_usage["capacity_bytes"]
+            capacity_bytes = volume_info["space"]["size"]
         return FSUsage(
-            capacity_bytes=capacity_bytes,
-            used_bytes=volume_usage["used_bytes"],
+            capacity_bytes=BinarySize(capacity_bytes),
+            used_bytes=BinarySize(volume_info["space"]["used"]),
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        uuid = await self.netapp_client.get_volume_uuid_by_name()
-        volume_info = await self.netapp_client.get_volume_info(uuid)
-        metric = volume_info["metric"]
+        volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["statistics"])
+        assert "statistics" in volume_info
+        stats = volume_info["statistics"]
+        # Example of volume info's statistics field:
+        # 'statistics': {'iops_raw': {'other': 10860,
+        #                             'read': 0,
+        #                             'total': 10860,
+        #                             'write': 0},
+        #                'status': 'ok',
+        #                'throughput_raw': {'other': 1239476,
+        #                                   'read': 0,
+        #                                   'total': 1239476,
+        #                                   'write': 0},
+        #                'timestamp': '2023-04-04T08:33:04Z'},
+        # Example of volume metrics (default: 15s interval of last hour):
+        #  {'num_records': 240,
+        #   'records': [{'iops': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'latency': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'throughput': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'timestamp': '2023-04-04T08:48:30Z'},
+        #               {'iops': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'latency': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'throughput': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'timestamp': '2023-04-04T08:48:15Z'},
+        #               {'iops': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'latency': {'other': 66, 'read': 0, 'total': 66, 'write': 0},
+        #                'throughput': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'timestamp': '2023-04-04T08:48:00Z'},
+        #               {'iops': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'latency': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'throughput': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'timestamp': '2023-04-04T08:47:45Z'},
+        #               {'iops': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'latency': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'throughput': {'other': 0, 'read': 0, 'total': 0, 'write': 0},
+        #                'timestamp': '2023-04-04T08:47:30Z'},
+        #               ...
         return FSPerfMetric(
-            iops_read=metric["iops"]["read"],
-            iops_write=metric["iops"]["write"],
-            io_bytes_read=metric["throughput"]["read"],
-            io_bytes_write=metric["throughput"]["write"],
-            io_usec_read=metric["latency"]["read"],
-            io_usec_write=metric["latency"]["write"],
+            iops_read=stats["iops_raw"]["read"],
+            iops_write=stats["iops_raw"]["write"],
+            io_bytes_read=stats["throughput_raw"]["read"],
+            io_bytes_write=stats["throughput_raw"]["write"],
+            io_usec_read=0,
+            io_usec_write=0,
         )
 
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
         vf_relpath = vfpath.relative_to(self.mount_path)
-        nfs_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{vf_relpath}"
-        delete_cmd = [b"xcp", b"delete", b"-force", os.fsencode(nfs_path)]
+        nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{vf_relpath}"
+        delete_cmd = [b"xcp", b"delete", b"-force", os.fsencode(nfspath)]
         if self.netapp_xcp_container_name is not None:
             delete_cmd = [
                 b"docker",
@@ -138,7 +166,7 @@ class NetAppVolume(BaseVolume):
 
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
-        await self.quota_manager.aclose()
+        # await self.quota_manager.aclose()
 
     # ------ volume operations ------
     async def create_quota_scope(
@@ -188,10 +216,10 @@ class NetAppVolume(BaseVolume):
         # These relative paths contains the qtree (quota-scope) name as the first part.
         src_relpath = src_path.relative_to(self.mount_path)
         dst_relpath = dst_path.relative_to(self.mount_path)
-        nfs_src_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{src_relpath}"
-        nfs_dst_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{dst_relpath}"
+        src_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{src_relpath}"
+        dst_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{dst_relpath}"
 
-        copy_cmd = [b"xcp", b"copy", os.fsencode(nfs_src_path), os.fsencode(nfs_dst_path)]
+        copy_cmd = [b"xcp", b"copy", os.fsencode(src_nfspath), os.fsencode(dst_nfspath)]
         if self.netapp_xcp_container_name is not None:
             copy_cmd = [
                 b"docker",
@@ -206,6 +234,7 @@ class NetAppVolume(BaseVolume):
 
     # ------ qtree and quotas operations ------
     async def get_quota(self, vfid: VFolderID) -> BinarySize:
+        # TODO: make it an alias of get_quota_scope()
         raise NotImplementedError
 
     async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
@@ -218,7 +247,7 @@ class NetAppVolume(BaseVolume):
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
         target_relpath = target_path.relative_to(self.mount_path)
-        nfs_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{target_relpath}"
+        nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{target_relpath}"
         total_size = 0
         total_count = 0
         start_time = time.monotonic()
@@ -232,7 +261,7 @@ class NetAppVolume(BaseVolume):
         files = list(glob.iglob(f"{self.netapp_xcp_catalog_path}/stats/*.json"))
         prev_files_count = len(files)
 
-        scan_cmd = ["xcp", "scan", "-q", nfs_path]
+        scan_cmd = ["xcp", "scan", "-q", nfspath]
         if self.netapp_xcp_container_name is not None:
             scan_cmd = ["docker", "exec", self.netapp_xcp_container_name] + scan_cmd
         # Measure the exact file sizes and bytes
