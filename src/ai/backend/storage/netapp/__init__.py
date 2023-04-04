@@ -7,7 +7,7 @@ import os
 import time
 from contextlib import aclosing
 from pathlib import Path, PurePosixPath
-from typing import FrozenSet
+from typing import FrozenSet, Optional
 
 import aiofiles
 import aiofiles.os
@@ -15,9 +15,9 @@ import aiofiles.os
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER
-from ..exception import ExecutionError, StorageProxyError
+from ..exception import ExecutionError, NotEmptyError, StorageProxyError
 from ..subproc import spawn_and_watch
-from ..types import FSPerfMetric, FSUsage, VFolderID, VFolderUsage
+from ..types import FSPerfMetric, FSUsage, QuotaConfig, VFolderID, VFolderUsage
 from ..vfs import BaseVolume
 from .netappclient import NetAppClient
 from .quotamanager import QuotaManager
@@ -137,6 +137,39 @@ class NetAppVolume(BaseVolume):
         await self.quota_manager.aclose()
 
     # ------ volume operations ------
+    async def create_quota_scope(
+        self,
+        quota_scope_id: str,
+        config: Optional[QuotaConfig] = None,
+    ) -> None:
+        # qspath = self.mangle_qspath(quota_scope_id)
+        # TODO: invoke the qtree creation API
+        pass
+
+    async def get_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> tuple[QuotaConfig, VFolderUsage]:
+        # TODO: invoke the qtree quota-get API
+        return QuotaConfig(0, 0), VFolderUsage(-1, -1)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: str,
+        options: Optional[QuotaConfig] = None,
+    ) -> QuotaConfig:
+        # TODO: invoke the qtree quota-set API
+        raise NotImplementedError
+
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        # TODO: invoke the qtree deletion API
+
     async def copy_tree(
         self,
         src_path: Path,
