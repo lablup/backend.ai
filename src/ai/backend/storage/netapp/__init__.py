@@ -59,14 +59,14 @@ class NetAppVolume(BaseVolume):
 
         # assign qtree info after netapp_client and quotamanager are initiated
         self.netapp_volume_uuid = await self.netapp_client.get_volume_uuid_by_name()
-        default_qtree = await self.get_default_qtree_by_volume_id(
+        default_qtree = await self.netapp_client.get_default_qtree_by_volume_id(
             self.netapp_volume_uuid,
         )
         self.netapp_qtree_name = default_qtree.get(
             "name",
             self.config["netapp_qtree_name"],
         )
-        self.netapp_qtree_id = await self.get_qtree_id_by_name(self.netapp_qtree_name)
+        self.netapp_qtree_id = await self.netapp_client.get_qtree_id_by_name(self.netapp_qtree_name)
 
         # adjust mount path (volume + qtree)
         self.mount_path = (self.mount_path / self.netapp_qtree_name).resolve()
@@ -76,7 +76,9 @@ class NetAppVolume(BaseVolume):
 
     async def get_hwinfo(self) -> HardwareMetadata:
         raw_metadata = await self.netapp_client.get_metadata()
-        qtree_info = await self.get_default_qtree_by_volume_id(self.netapp_volume_uuid)
+        qtree_info = await self.netapp_client.get_default_qtree_by_volume_id(
+            self.netapp_volume_uuid
+        )
         self.netapp_qtree_name = qtree_info["name"]
         quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
         # add quota in hwinfo
@@ -85,7 +87,9 @@ class NetAppVolume(BaseVolume):
 
     async def get_fs_usage(self) -> FSUsage:
         volume_usage = await self.netapp_client.get_usage()
-        qtree_info = await self.get_default_qtree_by_volume_id(self.netapp_volume_uuid)
+        qtree_info = await self.netapp_client.get_default_qtree_by_volume_id(
+            self.netapp_volume_uuid
+        )
         self.netapp_qtree_name = qtree_info["name"]
         quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
         space = quota.get("space")
@@ -99,8 +103,8 @@ class NetAppVolume(BaseVolume):
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        uuid = await self.get_volume_uuid_by_name()
-        volume_info = await self.get_volume_info(uuid)
+        uuid = await self.netapp_client.get_volume_uuid_by_name()
+        volume_info = await self.netapp_client.get_volume_info(uuid)
         metric = volume_info["metric"]
         return FSPerfMetric(
             iops_read=metric["iops"]["read"],
@@ -214,43 +218,8 @@ class NetAppVolume(BaseVolume):
         await self.quota_manager.aclose()
 
     # ------ volume operations ------
-    async def get_list_volumes(self):
-        resp = await self.netapp_client.get_list_volumes()
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
-    async def get_volume_uuid_by_name(self):
-        resp = await self.netapp_client.get_volume_uuid_by_name()
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
-    async def get_volume_info(self, volume_uuid):
-        resp = await self.netapp_client.get_volume_info(volume_uuid)
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
 
     # ------ qtree and quotas operations ------
-    async def get_default_qtree_by_volume_id(self, volume_uuid):
-        volume_uuid = volume_uuid if volume_uuid else self.netapp_volume_uuid
-        resp = await self.netapp_client.get_default_qtree_by_volume_id(volume_uuid)
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
-    async def get_qtree_id_by_name(self, qtree_name):
-        qtree_name = qtree_name if qtree_name else await self.get_default_qtree_by_volume_id()
-        resp = await self.netapp_client.get_qtree_id_by_name(qtree_name)
-
-        if "error" in resp:
-            raise ExecutionError("api error")
-        return resp
-
     async def get_quota(self, vfid: UUID) -> BinarySize:
         raise NotImplementedError
 
