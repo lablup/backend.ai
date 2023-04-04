@@ -47,7 +47,7 @@ class NetAppVolume(BaseVolume):
             self.netapp_password,
         )
         volume_info = await self.netapp_client.get_volume_by_id(self.volume_id)
-        self.volume_path = volume_info["path"].resolve()
+        self.volume_path = volume_info["path"]
         assert self.volume_path.is_absolute()
         # Example volume ID: 8a5c9938-a872-11ed-8519-d039ea42b802
         # Example volume name: "cj1nipacjssd1_02R10c1v2"
@@ -62,7 +62,7 @@ class NetAppVolume(BaseVolume):
         # vfroot:                           ^^^^^^^
         # mount_path:                       ^^^^^^^^^^^^^^
         # quota-scope path:                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-        # vf_relpath:                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        # vf_relpath: =vfpath.relative_to(mount_path)      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         # NOTE: QTree ID and name are per-volume.
         #       (i.e., Different volumes may have the same qtree ID and names
         #       for different QTree instances!)
