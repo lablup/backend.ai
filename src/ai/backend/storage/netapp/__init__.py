@@ -13,7 +13,7 @@ import aiofiles
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractVolume
+from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER
 from ..exception import ExecutionError, StorageProxyError, VFolderCreationError
 from ..types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
 from ..vfs import BaseVolume
@@ -69,7 +69,7 @@ class NetAppVolume(BaseVolume):
         self.netapp_qtree_id = await self.get_qtree_id_by_name(self.netapp_qtree_name)
 
         # adjust mount path (volume + qtree)
-        self.mount_path = (self.mount_path / Path(self.netapp_qtree_name)).resolve()
+        self.mount_path = (self.mount_path / self.netapp_qtree_name).resolve()
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_VFHOST_QUOTA, CAP_METRIC])
@@ -113,13 +113,8 @@ class NetAppVolume(BaseVolume):
 
     async def delete_vfolder(self, vfid: UUID) -> None:
         vfpath = self.mangle_vfpath(vfid)
-
-        # extract target_dir from vfpath
-        target_dir = str(vfpath).split(self.netapp_qtree_name + "/", 1)[1].split("/")[0]
-        nfs_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{target_dir}"
-        )
+        vfrelpath = vfpath.relative_to(self.mount_path)
+        nfs_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{vfrelpath}"
 
         async def watch_delete_dir(root_dir):
             delete_cmd = ["xcp", "delete", "-force", nfs_path]
@@ -156,37 +151,26 @@ class NetAppVolume(BaseVolume):
     async def clone_vfolder(
         self,
         src_vfid: UUID,
-        dst_volume: AbstractVolume,
         dst_vfid: UUID,
         options: VFolderCreationOptions = None,
     ) -> None:
         # check if there is enough space in destination
-        fs_usage = await dst_volume.get_fs_usage()
+        fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise VFolderCreationError("Not enough space available for clone")
 
         # create the target vfolder
-        await dst_volume.create_vfolder(dst_vfid, options=options, exist_ok=True)
+        await self.create_vfolder(dst_vfid, options=options, exist_ok=True)
 
         # arrange directory based on nfs
-        src_vfpath = str(self.mangle_vfpath(src_vfid)).split(
-            self.netapp_qtree_name + "/",
-            1,
-        )[1]
-        dst_vfpath = str(dst_volume.mangle_vfpath(dst_vfid)).split(
-            self.netapp_qtree_name + "/",
-            1,
-        )[1]
+        src_vfpath = self.mangle_vfpath(src_vfid)
+        dst_vfpath = self.mangle_vfpath(dst_vfid)
+        src_vfrelpath = src_vfpath.relative_to(self.mount_path)
+        dst_vfrelpath = dst_vfpath.relative_to(self.mount_path)
 
-        nfs_src_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{src_vfpath}"
-        )
-        nfs_dst_path = (
-            f"{self.netapp_xcp_hostname}:/{dst_volume.config['netapp_volume_name']}/"
-            + f"{dst_volume.config['netapp_qtree_name']}/{dst_vfpath}"
-        )
+        nfs_src_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{src_vfrelpath}"
+        nfs_dst_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{dst_vfrelpath}"
 
         # perform clone using xcp copy (exception handling needed)
         try:
@@ -222,7 +206,7 @@ class NetAppVolume(BaseVolume):
             await read_progress(nfs_src_path, nfs_dst_path)
 
         except Exception:
-            await dst_volume.delete_vfolder(dst_vfid)
+            await self.delete_vfolder(dst_vfid)
             raise RuntimeError("Copying files from source directories failed.")
 
     async def shutdown(self) -> None:
@@ -279,13 +263,10 @@ class NetAppVolume(BaseVolume):
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
+        target_relpath = target_path.relative_to(self.mount_path)
+        nfs_path = f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/{target_relpath}"
         total_size = 0
         total_count = 0
-        raw_target_path = str(target_path).split(self.netapp_qtree_name + "/", 1)[1]
-        nfs_path = (
-            f"{self.netapp_xcp_hostname}:/{self.netapp_volume_name}/"
-            + f"{self.netapp_qtree_name}/{raw_target_path}"
-        )
         start_time = time.monotonic()
         available = True
 
