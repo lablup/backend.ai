@@ -395,8 +395,8 @@ def log_worker(
         if logstash_handler:
             logstash_handler.cleanup()
         if graylog_handler:
-            # graylog_handler.close()
-            graylog_handler.cleanup()
+            graylog_handler.close()
+            # graylog_handler.cleanup()
         agg_sock.close()
         zctx.term()
 
