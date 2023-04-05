@@ -19,7 +19,7 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..abc import AbstractVolume
 from ..context import Context
@@ -28,7 +28,6 @@ from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

@@ -63,6 +63,13 @@ protocol = "tcp"
 ssl-enabled = true
 ssl-verify = true
 
+[logging.graylog]
+host = "0.0.0.0"
+port = 12201
+validate = false
+ca_certs = ""
+keyfile = ""
+certfile = ""
 
 [debug]
 enabled = false

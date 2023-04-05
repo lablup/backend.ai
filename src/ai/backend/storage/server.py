@@ -18,7 +18,7 @@ from setproctitle import setproctitle
 
 from ai.backend.common import config
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import BraceStyleAdapter, Logger, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
@@ -29,7 +29,6 @@ from .config import local_config_iv
 from .context import Context
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 
@@ -232,7 +231,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
                 log.info("Runtime: {0}", env_info())
                 log.info("Node ID: {0}", local_config["storage-proxy"]["node-id"])
                 log_config = logging.getLogger("ai.backend.agent.config")
-                log_config.addHandler(graylog_handler)
                 if local_config["debug"]["enabled"]:
                     log_config.debug("debug mode enabled.")
                 if "debug" in local_config and local_config["debug"]["enabled"]:

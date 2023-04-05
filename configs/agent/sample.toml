@@ -180,7 +180,7 @@ soft-reset-available = false
 # Set the global logging level.
 level = "INFO"
 
-# Multi-choice of: "console", "logstash", "file"
+# Multi-choice of: "console", "logstash", "file", "graylog"
 # For each choice, there must be a "logging.<driver>" section
 # in this config file as exemplified below.
 drivers = ["console", "file"]
@@ -220,6 +220,17 @@ protocol = "tcp"
 # SSL configs when protocol = "tcp"
 ssl-enabled = true
 ssl-verify = true
+
+
+[logging.graylog]
+host = "0.0.0.0"
+port = 12201
+
+# If True, validate the Graylog server’s certificate. In this case specifying ca_certs is also required.
+validate = false
+ca_certs = ""
+keyfile = ""
+certfile = ""
 
 
 # Specify additional package namespaces to include in the logs

@@ -10,7 +10,7 @@ from urllib.parse import quote_plus as urlquote
 import click
 import sqlalchemy as sa
 
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models.base import populate_fixture
 
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from .context import CLIContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

@@ -6,7 +6,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 
 from ..models import (
@@ -22,7 +22,6 @@ from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
 logger = logging.getLogger("ai.backend.manager.scheduler")
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 _check_keypair_concurrency_script = """

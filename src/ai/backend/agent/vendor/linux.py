@@ -10,10 +10,9 @@ import aiotools
 
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import get_docker_connector
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 _numa_supported = False
 

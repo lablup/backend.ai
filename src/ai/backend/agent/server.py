@@ -48,7 +48,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
-from ai.backend.common.logging import BraceStyleAdapter, Logger, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
@@ -78,9 +78,8 @@ from .utils import get_subnet_ip
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-graylogger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-graylogger.addHandler(graylog_handler)
-log = BraceStyleAdapter(graylogger)
+logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = BraceStyleAdapter(logger)
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -936,7 +935,6 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                log_config.addHandler(graylog_handler)
                 if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
 

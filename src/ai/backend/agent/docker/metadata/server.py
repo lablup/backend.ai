@@ -12,7 +12,7 @@ from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.types import WebMiddleware
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 
@@ -20,7 +20,6 @@ from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

@@ -86,7 +86,7 @@ from ai.backend.common.events import (
     SessionSuccessEvent,
 )
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler, pretty
+from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -133,7 +133,6 @@ if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 _sentinel = Sentinel.TOKEN

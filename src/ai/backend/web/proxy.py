@@ -17,10 +17,9 @@ from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
-from .logging import BraceStyleAdapter, graylog_handler
+from .logging import BraceStyleAdapter
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 HTTP_HEADERS_TO_FORWARD = [

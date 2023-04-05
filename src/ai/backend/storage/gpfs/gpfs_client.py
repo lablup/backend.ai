@@ -10,7 +10,7 @@ import aiohttp
 from aiohttp import web
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
 
 from .exceptions import (
@@ -33,7 +33,6 @@ from .types import (
 )
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

@@ -48,7 +48,7 @@ from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     BinarySize,
@@ -75,7 +75,6 @@ SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 # The common shared metadata instance
 convention = {

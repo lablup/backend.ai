@@ -6,7 +6,7 @@ from typing import Any, Mapping, MutableMapping, Optional, Tuple
 import aiofiles
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceName, SlotName
 
 from ..exception import InitializationError
@@ -18,7 +18,6 @@ from ..resources import (
 )
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

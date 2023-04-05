@@ -11,7 +11,7 @@ import yaml
 from aiohttp import web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import TemplateType, groups, session_templates, users
 from ..models.session_template import check_task_template
@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

@@ -190,7 +190,7 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
     LogSeverity,
@@ -204,7 +204,6 @@ from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 _max_cpu_count = os.cpu_count()

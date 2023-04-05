@@ -26,10 +26,9 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.redis_helper import _default_conn_opts
 from ai.backend.common.types import RedisConnectionInfo
 
-from .logging import BraceStyleAdapter, graylog_handler
+from .logging import BraceStyleAdapter
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

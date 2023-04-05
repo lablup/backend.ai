@@ -7,11 +7,10 @@ from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
 
 import attrs
 
-from ..logging import BraceStyleAdapter, graylog_handler
+from ..logging import BraceStyleAdapter
 from . import AbstractPlugin, BasePluginContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 __all__ = (

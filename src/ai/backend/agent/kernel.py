@@ -37,14 +37,13 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import KernelLifecycleEventReason
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId, ServicePort, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'

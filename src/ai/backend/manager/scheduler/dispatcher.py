@@ -31,7 +31,7 @@ from ai.backend.common.events import (
     SessionScheduledEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, aobject
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.types import DistributedLockFactory
@@ -82,7 +82,6 @@ __all__ = (
 )
 
 logger = logging.getLogger("ai.backend.manager.scheduler")
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")

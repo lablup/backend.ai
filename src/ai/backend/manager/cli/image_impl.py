@@ -9,13 +9,12 @@ from tabulate import tabulate
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image import rescan_images as rescan_images_func
 from ai.backend.manager.models.utils import connect_database
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

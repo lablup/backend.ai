@@ -9,7 +9,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ObjectNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

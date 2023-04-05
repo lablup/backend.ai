@@ -32,7 +32,7 @@ from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -102,7 +102,6 @@ __all__ = (
 
 
 logger = logging.getLogger("ai.backend.manager.models.kernels")  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

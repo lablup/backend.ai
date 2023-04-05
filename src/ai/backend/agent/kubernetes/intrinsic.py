@@ -11,7 +11,7 @@ from aiodocker.exceptions import DockerError
 from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
 
 from .. import __version__
@@ -29,7 +29,6 @@ from .agent import Container
 from .resources import get_resource_spec_from_container
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

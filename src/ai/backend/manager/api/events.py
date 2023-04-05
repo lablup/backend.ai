@@ -46,7 +46,7 @@ from ai.backend.common.events import (
     SessionSuccessEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
 from ..models import UserRole, groups, kernels
@@ -62,7 +62,6 @@ if TYPE_CHECKING:
     from .types import CORSOptions, WebMiddleware
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 sentinel: Final = Sentinel.token

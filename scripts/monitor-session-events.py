@@ -2,7 +2,6 @@
 import asyncio
 import json
 import logging
-from ai.backend.common.logging import graylog_handler
 import os
 import re
 import smtplib
@@ -14,7 +13,6 @@ _send_mail_tasks = weakref.WeakSet()
 _rx_term_escapes = re.compile(r"(\x9b|\x1b\[)[0-?]*[ -\/]*[@-~]")
 
 log = logging.getLogger("ai.backend.manager.monitor")
-log.addHandler(graylog_handler)
 
 SMTP_HOST = "127.0.0.1"
 SMTP_PORT = 25

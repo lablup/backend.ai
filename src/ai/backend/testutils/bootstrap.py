@@ -8,12 +8,10 @@ from typing import Iterator
 
 import pytest
 
-from ai.backend.common.logging import graylog_handler
 from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log.addHandler(graylog_handler)
 
 
 def wait_health_check(container_id):

@@ -29,7 +29,7 @@ from ai.backend.agent.resources import (
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -66,8 +66,6 @@ __all__ = (
 PREFIX = "cuda"
 
 logger = logging.getLogger("ai.backend.accelerator.cuda")
-logger.addHandler(graylog_handler)
-
 log = BraceStyleAdapter(logger)
 
 

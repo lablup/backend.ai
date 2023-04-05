@@ -4,7 +4,7 @@ import threading
 import time
 from pathlib import Path
 
-from ai.backend.common.logging import BraceStyleAdapter, Logger, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 
 test_log_config = {
     "level": "DEBUG",
@@ -18,7 +18,6 @@ test_log_config = {
 test_log_path = Path(f"/tmp/bai-testing-agent-logger-{os.getpid()}.sock")
 
 logger = logging.getLogger("ai.backend.common.testing")
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

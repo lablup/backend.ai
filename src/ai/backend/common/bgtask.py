@@ -34,12 +34,11 @@ from .events import (
     EventDispatcher,
     EventProducer,
 )
-from .logging import BraceStyleAdapter, graylog_handler
+from .logging import BraceStyleAdapter
 from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 TaskResult = Literal["bgtask_done", "bgtask_cancelled", "bgtask_failed"]
 BgtaskEvents: TypeAlias = (

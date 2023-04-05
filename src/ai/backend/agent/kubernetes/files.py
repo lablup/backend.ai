@@ -3,10 +3,9 @@ import os
 from pathlib import Path
 from typing import Dict
 
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 # the names of following AWS variables follow boto3 convention.

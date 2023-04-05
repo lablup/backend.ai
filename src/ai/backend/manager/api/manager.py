@@ -18,7 +18,7 @@ from aiotools import aclosing
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events import DoScheduleEvent
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
@@ -41,7 +41,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

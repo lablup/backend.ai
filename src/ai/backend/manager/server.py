@@ -37,7 +37,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter, Logger, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import LogSeverity
@@ -107,7 +107,6 @@ LATEST_REV_DATES: Final = {
 LATEST_API_VERSION: Final = "v6.20220615"
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 PUBLIC_INTERFACES: Final = [
@@ -818,7 +817,6 @@ def main(
                 log.info("Backend.AI Manager {0}", __version__)
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
-                log_config.addHandler(graylog_handler)
                 log_config.debug("debug mode enabled.")
                 if cfg["manager"]["event-loop"] == "uvloop":
                     import uvloop

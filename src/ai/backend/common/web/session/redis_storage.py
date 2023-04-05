@@ -6,12 +6,11 @@ from typing import Any, Callable, Optional
 
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from . import AbstractStorage, Session, extra_config_headers
 
 logger = logging.getLogger("ai.backend.web.server")
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 try:

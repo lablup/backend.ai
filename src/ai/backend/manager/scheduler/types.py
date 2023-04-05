@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql import ColumnElement, Select
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -45,7 +45,6 @@ from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
 logger = logging.getLogger("ai.backend.manager.scheduler")
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

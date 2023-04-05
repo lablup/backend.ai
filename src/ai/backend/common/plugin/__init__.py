@@ -12,10 +12,9 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
-from ..logging import BraceStyleAdapter, graylog_handler
+from ..logging import BraceStyleAdapter
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 __all__ = (

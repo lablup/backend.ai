@@ -51,7 +51,6 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
 from ai.backend.common.types import (
     BinarySize,
     DeviceId,
@@ -73,9 +72,7 @@ __all__ = (
     "CUDAPlugin",
 )
 
-logger = logging.getLogger("ai.backend.accelerator.cuda")
-logger.addHandler(graylog_handler)
-log = BraceStyleAdapter(logger)
+log = logging.getLogger("ai.backend.accelerator.cuda")
 
 MIN_MEM_UNIT = 512 * (2**20)  # 512 MiB
 MIN_SMP_UNIT = 2
@@ -145,7 +142,7 @@ class CUDAPlugin(AbstractComputePlugin):
         elif self._mode == AllocationModes.FRACTIONAL:
             self.slot_types.append(("cuda.shares", "count"))  # type: ignore  # (only updated here)
         else:
-            log.error("Not implemented allocation mode: {}", self._mode)
+            log.error(f"Not implemented allocation mode: {self._mode}")
             self.enabled = False
             return
 

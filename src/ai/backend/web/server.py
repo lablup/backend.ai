@@ -34,12 +34,11 @@ from ai.backend.common.web.session.redis_storage import RedisStorage
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
-from .logging import BraceStyleAdapter, graylog_handler
+from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .template import toml_scalar
 
 logger = logging.getLogger("ai.backend.web.server")
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 cache_patterns = {
@@ -662,7 +661,6 @@ def main(config_path: str, debug: bool) -> None:
     log.info("Backend.AI Web Server {0}", __version__)
     log.info("runtime: {0}", sys.prefix)
     log_config = logging.getLogger("ai.backend.web.config")
-    log_config.addHandler(graylog_handler)
     log_config.debug("debug mode enabled.")
     if debug:
         print("== Web Server configuration ==")

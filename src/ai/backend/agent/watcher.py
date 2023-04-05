@@ -18,14 +18,13 @@ from setproctitle import setproctitle
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import BraceStyleAdapter, Logger, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import Fstab
 
 from . import __version__ as VERSION
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 shutdown_enabled = False
@@ -427,7 +426,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
         log.info("runtime: {0}", utils.env_info())
 
         log_config = logging.getLogger("ai.backend.agent.config")
-        log_config.addHandler(graylog_handler)
         log_config.debug("debug mode enabled.")
 
         aiotools.start_server(

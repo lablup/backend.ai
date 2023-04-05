@@ -15,7 +15,7 @@ from ai.backend.common.config import redis_config_iv
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..config import SharedConfig
 from .image_impl import alias as alias_impl
@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from .context import CLIContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 

@@ -15,7 +15,7 @@ from graphql.execution import ExecutionResult  # pants: no-infer-dep
 from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models.base import DataLoaderManager
 from ..models.gql import GQLMutationPrivilegeCheckMiddleware, GraphQueryContext, Mutations, Queries
@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 _rx_mutation_hdr = re.compile(r"^mutation(\s+\w+)?\s*(\(|{|@)", re.M)

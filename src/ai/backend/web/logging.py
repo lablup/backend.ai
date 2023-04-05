@@ -1,7 +1,5 @@
 import logging
 
-import graypy
-
 
 class BraceMessage:
 
@@ -23,6 +21,3 @@ class BraceStyleAdapter(logging.LoggerAdapter):
         if self.isEnabledFor(level):
             msg, kwargs = self.process(msg, kwargs)
             self.logger._log(level, BraceMessage(msg, args), (), **kwargs)
-
-
-graylog_handler = graypy.GELFTLSHandler("0.0.0.0", 12201)

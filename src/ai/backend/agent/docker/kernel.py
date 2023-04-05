@@ -20,7 +20,7 @@ from aiotools import TaskGroup
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter, graylog_handler
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -30,7 +30,6 @@ from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
 logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-logger.addHandler(graylog_handler)
 log = BraceStyleAdapter(logger)
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB

@@ -4,7 +4,6 @@ import logging
 import socket
 import smtplib
 import subprocess
-from ai.backend.common.logging import graylog_handler
 import time
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -20,7 +19,6 @@ NOTIFY_EMAILS = [
 NOTIFY_INTERVAL = 6 * 3600  # in seconds
 
 log = logging.getLogger("ai.backend.agent.monitor")
-log.addHandler(graylog_handler)
 
 def check_lspci():
     proc = subprocess.run("lspci", capture_output=True)
