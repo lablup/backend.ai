@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import secrets
+import time
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -39,6 +40,7 @@ import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
+import yarl
 from aiohttp import hdrs, web
 from async_timeout import timeout
 from dateutil.parser import isoparse
@@ -81,7 +83,6 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import HookResults
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
@@ -133,7 +134,6 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    RejectedByHook,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1594,6 +1594,49 @@ async def handle_kernel_stat_sync(
         await root_ctx.registry.sync_kernel_stats(event.kernel_ids)
 
 
+async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
+    log_func = log.info
+    log_msg: str = ""
+    log_fmt: str = ""
+    log_arg: Any = None
+    begin = time.monotonic()
+    try:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30.0),
+        ) as session:
+            try:
+                async with session.post(url, json=data) as response:
+                    if response.content_length is not None and response.content_length > 0:
+                        log_func = log.warning
+                        log_msg = "warning"
+                        log_fmt = (
+                            "{3[0]} {3[1]} - the callback response body was not empty! "
+                            "(len: {3[2]:,} bytes)"
+                        )
+                        log_arg = (response.status, response.reason, response.content_length)
+                    else:
+                        log_msg = "result"
+                        log_fmt = "{3[0]} {3[1]}"
+                        log_arg = (response.status, response.reason)
+            except aiohttp.ClientError as e:
+                log_func = log.warning
+                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
+    except asyncio.CancelledError:
+        log_func = log.warning
+        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
+    except asyncio.TimeoutError:
+        log_func = log.warning
+        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
+    finally:
+        log_func(
+            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
+            data["event"],
+            data["session_id"],
+            url,
+            log_arg,
+        )
+
+
 async def invoke_session_callback(
     app: web.Application,
     source: AgentId,
@@ -1610,6 +1653,7 @@ async def invoke_session_callback(
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
+
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -1622,15 +1666,16 @@ async def invoke_session_callback(
     if (callback_url := session.callback_url) is None:
         return
 
-    async def _dispatch() -> None:
-        hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-            "PUBLISH_EVENT",
-            (event, callback_url, app_ctx),
-        )
-        if hook_result.status != HookResults.PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
+    }
 
-    await execute_with_retry(_dispatch)
+    app_ctx.webhook_ptask_group.create_task(
+        _make_session_callback(data, callback_url),
+    )
 
 
 async def handle_batch_result(
