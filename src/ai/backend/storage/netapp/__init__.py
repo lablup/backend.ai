@@ -174,9 +174,12 @@ class NetAppVolume(BaseVolume):
         quota_scope_id: str,
         config: Optional[QuotaConfig] = None,
     ) -> None:
-        # qspath = self.mangle_qspath(quota_scope_id)
-        # TODO: invoke the qtree creation API
-        pass
+        qspath = self.mangle_qspath(quota_scope_id)
+        await self.netapp_client.create_qtree(self.netapp_svm, self.volume_id, qspath.name)
+        if config is not None:
+            await self.netapp_client.update_quota_rule(
+                self.netapp_svm, self.volume_id, qspath.name, config
+            )
 
     async def get_quota_scope(
         self,
@@ -188,10 +191,15 @@ class NetAppVolume(BaseVolume):
     async def update_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaConfig] = None,
+        config: Optional[QuotaConfig] = None,
     ) -> QuotaConfig:
-        # TODO: invoke the qtree quota-set API
-        raise NotImplementedError
+        if config is None:
+            # TODO: clear rule?
+            return
+        qspath = self.mangle_qspath(quota_scope_id)
+        await self.netapp_client.update_quota_rule(
+            self.netapp_svm, self.volume_id, qspath.name, config
+        )
 
     async def delete_quota_scope(
         self,

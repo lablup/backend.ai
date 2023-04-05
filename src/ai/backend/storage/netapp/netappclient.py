@@ -283,6 +283,45 @@ class NetAppClient:
             else:
                 raise RuntimeError(f"No qtree {name} found in the volume {volume_id}")
 
+    async def create_qtree(self, svm_id: str, volume_id: VolumeID, qtree_name: str):
+        async with self._session.post(
+            f"{self.endpoint}/api/storage/qtrees",
+            params={
+                "svm": {"uuid": svm_id},
+                "volume": {"uuid": str(volume_id)},
+                "name": qtree_name,
+            },
+            auth=aiohttp.BasicAuth(self.user, self.password),
+            ssl=False,
+            raise_for_status=True,
+        ) as resp:
+            data = await resp.json()
+            return data
+
+    async def update_quota_rule(
+        self,
+        svm_id: str,
+        volume_id: VolumeID,
+        qtree_name: str,
+        config: QuotaConfig,
+    ):
+        async with self._session.post(
+            f"{self.endpoint}/api/storage/quota/rules",
+            data={
+                "svm": {"uuid": svm_id},
+                "volume": {"uuid": str(volume_id)},
+                "type": "tree",  # fix qtree-based quota
+                "qtree": {"name": qtree_name},
+                "space": {"hard_limit": config.hard_limit, "soft_limit": config.soft_limit},
+                # 'files': {'hard_limit': file_limit, 'soft_limit': file_limit},  # not supported yet from Backend.AI
+            },
+            auth=aiohttp.BasicAuth(self.user, self.password),
+            ssl=False,
+            raise_for_status=True,
+        ) as resp:
+            data = await resp.json()
+            return data
+
     async def get_qos_policies(self) -> List[Mapping[str, Any]]:
         async with self._session.get(
             f"{self.endpoint}/api/storage/qos/policies",
