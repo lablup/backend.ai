@@ -44,7 +44,8 @@ class NetAppVolume(BaseVolume):
         self.netapp_xcp_container_name = self.config["netapp_xcp_container_name"]
         self.volume_name = self.config["netapp_volume_name"]
         volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
-        self.volume_id = VolumeID(volume_info["uuid"])
+        assert "svm" in volume_info
+        self.volume_id = volume_info["uuid"]
         self.svm_name = volume_info["svm"]["name"]
         self.svm_id = StorageID(volume_info["svm"]["uuid"])
         self.volume_path = volume_info["path"]
@@ -212,6 +213,7 @@ class NetAppVolume(BaseVolume):
             self.volume_id,
             qspath.name,
         )
+        # QTree is automatically removed if the corresponding directory is deleted.
         await aiofiles.os.rmdir(qspath)
 
     async def copy_tree(
@@ -269,7 +271,7 @@ class NetAppVolume(BaseVolume):
         curr_files_count = 0
 
         # check the number of scan result files changed
-        # NOTE: if directory contains small amout of files, scan result doesn't get saved
+        # NOTE: if the target dir contains a small number of files, scan result doesn't get saved
         files = list(glob.iglob(f"{self.netapp_xcp_catalog_path}/stats/*.json"))
         prev_files_count = len(files)
 

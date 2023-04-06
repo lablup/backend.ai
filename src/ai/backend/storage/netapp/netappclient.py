@@ -93,12 +93,18 @@ class SpaceInfo(TypedDict):
     size: int
 
 
+class SVMInfo(TypedDict):
+    uuid: str
+    name: str
+
+
 class VolumeInfo(TypedDict):
     name: str
     uuid: VolumeID
     path: Path
     space: NotRequired[SpaceInfo]
     statistics: NotRequired[dict[str, Any]]
+    svm: NotRequired[SVMInfo]
 
 
 class QTreeInfo(TypedDict):
@@ -419,7 +425,7 @@ class NetAppClient:
             data={
                 "svm.uuid": str(svm_id),
                 "volume.uuid": str(volume_id),
-                "type": "tree",  # fix qtree-based quota
+                "type": "tree",
                 "qtree.name": qtree_name,
                 "space": {
                     "hard_limit": config.hard_limit,
@@ -446,7 +452,7 @@ class NetAppClient:
             params={
                 "svm.uuid": str(svm_id),
                 "volume.uuid": str(volume_id),
-                "type": "tree",  # fix qtree-based quota
+                "type": "tree",
                 "qtree.name": qtree_name,
                 "fields": "space,files",
             },
@@ -488,12 +494,13 @@ class NetAppClient:
     async def enable_quota(
         self,
         volume_id: VolumeID,
+        enable: bool = True,
     ) -> AsyncJobResult:
         async with self.send_request(
             "patch",
             f"/api/storage/volumes/{volume_id}",
             data={
-                "quota.enabled": True,
+                "quota.enabled": enable,
             },
         ) as resp:
             data = await resp.json()
