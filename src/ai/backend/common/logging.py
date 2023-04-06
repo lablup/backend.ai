@@ -55,7 +55,9 @@ logging_config_iv = t.Dict(
     {
         t.Key("level", default="INFO"): loglevel_iv,
         t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
-        t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file", "graylog")),
+        t.Key("drivers", default=["console"]): t.List(
+            t.Enum("console", "logstash", "file", "graylog")
+        ),
         t.Key("console", default=None): t.Null | t.Dict(
             {
                 t.Key("colored", default=None): t.Null | t.Bool,
@@ -80,8 +82,7 @@ logging_config_iv = t.Dict(
                 # NOTE: logstash does not have format option.
             }
         ).allow_extra("*"),
-        t.Key("graylog", default=None): t.Null
-        | t.Dict(
+        t.Key("graylog", default=None): t.Null | t.Dict(
             {
                 #  t.Key("endpoint"): tx.HostPortPair,
                 t.Key("host"): t.String,
