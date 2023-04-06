@@ -75,7 +75,6 @@ import aiohttp
 
 from ..types import QuotaConfig
 
-
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
 QTreeID: TypeAlias = int

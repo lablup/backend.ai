@@ -5,6 +5,7 @@ import glob
 import json
 import os
 import time
+import warnings
 from contextlib import aclosing
 from pathlib import Path, PurePosixPath
 from typing import FrozenSet, Optional
@@ -73,27 +74,20 @@ class NetAppVolume(BaseVolume):
         return frozenset([CAP_VFOLDER, CAP_VFHOST_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:
-        raw_metadata = await self.netapp_client.get_volume_metadata(self.volume_id)
-        default_qtree_info = await self.netapp_client.get_default_qtree(self.volume_id)
-        # self.netapp_qtree_name = default_qtree_info["name"]
-        # # add quota in hwinfo
-        # metadata = {"quota": json.dumps(quota), **raw_metadata}
-        metadata = {}  # TODO: reimplement
-        return {"status": "healthy", "status_info": None, "metadata": {**metadata}}
+        volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["files", "quota"])
+        metadata = {
+            "quota": volume_info["quota"],  # type: ignore
+            "files": volume_info["files"],  # type: ignore
+        }
+        return {"status": "healthy", "status_info": None, "metadata": metadata}
 
     async def get_fs_usage(self) -> FSUsage:
-        volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["space"])
+        volume_info = await self.netapp_client.get_volume_by_id(
+            self.volume_id, ["space.size,space.used"]
+        )
         assert "space" in volume_info
-        default_qtree_info = await self.netapp_client.get_default_qtree(self.volume_id)
-        # self.netapp_qtree_name = default_qtree_info["name"]
-        # space = quota.get("space")
-        space = {}  # TODO: reimplement
-        if space and space.get("hard_limit"):
-            capacity_bytes = space["hard_limit"]
-        else:
-            capacity_bytes = volume_info["space"]["size"]
         return FSUsage(
-            capacity_bytes=BinarySize(capacity_bytes),
+            capacity_bytes=BinarySize(volume_info["space"]["size"]),
             used_bytes=BinarySize(volume_info["space"]["used"]),
         )
 
@@ -248,11 +242,16 @@ class NetAppVolume(BaseVolume):
 
     # ------ qtree and quotas operations ------
     async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        # TODO: make it an alias of get_quota_scope()
-        raise NotImplementedError
+        if vfid.quota_scope_id is None:
+            return BinarySize(-1)
+        qconfig, _ = await self.get_quota_scope(vfid.quota_scope_id)
+        return BinarySize(qconfig.hard_limit)
 
     async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        raise NotImplementedError
+        warnings.warn(
+            "set_quota for individual vfolders is deprecated since 23.03",
+            DeprecationWarning,
+        )
 
     async def get_usage(
         self,
