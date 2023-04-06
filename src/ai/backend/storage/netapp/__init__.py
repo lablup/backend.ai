@@ -19,34 +19,34 @@ from ..exception import ExecutionError, NotEmptyError, StorageProxyError
 from ..subproc import spawn_and_watch
 from ..types import FSPerfMetric, FSUsage, QuotaConfig, VFolderID, VFolderUsage
 from ..vfs import BaseVolume
-from .netappclient import NetAppClient, VolumeID
-
-# from .quotamanager import QuotaManager
+from .netappclient import NetAppClient, StorageID, VolumeID
 
 
 class NetAppVolume(BaseVolume):
     endpoint: str
     netapp_user: str
     netapp_password: str
-    netapp_svm: str
+    svm_name: str
+    svm_id: StorageID
+    volume_name: str
     volume_id: VolumeID
     volume_path: Path
 
     async def init(self) -> None:
         self.endpoint = self.config["netapp_endpoint"]
-        self.netapp_user = self.config["netapp_user"]
-        self.netapp_password = self.config["netapp_password"]
-        self.netapp_svm = self.config["netapp_svm"]
-        self.volume_id = VolumeID(self.config["netapp_volume_id"])
+        self.netapp_client = NetAppClient(
+            self.endpoint,
+            self.config["netapp_user"],
+            self.config["netapp_password"],
+        )
         self.netapp_xcp_host = self.config["netapp_xcp_host"]
         self.netapp_xcp_catalog_path = self.config["netapp_xcp_catalog_path"]
         self.netapp_xcp_container_name = self.config["netapp_xcp_container_name"]
-        self.netapp_client = NetAppClient(
-            self.endpoint,
-            self.netapp_user,
-            self.netapp_password,
-        )
-        volume_info = await self.netapp_client.get_volume_by_id(self.volume_id)
+        self.volume_name = self.config["netapp_volume_name"]
+        volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
+        self.volume_id = VolumeID(volume_info["uuid"])
+        self.svm_name = volume_info["svm"]["name"]
+        self.svm_id = StorageID(volume_info["svm"]["uuid"])
         self.volume_path = volume_info["path"]
         assert self.volume_path.is_absolute()
         # Example volume ID: 8a5c9938-a872-11ed-8519-d039ea42b802
@@ -75,7 +75,6 @@ class NetAppVolume(BaseVolume):
         raw_metadata = await self.netapp_client.get_volume_metadata(self.volume_id)
         default_qtree_info = await self.netapp_client.get_default_qtree(self.volume_id)
         # self.netapp_qtree_name = default_qtree_info["name"]
-        # quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
         # # add quota in hwinfo
         # metadata = {"quota": json.dumps(quota), **raw_metadata}
         metadata = {}  # TODO: reimplement
@@ -86,7 +85,6 @@ class NetAppVolume(BaseVolume):
         assert "space" in volume_info
         default_qtree_info = await self.netapp_client.get_default_qtree(self.volume_id)
         # self.netapp_qtree_name = default_qtree_info["name"]
-        # quota = await self.quota_manager.get_quota_by_qtree_name(self.netapp_qtree_name)
         # space = quota.get("space")
         space = {}  # TODO: reimplement
         if space and space.get("hard_limit"):
@@ -166,7 +164,6 @@ class NetAppVolume(BaseVolume):
 
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
-        # await self.quota_manager.aclose()
 
     # ------ volume operations ------
     async def create_quota_scope(
@@ -175,31 +172,33 @@ class NetAppVolume(BaseVolume):
         config: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        await self.netapp_client.create_qtree(self.netapp_svm, self.volume_id, qspath.name)
+        await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
         if config is not None:
-            await self.netapp_client.update_quota_rule(
-                self.netapp_svm, self.volume_id, qspath.name, config
-            )
+            await self.update_quota_scope(quota_scope_id, config)
 
     async def get_quota_scope(
         self,
         quota_scope_id: str,
     ) -> tuple[QuotaConfig, VFolderUsage]:
-        # TODO: invoke the qtree quota-get API
-        return QuotaConfig(0, 0), VFolderUsage(-1, -1)
+        qspath = self.mangle_qspath(quota_scope_id)
+        qconfig = await self.netapp_client.get_quota_rule(self.svm_id, self.volume_id, qspath.name)
+        return qconfig, VFolderUsage(-1, -1)
 
     async def update_quota_scope(
         self,
         quota_scope_id: str,
-        config: Optional[QuotaConfig] = None,
-    ) -> QuotaConfig:
-        if config is None:
-            # TODO: clear rule?
-            return
+        config: QuotaConfig,
+    ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        await self.netapp_client.update_quota_rule(
-            self.netapp_svm, self.volume_id, qspath.name, config
+        result = await self.netapp_client.set_quota_rule(
+            self.svm_id,
+            self.volume_id,
+            qspath.name,
+            config,
         )
+        self.netapp_client.check_job_result(result, [])
+        result = await self.netapp_client.enable_quota(self.volume_id)
+        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     async def delete_quota_scope(
         self,
@@ -208,7 +207,12 @@ class NetAppVolume(BaseVolume):
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
             raise NotEmptyError(quota_scope_id)
-        # TODO: invoke the qtree deletion API
+        await self.netapp_client.delete_quota_rule(
+            self.svm_id,
+            self.volume_id,
+            qspath.name,
+        )
+        await aiofiles.os.rmdir(qspath)
 
     async def copy_tree(
         self,

@@ -1,10 +1,67 @@
+"""
+A thin wrapper of the NetApp ONTAP API.
+
+
+Generic ONTAP error codes
+-------------------------
+
+1	    An entry with the same identifiers already exists.
+2	    A field has an invalid value, is missing, or an extra field was provided.
+3	    The operation is not supported.
+4	    An entry with the specified identifiers was not found.
+6	    Permission denied.
+7	    Resource limit exceeded.
+8	    Resource in use.
+65541	RPC timed out.
+65552	Generic RPC failure.
+65562	Internal RPC error
+262145	Application code returned an unexpected exception.
+262160	There are too many requets already being processed. Retry after a short delay.
+262177	Missing value.
+262179	Unexpected argument. Argument shown in error message body.
+262185	Invalid value with value in the body of the error.
+262186	A field is used in an invalid context with another field,
+        as shown in error message body.
+262188	A field was specified twice. Location of assignments shown in error message body.
+262190	You must provide one or more values to apply your changes.
+262196	Field cannot be set in this operation.
+262197	Invalid value provided for field. Value and field shown in error message body.
+262198	A request body is not allowed on GET, HEAD, and DELETE.
+262199	Invalid JSON with error location provided in body of the error.
+262200	Invalid JSON range, with range provided in the body of the error.
+262201	Invalid JSON due to unknown formatting issue.
+262202	Field is considered secret and should not be provided in the URL.
+262210	Unable to retrieve all required records within the timeout.
+        This "order_by" query is not supported under the current system load
+        with the current number of records in the collection.
+262211	POST request on a REST API does not support filtering on an attribute.
+        Attributes must be in the request body.
+262212	Request is missing required value.
+262220	Wildcard fields=* is not allowed for CLI-based REST APIs.
+262245	Invalid value with reason provided in body of the error.
+262247	Invalid value for a field, with value and field in body of the error.
+262248	A value is missing assignment operator.
+262249	Field name is not supported for GET requests because it is not a readable attribute.
+262250	Field name cannot be queried in a GET request because it is not a readable attribute.
+262254	Invalid JSON input, an array was expected.
+262255	An array was found in the JSON when it was not expected.
+262268	The field is not supported as an order_by= field.
+262277	The query_fields and query parameters may only be specified for GET requests.
+262282	Property was specified twice.
+262286	Mismatching braces found in the fields= query.
+393271	A node is out of quorum. Body of error message identifies node.
+39387137	A provided URL is invalid.
+"""
 from __future__ import annotations
 
-import json
+import asyncio
+import contextlib
 import uuid
+from collections.abc import Container
 from pathlib import Path
 from typing import (
     Any,
+    AsyncIterator,
     List,
     Mapping,
     NotRequired,
@@ -16,9 +73,18 @@ from typing import (
 
 import aiohttp
 
+from ..types import QuotaConfig
 
+
+StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
 QTreeID: TypeAlias = int
+
+
+class AsyncJobResult(TypedDict):
+    state: str
+    code: str | None
+    message: str | None
 
 
 class SpaceInfo(TypedDict):
@@ -44,13 +110,15 @@ class QTreeInfo(TypedDict):
     statistics: NotRequired[dict[str, Any]]
 
 
+class NetAppClientError(RuntimeError):
+    pass
+
+
 class NetAppClient:
     endpoint: str
     user: str
     password: str
     _session: aiohttp.ClientSession
-    svm: str
-    volume_name: str
 
     def __init__(
         self,
@@ -61,10 +129,54 @@ class NetAppClient:
         self.endpoint = endpoint
         self.user = user
         self.password = password
-        self._session = aiohttp.ClientSession()
+        _connector = aiohttp.TCPConnector(ssl=False)
+        _auth = aiohttp.BasicAuth(self.user, self.password)
+        self._session = aiohttp.ClientSession(
+            self.endpoint,
+            connector=_connector,
+            auth=_auth,
+            raise_for_status=True,
+        )
 
     async def aclose(self) -> None:
         await self._session.close()
+
+    @contextlib.asynccontextmanager
+    async def send_request(
+        self,
+        method: str,
+        path: str,
+        params: dict[str, str | int] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        async with self._session.request(method, path, params=params, json=data) as resp:
+            yield resp
+
+    async def wait_job(self, job_id: str) -> AsyncJobResult:
+        while True:
+            async with self.send_request("get", f"/api/cluster/jobs/{job_id}") as resp:
+                data = await resp.json()
+                if data["state"] != "running":
+                    if error := data.get("error"):
+                        error_code = error["code"]
+                        error_msg = error["message"]
+                    else:
+                        error_code = None
+                        error_msg = None
+                    return {
+                        "state": data["state"],
+                        "code": error_code,
+                        "message": error_msg,
+                    }
+            await asyncio.sleep(0.1)
+
+    @staticmethod
+    def check_job_result(result: AsyncJobResult, allowed_codes: Container[str]) -> None:
+        if result["state"] == "failure":
+            if result["code"] in allowed_codes:
+                pass
+            else:
+                raise NetAppClientError(f"{result['state']} [{result['code']}] {result['message']}")
 
     async def get_volume_metadata(self, volume_id: VolumeID) -> Mapping[str, Any]:
         raise NotImplementedError
@@ -112,22 +224,22 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/volumes",
+        async with self.send_request(
+            "get",
+            "/api/storage/volumes",
             params={"fields": ",".join(_extra_fields)},
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             data = await resp.json()
-            return {
-                VolumeID(record["uuid"]): {
-                    "uuid": VolumeID(record["uuid"]),
-                    "name": record["name"],
-                    "path": Path(record["path"]),
+            items = {}
+            for record in data["records"]:
+                volume_id = VolumeID(record.pop("uuid"))
+                items[volume_id] = {
+                    "uuid": volume_id,
+                    "name": record.pop("name"),
+                    "path": Path(record.pop("path")),
+                    **record,
                 }
-                for record in data["records"]
-            }
+            return items
 
     async def get_volume_by_name(
         self,
@@ -138,19 +250,18 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/volumes",
+        async with self.send_request(
+            "get",
+            "/api/storage/volumes",
             params={"name": name, "fields": ",".join(_extra_fields)},
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             data = await resp.json()
             record = data["records"][0]
             return {
-                "uuid": VolumeID(record["uuid"]),
-                "name": record["name"],
-                "path": Path(record["path"]),
+                "uuid": VolumeID(record.pop("uuid")),
+                "name": record.pop("name"),
+                "path": Path(record.pop("path")),
+                **record,
             }
 
     async def get_volume_by_id(
@@ -162,18 +273,17 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/volumes/{volume_id}",
+        async with self.send_request(
+            "get",
+            f"/api/storage/volumes/{volume_id}",
             params={"fields": ",".join(_extra_fields)},
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             record = await resp.json()
             return {
-                "uuid": VolumeID(record["uuid"]),
-                "name": record["name"],
-                "path": Path(record["path"]),
+                "uuid": VolumeID(record.pop("uuid")),
+                "name": record.pop("name"),
+                "path": Path(record.pop("path")),
+                **record,
             }
 
     async def get_volume_metric_by_id(
@@ -185,12 +295,10 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/volumes/{volume_id}/metrics",
+        async with self.send_request(
+            "get",
+            f"/api/storage/volumes/{volume_id}/metrics",
             params={"fields": ",".join(_extra_fields)},
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             return await resp.json()
 
@@ -203,19 +311,18 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/qtrees/{volume_id}",
+        async with self.send_request(
+            "get",
+            f"/api/storage/qtrees/{volume_id}",
             params={"fields": ",".join(_extra_fields)},
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             data = await resp.json()
             return [
                 {
-                    "name": record["name"],
-                    "id": int(record["id"]),
-                    "path": Path(record["path"]),
+                    "name": record.pop("name"),
+                    "id": int(record.pop("id")),
+                    "path": Path(record.pop("path")),
+                    **record,
                 }
                 for record in data["records"]
             ]
@@ -237,18 +344,17 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/qtrees/{volume_id}/{qtree_id}",
+        async with self.send_request(
+            "get",
+            f"/api/storage/qtrees/{volume_id}/{qtree_id}",
             params={"fields": ",".join(_extra_fields)},
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             record = await resp.json()
             return {
-                "name": record["name"],
-                "id": int(record["id"]),
-                "path": Path(record["path"]),
+                "name": record.pop("name"),
+                "id": int(record.pop("id")),
+                "path": Path(record.pop("path")),
+                **record,
             }
 
     async def get_qtree_by_name(
@@ -261,73 +367,142 @@ class NetAppClient:
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/qtrees",
+        async with self.send_request(
+            "get",
+            "/api/storage/qtrees",
             params={
                 "name": name,
                 "volume.uuid": str(volume_id),
                 "fields": ",".join(_extra_fields),
             },
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             data = await resp.json()
             if data["num_records"] > 0:
                 record = data["records"][0]
                 return {
-                    "name": record["name"],
-                    "id": int(record["id"]),
-                    "path": Path(record["path"]),
+                    "name": record.pop("name"),
+                    "id": int(record.pop("id")),
+                    "path": Path(record.pop("path")),
+                    **record,
                 }
             else:
                 raise RuntimeError(f"No qtree {name} found in the volume {volume_id}")
 
-    async def create_qtree(self, svm_id: str, volume_id: VolumeID, qtree_name: str):
-        async with self._session.post(
-            f"{self.endpoint}/api/storage/qtrees",
-            params={
-                "svm": {"uuid": svm_id},
-                "volume": {"uuid": str(volume_id)},
+    async def create_qtree(
+        self,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+        qtree_name: str,
+    ) -> AsyncJobResult:
+        async with self.send_request(
+            "post",
+            "/api/storage/qtrees",
+            data={
+                "svm.uuid": str(svm_id),
+                "volume.uuid": str(volume_id),
                 "name": qtree_name,
             },
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             data = await resp.json()
-            return data
+        return await self.wait_job(data["job"]["uuid"])
 
-    async def update_quota_rule(
+    async def set_quota_rule(
         self,
-        svm_id: str,
+        svm_id: StorageID,
         volume_id: VolumeID,
         qtree_name: str,
         config: QuotaConfig,
-    ):
-        async with self._session.post(
-            f"{self.endpoint}/api/storage/quota/rules",
+    ) -> AsyncJobResult:
+        async with self.send_request(
+            "post",
+            "/api/storage/quota/rules",
             data={
-                "svm": {"uuid": svm_id},
-                "volume": {"uuid": str(volume_id)},
+                "svm.uuid": str(svm_id),
+                "volume.uuid": str(volume_id),
                 "type": "tree",  # fix qtree-based quota
-                "qtree": {"name": qtree_name},
-                "space": {"hard_limit": config.hard_limit, "soft_limit": config.soft_limit},
-                # 'files': {'hard_limit': file_limit, 'soft_limit': file_limit},  # not supported yet from Backend.AI
+                "qtree.name": qtree_name,
+                "space": {
+                    "hard_limit": config.hard_limit,
+                    "soft_limit": config.soft_limit,
+                },
+                # 'files': {  # not supported yet from Backend.AI
+                #     'hard_limit': 0,
+                #     'soft_limit': 0,
+                # },
             },
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
         ) as resp:
             data = await resp.json()
-            return data
+        return await self.wait_job(data["job"]["uuid"])
+
+    async def _find_quota_rule(
+        self,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+        qtree_name: str,
+    ) -> dict[str, Any]:
+        async with self.send_request(
+            "get",
+            "/api/storage/quota/rules",
+            params={
+                "svm.uuid": str(svm_id),
+                "volume.uuid": str(volume_id),
+                "type": "tree",  # fix qtree-based quota
+                "qtree.name": qtree_name,
+                "fields": "space,files",
+            },
+        ) as resp:
+            data = await resp.json()
+            records = data["records"]
+            if data["num_records"] == 0:
+                raise NetAppClientError(
+                    f"Quota rule not found for the volume {volume_id} and the qtree {qtree_name}"
+                )
+            return records[0]
+
+    async def get_quota_rule(
+        self,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+        qtree_name: str,
+    ) -> QuotaConfig:
+        record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
+        return QuotaConfig(
+            soft_limit=record["space"]["soft_limit"],
+            hard_limit=record["space"]["hard_limit"],
+        )
+
+    async def delete_quota_rule(
+        self,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+        qtree_name: str,
+    ) -> AsyncJobResult:
+        record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
+        async with self.send_request(
+            "delete",
+            f"/api/storage/quota/rules/{record['uuid']}",
+        ) as resp:
+            data = await resp.json()
+        return await self.wait_job(data["job"]["uuid"])
+
+    async def enable_quota(
+        self,
+        volume_id: VolumeID,
+    ) -> AsyncJobResult:
+        async with self.send_request(
+            "patch",
+            f"/api/storage/volumes/{volume_id}",
+            data={
+                "quota.enabled": True,
+            },
+        ) as resp:
+            data = await resp.json()
+        return await self.wait_job(data["job"]["uuid"])
 
     async def get_qos_policies(self) -> List[Mapping[str, Any]]:
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/qos/policies",
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
+        async with self.send_request(
+            "get",
+            "/api/storage/qos/policies",
         ) as resp:
             data = await resp.json()
             qos_policies_metadata = data["records"]
@@ -338,11 +513,9 @@ class NetAppClient:
         return qos_policies
 
     async def get_qos_by_uuid(self, qos_uuid) -> Mapping[str, Any]:
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/qos/policies/{qos_uuid}",
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
+        async with self.send_request(
+            "get",
+            f"/api/storage/qos/policies/{qos_uuid}",
         ) as resp:
             data = await resp.json()
             fixed = data["fixed"]
@@ -361,11 +534,9 @@ class NetAppClient:
             return qos_policy
 
     async def get_qos_by_volume_id(self, volume_uuid) -> Mapping[str, Any]:
-        async with self._session.get(
-            f"{self.endpoint}/api/storage/volumes/{volume_uuid}?fields=qos",
-            auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
-            raise_for_status=True,
+        async with self.send_request(
+            "get",
+            f"/api/storage/volumes/{volume_uuid}?fields=qos",
         ) as resp:
             data = await resp.json()
         return data["qos"]
