@@ -20,15 +20,13 @@ def dotfile():
 @click.option(
     "--perm",
     "permission",
-    help="Linux permission represented in octal number (e.g. 755) "
-    "Defaults to 755 if not specified",
+    help="Linux permission represented in octal number (e.g. 755) Defaults to 755 if not specified",
 )
 @click.option(
     "-f",
     "--file",
     "dotfile_path",
-    help="Path to dotfile to upload. "
-    "If not specified, client will try to read file from STDIN. ",
+    help="Path to dotfile to upload. If not specified, client will try to read file from STDIN. ",
 )
 @click.option(
     "-o",
@@ -45,8 +43,10 @@ def dotfile():
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    help=(
+        "Specify the group name or id of group dotfiles. "
+        "(If group name is provided, domain name must be specified with option -d)"
+    ),
 )
 def create(path, permission, dotfile_path, owner_access_key, domain, group):
     """
@@ -98,8 +98,10 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    help=(
+        "Specify the group name or id of group dotfiles. "
+        "(If group name is provided, domain name must be specified with option -d)"
+    ),
 )
 def get(path, owner_access_key, domain, group):
     """
@@ -133,12 +135,14 @@ def get(path, owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    help=(
+        "Specify the group name or id of group dotfiles. "
+        "(If group name is provided, domain name must be specified with option -d)"
+    ),
 )
 def list(owner_access_key, domain, group):
     """
-    List availabe user/domain/group dotfiles.
+    List available user/domain/group dotfiles.
     """
     fields = [
         ("Path", "path", None),
@@ -172,15 +176,13 @@ def list(owner_access_key, domain, group):
 @click.option(
     "--perm",
     "permission",
-    help="Linux permission represented in octal number (e.g. 755) "
-    "Defaults to 755 if not specified",
+    help="Linux permission represented in octal number (e.g. 755) Defaults to 755 if not specified",
 )
 @click.option(
     "-f",
     "--file",
     "dotfile_path",
-    help="Path to dotfile to upload. "
-    "If not specified, client will try to read file from STDIN. ",
+    help="Path to dotfile to upload. If not specified, client will try to read file from STDIN. ",
 )
 @click.option(
     "-o",
@@ -197,8 +199,10 @@ def list(owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    help=(
+        "Specify the group name or id of group dotfiles. "
+        "(If group name is provided, domain name must be specified with option -d)"
+    ),
 )
 def update(path, permission, dotfile_path, owner_access_key, domain, group):
     """
@@ -244,8 +248,10 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    help=(
+        "Specify the group name or id of group dotfiles. "
+        "(If group name is provided, domain name must be specified with option -d)"
+    ),
 )
 def delete(path, force, owner_access_key, domain, group):
     """

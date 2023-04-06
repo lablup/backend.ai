@@ -73,7 +73,6 @@ def round_down(from_dec: Decimal, with_dec: Decimal):
 
 
 class AbstractAllocMap(metaclass=ABCMeta):
-
     device_slots: Mapping[DeviceId, DeviceSlotInfo]
     device_mask: FrozenSet[DeviceId]
     exclusive_slot_types: Iterable[SlotName]
@@ -258,7 +257,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             for slot_name_b in requested_slots.keys():
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
-                        f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same time."
+                        f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
+                        " time."
                     )
 
         # check unique
@@ -463,7 +463,10 @@ class FractionAllocMap(AbstractAllocMap):
             for slot_name_b in requested_slots.keys():
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
-                        f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same time.",
+                        (
+                            f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
+                            " time."
+                        ),
                     )
 
         calculated_alloc_map = self._allocate_impl[self.allocation_strategy](
@@ -482,9 +485,12 @@ class FractionAllocMap(AbstractAllocMap):
                 actual_alloc[dev_id] = round_down(val, self.quantum_size)
             if sum(actual_alloc.values()) == 0 and requested_slots[slot_name] > 0:
                 raise NotMultipleOfQuantum(
-                    f"Requested resource amount for {slot_name} is {requested_slots[slot_name]} "
-                    "but actual calculated amount is zero. This can happen if user requests "
-                    "resource amount smaller than target device's quantum size.",
+                    (
+                        f"Requested resource amount for {slot_name} is"
+                        f" {requested_slots[slot_name]} but actual calculated amount is zero. This"
+                        " can happen if user requests resource amount smaller than target device's"
+                        " quantum size."
+                    ),
                 )
             actual_alloc_map[slot_name] = actual_alloc
 
@@ -555,7 +561,6 @@ class FractionAllocMap(AbstractAllocMap):
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-
         # higher value means more even with 0 being the highest value
         def measure_evenness(
             alloc_map: Mapping[DeviceId, Decimal],

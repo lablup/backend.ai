@@ -46,7 +46,8 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
         except ValueError:
             # interpret as name
             try:
-                item = session.Group.from_name(id_or_name)
+                groups = session.Group.from_name(id_or_name)
+                item = groups[0]  # take the first one
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
@@ -91,8 +92,10 @@ def list(ctx: CLIContext, domain_name) -> None:
     "--allowed-vfolder-hosts",
     type=str,
     default="{}",
-    help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
+    help=(
+        "Allowed virtual folder hosts. It must be JSON string (e.g:"
+        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
 )
 def add(
     ctx: CLIContext,
@@ -150,8 +153,10 @@ def add(
 @click.option(
     "--allowed-vfolder-hosts",
     type=str,
-    help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
+    help=(
+        "Allowed virtual folder hosts. It must be JSON string (e.g:"
+        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
 )
 def update(
     ctx: CLIContext, gid, name, description, is_active, total_resource_slots, allowed_vfolder_hosts

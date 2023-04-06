@@ -29,7 +29,7 @@ _default_detail_fields = (
 class Storage(BaseFunction):
     """
     Provides a shortcut of :func:`Admin.query()
-    <ai.backend.client.admin.Admin.query>` that fetches various straoge volume
+    <ai.backend.client.admin.Admin.query>` that fetches various storage volume
     information keyed by vfolder hosts.
 
     .. note::
@@ -72,13 +72,11 @@ class Storage(BaseFunction):
         vfolder_host: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict:
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($vfolder_host: String!) {
                 storage_volume(id: $vfolder_host) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"vfolder_host": vfolder_host}
         data = await api_session.get().Admin._query(query, variables)

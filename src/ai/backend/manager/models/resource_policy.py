@@ -258,7 +258,6 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -299,7 +298,6 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
 
 
 class ModifyKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -343,7 +341,6 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
 
 
 class DeleteKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

@@ -21,7 +21,7 @@ from ai.backend.storage.exception import ExecutionError
 
 from ..abc import AbstractVolume
 from ..context import Context
-from ..exception import InvalidSubpathError, VFolderNotFoundError
+from ..exception import InvalidSubpathError, StorageProxyError, VFolderNotFoundError
 from ..types import VFolderCreationOptions
 from ..utils import check_params, log_manager_api_entry
 
@@ -163,7 +163,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
             {
                 t.Key("src_volume"): t.String(),
                 t.Key("src_vfid"): tx.UUID(),
-                t.Key("dst_volume"): t.String(),
+                t.Key("dst_volume"): t.String() | t.Null,
                 t.Key("dst_vfid"): tx.UUID(),
                 t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
@@ -171,13 +171,13 @@ async def clone_vfolder(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "clone_vfolder", params)
         ctx: Context = request.app["ctx"]
+        if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
+            raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
         async with ctx.get_volume(params["src_volume"]) as src_volume:
-            async with ctx.get_volume(params["dst_volume"]) as dst_volume:
-                await src_volume.clone_vfolder(
-                    params["src_vfid"],
-                    dst_volume,
-                    params["dst_vfid"],
-                )
+            await src_volume.clone_vfolder(
+                params["src_vfid"],
+                params["dst_vfid"],
+            )
         return web.Response(status=204)
 
 

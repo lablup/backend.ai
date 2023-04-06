@@ -35,7 +35,7 @@ def cli(args) -> None:
     "--alembic-config",
     default="alembic.ini",
     metavar="PATH",
-    help="The path to Alembic config file. " "[default: alembic.ini]",
+    help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
 def show(cli_ctx: CLIContext, alembic_config) -> None:
@@ -70,7 +70,7 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     "--alembic-config",
     default="alembic.ini",
     metavar="PATH",
-    help="The path to Alembic config file. " "[default: alembic.ini]",
+    help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
 def oneshot(cli_ctx: CLIContext, alembic_config) -> None:

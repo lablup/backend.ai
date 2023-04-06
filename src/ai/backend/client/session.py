@@ -63,16 +63,20 @@ async def _negotiate_api_version(
             server_version = parse_api_version(server_info["version"])
             if server_version > client_version:
                 warnings.warn(
-                    "The server API version is higher than the client. "
-                    "Please upgrade the client package.",
+                    (
+                        "The server API version is higher than the client. "
+                        "Please upgrade the client package."
+                    ),
                     category=APIVersionWarning,
                 )
             if server_version < MIN_API_VERSION:
                 warnings.warn(
-                    f"The server is too old and does not meet the minimum API version requirement: "
-                    f"v{MIN_API_VERSION[0]}.{MIN_API_VERSION[1]}\n"
-                    f"Please upgrade the server or downgrade/reinstall the client SDK with "
-                    f"the same major.minor release of the server.",
+                    (
+                        "The server is too old and does not meet the minimum API version"
+                        f" requirement: v{MIN_API_VERSION[0]}.{MIN_API_VERSION[1]}\nPlease upgrade"
+                        " the server or downgrade/reinstall the client SDK with the same"
+                        " major.minor release of the server."
+                    ),
                     category=APIVersionWarning,
                 )
             return min(server_version, client_version)
@@ -128,7 +132,6 @@ _Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
-
     work_queue: queue.Queue[
         Union[
             Tuple[Union[AsyncIterator, Coroutine], Context],
@@ -270,6 +273,8 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Dotfile",
         "ServerLog",
         "Permission",
+        "Service",
+        "Model",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -303,9 +308,11 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.keypair import KeyPair
         from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.manager import Manager
+        from .func.model import Model
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
         from .func.server_log import ServerLog
+        from .func.service import Service
         from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
         from .func.storage import Storage
@@ -336,6 +343,8 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission
+        self.Service = Service
+        self.Model = Model
 
     @property
     def proxy_mode(self) -> bool:
@@ -453,7 +462,7 @@ class Session(BaseSession):
                 if payload["enabled"]:
                     self.config.announcement_handler(payload["message"])
             except (BackendClientError, BackendAPIError):
-                # The server may be an old one without annoucement API.
+                # The server may be an old one without announcement API.
                 pass
         return self
 
@@ -509,7 +518,7 @@ class AsyncSession(BaseSession):
                 if payload["enabled"]:
                     self.config.announcement_handler(payload["message"])
             except (BackendClientError, BackendAPIError):
-                # The server may be an old one without annoucement API.
+                # The server may be an old one without announcement API.
                 pass
         return self
 

@@ -103,7 +103,6 @@ GetPrefixValue = Mapping[str, Union["GetPrefixValue", Optional[str]]]
 
 
 class AsyncEtcd:
-
     etcd: EtcdClient
 
     _creds: Optional[EtcdCredential]

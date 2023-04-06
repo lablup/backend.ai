@@ -621,7 +621,7 @@ def main(config_path: str, debug: bool) -> None:
         debugFlag = "DEBUG"
     else:
         debugFlag = "INFO"
-    setproctitle(f"backend.ai: webserver " f"{config['service']['ip']}:{config['service']['port']}")
+    setproctitle(f"backend.ai: webserver {config['service']['ip']}:{config['service']['port']}")
 
     logging.config.dictConfig(
         {
@@ -630,7 +630,7 @@ def main(config_path: str, debug: bool) -> None:
             "formatters": {
                 "colored": {
                     "()": "coloredlogs.ColoredFormatter",
-                    "format": "%(asctime)s %(levelname)s %(name)s " "[%(process)d] %(message)s",
+                    "format": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
                     "field_styles": {
                         "levelname": {"color": 248, "bold": True},
                         "name": {"color": 246, "bold": False},

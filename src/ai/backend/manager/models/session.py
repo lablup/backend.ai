@@ -93,6 +93,8 @@ __all__ = (
     "check_all_dependencies",
     "ComputeSession",
     "ComputeSessionList",
+    "InferenceSession",
+    "InferenceSessionList",
 )
 
 
@@ -610,9 +612,6 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    # status_changed = sa.Column(
-    #     "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
-    # )
     status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
 
     status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
@@ -1053,6 +1052,7 @@ class ComputeSession(graphene.ObjectType):
     group_name = graphene.String()
     group_id = graphene.UUID()
     user_email = graphene.String()
+    full_name = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
     created_user_email = graphene.String()
@@ -1071,6 +1071,7 @@ class ComputeSession(graphene.ObjectType):
     result = graphene.String()
     commit_status = graphene.String()
     abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -1090,10 +1091,13 @@ class ComputeSession(graphene.ObjectType):
     # relations
     dependencies = graphene.List(lambda: ComputeSession)
 
+    inference_metrics = graphene.JSONString()
+
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         assert row is not None
         email = getattr(row, "email")
+        full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
         return {
@@ -1117,6 +1121,7 @@ class ComputeSession(graphene.ObjectType):
             "group_name": group_name,
             "group_id": row.group_id,
             "user_email": email,
+            "full_name": full_name,
             "user_id": row.user_uuid,
             "access_key": row.access_key,
             "created_user_email": None,  # TODO: implement
@@ -1165,6 +1170,15 @@ class ComputeSession(graphene.ObjectType):
             ),
             start=zero,
         ).to_json()
+
+    async def resolve_inference_metrics(
+        self, info: graphene.ResolveInfo
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
+        )
+        return await loader.load(self.id)
 
     # legacy
     async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
@@ -1215,6 +1229,10 @@ class ComputeSession(graphene.ObjectType):
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
@@ -1222,7 +1240,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("groups_name", None),
         "user_email": ("users_email", None),
-        "user_name": ("users_username", None),
+        "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
@@ -1246,7 +1264,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": "sessions_domain_name",
         "group_name": "groups_name",
         "user_email": "users_email",
-        "user_name": "users_username",
+        "full_name": "users_full_name",
         "access_key": "sessions_access_key",
         "scaling_group": "sessions_scaling_group_name",
         "cluster_mode": "sessions_cluster_mode",
@@ -1322,6 +1340,7 @@ class ComputeSession(graphene.ObjectType):
                 SessionRow,
                 GroupRow.name.label("group_name"),
                 UserRow.email,
+                UserRow.full_name,
             )
             .select_from(j)
             .options(selectinload(SessionRow.kernels))
@@ -1364,6 +1383,7 @@ class ComputeSession(graphene.ObjectType):
                 SessionRow,
                 GroupRow.name.label("group_name"),
                 UserRow.email,
+                UserRow.full_name,
             )
             .select_from(j)
             .where(SessionRow.id.in_(session_ids))
@@ -1416,3 +1436,15 @@ class ComputeSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(ComputeSession, required=True)
+
+
+class InferenceSession(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+
+class InferenceSessionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(InferenceSession, required=True)

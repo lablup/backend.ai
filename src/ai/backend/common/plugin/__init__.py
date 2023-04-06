@@ -145,7 +145,9 @@ class BasePluginContext(Generic[P]):
             if union := allowlist & blocklist:
                 raise ConfigurationError(
                     {
-                        "plugin.BasePluginContext": f"allowlist and blocklist has union value '{union}'"
+                        "plugin.BasePluginContext": (
+                            f"allowlist and blocklist has union value '{union}'"
+                        )
                     }
                 )
         scanned_plugins = self.discover_plugins(

@@ -73,6 +73,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     secret=secret,
                     inner_iv=download_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
                 t.Key("archive", default=False): t.ToBool,
                 t.Key("no_cache", default=False): t.ToBool,
             },
@@ -86,7 +87,10 @@ async def download(request: web.Request) -> web.StreamResponse:
             else:
                 vfpath = volume.mangle_vfpath(token_data["vfid"])
             try:
-                file_path = (vfpath / token_data["relpath"]).resolve()
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                file_path = parent_dir / token_data["relpath"]
                 file_path.relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
@@ -134,7 +138,7 @@ async def download(request: web.Request) -> web.StreamResponse:
         hdrs.CONTENT_TYPE: "application/octet-stream",
         hdrs.CONTENT_DISPOSITION: " ".join(
             [
-                "attachment;" f'filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
                 f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
             ],
         ),
@@ -197,7 +201,7 @@ async def download_directory_as_archive(
             hdrs.CONTENT_TYPE: "application/zip",
             hdrs.CONTENT_DISPOSITION: " ".join(
                 [
-                    "attachment;" f'filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                    f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
                     f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
                 ],
             ),
@@ -223,6 +227,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     secret=secret,
                     inner_iv=upload_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
             },
         ),
         read_from=CheckParamSource.QUERY,
@@ -247,6 +252,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     secret=secret,
                     inner_iv=upload_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
             },
         ),
         read_from=CheckParamSource.QUERY,
@@ -268,7 +274,12 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             current_size = Path(upload_temp_path).stat().st_size
             if current_size >= int(token_data["size"]):
-                target_path = vfpath / token_data["relpath"]
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                if not parent_dir.exists():
+                    parent_dir.mkdir(parents=True, exist_ok=True)
+                target_path = parent_dir / token_data["relpath"]
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()
@@ -289,12 +300,12 @@ async def tus_options(request: web.Request) -> web.Response:
     ctx: Context = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers[
-        "Access-Control-Allow-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    headers[
-        "Access-Control-Expose-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers["Access-Control-Allow-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
+    headers["Access-Control-Expose-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
@@ -324,12 +335,12 @@ async def prepare_tus_session_headers(
         )
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers[
-        "Access-Control-Allow-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    headers[
-        "Access-Control-Expose-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers["Access-Control-Allow-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
+    headers["Access-Control-Expose-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"

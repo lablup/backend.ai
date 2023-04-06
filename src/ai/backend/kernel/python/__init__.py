@@ -9,6 +9,7 @@ from typing import List
 import janus
 
 from .. import BaseRunner
+from ..base import promote_path
 
 log = logging.getLogger()
 
@@ -16,30 +17,11 @@ DEFAULT_PYFLAGS: List[str] = []
 
 
 class Runner(BaseRunner):
-
     log_prefix = "python-kernel"
     default_runtime_path = "/usr/bin/python"
     default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": ":".join(
-            [
-                "/usr/local/nvidia/bin",
-                "/usr/local/cuda/bin",
-                "/usr/local/sbin",
-                "/usr/local/bin",
-                "/opt/conda/bin",
-                "/usr/sbin",
-                "/usr/bin",
-                "/sbin",
-                "/bin",
-            ]
-        ),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
+        **BaseRunner.default_child_env,
+        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
     }
     jupyter_kspec_name = "python"
 
@@ -66,7 +48,7 @@ class Runner(BaseRunner):
         )
         stdout, _ = await proc.communicate()
         user_site = stdout.decode("utf8").strip()
-        self.child_env["PYTHONPATH"] = user_site
+        self.child_env["PYTHONPATH"] = promote_path(self.child_env["PYTHONPATH"], user_site)
 
         # Add support for interactive input in batch mode by copying
         # sitecustomize.py to USER_SITE of runtime python.

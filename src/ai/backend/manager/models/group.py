@@ -391,7 +391,6 @@ class ModifyGroupInput(graphene.InputObjectType):
 
 
 class CreateGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -431,7 +430,6 @@ class CreateGroup(graphene.Mutation):
 
 
 class ModifyGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -574,13 +572,15 @@ class PurgeGroup(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             if await cls.group_vfolder_mounted_to_active_kernels(conn, gid):
                 raise RuntimeError(
-                    "Some of virtual folders that belong to this group "
-                    "are currently mounted to active sessions. "
-                    "Terminate them first to proceed removal.",
+                    (
+                        "Some of virtual folders that belong to this group "
+                        "are currently mounted to active sessions. "
+                        "Terminate them first to proceed removal."
+                    ),
                 )
             if await cls.group_has_active_kernels(conn, gid):
                 raise RuntimeError(
-                    "Group has some active session. " "Terminate them first to proceed removal.",
+                    "Group has some active session. Terminate them first to proceed removal.",
                 )
             await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
@@ -681,7 +681,7 @@ class PurgeGroup(graphene.Mutation):
                 & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
             )
         )
-        async for row in (await db_conn.stream(query)):
+        async for row in await db_conn.stream(query):
             for _mount in row["mounts"]:
                 try:
                     vfolder_id = uuid.UUID(_mount[2])

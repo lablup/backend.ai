@@ -41,10 +41,12 @@ from ai.backend.agent.stats import (
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    ProcessMeasurement,
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -80,7 +82,6 @@ class CUDADevice(AbstractComputeDevice):
 
 
 class CUDAPlugin(AbstractComputePlugin):
-
     config_watch_enabled = False
 
     key = DeviceName("cuda")
@@ -167,9 +168,7 @@ class CUDAPlugin(AbstractComputePlugin):
             if dev_id in self.device_mask:
                 continue
             raw_info = libcudart.get_device_props(int(dev_id))
-            sysfs_node_path = (
-                "/sys/bus/pci/devices/" f"{raw_info['pciBusID_str'].lower()}/numa_node"
-            )
+            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
             node: Optional[int]
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
@@ -271,13 +270,16 @@ class CUDAPlugin(AbstractComputePlugin):
     ) -> Sequence[ContainerMeasurement]:
         return []
 
+    async def gather_process_measures(
+        self, ctx: StatContext, pid_map: Mapping[int, str]
+    ) -> Sequence[ProcessMeasurement]:
+        return []
+
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
             device_slots={
-                dev.device_id: (
-                    DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1))
-                )
+                dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1))
                 for dev in devices
             },
         )
@@ -437,7 +439,10 @@ class CUDAPlugin(AbstractComputePlugin):
             )
         else:
             alloc_map.allocations[SlotName("cuda.device")].update(
-                resource_spec.allocations.get(DeviceName("cuda"), {},).get(
+                resource_spec.allocations.get(
+                    DeviceName("cuda"),
+                    {},
+                ).get(
                     SlotName("cuda.device"),
                     {},
                 ),
@@ -471,3 +476,13 @@ class CUDAPlugin(AbstractComputePlugin):
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
         return []
+
+    def get_metadata(self) -> AcceleratorMetadata:
+        return {
+            "slot_name": self.slot_types[0][0],
+            "human_readable_name": "GPU",
+            "description": "CUDA-capable GPU",
+            "display_unit": "GPU",
+            "number_format": {"binary": False, "round_length": 0},
+            "display_icon": "gpu1",
+        }

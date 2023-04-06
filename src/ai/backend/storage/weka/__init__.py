@@ -21,7 +21,6 @@ log = BraceStyleAdapter(logger)
 
 
 class WekaVolume(BaseVolume):
-
     api_client: WekaAPIClient
 
     _fs_uid: str
