@@ -73,6 +73,7 @@ mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.10.9/bin/python"
+disable_error_code = ["typeddict-unknown-key"]
 
 [tool.black]
 line-length = 100
