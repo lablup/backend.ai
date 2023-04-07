@@ -13,12 +13,9 @@ from typing import (
     final,
 )
 
-import trafaret as t
-
-from ai.backend.common import validators as tx
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from .exception import InvalidQuotaScopeError, InvalidSubpathError, VFolderNotFoundError
+from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import (
     DirEntry,
     FSPerfMetric,
@@ -38,82 +35,9 @@ CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder
 CAP_FAST_SIZE: Final = "fast-size"  # ability to scan vFolder size fast (e.g. by API)
 
 
-class AbstractVolume(metaclass=ABCMeta):
-    def __init__(
-        self,
-        local_config: Mapping[str, Any],
-        mount_path: Path,
-        *,
-        fsprefix: Optional[PurePath] = None,
-        options: Optional[Mapping[str, Any]] = None,
-    ) -> None:
-        self.local_config = local_config
-        self.mount_path = mount_path
-        self.fsprefix = fsprefix or PurePath(".")
-        self.config = options or {}
-
-    async def init(self) -> None:
-        pass
-
-    async def shutdown(self) -> None:
-        pass
-
-    @final
+class AbstractQuotaModel(metaclass=ABCMeta):
+    @abstractmethod
     def mangle_qspath(self, ref: VFolderID | str | None) -> Path:
-        try:
-            match ref:
-                case VFolderID():
-                    if ref.quota_scope_id is None:
-                        return self.mount_path  # for legacy vfolder paths during migration
-                    tx.QuotaScopeID().check(ref.quota_scope_id)
-                    return Path(self.mount_path, ref.quota_scope_id)
-                case str():
-                    tx.QuotaScopeID().check(ref)
-                    return Path(self.mount_path, ref)
-                case None:
-                    return self.mount_path  # for legacy vfolder paths during migration
-                case _:
-                    raise InvalidQuotaScopeError(
-                        f"Invalid value format for quota scope ID: {ref!r}"
-                    )
-        except t.DataError:
-            raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}")
-
-    @final
-    def mangle_vfpath(self, vfid: VFolderID) -> Path:
-        folder_id_hex = vfid.folder_id.hex
-        prefix1 = folder_id_hex[0:2]
-        prefix2 = folder_id_hex[2:4]
-        rest = folder_id_hex[4:]
-        return self.mangle_qspath(vfid.quota_scope_id) / prefix1 / prefix2 / rest
-
-    @final
-    def sanitize_vfpath(
-        self,
-        vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
-    ) -> Path:
-        vfpath = self.mangle_vfpath(vfid).resolve()
-        if not (vfpath.exists() and vfpath.is_dir()):
-            raise VFolderNotFoundError(vfid)
-        target_path = (vfpath / relpath).resolve()
-        if not target_path.is_relative_to(vfpath):
-            raise InvalidSubpathError(vfid, relpath)
-        return target_path
-
-    @final
-    def strip_vfpath(self, vfid: VFolderID, target_path: Path) -> PurePosixPath:
-        vfpath = self.mangle_vfpath(vfid).resolve()
-        return PurePosixPath(target_path.relative_to(vfpath))
-
-    # ------ volume operations -------
-
-    @abstractmethod
-    async def get_capabilities(self) -> FrozenSet[str]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def get_hwinfo(self) -> HardwareMetadata:
         raise NotImplementedError
 
     @abstractmethod
@@ -162,6 +86,114 @@ class AbstractVolume(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+
+class AbstractFSOpModel(metaclass=ABCMeta):
+    @abstractmethod
+    async def copy_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        """
+        The actual backend-specific implementation of copying
+        files from a directory to another in an efficient way.
+        The source and destination are in the same filesystem namespace
+        but they may be on different physical media.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def move_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_tree(
+        self,
+        path: Path,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def scan_tree_usage(
+        self,
+        path: Path,
+    ) -> VFolderUsage:
+        raise NotImplementedError
+
+
+class AbstractVolume(metaclass=ABCMeta):
+    quota_model: AbstractQuotaModel
+    fsop_model: AbstractFSOpModel
+
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        fsprefix: Optional[PurePath] = None,
+        options: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        self.local_config = local_config
+        self.mount_path = mount_path
+        self.fsprefix = fsprefix or PurePath(".")
+        self.config = options or {}
+
+    async def init(self) -> None:
+        self.fsop_model = self.create_fsop_model()
+        self.quota_model = self.create_quota_model()
+
+    async def shutdown(self) -> None:
+        pass
+
+    @abstractmethod
+    def create_quota_model(self) -> AbstractQuotaModel:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_fsop_model(self) -> AbstractFSOpModel:
+        raise NotImplementedError
+
+    @final
+    def mangle_vfpath(self, vfid: VFolderID) -> Path:
+        folder_id_hex = vfid.folder_id.hex
+        prefix1 = folder_id_hex[0:2]
+        prefix2 = folder_id_hex[2:4]
+        rest = folder_id_hex[4:]
+        return self.quota_model.mangle_qspath(vfid.quota_scope_id) / prefix1 / prefix2 / rest
+
+    @final
+    def sanitize_vfpath(
+        self,
+        vfid: VFolderID,
+        relpath: PurePosixPath = PurePosixPath("."),
+    ) -> Path:
+        vfpath = self.mangle_vfpath(vfid).resolve()
+        if not (vfpath.exists() and vfpath.is_dir()):
+            raise VFolderNotFoundError(vfid)
+        target_path = (vfpath / relpath).resolve()
+        if not target_path.is_relative_to(vfpath):
+            raise InvalidSubpathError(vfid, relpath)
+        return target_path
+
+    @final
+    def strip_vfpath(self, vfid: VFolderID, target_path: Path) -> PurePosixPath:
+        vfpath = self.mangle_vfpath(vfid).resolve()
+        return PurePosixPath(target_path.relative_to(vfpath))
+
+    # ------ volume operations -------
+
+    @abstractmethod
+    async def get_capabilities(self) -> FrozenSet[str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_hwinfo(self) -> HardwareMetadata:
+        raise NotImplementedError
+
     @abstractmethod
     async def create_vfolder(
         self,
@@ -190,20 +222,6 @@ class AbstractVolume(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def copy_tree(
-        self,
-        src_path: Path,
-        dst_path: Path,
-    ) -> None:
-        """
-        The actual backend-specific implementation of copying
-        files from a directory to another in an efficient way.
-        The source and destination are in the same filesystem namespace
-        but they may be on different physical media.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         raise NotImplementedError
 
@@ -217,31 +235,6 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     async def get_performance_metric(self) -> FSPerfMetric:
-        pass
-
-    @abstractmethod
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        """
-        Gets the currently configured quota size of the given folder.
-
-        .. versionchanged:: 23.03
-
-           Use the quota scopes intead of per-folder quota.
-           As of 23.03, this return the quota limit of the quota scope where the given vfolder
-           belongs to.
-        """
-        pass
-
-    @abstractmethod
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        """
-        Sets the quota size of the given folder.
-
-        .. versionremoved:: 23.03
-
-           Use the quota scopes intead of per-folder quota.
-           As of 23.03, this becomes a no-op.
-        """
         pass
 
     @abstractmethod

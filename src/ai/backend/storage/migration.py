@@ -164,8 +164,8 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             orig_vfid = VFolderID(None, folder_id)
             dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
             try:
-                await volume.create_quota_scope(quota_scope_map[folder_id])
-                await volume.copy_tree(
+                await volume.quota_model.create_quota_scope(quota_scope_map[folder_id])
+                await volume.fsop_model.copy_tree(
                     volume.mangle_vfpath(orig_vfid),
                     volume.mangle_vfpath(dst_vfid),
                 )

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import errno
 import glob
 import json
 import os
 import time
-import warnings
 from contextlib import aclosing
 from pathlib import Path, PurePosixPath
 from typing import FrozenSet, Optional
@@ -16,12 +14,145 @@ import aiofiles.os
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER
+from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel
 from ..exception import ExecutionError, NotEmptyError, StorageProxyError
 from ..subproc import spawn_and_watch
 from ..types import FSPerfMetric, FSUsage, QuotaConfig, VFolderID, VFolderUsage
-from ..vfs import BaseVolume
+from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import NetAppClient, StorageID, VolumeID
+
+
+class QTreeQuotaModel(BaseQuotaModel):
+    """
+    Implements the quota scope model using NetApp's QTrees.
+    """
+
+    def __init__(
+        self,
+        mount_path: Path,
+        netapp_client: NetAppClient,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+    ) -> None:
+        super().__init__(mount_path)
+        self.netapp_client = netapp_client
+        self.svm_id = svm_id
+        self.volume_id = volume_id
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: str,
+        config: Optional[QuotaConfig] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
+        if config is not None:
+            await self.update_quota_scope(quota_scope_id, config)
+
+    async def get_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> tuple[QuotaConfig, VFolderUsage]:
+        qspath = self.mangle_qspath(quota_scope_id)
+        qconfig = await self.netapp_client.get_quota_rule(self.svm_id, self.volume_id, qspath.name)
+        return qconfig, VFolderUsage(-1, -1)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: str,
+        config: QuotaConfig,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        result = await self.netapp_client.set_quota_rule(
+            self.svm_id,
+            self.volume_id,
+            qspath.name,
+            config,
+        )
+        self.netapp_client.check_job_result(result, [])
+        result = await self.netapp_client.enable_quota(self.volume_id)
+        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
+
+    async def delete_quota_scope(
+        self,
+        quota_scope_id: str,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        await self.netapp_client.delete_quota_rule(
+            self.svm_id,
+            self.volume_id,
+            qspath.name,
+        )
+        # QTree is automatically removed when the corresponding directory is deleted.
+        await aiofiles.os.rmdir(qspath)
+
+
+class XCPFSOpModel(BaseFSOpModel):
+    """
+    Accelerates filesystem operations using NetApp's XCP tool.
+
+    ref) https://docs.netapp.com/us-en/xcp/xcp-install-xcp.html#install-and-configure-workflow
+    """
+
+    def __init__(
+        self,
+        mount_path: Path,
+        netapp_xcp_host: str,
+        netapp_xcp_container_name: str,
+        volume_path: Path,
+    ) -> None:
+        super().__init__(mount_path)
+        self.netapp_xcp_host = netapp_xcp_host
+        self.netapp_xcp_container_name = netapp_xcp_container_name
+        self.volume_path = volume_path
+
+    async def copy_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        if not src_path.is_relative_to(self.mount_path):
+            raise ValueError(f"Invalid path inside the volume: {src_path}")
+        if not dst_path.is_relative_to(self.mount_path):
+            raise ValueError(f"Invalid path inside the volume: {dst_path}")
+
+        # Rearrange the paths into the NFS absolute path.
+        # These relative paths contains the qtree (quota-scope) name as the first part.
+        src_relpath = src_path.relative_to(self.mount_path)
+        dst_relpath = dst_path.relative_to(self.mount_path)
+        src_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{src_relpath}"
+        dst_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{dst_relpath}"
+
+        copy_cmd = [b"xcp", b"copy", os.fsencode(src_nfspath), os.fsencode(dst_nfspath)]
+        if self.netapp_xcp_container_name is not None:
+            copy_cmd = [
+                b"docker",
+                b"exec",
+                self.netapp_xcp_container_name.encode(),
+                *copy_cmd,
+            ]
+        async with aclosing(spawn_and_watch(copy_cmd)) as ag:
+            async for line in ag:
+                # TODO: line for bgtask
+                pass
+
+    async def delete_tree(self, path: Path) -> None:
+        relpath = path.relative_to(self.mount_path)
+        nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{relpath}"
+        delete_cmd = [b"xcp", b"delete", b"-force", os.fsencode(nfspath)]
+        if self.netapp_xcp_container_name is not None:
+            delete_cmd = [
+                b"docker",
+                b"exec",
+                self.netapp_xcp_container_name.encode(),
+                *delete_cmd,
+            ]
+        async with aclosing(spawn_and_watch(delete_cmd)) as ag:
+            async for line in ag:
+                # TODO: line for bgtask
+                pass
 
 
 class NetAppVolume(BaseVolume):
@@ -34,6 +165,22 @@ class NetAppVolume(BaseVolume):
     volume_id: VolumeID
     volume_path: Path
 
+    def create_quota_model(self) -> AbstractQuotaModel:
+        return QTreeQuotaModel(
+            self.mount_path,
+            self.netapp_client,
+            self.svm_id,
+            self.volume_id,
+        )
+
+    def create_fsop_model(self) -> AbstractFSOpModel:
+        return XCPFSOpModel(
+            self.mount_path,
+            self.netapp_xcp_host,
+            self.netapp_xcp_container_name,
+            self.volume_path,
+        )
+
     async def init(self) -> None:
         self.endpoint = self.config["netapp_endpoint"]
         self.netapp_client = NetAppClient(
@@ -45,6 +192,7 @@ class NetAppVolume(BaseVolume):
         self.netapp_xcp_catalog_path = self.config["netapp_xcp_catalog_path"]
         self.netapp_xcp_container_name = self.config["netapp_xcp_container_name"]
         self.volume_name = self.config["netapp_volume_name"]
+        # TODO: resolve async-init ordering issue
         volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
         assert "svm" in volume_info
         self.volume_id = volume_info["uuid"]
@@ -139,127 +287,8 @@ class NetAppVolume(BaseVolume):
             io_usec_write=0,
         )
 
-    async def delete_vfolder(self, vfid: VFolderID) -> None:
-        vfpath = self.mangle_vfpath(vfid)
-        vf_relpath = vfpath.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{vf_relpath}"
-        delete_cmd = [b"xcp", b"delete", b"-force", os.fsencode(nfspath)]
-        if self.netapp_xcp_container_name is not None:
-            delete_cmd = [
-                b"docker",
-                b"exec",
-                self.netapp_xcp_container_name.encode(),
-                *delete_cmd,
-            ]
-        async with aclosing(spawn_and_watch(delete_cmd)) as ag:
-            async for line in ag:
-                # TODO: line for bgtask
-                pass
-        try:
-            await aiofiles.os.rmdir(vfpath.parent)
-            await aiofiles.os.rmdir(vfpath.parent.parent)
-        except OSError as e:
-            match e.errno:
-                case errno.ENOTEMPTY:
-                    pass
-                case _:
-                    raise
-
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
-
-    # ------ volume operations ------
-    async def create_quota_scope(
-        self,
-        quota_scope_id: str,
-        config: Optional[QuotaConfig] = None,
-    ) -> None:
-        qspath = self.mangle_qspath(quota_scope_id)
-        await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
-
-    async def get_quota_scope(
-        self,
-        quota_scope_id: str,
-    ) -> tuple[QuotaConfig, VFolderUsage]:
-        qspath = self.mangle_qspath(quota_scope_id)
-        qconfig = await self.netapp_client.get_quota_rule(self.svm_id, self.volume_id, qspath.name)
-        return qconfig, VFolderUsage(-1, -1)
-
-    async def update_quota_scope(
-        self,
-        quota_scope_id: str,
-        config: QuotaConfig,
-    ) -> None:
-        qspath = self.mangle_qspath(quota_scope_id)
-        result = await self.netapp_client.set_quota_rule(
-            self.svm_id,
-            self.volume_id,
-            qspath.name,
-            config,
-        )
-        self.netapp_client.check_job_result(result, [])
-        result = await self.netapp_client.enable_quota(self.volume_id)
-        self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
-
-    async def delete_quota_scope(
-        self,
-        quota_scope_id: str,
-    ) -> None:
-        qspath = self.mangle_qspath(quota_scope_id)
-        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
-        await self.netapp_client.delete_quota_rule(
-            self.svm_id,
-            self.volume_id,
-            qspath.name,
-        )
-        # QTree is automatically removed when the corresponding directory is deleted.
-        await aiofiles.os.rmdir(qspath)
-
-    async def copy_tree(
-        self,
-        src_path: Path,
-        dst_path: Path,
-    ) -> None:
-        if not src_path.is_relative_to(self.mount_path):
-            raise ValueError(f"Invalid path inside the volume: {src_path}")
-        if not dst_path.is_relative_to(self.mount_path):
-            raise ValueError(f"Invalid path inside the volume: {dst_path}")
-
-        # Rearrange the paths into the NFS absolute path.
-        # These relative paths contains the qtree (quota-scope) name as the first part.
-        src_relpath = src_path.relative_to(self.mount_path)
-        dst_relpath = dst_path.relative_to(self.mount_path)
-        src_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{src_relpath}"
-        dst_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{dst_relpath}"
-
-        copy_cmd = [b"xcp", b"copy", os.fsencode(src_nfspath), os.fsencode(dst_nfspath)]
-        if self.netapp_xcp_container_name is not None:
-            copy_cmd = [
-                b"docker",
-                b"exec",
-                self.netapp_xcp_container_name.encode(),
-                *copy_cmd,
-            ]
-        async with aclosing(spawn_and_watch(copy_cmd)) as ag:
-            async for line in ag:
-                # TODO: line for bgtask
-                pass
-
-    # ------ qtree and quotas operations ------
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        if vfid.quota_scope_id is None:
-            return BinarySize(-1)
-        qconfig, _ = await self.get_quota_scope(vfid.quota_scope_id)
-        return BinarySize(qconfig.hard_limit)
-
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        warnings.warn(
-            "set_quota for individual vfolders is deprecated since 23.03",
-            DeprecationWarning,
-        )
 
     async def get_usage(
         self,

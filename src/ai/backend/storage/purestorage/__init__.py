@@ -4,20 +4,97 @@ import asyncio
 import json
 import os
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet, Sequence
+from typing import AsyncIterator, FrozenSet
 
 from aiotools import aclosing
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER
+from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
 from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderID, VFolderUsage
 from ..utils import fstime2datetime
-from ..vfs import BaseVolume
+from ..vfs import BaseFSOpModel, BaseVolume
 from .purity import PurityClient
 
 
+class RapidFileToolsFSOpModel(BaseFSOpModel):
+    async def copy_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        extra_opts = []
+        if src_path.is_dir():
+            extra_opts.append(b"-r")
+        proc = await asyncio.create_subprocess_exec(
+            b"pcp",
+            *extra_opts,
+            b"-p",
+            # os.fsencode(src_path / "."),  # TODO: check if "/." is necessary?
+            os.fsencode(src_path),
+            os.fsencode(dst_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f'"pcp" command failed: {stderr.decode()}')
+
+    async def delete_tree(
+        self,
+        path: Path,
+    ) -> None:
+        proc = await asyncio.create_subprocess_exec(
+            b"prm",
+            b"-r",
+            os.fsencode(path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError("'prm' command returned a non-zero exit code.")
+
+    async def scan_tree_usage(
+        self,
+        path: Path,
+    ) -> VFolderUsage:
+        total_size = 0
+        total_count = 0
+        raw_target_path = os.fsencode(path)
+        # Measure the exact file sizes and bytes
+        proc = await asyncio.create_subprocess_exec(
+            b"pdu",
+            b"-0",
+            b"-b",
+            b"-a",
+            b"-s",
+            raw_target_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        assert proc.stdout is not None
+        try:
+            # TODO: check slowdowns when there are millions of files
+            while True:
+                try:
+                    line = await proc.stdout.readuntil(b"\0")
+                    line = line.rstrip(b"\0")
+                except asyncio.IncompleteReadError:
+                    break
+                size, name = line.split(maxsplit=1)
+                if len(name) != len(raw_target_path) and name != raw_target_path:
+                    total_size += int(size)
+                    total_count += 1
+        finally:
+            await proc.wait()
+        return VFolderUsage(file_count=total_count, used_bytes=total_size)
+
+
 class FlashBladeVolume(BaseVolume):
+    def create_fsop_model(self) -> AbstractFSOpModel:
+        return RapidFileToolsFSOpModel(self.mount_path)
+
     async def init(self) -> None:
         available = True
         try:
@@ -48,6 +125,7 @@ class FlashBladeVolume(BaseVolume):
             self.config["purity_api_token"],
             api_version=self.config["purity_api_version"],
         )
+        await super().init()
 
     async def shutdown(self) -> None:
         await self.purity_client.aclose()
@@ -80,30 +158,6 @@ class FlashBladeVolume(BaseVolume):
             used_bytes=usage["used_bytes"],
         )
 
-    async def copy_tree(
-        self,
-        src_path: Path,
-        dst_path: Path,
-    ) -> None:
-        proc = await asyncio.create_subprocess_exec(
-            b"pcp",
-            b"-r",
-            b"-p",
-            os.fsencode(src_path / "."),
-            os.fsencode(dst_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f'"pcp" command failed: {stderr.decode()}')
-
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        raise NotImplementedError
-
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        raise NotImplementedError
-
     async def get_performance_metric(self) -> FSPerfMetric:
         async with self.purity_client as client:
             async with aclosing(
@@ -122,43 +176,6 @@ class FlashBladeVolume(BaseVolume):
                     raise RuntimeError(
                         "no metric found for the configured flashblade filesystem",
                     )
-
-    async def get_usage(
-        self,
-        vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
-    ) -> VFolderUsage:
-        target_path = self.sanitize_vfpath(vfid, relpath)
-        total_size = 0
-        total_count = 0
-        raw_target_path = bytes(target_path)
-        # Measure the exact file sizes and bytes
-        proc = await asyncio.create_subprocess_exec(
-            b"pdu",
-            b"-0",
-            b"-b",
-            b"-a",
-            b"-s",
-            raw_target_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        assert proc.stdout is not None
-        try:
-            # TODO: check slowdowns when there are millions of files
-            while True:
-                try:
-                    line = await proc.stdout.readuntil(b"\0")
-                    line = line.rstrip(b"\0")
-                except asyncio.IncompleteReadError:
-                    break
-                size, name = line.split(maxsplit=1)
-                if len(name) != len(raw_target_path) and name != raw_target_path:
-                    total_size += int(size)
-                    total_count += 1
-        finally:
-            await proc.wait()
-        return VFolderUsage(file_count=total_count, used_bytes=total_size)
 
     async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
@@ -222,41 +239,3 @@ class FlashBladeVolume(BaseVolume):
                 await proc.wait()
 
         return _aiter()
-
-    async def copy_file(
-        self,
-        vfid: VFolderID,
-        src: PurePosixPath,
-        dst: PurePosixPath,
-    ) -> None:
-        src_path = self.sanitize_vfpath(vfid, src)
-        dst_path = self.sanitize_vfpath(vfid, dst)
-        proc = await asyncio.create_subprocess_exec(
-            b"pcp",
-            b"-p",
-            bytes(src_path),
-            bytes(dst_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f'"pcp" command failed: {stderr.decode()}')
-
-    async def delete_files(
-        self,
-        vfid: VFolderID,
-        relpaths: Sequence[PurePosixPath],
-        recursive: bool = False,
-    ) -> None:
-        target_paths = [bytes(self.sanitize_vfpath(vfid, p)) for p in relpaths]
-        proc = await asyncio.create_subprocess_exec(
-            b"prm",
-            b"-r",
-            *target_paths,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError("'prm' command returned a non-zero exit code.")

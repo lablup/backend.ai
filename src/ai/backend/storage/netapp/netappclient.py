@@ -238,12 +238,12 @@ class NetAppClient:
             items = {}
             for record in data["records"]:
                 volume_id = VolumeID(record.pop("uuid"))
-                items[volume_id] = {
-                    "uuid": volume_id,
-                    "name": record.pop("name"),
-                    "path": Path(record.pop("path")),
-                    **record,
-                }
+                items[volume_id] = VolumeInfo(
+                    uuid=volume_id,
+                    name=record.pop("name"),
+                    path=Path(record.pop("path")),
+                )
+                items[volume_id].update(record)
             return items
 
     async def get_volume_by_name(
@@ -262,12 +262,13 @@ class NetAppClient:
         ) as resp:
             data = await resp.json()
             record = data["records"][0]
-            return {
-                "uuid": VolumeID(record.pop("uuid")),
-                "name": record.pop("name"),
-                "path": Path(record.pop("path")),
-                **record,
-            }
+            volume_info = VolumeInfo(
+                uuid=VolumeID(record.pop("uuid")),
+                name=record.pop("name"),
+                path=Path(record.pop("path")),
+            )
+            volume_info.update(record)
+            return volume_info
 
     async def get_volume_by_id(
         self,
@@ -284,12 +285,13 @@ class NetAppClient:
             params={"fields": ",".join(_extra_fields)},
         ) as resp:
             record = await resp.json()
-            return {
-                "uuid": VolumeID(record.pop("uuid")),
-                "name": record.pop("name"),
-                "path": Path(record.pop("path")),
-                **record,
-            }
+            volume_info = VolumeInfo(
+                uuid=VolumeID(record.pop("uuid")),
+                name=record.pop("name"),
+                path=Path(record.pop("path")),
+            )
+            volume_info.update(record)
+            return volume_info
 
     async def get_volume_metric_by_id(
         self,
@@ -322,15 +324,16 @@ class NetAppClient:
             params={"fields": ",".join(_extra_fields)},
         ) as resp:
             data = await resp.json()
-            return [
-                {
-                    "name": record.pop("name"),
-                    "id": int(record.pop("id")),
-                    "path": Path(record.pop("path")),
-                    **record,
-                }
-                for record in data["records"]
-            ]
+            items = []
+            for record in data["records"]:
+                item = QTreeInfo(
+                    name=record.pop("name"),
+                    id=int(record.pop("id")),
+                    path=Path(record.pop("path")),
+                )
+                item.update(record)
+                items.append(item)
+            return items
 
     async def get_default_qtree(
         self,
@@ -355,12 +358,13 @@ class NetAppClient:
             params={"fields": ",".join(_extra_fields)},
         ) as resp:
             record = await resp.json()
-            return {
-                "name": record.pop("name"),
-                "id": int(record.pop("id")),
-                "path": Path(record.pop("path")),
-                **record,
-            }
+            qtree_info = QTreeInfo(
+                name=record.pop("name"),
+                id=int(record.pop("id")),
+                path=Path(record.pop("path")),
+            )
+            qtree_info.update(record)
+            return qtree_info
 
     async def get_qtree_by_name(
         self,
@@ -384,12 +388,13 @@ class NetAppClient:
             data = await resp.json()
             if data["num_records"] > 0:
                 record = data["records"][0]
-                return {
-                    "name": record.pop("name"),
-                    "id": int(record.pop("id")),
-                    "path": Path(record.pop("path")),
-                    **record,
-                }
+                qtree_info = QTreeInfo(
+                    name=record.pop("name"),
+                    id=int(record.pop("id")),
+                    path=Path(record.pop("path")),
+                )
+                qtree_info.update(record)
+                return qtree_info
             else:
                 raise RuntimeError(f"No qtree {name} found in the volume {volume_id}")
 

@@ -155,7 +155,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
             return web.Response(status=204)
 
 
@@ -543,10 +543,10 @@ async def get_quota(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "get_quota", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            quota = await volume.get_quota(params["vfid"])
-            return web.json_response(quota)
+        return web.Response(
+            status=400,
+            reason="get_quota (for individual vfolder) is a deprecated API",
+        )
 
 
 async def set_quota(request: web.Request) -> web.Response:
@@ -569,10 +569,10 @@ async def set_quota(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "update_quota", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            await volume.set_quota(params["vfid"], params["size_bytes"])
-            return web.Response(status=204)
+        return web.Response(
+            status=400,
+            reason="set_quota (for individual vfolder) is a deprecated API",
+        )
 
 
 async def mkdir(request: web.Request) -> web.Response:
