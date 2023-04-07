@@ -143,8 +143,8 @@ class AbstractVolume(metaclass=ABCMeta):
     async def update_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaConfig] = None,
-    ) -> QuotaConfig:
+        options: QuotaConfig,
+    ) -> None:
         """
         Update the quota option of the given quota scope.
         """

@@ -82,8 +82,8 @@ class BaseVolume(AbstractVolume):
     async def update_quota_scope(
         self,
         quota_scope_id: str,
-        options: Optional[QuotaConfig] = None,
-    ) -> QuotaConfig:
+        options: QuotaConfig,
+    ) -> None:
         raise NotImplementedError
 
     async def delete_quota_scope(

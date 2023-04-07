@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import glob
 import json
 import os
@@ -154,8 +155,15 @@ class NetAppVolume(BaseVolume):
             async for line in ag:
                 # TODO: line for bgtask
                 pass
-        # remove intermediate prefix directories if they become empty
-        await aiofiles.os.rmdir(vfpath.parent.parent)
+        try:
+            await aiofiles.os.rmdir(vfpath.parent)
+            await aiofiles.os.rmdir(vfpath.parent.parent)
+        except OSError as e:
+            match e.errno:
+                case errno.ENOTEMPTY:
+                    pass
+                case _:
+                    raise
 
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
@@ -207,7 +215,7 @@ class NetAppVolume(BaseVolume):
             self.volume_id,
             qspath.name,
         )
-        # QTree is automatically removed if the corresponding directory is deleted.
+        # QTree is automatically removed when the corresponding directory is deleted.
         await aiofiles.os.rmdir(qspath)
 
     async def copy_tree(
