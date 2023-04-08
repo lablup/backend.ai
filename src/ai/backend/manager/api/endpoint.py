@@ -75,8 +75,9 @@ async def list_(request: web.Request, params: Any) -> web.Response:
                     "scalingGroup",
                 ],
                 default=None,
-            ): t.String
-            | t.Null,
+            ): (
+                t.String | t.Null
+            ),
         }
     ),
 )

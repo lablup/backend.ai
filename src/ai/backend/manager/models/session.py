@@ -26,7 +26,7 @@ from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
@@ -970,6 +970,63 @@ class SessionRow(Base):
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
+
+    @classmethod
+    async def get_session_to_start_service(
+        cls, db_session: SASession, session_name_or_id: str | UUID, access_key: AccessKey
+    ) -> SessionRow:
+        from .scaling_group import ScalingGroupRow
+
+        try:
+            session_id = UUID(str(session_name_or_id))
+            session_cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id}%")
+        except ValueError:
+            session_cond = SessionRow.name == str(session_name_or_id)
+
+        session_cond = (
+            session_cond
+            & (SessionRow.access_key == access_key)
+            & (SessionRow.status == SessionStatus.RUNNING)
+        )
+
+        query = (
+            sa.select(SessionRow)
+            .where(session_cond)
+            .options(
+                noload("*"),
+                load_only(SessionRow.id, SessionRow.name, SessionRow.status),
+                joinedload(SessionRow.scaling_group).options(
+                    noload("*"), load_only(ScalingGroupRow.wsproxy_addr)
+                ),
+                selectinload(
+                    SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+                ).options(
+                    noload("*"),
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.kernel_host,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.service_ports,
+                    ),
+                ),
+            )
+        )
+        session_list = (await db_session.scalars(query)).all()
+        if not session_list:
+            raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
+        if len(session_list) > 1:
+            session_infos = [
+                {
+                    "session_id": sess.id,
+                    "session_name": sess.name,
+                    "status": sess.status,
+                    "created_at": sess.created_at,
+                }
+                for sess in session_list
+            ]
+            raise TooManySessionsMatched(extra_data={"matches": session_infos})
+        return session_list[0]
 
 
 class SessionDependencyRow(Base):

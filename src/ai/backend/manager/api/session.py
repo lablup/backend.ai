@@ -119,7 +119,6 @@ from ..models import (
     keypairs,
     query_accessible_vfolders,
     query_bootstrap_script,
-    scaling_groups,
     session_templates,
     users,
     verify_vfolder_name,
@@ -1262,28 +1261,46 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     service: str = params["app"]
     myself = asyncio.current_task()
     assert myself is not None
+    # Leave the codes for easy backport
+    # try:
+    #     async with root_ctx.db.begin_readonly_session() as db_sess:
+    #         session = await asyncio.shield(
+    #             app_ctx.database_ptask_group.create_task(
+    #                 SessionRow.get_session_with_main_kernel(
+    #                     session_name, access_key, db_session=db_sess
+    #                 ),
+    #             )
+    #         )
+    # except (SessionNotFound, TooManySessionsMatched):
+    #     raise
+
+    # query = (
+    #     sa.select([scaling_groups.c.wsproxy_addr])
+    #     .select_from(scaling_groups)
+    #     .where((scaling_groups.c.name == session.scaling_group_name))
+    # )
+
+    # async with root_ctx.db.begin_readonly() as conn:
+    #     result = await conn.execute(query)
+    #     sgroup = result.first()
+    # wsproxy_addr = sgroup["wsproxy_addr"]
+
     try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await asyncio.shield(
+            service_session: SessionRow = await asyncio.shield(
                 app_ctx.database_ptask_group.create_task(
-                    SessionRow.get_session_with_main_kernel(
-                        session_name, access_key, db_session=db_sess
+                    SessionRow.get_session_to_start_service(
+                        db_sess,
+                        session_name,
+                        access_key,
                     ),
                 )
             )
     except (SessionNotFound, TooManySessionsMatched):
         raise
 
-    query = (
-        sa.select([scaling_groups.c.wsproxy_addr])
-        .select_from(scaling_groups)
-        .where((scaling_groups.c.name == session.scaling_group_name))
-    )
-
-    async with root_ctx.db.begin_readonly() as conn:
-        result = await conn.execute(query)
-        sgroup = result.first()
-    wsproxy_addr = sgroup["wsproxy_addr"]
+    main_kernel: KernelRow = service_session.main_kernel
+    wsproxy_addr = service_session.scaling_group.wsproxy_addr
     if not wsproxy_addr:
         raise ServiceUnavailable("No coordinator configured for this resource group")
     wsproxy_status = await query_wsproxy_status(wsproxy_addr)
@@ -1292,11 +1309,11 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     else:
         wsproxy_advertise_addr = wsproxy_addr
 
-    if session.main_kernel.kernel_host is None:
-        kernel_host = urlparse(session.main_kernel.agent_addr).hostname
+    if main_kernel.kernel_host is None:
+        kernel_host = urlparse(main_kernel.agent_addr).hostname
     else:
-        kernel_host = session.main_kernel.kernel_host
-    for sport in session.main_kernel.service_ports:
+        kernel_host = main_kernel.kernel_host
+    for sport in main_kernel.service_ports:
         if sport["name"] == service:
             if params["port"]:
                 # using one of the primary/secondary ports of the app
@@ -1319,7 +1336,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 
     await asyncio.shield(
         app_ctx.database_ptask_group.create_task(
-            root_ctx.registry.increment_session_usage(session),
+            root_ctx.registry.increment_session_usage(service_session),
         )
     )
 
@@ -1329,9 +1346,9 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     if params["envs"] is not None:
         opts["envs"] = json.loads(params["envs"])
 
-    result = await asyncio.shield(
+    result: Mapping[str, Any] = await asyncio.shield(
         app_ctx.rpc_ptask_group.create_task(
-            root_ctx.registry.start_service(session, service, opts),
+            root_ctx.registry.start_service(service_session, service, opts),
         ),
     )
     if result["status"] == "failed":

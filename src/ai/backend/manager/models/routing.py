@@ -42,8 +42,6 @@ class RoutingRow(Base):
         sa.ForeignKey("sessions.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    # TODO: create alembic migration for session_endpoint_*, model* columns
-    # TODO: which session endpoint is bound?
     session_endpoint_name = sa.Column("session_endpoint_name", sa.String(length=256), nullable=True)
     # TODO: host-side port number of the session's endpoint app
     session_endpoint_port = sa.Column("session_endpoint_port", sa.Integer(), nullable=True)
