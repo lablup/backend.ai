@@ -661,7 +661,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
             last_stat = msgpack.unpackb(raw_stat)
             io_read_byte = int(nmget(last_stat, "io_read.current", 0))
             io_write_byte = int(nmget(last_stat, "io_write.current", 0))
-            disk_used = int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))
+            disk_used = int(nmget(last_stat, "io_scratch_size.stats.max", 0, "/"))
         else:
             io_read_byte = 0
             io_write_byte = 0
@@ -679,8 +679,6 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
         if start_index < 0:
             start_index = 0
-        if end_index >= stat_length:
-            end_index = stat_length - 1
         for time_series in time_series_list[start_index:end_index]:
             time_series["num_sessions"]["value"] += 1
             time_series["cpu_allocated"]["value"] += cpu_value
