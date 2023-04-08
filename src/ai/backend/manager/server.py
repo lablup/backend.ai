@@ -418,6 +418,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        debug=root_ctx.local_config["debug"]["enabled"],
     )
     await root_ctx.registry.init()
     yield
