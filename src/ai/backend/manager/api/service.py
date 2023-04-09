@@ -703,11 +703,25 @@ class PrivateContext:
 
 
 async def init(app: web.Application) -> None:
+    root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["service.context"]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.service_creation_tracker = {}
     app_ctx.pending_waits = set()
+
+    # passive events
+    evd = root_ctx.event_dispatcher
+    evd.subscribe(
+        SessionStartedEvent,
+        app,
+        handle_service_creation_lifecycle,
+    )
+    evd.subscribe(
+        SessionCancelledEvent,
+        app,
+        handle_service_creation_lifecycle,
+    )
 
 
 async def shutdown(app: web.Application) -> None:
