@@ -611,11 +611,10 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         rows = result.fetchall()
 
     # Build time-series of time-binned stats.
-    now_ts = now.timestamp()
     start_date_ts = start_date.timestamp()
     time_series_list: list[dict[str, Any]] = [
         {
-            "date": idx * time_window + now_ts,
+            "date": start_date_ts + (idx * time_window),
             "num_sessions": {
                 "value": 0,
                 "unit_hint": "count",
