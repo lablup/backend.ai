@@ -312,6 +312,9 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
     - name: Normalize the package version
       run: |
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
