@@ -92,7 +92,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
 
 
 class FlashBladeVolume(BaseVolume):
-    def create_fsop_model(self) -> AbstractFSOpModel:
+    async def create_fsop_model(self) -> AbstractFSOpModel:
         return RapidFileToolsFSOpModel(self.mount_path)
 
     async def init(self) -> None:

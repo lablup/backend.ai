@@ -250,10 +250,10 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 
 class BaseVolume(AbstractVolume):
-    def create_quota_model(self) -> AbstractQuotaModel:
+    async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)
 
-    def create_fsop_model(self) -> AbstractFSOpModel:
+    async def create_fsop_model(self) -> AbstractFSOpModel:
         return BaseFSOpModel(self.mount_path)
 
     async def get_capabilities(self) -> FrozenSet[str]:

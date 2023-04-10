@@ -3,15 +3,22 @@ from __future__ import annotations
 import asyncio
 import glob
 import json
+import logging
 import os
+import shlex
+import subprocess
 import time
 from contextlib import aclosing
 from pathlib import Path, PurePosixPath
-from typing import FrozenSet, Optional
+from typing import (
+    FrozenSet,
+    Optional,
+)
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel
@@ -20,6 +27,8 @@ from ..subproc import spawn_and_watch
 from ..types import FSPerfMetric, FSUsage, QuotaConfig, VFolderID, VFolderUsage
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import NetAppClient, StorageID, VolumeID
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class QTreeQuotaModel(BaseQuotaModel):
@@ -99,14 +108,26 @@ class XCPFSOpModel(BaseFSOpModel):
     def __init__(
         self,
         mount_path: Path,
-        netapp_xcp_host: str,
-        netapp_xcp_container_name: str,
+        netapp_nfs_host: str,
+        netapp_xcp_cmd: str,
         volume_path: Path,
     ) -> None:
         super().__init__(mount_path)
-        self.netapp_xcp_host = netapp_xcp_host
-        self.netapp_xcp_container_name = netapp_xcp_container_name
+        self.netapp_nfs_host = netapp_nfs_host
+        self.netapp_xcp_cmd = netapp_xcp_cmd
         self.volume_path = volume_path
+
+    async def check_license(self) -> bool:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *[*self.netapp_xcp_cmd, b"license"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+            stdout, _ = await proc.communicate()
+        except FileNotFoundError:
+            return False
+        return b"License status: ACTIVE\n" in stdout
 
     async def copy_tree(
         self,
@@ -122,17 +143,15 @@ class XCPFSOpModel(BaseFSOpModel):
         # These relative paths contains the qtree (quota-scope) name as the first part.
         src_relpath = src_path.relative_to(self.mount_path)
         dst_relpath = dst_path.relative_to(self.mount_path)
-        src_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{src_relpath}"
-        dst_nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{dst_relpath}"
+        src_nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{src_relpath}"
+        dst_nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{dst_relpath}"
 
-        copy_cmd = [b"xcp", b"copy", os.fsencode(src_nfspath), os.fsencode(dst_nfspath)]
-        if self.netapp_xcp_container_name is not None:
-            copy_cmd = [
-                b"docker",
-                b"exec",
-                self.netapp_xcp_container_name.encode(),
-                *copy_cmd,
-            ]
+        copy_cmd = [
+            *self.netapp_xcp_cmd,
+            b"copy",
+            os.fsencode(src_nfspath),
+            os.fsencode(dst_nfspath),
+        ]
         async with aclosing(spawn_and_watch(copy_cmd)) as ag:
             async for line in ag:
                 # TODO: line for bgtask
@@ -140,15 +159,8 @@ class XCPFSOpModel(BaseFSOpModel):
 
     async def delete_tree(self, path: Path) -> None:
         relpath = path.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{relpath}"
-        delete_cmd = [b"xcp", b"delete", b"-force", os.fsencode(nfspath)]
-        if self.netapp_xcp_container_name is not None:
-            delete_cmd = [
-                b"docker",
-                b"exec",
-                self.netapp_xcp_container_name.encode(),
-                *delete_cmd,
-            ]
+        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{relpath}"
+        delete_cmd = [*self.netapp_xcp_cmd, b"delete", b"-force", os.fsencode(nfspath)]
         async with aclosing(spawn_and_watch(delete_cmd)) as ag:
             async for line in ag:
                 # TODO: line for bgtask
@@ -156,7 +168,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
 
 class NetAppVolume(BaseVolume):
-    endpoint: str
+    ontap_endpoint: str
     netapp_user: str
     netapp_password: str
     svm_name: str
@@ -165,7 +177,7 @@ class NetAppVolume(BaseVolume):
     volume_id: VolumeID
     volume_path: Path
 
-    def create_quota_model(self) -> AbstractQuotaModel:
+    async def create_quota_model(self) -> AbstractQuotaModel:
         return QTreeQuotaModel(
             self.mount_path,
             self.netapp_client,
@@ -173,24 +185,34 @@ class NetAppVolume(BaseVolume):
             self.volume_id,
         )
 
-    def create_fsop_model(self) -> AbstractFSOpModel:
-        return XCPFSOpModel(
+    async def create_fsop_model(self) -> AbstractFSOpModel:
+        xcp_fsop_model = XCPFSOpModel(
             self.mount_path,
-            self.netapp_xcp_host,
-            self.netapp_xcp_container_name,
+            self.netapp_nfs_host,
+            self.netapp_xcp_cmd,
             self.volume_path,
         )
+        if await xcp_fsop_model.check_license():
+            return xcp_fsop_model
+        log.warning(
+            (
+                "XCP is not installed ('{}') or its license is not active. "
+                "Falling back to BaseFSOpModel which may be slower."
+            ),
+            shlex.join(self.netapp_xcp_cmd),
+        )
+        return BaseFSOpModel(self.mount_path)
 
     async def init(self) -> None:
-        self.endpoint = self.config["netapp_endpoint"]
+        self.ontap_endpoint = self.config["netapp_ontap_endpoint"]
         self.netapp_client = NetAppClient(
-            self.endpoint,
-            self.config["netapp_user"],
-            self.config["netapp_password"],
+            self.ontap_endpoint,
+            self.config["netapp_ontap_user"],
+            self.config["netapp_ontap_password"],
         )
-        self.netapp_xcp_host = self.config["netapp_xcp_host"]
+        self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_catalog_path = self.config["netapp_xcp_catalog_path"]
-        self.netapp_xcp_container_name = self.config["netapp_xcp_container_name"]
+        self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
         self.volume_name = self.config["netapp_volume_name"]
         # TODO: resolve async-init ordering issue
         volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
@@ -297,7 +319,7 @@ class NetAppVolume(BaseVolume):
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
         target_relpath = target_path.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_xcp_host}:{self.volume_path}/{target_relpath}"
+        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{target_relpath}"
         total_size = 0
         total_count = 0
         start_time = time.monotonic()
@@ -311,9 +333,7 @@ class NetAppVolume(BaseVolume):
         files = list(glob.iglob(f"{self.netapp_xcp_catalog_path}/stats/*.json"))
         prev_files_count = len(files)
 
-        scan_cmd = ["xcp", "scan", "-q", nfspath]
-        if self.netapp_xcp_container_name is not None:
-            scan_cmd = ["docker", "exec", self.netapp_xcp_container_name] + scan_cmd
+        scan_cmd = [*self.netapp_xcp_cmd, b"scan", b"-q", os.fsencode(nfspath)]
         # Measure the exact file sizes and bytes
         proc = await asyncio.create_subprocess_exec(
             *scan_cmd,

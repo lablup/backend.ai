@@ -143,18 +143,18 @@ class AbstractVolume(metaclass=ABCMeta):
         self.config = options or {}
 
     async def init(self) -> None:
-        self.fsop_model = self.create_fsop_model()
-        self.quota_model = self.create_quota_model()
+        self.fsop_model = await self.create_fsop_model()
+        self.quota_model = await self.create_quota_model()
 
     async def shutdown(self) -> None:
         pass
 
     @abstractmethod
-    def create_quota_model(self) -> AbstractQuotaModel:
+    async def create_quota_model(self) -> AbstractQuotaModel:
         raise NotImplementedError
 
     @abstractmethod
-    def create_fsop_model(self) -> AbstractFSOpModel:
+    async def create_fsop_model(self) -> AbstractFSOpModel:
         raise NotImplementedError
 
     @final
