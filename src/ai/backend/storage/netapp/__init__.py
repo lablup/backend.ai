@@ -210,12 +210,10 @@ class XCPFSOpModel(BaseFSOpModel):
                     if not line:
                         await entry_queue.put(SENTINEL)
                         break
-                    parts = tuple(map(str, line.rstrip(b"\n").split(b"\0")))
-                    item_path = Path(os.fsdecode(parts[7]))
+                    parts = tuple(map(os.fsdecode, line.rstrip(b"\n").split(b"\0")))
+                    item_path = Path(*Path(parts[7]).parts[2:])
                     item_abspath = (
-                        self.mount_path
-                        / target_relpath
-                        / item_path.relative_to(target_relpath.name)
+                        self.mount_path / target_relpath / item_path.relative_to(target_relpath)
                     )
                     match parts[5]:
                         case 2:
@@ -227,7 +225,7 @@ class XCPFSOpModel(BaseFSOpModel):
                     await entry_queue.put(
                         DirEntry(
                             name=item_path.name,
-                            path=item_path.relative_to(target_relpath.name),
+                            path=item_path.relative_to(target_relpath),
                             type=entry_type,
                             stat=Stat(
                                 size=int(parts[6]),

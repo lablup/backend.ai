@@ -2,7 +2,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from pathlib import PurePath
+from pathlib import PurePath, PurePosixPath
 
 import pytest
 
@@ -29,7 +29,11 @@ async def netapp_volume(vfroot) -> AsyncIterator[NetAppVolume]:
             "Cannot proceed the integration test for the NetApp volume without actual configuration"
         )
     netapp = NetAppVolume(
-        {},
+        {
+            "storage-proxy": {
+                "scandir-limit": 1000,
+            },
+        },
         volume_config["path"],
         fsprefix=PurePath("fsprefix"),
         options=options,
@@ -71,6 +75,20 @@ async def test_netapp_get_usage(netapp_volume: NetAppVolume, empty_vfolder: VFol
     assert usage.file_count == 7
     # This may vary depending on the device block size.
     assert 92 <= usage.used_bytes <= 4096 * 4
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_netapp_scandir(netapp_volume: NetAppVolume, empty_vfolder: VFolderID) -> None:
+    vfpath = netapp_volume.mangle_vfpath(empty_vfolder)
+    (vfpath / "test.txt").write_bytes(b"12345")
+    (vfpath / "inner").mkdir()
+    (vfpath / "inner" / "hello.txt").write_bytes(b"678")
+    (vfpath / "inner" / "world.txt").write_bytes(b"901")
+    (vfpath / "test2.txt").symlink_to((vfpath / "inner" / "hello.txt"))
+    (vfpath / "inner2").symlink_to((vfpath / "inner"))
+    async for entry in netapp_volume.scandir(empty_vfolder, PurePosixPath(".")):
+        print(entry)
 
 
 @pytest.mark.integration
