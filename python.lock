@@ -71,7 +71,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "pyzmq~=24.0.1",
-//     "redis[hiredis]~=4.3.4",
+//     "redis[hiredis]~=4.4.4",
 //     "rich~=12.2",
 //     "setproctitle~=1.2.2",
 //     "tabulate~=0.8.9",
@@ -855,36 +855,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f4951f8162905b96fd045e32853ba8cf707042faac846a23910817c508ef27d7",
-              "url": "https://files.pythonhosted.org/packages/0e/b5/8758f47b054f3e0558f2d6fa6943baaf1ff04c474bb6138283e97d2d5dcf/boto3-1.26.105-py3-none-any.whl"
+              "hash": "a1c48674c2ff25ddced599c51d14ba7a6dbe9fd51641e8d63a6887bebd9712d7",
+              "url": "https://files.pythonhosted.org/packages/dd/b7/d2767e43723b4cf2db45ed8c636c69be2563ed23c5a1e4741aff2d529a0e/boto3-1.26.109-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2914776e0138530ec6464d0e2f05b4aa18e9212ac920c48472f8a93650feaed2",
-              "url": "https://files.pythonhosted.org/packages/12/4f/1b46b6bee208ca96c36bcbdea19475b6efc2c0aecd895fabc8f1e1ad690a/boto3-1.26.105.tar.gz"
+              "hash": "d388cb7f54f1a3056f91ffcfb5cf18b226454204e5df7a5c10774718c3fbb166",
+              "url": "https://files.pythonhosted.org/packages/27/cb/86d83c450d1471e1bf6deee4b47be7228154306eab564568165908e30c11/boto3-1.26.109.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.30.0,>=1.29.105",
+            "botocore<1.30.0,>=1.29.109",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.26.105"
+          "version": "1.26.109"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "06a2838daad3f346cba5460d0d3deb198225b556ff9ca729798d787fadbdebde",
-              "url": "https://files.pythonhosted.org/packages/98/3e/b6cd0cc466982d8634c74276f9b6543b9fee02c0ec45b8ccb56865b78d8e/botocore-1.29.105-py3-none-any.whl"
+              "hash": "cf43dddb7e2ba5425fe19fad68b10043307b61d9103d06566f1ab6034e38b8db",
+              "url": "https://files.pythonhosted.org/packages/9f/9b/2c3fa91b4750b8e78211d07788445667e8c24f4a19f38c2fc099e75f282a/botocore-1.29.109-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "17c82391dfd6aaa8f96fbbb08cad2c2431ef3cda0ece89e6e6ba444c5eed45c2",
-              "url": "https://files.pythonhosted.org/packages/04/27/784403fa5978e6c19167cc403a8990ed0d335a82b1428debce5b1463e56e/botocore-1.29.105.tar.gz"
+              "hash": "2e449525f0ccedb31fdb962a77caac48b4c486c23515b84c5989a39a1823a024",
+              "url": "https://files.pythonhosted.org/packages/32/7b/7d139b04f4c9554e6fdd25ad22ed91376f3b6433cf329a78cf0a23f75211/botocore-1.29.109.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -895,7 +895,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.29.105"
+          "version": "1.29.109"
         },
         {
           "artifacts": [
@@ -1463,13 +1463,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "357ff22a75b4c0f6093470f21816a825d2adee398177569824e37b6c10069e19",
-              "url": "https://files.pythonhosted.org/packages/a8/aa/bfc8597c205da910dbaf9ec692d71bfb37b1599ca2985c9fbf9eea4f58e3/google_auth-2.17.1-py2.py3-none-any.whl"
+              "hash": "544536a43d44dff0f64222e4d027d124989fcb9c10979687e589e1694fba9c94",
+              "url": "https://files.pythonhosted.org/packages/a0/6c/1c662808a86ae5364a88621bc9b88ff8af0f74a28f144da115c9122f88f5/google_auth-2.17.2-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8f379b46bad381ad2a0b989dfb0c13ad28d3c2a79f27348213f8946a1d15d55a",
-              "url": "https://files.pythonhosted.org/packages/c8/ee/a028aa9ce069fe78d3cf8a86020d366fdb65b54fc33a9e317b4eafa1445e/google-auth-2.17.1.tar.gz"
+              "hash": "295c80ebb95eac74003c07a696cf3ef6b414e9230ae8894f3843f8215fd2aa56",
+              "url": "https://files.pythonhosted.org/packages/e2/bb/d809c7f2ed33c27bd2902dfce8ee1d3c7cac85ec80c11d365c755584aa55/google-auth-2.17.2.tar.gz"
             }
           ],
           "project_name": "google-auth",
@@ -1490,7 +1490,7 @@
             "six>=1.9.0"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.17.1"
+          "version": "2.17.2"
         },
         {
           "artifacts": [
@@ -3030,19 +3030,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "130328f552dcfac0b1cec75c12e3f005619dc5f874f0a06e8ff7263f0ee6225e",
-              "url": "https://files.pythonhosted.org/packages/b2/68/5321b5793bd506961bd40bdbdd0674e7de4fb873ee7cab33dd27283ad513/pytest-7.2.2-py3-none-any.whl"
+              "hash": "933051fa1bfbd38a21e73c3960cebdad4cf59483ddba7696c48509727e17f201",
+              "url": "https://files.pythonhosted.org/packages/83/b8/345f25e35406da60b5cb0cb9de9f92a96f44eae618dc2cc4a00a2bf416f9/pytest-7.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c99ab0c73aceb050f68929bc93af19ab6db0558791c6a0715723abe9d0ade9d4",
-              "url": "https://files.pythonhosted.org/packages/b9/29/311895d9cd3f003dd58e8fdea36dd895ba2da5c0c90601836f7de79f76fe/pytest-7.2.2.tar.gz"
+              "hash": "58ecc27ebf0ea643ebfdf7fb1249335da761a00c9f955bcd922349bcb68ee57d",
+              "url": "https://files.pythonhosted.org/packages/2b/a6/22c1138c2a7b60c9eb9ddeac017d82a58dfd9661651c721e7466af648764/pytest-7.3.0.tar.gz"
             }
           ],
           "project_name": "pytest",
           "requires_dists": [
             "argcomplete; extra == \"testing\"",
-            "attrs>=19.2.0",
+            "attrs>=19.2.0; extra == \"testing\"",
             "colorama; sys_platform == \"win32\"",
             "exceptiongroup>=1.0.0rc8; python_version < \"3.11\"",
             "hypothesis>=3.56; extra == \"testing\"",
@@ -3058,7 +3058,7 @@
             "xmlschema; extra == \"testing\""
           ],
           "requires_python": ">=3.7",
-          "version": "7.2.2"
+          "version": "7.3.0"
         },
         {
           "artifacts": [
@@ -3269,13 +3269,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1ea4018b8b5d8a13837f0f1c418959c90bfde0a605cb689e8070cff368a3b177",
-              "url": "https://files.pythonhosted.org/packages/d6/f6/19237b28c632935c7359bddf703395ba13bbd134fc5e2eb297c4c120398c/redis-4.3.6-py3-none-any.whl"
+              "hash": "da92a39fec86438d3f1e2a1db33c312985806954fe860120b582a8430e231d8f",
+              "url": "https://files.pythonhosted.org/packages/5c/68/da435219cd46d416bf5b59d66dbe36ae4aaf05b91b7be6e8241a87d4c9b1/redis-4.4.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7a462714dcbf7b1ad1acd81f2862b653cc8535cdfc879e28bf4947140797f948",
-              "url": "https://files.pythonhosted.org/packages/f2/52/2a4b3ceffe59483cdea5e653aaa40ebd7a90241612c40212dfc10fde9215/redis-4.3.6.tar.gz"
+              "hash": "68226f7ede928db8302f29ab088a157f41061fa946b7ae865452b6d7838bbffb",
+              "url": "https://files.pythonhosted.org/packages/ff/af/f791fa76162d1e7655a34bca58876b43388209912c6a771756fc0c8f96da/redis-4.4.4.tar.gz"
             }
           ],
           "project_name": "redis",
@@ -3284,13 +3284,12 @@
             "cryptography>=36.0.1; extra == \"ocsp\"",
             "hiredis>=1.0.0; extra == \"hiredis\"",
             "importlib-metadata>=1.0; python_version < \"3.8\"",
-            "packaging>=20.4",
             "pyopenssl==20.0.1; extra == \"ocsp\"",
             "requests>=2.26.0; extra == \"ocsp\"",
             "typing-extensions; python_version < \"3.8\""
           ],
-          "requires_python": ">=3.6",
-          "version": "4.3.6"
+          "requires_python": ">=3.7",
+          "version": "4.4.4"
         },
         {
           "artifacts": [
@@ -4235,7 +4234,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "pyzmq~=24.0.1",
-    "redis[hiredis]~=4.3.4",
+    "redis[hiredis]~=4.4.4",
     "rich~=12.2",
     "setproctitle~=1.2.2",
     "tabulate~=0.8.9",
