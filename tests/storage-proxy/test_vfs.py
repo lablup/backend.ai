@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path, PurePath
 
 import pytest
@@ -19,22 +20,23 @@ async def vfs(local_volume):
 
 
 @pytest.fixture
-async def empty_vfolder(vfs):
+async def empty_vfolder(vfs: BaseVolume) -> AsyncIterator[VFolderID]:
     qsid = f"qs-{secrets.token_hex(16)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
-    await vfs.create_quota_scope(qsid)
+    await vfs.quota_model.create_quota_scope(qsid)
     await vfs.create_vfolder(vfid)
     yield vfid
     await vfs.delete_vfolder(vfid)
-    await vfs.delete_quota_scope(qsid)
+    await vfs.quota_model.delete_quota_scope(qsid)
 
 
 @pytest.mark.asyncio
-async def test_vfs_vfolder_mgmt(vfs):
+async def test_vfs_vfolder_mgmt(vfs: BaseVolume) -> None:
     qsid = f"qs-{secrets.token_hex(16)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
-    await vfs.create_quota_scope(qsid)
+    await vfs.quota_model.create_quota_scope(qsid)
     await vfs.create_vfolder(vfid)
+    assert vfid.quota_scope_id is not None
     vfpath = (
         vfs.mount_path
         / vfid.quota_scope_id
@@ -79,12 +81,12 @@ async def test_vfs_vfolder_mgmt(vfs):
     assert not vfpath2.parent.exists()
     assert not vfpath2.parent.parent.exists()
 
-    await vfs.delete_quota_scope(qsid)
-    assert not vfs.mangle_qspath(qsid).exists()
+    await vfs.quota_model.delete_quota_scope(qsid)
+    assert not vfs.quota_model.mangle_qspath(qsid).exists()
 
 
 @pytest.mark.asyncio
-async def test_vfs_get_usage(vfs, empty_vfolder):
+async def test_vfs_get_usage(vfs: BaseVolume, empty_vfolder: VFolderID) -> None:
     vfpath = vfs.mangle_vfpath(empty_vfolder)
     (vfpath / "test.txt").write_bytes(b"12345")
     (vfpath / "inner").mkdir()
@@ -96,14 +98,16 @@ async def test_vfs_get_usage(vfs, empty_vfolder):
 
 
 @pytest.mark.asyncio
-async def test_vfs_clone(vfs):
+async def test_vfs_clone(vfs: BaseVolume) -> None:
     qsid1 = f"qs-{secrets.token_hex(16)}-0"
     qsid2 = f"qs-{secrets.token_hex(16)}-1"
-    await vfs.create_quota_scope(qsid1)
-    await vfs.create_quota_scope(qsid2)
+    await vfs.quota_model.create_quota_scope(qsid1)
+    await vfs.quota_model.create_quota_scope(qsid2)
 
     vfid1 = VFolderID(qsid1, uuid.uuid4())
     vfid2 = VFolderID(qsid2, uuid.uuid4())
+    assert vfid1.quota_scope_id is not None
+    assert vfid2.quota_scope_id is not None
     vfpath1 = (
         vfs.mount_path
         / vfid1.quota_scope_id
@@ -131,10 +135,10 @@ async def test_vfs_clone(vfs):
     await vfs.delete_vfolder(vfid1)
     await vfs.delete_vfolder(vfid2)
 
-    await vfs.delete_quota_scope(qsid1)
-    await vfs.delete_quota_scope(qsid2)
-    assert not vfs.mangle_qspath(qsid1).exists()
-    assert not vfs.mangle_qspath(qsid2).exists()
+    await vfs.quota_model.delete_quota_scope(qsid1)
+    await vfs.quota_model.delete_quota_scope(qsid2)
+    assert not vfs.quota_model.mangle_qspath(qsid1).exists()
+    assert not vfs.quota_model.mangle_qspath(qsid2).exists()
 
 
 @pytest.mark.asyncio

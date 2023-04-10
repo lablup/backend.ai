@@ -150,13 +150,13 @@ path = "/vfroot/netapp"
 
 [volume.netapp.options]
 netapp_ontap_endpoint = "https://netapp.example.com"
-netapp_ontap_admin = "admin-username"
+netapp_ontap_user = "admin-username"
 netapp_ontap_password = "admin-passwd"
 netapp_svm = "svm-name"
 netapp_volume_name = "netapp-volume-name"
 netapp_xcp_cmd = ["/home/user/xcp/linux/xcp"]
 # For containerized xcp: netapp_xcp_cmd = ["docker", "exec", "netapp-xcp", "xcp"]
-netapp_nfs_hostname = "xcp-hostname"
+netapp_nfs_host = "xcp-hostname"
 
 [volume.weka]
 backend = "weka"

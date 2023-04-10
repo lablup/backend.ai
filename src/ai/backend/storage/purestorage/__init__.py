@@ -93,7 +93,10 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
 
 class FlashBladeVolume(BaseVolume):
     async def create_fsop_model(self) -> AbstractFSOpModel:
-        return RapidFileToolsFSOpModel(self.mount_path)
+        return RapidFileToolsFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def init(self) -> None:
         available = True

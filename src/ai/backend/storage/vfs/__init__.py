@@ -173,8 +173,9 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
 
 class BaseFSOpModel(AbstractFSOpModel):
-    def __init__(self, mount_path: Path) -> None:
+    def __init__(self, mount_path: Path, scandir_limit: int) -> None:
         self.mount_path = mount_path
+        self.scandir_limit = scandir_limit
 
     async def copy_tree(
         self,
@@ -213,9 +214,71 @@ class BaseFSOpModel(AbstractFSOpModel):
         except FileNotFoundError:
             pass
 
+    def scan_tree(
+        self,
+        target_path: Path,
+    ) -> AsyncIterator[DirEntry]:
+        q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
+        loop = asyncio.get_running_loop()
+
+        def _scandir(q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
+            count = 0
+            limit = self.scandir_limit
+            try:
+                with os.scandir(target_path) as scanner:
+                    for entry in scanner:
+                        symlink_target = ""
+                        entry_type = DirEntryType.FILE
+                        if entry.is_dir():
+                            entry_type = DirEntryType.DIRECTORY
+                        if entry.is_symlink():
+                            entry_type = DirEntryType.SYMLINK
+                            symlink_target = str(Path(entry).resolve())
+                        entry_stat = entry.stat(follow_symlinks=False)
+                        q.put(
+                            DirEntry(
+                                name=entry.name,
+                                path=Path(entry.path),
+                                type=entry_type,
+                                stat=Stat(
+                                    size=entry_stat.st_size,
+                                    owner=str(entry_stat.st_uid),
+                                    mode=entry_stat.st_mode,
+                                    modified=fstime2datetime(entry_stat.st_mtime),
+                                    created=fstime2datetime(entry_stat.st_ctime),
+                                ),
+                                symlink_target=symlink_target,
+                            ),
+                        )
+                        count += 1
+                        if limit > 0 and count == limit:
+                            break
+            finally:
+                q.put(SENTINEL)
+
+        async def _scan_task(_scandir, q) -> None:
+            await loop.run_in_executor(None, _scandir, q.sync_q)
+
+        async def _aiter() -> AsyncIterator[DirEntry]:
+            scan_task = asyncio.create_task(_scan_task(_scandir, q))
+            await asyncio.sleep(0)
+            try:
+                while True:
+                    item = await q.async_q.get()
+                    if item is SENTINEL:
+                        break
+                    yield item
+                    q.async_q.task_done()
+            finally:
+                await scan_task
+                q.close()
+                await q.wait_closed()
+
+        return _aiter()
+
     async def scan_tree_usage(
         self,
-        path: Path,
+        target_path: Path,
     ) -> VFolderUsage:
         total_size = 0
         total_count = 0
@@ -241,7 +304,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
         loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, _calc_usage, path)
+            await loop.run_in_executor(None, _calc_usage, target_path)
         except TimeoutError:
             # -1 indicates "too many"
             total_size = -1
@@ -254,7 +317,10 @@ class BaseVolume(AbstractVolume):
         return BaseQuotaModel(self.mount_path)
 
     async def create_fsop_model(self) -> AbstractFSOpModel:
-        return BaseFSOpModel(self.mount_path)
+        return BaseFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER])
@@ -275,7 +341,9 @@ class BaseVolume(AbstractVolume):
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
-            raise InvalidQuotaScopeError(vfid.quota_scope_id)
+            raise InvalidQuotaScopeError(
+                f"Quota scope {qspath} does not exist in the target volume"
+            )
         vfpath = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
@@ -378,63 +446,7 @@ class BaseVolume(AbstractVolume):
 
     def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        q: janus.Queue[Union[Sentinel, DirEntry]] = janus.Queue()
-        loop = asyncio.get_running_loop()
-
-        def _scandir(q: janus._SyncQueueProxy[Union[Sentinel, DirEntry]]) -> None:
-            count = 0
-            limit = self.local_config["storage-proxy"]["scandir-limit"]
-            try:
-                with os.scandir(target_path) as scanner:
-                    for entry in scanner:
-                        symlink_target = ""
-                        entry_type = DirEntryType.FILE
-                        if entry.is_dir():
-                            entry_type = DirEntryType.DIRECTORY
-                        if entry.is_symlink():
-                            entry_type = DirEntryType.SYMLINK
-                            symlink_target = str(Path(entry).resolve())
-                        entry_stat = entry.stat(follow_symlinks=False)
-                        q.put(
-                            DirEntry(
-                                name=entry.name,
-                                path=Path(entry.path),
-                                type=entry_type,
-                                stat=Stat(
-                                    size=entry_stat.st_size,
-                                    owner=str(entry_stat.st_uid),
-                                    mode=entry_stat.st_mode,
-                                    modified=fstime2datetime(entry_stat.st_mtime),
-                                    created=fstime2datetime(entry_stat.st_ctime),
-                                ),
-                                symlink_target=symlink_target,
-                            ),
-                        )
-                        count += 1
-                        if limit > 0 and count == limit:
-                            break
-            finally:
-                q.put(SENTINEL)
-
-        async def _scan_task(_scandir, q) -> None:
-            await loop.run_in_executor(None, _scandir, q.sync_q)
-
-        async def _aiter() -> AsyncIterator[DirEntry]:
-            scan_task = asyncio.create_task(_scan_task(_scandir, q))
-            await asyncio.sleep(0)
-            try:
-                while True:
-                    item = await q.async_q.get()
-                    if item is SENTINEL:
-                        break
-                    yield item
-                    q.async_q.task_done()
-            finally:
-                await scan_task
-                q.close()
-                await q.wait_closed()
-
-        return _aiter()
+        return self.fsop_model.scan_tree(target_path)
 
     async def mkdir(
         self,

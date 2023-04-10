@@ -140,7 +140,7 @@ class NetAppClient:
             self.endpoint,
             connector=_connector,
             auth=_auth,
-            raise_for_status=True,
+            # raise_for_status=True,
         )
 
     async def aclose(self) -> None:
@@ -154,7 +154,7 @@ class NetAppClient:
         params: dict[str, str | int] | None = None,
         data: dict[str, Any] | None = None,
     ) -> AsyncIterator[aiohttp.ClientResponse]:
-        async with self._session.request(method, path, params=params, json=data) as resp:
+        async with self._session.request(method=method, url=path, params=params, json=data) as resp:
             yield resp
 
     async def wait_job(self, job_id: str) -> AsyncJobResult:
@@ -225,7 +225,7 @@ class NetAppClient:
     async def list_volumes(
         self, extra_fields: Optional[Sequence[str]] = None
     ) -> Mapping[VolumeID, VolumeInfo]:
-        default_extra_fields = ["path"]
+        default_extra_fields = ["nas.path"]
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
@@ -241,7 +241,7 @@ class NetAppClient:
                 items[volume_id] = VolumeInfo(
                     uuid=volume_id,
                     name=record.pop("name"),
-                    path=Path(record.pop("path")),
+                    path=Path(record.pop("nas", {}).pop("path")),
                 )
                 items[volume_id].update(record)
             return items
@@ -251,7 +251,7 @@ class NetAppClient:
         name: str,
         extra_fields: Optional[Sequence[str]] = None,
     ) -> VolumeInfo:
-        default_extra_fields = ["path"]
+        default_extra_fields = ["nas.path"]
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
@@ -265,7 +265,7 @@ class NetAppClient:
             volume_info = VolumeInfo(
                 uuid=VolumeID(record.pop("uuid")),
                 name=record.pop("name"),
-                path=Path(record.pop("path")),
+                path=Path(record.pop("nas", {}).pop("path")),
             )
             volume_info.update(record)
             return volume_info
@@ -275,7 +275,7 @@ class NetAppClient:
         volume_id: VolumeID,
         extra_fields: Optional[Sequence[str]] = None,
     ) -> VolumeInfo:
-        default_extra_fields = ["path"]
+        default_extra_fields = ["nas.path"]
         _extra_fields = (
             [*default_extra_fields, *extra_fields] if extra_fields else default_extra_fields
         )
@@ -288,7 +288,7 @@ class NetAppClient:
             volume_info = VolumeInfo(
                 uuid=VolumeID(record.pop("uuid")),
                 name=record.pop("name"),
-                path=Path(record.pop("path")),
+                path=Path(record.pop("nas", {}).pop("path")),
             )
             volume_info.update(record)
             return volume_info

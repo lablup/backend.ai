@@ -118,6 +118,13 @@ class AbstractFSOpModel(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    def scan_tree(
+        self,
+        path: Path,
+    ) -> AsyncIterator[DirEntry]:
+        raise NotImplementedError
+
+    @abstractmethod
     async def scan_tree_usage(
         self,
         path: Path,

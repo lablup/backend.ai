@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import glob
-import json
+import csv
 import logging
 import os
 import shlex
 import subprocess
-import time
+from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path, PurePosixPath
 from typing import (
@@ -22,9 +21,21 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_METRIC, CAP_VFHOST_QUOTA, CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel
-from ..exception import ExecutionError, NotEmptyError, StorageProxyError
+from ..exception import ExecutionError, NotEmptyError
 from ..subproc import spawn_and_watch
-from ..types import FSPerfMetric, FSUsage, QuotaConfig, VFolderID, VFolderUsage
+from ..types import (
+    SENTINEL,
+    DirEntry,
+    DirEntryType,
+    FSPerfMetric,
+    FSUsage,
+    QuotaConfig,
+    Sentinel,
+    Stat,
+    VFolderID,
+    VFolderUsage,
+)
+from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import NetAppClient, StorageID, VolumeID
 
@@ -89,12 +100,8 @@ class QTreeQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
             raise NotEmptyError(quota_scope_id)
-        await self.netapp_client.delete_quota_rule(
-            self.svm_id,
-            self.volume_id,
-            qspath.name,
-        )
-        # QTree is automatically removed when the corresponding directory is deleted.
+        # QTree and quota rule is automatically removed
+        # when the corresponding directory is deleted.
         await aiofiles.os.rmdir(qspath)
 
 
@@ -108,11 +115,12 @@ class XCPFSOpModel(BaseFSOpModel):
     def __init__(
         self,
         mount_path: Path,
+        scandir_limit: int,
         netapp_nfs_host: str,
         netapp_xcp_cmd: str,
         volume_path: Path,
     ) -> None:
-        super().__init__(mount_path)
+        super().__init__(mount_path, scandir_limit)
         self.netapp_nfs_host = netapp_nfs_host
         self.netapp_xcp_cmd = netapp_xcp_cmd
         self.volume_path = volume_path
@@ -160,11 +168,161 @@ class XCPFSOpModel(BaseFSOpModel):
     async def delete_tree(self, path: Path) -> None:
         relpath = path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{relpath}"
-        delete_cmd = [*self.netapp_xcp_cmd, b"delete", b"-force", os.fsencode(nfspath)]
+        delete_cmd = [
+            *self.netapp_xcp_cmd,
+            b"delete",
+            b"-force",
+            b"-removetopdir",
+            os.fsencode(nfspath),
+        ]
         async with aclosing(spawn_and_watch(delete_cmd)) as ag:
             async for line in ag:
                 # TODO: line for bgtask
                 pass
+
+    def scan_tree(
+        self,
+        target_path: Path,
+    ) -> AsyncIterator[DirEntry]:
+        target_relpath = target_path.relative_to(self.mount_path)
+        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{target_relpath}"
+        # Use a custom formatting
+        scan_cmd = [
+            *self.netapp_xcp_cmd,
+            b"scan",
+            b"-fmt",
+            rb"'{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}'.format(mode,uid,gid,ctime,mtime,type,size,x)",
+            os.fsencode(nfspath),
+        ]
+
+        async def aiter() -> AsyncIterator[DirEntry]:
+            proc = await asyncio.create_subprocess_exec(
+                *scan_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            assert proc.stdout is not None
+            assert proc.stderr is not None
+            stderr_lines: list[bytes] = []
+            entry_queue: asyncio.Queue[DirEntry | Sentinel] = asyncio.Queue(maxsize=1024)
+            async with asyncio.TaskGroup() as tg:
+
+                async def read_stdout():
+                    while True:
+                        line = await proc.stdout.readline()
+                        if not line:
+                            await entry_queue.put(SENTINEL)
+                            break
+                        parts = tuple(map(str, line.rstrip(b"\n").split(b"\0")))
+                        item_path = Path(os.fsdecode(parts[7]))
+                        item_abspath = (
+                            self.mount_path
+                            / target_relpath
+                            / item_path.relative_to(target_relpath.name)
+                        )
+                        match parts[5]:
+                            case 2:
+                                entry_type = DirEntryType.DIRECTORY
+                            case 5:
+                                entry_type = DirEntryType.SYMLINK
+                            case _:
+                                entry_type = DirEntryType.FILE
+                        await entry_queue.put(
+                            DirEntry(
+                                name=item_path.name,
+                                path=item_path.relative_to(target_relpath.name),
+                                type=entry_type,
+                                stat=Stat(
+                                    size=int(parts[6]),
+                                    owner=parts[1],
+                                    mode=int(parts[0]),
+                                    modified=fstime2datetime(float(parts[4])),
+                                    created=fstime2datetime(float(parts[3])),
+                                ),
+                                symlink_target=(
+                                    str(item_abspath.resolve())
+                                    if entry_type == DirEntryType.SYMLINK
+                                    else ""
+                                ),
+                            ),
+                        )
+
+                async def read_stderr():
+                    while True:
+                        line = await proc.stderr.readline()
+                        if not line:
+                            break
+                        stderr_lines.append(line)
+
+                tg.create_task(read_stdout())
+                tg.create_task(read_stderr())
+                while True:
+                    item = await entry_queue.get()
+                    try:
+                        if item is SENTINEL:
+                            break
+                        yield item
+                    finally:
+                        entry_queue.task_done()
+            await proc.wait()
+            if proc.returncode != 0:
+                error_msg_prefix = b"xcp: ERROR: "
+                error_msg = "unknown"
+                for line in stderr_lines:
+                    if line.startswith(error_msg_prefix):
+                        error_msg = line.removeprefix(error_msg_prefix).decode()
+                        break
+                raise ExecutionError(f"Running XCP has failed: {error_msg}")
+
+        return aiter()
+
+    async def scan_tree_usage(
+        self,
+        target_path: Path,
+    ) -> VFolderUsage:
+        target_relpath = target_path.relative_to(self.mount_path)
+        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{target_relpath}"
+        total_size = 0
+        total_count = 0
+        # Use a tree statistics output formatting
+        scan_cmd = [*self.netapp_xcp_cmd, b"scan", b"-csv", os.fsencode(nfspath)]
+        proc = await asyncio.create_subprocess_exec(
+            *scan_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            async with asyncio.timeout(30):
+                stdout, stderr = await proc.communicate()
+                if proc.returncode == 0:
+                    reader = csv.reader(map(lambda b: b.decode(), stdout.splitlines()))
+                    for row in reader:
+                        if len(row) < 2:
+                            continue
+                        match row[0].lower():
+                            case "total count":
+                                total_count = int(row[1])
+                            case "total space used":
+                                total_size = int(row[1])
+                            case _:
+                                pass
+                else:
+                    error_msg_prefix = b"xcp: ERROR: "
+                    error_msg = "unknown"
+                    for line in stderr.splitlines():
+                        if line.startswith(error_msg_prefix):
+                            error_msg = line.removeprefix(error_msg_prefix).rstrip().decode()
+                            break
+                    raise ExecutionError(f"Running XCP has failed: {error_msg}")
+        except asyncio.TimeoutError:
+            # -1 indicates "too many"
+            total_size = -1
+            total_count = -1
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+                await proc.wait()
+        return VFolderUsage(file_count=total_count, used_bytes=total_size)
 
 
 class NetAppVolume(BaseVolume):
@@ -188,6 +346,7 @@ class NetAppVolume(BaseVolume):
     async def create_fsop_model(self) -> AbstractFSOpModel:
         xcp_fsop_model = XCPFSOpModel(
             self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
             self.netapp_nfs_host,
             self.netapp_xcp_cmd,
             self.volume_path,
@@ -201,7 +360,10 @@ class NetAppVolume(BaseVolume):
             ),
             shlex.join(self.netapp_xcp_cmd),
         )
-        return BaseFSOpModel(self.mount_path)
+        return BaseFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def init(self) -> None:
         self.ontap_endpoint = self.config["netapp_ontap_endpoint"]
@@ -211,7 +373,6 @@ class NetAppVolume(BaseVolume):
             self.config["netapp_ontap_password"],
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
-        self.netapp_xcp_catalog_path = self.config["netapp_xcp_catalog_path"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
         self.volume_name = self.config["netapp_volume_name"]
         # TODO: resolve async-init ordering issue
@@ -240,6 +401,7 @@ class NetAppVolume(BaseVolume):
         #       (i.e., Different volumes may have the same qtree ID and names
         #       for different QTree instances!)
         # NOTE: The default qtree in the volume has no explicit path.
+        await super().init()
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_VFHOST_QUOTA, CAP_METRIC])
@@ -318,110 +480,7 @@ class NetAppVolume(BaseVolume):
         relpath: PurePosixPath = PurePosixPath("."),
     ) -> VFolderUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        target_relpath = target_path.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{target_relpath}"
-        total_size = 0
-        total_count = 0
-        start_time = time.monotonic()
-        available = True
-
-        prev_files_count = 0
-        curr_files_count = 0
-
-        # check the number of scan result files changed
-        # NOTE: if the target dir contains a small number of files, scan result doesn't get saved
-        files = list(glob.iglob(f"{self.netapp_xcp_catalog_path}/stats/*.json"))
-        prev_files_count = len(files)
-
-        scan_cmd = [*self.netapp_xcp_cmd, b"scan", b"-q", os.fsencode(nfspath)]
-        # Measure the exact file sizes and bytes
-        proc = await asyncio.create_subprocess_exec(
-            *scan_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        try:
-            stdout, stderr = await proc.communicate()
-            if b"xcp: ERROR:" in stdout:
-                # destination directory is busy for other operations
-                if b"xcp: ERROR: mnt3 MOUNT" in stdout:
-                    raise StorageProxyError
-                available = False
-            available = False if (await proc.wait() != 0) else True
-            # get the latest saved file
-            # scan command saves json file when operation completed
-            files = sorted(
-                glob.iglob(f"{self.netapp_xcp_catalog_path}/stats/*.json"),
-                key=os.path.getctime,
-                reverse=True,
-            )
-            curr_files_count = len(files)
-
-            # scan result file has been created
-            if prev_files_count < curr_files_count and available:
-                file = files[0]
-                async with aiofiles.open(file, "r", encoding="utf8") as scan_result:
-                    contents = await scan_result.read()
-                    data = json.loads(contents)
-                    # includes size element
-                    count_keys = [
-                        "numberOfDirectories",
-                        "numberOfHardlinkedFiles",
-                        "numberOfHardlinks",
-                        "numberOfRegularFiles",
-                        "numberOfSpecialFiles",
-                        "numberOfSymbolicLinks",
-                        "numberOfUnreadableDirs",
-                        "numberOfUnreadableFiles",
-                    ]
-                    size_keys = [
-                        "spaceSavedByHardlinks",
-                        "spaceUsedDirectories",
-                        "spaceUsedRegularFiles",
-                        "spaceUsedSpecialFiles",
-                        "spaceUsedSymbolicLinks",
-                    ]
-                    total_count = sum([data[item] for item in count_keys])
-                    total_size = sum([data[item] for item in size_keys])
-            else:
-                # if there's no scan result file, or cannot execute xcp command,
-                # then use the same way in vfs
-                def _calc_usage(target_path: os.DirEntry | Path) -> None:
-                    nonlocal total_size, total_count
-                    _timeout = 3
-                    # FIXME: Remove "type: ignore" when python/mypy#11964 is resolved.
-                    with os.scandir(target_path) as scanner:  # type: ignore
-                        for entry in scanner:
-                            if entry.is_dir():
-                                _calc_usage(entry)
-                                continue
-                            if entry.is_file() or entry.is_symlink():
-                                stat = entry.stat(follow_symlinks=False)
-                                total_size += stat.st_size
-                                total_count += 1
-                            if total_count % 1000 == 0:
-                                # Cancel if this I/O operation takes too much time.
-                                if time.monotonic() - start_time > _timeout:
-                                    raise TimeoutError
-
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, _calc_usage, target_path)
-        except StorageProxyError:
-            raise ExecutionError("Storage server is busy. Please try again")
-        except FileNotFoundError:
-            available = False
-        except IndexError:
-            available = False
-        except TimeoutError:
-            # -1 indicates "too many"
-            total_size = -1
-            total_count = -1
-        if not available:
-            raise ExecutionError(
-                "Cannot access the scan result file. Please check xcp is activated.",
-            )
-
-        return VFolderUsage(file_count=total_count, used_bytes=total_size)
+        return await self.fsop_model.scan_tree_usage(target_path)
 
     async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         usage = await self.get_usage(vfid)

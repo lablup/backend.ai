@@ -33,5 +33,7 @@ async def spawn_and_watch(
         exit_code = await proc.wait()
     if exit_code != 0:
         raise subprocess.CalledProcessError(
-            exit_code, shlex.join(map(str, cmdargs)), b"".join(last_lines)
+            exit_code,
+            shlex.join(map(lambda b: b.decode() if isinstance(b, bytes) else b, cmdargs)),
+            b"".join(last_lines),
         )
