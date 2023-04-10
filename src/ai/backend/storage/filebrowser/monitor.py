@@ -80,7 +80,7 @@ async def keep_monitors_running(ctx: Context) -> None:
     network_monitored_list = []
     idle_time_monitored_list = []
     while True:
-        await asyncio.sleep(30) # grace period for FileBrowser to start before monitoring.
+        await asyncio.sleep(30)  # grace period for FileBrowser to start before monitoring.
         browsers = await get_filebrowsers()
         if len(browsers) > 0:
             async with aiotools.TaskGroup() as tg:
