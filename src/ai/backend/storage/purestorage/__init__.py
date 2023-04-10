@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import AsyncIterator, FrozenSet
-
-from aiotools import aclosing
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
-from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderID, VFolderUsage
+from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderUsage
 from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseVolume
 from .purity import PurityClient
@@ -55,6 +54,54 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         if proc.returncode != 0:
             raise RuntimeError("'prm' command returned a non-zero exit code.")
 
+    def scan_tree(
+        self,
+        target_path: Path,
+    ) -> AsyncIterator[DirEntry]:
+        raw_target_path = os.fsencode(target_path)
+
+        async def _aiter() -> AsyncIterator[DirEntry]:
+            proc = await asyncio.create_subprocess_exec(
+                b"pls",
+                b"--json",
+                raw_target_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            assert proc.stdout is not None
+            try:
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    line = line.rstrip(b"\n")
+                    item = json.loads(line)
+                    item_path = Path(item["path"])
+                    entry_type = DirEntryType.FILE
+                    if item["filetype"] == 40000:
+                        entry_type = DirEntryType.DIRECTORY
+                    if item["filetype"] == 120000:
+                        entry_type = DirEntryType.SYMLINK
+                    yield DirEntry(
+                        name=item_path.name,
+                        path=item_path,
+                        type=entry_type,
+                        stat=Stat(
+                            size=item["size"],
+                            owner=str(item["uid"]),
+                            # The integer represents the octal number in decimal
+                            # (e.g., 644 which actually means 0o644)
+                            mode=int(str(item["mode"]), 8),
+                            modified=fstime2datetime(item["mtime"]),
+                            created=fstime2datetime(item["ctime"]),
+                        ),
+                        symlink_target="",  # TODO: should be tested on PureStorage
+                    )
+            finally:
+                await proc.wait()
+
+        return _aiter()
+
     async def scan_tree_usage(
         self,
         path: Path,
@@ -89,6 +136,23 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         finally:
             await proc.wait()
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
+
+    async def scan_tree_size(
+        self,
+        path: Path,
+    ) -> BinarySize:
+        proc = await asyncio.create_subprocess_exec(
+            b"pdu",
+            b"-hs",
+            bytes(path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"pdu command failed: {stderr.decode()}")
+        used_bytes, _ = stdout.decode().split()
+        return BinarySize.finite_from_str(used_bytes)
 
 
 class FlashBladeVolume(BaseVolume):
@@ -163,7 +227,7 @@ class FlashBladeVolume(BaseVolume):
 
     async def get_performance_metric(self) -> FSPerfMetric:
         async with self.purity_client as client:
-            async with aclosing(
+            async with contextlib.aclosing(
                 client.get_nfs_metric(self.config["purity_fs_name"]),
             ) as items:
                 async for item in items:
@@ -179,66 +243,3 @@ class FlashBladeVolume(BaseVolume):
                     raise RuntimeError(
                         "no metric found for the configured flashblade filesystem",
                     )
-
-    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
-        vfpath = self.mangle_vfpath(vfid)
-        proc = await asyncio.create_subprocess_exec(
-            b"pdu",
-            b"-hs",
-            bytes(vfpath),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f"pdu command failed: {stderr.decode()}")
-        used_bytes, _ = stdout.decode().split()
-        return BinarySize.finite_from_str(used_bytes)
-
-    # ------ vfolder internal operations -------
-
-    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
-        target_path = self.sanitize_vfpath(vfid, relpath)
-        raw_target_path = bytes(target_path)
-
-        async def _aiter() -> AsyncIterator[DirEntry]:
-            proc = await asyncio.create_subprocess_exec(
-                b"pls",
-                b"--json",
-                raw_target_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            assert proc.stdout is not None
-            try:
-                while True:
-                    line = await proc.stdout.readline()
-                    if not line:
-                        break
-                    line = line.rstrip(b"\n")
-                    item = json.loads(line)
-                    item_path = Path(item["path"])
-                    entry_type = DirEntryType.FILE
-                    if item["filetype"] == 40000:
-                        entry_type = DirEntryType.DIRECTORY
-                    if item["filetype"] == 120000:
-                        entry_type = DirEntryType.SYMLINK
-                    yield DirEntry(
-                        name=item_path.name,
-                        path=item_path,
-                        type=entry_type,
-                        stat=Stat(
-                            size=item["size"],
-                            owner=str(item["uid"]),
-                            # The integer represents the octal number in decimal
-                            # (e.g., 644 which actually means 0o644)
-                            mode=int(str(item["mode"]), 8),
-                            modified=fstime2datetime(item["mtime"]),
-                            created=fstime2datetime(item["ctime"]),
-                        ),
-                        symlink_target="",  # TODO: should be tested on PureStorage
-                    )
-            finally:
-                await proc.wait()
-
-        return _aiter()

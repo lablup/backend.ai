@@ -283,20 +283,18 @@ class BaseFSOpModel(AbstractFSOpModel):
         total_size = 0
         total_count = 0
         start_time = time.monotonic()
+        _timeout = 30
 
         def _calc_usage(target_path: os.DirEntry | Path) -> None:
             nonlocal total_size, total_count
-            _timeout = 3
             # FIXME: Remove "type: ignore" when python/mypy#11964 is resolved.
             with os.scandir(target_path) as scanner:  # type: ignore
                 for entry in scanner:
+                    stat = entry.stat(follow_symlinks=False)
+                    total_size += stat.st_size
+                    total_count += 1
                     if entry.is_dir():
                         _calc_usage(entry)
-                        continue
-                    if entry.is_file() or entry.is_symlink():
-                        stat = entry.stat(follow_symlinks=False)
-                        total_size += stat.st_size
-                        total_count += 1
                     if total_count % 1000 == 0:
                         # Cancel if this I/O operation takes too much time.
                         if time.monotonic() - start_time > _timeout:
@@ -310,6 +308,14 @@ class BaseFSOpModel(AbstractFSOpModel):
             total_size = -1
             total_count = -1
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
+
+    async def scan_tree_size(
+        self,
+        target_path: Path,
+    ) -> BinarySize:
+        info = await run(["du", "-hs", target_path])
+        used_bytes, _ = info.split()
+        return BinarySize.finite_from_str(used_bytes)
 
 
 class BaseVolume(AbstractVolume):
@@ -438,9 +444,7 @@ class BaseVolume(AbstractVolume):
 
     async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
-        info = await run(["du", "-hs", vfpath])
-        used_bytes, _ = info.split()
-        return BinarySize.finite_from_str(used_bytes)
+        return await self.fsop_model.scan_tree_size(vfpath)
 
     # ------ vfolder internal operations -------
 

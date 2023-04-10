@@ -115,6 +115,9 @@ class AbstractFSOpModel(metaclass=ABCMeta):
         self,
         path: Path,
     ) -> None:
+        """
+        Deletes all files and directories inside the given path.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -122,6 +125,9 @@ class AbstractFSOpModel(metaclass=ABCMeta):
         self,
         path: Path,
     ) -> AsyncIterator[DirEntry]:
+        """
+        Iterates over all files within the given path recursively.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -129,6 +135,24 @@ class AbstractFSOpModel(metaclass=ABCMeta):
         self,
         path: Path,
     ) -> VFolderUsage:
+        """
+        Retrieves the number of bytes and the number of files and directories inside
+        the given path, recursively.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def scan_tree_size(
+        self,
+        path: Path,
+    ) -> BinarySize:
+        """
+        Retrieves the approximate number of bytes used by a directory,
+        including all subdirectories and files recursively.
+
+        This method can be implemented using :meth:`scan_tree_usage()`, but in many cases we can
+        often implement this using a faster, dedicated command like ``du``.
+        """
         raise NotImplementedError
 
 

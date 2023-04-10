@@ -8,7 +8,7 @@ import shlex
 import subprocess
 from collections.abc import AsyncIterator
 from contextlib import aclosing
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import (
     FrozenSet,
     Optional,
@@ -32,7 +32,6 @@ from ..types import (
     QuotaConfig,
     Sentinel,
     Stat,
-    VFolderID,
     VFolderUsage,
 )
 from ..utils import fstime2datetime
@@ -201,70 +200,72 @@ class XCPFSOpModel(BaseFSOpModel):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            assert proc.stdout is not None
-            assert proc.stderr is not None
             stderr_lines: list[bytes] = []
             entry_queue: asyncio.Queue[DirEntry | Sentinel] = asyncio.Queue(maxsize=1024)
-            async with asyncio.TaskGroup() as tg:
 
-                async def read_stdout():
-                    while True:
-                        line = await proc.stdout.readline()
-                        if not line:
-                            await entry_queue.put(SENTINEL)
-                            break
-                        parts = tuple(map(str, line.rstrip(b"\n").split(b"\0")))
-                        item_path = Path(os.fsdecode(parts[7]))
-                        item_abspath = (
-                            self.mount_path
-                            / target_relpath
-                            / item_path.relative_to(target_relpath.name)
-                        )
-                        match parts[5]:
-                            case 2:
-                                entry_type = DirEntryType.DIRECTORY
-                            case 5:
-                                entry_type = DirEntryType.SYMLINK
-                            case _:
-                                entry_type = DirEntryType.FILE
-                        await entry_queue.put(
-                            DirEntry(
-                                name=item_path.name,
-                                path=item_path.relative_to(target_relpath.name),
-                                type=entry_type,
-                                stat=Stat(
-                                    size=int(parts[6]),
-                                    owner=parts[1],
-                                    mode=int(parts[0]),
-                                    modified=fstime2datetime(float(parts[4])),
-                                    created=fstime2datetime(float(parts[3])),
-                                ),
-                                symlink_target=(
-                                    str(item_abspath.resolve())
-                                    if entry_type == DirEntryType.SYMLINK
-                                    else ""
-                                ),
-                            ),
-                        )
-
-                async def read_stderr():
-                    while True:
-                        line = await proc.stderr.readline()
-                        if not line:
-                            break
-                        stderr_lines.append(line)
-
-                tg.create_task(read_stdout())
-                tg.create_task(read_stderr())
+            async def read_stdout() -> None:
+                assert proc.stdout is not None
                 while True:
-                    item = await entry_queue.get()
-                    try:
-                        if item is SENTINEL:
-                            break
-                        yield item
-                    finally:
-                        entry_queue.task_done()
-            await proc.wait()
+                    line = await proc.stdout.readline()
+                    if not line:
+                        await entry_queue.put(SENTINEL)
+                        break
+                    parts = tuple(map(str, line.rstrip(b"\n").split(b"\0")))
+                    item_path = Path(os.fsdecode(parts[7]))
+                    item_abspath = (
+                        self.mount_path
+                        / target_relpath
+                        / item_path.relative_to(target_relpath.name)
+                    )
+                    match parts[5]:
+                        case 2:
+                            entry_type = DirEntryType.DIRECTORY
+                        case 5:
+                            entry_type = DirEntryType.SYMLINK
+                        case _:
+                            entry_type = DirEntryType.FILE
+                    await entry_queue.put(
+                        DirEntry(
+                            name=item_path.name,
+                            path=item_path.relative_to(target_relpath.name),
+                            type=entry_type,
+                            stat=Stat(
+                                size=int(parts[6]),
+                                owner=parts[1],
+                                mode=int(parts[0]),
+                                modified=fstime2datetime(float(parts[4])),
+                                created=fstime2datetime(float(parts[3])),
+                            ),
+                            symlink_target=(
+                                str(item_abspath.resolve())
+                                if entry_type == DirEntryType.SYMLINK
+                                else ""
+                            ),
+                        ),
+                    )
+
+            async def read_stderr() -> None:
+                assert proc.stderr is not None
+                while True:
+                    line = await proc.stderr.readline()
+                    if not line:
+                        break
+                    stderr_lines.append(line)
+
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    tg.create_task(read_stdout())
+                    tg.create_task(read_stderr())
+                    while True:
+                        item = await entry_queue.get()
+                        try:
+                            if item is SENTINEL:
+                                break
+                            yield item
+                        finally:
+                            entry_queue.task_done()
+            finally:
+                await proc.wait()
             if proc.returncode != 0:
                 error_msg_prefix = b"xcp: ERROR: "
                 error_msg = "unknown"
@@ -324,6 +325,13 @@ class XCPFSOpModel(BaseFSOpModel):
                 await proc.wait()
         return VFolderUsage(file_count=total_count, used_bytes=total_size)
 
+    async def scan_tree_size(
+        self,
+        target_path: Path,
+    ) -> BinarySize:
+        usage = await self.scan_tree_usage(target_path)
+        return BinarySize(usage.used_bytes)
+
 
 class NetAppVolume(BaseVolume):
     ontap_endpoint: str
@@ -375,7 +383,6 @@ class NetAppVolume(BaseVolume):
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
         self.volume_name = self.config["netapp_volume_name"]
-        # TODO: resolve async-init ordering issue
         volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
         assert "svm" in volume_info
         self.volume_id = volume_info["uuid"]
@@ -402,6 +409,9 @@ class NetAppVolume(BaseVolume):
         #       for different QTree instances!)
         # NOTE: The default qtree in the volume has no explicit path.
         await super().init()
+
+    async def shutdown(self) -> None:
+        await self.netapp_client.aclose()
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_VFHOST_QUOTA, CAP_METRIC])
@@ -470,18 +480,3 @@ class NetAppVolume(BaseVolume):
             io_usec_read=0,
             io_usec_write=0,
         )
-
-    async def shutdown(self) -> None:
-        await self.netapp_client.aclose()
-
-    async def get_usage(
-        self,
-        vfid: VFolderID,
-        relpath: PurePosixPath = PurePosixPath("."),
-    ) -> VFolderUsage:
-        target_path = self.sanitize_vfpath(vfid, relpath)
-        return await self.fsop_model.scan_tree_usage(target_path)
-
-    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
-        usage = await self.get_usage(vfid)
-        return BinarySize(usage.used_bytes)
