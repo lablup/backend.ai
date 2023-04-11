@@ -6,13 +6,17 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.config import load_local_config
 from ai.backend.storage.types import VFolderID
 
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:
-    local_config = load_local_config(None, debug=True)
+    try:
+        local_config = load_local_config(None, debug=True)
+    except ConfigurationError:
+        return None
     for _, info in local_config["volume"].items():
         if info["backend"] == backend_name:
             return info
@@ -32,9 +36,14 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
 )
 async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
-    backend_config = has_backend(request.param)
-    if backend_config is None:
-        pytest.skip(f"{request.param} backend is not installed")
+    backend_options = {}
+    volume_path = local_volume
+    if request.param != "vfs":
+        backend_config = has_backend(request.param)
+        if backend_config is None:
+            pytest.skip(f"{request.param} backend is not installed")
+        backend_options = backend_config.get("options", {})
+        volume_path = Path(backend_config["path"])
     match request.param:
         case "cephfs":
             from ai.backend.storage.cephfs import CephFSVolume
@@ -72,9 +81,9 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
                 "scandir-limit": 1000,
             },
         },
-        local_volume if request.param == "vfs" else Path(backend_config["path"]),
+        volume_path,
         fsprefix=PurePath("fsprefix"),
-        options=backend_config.get("options", {}),
+        options=backend_options,
     )
     await volume.init()
     try:
