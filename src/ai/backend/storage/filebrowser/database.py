@@ -9,8 +9,7 @@ class FilebrowserTrackerDB:
 
     async def __ainit__(self):
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                """
+            await db.execute("""
                 CREATE TABLE IF NOT EXISTS containers (
                     container_id TEXT PRIMARY KEY,
                     container_name TEXT,
@@ -20,8 +19,7 @@ class FilebrowserTrackerDB:
                     status TEXT,
                     timestamp TEXT
                 )
-                """
-            )
+                """)
             await db.commit()
 
     @classmethod
@@ -58,7 +56,10 @@ class FilebrowserTrackerDB:
     ):
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                "INSERT INTO containers (container_id, container_name, service_ip, service_port, config, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?);",
+                (
+                    "INSERT INTO containers (container_id, container_name, service_ip,"
+                    " service_port, config, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?);"
+                ),
                 (
                     container_id,
                     container_name,
