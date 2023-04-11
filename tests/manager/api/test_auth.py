@@ -30,13 +30,13 @@ def test_extract_auth_params():
         _extract_auth_params(request)
 
     request.headers = {
-        "Authorization": ("BadAuthType signMethod=HMAC-SHA256," "credential=fake-ak:fake-sig")
+        "Authorization": "BadAuthType signMethod=HMAC-SHA256,credential=fake-ak:fake-sig"
     }
     with pytest.raises(InvalidAuthParameters):
         _extract_auth_params(request)
 
     request.headers = {
-        "Authorization": ("BackendAI signMethod=HMAC-SHA256," "credential=fake-ak:fake-sig")
+        "Authorization": "BackendAI signMethod=HMAC-SHA256,credential=fake-ak:fake-sig"
     }
     ret = _extract_auth_params(request)
     assert ret is not None

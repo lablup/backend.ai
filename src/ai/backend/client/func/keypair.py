@@ -92,10 +92,7 @@ class KeyPair(BaseFunction):
         """
         q = (
             "mutation($access_key: String!, $input: ModifyKeyPairInput!) {"
-            + "  modify_keypair(access_key: $access_key, props: $input) {"
-            "    ok msg"
-            "  }"
-            "}"
+            + "  modify_keypair(access_key: $access_key, props: $input) {    ok msg  }}"
         )
         variables = {
             "access_key": access_key,
@@ -141,21 +138,12 @@ class KeyPair(BaseFunction):
         You need an admin privilege for this operation.
         """
         if user_id is None:
-            q = (
-                "query($is_active: Boolean) {"
-                "  keypairs(is_active: $is_active) {"
-                "    $fields"
-                "  }"
-                "}"
-            )
+            q = "query($is_active: Boolean) {  keypairs(is_active: $is_active) {    $fields  }}"
         else:
             uid_type = "Int!" if isinstance(user_id, int) else "String!"
             q = (
                 "query($email: {0}, $is_active: Boolean) {{".format(uid_type)
-                + "  keypairs(email: $email, is_active: $is_active) {"
-                "    $fields"
-                "  }"
-                "}"
+                + "  keypairs(email: $email, is_active: $is_active) {    $fields  }}"
             )
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables: Dict[str, Any] = {
@@ -209,7 +197,7 @@ class KeyPair(BaseFunction):
 
         .. versionadded:: 18.12
         """
-        q = "query {" "  keypair {" "    $fields" "  }" "}"
+        q = "query {  keypair {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
         return data["keypair"]
@@ -223,10 +211,7 @@ class KeyPair(BaseFunction):
         """
         q = (
             "mutation($access_key: String!, $input: ModifyKeyPairInput!) {"
-            + "  modify_keypair(access_key: $access_key, props: $input) {"
-            "    ok msg"
-            "  }"
-            "}"
+            + "  modify_keypair(access_key: $access_key, props: $input) {    ok msg  }}"
         )
         variables = {
             "access_key": access_key,
@@ -251,10 +236,7 @@ class KeyPair(BaseFunction):
         """
         q = (
             "mutation($access_key: String!, $input: ModifyKeyPairInput!) {"
-            + "  modify_keypair(access_key: $access_key, props: $input) {"
-            "    ok msg"
-            "  }"
-            "}"
+            + "  modify_keypair(access_key: $access_key, props: $input) {    ok msg  }}"
         )
         variables = {
             "access_key": access_key,

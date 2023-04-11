@@ -91,9 +91,10 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
 
     :return: An iterator over the generated sequence
     """
-    assert (
-        num_points * min_distance <= length + min_distance
-    ), "There are too many points or it has a too large distance which cannot be fit into the given length."
+    assert num_points * min_distance <= length + min_distance, (
+        "There are too many points or it has a too large distance which cannot be fit into the"
+        " given length."
+    )
     extra = length - (num_points - 1) * min_distance
     ro = [random.uniform(0, 1) for _ in range(num_points + 1)]
     sum_ro = sum(ro)

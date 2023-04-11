@@ -278,8 +278,7 @@ class KubernetesKernel(AbstractKernel):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -300,8 +299,7 @@ class KubernetesKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
         async with watch.Watch().stream(

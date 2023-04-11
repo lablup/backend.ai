@@ -183,8 +183,10 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. "
-    "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)",
+    help=(
+        "The config file path. "
+        "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)"
+    ),
 )
 @click.option(
     "--debug",
