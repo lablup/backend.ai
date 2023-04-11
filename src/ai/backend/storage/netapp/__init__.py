@@ -117,12 +117,12 @@ class XCPFSOpModel(BaseFSOpModel):
         scandir_limit: int,
         netapp_nfs_host: str,
         netapp_xcp_cmd: str,
-        volume_path: Path,
+        nas_path: Path,
     ) -> None:
         super().__init__(mount_path, scandir_limit)
         self.netapp_nfs_host = netapp_nfs_host
         self.netapp_xcp_cmd = netapp_xcp_cmd
-        self.volume_path = volume_path
+        self.nas_path = nas_path
 
     async def check_license(self) -> bool:
         try:
@@ -150,8 +150,8 @@ class XCPFSOpModel(BaseFSOpModel):
         # These relative paths contains the qtree (quota-scope) name as the first part.
         src_relpath = src_path.relative_to(self.mount_path)
         dst_relpath = dst_path.relative_to(self.mount_path)
-        src_nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{src_relpath}"
-        dst_nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{dst_relpath}"
+        src_nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{src_relpath}"
+        dst_nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{dst_relpath}"
 
         copy_cmd = [
             *self.netapp_xcp_cmd,
@@ -166,7 +166,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
     async def delete_tree(self, path: Path) -> None:
         relpath = path.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{relpath}"
+        nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{relpath}"
         delete_cmd = [
             *self.netapp_xcp_cmd,
             b"delete",
@@ -184,7 +184,7 @@ class XCPFSOpModel(BaseFSOpModel):
         target_path: Path,
     ) -> AsyncIterator[DirEntry]:
         target_relpath = target_path.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{target_relpath}"
+        nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         # Use a custom formatting
         scan_cmd = [
             *self.netapp_xcp_cmd,
@@ -212,20 +212,29 @@ class XCPFSOpModel(BaseFSOpModel):
                         break
                     parts = tuple(map(os.fsdecode, line.rstrip(b"\n").split(b"\0")))
                     item_path = Path(*Path(parts[7]).parts[2:])
-                    item_abspath = (
-                        self.mount_path / target_relpath / item_path.relative_to(target_relpath)
-                    )
-                    match parts[5]:
+                    inner_relpath = item_path.relative_to(target_relpath)
+                    if inner_relpath == Path("."):  # exclude the top dir
+                        continue
+                    item_abspath = self.mount_path / target_relpath / inner_relpath
+                    match int(parts[5]):
                         case 2:
                             entry_type = DirEntryType.DIRECTORY
                         case 5:
                             entry_type = DirEntryType.SYMLINK
                         case _:
                             entry_type = DirEntryType.FILE
+                    symlink_target = ""
+                    if entry_type == DirEntryType.SYMLINK:
+                        symlink_dst = Path(item_abspath).resolve()
+                        try:
+                            symlink_dst = symlink_dst.relative_to(target_path)
+                        except ValueError:
+                            pass
+                        symlink_target = os.fsdecode(symlink_dst)
                     await entry_queue.put(
                         DirEntry(
                             name=item_path.name,
-                            path=item_path.relative_to(target_relpath),
+                            path=inner_relpath,
                             type=entry_type,
                             stat=Stat(
                                 size=int(parts[6]),
@@ -234,11 +243,7 @@ class XCPFSOpModel(BaseFSOpModel):
                                 modified=fstime2datetime(float(parts[4])),
                                 created=fstime2datetime(float(parts[3])),
                             ),
-                            symlink_target=(
-                                str(item_abspath.resolve())
-                                if entry_type == DirEntryType.SYMLINK
-                                else ""
-                            ),
+                            symlink_target=symlink_target,
                         ),
                     )
 
@@ -259,6 +264,7 @@ class XCPFSOpModel(BaseFSOpModel):
                         try:
                             if item is SENTINEL:
                                 break
+                            print(item)
                             yield item
                         finally:
                             entry_queue.task_done()
@@ -280,7 +286,7 @@ class XCPFSOpModel(BaseFSOpModel):
         target_path: Path,
     ) -> VFolderUsage:
         target_relpath = target_path.relative_to(self.mount_path)
-        nfspath = f"{self.netapp_nfs_host}:{self.volume_path}/{target_relpath}"
+        nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         total_size = 0
         total_count = 0
         # Use a tree statistics output formatting
@@ -339,7 +345,7 @@ class NetAppVolume(BaseVolume):
     svm_id: StorageID
     volume_name: str
     volume_id: VolumeID
-    volume_path: Path
+    nas_path: Path
 
     async def create_quota_model(self) -> AbstractQuotaModel:
         return QTreeQuotaModel(
@@ -355,7 +361,7 @@ class NetAppVolume(BaseVolume):
             self.local_config["storage-proxy"]["scandir-limit"],
             self.netapp_nfs_host,
             self.netapp_xcp_cmd,
-            self.volume_path,
+            self.nas_path,
         )
         if await xcp_fsop_model.check_license():
             return xcp_fsop_model
@@ -386,8 +392,8 @@ class NetAppVolume(BaseVolume):
         self.volume_id = volume_info["uuid"]
         self.svm_name = volume_info["svm"]["name"]
         self.svm_id = StorageID(volume_info["svm"]["uuid"])
-        self.volume_path = volume_info["path"]
-        assert self.volume_path.is_absolute()
+        self.nas_path = volume_info["path"]
+        assert self.nas_path.is_absolute()
         # Example volume ID: 8a5c9938-a872-11ed-8519-d039ea42b802
         # Example volume name: "cj1nipacjssd1_02R10c1v2"
         # Example volume path: /cj1nipacjssd1_02R10c1v2/

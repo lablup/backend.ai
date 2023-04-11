@@ -9,6 +9,7 @@ import secrets
 import shutil
 import time
 import warnings
+from collections import deque
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union, final
 
@@ -221,24 +222,32 @@ class BaseFSOpModel(AbstractFSOpModel):
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
         loop = asyncio.get_running_loop()
 
-        def _scandir(q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
+        def _scandir(target_path: Path, q: janus._SyncQueueProxy[Sentinel | DirEntry]) -> None:
             count = 0
             limit = self.scandir_limit
+            next_paths: deque[Path] = deque()
+            next_paths.append(target_path)
             try:
-                with os.scandir(target_path) as scanner:
-                    for entry in scanner:
-                        symlink_target = ""
-                        entry_type = DirEntryType.FILE
-                        if entry.is_dir():
-                            entry_type = DirEntryType.DIRECTORY
-                        if entry.is_symlink():
-                            entry_type = DirEntryType.SYMLINK
-                            symlink_target = str(Path(entry).resolve())
-                        entry_stat = entry.stat(follow_symlinks=False)
-                        q.put(
-                            DirEntry(
+                while next_paths:
+                    next_path = next_paths.popleft()
+                    with os.scandir(next_path) as scanner:
+                        for entry in scanner:
+                            symlink_target = ""
+                            entry_type = DirEntryType.FILE
+                            if entry.is_dir():
+                                entry_type = DirEntryType.DIRECTORY
+                            if entry.is_symlink():
+                                entry_type = DirEntryType.SYMLINK
+                                symlink_dst = Path(entry).resolve()
+                                try:
+                                    symlink_dst = symlink_dst.relative_to(target_path)
+                                except ValueError:
+                                    pass
+                                symlink_target = os.fsdecode(symlink_dst)
+                            entry_stat = entry.stat(follow_symlinks=False)
+                            item = DirEntry(
                                 name=entry.name,
-                                path=Path(entry.path),
+                                path=Path(entry.path).relative_to(target_path),
                                 type=entry_type,
                                 stat=Stat(
                                     size=entry_stat.st_size,
@@ -248,16 +257,18 @@ class BaseFSOpModel(AbstractFSOpModel):
                                     created=fstime2datetime(entry_stat.st_ctime),
                                 ),
                                 symlink_target=symlink_target,
-                            ),
-                        )
-                        count += 1
-                        if limit > 0 and count == limit:
-                            break
+                            )
+                            q.put(item)
+                            if entry.is_dir() and not entry.is_symlink():
+                                next_paths.append(Path(entry.path))
+                            count += 1
+                            if limit > 0 and count == limit:
+                                break
             finally:
                 q.put(SENTINEL)
 
         async def _scan_task(_scandir, q) -> None:
-            await loop.run_in_executor(None, _scandir, q.sync_q)
+            await loop.run_in_executor(None, _scandir, target_path, q.sync_q)
 
         async def _aiter() -> AsyncIterator[DirEntry]:
             scan_task = asyncio.create_task(_scan_task(_scandir, q))
@@ -267,6 +278,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                     item = await q.async_q.get()
                     if item is SENTINEL:
                         break
+                    print(item)
                     yield item
                     q.async_q.task_done()
             finally:
@@ -285,20 +297,23 @@ class BaseFSOpModel(AbstractFSOpModel):
         start_time = time.monotonic()
         _timeout = 30
 
-        def _calc_usage(target_path: os.DirEntry | Path) -> None:
+        def _calc_usage(target_path: Path) -> None:
             nonlocal total_size, total_count
-            # FIXME: Remove "type: ignore" when python/mypy#11964 is resolved.
-            with os.scandir(target_path) as scanner:  # type: ignore
-                for entry in scanner:
-                    stat = entry.stat(follow_symlinks=False)
-                    total_size += stat.st_size
-                    total_count += 1
-                    if entry.is_dir():
-                        _calc_usage(entry)
-                    if total_count % 1000 == 0:
-                        # Cancel if this I/O operation takes too much time.
-                        if time.monotonic() - start_time > _timeout:
-                            raise TimeoutError
+            next_paths: deque[Path] = deque()
+            next_paths.append(target_path)
+            while next_paths:
+                next_path = next_paths.popleft()
+                with os.scandir(next_path) as scanner:  # type: ignore
+                    for entry in scanner:
+                        stat = entry.stat(follow_symlinks=False)
+                        total_size += stat.st_size
+                        total_count += 1
+                        if entry.is_dir() and not entry.is_symlink():
+                            next_paths.append(Path(entry.path))
+                        if total_count % 1000 == 0:
+                            # Cancel if this I/O operation takes too much time.
+                            if time.monotonic() - start_time > _timeout:
+                                raise TimeoutError
 
         loop = asyncio.get_running_loop()
         try:
@@ -360,17 +375,17 @@ class BaseVolume(AbstractVolume):
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
         await self.fsop_model.delete_tree(vfpath)
-        try:
-            await aiofiles.os.rmdir(vfpath.parent)
-            await aiofiles.os.rmdir(vfpath.parent.parent)
-        except FileNotFoundError:
-            pass
-        except OSError as e:
-            match e.errno:
-                case errno.ENOTEMPTY:
-                    pass
-                case _:
-                    raise
+        for p in [vfpath, vfpath.parent, vfpath.parent.parent]:
+            try:
+                await aiofiles.os.rmdir(p)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                match e.errno:
+                    case errno.ENOTEMPTY:
+                        pass
+                    case _:
+                        raise
 
     @final
     async def clone_vfolder(
