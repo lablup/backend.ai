@@ -72,9 +72,9 @@ async def test_netapp_get_usage(netapp_volume: NetAppVolume, empty_vfolder: VFol
     (vfpath / "test2.txt").symlink_to((vfpath / "inner" / "hello.txt"))
     (vfpath / "inner2").symlink_to((vfpath / "inner"))
     usage = await netapp_volume.get_usage(empty_vfolder)
-    assert usage.file_count == 7
+    assert usage.file_count == 7  # including directories
     # This may vary depending on the device block size.
-    assert 92 <= usage.used_bytes <= 4096 * 4
+    assert 11 <= usage.used_bytes <= 4096 * 4
 
 
 @pytest.mark.integration
@@ -87,8 +87,17 @@ async def test_netapp_scandir(netapp_volume: NetAppVolume, empty_vfolder: VFolde
     (vfpath / "inner" / "world.txt").write_bytes(b"901")
     (vfpath / "test2.txt").symlink_to((vfpath / "inner" / "hello.txt"))
     (vfpath / "inner2").symlink_to((vfpath / "inner"))
+    entries = []
     async for entry in netapp_volume.scandir(empty_vfolder, PurePosixPath(".")):
-        print(entry)
+        entries.append(entry)
+    assert len(entries) == 7
+    merged_output = [str(entry.path) for entry in entries]
+    assert "inner/hello.txt" in merged_output
+    assert "inner/world.txt" in merged_output
+    assert "test.txt" in merged_output
+    assert "test2.txt" in merged_output
+    assert "inner" in merged_output
+    assert "inner2" in merged_output
 
 
 @pytest.mark.integration

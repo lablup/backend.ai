@@ -11,7 +11,16 @@ from ai.backend.storage.vfs import BaseVolume
 
 @pytest.fixture
 async def vfs(local_volume):
-    vfs = BaseVolume({}, local_volume, fsprefix=PurePath("fsprefix"), options={})
+    vfs = BaseVolume(
+        {
+            "storage-proxy": {
+                "scandir-limit": 1000,
+            },
+        },
+        local_volume,
+        fsprefix=PurePath("fsprefix"),
+        options={},
+    )
     await vfs.init()
     try:
         yield vfs
@@ -93,8 +102,8 @@ async def test_vfs_get_usage(vfs: BaseVolume, empty_vfolder: VFolderID) -> None:
     (vfpath / "inner" / "hello.txt").write_bytes(b"678")
     (vfpath / "inner" / "world.txt").write_bytes(b"901")
     usage = await vfs.get_usage(empty_vfolder)
-    assert usage.file_count == 3
-    assert usage.used_bytes == 11
+    assert usage.file_count == 4  # including directories
+    assert 11 <= usage.used_bytes <= 4096 * 4
 
 
 @pytest.mark.asyncio
