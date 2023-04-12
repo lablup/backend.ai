@@ -163,7 +163,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             if config is None:
                 # Set the limit as the filesystem size
                 vfs_stat = os.statvfs(self.mount_path)
-                config = QuotaConfig(vfs_stat.f_blocks * vfs_stat.f_bsize)
+                config = QuotaConfig(vfs_stat.f_blocks * self.block_size)
             async with FileLock(LOCK_FILE):
                 log.info("creating project quota (qs:{}, q:{})", quota_scope_id, config.limit_bytes)
                 await aiofiles.os.makedirs(qspath)
@@ -189,6 +189,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             # -N: without header
             ["sudo", "xfs_quota", "-x", "-c", "report -p -b -N", self.mount_path],
         )
+        print(full_report)
         for line in full_report.splitlines():
             if quota_scope_id in line:
                 report = line
@@ -197,9 +198,10 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             raise RuntimeError(f"unknown xfs project ID: {quota_scope_id}")
         if len(report.split()) != 6:
             raise ValueError("unexpected format for xfs_quota report")
-        _, used_blocks, _, hard_limit_blocks, _, _ = report.split()
-        used_bytes = int(used_blocks) * self.block_size
-        hard_limit_bytes = int(hard_limit_blocks) * self.block_size
+        _, used_kbs, _, hard_limit_kbs, _, _ = report.split()
+        # By default, report command displays the sizes in the 1 KiB unit.
+        used_bytes = int(used_kbs) * 1024
+        hard_limit_bytes = int(hard_limit_kbs) * 1024
         return QuotaUsage(used_bytes, hard_limit_bytes)
 
     async def update_quota_scope(
@@ -207,27 +209,26 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         quota_scope_id: str,
         config: QuotaConfig,
     ) -> None:
-        qspath = self.mangle_qspath(quota_scope_id)
-        if quota_scope_id not in self.project_registry.name_id_map.keys():
-            await run(
-                [
-                    "sudo",
-                    "xfs_quota",
-                    "-x",
-                    "-c",
-                    f"project -s {quota_scope_id}",
-                    qspath,
-                ],
-            )
-        limit_blocks = config.limit_bytes // self.block_size
+        # This will annotate all entries under the quota scope tree as a part of the project.
         await run(
             [
                 "sudo",
                 "xfs_quota",
                 "-x",
                 "-c",
-                f"limit -p bsoft={limit_blocks} bhard={limit_blocks} {quota_scope_id}",
-                qspath,
+                f"project -s {quota_scope_id}",
+                self.mount_path,
+            ],
+        )
+        # bsoft, bhard accepts bytes or binary-prefixed numbers.
+        await run(
+            [
+                "sudo",
+                "xfs_quota",
+                "-x",
+                "-c",
+                f"limit -p bsoft={config.limit_bytes} bhard={config.limit_bytes} {quota_scope_id}",
+                self.mount_path,
             ],
         )
 

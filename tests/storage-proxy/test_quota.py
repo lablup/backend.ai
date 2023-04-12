@@ -2,7 +2,7 @@ import secrets
 
 import pytest
 
-from ai.backend.storage.abc import CAP_VFHOST_QUOTA, AbstractVolume
+from ai.backend.storage.abc import CAP_QUOTA, AbstractVolume
 from ai.backend.storage.types import QuotaConfig
 
 
@@ -15,7 +15,7 @@ async def test_quota_capability(volume: AbstractVolume) -> None:
 @pytest.mark.asyncio
 async def test_quota_limit(test_id: str, volume: AbstractVolume) -> None:
     caps = await volume.get_capabilities()
-    if CAP_VFHOST_QUOTA not in caps:
+    if CAP_QUOTA not in caps:
         pytest.skip("this backend does not support quota management")
 
     qsid = f"test-{test_id}-qs-{secrets.token_hex(8)}"

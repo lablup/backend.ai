@@ -15,7 +15,7 @@ from ai.backend.storage.types import VFolderID
 
 @pytest.fixture(scope="session")
 def test_id() -> str:
-    return secrets.token_hex(12)
+    return secrets.token_hex(6)
 
 
 @pytest.fixture

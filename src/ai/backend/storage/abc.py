@@ -28,7 +28,6 @@ from .types import (
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
-CAP_VFHOST_QUOTA: Final = "vfhost-quota"  # ability to set quota per vFolder host
 CAP_METRIC: Final = "metric"  # ability to report disk related metrics
 CAP_QUOTA: Final = "quota"  # ability to manage quota limits
 CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder fast (e.g. by API)
