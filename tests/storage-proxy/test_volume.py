@@ -1,7 +1,7 @@
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from pathlib import Path, PurePath, PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest

@@ -73,7 +73,7 @@ from typing import (
 
 import aiohttp
 
-from ..types import QuotaConfig
+from ..types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
@@ -477,8 +477,7 @@ class NetAppClient:
     ) -> QuotaConfig:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         return QuotaConfig(
-            soft_limit=record["space"]["soft_limit"],
-            hard_limit=record["space"]["hard_limit"],
+            limit_bytes=record["space"]["hard_limit"],
         )
 
     async def delete_quota_rule(
@@ -509,6 +508,33 @@ class NetAppClient:
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])
+
+    async def get_quota_report(
+        self,
+        svm_id: StorageID,
+        volume_id: VolumeID,
+        qtree_name: str,
+    ) -> QuotaUsage:
+        async with self.send_request(
+            "delete",
+            "/api/storage/quota/reports",
+            params={
+                "type": "tree",
+                "svm.uuid": str(svm_id),
+                "volume.uuid": str(volume_id),
+                "qtree.name": qtree_name,
+            },
+        ) as resp:
+            data = await resp.json()
+            records = data["records"]
+            if data["num_records"] == 0:
+                raise NetAppClientError(
+                    f"Quota report not found for the volume {volume_id} and the qtree {qtree_name}"
+                )
+            return QuotaUsage(
+                used_bytes=records[0]["space"]["used"]["total"],
+                limit_bytes=records[0]["space"]["hard_limit"],
+            )
 
     async def get_qos_policies(self) -> List[Mapping[str, Any]]:
         async with self.send_request(

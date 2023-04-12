@@ -74,9 +74,7 @@ class QTreeQuotaModel(BaseQuotaModel):
         quota_scope_id: str,
     ) -> QuotaUsage:
         qspath = self.mangle_qspath(quota_scope_id)
-        qconfig = await self.netapp_client.get_quota_rule(self.svm_id, self.volume_id, qspath.name)
-        # TODO: add quota report query
-        return qconfig, TreeUsage(-1, -1)
+        return await self.netapp_client.get_quota_report(self.svm_id, self.volume_id, qspath.name)
 
     async def update_quota_scope(
         self,
