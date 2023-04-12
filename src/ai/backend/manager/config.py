@@ -250,7 +250,7 @@ manager_local_config_iv = (
                     t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
                     t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
                     t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
-                    t.Key("heartbeat-timeout", default=5.0): t.Float[1.0:],  # type: ignore
+                    t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
                     t.Key("secret", default=None): t.Null | t.String,
                     t.Key("ssl-enabled", default=False): t.ToBool,
                     t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
@@ -487,6 +487,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
+
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
