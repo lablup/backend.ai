@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager as actxmgr
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
@@ -62,7 +62,6 @@ class Context:
         volume_obj = volume_cls(
             local_config=self.local_config,
             mount_path=Path(volume_config["path"]),
-            fsprefix=PurePosixPath(volume_config["fsprefix"]),
             options=volume_config["options"] or {},
         )
         await volume_obj.init()

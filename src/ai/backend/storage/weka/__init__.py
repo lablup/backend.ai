@@ -3,20 +3,59 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import HardwareMetadata
 from ai.backend.storage.abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric
 from ai.backend.storage.vfs import BaseVolume
 
-from ..types import VFolderID
-from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
+from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError
 from .weka_client import WekaAPIClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+"""
+
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        inode_id = await self._get_inode_id(vfpath)
+        quota = await self.api_client.get_quota(self._fs_uid, inode_id)
+        return BinarySize(quota.hard_limit)
+
+    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        inode_id = await self._get_inode_id(vfpath)
+        try:
+            quota = await self.api_client.get_quota(self._fs_uid, inode_id)
+            if quota.used_bytes is None:
+                return BinarySize(-1)
+            return BinarySize(quota.used_bytes)
+        except WekaNotFoundError:
+            return BinarySize(-1)
+
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        inode_id = await self._get_inode_id(vfpath)
+        weka_path = vfpath.absolute().as_posix().replace(self.mount_path.absolute().as_posix(), "")
+        if not weka_path.startswith("/"):
+            weka_path = "/" + weka_path
+        await self.api_client.set_quota_v1(weka_path, inode_id, hard_limit=size_bytes)
+
+    async def remove_quota():
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        inode_id = await self._get_inode_id(vfpath)
+        try:
+            await self.api_client.remove_quota(self._fs_uid, inode_id)
+        except WekaNotFoundError:
+            pass
+"""
 
 
 class WekaVolume(BaseVolume):
@@ -29,10 +68,9 @@ class WekaVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
-        fsprefix: Optional[PurePath] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, fsprefix=fsprefix, options=options)
+        super().__init__(local_config, mount_path, options=options)
         ssl_verify = self.config.get("weka_verify_ssl", False)
         self.api_client = WekaAPIClient(
             self.config["weka_endpoint"],
@@ -122,49 +160,3 @@ class WekaVolume(BaseVolume):
             io_usec_read=latest_metric["READ_LATENCY"] or 0,
             io_usec_write=latest_metric["WRITE_LATENCY"] or 0,
         )
-
-    async def create_vfolder(
-        self,
-        vfid: VFolderID,
-    ) -> None:
-        await super().create_vfolder(vfid, options, exist_ok=exist_ok)
-        if options is not None and options.quota is not None:
-            await self.set_quota(vfid, options.quota)
-
-    async def delete_vfolder(self, vfid: VFolderID) -> None:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        try:
-            await self.api_client.remove_quota(self._fs_uid, inode_id)
-        except WekaNotFoundError:
-            pass
-        await super().delete_vfolder(vfid)
-
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        quota = await self.api_client.get_quota(self._fs_uid, inode_id)
-        return BinarySize(quota.hard_limit)
-
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        weka_path = vfpath.absolute().as_posix().replace(self.mount_path.absolute().as_posix(), "")
-        if not weka_path.startswith("/"):
-            weka_path = "/" + weka_path
-        await self.api_client.set_quota_v1(weka_path, inode_id, hard_limit=size_bytes)
-
-    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        try:
-            quota = await self.api_client.get_quota(self._fs_uid, inode_id)
-            if quota.used_bytes is None:
-                return BinarySize(-1)
-            return BinarySize(quota.used_bytes)
-        except WekaNotFoundError:
-            return BinarySize(-1)

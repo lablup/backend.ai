@@ -1,19 +1,58 @@
 import json
 import logging
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric, VFolderID
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
 from ai.backend.storage.vfs import BaseVolume
 
-from ..exception import VFolderCreationError
-from .exceptions import GPFSJobFailedError, GPFSNoMetricError
+from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+"""
+    async def create_vfolder(
+        self,
+        vfid: VFolderID,
+    ) -> None:
+        vfpath = self.mangle_vfpath(vfid)
+        await self.api_client.create_fileset(
+            self.fs,
+            str(vfid),
+            path=vfpath,
+            owner=self.config.get("gpfs_owner", "1000:1000"),
+        )
+
+    async def copy_tree(
+        self,
+        src_path: Path,
+        dst_path: Path,
+    ) -> None:
+        await self.api_client.copy_folder(
+            self.fs,
+            src_path,
+            self.fs,
+            dst_path,
+        )
+
+    async def delete_vfolder(self, vfid: VFolderID) -> None:
+        await self.api_client.remove_fileset(self.fs, str(vfid))
+
+    async def get_quota(self, vfid: VFolderID) -> BinarySize:
+        quotas = await self.api_client.list_fileset_quotas(self.fs, str(vfid))
+        custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
+        if len(custom_defined_quotas) == 0:
+            return BinarySize(-1)
+        assert custom_defined_quotas[0].blockLimit is not None
+        return BinarySize(custom_defined_quotas[0].blockLimit)
+
+    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
+        await self.api_client.set_quota(self.fs, str(vfid), size_bytes)
+"""
 
 
 class GPFSVolume(BaseVolume):
@@ -26,10 +65,9 @@ class GPFSVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
-        fsprefix: Optional[PurePath] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, fsprefix=fsprefix, options=options)
+        super().__init__(local_config, mount_path, options=options)
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
 
         self.api_client = GPFSAPIClient(
@@ -115,47 +153,3 @@ class GPFSVolume(BaseVolume):
             io_usec_read=latest_metric[4] or 0,
             io_usec_write=latest_metric[5] or 0,
         )
-
-    async def create_vfolder(
-        self,
-        vfid: VFolderID,
-    ) -> None:
-        vfpath = self.mangle_vfpath(vfid)
-        await self.api_client.create_fileset(
-            self.fs,
-            str(vfid),
-            path=vfpath,
-            owner=self.config.get("gpfs_owner", "1000:1000"),
-        )
-        if options is not None and options.quota is not None:
-            try:
-                await self.set_quota(vfid, options.quota)
-            except GPFSJobFailedError:
-                await self.api_client.remove_fileset(self.fs, str(vfid))
-                raise VFolderCreationError("Failed to set quota")
-
-    async def copy_tree(
-        self,
-        src_path: Path,
-        dst_path: Path,
-    ) -> None:
-        await self.api_client.copy_folder(
-            self.fs,
-            src_path,
-            self.fs,
-            dst_path,
-        )
-
-    async def delete_vfolder(self, vfid: VFolderID) -> None:
-        await self.api_client.remove_fileset(self.fs, str(vfid))
-
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        quotas = await self.api_client.list_fileset_quotas(self.fs, str(vfid))
-        custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
-        if len(custom_defined_quotas) == 0:
-            return BinarySize(-1)
-        assert custom_defined_quotas[0].blockLimit is not None
-        return BinarySize(custom_defined_quotas[0].blockLimit)
-
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        await self.api_client.set_quota(self.fs, str(vfid), size_bytes)

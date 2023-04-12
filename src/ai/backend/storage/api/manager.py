@@ -8,6 +8,7 @@ from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import (
+    Any,
     AsyncContextManager,
     Awaitable,
     Callable,
@@ -30,7 +31,7 @@ from ai.backend.storage.exception import ExecutionError
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import InvalidSubpathError, StorageProxyError, VFolderNotFoundError
-from ..types import QuotaConfig, VFolderCreationOptions, VFolderID
+from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -163,7 +164,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        options: VFolderCreationOptions | None  # deprecated
+        options: dict[str, Any] | None  # deprecated
 
     async with cast(
         AsyncContextManager[Params],
@@ -173,7 +174,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
-                    t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
+                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
         ),
@@ -215,7 +216,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         src_vfid: VFolderID
         dst_volume: str | None  # deprecated
         dst_vfid: VFolderID
-        options: VFolderCreationOptions | None  # deprecated
+        options: dict[str, Any] | None  # deprecated
 
     async with cast(
         AsyncContextManager[Params],
@@ -227,7 +228,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                     t.Key("src_vfid"): tx.VFolderID(),
                     t.Key("dst_volume"): t.String() | t.Null,
                     t.Key("dst_vfid"): tx.VFolderID(),
-                    t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
+                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
         ),
