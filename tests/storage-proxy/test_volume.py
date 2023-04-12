@@ -1,110 +1,16 @@
 import secrets
 import uuid
-from collections.abc import AsyncIterator
-from pathlib import Path, PurePosixPath
-from typing import Any
+from pathlib import PurePosixPath
 
 import pytest
 
-from ai.backend.common.exception import ConfigurationError
 from ai.backend.storage.abc import AbstractVolume
-from ai.backend.storage.config import load_local_config
 from ai.backend.storage.types import VFolderID
 
 
-def has_backend(backend_name: str) -> dict[str, Any] | None:
-    try:
-        local_config = load_local_config(None, debug=True)
-    except ConfigurationError:
-        return None
-    for _, info in local_config["volume"].items():
-        if info["backend"] == backend_name:
-            return info
-    return None
-
-
-@pytest.fixture(
-    params=[
-        "cephfs",
-        "gpfs",
-        "netapp",
-        "purestorage",
-        "vfs",
-        "weka",
-        "xfs",
-    ]
-)
-async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
-    volume_cls: type[AbstractVolume]
-    backend_options = {}
-    volume_path = local_volume
-    if request.param != "vfs":
-        backend_config = has_backend(request.param)
-        if backend_config is None:
-            pytest.skip(f"{request.param} backend is not installed")
-        backend_options = backend_config.get("options", {})
-        volume_path = Path(backend_config["path"])
-    match request.param:
-        case "cephfs":
-            from ai.backend.storage.cephfs import CephFSVolume
-
-            volume_cls = CephFSVolume
-        case "gpfs":
-            from ai.backend.storage.gpfs import GPFSVolume
-
-            volume_cls = GPFSVolume
-        case "netapp":
-            from ai.backend.storage.netapp import NetAppVolume
-
-            volume_cls = NetAppVolume
-        case "purestorage":
-            from ai.backend.storage.purestorage import FlashBladeVolume
-
-            volume_cls = FlashBladeVolume
-        case "vfs":
-            from ai.backend.storage.vfs import BaseVolume
-
-            volume_cls = BaseVolume
-        case "weka":
-            from ai.backend.storage.weka import WekaVolume
-
-            volume_cls = WekaVolume
-        case "xfs":
-            from ai.backend.storage.xfs import XfsVolume
-
-            volume_cls = XfsVolume
-        case _:
-            raise RuntimeError(f"Unknown volume backend: {request.param}")
-    volume = volume_cls(
-        {
-            "storage-proxy": {
-                "scandir-limit": 1000,
-            },
-        },
-        volume_path,
-        options=backend_options,
-    )
-    await volume.init()
-    try:
-        yield volume
-    finally:
-        await volume.shutdown()
-
-
-@pytest.fixture
-async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
-    qsid = f"qs-{secrets.token_hex(16)}-0"
-    vfid = VFolderID(qsid, uuid.uuid4())
-    await volume.quota_model.create_quota_scope(qsid)
-    await volume.create_vfolder(vfid)
-    yield vfid
-    await volume.delete_vfolder(vfid)
-    await volume.quota_model.delete_quota_scope(qsid)
-
-
 @pytest.mark.asyncio
-async def test_volume_vfolder_prefix_handling(volume: AbstractVolume) -> None:
-    qsid = f"qs-{secrets.token_hex(16)}-0"
+async def test_volume_vfolder_prefix_handling(test_id: str, volume: AbstractVolume) -> None:
+    qsid = f"test-{test_id}-qs-{secrets.token_hex(8)}-0"
     vfid = VFolderID(qsid, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid)
     await volume.create_vfolder(vfid)
@@ -196,10 +102,10 @@ async def test_volume_scandir(volume: AbstractVolume, empty_vfolder: VFolderID) 
 
 
 @pytest.mark.asyncio
-async def test_volume_clone(volume: AbstractVolume) -> None:
-    qsid_base = secrets.token_hex(16)
-    qsid1 = f"qs-{qsid_base}-0"
-    qsid2 = f"qs-{qsid_base}-1"
+async def test_volume_clone(test_id: str, volume: AbstractVolume) -> None:
+    qsid_base = secrets.token_hex(8)
+    qsid1 = f"test-{test_id}-qs-{qsid_base}-0"
+    qsid2 = f"test-{test_id}-qs-{qsid_base}-1"
     await volume.quota_model.create_quota_scope(qsid1)
     await volume.quota_model.create_quota_scope(qsid2)
     vfid1 = VFolderID(qsid1, uuid.uuid4())

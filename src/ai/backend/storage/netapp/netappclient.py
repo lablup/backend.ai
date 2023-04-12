@@ -161,19 +161,21 @@ class NetAppClient:
         while True:
             async with self.send_request("get", f"/api/cluster/jobs/{job_id}") as resp:
                 data = await resp.json()
-                if data["state"] != "running":
-                    if error := data.get("error"):
-                        error_code = error["code"]
-                        error_msg = error["message"]
-                    else:
+                match data["state"]:
+                    case "running":
+                        await asyncio.sleep(0.1)
+                        continue
+                    case "failure":
+                        error_code = data["error"]["code"]
+                        error_msg = data["error"]["message"]
+                    case _:
                         error_code = None
                         error_msg = None
-                    return {
-                        "state": data["state"],
-                        "code": error_code,
-                        "message": error_msg,
-                    }
-            await asyncio.sleep(0.1)
+                return {
+                    "state": data["state"],
+                    "code": error_code,
+                    "message": error_msg,
+                }
 
     @staticmethod
     def check_job_result(result: AsyncJobResult, allowed_codes: Container[str]) -> None:
@@ -516,13 +518,14 @@ class NetAppClient:
         qtree_name: str,
     ) -> QuotaUsage:
         async with self.send_request(
-            "delete",
+            "get",
             "/api/storage/quota/reports",
             params={
                 "type": "tree",
                 "svm.uuid": str(svm_id),
                 "volume.uuid": str(volume_id),
                 "qtree.name": qtree_name,
+                "fields": "space",
             },
         ) as resp:
             data = await resp.json()
