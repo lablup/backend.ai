@@ -163,7 +163,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        options: VFolderCreationOptions | None
+        options: VFolderCreationOptions | None  # deprecated
 
     async with cast(
         AsyncContextManager[Params],
@@ -181,7 +181,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.create_vfolder(params["vfid"], params["options"])
+            await volume.create_vfolder(params["vfid"])
             return web.Response(status=204)
 
 
@@ -213,9 +213,9 @@ async def clone_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         src_volume: str
         src_vfid: VFolderID
-        dst_volume: str | None
+        dst_volume: str | None  # deprecated
         dst_vfid: VFolderID
-        options: VFolderCreationOptions | None
+        options: VFolderCreationOptions | None  # deprecated
 
     async with cast(
         AsyncContextManager[Params],

@@ -9,7 +9,7 @@ from typing import Any, FrozenSet, Mapping, Optional
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
 from ai.backend.storage.vfs import BaseVolume
 
 from ..types import VFolderID
@@ -84,10 +84,10 @@ class WekaVolume(BaseVolume):
                 "metadata": {},
             }
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         assert self._fs_uid is not None
         fs = await self.api_client.get_fs(self._fs_uid)
-        return FSUsage(
+        return CapacityUsage(
             fs.total_budget,
             fs.used_total,
         )
@@ -126,9 +126,6 @@ class WekaVolume(BaseVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: VFolderCreationOptions = None,
-        *,
-        exist_ok: bool = False,
     ) -> None:
         await super().create_vfolder(vfid, options, exist_ok=exist_ok)
         if options is not None and options.quota is not None:

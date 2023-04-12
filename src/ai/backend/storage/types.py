@@ -15,11 +15,10 @@ __all__ = (
     "Sentinel",
     "SENTINEL",
     "FSPerfMetric",
-    "FSUsage",
+    "CapacityUsage",
     "VolumeInfo",
-    "VFolderCreationOptions",
     "VFolderID",
-    "VFolderUsage",
+    "TreeUsage",
     "QuotaConfig",
     "Stat",
     "DirEntry",
@@ -48,9 +47,15 @@ class FSPerfMetric:
 
 
 @attrs.define(slots=True, frozen=True)
-class FSUsage:
-    capacity_bytes: BinarySize
-    used_bytes: BinarySize
+class CapacityUsage:
+    used_bytes: int
+    capacity_bytes: int
+
+
+@attrs.define(slots=True, frozen=True)
+class QuotaUsage:
+    used_bytes: int
+    limit_bytes: int
 
 
 @attrs.define(slots=True, frozen=True)
@@ -73,22 +78,7 @@ class VolumeInfo:
 
 
 @attrs.define(slots=True, frozen=True)
-class VFolderCreationOptions:
-    quota: Optional[BinarySize]
-
-    class Validator(t.Trafaret):
-        def check_and_return(self, value: Any) -> VFolderCreationOptions:
-            validator = t.Dict({t.Key("quota", default=None): t.Null | tx.BinarySize})
-            converted = validator.check(value)
-            return VFolderCreationOptions(converted["quota"])
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return cls.Validator()
-
-
-@attrs.define(slots=True, frozen=True)
-class VFolderUsage:
+class TreeUsage:
     file_count: int  # TODO: refactor using DecimalSize
     used_bytes: int  # TODO: refactor using DecimalSize
 

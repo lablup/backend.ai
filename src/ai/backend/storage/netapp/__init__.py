@@ -25,14 +25,15 @@ from ..exception import ExecutionError, NotEmptyError
 from ..subproc import spawn_and_watch
 from ..types import (
     SENTINEL,
+    CapacityUsage,
     DirEntry,
     DirEntryType,
     FSPerfMetric,
-    FSUsage,
     QuotaConfig,
+    QuotaUsage,
     Sentinel,
     Stat,
-    VFolderUsage,
+    TreeUsage,
 )
 from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
@@ -68,13 +69,14 @@ class QTreeQuotaModel(BaseQuotaModel):
         if config is not None:
             await self.update_quota_scope(quota_scope_id, config)
 
-    async def get_quota_scope(
+    async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> tuple[QuotaConfig, VFolderUsage]:
+    ) -> QuotaUsage:
         qspath = self.mangle_qspath(quota_scope_id)
         qconfig = await self.netapp_client.get_quota_rule(self.svm_id, self.volume_id, qspath.name)
-        return qconfig, VFolderUsage(-1, -1)
+        # TODO: add quota report query
+        return qconfig, TreeUsage(-1, -1)
 
     async def update_quota_scope(
         self,
@@ -284,7 +286,7 @@ class XCPFSOpModel(BaseFSOpModel):
     async def scan_tree_usage(
         self,
         target_path: Path,
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         target_relpath = target_path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"
         total_size = 0
@@ -327,7 +329,7 @@ class XCPFSOpModel(BaseFSOpModel):
             if proc.returncode is None:
                 proc.kill()
                 await proc.wait()
-        return VFolderUsage(file_count=total_count, used_bytes=total_size)
+        return TreeUsage(file_count=total_count, used_bytes=total_size)
 
     async def scan_tree_size(
         self,
@@ -428,12 +430,12 @@ class NetAppVolume(BaseVolume):
         }
         return {"status": "healthy", "status_info": None, "metadata": metadata}
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         volume_info = await self.netapp_client.get_volume_by_id(
             self.volume_id, ["space.size,space.used"]
         )
         assert "space" in volume_info
-        return FSUsage(
+        return CapacityUsage(
             capacity_bytes=BinarySize(volume_info["space"]["size"]),
             used_bytes=BinarySize(volume_info["space"]["used"]),
         )

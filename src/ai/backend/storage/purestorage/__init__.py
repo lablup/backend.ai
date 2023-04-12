@@ -5,12 +5,14 @@ import contextlib
 import json
 import os
 from pathlib import Path
+from subprocess import CalledProcessError
 from typing import AsyncIterator, FrozenSet
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
-from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderUsage
+from ..subproc import run
+from ..types import CapacityUsage, DirEntry, DirEntryType, FSPerfMetric, Stat, TreeUsage
 from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseVolume
 from .purity import PurityClient
@@ -22,37 +24,37 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
         src_path: Path,
         dst_path: Path,
     ) -> None:
-        extra_opts = []
+        extra_opts: list[bytes] = []
         if src_path.is_dir():
             extra_opts.append(b"-r")
-        proc = await asyncio.create_subprocess_exec(
-            b"pcp",
-            *extra_opts,
-            b"-p",
-            # os.fsencode(src_path / "."),  # TODO: check if "/." is necessary?
-            os.fsencode(src_path),
-            os.fsencode(dst_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f'"pcp" command failed: {stderr.decode()}')
+        try:
+            await run(
+                [
+                    b"pcp",
+                    *extra_opts,
+                    b"-p",
+                    # os.fsencode(src_path / "."),  # TODO: check if "/." is necessary?
+                    os.fsencode(src_path),
+                    os.fsencode(dst_path),
+                ]
+            )
+        except CalledProcessError as e:
+            raise RuntimeError(f'"pcp" command failed: {e.stderr}')
 
     async def delete_tree(
         self,
         path: Path,
     ) -> None:
-        proc = await asyncio.create_subprocess_exec(
-            b"prm",
-            b"-r",
-            os.fsencode(path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError("'prm' command returned a non-zero exit code.")
+        try:
+            await run(
+                [
+                    b"prm",
+                    b"-r",
+                    os.fsencode(path),
+                ]
+            )
+        except CalledProcessError as e:
+            raise RuntimeError(f"'prm' command failed: {e.stderr}")
 
     def scan_tree(
         self,
@@ -105,7 +107,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
     async def scan_tree_usage(
         self,
         path: Path,
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         total_size = 0
         total_count = 0
         raw_target_path = os.fsencode(path)
@@ -135,7 +137,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
                     total_count += 1
         finally:
             await proc.wait()
-        return VFolderUsage(file_count=total_count, used_bytes=total_size)
+        return TreeUsage(file_count=total_count, used_bytes=total_size)
 
     async def scan_tree_size(
         self,
@@ -217,10 +219,10 @@ class FlashBladeVolume(BaseVolume):
             },
         }
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         async with self.purity_client as client:
             usage = await client.get_usage(self.config["purity_fs_name"])
-        return FSUsage(
+        return CapacityUsage(
             capacity_bytes=usage["capacity_bytes"],
             used_bytes=usage["used_bytes"],
         )

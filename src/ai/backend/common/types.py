@@ -854,21 +854,18 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
 
 @attrs.define(auto_attribs=True, slots=True)
 class QuotaConfig:
-    soft_limit: int  # in bytes  # TODO: refactor using DecimalSize
-    hard_limit: int  # in bytes  # TODO: refactor using DecimalSize
+    limit_bytes: int
 
     class Validator(t.Trafaret):
         def check_and_return(self, value: Any) -> QuotaConfig:
             validator = t.Dict(
                 {
-                    t.Key("soft_limit"): t.ToInt(),  # TODO: refactor using DecimalSize
-                    t.Key("hard_limit"): t.ToInt(),  # TODO: refactor using DecimalSize
+                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
                 }
             )
             converted = validator.check(value)
             return QuotaConfig(
-                soft_limit=converted["soft_limit"],
-                hard_limit=converted["hard_limit"],
+                limit_bytes=converted["limit_bytes"],
             )
 
     @classmethod

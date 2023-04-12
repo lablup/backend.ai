@@ -5,8 +5,31 @@ import subprocess
 from collections.abc import AsyncGenerator, Sequence
 
 
+async def run(
+    cmdargs: Sequence[str | bytes | os.PathLike],
+    *,
+    cwd: os.PathLike | None = None,
+) -> str:
+    proc = await asyncio.create_subprocess_exec(
+        *cmdargs,
+        cwd=cwd,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    out, err = await proc.communicate()
+    if proc.returncode is not None and proc.returncode != 0:
+        raise subprocess.CalledProcessError(
+            proc.returncode,
+            shlex.join(map(os.fsdecode, cmdargs)),
+            output=out,
+            stderr=err,
+        )
+    return out.decode()
+
+
 async def spawn_and_watch(
-    cmdargs: Sequence[str | bytes],
+    cmdargs: Sequence[str | bytes | os.PathLike],
     *,
     cwd: os.PathLike | None = None,
     tail_length: int = 50,
@@ -34,6 +57,6 @@ async def spawn_and_watch(
     if exit_code != 0:
         raise subprocess.CalledProcessError(
             exit_code,
-            shlex.join(map(lambda b: b.decode() if isinstance(b, bytes) else b, cmdargs)),
-            b"".join(last_lines),
+            shlex.join(map(os.fsdecode, cmdargs)),
+            output=b"".join(last_lines),
         )

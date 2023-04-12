@@ -82,7 +82,6 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
             },
         },
         volume_path,
-        fsprefix=PurePath("fsprefix"),
         options=backend_options,
     )
     await volume.init()

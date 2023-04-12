@@ -8,7 +8,6 @@ import os
 import secrets
 import shutil
 import time
-import warnings
 from collections import deque
 from pathlib import Path, PurePosixPath
 from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union, final
@@ -23,34 +22,23 @@ from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 from ..exception import ExecutionError, InvalidAPIParameters, InvalidQuotaScopeError, NotEmptyError
+from ..subproc import run
 from ..types import (
     SENTINEL,
+    CapacityUsage,
     DirEntry,
     DirEntryType,
     FSPerfMetric,
-    FSUsage,
     QuotaConfig,
+    QuotaUsage,
     Sentinel,
     Stat,
-    VFolderCreationOptions,
+    TreeUsage,
     VFolderID,
-    VFolderUsage,
 )
 from ..utils import fstime2datetime
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-
-async def run(cmd: Sequence[Union[str, Path]]) -> str:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    out, err = await proc.communicate()
-    if err:
-        raise ExecutionError(err.decode())
-    return out.decode()
 
 
 class BaseQuotaModel(AbstractQuotaModel):
@@ -95,11 +83,11 @@ class BaseQuotaModel(AbstractQuotaModel):
             lambda: qspath.mkdir(0o755, parents=True, exist_ok=False),
         )
 
-    async def get_quota_scope(
+    async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> tuple[QuotaConfig, VFolderUsage]:
-        return QuotaConfig(0, 0), VFolderUsage(-1, -1)
+    ) -> QuotaUsage:
+        return QuotaUsage(-1, -1)
 
     async def update_quota_scope(
         self,
@@ -143,12 +131,12 @@ class SetGIDQuotaModel(BaseQuotaModel):
         )
         # TODO: setgid impl.
 
-    async def get_quota_scope(
+    async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> tuple[QuotaConfig, VFolderUsage]:
-        return QuotaConfig(0, 0), VFolderUsage(-1, -1)
+    ) -> QuotaUsage:
         # TODO: setgid impl.
+        return QuotaUsage(-1, -1)
 
     async def update_quota_scope(
         self,
@@ -276,11 +264,12 @@ class BaseFSOpModel(AbstractFSOpModel):
             try:
                 while True:
                     item = await q.async_q.get()
-                    if item is SENTINEL:
-                        break
-                    print(item)
-                    yield item
-                    q.async_q.task_done()
+                    try:
+                        if item is SENTINEL:
+                            break
+                        yield item
+                    finally:
+                        q.async_q.task_done()
             finally:
                 await scan_task
                 q.close()
@@ -291,7 +280,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     async def scan_tree_usage(
         self,
         target_path: Path,
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         total_size = 0
         total_count = 0
         start_time = time.monotonic()
@@ -322,7 +311,7 @@ class BaseFSOpModel(AbstractFSOpModel):
             # -1 indicates "too many"
             total_size = -1
             total_count = -1
-        return VFolderUsage(file_count=total_count, used_bytes=total_size)
+        return TreeUsage(file_count=total_count, used_bytes=total_size)
 
     async def scan_tree_size(
         self,
@@ -353,12 +342,10 @@ class BaseVolume(AbstractVolume):
             "metadata": {},
         }
 
+    @final
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
-        *,
-        exist_ok: bool = False,
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
@@ -366,12 +353,9 @@ class BaseVolume(AbstractVolume):
                 f"Quota scope {qspath} does not exist in the target volume"
             )
         vfpath = self.mangle_vfpath(vfid)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: vfpath.mkdir(0o755, parents=True, exist_ok=exist_ok),
-        )
+        await aiofiles.os.makedirs(vfpath, 0o755)
 
+    @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
         await self.fsop_model.delete_tree(vfpath)
@@ -392,7 +376,6 @@ class BaseVolume(AbstractVolume):
         self,
         src_vfid: VFolderID,
         dst_vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         # check if there is enough space in the destination
         fs_usage = await self.get_fs_usage()
@@ -402,7 +385,7 @@ class BaseVolume(AbstractVolume):
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
-        await self.create_vfolder(dst_vfid, options=options, exist_ok=True)
+        await self.create_vfolder(dst_vfid)
         dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
@@ -441,28 +424,31 @@ class BaseVolume(AbstractVolume):
     async def get_performance_metric(self) -> FSPerfMetric:
         raise NotImplementedError
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         loop = asyncio.get_running_loop()
         stat = await loop.run_in_executor(None, os.statvfs, self.mount_path)
-        return FSUsage(
+        return CapacityUsage(
             capacity_bytes=BinarySize(stat.f_frsize * stat.f_blocks),
             used_bytes=BinarySize(stat.f_frsize * (stat.f_blocks - stat.f_bavail)),
         )
 
+    @final
     async def get_usage(
         self,
         vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         target_path = self.sanitize_vfpath(vfid, relpath)
         return await self.fsop_model.scan_tree_usage(target_path)
 
+    @final
     async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
         return await self.fsop_model.scan_tree_size(vfpath)
 
     # ------ vfolder internal operations -------
 
+    @final
     def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
         return self.fsop_model.scan_tree(target_path)
@@ -509,18 +495,12 @@ class BaseVolume(AbstractVolume):
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
-        warnings.warn(
-            "Use move_file() instead. move_tree() will be deprecated",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_dir():
             raise InvalidAPIParameters(
                 msg=f"source path {str(src_path)} is not a directory",
             )
         dst_path = self.sanitize_vfpath(vfid, dst)
-        src_path = self.sanitize_vfpath(vfid, src)
         await self.fsop_model.move_tree(src_path, dst_path)
 
     async def copy_file(

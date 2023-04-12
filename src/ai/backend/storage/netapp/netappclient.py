@@ -432,8 +432,8 @@ class NetAppClient:
                 "type": "tree",
                 "qtree.name": qtree_name,
                 "space": {
-                    "hard_limit": config.hard_limit,
-                    "soft_limit": config.soft_limit,
+                    "hard_limit": config.limit_bytes,
+                    "soft_limit": config.limit_bytes,
                 },
                 # 'files': {  # not supported yet from Backend.AI
                 #     'hard_limit': 0,

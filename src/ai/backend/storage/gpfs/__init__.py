@@ -6,7 +6,7 @@ from typing import Any, FrozenSet, Mapping, Optional
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderID
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, VFolderID
 from ai.backend.storage.vfs import BaseVolume
 
 from ..exception import VFolderCreationError
@@ -78,7 +78,7 @@ class GPFSVolume(BaseVolume):
             },
         }
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         storage_pools = await self.api_client.list_fs_pools(self.fs)
         free, total = 0, 0
         for _pool in storage_pools:
@@ -87,7 +87,7 @@ class GPFSVolume(BaseVolume):
                 continue
             total += pool.totalDataInKB
             free += pool.freeDataInKB
-        return FSUsage(BinarySize(total), BinarySize(total - free))
+        return CapacityUsage(BinarySize(total), BinarySize(total - free))
 
     async def get_performance_metric(self) -> FSPerfMetric:
         # ref: https://www.ibm.com/docs/en/spectrum-scale/5.0.3?topic=2-perfmondata-get
@@ -119,9 +119,6 @@ class GPFSVolume(BaseVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
-        *,
-        exist_ok: bool = False,
     ) -> None:
         vfpath = self.mangle_vfpath(vfid)
         await self.api_client.create_fileset(

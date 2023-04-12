@@ -7,7 +7,7 @@ from ai.backend.common.types import BinarySize
 from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..exception import ExecutionError
-from ..types import FSUsage, Optional, VFolderCreationOptions, VFolderID
+from ..types import CapacityUsage, Optional, VFolderID
 from ..vfs import BaseVolume
 
 
@@ -48,9 +48,6 @@ class CephFSVolume(BaseVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
-        *,
-        exist_ok: bool = False
     ) -> None:
         vfpath = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()
@@ -62,15 +59,15 @@ class CephFSVolume(BaseVolume):
             quota = options.quota
             await self.set_quota(vfpath, quota)
 
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         (total, used, _) = await asyncio.get_running_loop().run_in_executor(
             None,
             shutil.disk_usage,
             self.mount_path,
         )
-        return FSUsage(
-            capacity_bytes=BinarySize(total),
-            used_bytes=BinarySize(used),
+        return CapacityUsage(
+            used_bytes=used,
+            capacity_bytes=total,
         )
 
     async def get_quota(self, vfpath) -> BinarySize:

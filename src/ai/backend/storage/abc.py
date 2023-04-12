@@ -17,13 +17,13 @@ from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import (
+    CapacityUsage,
     DirEntry,
     FSPerfMetric,
-    FSUsage,
     QuotaConfig,
-    VFolderCreationOptions,
+    QuotaUsage,
+    TreeUsage,
     VFolderID,
-    VFolderUsage,
 )
 
 # Available capabilities of a volume implementation
@@ -54,10 +54,10 @@ class AbstractQuotaModel(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_quota_scope(
+    async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> tuple[QuotaConfig, VFolderUsage]:
+    ) -> QuotaUsage:
         """
         Get the information about the given quota scope.
         """
@@ -134,7 +134,7 @@ class AbstractFSOpModel(metaclass=ABCMeta):
     async def scan_tree_usage(
         self,
         path: Path,
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         """
         Retrieves the number of bytes and the number of files and directories inside
         the given path, recursively.
@@ -165,12 +165,10 @@ class AbstractVolume(metaclass=ABCMeta):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
-        fsprefix: Optional[PurePath] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
-        self.fsprefix = fsprefix or PurePath(".")
         self.config = options or {}
 
     async def init(self) -> None:
@@ -229,9 +227,6 @@ class AbstractVolume(metaclass=ABCMeta):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
-        *,
-        exist_ok: bool = False,
     ) -> None:
         raise NotImplementedError
 
@@ -244,7 +239,6 @@ class AbstractVolume(metaclass=ABCMeta):
         self,
         src_vfid: VFolderID,
         dst_vfid: VFolderID,
-        options: Optional[VFolderCreationOptions] = None,
     ) -> None:
         """
         Create a new vfolder on the same volume and copy all contents of the source
@@ -269,7 +263,7 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         pass
 
     @abstractmethod
@@ -277,7 +271,7 @@ class AbstractVolume(metaclass=ABCMeta):
         self,
         vfid: VFolderID,
         relpath: PurePosixPath = PurePosixPath("."),
-    ) -> VFolderUsage:
+    ) -> TreeUsage:
         pass
 
     @abstractmethod
