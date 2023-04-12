@@ -9,7 +9,7 @@ import attrs
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import BinarySize, QuotaConfig, VFolderID
+from ai.backend.common.types import QuotaConfig, VFolderID
 
 __all__ = (
     "Sentinel",

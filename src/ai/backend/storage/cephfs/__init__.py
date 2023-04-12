@@ -9,6 +9,7 @@ import aiofiles.os
 from ai.backend.common.types import BinarySize
 
 from ..abc import CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel
+from ..subproc import run
 from ..types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
@@ -29,16 +30,15 @@ class CephFSQuotaModel(BaseQuotaModel):
         loop = asyncio.get_running_loop()
         # without type: ignore mypy will raise error when trying to run on macOS
         # because os.getxattr() exists only for linux
-        raw_report = await loop.run_in_executor(
+        raw_reports = await loop.run_in_executor(
             None,
-            lambda: os.getxattr(qspath, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+            lambda: (
+                os.getxattr(qspath, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+                os.getxattr(qspath, "ceph.quota.max_bytes"),  # type: ignore[attr-defined]
+            ),
         )
-        used_bytes = int(raw_report.strip().decode())
-        raw_report = await loop.run_in_executor(
-            None,
-            lambda: os.getxattr(qspath, "ceph.quota.max_bytes"),  # type: ignore[attr-defined]
-        )
-        limit_bytes = int(raw_report.strip().decode())
+        used_bytes = int(raw_reports[0].strip().decode())
+        limit_bytes = int(raw_reports[1].strip().decode())
         return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
 
     async def update_quota_scope(
@@ -59,16 +59,15 @@ class CephFSQuotaModel(BaseQuotaModel):
 class CephFSOpModel(BaseFSOpModel):
     async def scan_tree_usage(self, target_path: Path) -> TreeUsage:
         loop = asyncio.get_running_loop()
-        raw_report = await loop.run_in_executor(
+        raw_reports = await loop.run_in_executor(
             None,
-            lambda: os.getxattr(target_path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
+            lambda: (
+                os.getxattr(target_path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
+                os.getxattr(target_path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+            ),
         )
-        file_count = int(raw_report.strip().decode())
-        raw_report = await loop.run_in_executor(
-            None,
-            lambda: os.getxattr(target_path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
-        )
-        used_bytes = int(raw_report.strip().decode())
+        file_count = int(raw_reports[0].strip().decode())
+        used_bytes = int(raw_reports[1].strip().decode())
         return TreeUsage(file_count=file_count, used_bytes=used_bytes)
 
     async def scan_tree_size(self, target_path: Path) -> BinarySize:
@@ -86,17 +85,9 @@ class CephFSVolume(BaseVolume):
     project_id_pool: List[int]
 
     async def init(self) -> None:
-        available = True
         try:
-            await asyncio.create_subprocess_exec(
-                b"ceph",
-                b"--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
+            await run([b"ceph", b"--version"])
         except FileNotFoundError:
-            available = False
-        if not available:
             raise RuntimeError("Ceph is not installed. ")
         await super().init()
 

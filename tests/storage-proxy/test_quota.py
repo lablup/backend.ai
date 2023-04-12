@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 
 import pytest
@@ -31,6 +32,7 @@ async def test_quota_limit(test_id: str, volume: AbstractVolume) -> None:
 
     (qspath / "test.txt").write_bytes(secrets.token_bytes(8192))
 
+    await asyncio.sleep(2)  # the filesystem may have some delay to update this info.
     qusage = await volume.quota_model.describe_quota_scope(qsid)
     assert qusage.used_bytes >= 8192
 
