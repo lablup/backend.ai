@@ -84,7 +84,6 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
     """
     Tests if the storage backend could guarantee the correct behavior of the vfolder v2 -> v3 migration script.
     """
-    block_size = os.statvfs(volume.mount_path).f_bsize
     qsrc = f"test-{test_id}-qsrc"
     qdst = f"test-{test_id}-qdst"
     await volume.quota_model.create_quota_scope(qsrc, QuotaConfig(10 * MiB))
