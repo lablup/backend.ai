@@ -6,56 +6,74 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata
-from ai.backend.storage.abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric
-from ai.backend.storage.vfs import BaseVolume
+import aiofiles.os
 
-from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import HardwareMetadata, QuotaConfig
+
+from ..abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ..vfs import BaseQuotaModel, BaseVolume
+from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
 from .weka_client import WekaAPIClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-"""
 
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        quota = await self.api_client.get_quota(self._fs_uid, inode_id)
-        return BinarySize(quota.hard_limit)
+class WekaQuotaModel(BaseQuotaModel):
+    def __init__(
+        self,
+        mount_path: Path,
+        fs_uid: str,
+        api_client: WekaAPIClient,
+    ) -> None:
+        super().__init__(mount_path)
+        self.fs_uid = fs_uid
+        self.api_client = api_client
 
-    async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
+    async def _get_inode_id(self, path: Path) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: os.stat(path).st_ino,
+        )
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: str,
+        config: Optional[QuotaConfig] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        await aiofiles.os.makedirs(qspath)
+        assert self.fs_uid is not None
+        if config is not None:
+            await self.update_quota_scope(quota_scope_id, config)
+
+    async def update_quota_scope(self, quota_scope_id: str, config: QuotaConfig) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        inode_id = await self._get_inode_id(qspath)
+        qs_relpath = qspath.relative_to(self.mount_path).as_posix()
+        if not qs_relpath.startswith("/"):
+            qs_relpath = "/" + qs_relpath
+        await self.api_client.set_quota_v1(qs_relpath, inode_id, hard_limit=config.limit_bytes)
+
+    async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
+        qspath = self.mangle_qspath(quota_scope_id)
+        inode_id = await self._get_inode_id(qspath)
+        quota = await self.api_client.get_quota(self.fs_uid, inode_id)
+        return QuotaUsage(
+            used_bytes=quota.used_bytes if quota.used_bytes is not None else -1,
+            limit_bytes=quota.hard_limit if quota.hard_limit is not None else -1,
+        )
+
+    async def delete_quota_scope(self, quota_scope_id: str) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        inode_id = await self._get_inode_id(qspath)
         try:
-            quota = await self.api_client.get_quota(self._fs_uid, inode_id)
-            if quota.used_bytes is None:
-                return BinarySize(-1)
-            return BinarySize(quota.used_bytes)
-        except WekaNotFoundError:
-            return BinarySize(-1)
-
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        weka_path = vfpath.absolute().as_posix().replace(self.mount_path.absolute().as_posix(), "")
-        if not weka_path.startswith("/"):
-            weka_path = "/" + weka_path
-        await self.api_client.set_quota_v1(weka_path, inode_id, hard_limit=size_bytes)
-
-    async def remove_quota():
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
-        inode_id = await self._get_inode_id(vfpath)
-        try:
-            await self.api_client.remove_quota(self._fs_uid, inode_id)
+            await self.api_client.remove_quota(self.fs_uid, inode_id)
         except WekaNotFoundError:
             pass
-"""
+        await aiofiles.os.rmdir(qspath)
 
 
 class WekaVolume(BaseVolume):
@@ -81,29 +99,25 @@ class WekaVolume(BaseVolume):
         )
 
     async def init(self) -> None:
-        await super().init()
         for fs in await self.api_client.list_fs():
             if fs.name == self.config["weka_fs_name"]:
                 self._fs_uid = fs.uid
-                return
+                break
         else:
-            raise WekaInitError(f"FileSystem {fs.name} not found")
+            raise WekaInitError(f"FileSystem {self.config['weka_fs_name']} not found")
+        await super().init()
 
-    async def _get_inode_id(self, path: Path) -> int:
-        return await asyncio.get_running_loop().run_in_executor(
-            None,
-            lambda: os.stat(path).st_ino,
-        )
+    async def create_quota_model(self) -> AbstractQuotaModel:
+        return WekaQuotaModel(self.mount_path, self._fs_uid, self.api_client)
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         assert self._fs_uid is not None
-        health_status = await self.api_client.check_health()
+        health_status = (await self.api_client.check_health()).lower()
         if health_status == "ok":
             health_status = "healthy"
-
         try:
             cluster_info = await self.api_client.get_cluster_info()
             quotas = await self.api_client.list_quotas(self._fs_uid)
