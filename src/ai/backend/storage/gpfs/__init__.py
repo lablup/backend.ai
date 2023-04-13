@@ -5,27 +5,82 @@ from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
-from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric
-from ai.backend.storage.vfs import BaseVolume
 
+from ..abc import (
+    CAP_METRIC,
+    CAP_QUOTA,
+    CAP_VFOLDER,
+    AbstractFSOpModel,
+    AbstractQuotaModel,
+    QuotaConfig,
+    QuotaUsage,
+)
+from ..types import CapacityUsage, FSPerfMetric
+from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-"""
-    async def create_vfolder(
+
+class GPFSQuotaModel(BaseQuotaModel):
+    def __init__(
         self,
-        vfid: VFolderID,
+        mount_path: Path,
+        api_client: GPFSAPIClient,
+        fs: str,
+        gpfs_owner: str,
     ) -> None:
-        vfpath = self.mangle_vfpath(vfid)
+        super().__init__(mount_path)
+        self.api_client = api_client
+        self.fs = fs
+        self.gpfs_owner = gpfs_owner
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: str,
+        config: Optional[QuotaConfig] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
             self.fs,
-            str(vfid),
-            path=vfpath,
-            owner=self.config.get("gpfs_owner", "1000:1000"),
+            quota_scope_id,
+            path=qspath,
+            owner=self.gpfs_owner,
         )
+        if config is not None:
+            await self.update_quota_scope(quota_scope_id, config)
+
+    async def update_quota_scope(self, quota_scope_id: str, config: QuotaConfig) -> None:
+        await self.api_client.set_quota(self.fs, quota_scope_id, config.limit_bytes)
+
+    async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
+        quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id)
+        custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
+        if len(custom_defined_quotas) == 0:
+            return QuotaUsage(-1, -1)
+        quota_info = custom_defined_quotas[0]
+        # The units are kilobytes (ref: )
+        return QuotaUsage(
+            used_bytes=quota_info.blockUsage * 1024 if quota_info.blockUsage is not None else -1,
+            limit_bytes=quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1,
+        )
+
+    async def delete_quota_scope(self, quota_scope_id: str) -> None:
+        await self.api_client.remove_fileset(self.fs, quota_scope_id)
+
+
+class GPFSOpModel(BaseFSOpModel):
+    def __init__(
+        self,
+        mount_path: Path,
+        scandir_limit: int,
+        api_client: GPFSAPIClient,
+        fs: str,
+    ) -> None:
+        super().__init__(mount_path, scandir_limit)
+        self.api_client = api_client
+        self.fs = fs
 
     async def copy_tree(
         self,
@@ -38,21 +93,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
             self.fs,
             dst_path,
         )
-
-    async def delete_vfolder(self, vfid: VFolderID) -> None:
-        await self.api_client.remove_fileset(self.fs, str(vfid))
-
-    async def get_quota(self, vfid: VFolderID) -> BinarySize:
-        quotas = await self.api_client.list_fileset_quotas(self.fs, str(vfid))
-        custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
-        if len(custom_defined_quotas) == 0:
-            return BinarySize(-1)
-        assert custom_defined_quotas[0].blockLimit is not None
-        return BinarySize(custom_defined_quotas[0].blockLimit)
-
-    async def set_quota(self, vfid: VFolderID, size_bytes: BinarySize) -> None:
-        await self.api_client.set_quota(self.fs, str(vfid), size_bytes)
-"""
 
 
 class GPFSVolume(BaseVolume):
@@ -69,7 +109,6 @@ class GPFSVolume(BaseVolume):
     ) -> None:
         super().__init__(local_config, mount_path, options=options)
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
-
         self.api_client = GPFSAPIClient(
             self.config["gpfs_endpoint"],
             self.config["gpfs_username"],
@@ -78,9 +117,26 @@ class GPFSVolume(BaseVolume):
             ssl=False if not verify_ssl else None,
         )
         self.fs = self.config["gpfs_fs_name"]
+        self.gpfs_owner = self.config.get("gpfs_owner", "1000:1000")
 
     async def init(self) -> None:
         await super().init()
+
+    async def create_quota_model(self) -> AbstractQuotaModel:
+        return GPFSQuotaModel(
+            self.mount_path,
+            self.api_client,
+            self.fs,
+            self.gpfs_owner,
+        )
+
+    async def create_fsop_model(self) -> AbstractFSOpModel:
+        return GPFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+            self.api_client,
+            self.fs,
+        )
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
