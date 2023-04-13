@@ -40,6 +40,7 @@ class CephDirQuotaModel(BaseQuotaModel):
                     case _:
                         limit_bytes = -1  # unset
             return used_bytes, limit_bytes
+
         # without type: ignore mypy will raise error when trying to run on macOS
         # because os.getxattr() exists only for linux
         used_bytes, limit_bytes = await loop.run_in_executor(
