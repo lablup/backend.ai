@@ -77,13 +77,21 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
     (qsrc_path / "vf1" / "inner1" / "c.txt").write_bytes(b"cde")
     (qsrc_path / "vf1" / "inner2").mkdir(parents=True)
     (qsrc_path / "vf1" / "inner2" / "d.txt").write_bytes(b"def")
-    await volume.fsop_model.move_tree(qsrc_path / "vf1", qdst_path)
-    assert (qdst_path / "vf1").is_dir()
-    assert (qdst_path / "vf1" / "a.txt").read_bytes() == b"abc"
-    assert (qdst_path / "vf1" / "b.txt").read_bytes() == b"bcd"
-    assert (qdst_path / "vf1" / "inner1").is_dir()
-    assert (qdst_path / "vf1" / "inner1" / "c.txt").read_bytes() == b"cde"
-    assert (qdst_path / "vf1" / "inner2" / "d.txt").read_bytes() == b"def"
-    await volume.fsop_model.delete_tree(qdst_path / "vf1")
-    await volume.quota_model.delete_quota_scope(qsrc)
-    await volume.quota_model.delete_quota_scope(qdst)
+    try:
+        if CAP_QUOTA in (await volume.get_capabilities()):
+            qusage = await volume.quota_model.describe_quota_scope(qdst)
+            assert qusage.used_bytes == 0
+        await volume.fsop_model.move_tree(qsrc_path / "vf1", qdst_path)
+        assert (qdst_path / "vf1").is_dir()
+        assert (qdst_path / "vf1" / "a.txt").read_bytes() == b"abc"
+        assert (qdst_path / "vf1" / "b.txt").read_bytes() == b"bcd"
+        assert (qdst_path / "vf1" / "inner1").is_dir()
+        assert (qdst_path / "vf1" / "inner1" / "c.txt").read_bytes() == b"cde"
+        assert (qdst_path / "vf1" / "inner2" / "d.txt").read_bytes() == b"def"
+        if CAP_QUOTA in (await volume.get_capabilities()):
+            qusage = await wait_until_quota_changed(volume.quota_model, qdst, qusage)
+            assert qusage.used_bytes >= 12
+    finally:
+        await volume.fsop_model.delete_tree(qdst_path / "vf1")
+        await volume.quota_model.delete_quota_scope(qsrc)
+        await volume.quota_model.delete_quota_scope(qdst)
