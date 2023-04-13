@@ -6,6 +6,7 @@ import logging
 import os
 import shlex
 import subprocess
+import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
@@ -47,6 +48,7 @@ from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import NetAppClient, StorageID, VolumeID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+xcp_lic_check_path = Path("/tmp/backend.ai/storage.netapp.xcp-license-check")
 
 
 class QTreeQuotaModel(BaseQuotaModel):
@@ -133,6 +135,8 @@ class XCPFSOpModel(BaseFSOpModel):
         self.nas_path = nas_path
 
     async def check_license(self) -> bool:
+        if xcp_lic_check_path.exists() and xcp_lic_check_path.stat().st_mtime >= time.time() - 3600:
+            return xcp_lic_check_path.read_bytes().strip() == b"1"
         try:
             proc = await asyncio.create_subprocess_exec(
                 *[*self.netapp_xcp_cmd, b"license"],
@@ -142,7 +146,13 @@ class XCPFSOpModel(BaseFSOpModel):
             stdout, _ = await proc.communicate()
         except FileNotFoundError:
             return False
-        return b"License status: ACTIVE\n" in stdout
+        result = b"License status: ACTIVE\n" in stdout
+        xcp_lic_check_path.parent.mkdir(parents=True, exist_ok=True)
+        if result:
+            xcp_lic_check_path.write_bytes(b"1")
+        else:
+            xcp_lic_check_path.write_bytes(b"0")
+        return result
 
     async def copy_tree(
         self,
@@ -218,6 +228,10 @@ class XCPFSOpModel(BaseFSOpModel):
                     if not line:
                         await entry_queue.put(SENTINEL)
                         break
+                    if b"\0" not in line:
+                        # This is some unexpected output like
+                        # "Error while sending previously unsent statistics"
+                        continue
                     parts = tuple(map(os.fsdecode, line.rstrip(b"\n").split(b"\0")))
                     item_path = Path(*Path(parts[7]).parts[2:])
                     inner_relpath = item_path.relative_to(target_relpath)
@@ -272,7 +286,6 @@ class XCPFSOpModel(BaseFSOpModel):
                         try:
                             if item is SENTINEL:
                                 break
-                            print(item)
                             yield item
                         finally:
                             entry_queue.task_done()
