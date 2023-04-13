@@ -57,3 +57,33 @@ async def test_quota_limit(test_id: str, volume: AbstractVolume) -> None:
 
     await volume.quota_model.delete_quota_scope(qsid)
     assert not qspath.exists()
+
+
+@pytest.mark.asyncio
+async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolume) -> None:
+    """
+    Tests if the storage backend could guarantee the correct behavior of the vfolder v2 -> v3 migration script.
+    """
+    qsrc = f"test-{test_id}-qsrc"
+    qdst = f"test-{test_id}-qdst"
+    await volume.quota_model.create_quota_scope(qsrc)
+    await volume.quota_model.create_quota_scope(qdst)
+    qsrc_path = volume.quota_model.mangle_qspath(qsrc)
+    qdst_path = volume.quota_model.mangle_qspath(qdst)
+    (qsrc_path / "vf1").mkdir(parents=True)
+    (qsrc_path / "vf1" / "a.txt").write_bytes(b"abc")
+    (qsrc_path / "vf1" / "b.txt").write_bytes(b"bcd")
+    (qsrc_path / "vf1" / "inner1").mkdir(parents=True)
+    (qsrc_path / "vf1" / "inner1" / "c.txt").write_bytes(b"cde")
+    (qsrc_path / "vf1" / "inner2").mkdir(parents=True)
+    (qsrc_path / "vf1" / "inner2" / "d.txt").write_bytes(b"def")
+    await volume.fsop_model.move_tree(qsrc_path / "vf1", qdst_path)
+    assert (qdst_path / "vf1").is_dir()
+    assert (qdst_path / "vf1" / "a.txt").read_bytes() == b"abc"
+    assert (qdst_path / "vf1" / "b.txt").read_bytes() == b"bcd"
+    assert (qdst_path / "vf1" / "inner1").is_dir()
+    assert (qdst_path / "vf1" / "inner1" / "c.txt").read_bytes() == b"cde"
+    assert (qdst_path / "vf1" / "inner2" / "d.txt").read_bytes() == b"def"
+    await volume.fsop_model.delete_tree(qdst_path / "vf1")
+    await volume.quota_model.delete_quota_scope(qsrc)
+    await volume.quota_model.delete_quota_scope(qdst)
