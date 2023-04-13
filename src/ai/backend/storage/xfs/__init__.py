@@ -15,7 +15,7 @@ import aiofiles.os
 
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.storage.abc import CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER
+from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..abc import AbstractQuotaModel
 from ..exception import NotEmptyError
@@ -270,4 +270,4 @@ class XfsVolume(BaseVolume):
         )
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SCAN, CAP_FAST_SIZE])
+        return frozenset([CAP_VFOLDER, CAP_QUOTA])

@@ -14,7 +14,7 @@ from ..types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
 
-class CephFSQuotaModel(BaseQuotaModel):
+class CephDirQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: str,
@@ -92,7 +92,7 @@ class CephFSVolume(BaseVolume):
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:
-        return CephFSQuotaModel(self.mount_path)
+        return CephDirQuotaModel(self.mount_path)
 
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return CephFSOpModel(
