@@ -28,17 +28,24 @@ class CephDirQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
+
+        def read_attrs() -> tuple[int, int]:
+            used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined]
+            try:
+                limit_bytes = int(os.getxattr(qspath, "ceph.quota.max_bytes").decode())  # type: ignore[attr-defined]
+            except OSError as e:
+                match e.errno:
+                    case 61:
+                        limit_bytes = 0
+                    case _:
+                        limit_bytes = -1  # unset
+            return used_bytes, limit_bytes
         # without type: ignore mypy will raise error when trying to run on macOS
         # because os.getxattr() exists only for linux
-        raw_reports = await loop.run_in_executor(
+        used_bytes, limit_bytes = await loop.run_in_executor(
             None,
-            lambda: (
-                os.getxattr(qspath, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
-                os.getxattr(qspath, "ceph.quota.max_bytes"),  # type: ignore[attr-defined]
-            ),
+            read_attrs,
         )
-        used_bytes = int(raw_reports[0].strip().decode())
-        limit_bytes = int(raw_reports[1].strip().decode())
         return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
 
     async def update_quota_scope(

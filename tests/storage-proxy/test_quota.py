@@ -1,10 +1,14 @@
+import asyncio
 import secrets
+from typing import Final
 
 import pytest
 from tenacity import AsyncRetrying, stop_after_delay, wait_exponential
 
 from ai.backend.storage.abc import CAP_QUOTA, AbstractQuotaModel, AbstractVolume
 from ai.backend.storage.types import QuotaConfig, QuotaUsage
+
+MiB: Final = 2**20
 
 
 @pytest.mark.asyncio
@@ -32,6 +36,21 @@ async def wait_until_quota_changed(
 
 
 @pytest.mark.asyncio
+async def test_quota_scope_creation_and_deletion(test_id: str, volume: AbstractVolume) -> None:
+    qs = f"test-{test_id}-qsrc"
+    await volume.quota_model.create_quota_scope(qs)
+    assert volume.quota_model.mangle_qspath(qs).is_dir()
+    await volume.quota_model.delete_quota_scope(qs)
+    assert not volume.quota_model.mangle_qspath(qs).exists()
+
+    if CAP_QUOTA in (await volume.get_capabilities()):
+        await volume.quota_model.create_quota_scope(qs, QuotaConfig(10 * MiB))
+        assert volume.quota_model.mangle_qspath(qs).is_dir()
+        await volume.quota_model.delete_quota_scope(qs)
+        assert not volume.quota_model.mangle_qspath(qs).exists()
+
+
+@pytest.mark.asyncio
 async def test_quota_limit(test_id: str, volume: AbstractVolume) -> None:
     caps = await volume.get_capabilities()
     if CAP_QUOTA not in caps:
@@ -39,7 +58,6 @@ async def test_quota_limit(test_id: str, volume: AbstractVolume) -> None:
 
     qsid = f"test-{test_id}-qs-{secrets.token_hex(8)}"
     qspath = volume.quota_model.mangle_qspath(qsid)
-    MiB = 2**20
 
     await volume.quota_model.create_quota_scope(qsid, QuotaConfig(10 * MiB))
     assert qspath.exists() and qspath.is_dir()
@@ -66,8 +84,8 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
     """
     qsrc = f"test-{test_id}-qsrc"
     qdst = f"test-{test_id}-qdst"
-    await volume.quota_model.create_quota_scope(qsrc)
-    await volume.quota_model.create_quota_scope(qdst)
+    await volume.quota_model.create_quota_scope(qsrc, QuotaConfig(10 * MiB))
+    await volume.quota_model.create_quota_scope(qdst, QuotaConfig(10 * MiB))
     qsrc_path = volume.quota_model.mangle_qspath(qsrc)
     qdst_path = volume.quota_model.mangle_qspath(qdst)
     (qsrc_path / "vf1").mkdir(parents=True)
@@ -90,8 +108,13 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
         assert (qdst_path / "vf1" / "inner2" / "d.txt").read_bytes() == b"def"
         if CAP_QUOTA in (await volume.get_capabilities()):
             qusage = await wait_until_quota_changed(volume.quota_model, qdst, qusage)
+            # even after change is detected, the summation often takes more delay.
+            await asyncio.sleep(0.5)
             assert qusage.used_bytes >= 12
     finally:
-        await volume.fsop_model.delete_tree(qdst_path / "vf1")
+        if (qsrc_path / "vf1").exists():
+            await volume.fsop_model.delete_tree(qsrc_path / "vf1")
+        if (qdst_path / "vf1").exists():
+            await volume.fsop_model.delete_tree(qdst_path / "vf1")
         await volume.quota_model.delete_quota_scope(qsrc)
         await volume.quota_model.delete_quota_scope(qdst)
