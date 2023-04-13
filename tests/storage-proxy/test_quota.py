@@ -98,13 +98,11 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
     (qsrc_path / "vf1" / "inner1" / "c.txt").write_bytes(b"cde")
     (qsrc_path / "vf1" / "inner2").mkdir(parents=True)
     (qsrc_path / "vf1" / "inner2" / "d.txt").write_bytes(b"def")
-    tree_usage = await volume.fsop_model.scan_tree_usage(qsrc_path)
-    assert 7 <= tree_usage.file_count <= 8
-    assert 12 <= tree_usage.used_bytes <= tree_usage.file_count * block_size
-    tree_usage = await volume.fsop_model.scan_tree_usage(qdst_path)
-    assert 0 <= tree_usage.file_count <= 1
-    assert 0 <= tree_usage.used_bytes <= block_size
     try:
+        tree = [item async for item in volume.fsop_model.scan_tree(qsrc_path)]
+        assert len(tree) == 7
+        tree = [item async for item in volume.fsop_model.scan_tree(qdst_path)]
+        assert len(tree) == 0
         await volume.fsop_model.move_tree(qsrc_path / "vf1", qdst_path)
         assert (qdst_path / "vf1").is_dir()
         assert (qdst_path / "vf1" / "a.txt").read_bytes() == b"abc"
@@ -112,12 +110,10 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
         assert (qdst_path / "vf1" / "inner1").is_dir()
         assert (qdst_path / "vf1" / "inner1" / "c.txt").read_bytes() == b"cde"
         assert (qdst_path / "vf1" / "inner2" / "d.txt").read_bytes() == b"def"
-        tree_usage = await volume.fsop_model.scan_tree_usage(qsrc_path)
-        assert 0 <= tree_usage.file_count <= 1
-        assert 0 <= tree_usage.used_bytes <= block_size
-        tree_usage = await volume.fsop_model.scan_tree_usage(qdst_path)
-        assert 7 <= tree_usage.file_count <= 8
-        assert 12 <= tree_usage.used_bytes <= tree_usage.file_count * block_size
+        tree = [item async for item in volume.fsop_model.scan_tree(qsrc_path)]
+        assert len(tree) == 0
+        tree = [item async for item in volume.fsop_model.scan_tree(qdst_path)]
+        assert len(tree) == 7
     finally:
         if (qsrc_path / "vf1").exists():
             await volume.fsop_model.delete_tree(qsrc_path / "vf1")
