@@ -157,7 +157,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             if folder_id in completed_folder_ids:
                 continue
             log.info(
-                "copying vfolder {} into quota_scope {}",
+                "moving vfolder {} into quota_scope {}",
                 folder_id,
                 quota_scope_map[folder_id],
             )
@@ -165,9 +165,9 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
             try:
                 await volume.quota_model.create_quota_scope(quota_scope_map[folder_id])
-                await volume.fsop_model.copy_tree(
+                await volume.fsop_model.move_tree(
                     volume.mangle_vfpath(orig_vfid),
-                    volume.mangle_vfpath(dst_vfid),
+                    volume.quota_model.mangle_qspath(dst_vfid),
                 )
             except Exception:
                 log.exception("error during migration of vfolder {}", folder_id)
