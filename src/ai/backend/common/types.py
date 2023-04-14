@@ -781,6 +781,8 @@ class VFolderID:
     folder_id: uuid.UUID
 
     def __str__(self) -> str:
+        if self.quota_scope_id is None:
+            return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
 
