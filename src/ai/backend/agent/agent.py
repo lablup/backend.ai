@@ -398,7 +398,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
         mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin//scp")
+        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
         mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
         mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
         mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
