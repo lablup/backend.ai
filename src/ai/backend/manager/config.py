@@ -487,7 +487,6 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
-
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
