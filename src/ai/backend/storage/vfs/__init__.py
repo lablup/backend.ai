@@ -215,55 +215,55 @@ class BaseFSOpModel(AbstractFSOpModel):
             limit = self.scandir_limit
             next_paths: deque[Path] = deque()
             next_paths.append(target_path)
-            try:
-                while next_paths:
-                    next_path = next_paths.popleft()
-                    with os.scandir(next_path) as scanner:
-                        for entry in scanner:
-                            symlink_target = ""
-                            entry_type = DirEntryType.FILE
-                            try:
-                                if entry.is_dir():
-                                    entry_type = DirEntryType.DIRECTORY
-                                if entry.is_symlink():
-                                    entry_type = DirEntryType.SYMLINK
-                                    symlink_dst = Path(entry).resolve()
-                                    try:
-                                        symlink_dst = symlink_dst.relative_to(target_path)
-                                    except ValueError:
-                                        pass
-                                    symlink_target = os.fsdecode(symlink_dst)
-                                entry_stat = entry.stat(follow_symlinks=False)
-                            except (FileNotFoundError, PermissionError):
-                                # the filesystem may be changed during scan
-                                continue
-                            item = DirEntry(
-                                name=entry.name,
-                                path=Path(entry.path).relative_to(target_path),
-                                type=entry_type,
-                                stat=Stat(
-                                    size=entry_stat.st_size,
-                                    owner=str(entry_stat.st_uid),
-                                    mode=entry_stat.st_mode,
-                                    modified=fstime2datetime(entry_stat.st_mtime),
-                                    created=fstime2datetime(entry_stat.st_ctime),
-                                ),
-                                symlink_target=symlink_target,
-                            )
-                            q.put(item)
-                            if entry.is_dir() and not entry.is_symlink():
-                                next_paths.append(Path(entry.path))
-                            count += 1
-                            if limit > 0 and count == limit:
-                                break
-            finally:
-                q.put(SENTINEL)
+            while next_paths:
+                next_path = next_paths.popleft()
+                with os.scandir(next_path) as scanner:
+                    for entry in scanner:
+                        symlink_target = ""
+                        entry_type = DirEntryType.FILE
+                        try:
+                            if entry.is_dir():
+                                entry_type = DirEntryType.DIRECTORY
+                            if entry.is_symlink():
+                                entry_type = DirEntryType.SYMLINK
+                                symlink_dst = Path(entry).resolve()
+                                try:
+                                    symlink_dst = symlink_dst.relative_to(target_path)
+                                except ValueError:
+                                    pass
+                                symlink_target = os.fsdecode(symlink_dst)
+                            entry_stat = entry.stat(follow_symlinks=False)
+                        except (FileNotFoundError, PermissionError):
+                            # the filesystem may be changed during scan
+                            continue
+                        item = DirEntry(
+                            name=entry.name,
+                            path=Path(entry.path).relative_to(target_path),
+                            type=entry_type,
+                            stat=Stat(
+                                size=entry_stat.st_size,
+                                owner=str(entry_stat.st_uid),
+                                mode=entry_stat.st_mode,
+                                modified=fstime2datetime(entry_stat.st_mtime),
+                                created=fstime2datetime(entry_stat.st_ctime),
+                            ),
+                            symlink_target=symlink_target,
+                        )
+                        q.put(item)
+                        if entry.is_dir() and not entry.is_symlink():
+                            next_paths.append(Path(entry.path))
+                        count += 1
+                        if limit > 0 and count == limit:
+                            break
 
-        async def _scan_task(_scandir, q) -> None:
-            await loop.run_in_executor(None, _scandir, target_path, q.sync_q)
+        async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
+            try:
+                await loop.run_in_executor(None, _scandir, target_path, q.sync_q)
+            finally:
+                await q.async_q.put(SENTINEL)
 
         async def _aiter() -> AsyncIterator[DirEntry]:
-            scan_task = asyncio.create_task(_scan_task(_scandir, q))
+            scan_task = asyncio.create_task(_scan_task(q))
             await asyncio.sleep(0)
             try:
                 while True:
