@@ -1581,33 +1581,25 @@ class AgentRegistry:
                 for kernel in grouped_kernels:
                     match kernel.status:
                         case KernelStatus.PENDING:
-
-                            async def _update() -> None:
-                                async with self.db.begin_session() as db_sess:
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(
-                                            status=KernelStatus.CANCELLED,
-                                            status_info=reason,
-                                            status_changed=now,
-                                            terminated_at=now,
-                                            status_history=sql_json_merge(
-                                                KernelRow.status_history,
-                                                (),
-                                                {
-                                                    KernelStatus.CANCELLED.name: now.isoformat(),
-                                                },
-                                            ),
-                                        )
-                                        .where(KernelRow.id == kernel.id),
-                                    )
-
-                            await execute_with_retry(_update)
+                            await KernelRow.set_kernel_status(
+                                self.db,
+                                kernel.id,
+                                KernelStatus.CANCELLED,
+                                reason=reason,
+                                current_time=now,
+                            )
                             await self.event_producer.produce_event(
                                 KernelCancelledEvent(kernel.id, session_id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
+                                await SessionRow.set_session_status(
+                                    self.db,
+                                    kernel.session_id,
+                                    SessionStatus.CANCELLED,
+                                    reason=reason,
+                                    current_time=now,
+                                )
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
                                         kernel.session_id,

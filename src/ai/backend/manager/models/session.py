@@ -781,8 +781,12 @@ class SessionRow(Base):
         *,
         status_data: Optional[Mapping[str, Any]] = None,
         reason: Optional[str] = None,
+        current_time: Optional[datetime] = None,
     ) -> None:
-        now = datetime.now(tzutc())
+        if current_time is None:
+            now = datetime.now(tzutc())
+        else:
+            now = current_time
         data = {
             "status": status,
             "status_history": sql_json_merge(
