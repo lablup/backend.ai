@@ -222,17 +222,21 @@ class BaseFSOpModel(AbstractFSOpModel):
                         for entry in scanner:
                             symlink_target = ""
                             entry_type = DirEntryType.FILE
-                            if entry.is_dir():
-                                entry_type = DirEntryType.DIRECTORY
-                            if entry.is_symlink():
-                                entry_type = DirEntryType.SYMLINK
-                                symlink_dst = Path(entry).resolve()
-                                try:
-                                    symlink_dst = symlink_dst.relative_to(target_path)
-                                except ValueError:
-                                    pass
-                                symlink_target = os.fsdecode(symlink_dst)
-                            entry_stat = entry.stat(follow_symlinks=False)
+                            try:
+                                if entry.is_dir():
+                                    entry_type = DirEntryType.DIRECTORY
+                                if entry.is_symlink():
+                                    entry_type = DirEntryType.SYMLINK
+                                    symlink_dst = Path(entry).resolve()
+                                    try:
+                                        symlink_dst = symlink_dst.relative_to(target_path)
+                                    except ValueError:
+                                        pass
+                                    symlink_target = os.fsdecode(symlink_dst)
+                                entry_stat = entry.stat(follow_symlinks=False)
+                            except (FileNotFoundError, PermissionError):
+                                # the filesystem may be changed during scan
+                                continue
                             item = DirEntry(
                                 name=entry.name,
                                 path=Path(entry.path).relative_to(target_path),
@@ -294,7 +298,11 @@ class BaseFSOpModel(AbstractFSOpModel):
                 next_path = next_paths.popleft()
                 with os.scandir(next_path) as scanner:  # type: ignore
                     for entry in scanner:
-                        stat = entry.stat(follow_symlinks=False)
+                        try:
+                            stat = entry.stat(follow_symlinks=False)
+                        except (FileNotFoundError, PermissionError):
+                            # the filesystem may be changed during scan
+                            continue
                         total_size += stat.st_size
                         total_count += 1
                         if entry.is_dir() and not entry.is_symlink():
