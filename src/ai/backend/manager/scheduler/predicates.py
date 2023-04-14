@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Any, Optional
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
@@ -9,14 +10,19 @@ from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 
+from ..defs import DEFAULT_ROLE
 from ..models import (
     DefaultForUnspecified,
     DomainRow,
     GroupRow,
+    KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
     SessionDependencyRow,
     SessionRow,
+    kernels,
+    keypair_resource_policies,
+    keypairs,
 )
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
@@ -236,4 +242,79 @@ async def check_domain_resource_limit(
                 )
             ),
         )
+    return PredicateResult(True)
+
+
+async def check_pending_session_limit(
+    db_sess: SASession,
+    sched_ctx: SchedulingContext,
+    sess_ctx: SessionRow,
+) -> PredicateResult:
+    result = True
+    failure_msgs = []
+
+    kernel_query = (
+        sa.select([kernels.c.occupied_slots])
+        .select_from(kernels)
+        .where(
+            (kernels.c.status == KernelStatus.PENDING)
+            & (kernels.c.cluster_role == DEFAULT_ROLE)
+            & (kernels.c.access_key == sess_ctx.access_key)
+        )
+    )
+    pending_kernels: list[dict[str, Any]] = (await db_sess.execute(kernel_query)).fetchall()
+
+    j = sa.join(
+        keypair_resource_policies,
+        keypairs,
+        keypair_resource_policies.c.name == keypairs.c.resource_policy,
+    )
+    policy_query = (
+        sa.select(
+            [
+                keypair_resource_policies.c.max_pernding_sessions,
+                keypair_resource_policies.c.max_pending_session_resource_slots,
+            ]
+        )
+        .select_from(j)
+        .where(keypairs.c.access_key == sess_ctx.access_key)
+    )
+    pending_session_policy: dict[str, Any] = (await db_sess.execute(policy_query)).first()
+
+    max_pending_session: Optional[int] = pending_session_policy["max_pernding_sessions"]
+    if max_pending_session is not None and max_pending_session > 0:
+        if len(pending_kernels) >= max_pending_session:
+            result = False
+            failure_msgs.append(
+                f"You cannot create more than {max_pending_session} pending session."
+            )
+
+    max_pending_session_resource: Optional[ResourceSlot] = pending_session_policy[
+        "max_pernding_sessions"
+    ]
+
+    if max_pending_session_resource:
+        current_pending_session_slots: ResourceSlot = sum(
+            [kernel["occupied_slots"] for kernel in pending_kernels]
+        )
+        if current_pending_session_slots >= max_pending_session_resource:
+            result = False
+            msg = "Your pending session quota is exceeded. ({})".format(
+                " ".join(
+                    f"{k}={v}"
+                    for k, v in current_pending_session_slots.to_humanized(
+                        sched_ctx.known_slot_types
+                    ).items()
+                )
+            )
+            failure_msgs.append(msg)
+
+    if not result:
+        return PredicateResult(False, "\n".join(failure_msgs))
+    log.debug(
+        "number of concurrent pending sessions of ak:{0} = {1} / {2}",
+        sess_ctx.access_key,
+        len(pending_kernels),
+        max_pending_session,
+    )
     return PredicateResult(True)
