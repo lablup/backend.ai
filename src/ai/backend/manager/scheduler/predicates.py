@@ -272,32 +272,30 @@ async def check_pending_session_limit(
     policy_query = (
         sa.select(
             [
-                keypair_resource_policies.c.max_pernding_sessions,
+                keypair_resource_policies.c.max_pending_session_count,
                 keypair_resource_policies.c.max_pending_session_resource_slots,
             ]
         )
         .select_from(j)
         .where(keypairs.c.access_key == sess_ctx.access_key)
     )
-    pending_session_policy: dict[str, Any] = (await db_sess.execute(policy_query)).first()
+    policy: dict[str, Any] = (await db_sess.execute(policy_query)).first()
 
-    max_pending_session: Optional[int] = pending_session_policy["max_pernding_sessions"]
-    if max_pending_session is not None and max_pending_session > 0:
-        if len(pending_kernels) >= max_pending_session:
+    pending_count_limit: Optional[int] = policy["max_pending_session_count"]
+    if pending_count_limit is not None and pending_count_limit > 0:
+        if len(pending_kernels) >= pending_count_limit:
             result = False
             failure_msgs.append(
-                f"You cannot create more than {max_pending_session} pending session."
+                f"You cannot create more than {pending_count_limit} pending session."
             )
 
-    max_pending_session_resource: Optional[ResourceSlot] = pending_session_policy[
-        "max_pernding_sessions"
-    ]
+    pending_resource_limit: Optional[ResourceSlot] = policy["max_pending_session_resource_slots"]
 
-    if max_pending_session_resource:
+    if pending_resource_limit is not None:
         current_pending_session_slots: ResourceSlot = sum(
             [kernel["occupied_slots"] for kernel in pending_kernels]
         )
-        if current_pending_session_slots >= max_pending_session_resource:
+        if current_pending_session_slots >= pending_resource_limit:
             result = False
             msg = "Your pending session quota is exceeded. ({})".format(
                 " ".join(
@@ -315,6 +313,6 @@ async def check_pending_session_limit(
         "number of concurrent pending sessions of ak:{0} = {1} / {2}",
         sess_ctx.access_key,
         len(pending_kernels),
-        max_pending_session,
+        pending_count_limit,
     )
     return PredicateResult(True)
