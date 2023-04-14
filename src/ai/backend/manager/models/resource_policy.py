@@ -7,10 +7,11 @@ import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import relationship
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import load_only, noload, relationship
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot
 
 from .base import (
     Base,
@@ -77,6 +78,31 @@ keypair_resource_policies = sa.Table(
 class KeyPairResourcePolicyRow(Base):
     __table__ = keypair_resource_policies
     keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
+
+    @staticmethod
+    async def get_pending_session_policy(
+        db_session: SASession, access_key: AccessKey
+    ) -> KeyPairResourcePolicyRow:
+        from .keypair import KeyPairRow
+
+        j = sa.join(
+            KeyPairResourcePolicyRow,
+            KeyPairRow,
+            KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+        )
+        query = (
+            sa.select(KeyPairResourcePolicyRow)
+            .select_from(j)
+            .where(KeyPairRow.access_key == access_key)
+            .options(
+                noload("*"),
+                load_only(
+                    KeyPairResourcePolicyRow.max_pending_session_count,
+                    KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+                ),
+            )
+        )
+        return (await db_session.scalars(query)).first()
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):

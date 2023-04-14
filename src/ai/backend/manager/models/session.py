@@ -26,7 +26,7 @@ from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
@@ -970,6 +970,19 @@ class SessionRow(Base):
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
+
+    @staticmethod
+    async def get_pending_sessions_to_check_predicate(
+        db_session: SASession, access_key: AccessKey
+    ) -> list[SessionRow]:
+        query = (
+            sa.select(SessionRow)
+            .where(
+                (SessionRow.access_key == access_key) & (SessionRow.status == SessionStatus.PENDING)
+            )
+            .options(noload("*"), load_only(SessionRow.requested_slots))
+        )
+        return (await db_session.scalars(query)).all()
 
 
 class SessionDependencyRow(Base):
