@@ -30,6 +30,6 @@ python_requirements(
 )
 python_requirements(
     name="reqs-towncrier",
-    source="mypy-requirements.txt",
-    resolve="mypy",
+    source="towncrier-requirements.txt",
+    resolve="towncrier",
 )

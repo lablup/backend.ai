@@ -80,7 +80,7 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython>=3.11,<4"]
+interpreter_constraints = ["CPython==3.11.3"]  # don't know why this is required... (maybe a Pants bug?)
 
 [flake8]
 install_from_resolve = "flake8"
@@ -90,7 +90,6 @@ extra_requirements.add = [
 
 [isort]
 install_from_resolve = "isort"
-interpreter_constraints = ["CPython>=3.11,<4"]
 
 [pytest]
 install_from_resolve = "pytest"
@@ -108,12 +107,10 @@ execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
 [coverage-py]
 install_from_resolve = "coverage-py"
-interpreter_constraints = ["CPython>=3.11,<4"]
 report = ["xml", "console"]
 
 [mypy]
 install_from_resolve = "mypy"
-interpreter_constraints = ["CPython>=3.11,<4"]
 extra_requirements.add = [
 ]
 extra_type_stubs = [
