@@ -157,6 +157,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
 
             for folder_id in folder_ids:
                 if folder_id in completed_folder_ids:
+                    progbar.update(1)
                     continue
                 progbar.write(
                     "moving vfolder {} into quota_scope {}".format(
@@ -210,6 +211,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                             VFolderMigrationStatus.COMPLETE,
                         )
                     await volume.delete_vfolder(orig_vfid)
+                finally:
                     progbar.update(1)
 
     async with connect_database(ctx.dsn) as conn:
