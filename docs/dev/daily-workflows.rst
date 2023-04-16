@@ -180,12 +180,12 @@ To (re-)generate the virtualenv, run:
     $ ./pants export
 
 Then configure your IDEs/editors to use
-``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
-interpreter for your code, where ``VERSION`` is the interpreter version
+``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
+interpreter for your code, where ``PYTHON_VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
-As of Pants 2.16, you may also export the virtualenvs by the individual lockfiles
-using the ``--resolve`` option like:
+As of Pants 2.16, you must export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option like, as all tools are unified to use the same custom resolve subsystem of Pants:
 
 .. code-block:: console
 
@@ -196,13 +196,33 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 ``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
 For linters and formatters, configure the tool executable paths to indicate
-``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
+``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, flake8's executable path is
-``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
+``dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8``.
 
-Currently we have four Python tools to configure in this way:
+Currently we have the following Python tools to configure in this way:
 
 * ``flake8``: Validates PEP-8 coding style
+
+  .. tip::
+
+     Due to limitation of Pants, ``./pants export --resolve=flake8`` only creates a venv
+     for Python 3.9.x because the ``tools/pants-plugins`` source tree uses Python 3.9.x
+     and the Pants resolver takes the lowest compatible version for the tool, while
+     ``./pants lint`` uses both Python 3.11.3 and 3.9.x because it can infer
+     existence of multiple resolve partitions from the entire sourec tree, but
+     this is not the case for ``./panst export``.
+
+     To configure your IDE/editor to use the latest Python version for flake8, just
+     manually create a venv like below and let the editor to use it:
+
+     .. code-block:: console
+
+        $ python -m venv dist/export/python/virtualenvs/flake8/3.11.3
+        $ dist/export/python/virtualenvs/flake8/3.11.3/bin/pip install flake8
+
+     Fortunately, running ``./pants export`` won't remove this manually created venv
+     as it only overwrites the venvs created by itself.
 
 * ``mypy``: Validates the type annotations
 
@@ -224,6 +244,12 @@ Currently we have four Python tools to configure in this way:
 * ``isort``: Validates and reorders import statements in a fixed order depending on
   the categories of imported packages (such as bulitins, first-parties, and
   third-parties), the alphabetical order, and whether it uses ``from`` or not.
+
+* ``pytest``: The unit test runner framework.
+
+* ``coverage-py``: Generates reports about which source lines were visited during execution of a pytest session.
+
+* ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
 VSCode
 ~~~~~~

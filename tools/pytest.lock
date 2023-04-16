@@ -11,13 +11,12 @@
 //   "generated_with_requirements": [
 //     "aioresponses>=0.7.3",
 //     "pytest-aiohttp>=1.0.4",
-//     "pytest-asyncio>=0.19",
-//     "pytest-cov!=2.12.1,<3.1,>=2.12",
+//     "pytest-asyncio>=0.21",
+//     "pytest-cov>=4.0",
 //     "pytest-custom_exit_code>=0.3.0",
 //     "pytest-dependency>=0.5.1",
 //     "pytest-mock>=3.8.2",
-//     "pytest-xdist<3,>=2.5",
-//     "pytest>=7.1.2"
+//     "pytest==7.3.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -375,26 +374,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a295f7cc774947aac58dde7fdc85f4aa00c42adf5d8f5468fc630c1acf30a142",
-              "url": "https://files.pythonhosted.org/packages/81/c0/3072ecc23f4c5e0a1af35e3a222855cfd9c80a1a105ca67be3b6172637dd/execnet-1.9.0-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "8f694f3ba9cc92cab508b152dcfe322153975c29bda272e2fd7f3f00f36e47c5",
-              "url": "https://files.pythonhosted.org/packages/7a/3c/b5ac9fc61e1e559ced3e40bf5b518a4142536b34eb274aa50dff29cb89f5/execnet-1.9.0.tar.gz"
-            }
-          ],
-          "project_name": "execnet",
-          "requires_dists": [
-            "pre-commit; extra == \"testing\""
-          ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.9.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "f20380df709d91525e4bee04746ba612a4df0972c1b8f8e1e8af997e678c7b81",
               "url": "https://files.pythonhosted.org/packages/55/71/5fb91c250a1fa82a38f8b1ce2b3016f44b1c210c4d0c4b2e39c7e53e42b7/frozenlist-1.3.3-cp311-cp311-musllinux_1_1_x86_64.whl"
             },
@@ -629,31 +608,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378",
-              "url": "https://files.pythonhosted.org/packages/f6/f0/10642828a8dfb741e5f3fbaac830550a518a775c7fff6f04a007259b0548/py-1.11.0-py2.py3-none-any.whl"
+              "hash": "3799fa815351fea3a5e96ac7e503a96fa51cc9942c3753cda7651b93c1cfa362",
+              "url": "https://files.pythonhosted.org/packages/1b/d1/72df649a705af1e3a09ffe14b0c7d3be1fd730da6b98beb4a2ed26b8a023/pytest-7.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "51c75c4126074b472f746a24399ad32f6053d1b34b68d2fa41e558e6f4a98719",
-              "url": "https://files.pythonhosted.org/packages/98/ff/fec109ceb715d2a6b4c4a85a61af3b40c723a961e8828319fbcb15b868dc/py-1.11.0.tar.gz"
-            }
-          ],
-          "project_name": "py",
-          "requires_dists": [],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.11.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "933051fa1bfbd38a21e73c3960cebdad4cf59483ddba7696c48509727e17f201",
-              "url": "https://files.pythonhosted.org/packages/83/b8/345f25e35406da60b5cb0cb9de9f92a96f44eae618dc2cc4a00a2bf416f9/pytest-7.3.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "58ecc27ebf0ea643ebfdf7fb1249335da761a00c9f955bcd922349bcb68ee57d",
-              "url": "https://files.pythonhosted.org/packages/2b/a6/22c1138c2a7b60c9eb9ddeac017d82a58dfd9661651c721e7466af648764/pytest-7.3.0.tar.gz"
+              "hash": "434afafd78b1d78ed0addf160ad2b77a30d35d4bdf8af234fe621919d9ed15e3",
+              "url": "https://files.pythonhosted.org/packages/ec/d9/36b65598f3d19d0a14d13dc87ad5fa42869ae53bb7471f619a30eaabc4bf/pytest-7.3.1.tar.gz"
             }
           ],
           "project_name": "pytest",
@@ -675,7 +636,7 @@
             "xmlschema; extra == \"testing\""
           ],
           "requires_python": ">=3.7",
-          "version": "7.3.0"
+          "version": "7.3.1"
         },
         {
           "artifacts": [
@@ -733,13 +694,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "578d5d15ac4a25e5f961c938b85a05b09fdaae9deef3bb6de9a6e766622ca7a6",
-              "url": "https://files.pythonhosted.org/packages/20/49/b3e0edec68d81846f519c602ac38af9db86e1e71275528b3e814ae236063/pytest_cov-3.0.0-py3-none-any.whl"
+              "hash": "2feb1b751d66a8bd934e5edfa2e961d11309dc37b73b0eabe73b5945fee20f6b",
+              "url": "https://files.pythonhosted.org/packages/fe/1f/9ec0ddd33bd2b37d6ec50bb39155bca4fe7085fa78b3b434c05459a860e3/pytest_cov-4.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e7f0f5b1617d2210a2cabc266dfe2f4c75a8d32fb89eafb7ad9d06f6d076d470",
-              "url": "https://files.pythonhosted.org/packages/61/41/e046526849972555928a6d31c2068410e47a31fb5ab0a77f868596811329/pytest-cov-3.0.0.tar.gz"
+              "hash": "996b79efde6433cdbd0088872dbc5fb3ed7fe1578b68cdbba634f14bb8dd0470",
+              "url": "https://files.pythonhosted.org/packages/ea/70/da97fd5f6270c7d2ce07559a19e5bf36a76f0af21500256f005a69d9beba/pytest-cov-4.0.0.tar.gz"
             }
           ],
           "project_name": "pytest-cov",
@@ -754,7 +715,7 @@
             "virtualenv; extra == \"testing\""
           ],
           "requires_python": ">=3.6",
-          "version": "3.0.0"
+          "version": "4.0.0"
         },
         {
           "artifacts": [
@@ -795,27 +756,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "810958f66a91afb1a1e2ae83089d8dc1cd2437ac96b12963042fbb9fb4d16af0",
-              "url": "https://files.pythonhosted.org/packages/f4/af/9c0bda43e486a3c9bf1e0f876d0f241bc3f229d7d65d09331a0868db9629/pytest_forked-1.6.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "4dafd46a9a600f65d822b8f605133ecf5b3e1941ebb3588e943b4e3eb71a5a3f",
-              "url": "https://files.pythonhosted.org/packages/8c/c9/93ad2ba2413057ee694884b88cf7467a46c50c438977720aeac26e73fdb7/pytest-forked-1.6.0.tar.gz"
-            }
-          ],
-          "project_name": "pytest-forked",
-          "requires_dists": [
-            "py",
-            "pytest>=3.10"
-          ],
-          "requires_python": ">=3.7",
-          "version": "1.6.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "f4c973eeae0282963eb293eb173ce91b091a79c1334455acfac9ddee8a1c784b",
               "url": "https://files.pythonhosted.org/packages/91/84/c951790e199cd54ddbf1021965b62a5415b81193ebdb4f4af2659fd06a73/pytest_mock-3.10.0-py3-none-any.whl"
             },
@@ -834,31 +774,6 @@
           ],
           "requires_python": ">=3.7",
           "version": "3.10.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "6fe5c74fec98906deb8f2d2b616b5c782022744978e7bd4695d39c8f42d0ce65",
-              "url": "https://files.pythonhosted.org/packages/21/08/b1945d4b4986eb1aa10cf84efc5293bba39da80a2f95db3573dd90678408/pytest_xdist-2.5.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "4580deca3ff04ddb2ac53eba39d76cb5dd5edeac050cb6fbc768b0dd712b4edf",
-              "url": "https://files.pythonhosted.org/packages/5d/43/9dbc32d297d6eae85d6c05dc8e8d3371061bd6cbe56a2f645d9ea4b53d9b/pytest-xdist-2.5.0.tar.gz"
-            }
-          ],
-          "project_name": "pytest-xdist",
-          "requires_dists": [
-            "execnet>=1.1",
-            "filelock; extra == \"testing\"",
-            "psutil>=3.0; extra == \"psutil\"",
-            "pytest-forked",
-            "pytest>=6.2.0",
-            "setproctitle; extra == \"setproctitle\""
-          ],
-          "requires_python": ">=3.6",
-          "version": "2.5.0"
         },
         {
           "artifacts": [
@@ -947,19 +862,18 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.122",
+  "pex_version": "2.1.130",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
     "aioresponses>=0.7.3",
     "pytest-aiohttp>=1.0.4",
-    "pytest-asyncio>=0.19",
-    "pytest-cov!=2.12.1,<3.1,>=2.12",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
     "pytest-custom_exit_code>=0.3.0",
     "pytest-dependency>=0.5.1",
     "pytest-mock>=3.8.2",
-    "pytest-xdist<3,>=2.5",
-    "pytest>=7.1.2"
+    "pytest==7.3.1"
   ],
   "requires_python": [
     "==3.11.3"

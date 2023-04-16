@@ -6,11 +6,10 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<4,>=3.11"
+//     "CPython==3.11.3"
 //   ],
 //   "generated_with_requirements": [
-//     "black~=23.3",
-//     "typing-extensions>=3.10.0.0; python_version < \"3.10\""
+//     "black~=23.3"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -189,15 +188,14 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.122",
+  "pex_version": "2.1.130",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "black~=23.3",
-    "typing-extensions>=3.10.0.0; python_version < \"3.10\""
+    "black~=23.3"
   ],
   "requires_python": [
-    "<4,>=3.11"
+    "==3.11.3"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
