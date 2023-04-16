@@ -185,6 +185,12 @@ You may display the available resolve names by (the command works with Python 3.
 
     $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))'
 
+Similarly, you can export all virtualenvs at once:
+
+.. code-block:: console
+
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs ./pants export
+
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
 interpreter for your code, where ``PYTHON_VERSION`` is the interpreter version
@@ -210,25 +216,14 @@ Currently we have the following Python tools to configure in this way:
 
 * ``flake8``: Validates PEP-8 coding style
 
-  .. tip::
+  .. info::
 
      Due to limitation of Pants, ``./pants export --resolve=flake8`` only creates a venv
-     for Python 3.9.x because the ``tools/pants-plugins`` source tree uses Python 3.9.x
-     and the Pants resolver takes the lowest compatible version for the tool, while
-     ``./pants lint`` uses both Python 3.11.3 and 3.9.x because it can infer
+     for the Python version of the ``python-default`` resolve, while the
+     ``pants-plugins`` resolve uses Python 3.9.x.
+     ``./pants lint`` correctly uses both Python versions because it can infer
      existence of multiple resolve partitions from the entire sourec tree, but
-     this is not the case for ``./panst export``.
-
-     To configure your IDE/editor to use the latest Python version for flake8, just
-     manually create a venv like below and let the editor to use it:
-
-     .. code-block:: console
-
-        $ python -m venv dist/export/python/virtualenvs/flake8/3.11.3
-        $ dist/export/python/virtualenvs/flake8/3.11.3/bin/pip install flake8
-
-     Fortunately, running ``./pants export`` won't remove this manually created venv
-     as it only overwrites the venvs created by itself.
+     this is not the case for ``./pants export``.
 
 * ``mypy``: Validates the type annotations
 
