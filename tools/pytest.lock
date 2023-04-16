@@ -16,7 +16,7 @@
 //     "pytest-custom_exit_code>=0.3.0",
 //     "pytest-dependency>=0.5.1",
 //     "pytest-mock>=3.8.2",
-//     "pytest==7.3.1"
+//     "pytest~=7.3.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -873,7 +873,7 @@
     "pytest-custom_exit_code>=0.3.0",
     "pytest-dependency>=0.5.1",
     "pytest-mock>=3.8.2",
-    "pytest==7.3.1"
+    "pytest~=7.3.1"
   ],
   "requires_python": [
     "==3.11.3"

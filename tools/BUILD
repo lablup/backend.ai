@@ -14,6 +14,11 @@ python_requirements(
     resolve="black",
 )
 python_requirements(
+    name="reqs-isort",
+    source="isort-requirements.txt",
+    resolve="isort",
+)
+python_requirements(
     name="reqs-mypy",
     source="mypy-requirements.txt",
     resolve="mypy",
