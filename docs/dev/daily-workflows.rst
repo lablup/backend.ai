@@ -291,10 +291,10 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/tools/isort/bin/isort'  " requires absolute path
-   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/tools/black/bin/black'  " requires absolute path
-   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/tools/flake8/bin/flake8'
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/tools/mypy/bin/mypy'
+   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/isort/3.11.3/bin/isort'  " requires absolute path
+   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.3/bin/black'  " requires absolute path
+   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.3/bin/mypy'
    let g:ale_fixers = {'python': ['isort', 'black']}
    let g:ale_fix_on_save = 1
 
@@ -309,14 +309,14 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.9/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.3/bin/python",
      "python.formatting.provider": "black",
-     "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
-     "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.3/bin/black",
+     "python.sortImports.path": "dist/export/python/virtualenvs/isort/3.11.3/bin/isort",
      "python.linting.mypyEnabled": true,
      "python.linting.flake8Enabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
-     "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.3/bin/mypy",
+     "python.linting.flake8Path": "dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8"
    }
 
 
