@@ -20,7 +20,7 @@
 //     "aiohttp_cors~=0.7",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
-//     "aiomonitor-ng~=0.7.0",
+//     "aiomonitor-ng~=0.7.1",
 //     "aioresponses>=0.7.3",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -348,13 +348,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9f159c1ac9bd0d103095ff03fa2020d5e3f46764d402ffc7fab6b7614235428d",
-              "url": "https://files.pythonhosted.org/packages/6c/b8/6555a292bd744e8ab8aae36005925ff67783dc69c2c873255c867bc0fb68/aiomonitor_ng-0.7.0-py3-none-any.whl"
+              "hash": "c964bdb695f1382f89fbef6404c9673ea081d39265bff0983c11801e3c1cca0d",
+              "url": "https://files.pythonhosted.org/packages/7c/22/bc8a50ee946d860aeaec0e4537b6aa0227c9194606c7aafec1c74a90054e/aiomonitor_ng-0.7.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8dcf63e60779da45e967077e82a41d3b352bafee4326e11f02ebd4d71e5b1f73",
-              "url": "https://files.pythonhosted.org/packages/fb/18/05c571cdcc5c6b8d8be0d4023dd592831fcdce432e2381b88146a3b49d50/aiomonitor-ng-0.7.0.tar.gz"
+              "hash": "b4f32fbc041cc4229e7c987de5e4495376e64e5f874ed0ce2cebf0717c5b838c",
+              "url": "https://files.pythonhosted.org/packages/28/86/14dc5189f65fa7f6e290272cebc64157416ba27f7bd75016844bb0c75b3d/aiomonitor-ng-0.7.1.tar.gz"
             }
           ],
           "project_name": "aiomonitor-ng",
@@ -368,7 +368,7 @@
             "typing-extensions>=4.1"
           ],
           "requires_python": null,
-          "version": "0.7.0"
+          "version": "0.7.1"
         },
         {
           "artifacts": [
@@ -665,13 +665,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "29e95c7f6778868dbd49170f98f8818f78f3dc5e0e37c0b1f474e3561b240836",
-              "url": "https://files.pythonhosted.org/packages/fb/6e/6f83bf616d2becdf333a1640f1d463fef3150e2e926b7010cb0f81c95e88/attrs-22.2.0-py3-none-any.whl"
+              "hash": "1f28b4522cdc2fb4256ac1a020c78acf9cba2c6b461ccd2c126f3aa8e8335d04",
+              "url": "https://files.pythonhosted.org/packages/f0/eb/fcb708c7bf5056045e9e98f62b93bd7467eb718b0202e7698eb11d66416c/attrs-23.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c9227bfc2f01993c03f68db37d1d15c9690188323c067c641f1a35ca58185f99",
-              "url": "https://files.pythonhosted.org/packages/21/31/3f468da74c7de4fcf9b25591e682856389b3400b4b62f201e65f15ea3e07/attrs-22.2.0.tar.gz"
+              "hash": "6279836d581513a26f1bf235f9acd333bc9115683f14f7e8fae46c98fc50e015",
+              "url": "https://files.pythonhosted.org/packages/97/90/81f95d5f705be17872843536b1868f351805acf6971251ff07c1b8334dbb/attrs-23.1.0.tar.gz"
             }
           ],
           "project_name": "attrs",
@@ -680,32 +680,26 @@
             "attrs[tests-no-zope]; extra == \"tests\"",
             "attrs[tests]; extra == \"cov\"",
             "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"tests-no-zope\"",
-            "cloudpickle; platform_python_implementation == \"CPython\" and extra == \"tests_no_zope\"",
-            "coverage-enable-subprocess; extra == \"cov\"",
             "coverage[toml]>=5.3; extra == \"cov\"",
             "furo; extra == \"docs\"",
             "hypothesis; extra == \"tests-no-zope\"",
-            "hypothesis; extra == \"tests_no_zope\"",
-            "mypy<0.990,>=0.971; platform_python_implementation == \"CPython\" and extra == \"tests-no-zope\"",
-            "mypy<0.990,>=0.971; platform_python_implementation == \"CPython\" and extra == \"tests_no_zope\"",
+            "importlib-metadata; python_version < \"3.8\"",
+            "mypy>=1.1.1; platform_python_implementation == \"CPython\" and extra == \"tests-no-zope\"",
             "myst-parser; extra == \"docs\"",
+            "pre-commit; extra == \"dev\"",
             "pympler; extra == \"tests-no-zope\"",
-            "pympler; extra == \"tests_no_zope\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version < \"3.11\") and extra == \"tests-no-zope\"",
-            "pytest-mypy-plugins; (platform_python_implementation == \"CPython\" and python_version < \"3.11\") and extra == \"tests_no_zope\"",
+            "pytest-mypy-plugins; platform_python_implementation == \"CPython\" and python_version < \"3.11\" and extra == \"tests-no-zope\"",
             "pytest-xdist[psutil]; extra == \"tests-no-zope\"",
-            "pytest-xdist[psutil]; extra == \"tests_no_zope\"",
             "pytest>=4.3.0; extra == \"tests-no-zope\"",
-            "pytest>=4.3.0; extra == \"tests_no_zope\"",
             "sphinx-notfound-page; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
             "towncrier; extra == \"docs\"",
-            "zope.interface; extra == \"docs\"",
-            "zope.interface; extra == \"tests\""
+            "zope-interface; extra == \"docs\"",
+            "zope-interface; extra == \"tests\""
           ],
-          "requires_python": ">=3.6",
-          "version": "22.2.0"
+          "requires_python": ">=3.7",
+          "version": "23.1.0"
         },
         {
           "artifacts": [
@@ -855,36 +849,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "631db554cf9d98a2d29c0533a7020cf967b6800437be36e4335e654a480dfcdf",
-              "url": "https://files.pythonhosted.org/packages/40/ed/9078d092946cbac86d0979e439c13796dbb5a243f7c3f550df432746ff2a/boto3-1.26.113-py3-none-any.whl"
+              "hash": "e32977256470b4de3a25a43acdf6c8e6375e762656ace292ad2ceba446203615",
+              "url": "https://files.pythonhosted.org/packages/94/08/f7bb071229e11d54d43777e1d11344b53a987c6d156a4a199f75ee904506/boto3-1.26.114-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0de50b90e14e1dc3037d302f45edbf7b342ba2540f464e9ce60bad12651f02e1",
-              "url": "https://files.pythonhosted.org/packages/97/4a/d5cf13275bca29b301b3ab63dd0389f8ed248db9e73427b7154b465e3c21/boto3-1.26.113.tar.gz"
+              "hash": "b10324d452fe677d6e1005b650ae11158cf21310e0c0062b00d184b352f4196b",
+              "url": "https://files.pythonhosted.org/packages/18/5b/c8b6ae6be553d1ed09e5a4f4b750a866e3b3ef53325ee851b0525ca9c9cd/boto3-1.26.114.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.30.0,>=1.29.113",
+            "botocore<1.30.0,>=1.29.114",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.26.113"
+          "version": "1.26.114"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d927c1fbf5f5caf7937b5f53eb158c708bcbe3b6aa6d46e1fbd353241f21b5b0",
-              "url": "https://files.pythonhosted.org/packages/4c/33/b087d4f5168d8e7dec6c76ee7ed571a5d51e63fe224b1c42fddffe8276db/botocore-1.29.113-py3-none-any.whl"
+              "hash": "dd61f445eb53fe906dbde86405915cce61ffa13824a1bb7b826bfc7869a3e628",
+              "url": "https://files.pythonhosted.org/packages/58/5f/1edbe5ba4386225d39eb763e7c11e2c62b8e2f6dac88a59164e9bcea2ed1/botocore-1.29.114-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "acfee1faaa3ef2a6931fe574c092f596afb48f3c49e054aec7cfa8494227c031",
-              "url": "https://files.pythonhosted.org/packages/40/10/f20cd0eab80b2f3bf7304f2fe63315d9a4d8fd852276751a8a4a001897ab/botocore-1.29.113.tar.gz"
+              "hash": "aeacb03303d6babb0490247158647346d27900fcf89bfb9713db41f1ce1cc93f",
+              "url": "https://files.pythonhosted.org/packages/0c/3b/37aa84d8a9cd56fdc229257e68c2400bc4fa34d87d46ff16646add03e4f4/botocore-1.29.114.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -895,7 +889,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.29.113"
+          "version": "1.29.114"
         },
         {
           "artifacts": [
@@ -1222,48 +1216,48 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cf91e428c51ef692b82ce786583e214f58392399cf65c341bc7301d096fa3ba2",
-              "url": "https://files.pythonhosted.org/packages/10/2b/485100eb127268fcc72eaf3b0ee643523718b2a23f8ba3904ef027fdbbb2/cryptography-40.0.1-cp36-abi3-musllinux_1_1_x86_64.whl"
+              "hash": "a95f4802d49faa6a674242e25bfeea6fc2acd915b5e5e29ac90a32b1139cae1c",
+              "url": "https://files.pythonhosted.org/packages/91/89/13174c6167f452598baa8584133993e3d624b6a19e93748e5f2885a442f2/cryptography-40.0.2-cp36-abi3-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2803f2f8b1e95f614419926c7e6f55d828afc614ca5ed61543877ae668cc3472",
-              "url": "https://files.pythonhosted.org/packages/15/d9/c679e9eda76bfc0d60c9d7a4084ca52d0631d9f24ef04f818012f6d1282e/cryptography-40.0.1.tar.gz"
+              "hash": "4df2af28d7bedc84fe45bd49bc35d710aede676e2a4cb7fc6d103a2adc8afe4d",
+              "url": "https://files.pythonhosted.org/packages/0d/91/b2efda2ffb30b1623016d8e8ea6f59dde22b9bc86c0883bc12d965c53dca/cryptography-40.0.2-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0a4e3406cfed6b1f6d6e87ed243363652b2586b2d917b0609ca4f97072994405",
-              "url": "https://files.pythonhosted.org/packages/92/65/bead02abece1e8b3f0dee942e216cb42df2630aa7efb41d2831d99a9bb68/cryptography-40.0.1-cp36-abi3-manylinux_2_28_aarch64.whl"
+              "hash": "05dc219433b14046c476f6f09d7636b92a1c3e5808b9a6536adf4932b3b2c440",
+              "url": "https://files.pythonhosted.org/packages/85/86/a17a4baf08e0ae6496b44f75136f8e14b843fd3d8a3f4105c0fd79d4786b/cryptography-40.0.2-cp36-abi3-macosx_10_12_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9618a87212cb5200500e304e43691111570e1f10ec3f35569fdfcd17e28fd797",
-              "url": "https://files.pythonhosted.org/packages/a1/e0/4fa9f4d0c15040ea0b0c19f8442c62a5cebc4846db4a745177a85b7a6d82/cryptography-40.0.1-cp36-abi3-macosx_10_12_x86_64.whl"
+              "hash": "d5a1bd0e9e2031465761dfa920c16b0065ad77321d8a8c1f5ee331021fda65e9",
+              "url": "https://files.pythonhosted.org/packages/88/87/c720c0b56f6363eaa32c582b6240523010691ad973204649526c4ce28e95/cryptography-40.0.2-cp36-abi3-musllinux_1_1_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d8aa3609d337ad85e4eb9bb0f8bcf6e4409bfb86e706efa9a027912169e89122",
-              "url": "https://files.pythonhosted.org/packages/b6/2e/16f5531d29034554aeca5b6fafb83a2afc75e29666269233f26f9372af05/cryptography-40.0.1-cp36-abi3-musllinux_1_1_aarch64.whl"
+              "hash": "adc0d980fd2760c9e5de537c28935cc32b9353baaf28e0814df417619c6c8c3b",
+              "url": "https://files.pythonhosted.org/packages/8e/34/f54dbfc6d12fa34a50f03bf01319d585e7e9bddd68ad28299b4998e3098b/cryptography-40.0.2-cp36-abi3-manylinux_2_28_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1e0af458515d5e4028aad75f3bb3fe7a31e46ad920648cd59b64d3da842e4356",
-              "url": "https://files.pythonhosted.org/packages/c0/ea/76eb113bafc97f2e8d9872eda85eb59383892a3559ebbec7595753785fd2/cryptography-40.0.1-cp36-abi3-manylinux_2_28_x86_64.whl"
+              "hash": "0dcca15d3a19a66e63662dc8d30f8036b07be851a8680eda92d079868f106288",
+              "url": "https://files.pythonhosted.org/packages/9c/1b/30faebcef9be2df5728a8086b8fc15fff92364fe114fb207b70cd7c81329/cryptography-40.0.2-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "918cb89086c7d98b1b86b9fdb70c712e5a9325ba6f7d7cfb509e784e0cfc6917",
-              "url": "https://files.pythonhosted.org/packages/c7/0c/5eeec6973710b2dacff598be034b13f3812ca8a563e8b324b129a93d0214/cryptography-40.0.1-cp36-abi3-macosx_10_12_universal2.whl"
+              "hash": "8f79b5ff5ad9d3218afb1e7e20ea74da5f76943ee5edb7f76e56ec5161ec782b",
+              "url": "https://files.pythonhosted.org/packages/cc/aa/285f288e36d398db873d4cc20984c9a132ef5eace539d91babe4c4e94aaa/cryptography-40.0.2-cp36-abi3-macosx_10_12_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3a4805a4ca729d65570a1b7cac84eac1e431085d40387b7d3bbaa47e39890b88",
-              "url": "https://files.pythonhosted.org/packages/e9/79/b258803f573bfb202e29f9f56cd73e2b2e2fee1fe2e9cdf03f388919d8cc/cryptography-40.0.1-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "c33c0d32b8594fa647d2e01dbccc303478e16fdd7cf98652d5b3ed11aa5e5c99",
+              "url": "https://files.pythonhosted.org/packages/f7/80/04cc7637238b78f8e7354900817135c5a23cf66dfb3f3a216c6d630d6833/cryptography-40.0.2.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "63dac2d25c47f12a7b8aa60e528bfb3c51c5a6c5a9f7c86987909c6c79765554",
-              "url": "https://files.pythonhosted.org/packages/ed/d0/f7470892f9f496f3d403fca9b141367b1d5350fcd953ef5761674afafaa7/cryptography-40.0.1-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "a04386fb7bc85fab9cd51b6308633a3c271e3d0d3eae917eebab2fac6219b6d2",
+              "url": "https://files.pythonhosted.org/packages/ff/87/cffd495cc78503fb49aa3e19babc126b610174d08aa32c0d1d75c6499afc/cryptography-40.0.2-cp36-abi3-manylinux_2_28_aarch64.whl"
             }
           ],
           "project_name": "cryptography",
@@ -1292,7 +1286,7 @@
             "twine>=1.12.0; extra == \"docstest\""
           ],
           "requires_python": ">=3.6",
-          "version": "40.0.1"
+          "version": "40.0.2"
         },
         {
           "artifacts": [
@@ -3029,13 +3023,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "933051fa1bfbd38a21e73c3960cebdad4cf59483ddba7696c48509727e17f201",
-              "url": "https://files.pythonhosted.org/packages/83/b8/345f25e35406da60b5cb0cb9de9f92a96f44eae618dc2cc4a00a2bf416f9/pytest-7.3.0-py3-none-any.whl"
+              "hash": "3799fa815351fea3a5e96ac7e503a96fa51cc9942c3753cda7651b93c1cfa362",
+              "url": "https://files.pythonhosted.org/packages/1b/d1/72df649a705af1e3a09ffe14b0c7d3be1fd730da6b98beb4a2ed26b8a023/pytest-7.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "58ecc27ebf0ea643ebfdf7fb1249335da761a00c9f955bcd922349bcb68ee57d",
-              "url": "https://files.pythonhosted.org/packages/2b/a6/22c1138c2a7b60c9eb9ddeac017d82a58dfd9661651c721e7466af648764/pytest-7.3.0.tar.gz"
+              "hash": "434afafd78b1d78ed0addf160ad2b77a30d35d4bdf8af234fe621919d9ed15e3",
+              "url": "https://files.pythonhosted.org/packages/ec/d9/36b65598f3d19d0a14d13dc87ad5fa42869ae53bb7471f619a30eaabc4bf/pytest-7.3.1.tar.gz"
             }
           ],
           "project_name": "pytest",
@@ -3057,7 +3051,7 @@
             "xmlschema; extra == \"testing\""
           ],
           "requires_python": ">=3.7",
-          "version": "7.3.0"
+          "version": "7.3.1"
         },
         {
           "artifacts": [
@@ -4183,7 +4177,7 @@
     "aiohttp_cors~=0.7",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
-    "aiomonitor-ng~=0.7.0",
+    "aiomonitor-ng~=0.7.1",
     "aioresponses>=0.7.3",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
