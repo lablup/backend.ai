@@ -171,13 +171,19 @@ Using IDEs and editors
 
 Pants has an ``export`` goal to auto-generate a virtualenv that contains all
 external dependencies installed in a single place.
-This is very useful when you work with IDEs and editors.
+This is very useful when you use IDEs and editors.
 
-To (re-)generate the virtualenv, run:
+To (re-)generate the virtualenv(s), run:
 
 .. code-block:: console
 
-    $ ./pants export
+    $ ./pants export --resolve=RESOLVE_NAME  # you may add multiple --resolve options
+
+You may display the available resolve names by (the command works with Python 3.11 or later):
+
+.. code-block:: console
+
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))'
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
@@ -185,7 +191,7 @@ interpreter for your code, where ``PYTHON_VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
 As of Pants 2.16, you must export the virtualenvs by the individual lockfiles
-using the ``--resolve`` option like, as all tools are unified to use the same custom resolve subsystem of Pants:
+using the ``--resolve`` option, as all tools are unified to use the same custom resolve subsystem of Pants and the ``::`` target no longer works properly, like:
 
 .. code-block:: console
 
