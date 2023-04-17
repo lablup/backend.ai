@@ -71,7 +71,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "pyzmq~=24.0.1",
-//     "redis[hiredis]~=4.4.4",
+//     "redis[hiredis]~=4.5.4",
 //     "rich~=12.2",
 //     "setproctitle~=1.2.2",
 //     "tabulate~=0.8.9",
@@ -3262,18 +3262,18 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "da92a39fec86438d3f1e2a1db33c312985806954fe860120b582a8430e231d8f",
-              "url": "https://files.pythonhosted.org/packages/5c/68/da435219cd46d416bf5b59d66dbe36ae4aaf05b91b7be6e8241a87d4c9b1/redis-4.4.4-py3-none-any.whl"
+              "hash": "2c19e6767c474f2e85167909061d525ed65bea9301c0770bb151e041b7ac89a2",
+              "url": "https://files.pythonhosted.org/packages/b5/d4/ef474a49ec5821f3155c5de2d37ddcc4a497e2500cd16d4a9e51ce02030d/redis-4.5.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "68226f7ede928db8302f29ab088a157f41061fa946b7ae865452b6d7838bbffb",
-              "url": "https://files.pythonhosted.org/packages/ff/af/f791fa76162d1e7655a34bca58876b43388209912c6a771756fc0c8f96da/redis-4.4.4.tar.gz"
+              "hash": "73ec35da4da267d6847e47f68730fdd5f62e2ca69e3ef5885c6a78a9374c3893",
+              "url": "https://files.pythonhosted.org/packages/15/00/141ee6abca8d32448b23539e8f0e74091842c30ef357b636b372e2606aa9/redis-4.5.4.tar.gz"
             }
           ],
           "project_name": "redis",
           "requires_dists": [
-            "async-timeout>=4.0.2",
+            "async-timeout>=4.0.2; python_version <= \"3.11.2\"",
             "cryptography>=36.0.1; extra == \"ocsp\"",
             "hiredis>=1.0.0; extra == \"hiredis\"",
             "importlib-metadata>=1.0; python_version < \"3.8\"",
@@ -3282,7 +3282,7 @@
             "typing-extensions; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "4.4.4"
+          "version": "4.5.4"
         },
         {
           "artifacts": [
@@ -4227,7 +4227,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "pyzmq~=24.0.1",
-    "redis[hiredis]~=4.4.4",
+    "redis[hiredis]~=4.5.4",
     "rich~=12.2",
     "setproctitle~=1.2.2",
     "tabulate~=0.8.9",
