@@ -277,7 +277,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     parent_dir = vfpath / dst_dir
                 if not parent_dir.exists():
                     parent_dir.mkdir(parents=True, exist_ok=True)
-                target_path = parent_dir / token_data["relpath"]
+                target_path: Path = parent_dir / token_data["relpath"]
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
