@@ -253,7 +253,7 @@ async def check_pending_session_limit(
     policy = await KeyPairResourcePolicyRow.get_pending_session_policy(db_sess, sess_ctx.access_key)
 
     pending_count_limit: int | None = policy.max_pending_session_count
-    if pending_count_limit is not None and pending_count_limit > 0:
+    if pending_count_limit is not None:
         if len(pending_sessions) >= pending_count_limit:
             result = False
             failure_msgs.append(
