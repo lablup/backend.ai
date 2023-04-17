@@ -257,7 +257,7 @@ async def check_pending_session_limit(
         if len(pending_sessions) >= pending_count_limit:
             result = False
             failure_msgs.append(
-                f"You cannot create more than {pending_count_limit} pending session."
+                f"You cannot create more than {pending_count_limit} pending session(s)."
             )
 
     pending_resource_limit: ResourceSlot | None = policy.max_pending_session_resource_slots
