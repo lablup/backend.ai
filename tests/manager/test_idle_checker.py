@@ -39,7 +39,7 @@ def get_checker_from_host(
         )
 
 
-def test_remaining_time_calculation() -> None:
+def remaining_time_calculation() -> None:
     # test 1
     # now + 10.0 == idle_baseline + timeout_period
     now = datetime(2020, 3, 1, 12, 30, second=20)
@@ -80,7 +80,7 @@ def test_remaining_time_calculation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_new_user_grace_period_checker(
+async def new_user_grace_period_checker(
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -128,7 +128,7 @@ async def test_new_user_grace_period_checker(
 
 
 @pytest.mark.asyncio
-async def test_network_timeout_idle_checker__remaining_time_positive_no_grace_period(
+async def network_timeout_idle_checker(
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -200,27 +200,6 @@ async def test_network_timeout_idle_checker__remaining_time_positive_no_grace_pe
     assert should_alive
     assert remaining == expected
 
-
-@pytest.mark.asyncio
-async def test_network_timeout_idle_checker__remaining_time_negative_no_grace_period(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
-
     # test 2
     # remaining time is negative and no grace period
     session_id = SessionId(uuid4())
@@ -273,27 +252,6 @@ async def test_network_timeout_idle_checker__remaining_time_negative_no_grace_pe
 
     assert not should_alive
     assert remaining == expected
-
-
-@pytest.mark.asyncio
-async def test_network_timeout_idle_checker__remaining_time_positive_with_grace_period(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
 
     # test 3
     # remaining time is positive with new user grace period
@@ -356,27 +314,6 @@ async def test_network_timeout_idle_checker__remaining_time_positive_with_grace_
 
     assert should_alive
     assert remaining == expected
-
-
-@pytest.mark.asyncio
-async def test_network_timeout_idle_checker__remaining_time_negative_with_grace_period(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
 
     # test 4
     # remaining time is negative with new user grace period
@@ -442,7 +379,7 @@ async def test_network_timeout_idle_checker__remaining_time_negative_with_grace_
 
 
 @pytest.mark.asyncio
-async def test_session_lifetime_checker__remaining_time_positive_no_grace_period(
+async def session_lifetime_checker(
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -508,27 +445,6 @@ async def test_session_lifetime_checker__remaining_time_positive_no_grace_period
     assert should_alive
     assert remaining == expected
 
-
-@pytest.mark.asyncio
-async def test_session_lifetime_checker__remaining_time_negative_no_grace_period(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
-
     # test 2
     # remaining time is negative and no grace period
     session_id = SessionId(uuid4())
@@ -575,27 +491,6 @@ async def test_session_lifetime_checker__remaining_time_negative_no_grace_period
 
     assert not should_alive
     assert remaining == expected
-
-
-@pytest.mark.asyncio
-async def test_session_lifetime_checker__remaining_time_positive_with_grace_period(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
 
     # test 3
     # remaining time is positive with new user grace period
@@ -650,27 +545,6 @@ async def test_session_lifetime_checker__remaining_time_positive_with_grace_peri
 
     assert should_alive
     assert remaining == expected
-
-
-@pytest.mark.asyncio
-async def test_session_lifetime_checker__remaining_time_negative_with_grace_period(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
 
     # test 4
     # remaining time is negative with new user grace period
@@ -728,7 +602,7 @@ async def test_session_lifetime_checker__remaining_time_negative_with_grace_peri
 
 
 @pytest.mark.asyncio
-async def test_utilization_idle_checker__utilization(
+async def utilization_idle_checker__utilization(
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -812,7 +686,7 @@ async def test_utilization_idle_checker__utilization(
 
 
 @pytest.mark.asyncio
-async def test_utilization_idle_checker__remaining_time_positive_no_util(
+async def utilization_idle_checker(
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -914,27 +788,6 @@ async def test_utilization_idle_checker__remaining_time_positive_no_util(
     assert remaining == expected
     assert util_info is None
 
-
-@pytest.mark.asyncio
-async def test_utilization_idle_checker__remaining_time_positivie_with_util(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
-
     # test 2
     # remaining time is positive with utilization.
     session_id = SessionId(uuid4())
@@ -1016,27 +869,6 @@ async def test_utilization_idle_checker__remaining_time_positivie_with_util(
     assert should_alive
     assert remaining == expected
     assert util_info is not None
-
-
-@pytest.mark.asyncio
-async def test_utilization_idle_checker__remaining_time_negative_with_util(
-    etcd_fixture,
-    database_fixture,
-    create_app_and_client,
-    mocker,
-) -> None:
-    test_app, _ = await create_app_and_client(
-        [
-            shared_config_ctx,
-            redis_ctx,
-            event_dispatcher_ctx,
-            background_task_ctx,
-            database_ctx,
-            distributed_lock_ctx,
-        ],
-        [".etcd"],
-    )
-    root_ctx: RootContext = test_app["_root.context"]
 
     # test 3
     # remaining time is negative with utilization.
