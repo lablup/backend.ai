@@ -71,7 +71,6 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
-    DoSyncKernelStatsEvent,
     EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
@@ -611,7 +610,8 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))
 
         # Prepare heartbeats.
-        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
+        heartbeat_interval = self.local_config["debug"]["heartbeat-interval"]
+        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
@@ -870,18 +870,13 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
         try:
-            updated_kernel_ids = []
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
                     if not kernel_obj.stats_enabled:
                         continue
-                    updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
-            # Let the manager store the statistics in the persistent database.
-            if updated_kernel_ids:
-                await self.produce_event(DoSyncKernelStatsEvent(updated_kernel_ids))
         except asyncio.CancelledError:
             pass
         except Exception:

@@ -289,6 +289,9 @@ log-stats = false
 # Include debug-level logs for heartbeats
 log-heartbeats = false
 
+# Set the interval of agent heartbeats in seconds.
+heartbeat-interval = 20.0
+
 # Include debug-level logs for docker event stream.
 log-docker-events = false
 

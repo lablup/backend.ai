@@ -61,7 +61,6 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
-    DoSyncKernelStatsEvent,
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
@@ -1536,16 +1535,6 @@ async def handle_destroy_session(
     )
 
 
-async def handle_kernel_stat_sync(
-    app: web.Application,
-    agent_id: AgentId,
-    event: DoSyncKernelStatsEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    if root_ctx.local_config["debug"]["periodic-sync-stats"]:
-        await root_ctx.registry.sync_kernel_stats(event.kernel_ids)
-
-
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
     log_func = log.info
     log_msg: str = ""
@@ -2561,7 +2550,6 @@ async def init(app: web.Application) -> None:
     evd.consume(AgentHeartbeatEvent, app, handle_agent_heartbeat)
 
     # action-trigerring events
-    evd.consume(DoSyncKernelStatsEvent, app, handle_kernel_stat_sync, name="api.session.synckstat")
     evd.consume(DoSyncKernelLogsEvent, app, handle_kernel_log, name="api.session.syncklog")
     evd.consume(DoTerminateSessionEvent, app, handle_destroy_session, name="api.session.doterm")
 

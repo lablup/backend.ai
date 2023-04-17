@@ -103,6 +103,7 @@ agent_local_config_iv = (
                     t.Key("log-alloc-map", default=False): t.ToBool,
                     t.Key("log-events", default=False): t.ToBool,
                     t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("heartbeat-interval", default=20.0): t.Float,
                     t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {
