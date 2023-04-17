@@ -47,7 +47,6 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    kernels,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
@@ -281,11 +280,10 @@ class SchedulerDispatcher(aobject):
                         sa.update(SessionRow)
                         .values(
                             status=SessionStatus.CANCELLED,
-                            status_changed=now,
                             status_info="pending-timeout",
                             terminated_at=now,
                             status_history=sql_json_merge(
-                                kernels.c.status_history,
+                                SessionRow.status_history,
                                 (),
                                 {
                                     SessionStatus.CANCELLED.name: now.isoformat(),
@@ -530,8 +528,7 @@ class SchedulerDispatcher(aobject):
         requested_architectures = set(k.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architecture"
-                "on single node session",
+                "Cannot assign multiple kernels with different architectureon single node session",
             )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
@@ -541,7 +538,7 @@ class SchedulerDispatcher(aobject):
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        f"No agents found to be compatible with the image acrhitecture "
+                        "No agents found to be compatible with the image acrhitecture "
                         f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
                         f"arch: {requested_architecture})"
                     ),
@@ -561,8 +558,8 @@ class SchedulerDispatcher(aobject):
                 if cand_agent is None:
                     raise InstanceNotAvailable(
                         extra_msg=(
-                            f"Could not find a contiguous resource region in any agent "
-                            f"big enough to host the session "
+                            "Could not find a contiguous resource region in any agent "
+                            "big enough to host the session "
                             f"({sess_ctx.id})"
                         ),
                     )
@@ -627,7 +624,7 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e)
+            exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
 
             async def _update_generic_failure() -> None:
                 async with self.db.begin_session() as kernel_db_sess:
@@ -751,7 +748,7 @@ class SchedulerDispatcher(aobject):
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    f"No agents found to be compatible with the image acrhitecture "
+                                    "No agents found to be compatible with the image acrhitecture "
                                     f"(image: {kernel.image_ref}, "
                                     f"arch: {kernel.architecture})"
                                 ),
@@ -763,8 +760,8 @@ class SchedulerDispatcher(aobject):
                         if agent is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    f"Could not find a contiguous resource region in any agent "
-                                    f"big enough to host a kernel in the session "
+                                    "Could not find a contiguous resource region in any agent "
+                                    "big enough to host a kernel in the session "
                                     f"({sess_ctx.id})"
                                 ),
                             )
@@ -822,7 +819,7 @@ class SchedulerDispatcher(aobject):
                         log_fmt + "unexpected-error, during agent allocation",
                         *log_args,
                     )
-                    exc_data = convert_to_status_data(e)
+                    exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
 
                     async def _update_generic_failure() -> None:
                         async with self.db.begin_session() as kernel_db_sess:
@@ -1025,7 +1022,7 @@ class SchedulerDispatcher(aobject):
             await self.registry.start_session(sched_ctx, session)
         except Exception as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
-            log.warning(log_fmt + "failed-starting: {1!r}", *log_args, status_data)
+            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.
 

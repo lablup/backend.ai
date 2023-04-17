@@ -519,7 +519,7 @@ kernels = sa.Table(
         "session_name",
         unique=True,
         postgresql_where=sa.text(
-            "status NOT IN ('TERMINATED', 'CANCELLED') and " "cluster_role = 'main'"
+            "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
         ),
     ),
 )
@@ -579,9 +579,9 @@ class KernelRow(Base):
         status_data: Optional[Mapping[str, Any]] = None,
         reason: Optional[str] = None,
     ) -> None:
-        assert status != KernelStatus.TERMINATED, (
-            "TERMINATED status update must be handled in " "mark_kernel_terminated()"
-        )
+        assert (
+            status != KernelStatus.TERMINATED
+        ), "TERMINATED status update must be handled in mark_kernel_terminated()"
         now = datetime.now(tzutc())
         data = {
             "status": status,

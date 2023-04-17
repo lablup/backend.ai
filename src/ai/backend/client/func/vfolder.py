@@ -303,8 +303,10 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[download_info["url"]]
                     else:
                         raise BackendClientError(
-                            "Overriding storage proxy addresses are given, "
-                            "but no url matches with any of them.\n",
+                            (
+                                "Overriding storage proxy addresses are given, "
+                                "but no url matches with any of them.\n"
+                            ),
                         )
 
                 params = {"token": download_info["token"]}
@@ -348,8 +350,10 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[upload_info["url"]]
                     else:
                         raise BackendClientError(
-                            "Overriding storage proxy addresses are given, "
-                            "but no url matches with any of them.\n",
+                            (
+                                "Overriding storage proxy addresses are given, "
+                                "but no url matches with any of them.\n"
+                            ),
                         )
                 params = {"token": upload_info["token"]}
                 if dst_dir is not None:
@@ -617,6 +621,19 @@ class VFolder(BaseFunction):
                 "vfolder": vfolder,
                 "user": user,
                 "perm": perm,
+            }
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    @classmethod
+    async def change_vfolder_ownership(cls, vfolder: str, user_email: str):
+        rqst = Request("POST", "/folders/_/change-ownership")
+        rqst.set_json(
+            {
+                "vfolder": vfolder,
+                "user_email": user_email,
             }
         )
         async with rqst.fetch() as resp:

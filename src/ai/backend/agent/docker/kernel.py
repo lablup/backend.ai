@@ -284,16 +284,14 @@ class DockerKernel(AbstractKernel):
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -314,8 +312,7 @@ class DockerKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
         proc = await asyncio.create_subprocess_exec(
             *[
                 "docker",
@@ -522,9 +519,12 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                 "Cmd": [
                     "/bin/sh",
                     "-c",
-                    "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
-                    "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
+                    (
+                        "ctr -n services.linuxkit t kill --exec-id metaproxy docker;ctr -n"
+                        " services.linuxkit t exec --exec-id metaproxy docker"
+                        " /host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port"
+                        f" {server_port}"
+                    ),
                 ],
                 "HostConfig": {
                     "PidMode": "host",

@@ -41,7 +41,7 @@ class Runner(BaseRunner):
             cmd = [str(self.runtime_path), *map(str, ofiles_glob), *DEFAULT_CFLAGS, "-o", "./main"]
             return await self.run_subproc(cmd)
         else:
-            log.error('cannot find build script ("Makefile") ' 'or the main file ("main.c").')
+            log.error('cannot find build script ("Makefile") or the main file ("main.c").')
             return 127
 
     async def execute_heuristic(self) -> int:
