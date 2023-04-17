@@ -13,7 +13,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..utils import update_nested_dict
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class PersistentServiceContainer:
@@ -59,8 +59,8 @@ class PersistentServiceContainer:
                 raise
         if c["Config"].get("Labels", {}).get("ai.backend.system", "0") != "1":
             raise RuntimeError(
-                f"An existing container named \"{c['Name'].lstrip('/')}\" is not a system container "
-                f"spawned by Backend.AI. Please check and remove it."
+                f"An existing container named \"{c['Name'].lstrip('/')}\" is not a system container"
+                " spawned by Backend.AI. Please check and remove it."
             )
         return (
             int(c["Config"].get("Labels", {}).get("ai.backend.version", "0")),

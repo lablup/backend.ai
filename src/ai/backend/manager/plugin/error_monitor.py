@@ -15,15 +15,17 @@ from ..models import error_logs
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):
     async def init(self, context: Any = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_monitor is initialized without the root context. "
-                "The plugin is disabled.",
+                (
+                    "manager.plugin.error_monitor is initialized without the root context. "
+                    "The plugin is disabled."
+                ),
             )
             self.enabled = False
             return

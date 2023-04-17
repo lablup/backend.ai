@@ -20,7 +20,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    Sequence,
     Type,
     TypedDict,
     TypeVar,
@@ -56,7 +55,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.common.events"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PTGExceptionHandler: TypeAlias = Callable[
     [Type[Exception], Exception, TracebackType], Awaitable[None]
@@ -64,8 +63,7 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
-
-    # derivatives shoudld define the fields.
+    # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
 
@@ -129,7 +127,6 @@ class DoTerminateSessionEvent(AbstractEvent):
 
 @attrs.define(slots=True, frozen=True)
 class GenericAgentEventArgs:
-
     reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:
@@ -230,14 +227,12 @@ class KernelLifecycleEventReason(str, enum.Enum):
 @attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attrs.field()
-    creation_id: str = attrs.field()
     reason: str = attrs.field(default="")
     creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
-            self.creation_id,
             self.reason,
             self.creation_info,
         )
@@ -246,14 +241,9 @@ class KernelCreationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
-            creation_id=value[1],
-            reason=value[2],
-            creation_info=value[3],
+            reason=value[1],
+            creation_info=value[2],
         )
-
-
-class KernelEnqueuedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_enqueued"
 
 
 class KernelPreparingEvent(KernelCreationEventArgs, AbstractEvent):
@@ -393,6 +383,10 @@ class SessionTerminationEventArgs:
         )
 
 
+class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
+    name = "session_terminating"
+
+
 class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
     name = "session_terminated"
 
@@ -445,22 +439,6 @@ class DoSyncKernelLogsEvent(AbstractEvent):
         return cls(
             KernelId(uuid.UUID(value[0])),
             value[1],
-        )
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class DoSyncKernelStatsEvent(AbstractEvent):
-    name = "do_sync_kernel_stats"
-
-    kernel_ids: Sequence[KernelId] = attrs.field()
-
-    def serialize(self) -> tuple:
-        return ([*map(str, self.kernel_ids)],)
-
-    @classmethod
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_ids=tuple(KernelId(uuid.UUID(item)) for item in value[0]),
         )
 
 

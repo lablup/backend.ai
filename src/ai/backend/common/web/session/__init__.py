@@ -6,11 +6,20 @@ import sys
 import time
 from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Optional, Union, cast
 
+import trafaret as t
 from aiohttp import web
 
-from ai.backend.web.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+
+extra_config_headers = t.Dict(
+    {
+        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
+        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
+        t.Key("X-BackendAI-SessionID", default=None): t.Null | t.String,
+    }
+).allow_extra("*")
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 Middleware = Callable[[web.Request, Handler], Awaitable[web.StreamResponse]]
@@ -136,8 +145,8 @@ class Session(MutableMapping[str, Any]):
         self._created = int(time.time())
 
 
-SESSION_KEY = "bai_session"
-STORAGE_KEY = "bai_session_storage"
+SESSION_KEY = "aiohttp_session"
+STORAGE_KEY = "aiohttp_session_storage"
 
 
 async def get_session(request: web.Request) -> Session:
@@ -145,9 +154,7 @@ async def get_session(request: web.Request) -> Session:
     if session is None:
         storage = request.get(STORAGE_KEY)
         if storage is None:
-            raise RuntimeError(
-                "Install aiohttp_session middleware " "in your aiohttp.web.Application"
-            )
+            raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
 
         session = await storage.load_session(request)
         if not isinstance(session, Session):
@@ -162,7 +169,7 @@ async def get_session(request: web.Request) -> Session:
 async def new_session(request: web.Request) -> Session:
     storage = request.get(STORAGE_KEY)
     if storage is None:
-        raise RuntimeError("Install aiohttp_session middleware " "in your aiohttp.web.Application")
+        raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
 
     session = await storage.new_session()
     if not isinstance(session, Session):
@@ -218,7 +225,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
     def __init__(
         self,
         *,
-        cookie_name: str = "BAI_SESSION",
+        cookie_name: str = "AIOHTTP_SESSION",
         domain: Optional[str] = None,
         max_age: Optional[int] = None,
         path: str = "/",
@@ -304,7 +311,7 @@ class SimpleCookieStorage(AbstractStorage):
     def __init__(
         self,
         *,
-        cookie_name: str = "BAI_SESSION",
+        cookie_name: str = "AIOHTTP_SESSION",
         domain: Optional[str] = None,
         max_age: Optional[int] = None,
         path: str = "/",

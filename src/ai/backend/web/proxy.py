@@ -8,32 +8,23 @@ import random
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-import trafaret as t
 from aiohttp import web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
-from ai.backend.common.web.session import STORAGE_KEY, get_session
+from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
-from .auth import get_anonymous_session, get_api_session
+from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
-
-extra_config_headers = t.Dict(
-    {
-        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
-        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
-        t.Key("X-BackendAI-SessionID", default=None): t.Null | t.String,
-    }
-).allow_extra("*")
 
 
 class WebSocketProxy:
@@ -133,7 +124,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
-        if not request.content:
+        if not request.can_read_body:  # designated as encrypted but has an empty payload
             request["payload"] = ""
             return await handler(request)
         config = request.app["config"]
@@ -150,6 +141,8 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
         b64p = base64.b64decode(real_payload)
         request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
     else:
+        # For all other requests without explicit encryption,
+        # let the handler decide how to read the body.
         request["payload"] = ""
     return await handler(request)
 
@@ -180,12 +173,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
                 decrypted_payload_length = len(payload)
             else:
                 payload = request.content
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For")
-            if not client_ip:
-                client_ip = request.remote
-            _headers = {"X-Forwarded-For": client_ip}
-            api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
@@ -278,12 +266,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
                 body["domain"] = request.app["config"]["api"]["domain"]
                 content = json.dumps(body).encode("utf8")
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For")
-            if not client_ip:
-                client_ip = request.remote
-            _headers = {"X-Forwarded-For": client_ip}
-            api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             api_rqst = Request(
@@ -370,6 +353,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     try:
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             api_rqst = Request(
                 request.method,
                 path,

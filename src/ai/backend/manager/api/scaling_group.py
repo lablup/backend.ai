@@ -22,7 +22,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @dataclass(unsafe_hash=True)
@@ -69,9 +69,9 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "group_id", "group_name"], default=None): t.Null
-            | tx.UUID
-            | t.String,
+            tx.AliasedKey(["group", "group_id", "group_name"], default=None): (
+                t.Null | tx.UUID | t.String
+            ),
         }
     )
 )

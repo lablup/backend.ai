@@ -1,0 +1,25 @@
+name: 'alembic-check'
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
+  merge_group:
+
+jobs:
+  check-multiple-heads:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'require:db-migration') }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    - name: Parse versions from config
+      run: |
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Check for multiple heads
+      run: python scripts/check-multiple-alembic-heads.py

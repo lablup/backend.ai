@@ -2,7 +2,7 @@
 package = "ai.backend.manager"  # reference point for getting __version__
 filename = "CHANGELOG.md"
 directory = "changes/"
-title_format = "## {version} ({project_date})"
+title_format = ""  # embedded inside the template
 template = "changes/template.md"
 start_string = "<!-- towncrier release notes start -->\n"
 issue_format = "([#{issue}](https://github.com/lablup/backend.ai/issues/{issue}))"
@@ -68,16 +68,20 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 ignore_missing_imports = true
+implicit_optional = true  # FIXME: remove after adding https://github.com/hauntsaninja/no_implicit_optional to fmt
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.10.8/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.11.3/bin/python"
+disable_error_code = ["typeddict-unknown-key"]
 
 [tool.black]
 line-length = 100
+preview = true
 
 [tool.isort]
 profile = "black"
+split_on_trailing_comma = true
 line_length = 100
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_first_party = ["ai.backend"]

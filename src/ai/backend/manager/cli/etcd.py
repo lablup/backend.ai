@@ -29,7 +29,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()
@@ -143,9 +143,11 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
     "--scope",
     type=EnumChoice(ConfigScopes),
     default=ConfigScopes.GLOBAL,
-    help="The configuration scope to get/put the subtree. "
-    "To move between different scopes, use the global scope "
-    "and specify the per-scope prefixes manually.",
+    help=(
+        "The configuration scope to get/put the subtree. "
+        "To move between different scopes, use the global scope "
+        "and specify the per-scope prefixes manually."
+    ),
 )
 @click.pass_obj
 def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
@@ -171,7 +173,7 @@ def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
 @click.option(
     "--prefix",
     is_flag=True,
-    help="Get all key-value pairs prefixed with the given key " "as a JSON form.",
+    help="Get all key-value pairs prefixed with the given key as a JSON form.",
 )
 @click.option(
     "-s",
@@ -306,7 +308,7 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
     """
     with cli_ctx.logger:
         log.warn("etcd rescan-images command is deprecated, use image rescan instead")
-        asyncio.run(rescan_images_impl(cli_ctx, registry))
+        asyncio.run(rescan_images_impl(cli_ctx, registry, False))
 
 
 @cli.command()

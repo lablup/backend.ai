@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models import kernels, keypairs
+from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
@@ -317,6 +317,7 @@ class KernelInfo:
     agent_addr: str
     cluster_role: str
     cluster_idx: int
+    local_rank: int
     cluster_hostname: str
     image_ref: ImageRef
     resource_opts: Mapping[str, Any]
@@ -338,6 +339,7 @@ class KernelInfo:
             kernels.c.agent_addr,  # for scheduled kernels
             kernels.c.cluster_role,
             kernels.c.cluster_idx,
+            kernels.c.local_rank,
             kernels.c.cluster_hostname,
             kernels.c.image,
             kernels.c.architecture,
@@ -359,6 +361,7 @@ class KernelInfo:
             agent_addr=row["agent_addr"],
             cluster_role=row["cluster_role"],
             cluster_idx=row["cluster_idx"],
+            local_rank=row["local_rank"],
             cluster_hostname=row["cluster_hostname"],
             image_ref=ImageRef(row["image"], [row["registry"]], row["architecture"]),
             resource_opts=row["resource_opts"],
@@ -371,7 +374,7 @@ class KernelInfo:
 
 @attrs.define(auto_attribs=True, slots=True)
 class KernelAgentBinding:
-    kernel: KernelInfo
+    kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
     allocated_host_ports: Set[int]
 
@@ -411,8 +414,8 @@ class AbstractScheduler(metaclass=ABCMeta):
     def pick_session(
         self,
         total_capacity: ResourceSlot,
-        pending_sessions: Sequence[PendingSession],
-        existing_sessions: Sequence[ExistingSession],
+        pending_sessions: Sequence[SessionRow],
+        existing_sessions: Sequence[SessionRow],
     ) -> Optional[SessionId]:
         """
         Pick a session to try schedule.
@@ -423,8 +426,8 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     def assign_agent_for_session(
         self,
-        possible_agents: Sequence[AgentContext],
-        pending_session: PendingSession,
+        possible_agents: Sequence[AgentRow],
+        pending_session: SessionRow,
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -439,7 +442,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentContext],
+        possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
     ) -> Optional[AgentId]:
         """

@@ -18,7 +18,7 @@ from typing import (
 )
 
 import appdirs
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 __all__ = [
@@ -39,7 +39,7 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
-API_VERSION = (6, "20220615")
+API_VERSION = (6, "20230315")
 MIN_API_VERSION = (5, "20191215")
 
 DEFAULT_CHUNK_SIZE = 16 * (2**20)  # 16 MiB
@@ -83,7 +83,7 @@ def get_env(
 
     :returns: The value processed by the *clean* function.
     """
-    load_dotenv(override=True)
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
     key = key.upper()
     raw = os.environ.get("BACKEND_" + key)
     if raw is None:
@@ -194,8 +194,8 @@ class APIConfig:
         "read_timeout": "0",
     }
     """
-    The default values for config parameterse settable via environment variables
-    xcept the access and secret keys.
+    The default values for config parameters settable via environment variables
+    except the access and secret keys.
     """
 
     _endpoints: List[URL]

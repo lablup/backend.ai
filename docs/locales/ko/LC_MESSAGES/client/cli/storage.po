@@ -62,7 +62,7 @@ msgid ""
 msgstr ""
 
 #: ../../client/cli/storage.rst:40 49bc9f93e9b44b0186ee9feab4a537ca
-msgid "To delete the vfolder completey:"
+msgid "To delete the vfolder completely:"
 msgstr ""
 
 #: ../../client/cli/storage.rst:48 4368cee4eda4475da77ed96f032b13da
@@ -114,7 +114,7 @@ msgstr ""
 #: ../../client/cli/storage.rst:99 87b8daf00dc9487fbc3a6b29851b37f5
 msgid ""
 "By reusing the same vfolder in subsequent sessions, you do not have to "
-"donwload the result and upload it as the input for next sessions, just "
+"download the result and upload it as the input for next sessions, just "
 "keeping them in the storage."
 msgstr ""
 

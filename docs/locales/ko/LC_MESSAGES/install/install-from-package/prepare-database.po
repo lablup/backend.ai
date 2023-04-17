@@ -1,0 +1,47 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/prepare-database.rst:2
+#: 9b99bdc058d24fc79b66c57dee71c343
+msgid "Prepare Database"
+msgstr ""
+
+#: ../../install/install-from-package/prepare-database.rst:4
+#: f280899f7605405285230ad9e451f80c
+msgid ""
+"Backend.AI makes use of PostgreSQL as its main database. Launch the "
+"service using docker compose by generating the file ``$HOME/halfstack"
+"/docker-compose.hs.postgres.yaml`` and populating it with the following "
+"YAML. Feel free to adjust the volume paths and port settings. Please "
+"refer `the latest configuration "
+"<https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-"
+"main.yml>`_ (it's a symbolic link so follow the filename in it) if "
+"needed."
+msgstr ""
+
+#: ../../install/install-from-package/prepare-database.rst:56
+#: df5641a037864f719e5a044eb9f5ebd9
+msgid ""
+"Execute the following command to start the service container. The project"
+" ``${USER}`` is added for operational convenience."
+msgstr ""
+

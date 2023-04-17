@@ -41,16 +41,18 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50200): t.ToInt[1:65535],
+                    t.Key("aiomonitor-port", default=48200): t.ToInt[1:65535],
                     t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                         type="dir", auto_create=True
                     ),
-                    t.Key("abuse-report-path", default=None): t.Null
-                    | tx.Path(type="dir", allow_nonexisting=True),
+                    t.Key("abuse-report-path", default=None): t.Null | tx.Path(
+                        type="dir", allow_nonexisting=True
+                    ),
                     t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
+                    t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
                 }
             ).allow_extra("*"),
             t.Key("container"): t.Dict(
@@ -60,8 +62,9 @@ agent_local_config_iv = (
                     t.Key("bind-host", default=""): t.String(allow_blank=True),
                     t.Key("advertised-host", default=None): t.Null | t.String(),
                     t.Key("port-range", default=(30000, 31000)): tx.PortRange,
-                    t.Key("stats-type", default="docker"): t.Null
-                    | t.Enum(*[e.value for e in StatModes]),
+                    t.Key("stats-type", default="docker"): t.Null | t.Enum(
+                        *[e.value for e in StatModes]
+                    ),
                     t.Key("sandbox-type", default="docker"): t.Enum("docker", "jail"),
                     t.Key("jail-args", default=[]): t.List(t.String),
                     t.Key("scratch-type"): t.Enum("hostdir", "memory", "k8s-nfs"),
@@ -83,7 +86,7 @@ agent_local_config_iv = (
                     t.Key(
                         "allocation-order", default=["cuda", "rocm", "tpu", "cpu", "mem"]
                     ): t.List(t.String),
-                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED): tx.Enum(
+                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED.name): tx.Enum(
                         AffinityPolicy,
                         use_name=True,
                     ),
@@ -101,6 +104,7 @@ agent_local_config_iv = (
                     t.Key("log-alloc-map", default=False): t.ToBool,
                     t.Key("log-events", default=False): t.ToBool,
                     t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("heartbeat-interval", default=20.0): t.Float,
                     t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {

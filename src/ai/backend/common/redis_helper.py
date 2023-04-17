@@ -66,7 +66,7 @@ _default_conn_opts: Mapping[str, Any] = {
 
 _scripts: Dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ConnectionNotAvailable(Exception):
@@ -246,7 +246,7 @@ async def execute(
                     aw_or_pipe = func(r)
                 else:
                     raise TypeError(
-                        "The func must be a function or a coroutinefunction " "with no arguments."
+                        "The func must be a function or a coroutinefunction with no arguments."
                     )
                 if isinstance(aw_or_pipe, Pipeline):
                     result = await aw_or_pipe.execute()

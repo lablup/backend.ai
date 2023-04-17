@@ -1,0 +1,73 @@
+:host > *, html {
+}
+
+backend-ai-webui {
+}
+
+.splash:before {
+  content: url("hpc-innohub-logo.svg");
+  position: absolute;
+  top: calc(50% - 150px);
+  left: calc(50% - 150px);
+  width: 240px;
+}
+
+.splash {
+  top: calc(50% - 130px);
+  height: 340px!important;
+}
+
+.splash-header {
+  height: 160px!important;
+  background-position: left bottom!important;
+}
+
+.splash-header > img {
+  padding-top:75px!important;
+}
+
+.loading-message {
+  top: calc(50% + 128px)!important;
+}
+
+.sk-folding-cube {
+  top: calc(50% + 130px)!important;
+}
+
+.portrait-canvas {
+  background-image: url("/resources/logo.png")!important;
+  background-color: transparent!important;
+  background-size: 34px 26px!important;
+  background-repeat: no-repeat;
+}
+#portrait-bar{
+  background-color: #52ACC2!important;
+}
+#portrait-bar + div {
+  background-color: #49A1B8!important;
+}
+
+.site-name {
+  font-size: 16px!important;
+}
+
+:host > *, html {
+  --general-sidebar-topbar-color: #FFFFFF!important;
+  --general-sidebar-selected-color: #52ACC2!important;
+  --general-button-background-color: #49A1B8!important;
+  --general-progress-bar-bg: #e8e8e8;
+}
+
+wl-button.primary-action[raised] {
+  background-image: linear-gradient(rgb(105, 206, 224) 0%, rgb(73, 161, 184) 100%)!important;
+}
+
+.terms-of-use {
+  display:none;
+}
+
+backend-ai-login {
+  --login-banner-height:60px;
+  --login-banner-width:250px;
+  --login-banner-background: center left / contain no-repeat url("/resources/hpc-innohub-logo.svg");
+}

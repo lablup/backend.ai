@@ -23,7 +23,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
 from ..exceptions import BackendClientError
-from ..pagination import generate_paginated_results
+from ..pagination import fetch_paginated_result
 from ..request import Request
 from .base import BaseFunction, api_function
 
@@ -37,6 +37,7 @@ _default_list_fields = (
     vfolder_fields["group_id"],
     vfolder_fields["permission"],
     vfolder_fields["ownership_type"],
+    vfolder_fields["status"],
 )
 
 
@@ -111,7 +112,7 @@ class VFolder(BaseFunction):
         :param group: Fetch vfolders in a specific group.
         :param fields: Additional per-vfolder query fields to fetch.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "vfolder_list",
             {
                 "group_id": (group, "UUID"),
@@ -277,6 +278,7 @@ class VFolder(BaseFunction):
         relative_paths: Sequence[Union[str, Path]],
         *,
         basedir: Union[str, Path] = None,
+        dst_dir: Union[str, Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
         address_map: Optional[Mapping[str, str]] = None,
@@ -301,15 +303,16 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[download_info["url"]]
                     else:
                         raise BackendClientError(
-                            "Overriding storage proxy addresses are given, "
-                            "but no url matches with any of them.\n",
+                            (
+                                "Overriding storage proxy addresses are given, "
+                                "but no url matches with any of them.\n"
+                            ),
                         )
 
-                download_url = URL(overriden_url).with_query(
-                    {
-                        "token": download_info["token"],
-                    }
-                )
+                params = {"token": download_info["token"]}
+                if dst_dir is not None:
+                    params["dst_dir"] = dst_dir
+                download_url = URL(overriden_url).with_query(params)
             await self._download_file(
                 file_path, download_url, chunk_size, max_retries, show_progress
             )
@@ -320,6 +323,7 @@ class VFolder(BaseFunction):
         files: Sequence[Union[str, Path]],
         *,
         basedir: Union[str, Path] = None,
+        dst_dir: Union[str, Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
         show_progress: bool = False,
@@ -346,14 +350,15 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[upload_info["url"]]
                     else:
                         raise BackendClientError(
-                            "Overriding storage proxy addresses are given, "
-                            "but no url matches with any of them.\n",
+                            (
+                                "Overriding storage proxy addresses are given, "
+                                "but no url matches with any of them.\n"
+                            ),
                         )
-                upload_url = URL(overriden_url).with_query(
-                    {
-                        "token": upload_info["token"],
-                    }
-                )
+                params = {"token": upload_info["token"]}
+                if dst_dir is not None:
+                    params["dst_dir"] = dst_dir
+                upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:
                 input_file = open(base_path / file_path, "rb")
@@ -367,7 +372,9 @@ class VFolder(BaseFunction):
                 upload_checksum=False,
                 chunk_size=chunk_size,
             )
-            return await uploader.upload()
+            await uploader.upload()
+            input_file.close()
+        return None
 
     @api_function
     async def mkdir(
@@ -592,6 +599,13 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
+    async def list_shared_vfolders(cls):
+        rqst = Request("GET", "folders/_/shared")
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    @classmethod
     async def shared_vfolder_info(cls, vfolder_id: str):
         rqst = Request("GET", "folders/_/shared")
         rqst.set_json({"vfolder_id": vfolder_id})
@@ -607,6 +621,19 @@ class VFolder(BaseFunction):
                 "vfolder": vfolder,
                 "user": user,
                 "perm": perm,
+            }
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    @classmethod
+    async def change_vfolder_ownership(cls, vfolder: str, user_email: str):
+        rqst = Request("POST", "/folders/_/change-ownership")
+        rqst.set_json(
+            {
+                "vfolder": vfolder,
+                "user_email": user_email,
             }
         )
         async with rqst.fetch() as resp:

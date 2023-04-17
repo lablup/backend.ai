@@ -16,6 +16,7 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
 from ..config import load as load_config
@@ -24,7 +25,7 @@ from .context import CLIContext, init_logger, redis_ctx
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
-@click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "-f",
     "--config-path",
@@ -36,10 +37,16 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx, config_path, debug):
+def main(ctx, config_path, log_level, debug):
     """
     Manager Administration CLI
     """
@@ -62,18 +69,20 @@ def main(ctx, config_path, debug):
     type=str,
     default=None,
     metavar="ID_OR_NAME",
-    help="Open a postgres client shell using the psql executable "
-    "shipped with the given postgres container. "
-    'If not set or set as an empty string "", it will auto-detect '
-    "the psql container from the halfstack. "
-    'If set "-", it will use the host-provided psql executable. '
-    "You may append additional arguments passed to the psql cli command. "
-    "[default: auto-detect from halfstack]",
+    help=(
+        "Open a postgres client shell using the psql executable "
+        "shipped with the given postgres container. "
+        'If not set or set as an empty string "", it will auto-detect '
+        "the psql container from the halfstack. "
+        'If set "-", it will use the host-provided psql executable. '
+        "You may append additional arguments passed to the psql cli command. "
+        "[default: auto-detect from halfstack]"
+    ),
 )
 @click.option(
     "--psql-help",
     is_flag=True,
-    help="Show the help text of the psql command instead of " "this dbshell command.",
+    help="Show the help text of the psql command instead of this dbshell command.",
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
@@ -97,8 +106,10 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         )
         if not candidate_container_names:
             click.echo(
-                "Could not find the halfstack postgres container. "
-                "Please set the container name explicitly.",
+                (
+                    "Could not find the halfstack postgres container. "
+                    "Please set the container name explicitly."
+                ),
                 err=True,
             )
             sys.exit(ExitCode.FAILURE)
@@ -160,11 +171,13 @@ def generate_keypair(cli_ctx: CLIContext):
     "--vacuum-full",
     type=bool,
     default=False,
-    help="Reclaim storage occupied by dead tuples."
-    "If not set or set False, it will run VACUUM without FULL."
-    "If set True, it will run VACUUM FULL."
-    "When VACUUM FULL is being processed, the database is locked."
-    "[default: False]",
+    help=(
+        "Reclaim storage occupied by dead tuples."
+        "If not set or set False, it will run VACUUM without FULL. "
+        "If set True, it will run VACUUM FULL. "
+        "When VACUUM FULL is being processed, the database is locked. "
+        "[default: False]"
+    ),
 )
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:

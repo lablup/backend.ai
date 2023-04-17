@@ -1,1 +1,0 @@
-Fallback to the legacy logic of getting current allocation if there is no devices in affinity hint which prevented to launch a compute session with CPU and memory only for a single numa node system.

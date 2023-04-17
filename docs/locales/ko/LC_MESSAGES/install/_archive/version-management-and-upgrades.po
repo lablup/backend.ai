@@ -73,7 +73,7 @@ msgstr ""
 #: ../../install/_archive/version-management-and-upgrades.md:12
 #: 8de720817c5046e1b5d3b06de40d60fd
 msgid ""
-"It is recommeded to use \"merge\" but you may use \"cherry-pick\" as well, "
+"It is recommended to use \"merge\" but you may use \"cherry-pick\" as well, "
 "to keep the history clean if `master` has deviated too much."
 msgstr ""
 
