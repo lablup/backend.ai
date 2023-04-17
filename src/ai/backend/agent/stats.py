@@ -484,6 +484,10 @@ class StatContext:
 
         Intended to be used by the agent.
         """
+        # FIXME: support Docker Desktop backend (#1230)
+        if sys.platform == "darwin":
+            return
+
         async with self._lock:
             pid_map = {}
             pids = []
