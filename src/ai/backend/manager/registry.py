@@ -2735,34 +2735,13 @@ class AgentRegistry:
                 return (await db_sess.execute(query)).first()["session_id"]
 
         session_id = await execute_with_retry(_mark_kernel)
+        async with self.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_kernels(
+                session_id, allow_stale=True, db_session=db_sess
+            )
+            error_kernels = [k for k in session.kernels if k.status == KernelStatus.ERROR]
 
-        async def _mark_session() -> SessionRow:
-            async with self.db.begin_session() as db_sess:
-                values = {
-                    "status": SessionStatus.ERROR,
-                    "status_info": reason,
-                    "terminated_at": now,
-                    "status_history": sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            SessionStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
-                        },
-                    ),
-                }
-                query = sa.update(SessionRow).values(**values).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
-
-                session = await SessionRow.get_session_with_kernels(
-                    session_id, allow_stale=True, db_session=db_sess
-                )
-                return session
-
-        session = await execute_with_retry(_mark_session)
-
-        error_kernels = [k for k in session.kernels if k.status == KernelStatus.ERROR]
         per_agent_tasks = []
-        # to_be_terminated = []
 
         async def _destroy_kernels_in_agent(
             session: SessionRow, destroyed_kernels: List[KernelRow]
@@ -2808,14 +2787,31 @@ class AgentRegistry:
 
         if per_agent_tasks:
             await asyncio.gather(*per_agent_tasks, return_exceptions=True)
-        # for kernel in to_be_terminated:
-        #     await self.event_producer.produce_event(
-        #         KernelTerminatedEvent(kernel.id, KernelLifecycleEventReason(reason)),
-        #     )
-        # await self.hook_plugin_ctx.notify(
-        #     "POST_DESTROY_SESSION",
-        #     (session_id, session.name, session.access_key),
-        # )
+
+        candidate_status = determine_session_status(session.kernels)
+
+        async def _update_session() -> None:
+            async with self.db.begin_session() as db_session:
+                values = {
+                    "status": candidate_status,
+                    "status_info": reason,
+                    "status_history": sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            candidate_status.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
+                }
+                if candidate_status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
+                    values["terminated_at"] = now
+                update_query = (
+                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**values)
+                )
+                await db_session.execute(update_query)
+
+        if candidate_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
+            await execute_with_retry(_update_session)
         await self.recalc_resource_usage()
 
     async def mark_session_terminating(

@@ -1014,9 +1014,10 @@ class AbstractAgent(
                         restart_tracker.destroy_event.set()
                     else:
                         await self.rescan_resource_usage()
-                        await self.produce_event(
-                            KernelTerminatedEvent(ev.kernel_id, ev.reason),
-                        )
+                        if not ev.suppress_events:
+                            await self.produce_event(
+                                KernelTerminatedEvent(ev.kernel_id, ev.reason),
+                            )
                     # Notify cleanup waiters after all state updates.
                     if kernel_obj is not None and kernel_obj.clean_event is not None:
                         kernel_obj.clean_event.set_result(None)
