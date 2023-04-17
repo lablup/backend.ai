@@ -1949,13 +1949,16 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
                 session_name, db_sess, owner_access_key
             )
 
-        target_sessions: List[str | uuid.UUID] = [*dependent_session_ids, session_name]
-        sessions = [
-            await SessionRow.get_session_with_kernels(
-                name_or_id, owner_access_key, db_session=db_sess
-            )
-            for name_or_id in target_sessions
-        ]
+            target_session_references: List[str | uuid.UUID] = [
+                *dependent_session_ids,
+                session_name,
+            ]
+            sessions = [
+                await SessionRow.get_session_with_kernels(
+                    name_or_id, owner_access_key, db_session=db_sess
+                )
+                for name_or_id in target_session_references
+            ]
 
         last_stats = await asyncio.gather(
             *[
@@ -2324,7 +2327,7 @@ async def find_dependent_sessions(
     root_session = await SessionRow.get_session(
         root_session_name_or_id, access_key=access_key, db_session=db_session
     )
-    return await _find_dependent_sessions(root_session)
+    return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
 
 
 @server_status_required(READ_ALLOWED)
