@@ -58,13 +58,11 @@ class Project(BaseFunction):
         :param domain_name: Name of domain to get projects from.
         :param fields: Per-project query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($name: String!, $domain_name: String) {
                 projects_by_name(name: $name, domain_name: $domain_name) {$fields}
             }
-        """
-        )
+        """)
         resolved_fields = resolve_fields(fields, project_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -89,13 +87,11 @@ class Project(BaseFunction):
         """
         if fields is None:
             fields = _default_list_fields
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($domain_name: String) {
                 projects(domain_name: $domain_name) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
@@ -116,13 +112,11 @@ class Project(BaseFunction):
         """
         if fields is None:
             fields = _default_detail_fields
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($gid: UUID!) {
                 project(id: $gid) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
@@ -145,15 +139,13 @@ class Project(BaseFunction):
         Creates a new project with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($name: String!, $input: ProjectInput!) {
                 create_project(name: $name, props: $input) {
                     ok msg project {$fields}
                 }
             }
-        """
-        )
+        """)
         resolved_fields = resolve_fields(
             fields,
             project_fields,
@@ -191,15 +183,13 @@ class Project(BaseFunction):
         Update existing project.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!, $input: ModifyProjectInput!) {
                 modify_project(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "gid": gid,
             "input": {
@@ -220,15 +210,13 @@ class Project(BaseFunction):
         """
         Inactivates the existing project. Does not actually delete it for safety.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!) {
                 delete_project(gid: $gid) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_project"]
@@ -239,15 +227,13 @@ class Project(BaseFunction):
         """
         Delete the existing project. This action cannot be undone.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!) {
                 purge_project(gid: $gid) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
         return data["purge_project"]
@@ -261,15 +247,13 @@ class Project(BaseFunction):
         Add users to a project.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!, $input: ModifyProjectInput!) {
                 modify_project(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "gid": gid,
             "input": {
@@ -289,15 +273,13 @@ class Project(BaseFunction):
         Remove users from a project.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!, $input: ModifyProjectInput!) {
                 modify_project(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "gid": gid,
             "input": {

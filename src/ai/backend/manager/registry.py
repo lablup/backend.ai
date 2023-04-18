@@ -101,7 +101,7 @@ from .api.exceptions import (
 )
 from .config import SharedConfig
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError
+from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KERNEL_STATUS_TRANSITION_MAP,
@@ -227,7 +227,7 @@ async def RPCContext(
         deserializer=msgpack.unpackb,
     )
     try:
-        async with (_timeout(invoke_timeout), peer):
+        async with _timeout(invoke_timeout), peer:
             okey_token = peer.call.order_key.set("")
             try:
                 yield peer
@@ -264,6 +264,8 @@ class AgentRegistry:
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
+        *,
+        debug: bool = False,
     ) -> None:
         self.shared_config = shared_config
         self.docker = aiodocker.Docker()
@@ -279,6 +281,7 @@ class AgentRegistry:
         self._post_kernel_creation_tasks = weakref.WeakValueDictionary()
         self._post_kernel_creation_infos = {}
         self._kernel_actual_allocated_resources = {}
+        self.debug = debug
         self.rpc_keepalive_timeout = int(
             shared_config.get("config/network/rpc/keepalive-timeout", "60")
         )
@@ -306,7 +309,7 @@ class AgentRegistry:
             query = sa.select("*").select_from(agents)
             if check_shadow:
                 query = query.where(agents.c.status == AgentStatus.ALIVE)
-            async for row in (await conn.stream(query)):
+            async for row in await conn.stream(query):
                 yield row
 
     async def update_instance(self, inst_id, updated_fields):
@@ -378,8 +381,10 @@ class AgentRegistry:
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
-                f"You cannot create session with more than "
-                f"{resource_policy['max_containers_per_session']} containers.",
+                (
+                    "You cannot create session with more than "
+                    f"{resource_policy['max_containers_per_session']} containers."
+                ),
             )
 
         async with self.db.begin_readonly() as conn:
@@ -393,9 +398,11 @@ class AgentRegistry:
             )
             if scaling_group is None:
                 log.warning(
-                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                    f"The client did not specify the scaling group for session; "
-                    f"falling back to {checked_scaling_group}",
+                    (
+                        f"enqueue_session(s:{session_name}, ak:{access_key}): "
+                        "The client did not specify the scaling group for session; "
+                        f"falling back to {checked_scaling_group}"
+                    ),
                 )
 
             use_host_network_query = (
@@ -581,7 +588,7 @@ class AgentRegistry:
                     # (e.g., image does not support accelerators
                     #  requested by the client)
                     raise InvalidAPIParameters(
-                        "Your resource request has resource type(s) " "not supported by the image."
+                        "Your resource request has resource type(s) not supported by the image."
                     )
 
                 # If intrinsic resources are not specified,
@@ -612,10 +619,10 @@ class AgentRegistry:
                 )
                 gpu = creation_config.get("instanceGPUs")
                 if gpu is not None:
-                    raise InvalidAPIParameters("Client upgrade required " "to use GPUs (v19.03+).")
+                    raise InvalidAPIParameters("Client upgrade required to use GPUs (v19.03+).")
                 tpu = creation_config.get("instanceTPUs")
                 if tpu is not None:
-                    raise InvalidAPIParameters("Client upgrade required " "to use TPUs (v19.03+).")
+                    raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"
@@ -677,9 +684,11 @@ class AgentRegistry:
                     "cluster_role": kernel["cluster_role"],
                     "cluster_idx": kernel["cluster_idx"],
                     "local_rank": kernel["local_rank"],
-                    "cluster_hostname": f"{kernel['cluster_role']}{kernel['cluster_idx']}"
-                    if not kernel["cluster_hostname"]
-                    else kernel["cluster_hostname"],
+                    "cluster_hostname": (
+                        f"{kernel['cluster_role']}{kernel['cluster_idx']}"
+                        if not kernel["cluster_hostname"]
+                        else kernel["cluster_hostname"]
+                    ),
                     "image": image_ref.canonical,
                     # "image_id": image_row.id,
                     "architecture": image_ref.architecture,
@@ -935,11 +944,11 @@ class AgentRegistry:
                 "BACKENDAI_ACCESS_KEY": scheduled_session.access_key,
                 # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
                 # (In the future, each kernel in a cluster session may use different images)
-                "BACKENDAI_PREOPEN_PORTS": ",".join(
-                    str(port) for port in scheduled_session.main_kernel.preopen_ports
-                )
-                if scheduled_session.main_kernel.preopen_ports is not None
-                else "",
+                "BACKENDAI_PREOPEN_PORTS": (
+                    ",".join(str(port) for port in scheduled_session.main_kernel.preopen_ports)
+                    if scheduled_session.main_kernel.preopen_ports is not None
+                    else ""
+                ),
             }
         )
 
@@ -980,7 +989,7 @@ class AgentRegistry:
             if agent_errors:
                 raise MultiAgentError(
                     "agent(s) raise errors during kernel creation",
-                    errors=agent_errors,
+                    agent_errors,
                 )
             await self.settle_agent_alloc(kernel_agent_bindings)
         # If all is well, let's say the session is ready.
@@ -1276,7 +1285,7 @@ class AgentRegistry:
                             query = (
                                 sa.update(KernelRow)
                                 .where(KernelRow.id == kernel_id)
-                                .value(
+                                .values(
                                     status=KernelStatus.ERROR,
                                     status_info=f"other-error ({ex!r})",
                                     status_changed=now,
@@ -1285,19 +1294,15 @@ class AgentRegistry:
                                         KernelRow.status_history,
                                         (),
                                         {
-                                            KernelStatus.ERROR.name: now.isoformat(),  # ["PULLING", "PREPARING"]
+                                            KernelStatus.ERROR.name: (
+                                                now.isoformat()
+                                            ),  # ["PULLING", "PREPARING"]
                                         },
                                     ),
                                     agent=binding.agent_alloc_ctx.agent_id,
                                     agent_addr=binding.agent_alloc_ctx.agent_addr,
                                     scaling_group=binding.agent_alloc_ctx.scaling_group,
-                                    status_data={
-                                        "error": {
-                                            "src": "other",
-                                            "name": ex.__class__.__name__,
-                                            "repr": repr(ex),
-                                        },
-                                    },
+                                    status_data=convert_to_status_data(ex, self.debug),
                                 )
                             )
                             await db_sess.execute(query)
@@ -1474,7 +1479,7 @@ class AgentRegistry:
                     .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
-                async for row in (await conn.stream(query)):
+                async for row in await conn.stream(query):
                     occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
                 query = (
                     sa.select(
@@ -1488,7 +1493,7 @@ class AgentRegistry:
                     .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
-                async for row in (await conn.stream(query)):
+                async for row in await conn.stream(query):
                     concurrency_used_per_key[row.access_key].add(row.session_id)
 
                 if len(occupied_slots_per_agent) > 0:
@@ -1646,7 +1651,10 @@ class AgentRegistry:
                 case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
                     if not forced:
                         raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/preparing/terminating/error status",
+                            (
+                                "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                                " status"
+                            ),
                         )
                     log.warning(
                         "force-terminating session (s:{}, status:{})",
@@ -1723,7 +1731,10 @@ class AgentRegistry:
                         case KernelStatus.SCHEDULED | KernelStatus.PREPARING | KernelStatus.TERMINATING | KernelStatus.ERROR:
                             if not forced:
                                 raise GenericForbidden(
-                                    "Cannot destroy kernels in scheduled/preparing/terminating/error status",
+                                    (
+                                        "Cannot destroy kernels in"
+                                        " scheduled/preparing/terminating/error status"
+                                    ),
                                 )
                             log.warning(
                                 "force-terminating kernel (k:{}, status:{})",
@@ -2746,7 +2757,8 @@ class AgentRegistry:
         kernel: KernelRow = session.main_kernel
         if kernel.status != KernelStatus.RUNNING:
             raise InvalidAPIParameters(
-                f"Unable to commit since kernel(id: {kernel.id}) of session(id: {session.id}) is currently not RUNNING."
+                f"Unable to commit since kernel(id: {kernel.id}) of session(id: {session.id}) is"
+                " currently not RUNNING."
             )
         email = await self._get_user_email(kernel)
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")

@@ -182,9 +182,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("all", default=False): t.ToBool,
-            tx.AliasedKey(["project_id", "projectId", "group_id", "groupId"], default=None): tx.UUID
-            | t.String
-            | t.Null,
+            tx.AliasedKey(["project_id", "projectId", "group_id", "groupId"], default=None): (
+                tx.UUID | t.String | t.Null
+            ),
         }
     ),
 )

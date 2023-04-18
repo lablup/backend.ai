@@ -46,8 +46,7 @@ async def query_wsproxy_status(
         {
             tx.AliasedKey(
                 ["project", "project_id", "project_name", "group", "group_id", "group_name"]
-            ): tx.UUID
-            | t.String,
+            ): (tx.UUID | t.String),
         }
     ),
 )
@@ -75,9 +74,9 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
             tx.AliasedKey(
                 ["project", "project_id", "project_name", "group", "group_id", "group_name"],
                 default=None,
-            ): t.Null
-            | tx.UUID
-            | t.String,
+            ): (
+                t.Null | tx.UUID | t.String
+            ),
         }
     )
 )

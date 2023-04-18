@@ -631,7 +631,7 @@ async def batch_result(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in (await db_conn.stream(query)):
+    async for row in await db_conn.stream(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
@@ -651,7 +651,7 @@ async def batch_multiresult(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in (await db_conn.stream(query)):
+    async for row in await db_conn.stream(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -674,7 +674,7 @@ async def batch_result_in_session(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in (await db_sess.stream(query)):
+    async for row in await db_sess.stream(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
@@ -695,7 +695,7 @@ async def batch_multiresult_in_session(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in (await db_sess.stream(query)):
+    async for row in await db_sess.stream(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -818,8 +818,10 @@ def privileged_mutation(required_role, target_func=None):
                     if target_domain is None and target_project is None:
                         return cls(
                             False,
-                            "misconfigured privileged mutation: "
-                            "both target_domain and target_project missing",
+                            (
+                                "misconfigured privileged mutation: "
+                                "both target_domain and target_project missing"
+                            ),
                             None,
                         )
                     permit_chains = []

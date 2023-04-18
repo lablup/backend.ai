@@ -43,17 +43,11 @@ legacy_names = legacy_values - new_values
 
 
 def _delete_enum_value(connection, enum_name, val):
-    connection.execute(
-        text(
-            textwrap.dedent(
-                f"""DELETE FROM pg_enum
+    connection.execute(text(textwrap.dedent(f"""DELETE FROM pg_enum
                     WHERE enumlabel = '{val}'
                     AND enumtypid = (
                     SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-                );"""
-            )
-        )
-    )
+                );""")))
 
 
 def upgrade():
@@ -362,7 +356,8 @@ def downgrade():
 
     conn.execute(
         text(
-            f"UPDATE vfolders SET ownership_type = '{LegacyVFolderOwnershipType.GROUP.value}' WHERE ownership_type = '{VFolderOwnershipType.PROJECT.value}';"
+            f"UPDATE vfolders SET ownership_type = '{LegacyVFolderOwnershipType.GROUP.value}' WHERE"
+            f" ownership_type = '{VFolderOwnershipType.PROJECT.value}';"
         )
     )
 

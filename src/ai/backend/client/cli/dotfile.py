@@ -20,15 +20,13 @@ def dotfile():
 @click.option(
     "--perm",
     "permission",
-    help="Linux permission represented in octal number (e.g. 755) "
-    "Defaults to 755 if not specified",
+    help="Linux permission represented in octal number (e.g. 755) Defaults to 755 if not specified",
 )
 @click.option(
     "-f",
     "--file",
     "dotfile_path",
-    help="Path to dotfile to upload. "
-    "If not specified, client will try to read file from STDIN. ",
+    help="Path to dotfile to upload. If not specified, client will try to read file from STDIN. ",
 )
 @click.option(
     "-o",
@@ -45,16 +43,20 @@ def dotfile():
     "-j",
     "--project",
     metavar="PROJECT",
-    help="Sepcify the project name or id of project dotfiles. "
-    "(If project name is provided, domain name must be specified with option -d)",
+    help=(
+        "Sepcify the project name or id of project dotfiles. "
+        "(If project name is provided, domain name must be specified with option -d)"
+    ),
 )
 @click.option(
     "-g",
     "--group",
     metavar="GROUP",
-    help="Sepcify the project name or id of project dotfiles. "
-    "(If project name is provided, domain name must be specified with option -d). "
-    "This option is deprecated, use `--project` option instead.",
+    help=(
+        "Sepcify the project name or id of project dotfiles. "
+        "(If project name is provided, domain name must be specified with option -d). "
+        "This option is deprecated, use `--project` option instead."
+    ),
 )
 def create(path, permission, dotfile_path, owner_access_key, domain, project, group):
     """
@@ -114,8 +116,10 @@ def create(path, permission, dotfile_path, owner_access_key, domain, project, gr
     "-p",
     "--project",
     metavar="PROJECT",
-    help="Sepcify the project name or id of project dotfiles. "
-    "(If project name is provided, domain name must be specified with option -d)",
+    help=(
+        "Sepcify the project name or id of project dotfiles. "
+        "(If project name is provided, domain name must be specified with option -d)"
+    ),
 )
 def get(path, owner_access_key, domain, project):
     """
@@ -149,8 +153,10 @@ def get(path, owner_access_key, domain, project):
     "-p",
     "--project",
     metavar="PROJECT",
-    help="Sepcify the project name or id of project dotfiles. "
-    "(If project name is provided, domain name must be specified with option -d)",
+    help=(
+        "Sepcify the project name or id of project dotfiles. "
+        "(If project name is provided, domain name must be specified with option -d)"
+    ),
 )
 def list(owner_access_key, domain, project):
     """
@@ -188,15 +194,13 @@ def list(owner_access_key, domain, project):
 @click.option(
     "--perm",
     "permission",
-    help="Linux permission represented in octal number (e.g. 755) "
-    "Defaults to 755 if not specified",
+    help="Linux permission represented in octal number (e.g. 755) Defaults to 755 if not specified",
 )
 @click.option(
     "-f",
     "--file",
     "dotfile_path",
-    help="Path to dotfile to upload. "
-    "If not specified, client will try to read file from STDIN. ",
+    help="Path to dotfile to upload. If not specified, client will try to read file from STDIN. ",
 )
 @click.option(
     "-o",
@@ -213,8 +217,10 @@ def list(owner_access_key, domain, project):
     "-p",
     "--project",
     metavar="RPOJECT",
-    help="Sepcify the project name or id of project dotfiles. "
-    "(If project name is provided, domain name must be specified with option -d)",
+    help=(
+        "Sepcify the project name or id of project dotfiles. "
+        "(If project name is provided, domain name must be specified with option -d)"
+    ),
 )
 def update(path, permission, dotfile_path, owner_access_key, domain, project):
     """
@@ -260,8 +266,10 @@ def update(path, permission, dotfile_path, owner_access_key, domain, project):
     "-p",
     "--project",
     metavar="PROJECT",
-    help="Sepcify the project name or id of project dotfiles. "
-    "(If project name is provided, domain name must be specified with option -d)",
+    help=(
+        "Sepcify the project name or id of project dotfiles. "
+        "(If project name is provided, domain name must be specified with option -d)"
+    ),
 )
 def delete(path, force, owner_access_key, domain, project):
     """

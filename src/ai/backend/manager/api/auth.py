@@ -353,20 +353,16 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
                 body = await request.read()
         body_hash = hashlib.new(hash_type, body).hexdigest()
 
-        sign_bytes = (
-            ("{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\n" "x-{name}-version:{5}\n{6}")
-            .format(
-                request.method,
-                str(request.raw_path),
-                request["raw_date"],
-                request.host,
-                request.content_type,
-                api_version,
-                body_hash,
-                name="backendai" if new_api_version is not None else "sorna",
-            )
-            .encode()
-        )
+        sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
+            request.method,
+            str(request.raw_path),
+            request["raw_date"],
+            request.host,
+            request.content_type,
+            api_version,
+            body_hash,
+            name="backendai" if new_api_version is not None else "sorna",
+        ).encode()
         sign_key = hmac.new(
             secret_key.encode(), request["date"].strftime("%Y%m%d").encode(), hash_type
         ).digest()

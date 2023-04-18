@@ -20,33 +20,40 @@ def session_template():
     "-f",
     "--file",
     "template_path",
-    help="Path to task template file. "
-    "If not specified, client will try to read config from STDIN. ",
+    help=(
+        "Path to task template file. If not specified, client will try to read config from STDIN. "
+    ),
 )
 @click.option(
     "-d",
     "--domain",
     metavar="DOMAIN_NAME",
     default=None,
-    help="Domain name where the session will be spawned. "
-    "If not specified, config's domain name will be used.",
+    help=(
+        "Domain name where the session will be spawned. "
+        "If not specified, config's domain name will be used."
+    ),
 )
 @click.option(
     "-j",
     "--project",
     metavar="PROJECT_NAME",
     default=None,
-    help="Project name where the session is spawned. "
-    "User should be a member of the project to execute the code.",
+    help=(
+        "Project name where the session is spawned. "
+        "User should be a member of the project to execute the code."
+    ),
 )
 @click.option(
     "-g",
     "--group",
     metavar="PROJECT_NAME",
     default=None,
-    help="Project name where the session is spawned. "
-    "User should be a member of the project to execute the code. "
-    "This option is deprecated, use `--project` option instead.",
+    help=(
+        "Project name where the session is spawned. "
+        "User should be a member of the project to execute the code. "
+        "This option is deprecated, use `--project` option instead."
+    ),
 )
 @click.option(
     "-o",
@@ -159,8 +166,9 @@ def list(list_all):
     "-f",
     "--file",
     "template_path",
-    help="Path to task template file. "
-    "If not specified, client will try to read config from STDIN. ",
+    help=(
+        "Path to task template file. If not specified, client will try to read config from STDIN. "
+    ),
 )
 @click.option(
     "-o",

@@ -38,10 +38,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(
-                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
-            ): tx.UUID
-            | t.String,
+            tx.AliasedKey(["project", "projectId", "project_id", "group", "groupId", "group_id"]): (
+                tx.UUID | t.String
+            ),
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("data"): t.String(max_length=MAXIMUM_DOTFILE_SIZE),
             t.Key("path"): t.String,
@@ -106,10 +105,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(
-                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
-            ): tx.UUID
-            | t.String,
+            tx.AliasedKey(["project", "projectId", "project_id", "group", "groupId", "group_id"]): (
+                tx.UUID | t.String
+            ),
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("path", default=None): t.Null | t.String,
         }
@@ -183,10 +181,9 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(
-                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
-            ): tx.UUID
-            | t.String,
+            tx.AliasedKey(["project", "projectId", "project_id", "group", "groupId", "group_id"]): (
+                tx.UUID | t.String
+            ),
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("data"): t.String(max_length=MAXIMUM_DOTFILE_SIZE),
             t.Key("path"): t.String,
@@ -242,10 +239,9 @@ async def update(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(
-                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
-            ): tx.UUID
-            | t.String,
+            tx.AliasedKey(["project", "projectId", "project_id", "group", "groupId", "group_id"]): (
+                tx.UUID | t.String
+            ),
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("path"): t.String,
         }

@@ -57,7 +57,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--access-key",
         type=str,
         default=None,
-        help="Get sessions for a specific access key " "(only works if you are a super-admin)",
+        help="Get sessions for a specific access key (only works if you are a super-admin)",
     )
     @click.option("--name-only", is_flag=True, help="Display session names only.")
     @click.option(
@@ -86,7 +86,10 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--all",
         is_flag=True,
         default=False,
-        help='Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status. Ignores --status option.',
+        help=(
+            'Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status.'
+            " Ignores --status option."
+        ),
     )
     def list(
         ctx: CLIContext,
@@ -263,7 +266,7 @@ def _info_cmd(docs: str = None):
             else:
                 fields.append(session_fields_v5["containers"])
             fields.append(session_fields["dependencies"])
-            q = "query($id: UUID!) {" "  compute_session(id: $id) {" "    $fields" "  }" "}"
+            q = "query($id: UUID!) {  compute_session(id: $id) {    $fields  }}"
             try:
                 uuid.UUID(session_id)
             except ValueError:

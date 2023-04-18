@@ -348,8 +348,7 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
-    alembic_config_template = textwrap.dedent(
-        """
+    alembic_config_template = textwrap.dedent("""
     [alembic]
     script_location = ai.backend.manager.models:alembic
     sqlalchemy.url = {sqlalchemy_url:s}
@@ -375,8 +374,7 @@ def database(request, local_config, test_db):
 
     [formatter_simple]
     format = [%(name)s] %(message)s
-    """
-    ).strip()
+    """).strip()
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
