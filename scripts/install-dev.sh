@@ -691,7 +691,7 @@ configure_backendai() {
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    cp "configs/accelerator/cuda-mock.toml" cuda-mock.toml
+    cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
   fi
 
   # configure manager
@@ -721,7 +721,7 @@ configure_backendai() {
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
