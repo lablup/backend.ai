@@ -72,7 +72,6 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
-    DoSyncKernelStatsEvent,
     EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
@@ -397,8 +396,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/opt/kernel/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/opt/kernel/scp")
+        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
+        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
         mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
         mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
         mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
@@ -621,7 +620,8 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
 
         # Prepare heartbeats.
-        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
+        heartbeat_interval = self.local_config["debug"]["heartbeat-interval"]
+        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
@@ -737,8 +737,7 @@ class AbstractAgent(
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        commit_status_script = textwrap.dedent(
-            """
+        commit_status_script = textwrap.dedent("""
         local key_and_value = {}
         for i, k in pairs(KEYS) do
             key_and_value[i*2-1] = k
@@ -750,8 +749,7 @@ class AbstractAgent(
                 redis.call('EXPIRE', k, ARGV[1])
             end
         end
-        """
-        )
+        """)
         await redis_helper.execute_script(
             self.redis_stat_pool,
             "check_kernel_commit_statuses",
@@ -864,18 +862,13 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
         try:
-            updated_kernel_ids = []
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
                     if not kernel_obj.stats_enabled:
                         continue
-                    updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
-            # Let the manager store the statistics in the persistent database.
-            if updated_kernel_ids:
-                await self.produce_event(DoSyncKernelStatsEvent(updated_kernel_ids))
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -1146,9 +1139,11 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            "rescan_resoucre_usage(k:{}): "
-                            "failed to read kernel resource info; "
-                            "maybe already terminated",
+                            (
+                                "rescan_resoucre_usage(k:{}): "
+                                "failed to read kernel resource info; "
+                                "maybe already terminated"
+                            ),
                             kernel_id,
                         )
 
@@ -1530,7 +1525,10 @@ class AbstractAgent(
             if agent_architecture != ctx.image_ref.architecture:
                 # disable running different architecture's image
                 raise AgentError(
-                    f"cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine",
+                    (
+                        f"cannot run {ctx.image_ref.architecture} image on"
+                        f" {agent_architecture} machine"
+                    ),
                 )
 
             # Check if we need to pull the container image
@@ -1610,7 +1608,7 @@ class AbstractAgent(
                             )
                         except ResourceError as e:
                             log.info(
-                                "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",
+                                "resource allocation failed ({}): {} of {}\n(alloc map: {})",
                                 type(e).__name__,
                                 device_specific_slots,
                                 dev_name,

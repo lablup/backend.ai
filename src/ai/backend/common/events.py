@@ -20,7 +20,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    Sequence,
     Type,
     TypedDict,
     TypeVar,
@@ -440,22 +439,6 @@ class DoSyncKernelLogsEvent(AbstractEvent):
         return cls(
             KernelId(uuid.UUID(value[0])),
             value[1],
-        )
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class DoSyncKernelStatsEvent(AbstractEvent):
-    name = "do_sync_kernel_stats"
-
-    kernel_ids: Sequence[KernelId] = attrs.field()
-
-    def serialize(self) -> tuple:
-        return ([*map(str, self.kernel_ids)],)
-
-    @classmethod
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_ids=tuple(KernelId(uuid.UUID(item)) for item in value[0]),
         )
 
 
