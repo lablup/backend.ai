@@ -205,8 +205,7 @@ from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _max_cpu_count = os.cpu_count()
 _file_perm = (Path(__file__).parent / "server.py").stat()

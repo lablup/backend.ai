@@ -57,8 +57,7 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
 

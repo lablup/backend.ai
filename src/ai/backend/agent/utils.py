@@ -36,8 +36,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]

@@ -17,8 +17,7 @@ from ..models.base import populate_fixture
 if TYPE_CHECKING:
     from .context import CLIContext
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()

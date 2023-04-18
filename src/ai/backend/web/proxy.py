@@ -19,8 +19,7 @@ from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",

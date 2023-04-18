@@ -13,8 +13,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..utils import update_nested_dict
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class PersistentServiceContainer:

@@ -25,8 +25,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @server_status_required(READ_ALLOWED)

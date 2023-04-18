@@ -43,8 +43,7 @@ from ai.backend.common.types import CommitStatus, KernelId, ServicePort, aobject
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
 # since they are passed as separate status field.)

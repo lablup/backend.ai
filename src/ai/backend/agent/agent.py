@@ -136,8 +136,7 @@ from .utils import generate_local_instance_id, get_arch_name
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _sentinel = Sentinel.TOKEN
 

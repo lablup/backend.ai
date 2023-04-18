@@ -15,8 +15,7 @@ from ..exception import ExecutionError, VFolderCreationError
 from ..types import VFolderCreationOptions, VFolderUsage
 from ..vfs import BaseVolume, run
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")

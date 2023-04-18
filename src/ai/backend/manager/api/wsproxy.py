@@ -17,8 +17,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ServiceProxy(metaclass=ABCMeta):

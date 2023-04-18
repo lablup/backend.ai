@@ -50,8 +50,7 @@ from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 def netstat_ns_work(ns_path: Path):

@@ -17,8 +17,7 @@ from ..resources import (
     known_slot_types,
 )
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def detect_resources(

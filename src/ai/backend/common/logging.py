@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
 
 import coloredlogs
-import graypy
 import trafaret as t
 import yarl
 import zmq
@@ -84,12 +83,11 @@ logging_config_iv = t.Dict(
         ).allow_extra("*"),
         t.Key("graylog", default=None): t.Null | t.Dict(
             {
-                #  t.Key("endpoint"): tx.HostPortPair,
                 t.Key("host"): t.String,
                 t.Key("port"): t.ToInt[1024:65535],
                 t.Key("level", default="INFO"): loglevel_iv,
-                t.Key("validate", default=False): t.Bool,
-                t.Key("ca_certs", default=None): t.Null | t.String(allow_blank=True),
+                t.Key("ssl-verify", default=False): t.Bool,
+                t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
                 t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
                 t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
             }
@@ -205,12 +203,16 @@ class LogstashHandler(logging.Handler):
 
 
 def setup_graylog_handler(config: Mapping[str, Any]) -> logging.Handler:
+    try:
+        import graypy
+    except ImportError:
+        return None
     drv_config = config["graylog"]
     graylog_handler = graypy.GELFTLSHandler(
         host=drv_config["host"],
         port=drv_config["port"],
-        validate=drv_config["validate"],
-        ca_certs=drv_config["ca_certs"],
+        validate=drv_config["ssl-verify"],
+        ca_certs=drv_config["ca-certs"],
         keyfile=drv_config["keyfile"],
         certfile=drv_config["certfile"],
     )
@@ -392,7 +394,6 @@ def log_worker(
             logstash_handler.cleanup()
         if graylog_handler:
             graylog_handler.close()
-            # graylog_handler.cleanup()
         agg_sock.close()
         zctx.term()
 

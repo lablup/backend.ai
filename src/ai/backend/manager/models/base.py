@@ -75,8 +75,7 @@ if TYPE_CHECKING:
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 # The common shared metadata instance
 convention = {
     "ix": "ix_%(column_0_label)s",

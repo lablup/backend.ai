@@ -59,10 +59,10 @@ reserved-disk = "8G"
 host = "localhost"
 port = 12201
 
-# If True, validate the Graylog server’s certificate. In this case specifying ca_certs is also required.
-validate = false
+# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
+ssl-verify = false
 
-ca_certs = ""
+ca-certs = ""
 keyfile = ""
 certfile = ""
 

@@ -11,8 +11,7 @@ from ..models.acl import get_all_permissions
 from .auth import auth_required
 from .manager import ALL_ALLOWED, server_status_required
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @auth_required

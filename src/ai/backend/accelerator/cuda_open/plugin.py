@@ -67,8 +67,7 @@ __all__ = (
 
 PREFIX = "cuda"
 
-logger = logging.getLogger("ai.backend.accelerator.cuda")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
 
 
 class CUDADevice(AbstractComputeDevice):

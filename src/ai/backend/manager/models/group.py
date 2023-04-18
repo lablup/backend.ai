@@ -52,8 +52,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .scaling_group import ScalingGroup
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
     "groups",

@@ -14,8 +14,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class PersistentServiceContainer:

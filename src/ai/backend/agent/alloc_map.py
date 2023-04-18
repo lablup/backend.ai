@@ -37,8 +37,7 @@ from .exception import (
 if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 log_alloc_map: bool = False
 T = TypeVar("T")
 

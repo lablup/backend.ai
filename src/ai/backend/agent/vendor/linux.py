@@ -12,8 +12,7 @@ from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 _numa_supported = False
 
 if sys.platform == "linux":

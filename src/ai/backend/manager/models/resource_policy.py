@@ -31,8 +31,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 
-logger = logging.getLogger("ai.backend.manager.models")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
     "keypair_resource_policies",

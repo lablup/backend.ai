@@ -34,8 +34,7 @@ if TYPE_CHECKING:
 from ..defs import LockID
 from ..types import Sentinel
 
-logger = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
