@@ -10,12 +10,10 @@ import textwrap
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import text
 
-from ai.backend.manager.models import VFolderOwnershipType
-from ai.backend.manager.models.base import GUID, JSONB, ResourceSlotColumn, convention
+from ai.backend.manager.models.base import convention
+from ai.backend.manager.models.vfolder import VFolderOwnershipType, vfolders
 
 # revision identifiers, used by Alembic.
 revision = "57e4e9d12256"
@@ -28,6 +26,8 @@ metadata = sa.MetaData(naming_convention=convention)
 enum_name = VFolderOwnershipType.__name__.lower()
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
+
+PAGE_SIZE = 100
 
 
 class LegacyVFolderOwnershipType(str, enum.Enum):
@@ -81,9 +81,9 @@ def upgrade():
     # endpoints
     op.drop_constraint("fk_endpoints_project_groups", "endpoints", type_="foreignkey")
     # association_*_users
-    op.drop_constraint(
-        "uq_association_user_id_group_id", "association_groups_users", type_="unique"
-    )
+    # op.drop_constraint(
+    #     "uq_association_user_id_group_id", "association_groups_users", type_="unique"
+    # )
     op.drop_constraint(
         "fk_association_groups_users_group_id_groups",
         "association_groups_users",
@@ -197,14 +197,22 @@ def upgrade():
         conn.execute(text(f"ALTER TYPE {enum_name} ADD VALUE '{n}';"))
     conn.commit()
 
-    conn.execute(
-        text(
-            textwrap.dedent(
-                f"UPDATE vfolders SET ownership_type = '{VFolderOwnershipType.PROJECT.value}'"
-                f"WHERE ownership_type = '{LegacyVFolderOwnershipType.GROUP.value}';"
-            )
+    vfolder_cnt = conn.execute(
+        sa.select([sa.func.count()])
+        .select_from(vfolders)
+        .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
+    ).scalar()
+
+    for offset in range(0, vfolder_cnt, PAGE_SIZE):
+        update_query = (
+            sa.update(vfolders)
+            .values(ownership_type=VFolderOwnershipType.PROJECT)
+            .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
+            .order_by(vfolders.c.id)
+            .offset(offset)
+            .limit(PAGE_SIZE)
         )
-    )
+        conn.execute(update_query)
 
     for n in legacy_names:
         _delete_enum_value(conn, enum_name, n)
@@ -328,9 +336,9 @@ def downgrade():
         ondelete="RESTRICT",
     )
     # association_*_users
-    op.create_unique_constraint(
-        "uq_association_user_id_group_id", "association_groups_users", ["user_id", "group_id"]
-    )
+    # op.create_unique_constraint(
+    #     "uq_association_user_id_group_id", "association_groups_users", ["user_id", "group_id"]
+    # )
     op.create_foreign_key(
         op.f("fk_association_groups_users_group_id_groups"),
         "association_groups_users",
@@ -354,12 +362,22 @@ def downgrade():
         conn.execute(text(f"ALTER TYPE {enum_name} ADD VALUE '{n}';"))
     conn.commit()
 
-    conn.execute(
-        text(
-            f"UPDATE vfolders SET ownership_type = '{LegacyVFolderOwnershipType.GROUP.value}' WHERE"
-            f" ownership_type = '{VFolderOwnershipType.PROJECT.value}';"
+    vfolder_cnt = conn.execute(
+        sa.select([sa.func.count()])
+        .select_from(vfolders)
+        .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
+    ).scalar()
+
+    for offset in range(0, vfolder_cnt, PAGE_SIZE):
+        update_query = (
+            sa.update(vfolders)
+            .values(ownership_type=LegacyVFolderOwnershipType.GROUP)
+            .where(vfolders.c.ownership_type == VFolderOwnershipType.PROJECT)
+            .order_by(vfolders.c.id)
+            .offset(offset)
+            .limit(PAGE_SIZE)
         )
-    )
+        conn.execute(update_query)
 
     for n in new_names:
         _delete_enum_value(conn, enum_name, n)
