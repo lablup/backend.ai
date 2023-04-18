@@ -202,7 +202,7 @@ class LogstashHandler(logging.Handler):
             self._sock.sendall(json.dumps(log).encode("utf-8"))
 
 
-def setup_graylog_handler(config: Mapping[str, Any]) -> logging.Handler:
+def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler]:
     try:
         import graypy
     except ImportError:
