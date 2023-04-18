@@ -47,7 +47,7 @@ Here are the description of each field:
 
   * ``display_icon``: The device icon type displayed in the UI.
 
-  * ``dispaly_unit``: The resource slot unit displayed in the UI, alongside the amount numbers.
+  * ``display_unit``: The resource slot unit displayed in the UI, alongside the amount numbers.
 
   * ``human_readable_name``: The device name displayed in the UI.
 
