@@ -57,7 +57,6 @@ from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
-    AcceleratorNumberFormat,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -89,15 +88,26 @@ MIN_SMP_COUNT = 4  # when calculated SMP is lower than this, set this as the min
 
 PREFIX = "mock"
 
+_format_config_iv = t.Dict(
+    {
+        t.Key("human_readable_name"): t.String,
+        t.Key("description"): t.String,
+        t.Key("display_unit"): t.String,
+        t.Key("number_format"): t.Dict(
+            {
+                t.Key("binary"): t.Bool,
+                t.Key("round_length"): t.Int[0:],
+            }
+        ),
+        t.Key("display_icon"): t.String,
+    }
+).allow_extra("*")
+
+
 _mock_config_iv = t.Dict(
     {
         t.Key("slot_name"): t.String,
         t.Key("device_plugin_name"): t.String,
-        t.Key("human_readable_name"): t.String,
-        t.Key("description"): t.String,
-        t.Key("display_unit"): t.String,
-        t.Key("number_format"): t.String,
-        t.Key("display_icon"): t.String,
         t.Key("devices"): t.List(
             t.Dict(
                 {
@@ -110,6 +120,7 @@ _mock_config_iv = t.Dict(
             ).allow_extra("*")
         ),
         t.Key("attributes"): t.Dict({}).allow_extra("*"),
+        t.Key("formats"): t.Dict({}).allow_extra("*"),
     }
 ).allow_extra("*")
 
@@ -135,6 +146,8 @@ class MockPlugin(AbstractComputePlugin):
     key: DeviceName
     slot_types: List[Tuple[SlotName, SlotTypes]] = []
     exclusive_slot_types: Set[str] = set()
+
+    device_formats: Mapping[str, Mapping[str, Any]]
 
     enabled: bool = True
     device_mask: Sequence[DeviceId] = []
@@ -173,12 +186,16 @@ class MockPlugin(AbstractComputePlugin):
                 self.enabled = False
                 return
 
+        self.device_formats = {}
+        for format_name, format in self.mock_config["formats"].items():
+            self.device_formats[format_name] = _format_config_iv.check(format)
+
         if self._mode == AllocationModes.DISCRETE:
             self.slot_types.append((f"{self.key}.device", "count"))  # type: ignore  # (only updated here)
         elif self._mode == AllocationModes.FRACTIONAL:
             self.slot_types.append((f"{self.key}.shares", "count"))  # type: ignore  # (only updated here)
         else:
-            log.error("Not implemented allocation mode: {}", self._mode)
+            log.error("Unimplemented allocation mode: {}", self._mode)
             self.enabled = False
             return
 
@@ -787,24 +804,25 @@ class MockPlugin(AbstractComputePlugin):
         return []
 
     def get_metadata(self) -> AcceleratorMetadata:
-        number_format: AcceleratorNumberFormat
-        match self._mode:
-            case AllocationModes.DISCRETE:
-                display_unit = "GPU"
-                number_format = {"binary": False, "round_length": 0}
-                description = "CUDA-capable GPU"
-            case AllocationModes.FRACTIONAL:
-                display_unit = "fGPU"
-                exponent = self.quantum_size.as_tuple().exponent
-                assert isinstance(exponent, int)
-                number_format = {"binary": False, "round_length": abs(exponent)}
-                description = "CUDA-capable GPU (fractional)"
-        # TODO: get format info depending on the slot name
+        assert self._all_devices is not None
+        format_key = ""
+        if self._mode == AllocationModes.DISCRETE:
+            format_key = "device"
+        else:
+            format_key = "shares"
+        if self.key == DeviceName("cuda"):
+            for device in self._all_devices:
+                assert isinstance(device, CUDADevice)
+                if device.is_mig_device:
+                    format_key = "*-mig"
+                    break
+
+        device_format = self.device_formats[format_key]
         return {
-            "slot_name": self.mock_config["slot_name"],
-            "human_readable_name": self.mock_config["human_readable_name"],
-            "description": description,
-            "display_unit": display_unit,
-            "number_format": number_format,
-            "display_icon": self.mock_config["display_icon"],
+            "slot_name": f"{self.mock_config['slot_name']}.{format_key}",
+            "human_readable_name": device_format["human_readable_name"],
+            "description": device_format["description"],
+            "display_unit": device_format["display_unit"],
+            "number_format": device_format["number_format"],
+            "display_icon": device_format["display_icon"],
         }
