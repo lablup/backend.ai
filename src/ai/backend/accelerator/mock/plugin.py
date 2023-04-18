@@ -195,7 +195,7 @@ class MockPlugin(AbstractComputePlugin):
         elif self._mode == AllocationModes.FRACTIONAL:
             self.slot_types.append((f"{self.key}.shares", "count"))  # type: ignore  # (only updated here)
         else:
-            log.error("Unimplemented allocation mode: {}", self._mode)
+            log.error("Invalid allocation mode: {}", self._mode)
             self.enabled = False
             return
 
