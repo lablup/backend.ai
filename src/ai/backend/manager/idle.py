@@ -745,6 +745,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("cuda_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("cuda_mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
+                    t.Key("atom_mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                 },
             ),
         },
@@ -759,6 +760,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         "cpu": {"cpu_util"},
         "mem": {"mem"},
         "cuda": {"cuda_util", "cuda_mem"},
+        "atom": {"atom_mem"},
     }
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
