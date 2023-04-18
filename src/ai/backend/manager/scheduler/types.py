@@ -44,8 +44,7 @@ from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
-logger = logging.getLogger("ai.backend.manager.scheduler")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
 def merge_resource(

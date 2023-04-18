@@ -10,8 +10,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from . import AbstractStorage, Session, extra_config_headers
 
-logger = logging.getLogger("ai.backend.web.server")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
 try:
     from redis import VERSION

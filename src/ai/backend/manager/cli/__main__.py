@@ -22,8 +22,7 @@ from ai.backend.common.validators import TimeDuration
 from ..config import load as load_config
 from .context import CLIContext, init_logger, redis_ctx
 
-logger = logging.getLogger("ai.backend.manager.cli")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})

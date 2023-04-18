@@ -14,8 +14,7 @@ from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
 from .types import AbstractScheduler, KernelInfo
 
-logger = logging.getLogger("ai.backend.manager.scheduler")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
 class DRFScheduler(AbstractScheduler):

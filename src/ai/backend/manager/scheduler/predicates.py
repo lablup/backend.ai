@@ -21,8 +21,7 @@ from ..models import (
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
-logger = logging.getLogger("ai.backend.manager.scheduler")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 _check_keypair_concurrency_script = """
 local key = KEYS[1]

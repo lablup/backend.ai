@@ -17,8 +17,7 @@ test_log_config = {
 
 test_log_path = Path(f"/tmp/bai-testing-agent-logger-{os.getpid()}.sock")
 
-logger = logging.getLogger("ai.backend.common.testing")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.common.testing"))
 
 
 def get_logger_thread():

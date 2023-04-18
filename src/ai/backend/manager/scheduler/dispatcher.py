@@ -80,8 +80,7 @@ __all__ = (
     "SchedulerDispatcher",
 )
 
-logger = logging.getLogger("ai.backend.manager.scheduler")
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")

@@ -101,8 +101,7 @@ __all__ = (
 )
 
 
-logger = logging.getLogger("ai.backend.manager.models.kernels")  # type: ignore[name-defined]
-log = BraceStyleAdapter(logger)
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
 class KernelStatus(enum.Enum):
