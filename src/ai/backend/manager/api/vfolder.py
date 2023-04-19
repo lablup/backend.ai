@@ -2061,7 +2061,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < len(params["emails"]):
             users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
-                f"Some user does not belong to folder's group: {','.join(users_not_in_vfolder_group)}",
+                f"Some users do not belong to folder's group: {','.join(users_not_in_vfolder_group)}",
                 object_name="user",
             )
 
