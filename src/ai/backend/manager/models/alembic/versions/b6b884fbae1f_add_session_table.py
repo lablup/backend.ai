@@ -14,6 +14,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import registry
 
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 from ai.backend.manager.models.session import SessionDependencyRow
@@ -67,7 +68,14 @@ def upgrade() -> None:
             server_default="SINGLE_NODE",
         ),
         sa.Column("cluster_size", sa.Integer, nullable=False, default=1),
+        sa.Column("cluster_idx", sa.Integer, nullable=False, default=0),
+        sa.Column("local_rank", sa.Integer, nullable=False, default=0),
+        sa.Column(
+            "cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname
+        ),
         # Resource ownership
+        sa.Column("agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True),
+        sa.Column("agent_addr", sa.String(length=128), nullable=True),
         sa.Column("scaling_group", sa.ForeignKey("scaling_groups.name"), nullable=True),
         sa.Column(
             "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
@@ -76,12 +84,29 @@ def upgrade() -> None:
         sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False),
         sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key")),
         sa.Column("image", sa.String(length=512)),
+        sa.Column("architecture", sa.String(length=32), default="x86_64"),
+        sa.Column("registry", sa.String(length=512)),
         sa.Column("tag", sa.String(length=64), nullable=True),
         # Resource occupation
+        sa.Column("container_id", sa.String(length=64)),
         sa.Column("occupied_slots", pgsql.JSONB(), nullable=False),
+        sa.Column("occupied_shares", pgsql.JSONB(), nullable=False, default={}),  # legacy
+        sa.Column("environ", sa.ARRAY(sa.String), nullable=True),
+        sa.Column("mounts", sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03
+        sa.Column("mount_map", pgsql.JSONB(), nullable=True, default={}),  # legacy since 22.03
         sa.Column("vfolder_mounts", pgsql.JSONB(), nullable=True),
+        sa.Column("attached_devices", pgsql.JSONB(), nullable=True, default={}),
         sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={}),
         sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True),
+        # Port mappings
+        # If kernel_host is NULL, it is assumed to be same to the agent host or IP.
+        sa.Column("kernel_host", sa.String(length=128), nullable=True),
+        sa.Column("repl_in_port", sa.Integer(), nullable=False),
+        sa.Column("repl_out_port", sa.Integer(), nullable=False),
+        sa.Column("stdin_port", sa.Integer(), nullable=False),  # legacy for stream_pty
+        sa.Column("stdout_port", sa.Integer(), nullable=False),  # legacy for stream_pty
+        sa.Column("service_ports", pgsql.JSONB(), nullable=True),
+        sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True),
         sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
         # Lifecycle
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -94,7 +119,7 @@ def upgrade() -> None:
             server_default="PENDING",
             nullable=False,
         ),
-        # sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True),
         sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
         sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
         sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null()),
@@ -107,6 +132,8 @@ def upgrade() -> None:
             server_default="UNDEFINED",
             nullable=False,
         ),
+        sa.Column("internal_data", pgsql.JSONB(), nullable=True),
+        sa.Column("container_log", sa.LargeBinary(), nullable=True),
         # Resource metrics measured upon termination
         sa.Column("num_queries", sa.BigInteger(), default=0),
         sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null()),
@@ -252,6 +279,7 @@ def upgrade() -> None:
 
     def migrate_kernel_to_session(kernel_query: sa.sql.Select, is_single_kernel: bool) -> None:
         session_map: dict[UUID, dict[str, Any]] = {}
+        main_kernel_rows: dict[UUID, dict[str, Any]] = {}
         single_kernel_ids: dict[UUID, UUID] = {}
         kernel_rows: Sequence[Mapping[str, Any]] = connection.execute(kernel_query).fetchall()
 
@@ -299,6 +327,15 @@ def upgrade() -> None:
                 single_kernel_ids[row["id"]] = sess_id
         else:
             for row in kernel_rows:
+                # Since main kernel of multi-kernel session has the same id with session_id
+                # insert new kernels to kernels have distinguished id with sessions.
+                if row["cluster_role"] == "main" or row["cluster_role"] == DEFAULT_ROLE:
+                    new_kern_id = uuid4()
+                    main_kernel_rows[row["id"]] = {
+                        **row,
+                        "id": new_kern_id,
+                    }
+
                 sess_id = row["session_id"]
                 if sess_id not in session_map:
                     session_map[sess_id] = _map_session(sess_id, row)
@@ -339,7 +376,7 @@ def upgrade() -> None:
                         pass
 
                     if sess["status_info"] != row["status_info"]:
-                        if row["cluster_role"] == "main":
+                        if row["cluster_role"] == "main" or row["cluster_role"] == DEFAULT_ROLE:
                             sess["status_info"] = row["status_info"]
 
         if session_map:
@@ -391,6 +428,15 @@ def upgrade() -> None:
             if sess_update_params:
                 connection.execute(sess_query, sess_update_params)
 
+        # Insert and delete multi-kernel session's main kernel
+        if main_kernel_rows:
+            connection.execute(sa.insert(kernels), list(main_kernel_rows.values()))
+            delete_query = sa.delete(kernels).where(kernels.c.id.in_(list(main_kernel_rows.keys())))
+            connection.execute(delete_query)
+
+    # Drop the unique constraint before migration
+    op.drop_index("ix_kernels_unique_sess_token", table_name="kernels")
+
     # Multi-kernel session migration
     session_cnt = connection.execute(
         sa.select([sa.func.count(sa.distinct(kernels.c.session_id))]).where(
@@ -422,6 +468,17 @@ def upgrade() -> None:
             .limit(PAGE_SIZE)
         )
         migrate_kernel_to_session(query, is_single_kernel=True)
+
+    # Restore the dropped constraint.
+    op.create_index(
+        "ix_kernels_unique_sess_token",
+        "kernels",
+        ["access_key", "session_name"],
+        unique=True,
+        postgresql_where=sa.text(
+            "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
+        ),
+    )
 
     op.create_foreign_key(
         op.f("fk_session_dependencies_session_id_sessions"),
