@@ -398,14 +398,14 @@ def upgrade() -> None:
         )
     ).scalar()
     for offset in range(0, session_cnt, PAGE_SIZE):
-        _query = (
+        session_id_query = (
             sa.select([sa.distinct(kernels.c.session_id)])
             .where(kernels.c.cluster_size > 1)
             .order_by(kernels.c.session_id)
             .offset(offset)
             .limit(PAGE_SIZE)
         )
-        session_ids = connection.execute(_query).scalars().all()
+        session_ids = connection.execute(session_id_query).scalars().all()
         query = sa.select([kernels]).where(kernels.c.session_id.in_(session_ids))
         migrate_kernel_to_session(query, is_single_kernel=False)
 
@@ -414,7 +414,13 @@ def upgrade() -> None:
         sa.select([sa.func.count()]).select_from(kernels).where(kernels.c.cluster_size == 1)
     ).scalar()
     for offset in range(0, kernel_cnt, PAGE_SIZE):
-        query = sa.select([kernels]).order_by(kernels.c.id).offset(offset).limit(PAGE_SIZE)
+        query = (
+            sa.select([kernels])
+            .where(kernels.c.cluster_size == 1)
+            .order_by(kernels.c.id)
+            .offset(offset)
+            .limit(PAGE_SIZE)
+        )
         migrate_kernel_to_session(query, is_single_kernel=True)
 
     op.create_foreign_key(
