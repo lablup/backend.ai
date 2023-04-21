@@ -327,6 +327,10 @@ class VFolder(BaseFunction):
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         for file_path in file_paths:
+            if file_path.is_dir():
+                raise BackendClientError(
+                    f"Failed to upload {file_path}. Use recursive option to upload directories."
+                )
             file_size = Path(file_path).stat().st_size
             rqst = Request("POST", "/folders/{}/request-upload".format(self.name))
             rqst.set_json(
