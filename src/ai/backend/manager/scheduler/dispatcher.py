@@ -42,6 +42,7 @@ from ..exceptions import convert_to_status_data
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentStatus,
+    KernelRole,
     KernelStatus,
     agents,
     kernels,
@@ -357,26 +358,32 @@ class SchedulerDispatcher(aobject):
             async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
                 check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
                 async with self.db.begin() as kernel_db_conn:
-                    predicates: Sequence[Tuple[str, Awaitable[PredicateResult]]] = [
+                    predicates: list[Tuple[str, Awaitable[PredicateResult]]] = [
                         (
                             "reserved_time",
                             check_reserved_batch_session(kernel_db_conn, sched_ctx, sess_ctx),
                         ),
-                        ("concurrency", check_concurrency(kernel_db_conn, sched_ctx, sess_ctx)),
-                        ("dependencies", check_dependencies(kernel_db_conn, sched_ctx, sess_ctx)),
-                        (
-                            "keypair_resource_limit",
-                            check_keypair_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
-                        ),
-                        (
-                            "user_group_resource_limit",
-                            check_group_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
-                        ),
-                        (
-                            "domain_resource_limit",
-                            check_domain_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
-                        ),
                     ]
+                    if any([kernel.role != KernelRole.SYSTEM for kernel in sess_ctx.kernels]):
+                        predicates += [
+                            ("concurrency", check_concurrency(kernel_db_conn, sched_ctx, sess_ctx)),
+                            (
+                                "dependencies",
+                                check_dependencies(kernel_db_conn, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "keypair_resource_limit",
+                                check_keypair_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "user_group_resource_limit",
+                                check_group_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "domain_resource_limit",
+                                check_domain_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
+                            ),
+                        ]
                     for predicate_name, check_coro in predicates:
                         try:
                             check_results.append((predicate_name, await check_coro))

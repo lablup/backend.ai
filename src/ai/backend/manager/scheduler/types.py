@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models import kernels, keypairs
+from ..models import KernelRole, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
@@ -325,6 +325,7 @@ class KernelInfo:
     bootstrap_script: Optional[str]
     startup_command: Optional[str]
     created_at: datetime
+    role: KernelRole
 
     def __str__(self):
         return f"{self.kernel_id}#{self.cluster_role}{self.cluster_idx}"
@@ -349,6 +350,7 @@ class KernelInfo:
             kernels.c.bootstrap_script,
             kernels.c.startup_command,
             kernels.c.created_at,
+            kernels.c.role,
         }
 
     @classmethod
@@ -369,6 +371,7 @@ class KernelInfo:
             bootstrap_script=row["bootstrap_script"],
             startup_command=row["startup_command"],
             created_at=row["created_at"],
+            role=row["role"],
         )
 
 
