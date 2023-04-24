@@ -1081,7 +1081,6 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
-    public_host = graphene.String()
 
     # statistics
     num_queries = BigInt()
@@ -1233,12 +1232,6 @@ class ComputeSession(graphene.ObjectType):
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
-
-    async def resolve_public_host(self, info: graphene.ResolveInfo) -> str:
-        graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_agent_public_host(
-            self.main_kernel.agent, self.main_kernel.agent_addr
-        )
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),

@@ -129,7 +129,7 @@ from ..models import (
 from ..models.session import SessionDependencyRow
 from ..models.utils import execute_with_retry
 from ..types import UserScope
-from .auth import auth_required
+from .auth import admin_required, auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
@@ -2038,6 +2038,43 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 
 
 @server_status_required(READ_ALLOWED)
+@admin_required
+@check_api_params(
+    t.Dict(
+        {
+            tx.AliasedKey(["session_id", "sessionId"]): tx.UUID,
+        }
+    ),
+)
+async def get_session_host_info(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_id = params["session_id"]
+    _, owner_access_key = await get_access_key_scopes(request)
+
+    async with root_ctx.db.begin_session() as db_sess:
+        sess = await SessionRow.get_session_with_main_kernel(
+            session_id, owner_access_key, db_session=db_sess
+        )
+    kernel_role = sess.main_kernel.role
+    if kernel_role == KernelRole.SYSTEM:
+        public_host = await root_ctx.registry.get_agent_public_host(
+            sess.main_kernel.agent, sess.main_kernel.agent_addr
+        )
+        sshd_ports: list[str] = []
+        for sport in sess.main_kernel.service_ports:
+            if sport["name"] == "sshd":
+                sshd_ports = sport["host_ports"]
+                break
+    return web.json_response(
+        {
+            "kernelRole": kernel_role,
+            "publicHost": public_host,
+            "sshdPorts": sshd_ports,
+        }
+    )
+
+
+@server_status_required(READ_ALLOWED)
 @auth_required
 async def get_info(request: web.Request) -> web.Response:
     # NOTE: This API should be replaced with GraphQL version.
@@ -2060,14 +2097,6 @@ async def get_info(request: web.Request) -> web.Response:
         resp["architecture"] = sess.main_kernel.architecture
         resp["registry"] = sess.main_kernel.registry
         resp["tag"] = sess.tag
-
-        kernel_role = sess.main_kernel.role
-        resp["sessionRole"] = kernel_role
-        if kernel_role == KernelRole.SYSTEM:
-            resp["publicHost"] = await root_ctx.registry.get_agent_public_host(
-                sess.main_kernel.agent, sess.main_kernel.agent_addr
-            )
-            resp["servicePorts"] = sess.main_kernel.service_ports
 
         # Resource occupation
         resp["containerId"] = str(sess.main_kernel.container_id)
@@ -2776,6 +2805,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-from-template", create_from_template))
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
+    cors.add(app.router.add_route("GET", "/_/host", get_session_host_info))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
