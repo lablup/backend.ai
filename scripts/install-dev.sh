@@ -389,16 +389,6 @@ set_brew_python_build_flags() {
 }
 
 install_python() {
-  if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-    local pants_python_version=$(pyenv latest -q '3.9')  # get the latest 3.9 from all installed versions
-    if [ -z "$pants_python_version" ]; then
-      pants_python_version=$(pyenv latest -q -k '3.9')  # get the latest 3.9 from all installable versions
-      show_info "Installing Python ${pants_python_version} for Pants to run ..."
-      pyenv install "${pants_python_version}"
-    else
-      echo "✓ Python ${pants_python_version} as the Pants runtime is already installed."
-    fi
-  fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
@@ -473,25 +463,21 @@ check_python() {
   pyenv shell --unset
 }
 
-search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv latest -q '3.9')
-  if [ -z "$_PYENV_PYVER" ]; then
-    >&2 echo "No Python 3.9 available via pyenv!"
-    >&2 echo "Please install Python 3.9 using pyenv and try again."
-    exit 1
-  else
-    >&2 echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
-  fi
-  echo "$_PYENV_PYVER"
-}
-
 bootstrap_pants() {
   mkdir -p .tmp
   set +e
-  local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-  echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  PANTS="./pants"
-  ./pants version
+  case $DISTRO in
+  Darwin)
+    brew install pantsbuild/tap/pants
+    ;;
+  *)
+    wget -O ./pants "https://github.com/pantsbuild/scie-pants/releases/download/v0.5.4/scie-pants-linux-$(uname -m)"
+    $sudo mv ./pants /usr/local/bin/pants
+    $sudo chmod +x /usr/local/bin/pants
+    ;;
+  esac
+  PANTS="pants"
+  $PANTS version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
     show_error "Cannot proceed the installation because Pants is not available for your platform!"
