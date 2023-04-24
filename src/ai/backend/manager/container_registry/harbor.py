@@ -125,17 +125,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
         project, _, repository = image.partition("/")
         project, repository = [urllib.parse.urlencode({"": x})[1:] for x in [project, repository]]
-        artifact_url = (
-            api_url / "projects" / project / "repositories" / repository / "artifacts"
-        ).with_query(
-            {"page_size": "30"},
-        )
         async with aiotools.TaskGroup() as tg:
+            artifact_url: Optional[yarl.URL] = (
+                api_url / "projects" / project / "repositories" / repository / "artifacts"
+            ).with_query(
+                {"page_size": "30"},
+            )
             while artifact_url is not None:
-                async with sess.get(
-                    api_url / "projects" / project / "repositories" / repository / "artifacts",
-                    **rqst_args,
-                ) as resp:
+                async with sess.get(artifact_url, allow_redirects=False, **rqst_args) as resp:
                     resp.raise_for_status()
                     body = await resp.json()
                     for image_info in body:
@@ -162,6 +159,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         finally:
                             if skip_reason:
                                 log.warn("Skipped image - {}:{} ({})", image, tag, skip_reason)
+                    artifact_url = None
                     next_page_link = resp.links.get("next")
                     if next_page_link:
                         next_page_url = cast(yarl.URL, next_page_link["url"])
