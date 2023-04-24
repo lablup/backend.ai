@@ -474,9 +474,9 @@ bootstrap_pants() {
       brew install pantsbuild/tap/pants
       ;;
     *)
-      wget -O ./pants "https://github.com/pantsbuild/scie-pants/releases/download/v0.5.4/scie-pants-linux-$(uname -m)"
-      $sudo mv ./pants /usr/local/bin/pants
-      $sudo chmod +x /usr/local/bin/pants
+      curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
+      bash /tmp/get-pants.sh
+      $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
       ;;
     esac
   fi
