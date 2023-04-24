@@ -73,11 +73,11 @@ def list(ctx: CLIContext) -> None:
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
 @click.option(
     "-p",
-    "--public",
+    "--private",
     is_flag=True,
     help=(
-        "New scaling group will be public. "
-        "Only public scaling group which is public can be queried when users create new sessions."
+        "New scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
     ),
 )
 @click.option("--driver", type=str, default="static", help="Set driver.")
@@ -99,7 +99,7 @@ def add(
     name,
     description,
     inactive,
-    public,
+    private,
     driver,
     driver_opts,
     scheduler,
@@ -117,7 +117,7 @@ def add(
                 name,
                 description=description,
                 is_active=not inactive,
-                is_public=public,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
@@ -149,7 +149,15 @@ def add(
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
-@click.option("-p", "--public", is_flag=True, help="The scaling group will be public.")
+@click.option(
+    "-p",
+    "--private",
+    is_flag=True,
+    help=(
+        "The scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
+    ),
+)
 @click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
     "--driver-opts", type=JSONParamType(), default=None, help="Set driver options as a JSON string."
@@ -169,7 +177,7 @@ def update(
     name,
     description,
     inactive,
-    public,
+    private,
     driver,
     driver_opts,
     scheduler,
@@ -187,6 +195,7 @@ def update(
                 name,
                 description=description,
                 is_active=not inactive,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
