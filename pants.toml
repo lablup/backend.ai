@@ -18,7 +18,8 @@ pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
-    "*.log"
+    "*.log",
+    "tools/pants-plugins",
 ]
 
 [anonymous-telemetry]
@@ -44,7 +45,6 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.9"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
