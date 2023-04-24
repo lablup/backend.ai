@@ -2790,6 +2790,18 @@ class AgentRegistry:
         ) as rpc:
             return await rpc.call.get_local_config()
 
+    async def get_agent_public_host(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+    ) -> str:
+        async with RPCContext(
+            agent_id,
+            agent_addr,
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_public_host()
+
     async def get_abusing_report(
         self,
         kernel_id: KernelId,

@@ -2060,6 +2060,13 @@ async def get_info(request: web.Request) -> web.Response:
         resp["registry"] = sess.main_kernel.registry
         resp["tag"] = sess.tag
 
+        session_type: SessionTypes = sess.session_type
+        resp["sessionType"] = session_type.name
+        if session_type == SessionTypes.SYSTEM:
+            resp["publicHost"] = await root_ctx.registry.get_agent_public_host(
+                sess.main_kernel.agent, sess.main_kernel.agent_addr
+            )
+
         # Resource occupation
         resp["containerId"] = str(sess.main_kernel.container_id)
         resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy

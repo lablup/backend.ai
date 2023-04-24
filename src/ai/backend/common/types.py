@@ -274,6 +274,7 @@ class SessionTypes(str, enum.Enum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
+    SYSTEM = "system"
 
 
 class SessionResult(str, enum.Enum):
