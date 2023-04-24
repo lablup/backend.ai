@@ -1496,7 +1496,12 @@ class AgentRegistry:
                             kernels.c.occupied_slots,
                         ]
                     )
-                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    .where(
+                        (
+                            kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)
+                            & kernels.c.role.not_in(PRIVATE_KERNEL_ROLES)
+                        )
+                    )
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in await conn.stream(query):
@@ -1779,7 +1784,10 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
+                            if (
+                                kernel.cluster_role == DEFAULT_ROLE
+                                and kernel.role not in PRIVATE_KERNEL_ROLES
+                            ):
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
                                 await redis_helper.execute(
@@ -1820,7 +1828,10 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
+                            if (
+                                kernel.cluster_role == DEFAULT_ROLE
+                                and kernel.role not in PRIVATE_KERNEL_ROLES
+                            ):
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
                                 await redis_helper.execute(

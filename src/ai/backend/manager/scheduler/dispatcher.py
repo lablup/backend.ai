@@ -355,11 +355,11 @@ class SchedulerDispatcher(aobject):
                             "reserved_time",
                             check_reserved_batch_session(db_sess, sched_ctx, sess_ctx),
                         ),
-                        ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
                         ("dependencies", check_dependencies(db_sess, sched_ctx, sess_ctx)),
                     ]
                     if any([kernel.role != KernelRole.SYSTEM for kernel in sess_ctx.kernels]):
                         predicates += [
+                            ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
                             (
                                 "keypair_resource_limit",
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
