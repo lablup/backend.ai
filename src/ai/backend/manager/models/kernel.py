@@ -1385,7 +1385,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.status.not_in(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
             ),
         )
         concurrency_used = result.scalar()
