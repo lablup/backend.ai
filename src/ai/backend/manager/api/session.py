@@ -2046,7 +2046,7 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
         }
     ),
 )
-async def get_session_host_info(request: web.Request, params: Any) -> web.Response:
+async def get_direct_access_host(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_id = params["session_id"]
     _, owner_access_key = await get_access_key_scopes(request)
@@ -2805,7 +2805,6 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-from-template", create_from_template))
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
-    cors.add(app.router.add_route("GET", "/_/host", get_session_host_info))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
@@ -2814,6 +2813,9 @@ def create_app(
     task_log_resource = cors.add(app.router.add_resource(r"/_/logs"))
     cors.add(task_log_resource.add_route("HEAD", get_task_logs))
     cors.add(task_log_resource.add_route("GET", get_task_logs))
+    cors.add(
+        app.router.add_route("GET", "/{session_id}/direct-access-host", get_direct_access_host)
+    )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
     cors.add(app.router.add_route("POST", "/{session_name}/interrupt", interrupt))
