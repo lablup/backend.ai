@@ -62,7 +62,6 @@ class ScalingGroupOpts(JSONSerializableMixin):
             SessionTypes.INTERACTIVE,
             SessionTypes.BATCH,
             SessionTypes.INFERENCE,
-            SessionTypes.SYSTEM,
         ],
     )
     pending_timeout: timedelta = timedelta(seconds=0)

@@ -103,6 +103,7 @@ from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
     AgentStatus,
+    KernelRole,
     KernelRow,
     KernelStatus,
     RoutingRow,
@@ -792,8 +793,6 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         param_from_template["session_type"] = SessionTypes.BATCH
     elif template["spec"]["session_type"] == "inference":
         param_from_template["session_type"] = SessionTypes.INFERENCE
-    elif template["spec"]["session_type"] == "system":
-        param_from_template["session_type"] = SessionTypes.SYSTEM
 
     # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
     # Check https://github.com/python/mypy/issues/7316
@@ -1062,8 +1061,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             kernel_config["sess_type"] = SessionTypes.BATCH
         elif template["spec"]["sess_type"] == "inference":
             kernel_config["sess_type"] = SessionTypes.INFERENCE
-        elif template["spec"]["sess_type"] == "system":
-            kernel_config["sess_type"] = SessionTypes.SYSTEM
 
         if tag := template["metadata"].get("tag", None):
             kernel_config["tag"] = tag
@@ -2064,12 +2061,13 @@ async def get_info(request: web.Request) -> web.Response:
         resp["registry"] = sess.main_kernel.registry
         resp["tag"] = sess.tag
 
-        session_type: SessionTypes = sess.session_type
-        resp["sessionType"] = session_type.name
-        if session_type == SessionTypes.SYSTEM:
+        kernel_role = sess.main_kernel.role
+        resp["sessionRole"] = kernel_role
+        if kernel_role == KernelRole.SYSTEM:
             resp["publicHost"] = await root_ctx.registry.get_agent_public_host(
                 sess.main_kernel.agent, sess.main_kernel.agent_addr
             )
+            resp["servicePorts"] = sess.main_kernel.service_ports
 
         # Resource occupation
         resp["containerId"] = str(sess.main_kernel.container_id)
