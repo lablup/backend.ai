@@ -57,8 +57,8 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
     log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
     async with root_ctx.db.begin() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name, access_key)
-        if not sgroups["is_public"] and not is_admin:
-            raise ObjectNotFound(object_name="scaling group")
+        if not is_admin:
+            sgroups = [sgroup for sgroup in sgroups if sgroup["is_public"]]
         return web.json_response(
             {
                 "scaling_groups": [{"name": sgroup["name"]} for sgroup in sgroups],
