@@ -105,6 +105,7 @@ from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KERNEL_STATUS_TRANSITION_MAP,
+    PRIVATE_KERNEL_ROLES,
     SESSION_STATUS_TRANSITION_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentRow,
@@ -693,6 +694,7 @@ class AgentRegistry:
                     # "image_id": image_row.id,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
+                    "role": image_row.type,
                     "startup_command": kernel.get("startup_command"),
                     "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
@@ -1339,7 +1341,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1361,7 +1364,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.domain_name == domain_name)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1384,7 +1388,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.group_id == group_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
