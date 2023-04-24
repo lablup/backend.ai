@@ -466,24 +466,27 @@ check_python() {
 bootstrap_pants() {
   mkdir -p .tmp
   set +e
-  case $DISTRO in
-  Darwin)
-    brew install pantsbuild/tap/pants
-    ;;
-  *)
-    wget -O ./pants "https://github.com/pantsbuild/scie-pants/releases/download/v0.5.4/scie-pants-linux-$(uname -m)"
-    $sudo mv ./pants /usr/local/bin/pants
-    $sudo chmod +x /usr/local/bin/pants
-    ;;
-  esac
-  PANTS="pants"
-  $PANTS version
+  if command -v pants &> /dev/null ; then
+    echo "Pants system command is already installed."
+  else
+    case $DISTRO in
+    Darwin)
+      brew install pantsbuild/tap/pants
+      ;;
+    *)
+      wget -O ./pants "https://github.com/pantsbuild/scie-pants/releases/download/v0.5.4/scie-pants-linux-$(uname -m)"
+      $sudo mv ./pants /usr/local/bin/pants
+      $sudo chmod +x /usr/local/bin/pants
+      ;;
+    esac
+  fi
+  pants version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
     show_error "Cannot proceed the installation because Pants is not available for your platform!"
     exit 1
   fi
-  set +e
+  set -e
 }
 
 install_editable_webui() {
@@ -631,7 +634,7 @@ setup_environment() {
   show_info "Using the current working-copy directory as the installation path..."
 
   show_info "Creating the unified virtualenv for IDEs..."
-  $PANTS export \
+  pants export \
     --resolve=python-default \
     --resolve=python-kernel \
     --resolve=pants-plugins \
@@ -899,9 +902,6 @@ configure_backendai() {
   echo "> ${WHITE}cat env-local-user-session.sh${NC}"
   show_note "To apply the client config, source one of the configs like:"
   echo "> ${WHITE}source env-local-user-session.sh${NC}"
-  echo " "
-  show_note "Your pants invocation command:"
-  echo "> ${WHITE}${PANTS}${NC}"
   echo " "
   show_important_note "You should change your default admin API keypairs for production environment!"
   show_note "How to run Backend.AI manager:"
