@@ -42,4 +42,5 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_column("kernels")
+    op.drop_column("kernels", "role")
+    kernelrole.drop(op.get_bind())
