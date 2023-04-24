@@ -1,16 +1,17 @@
 """add_is_public_flag_to_scaling_group
 
-Revision ID: e1ec266fbc0f
-Revises: 10c58e701d87
-Create Date: 2023-04-24 11:19:26.604805
+Revision ID: fe59ec332c07
+Revises: bedd92de93af
+Create Date: 2023-04-24 22:35:05.793777
 
 """
-import sqlalchemy as sa
 from alembic import op
+import sqlalchemy as sa
+
 
 # revision identifiers, used by Alembic.
-revision = "e1ec266fbc0f"
-down_revision = "10c58e701d87"
+revision = 'fe59ec332c07'
+down_revision = 'bedd92de93af'
 branch_labels = None
 depends_on = None
 
