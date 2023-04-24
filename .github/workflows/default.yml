@@ -34,16 +34,15 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      # See: github.com/pantsbuild/actions/tree/main/init-pants/
+      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check '::'
+      run: pants tailor --check update-build-files --check '::'
     - name: Check forbidden cross imports
       run: ./scripts/check-cross-imports.sh
     - name: Lint
@@ -59,7 +58,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
+        pants lint --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -91,12 +90,9 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
@@ -112,7 +108,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
+        pants check --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -154,12 +150,9 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -170,7 +163,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
+        pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -215,12 +208,9 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Install local dependencies for packaging
@@ -232,11 +222,11 @@ jobs:
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
         # Build non-platform-specific wheels
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
         # Build x86_64 wheels
         MANYLINUX_PTAG=manylinux2014_x86_64
         MACOS_PTAG=macosx_11_0_x86_64
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
@@ -244,7 +234,7 @@ jobs:
         # Build arm64 wheels
         MANYLINUX_PTAG=manylinux2014_aarch64
         MACOS_PTAG=macosx_11_0_arm64
-        ./pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
@@ -254,7 +244,7 @@ jobs:
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `./pants publish ::` because we manually rename the
+      # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
