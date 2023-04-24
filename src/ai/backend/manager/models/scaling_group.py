@@ -95,7 +95,9 @@ scaling_groups = sa.Table(
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, index=True, default=True),
-    sa.Column("is_public", sa.Boolean, index=True, default=True, server_default=true()),
+    sa.Column(
+        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    ),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
     sa.Column("driver", sa.String(length=64), nullable=False),
