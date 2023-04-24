@@ -792,6 +792,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         param_from_template["session_type"] = SessionTypes.BATCH
     elif template["spec"]["session_type"] == "inference":
         param_from_template["session_type"] = SessionTypes.INFERENCE
+    elif template["spec"]["session_type"] == "system":
+        param_from_template["session_type"] = SessionTypes.SYSTEM
 
     # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
     # Check https://github.com/python/mypy/issues/7316
@@ -1060,6 +1062,8 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             kernel_config["sess_type"] = SessionTypes.BATCH
         elif template["spec"]["sess_type"] == "inference":
             kernel_config["sess_type"] = SessionTypes.INFERENCE
+        elif template["spec"]["sess_type"] == "system":
+            kernel_config["sess_type"] = SessionTypes.SYSTEM
 
         if tag := template["metadata"].get("tag", None):
             kernel_config["tag"] = tag
