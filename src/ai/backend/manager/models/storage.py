@@ -124,10 +124,10 @@ class StorageSessionManager:
         _ctx_volumes_cache.set(results)
         return results
 
-    async def get_sftp_scaling_groups(self, volume_name: str) -> List[str]:
-        if volume_name not in self._proxies:
-            raise IndexError(f"volume {volume_name} does not exist")
-        return self._proxies[volume_name].sftp_scaling_groups
+    async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
+        if proxy_name not in self._proxies:
+            raise IndexError(f"proxy {proxy_name} does not exist")
+        return self._proxies[proxy_name].sftp_scaling_groups
 
     async def get_mount_path(
         self,
