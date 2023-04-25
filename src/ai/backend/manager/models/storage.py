@@ -127,7 +127,7 @@ class StorageSessionManager:
     async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
         if proxy_name not in self._proxies:
             raise IndexError(f"proxy {proxy_name} does not exist")
-        return self._proxies[proxy_name].sftp_scaling_groups
+        return self._proxies[proxy_name].sftp_scaling_groups or []
 
     async def get_mount_path(
         self,

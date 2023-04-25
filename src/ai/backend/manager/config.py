@@ -414,7 +414,9 @@ volume_config_iv = t.Dict(
                     t.Key("manager_api"): t.String,
                     t.Key("secret"): t.String,
                     t.Key("ssl_verify"): t.ToBool,
-                    t.Key("sftp_scaling_groups", default=""): tx.StringList(delimiter=","),
+                    t.Key("sftp_scaling_groups", default=None): t.Null | tx.StringList(
+                        delimiter=","
+                    ),
                 }
             ),
         ),
