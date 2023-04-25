@@ -388,7 +388,6 @@ def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, s
 
 @cli.command()
 @click.argument("proxy")
-@click.argument("scaling_groups")
 @click.option(
     "-s",
     "--scope",
@@ -397,7 +396,7 @@ def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, s
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, scope) -> None:
+def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scope) -> None:
     """
     Removes storage proxy node config's SFTP desginated scaling groups.
     """
