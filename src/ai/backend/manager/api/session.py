@@ -2039,21 +2039,14 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 
 @server_status_required(READ_ALLOWED)
 @admin_required
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["session_id", "sessionId"]): tx.UUID,
-        }
-    ),
-)
-async def get_direct_access_host(request: web.Request, params: Any) -> web.Response:
+async def get_direct_access_host(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    session_id = params["session_id"]
+    session_name = request.match_info["session_name"]
     _, owner_access_key = await get_access_key_scopes(request)
 
     async with root_ctx.db.begin_session() as db_sess:
         sess = await SessionRow.get_session_with_main_kernel(
-            session_id, owner_access_key, db_session=db_sess
+            session_name, owner_access_key, db_session=db_sess
         )
     kernel_role = sess.main_kernel.role
     if kernel_role == KernelRole.SYSTEM:
@@ -2814,7 +2807,7 @@ def create_app(
     cors.add(task_log_resource.add_route("HEAD", get_task_logs))
     cors.add(task_log_resource.add_route("GET", get_task_logs))
     cors.add(
-        app.router.add_route("GET", "/{session_id}/direct-access-host", get_direct_access_host)
+        app.router.add_route("GET", "/{session_name}/direct-access-host", get_direct_access_host)
     )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
