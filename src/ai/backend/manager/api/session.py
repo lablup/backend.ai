@@ -2805,7 +2805,7 @@ def create_app(
     cors.add(task_log_resource.add_route("HEAD", get_task_logs))
     cors.add(task_log_resource.add_route("GET", get_task_logs))
     cors.add(
-        app.router.add_route("GET", "/{session_name}/direct-access-host", get_direct_access_info)
+        app.router.add_route("GET", "/{session_name}/direct-access-info", get_direct_access_info)
     )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
