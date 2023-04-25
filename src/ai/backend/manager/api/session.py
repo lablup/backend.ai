@@ -2051,9 +2051,7 @@ async def get_direct_access_host(request: web.Request) -> web.Response:
     kernel_role: KernelRole = sess.main_kernel.role
     resp = {}
     if kernel_role == KernelRole.SYSTEM:
-        public_host = await root_ctx.registry.get_agent_public_host(
-            sess.main_kernel.agent, sess.main_kernel.agent_addr
-        )
+        public_host = sess.main_kernel.agent_row.public_host
         sshd_ports: list[str] = []
         for sport in sess.main_kernel.service_ports:
             if sport["name"] == "sshd":

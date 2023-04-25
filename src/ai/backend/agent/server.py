@@ -554,17 +554,6 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def get_public_host(self) -> str:
-        agent_config: Mapping[str, Any] = self.local_config["agent"]
-        container_config: Mapping[str, Any] = self.local_config["container"]
-        return (
-            agent_config.get("public-host")
-            or container_config.get("advertised-host")
-            or container_config["bind-host"]
-        )
-
-    @rpc_function
-    @collect_error
     async def get_abusing_report(
         self,
         kernel_id,  # type: str
