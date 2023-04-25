@@ -73,62 +73,50 @@ class libnuma:
                         data = await resp.json()
             except (RuntimeError, aiohttp.ClientError):
                 return None
-            else:
-                # Assume cgroup v1 if CgroupVersion key is absent
-                if "CgroupVersion" not in data:
-                    data["CgroupVersion"] = "1"
-                driver = data["CgroupDriver"]
-                version = data["CgroupVersion"]
-                try:
-                    mount_point = get_cgroup_mount_point(version, "cpuset")
-                except RuntimeError:
+            # Assume cgroup v1 if CgroupVersion key is absent
+            if "CgroupVersion" not in data:
+                data["CgroupVersion"] = "1"
+            driver = data["CgroupDriver"]
+            version = data["CgroupVersion"]
+            try:
+                mount_point = get_cgroup_mount_point(version, "cpuset")
+            except RuntimeError:
+                return None
+            match driver:
+                case "cgroupfs":
+                    cgroup_parent = "docker"
+                case "systemd":
+                    cgroup_parent = "system.slice"
+                case _:
+                    log.warning(
+                        "unsupported cgroup driver: {}, falling back to the next cpuset source",
+                        driver,
+                    )
                     return None
-                else:
-                    match driver:
-                        case "cgroupfs":
-                            cgroup_parent = "docker"
-                        case "systemd":
-                            cgroup_parent = "system.slice"
-                        case _:
-                            log.warning(
-                                (
-                                    "unsupported cgroup driver: {}, "
-                                    "falling back to the next cpuset source"
-                                ),
-                                driver,
-                            )
-                            return None
-                    match version:
-                        case "1":
-                            cpuset_source_name = "cpuset.effective_cpus"
-                        case "2":
-                            cpuset_source_name = "cpuset.cpus.effective"
-                        case _:
-                            log.warning(
-                                (
-                                    "unsupported cgroup version: {}, "
-                                    "falling back to the next cpuset source"
-                                ),
-                                driver,
-                            )
-                            return None
-                    docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
-                    log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
-                    cpuset_source = "the docker cgroup (v{})".format(version)
-                    try:
-                        docker_cpuset = docker_cpuset_path.read_text()
-                        cpuset = {*parse_cpuset(docker_cpuset)}
-                    except (IOError, ValueError):
-                        log.warning(
-                            (
-                                "failed to parse cgroup cpuset from {}, "
-                                "falling back to the next cpuset source"
-                            ),
-                            docker_cpuset_path,
-                        )
-                        return None
-                    else:
-                        return cpuset, cpuset_source
+            match version:
+                case "1":
+                    cpuset_source_name = "cpuset.effective_cpus"
+                case "2":
+                    cpuset_source_name = "cpuset.cpus.effective"
+                case _:
+                    log.warning(
+                        "unsupported cgroup version: {}, falling back to the next cpuset source",
+                        driver,
+                    )
+                    return None
+            docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
+            log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
+            cpuset_source = "the docker cgroup (v{})".format(version)
+            try:
+                docker_cpuset = docker_cpuset_path.read_text()
+                cpuset = {*parse_cpuset(docker_cpuset)}
+                return cpuset, cpuset_source
+            except (IOError, ValueError):
+                log.warning(
+                    "failed to parse cgroup cpuset from {}, falling back to the next cpuset source",
+                    docker_cpuset_path,
+                )
+                return None
 
         async def read_affinity_cpuset() -> tuple[set[int], str] | None:
             try:
