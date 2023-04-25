@@ -804,12 +804,12 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _transit() -> None:
+        async def _update() -> None:
             async with db.begin_session() as db_sess:
                 query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
                 await db_sess.execute(query)
 
-        await execute_with_retry(_transit)
+        await execute_with_retry(_update)
 
     async def set_session_result(
         db: ExtendedAsyncSAEngine,

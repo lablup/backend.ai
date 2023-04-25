@@ -1039,7 +1039,7 @@ class AgentRegistry:
                 ),
             }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-            is_updated = await KernelRow.update_kernel_status(
+            is_updated = await KernelRow.update_kernel(
                 self.db, kernel_id, new_status, update_data=update_data
             )
             if not is_updated:
@@ -1920,7 +1920,7 @@ class AgentRegistry:
                         },
                     ),
                 }
-                await KernelRow.update_kernel_status(
+                await KernelRow.update_kernel(
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
@@ -2403,7 +2403,7 @@ class AgentRegistry:
             lambda r: r.get(str(kernel_id)),
         )
 
-        async def _update_kernel_status() -> Tuple[AccessKey, AgentId] | None:
+        async def _update_kernel() -> tuple[AccessKey, AgentId] | None:
             async with self.db.begin_session() as db_sess:
                 # Check the current status.
                 select_query = (
@@ -2427,7 +2427,6 @@ class AgentRegistry:
                     # Skip if non-existent, already terminated, or restarting.
                     return None
 
-                access_key, agent = kernel.access_key, kernel.agent
                 # Change the status to TERMINATED.
                 # (we don't delete the row for later logging and billing)
                 now = datetime.now(tzutc())
@@ -2455,9 +2454,9 @@ class AgentRegistry:
                     sa.update(KernelRow).values(**values).where(KernelRow.id == kernel_id)
                 )
                 await db_sess.execute(update_query)
-                return access_key, agent
+                return kernel.access_key, kernel.agent
 
-        result = await execute_with_retry(_update_kernel_status)
+        result = await execute_with_retry(_update_kernel)
 
         if result is None:
             return

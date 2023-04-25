@@ -625,20 +625,19 @@ class KernelRow(Base):
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data["terminated_at"] = now
 
-        await cls.update_kernel_status(db, kernel_id, status, update_data=data)
+        await cls.update_kernel(db, kernel_id, status, update_data=data)
 
     @classmethod
-    async def update_kernel_status(
+    async def update_kernel(
         cls,
         db: ExtendedAsyncSAEngine,
         kernel_id: KernelId,
         new_status: KernelStatus,
-        *,
         update_data: Optional[Mapping[str, Any]] = None,
     ) -> bool:
         """
-        Update kernel's status.
-        Return True if the kernel status is updated, else return False.
+        Update kernel by given id and data.
+        Return True if the kernel is updated, else return False.
         """
 
         now = datetime.now(tzutc())
