@@ -2048,7 +2048,8 @@ async def get_direct_access_host(request: web.Request) -> web.Response:
         sess = await SessionRow.get_session_with_main_kernel(
             session_name, owner_access_key, db_session=db_sess
         )
-    kernel_role = sess.main_kernel.role
+    kernel_role: KernelRole = sess.main_kernel.role
+    resp = {}
     if kernel_role == KernelRole.SYSTEM:
         public_host = await root_ctx.registry.get_agent_public_host(
             sess.main_kernel.agent, sess.main_kernel.agent_addr
@@ -2058,13 +2059,12 @@ async def get_direct_access_host(request: web.Request) -> web.Response:
             if sport["name"] == "sshd":
                 sshd_ports = sport["host_ports"]
                 break
-    return web.json_response(
-        {
-            "kernelRole": kernel_role,
+        resp = {
+            "kernelRole": kernel_role.name,
             "publicHost": public_host,
             "sshdPorts": sshd_ports,
         }
-    )
+    return web.json_response(resp)
 
 
 @server_status_required(READ_ALLOWED)
