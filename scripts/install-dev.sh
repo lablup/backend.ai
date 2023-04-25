@@ -389,16 +389,6 @@ set_brew_python_build_flags() {
 }
 
 install_python() {
-  if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-    local pants_python_version=$(pyenv latest -q '3.9')  # get the latest 3.9 from all installed versions
-    if [ -z "$pants_python_version" ]; then
-      pants_python_version=$(pyenv latest -q -k '3.9')  # get the latest 3.9 from all installable versions
-      show_info "Installing Python ${pants_python_version} for Pants to run ..."
-      pyenv install "${pants_python_version}"
-    else
-      echo "✓ Python ${pants_python_version} as the Pants runtime is already installed."
-    fi
-  fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
@@ -473,31 +463,33 @@ check_python() {
   pyenv shell --unset
 }
 
-search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv latest -q '3.9')
-  if [ -z "$_PYENV_PYVER" ]; then
-    >&2 echo "No Python 3.9 available via pyenv!"
-    >&2 echo "Please install Python 3.9 using pyenv and try again."
-    exit 1
-  else
-    >&2 echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
-  fi
-  echo "$_PYENV_PYVER"
-}
-
 bootstrap_pants() {
   mkdir -p .tmp
   set +e
-  local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-  echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  PANTS="./pants"
-  ./pants version
+  if command -v pants &> /dev/null ; then
+    echo "Pants system command is already installed."
+  else
+    case $DISTRO in
+    Darwin)
+      brew install pantsbuild/tap/pants
+      ;;
+    *)
+      curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
+      bash /tmp/get-pants.sh
+      if ! command -v pants &> /dev/null ; then
+        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+      fi
+      ;;
+    esac
+  fi
+  pants version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
     show_error "Cannot proceed the installation because Pants is not available for your platform!"
     exit 1
   fi
-  set +e
+  set -e
 }
 
 install_editable_webui() {
@@ -645,7 +637,7 @@ setup_environment() {
   show_info "Using the current working-copy directory as the installation path..."
 
   show_info "Creating the unified virtualenv for IDEs..."
-  $PANTS export \
+  pants export \
     --resolve=python-default \
     --resolve=python-kernel \
     --resolve=pants-plugins \
@@ -691,7 +683,7 @@ configure_backendai() {
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    cp "configs/accelerator/cuda-mock.toml" cuda-mock.toml
+    cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
   fi
 
   # configure manager
@@ -721,7 +713,7 @@ configure_backendai() {
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
@@ -913,9 +905,6 @@ configure_backendai() {
   echo "> ${WHITE}cat env-local-user-session.sh${NC}"
   show_note "To apply the client config, source one of the configs like:"
   echo "> ${WHITE}source env-local-user-session.sh${NC}"
-  echo " "
-  show_note "Your pants invocation command:"
-  echo "> ${WHITE}${PANTS}${NC}"
   echo " "
   show_important_note "You should change your default admin API keypairs for production environment!"
   show_note "How to run Backend.AI manager:"

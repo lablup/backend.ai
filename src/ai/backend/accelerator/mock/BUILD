@@ -13,13 +13,13 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-accelerator-cuda-mock",
-        description="Backend.AI Accelerator Plugin for CUDA (Mockup)",
+        name="backend.ai-accelerator-mock",
+        description="Backend.AI Mockup Accelerator Plugin",
         license="LGPLv3",
     ),
     entry_points={
         "backendai_accelerator_v21": {
-            "cuda_mock": "ai.backend.accelerator.cuda_mock.plugin:CUDAPlugin",
+            "mock": "ai.backend.accelerator.mock.plugin:MockPlugin",
         }
     },
     generate_setup=True,

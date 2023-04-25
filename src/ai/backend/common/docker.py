@@ -82,7 +82,7 @@ common_image_label_schema = t.Dict(
         t.Key("ai.backend.runtime-type"): t.String(),
         t.Key("ai.backend.runtime-path"): tx.PurePath(),
         # Optional labels
-        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE"),
+        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
         t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
