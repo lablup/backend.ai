@@ -96,6 +96,7 @@ extra_requirements.add = [
     "pytest-dependency>=0.5.1",
     "pytest-mock>=3.8.2",
     "aioresponses>=0.7.3",
+    "yarl~=1.8.2"  # FIXME: remove after docker crash issue is resolved
 ]
 args = ["-v", "--suppress-no-test-exit-code"]
 lockfile = "tools/pytest.lock"
