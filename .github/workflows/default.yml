@@ -50,6 +50,8 @@ jobs:
         fi
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           BASE_REF="origin/main"
+          git remote set-branches origin main
+          git fetch --depth 1 origin main
         else
           BASE_REF="HEAD~1"
         fi
@@ -95,6 +97,8 @@ jobs:
         fi
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           BASE_REF="origin/main"
+          git remote set-branches origin main
+          git fetch --depth 1 origin main
         else
           BASE_REF="HEAD~1"
         fi
@@ -145,6 +149,8 @@ jobs:
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           BASE_REF="origin/main"
+          git remote set-branches origin main
+          git fetch --depth 1 origin main
         else
           BASE_REF="HEAD~1"
         fi
