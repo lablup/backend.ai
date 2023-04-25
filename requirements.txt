@@ -5,7 +5,7 @@ aiohttp~=3.8.1
 aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiodns>=3.0
-aiomonitor-ng~=0.7.0
+aiomonitor-ng~=0.7.2
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
 aiotools~=1.5.9
@@ -70,7 +70,7 @@ trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
 uvloop>=0.17; sys_platform != "Windows"
-yarl>=1.7
+yarl~=1.8.2
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)

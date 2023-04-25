@@ -88,6 +88,7 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
+    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -97,6 +98,7 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
+    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
@@ -123,6 +125,15 @@ class KernelStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
+
+
+class KernelRole(enum.Enum):
+    INFERENCE = "INFERENCE"
+    COMPUTE = "COMPUTE"
+    SYSTEM = "SYSTEM"
+
+
+PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
 
 
 # statuses to consider when calculating current resource usage
@@ -450,6 +461,14 @@ kernels = sa.Table(
         nullable=False,
         index=True,
     ),
+    sa.Column(
+        "role",
+        EnumType(KernelRole),
+        default=KernelRole.COMPUTE,
+        server_default=KernelRole.COMPUTE.name,
+        nullable=False,
+        index=True,
+    ),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
@@ -715,10 +734,6 @@ class KernelStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                log.debug(
-                    "Getting {}",
-                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"],
-                )
                 await pipe.mget(
                     [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
                 )
@@ -726,7 +741,6 @@ class KernelStatistics:
 
         stats = []
         results = await redis_helper.execute(ctx.redis_live, _build_pipeline)
-        log.debug("results {}", results)
         for result in results:
             if result[0] is not None and result[1] is not None:
                 requests = int(result[0])
@@ -1424,7 +1438,8 @@ async def recalc_concurrency_used(
             .select_from(KernelRow)
             .where(
                 (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
             ),
         )
         concurrency_used = result.scalar()

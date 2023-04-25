@@ -102,10 +102,12 @@ from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    PRIVATE_KERNEL_ROLES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentRow,
     AgentStatus,
     ImageRow,
+    KernelRole,
     KernelRow,
     KernelStatus,
     KeyPairResourcePolicyRow,
@@ -682,6 +684,7 @@ class AgentRegistry:
                     # "image_id": image_row.id,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
+                    "role": KernelRole(image_row.labels.get("ai.backend.role", KernelRole.COMPUTE)),
                     "startup_command": kernel.get("startup_command"),
                     "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
@@ -1235,7 +1238,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1257,7 +1261,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.domain_name == domain_name)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1280,7 +1285,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.group_id == group_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1386,7 +1392,12 @@ class AgentRegistry:
                             kernels.c.occupied_slots,
                         ]
                     )
-                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    .where(
+                        (
+                            kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)
+                            & kernels.c.role.not_in(PRIVATE_KERNEL_ROLES)
+                        )
+                    )
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in await conn.stream(query):
@@ -1654,7 +1665,10 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
+                            if (
+                                kernel.cluster_role == DEFAULT_ROLE
+                                and kernel.role not in PRIVATE_KERNEL_ROLES
+                            ):
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
                                 await redis_helper.execute(
@@ -1695,7 +1709,10 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
+                            if (
+                                kernel.cluster_role == DEFAULT_ROLE
+                                and kernel.role not in PRIVATE_KERNEL_ROLES
+                            ):
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
                                 await redis_helper.execute(
