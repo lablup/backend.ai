@@ -134,11 +134,13 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "http://localhost:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+         - sftp_scaling_groups: "group-1,group-2,..."
        + "mynas1"
          - client_api: "https://proxy1.example.com:6021"
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+         - sftp_scaling_groups: "group-3,group-4,..."
      # 23.03 and later
        + exposed_volume_info: "percentage"
        ...
@@ -401,6 +403,9 @@ volume_config_iv = t.Dict(
                     t.Key("manager_api"): t.String,
                     t.Key("secret"): t.String,
                     t.Key("ssl_verify"): t.ToBool,
+                    t.Key("sftp_scaling_groups", default=None): t.Null | tx.StringList(
+                        delimiter=","
+                    ),
                 }
             ),
         ),

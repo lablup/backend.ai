@@ -352,3 +352,62 @@ def unquote(cli_ctx: CLIContext, value) -> None:
     Unquote the given string used as a URL piece in etcd keys.
     """
     print(etcd_unquote(value))
+
+
+@cli.command()
+@click.argument("proxy")
+@click.argument("scaling_groups")
+@click.option(
+    "-s",
+    "--scope",
+    type=EnumChoice(ConfigScopes),
+    default=ConfigScopes.GLOBAL,
+    help="The configuration scope to put the value.",
+)
+@click.pass_obj
+def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, scope) -> None:
+    """
+    Updates storage proxy node config's SFTP desginated scaling groups.
+    To enter multiple scaling groups concatenate names with comma(,).
+    """
+
+    async def _impl():
+        async with etcd_ctx(cli_ctx) as etcd:
+            data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
+            if len(data) == 0:
+                log.error("proxy {} does not exist", proxy)
+                sys.exit(ExitCode.FAILURE)
+            await etcd.put(
+                f"volumes/proxies/{proxy}/sftp_scaling_groups",
+                ",".join([x.strip() for x in scaling_groups.split(",")]),
+            )
+
+    with cli_ctx.logger:
+        asyncio.run(_impl())
+
+
+@cli.command()
+@click.argument("proxy")
+@click.option(
+    "-s",
+    "--scope",
+    type=EnumChoice(ConfigScopes),
+    default=ConfigScopes.GLOBAL,
+    help="The configuration scope to put the value.",
+)
+@click.pass_obj
+def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scope) -> None:
+    """
+    Removes storage proxy node config's SFTP desginated scaling groups.
+    """
+
+    async def _impl():
+        async with etcd_ctx(cli_ctx) as etcd:
+            data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
+            if len(data) == 0:
+                log.error("proxy {} does not exist", proxy)
+                sys.exit(ExitCode.FAILURE)
+            await etcd.delete(f"volumes/proxies/{proxy}/sftp_scaling_groups")
+
+    with cli_ctx.logger:
+        asyncio.run(_impl())
