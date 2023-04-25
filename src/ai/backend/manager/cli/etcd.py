@@ -399,8 +399,7 @@ def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, s
 @click.pass_obj
 def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, scope) -> None:
     """
-    Updates storage proxy node config's SFTP desginated scaling groups.
-    To enter multiple scaling groups concatenate names with comma(,).
+    Removes storage proxy node config's SFTP desginated scaling groups.
     """
 
     async def _impl():
