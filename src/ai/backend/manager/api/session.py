@@ -122,7 +122,7 @@ from ..models import (
 from ..models.kernel import match_session_ids
 from ..models.utils import execute_with_retry
 from ..types import UserScope
-from .auth import admin_required, auth_required
+from .auth import auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
@@ -1936,7 +1936,7 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 
 
 @server_status_required(READ_ALLOWED)
-@admin_required
+@auth_required
 async def get_direct_access_info(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
