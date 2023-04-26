@@ -99,8 +99,10 @@ from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
     AgentStatus,
+    KernelRole,
     KernelStatus,
     UserRole,
+    agents,
 )
 from ..models import association_groups_users as agus
 from ..models import (
@@ -120,7 +122,7 @@ from ..models import (
 from ..models.kernel import match_session_ids
 from ..models.utils import execute_with_retry
 from ..types import UserScope
-from .auth import auth_required
+from .auth import admin_required, auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
@@ -1934,6 +1936,45 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 
 
 @server_status_required(READ_ALLOWED)
+@admin_required
+async def get_direct_access_info(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name = request.match_info["session_name"]
+    _, owner_access_key = await get_access_key_scopes(request)
+    resp = {}
+    async with root_ctx.db.begin_readonly() as conn:
+        session_infos = await match_session_ids(
+            session_name,
+            owner_access_key,
+            extra_cond=(~(kernels.c.status.in_(DEAD_KERNEL_STATUSES))),
+            db_connection=conn,
+        )
+        if len(session_infos) > 1:
+            raise TooManySessionsMatched(extra_data={"matches": session_infos})
+        elif len(session_infos) > 0:
+            raise SessionNotFound
+        query = (
+            sa.select([kernels.c.role, kernels.c.service_ports, agents.c.public_host])
+            .select_from(sa.join(agents, kernels))
+            .where(kernels.c.session_id == session_infos[0]["session_id"])
+        )
+        result = await conn.execute(query)
+        kernel = result.fetchone()
+        if kernel["role"] == KernelRole.SYSTEM:
+            sshd_ports: list[str] = []
+            for sport in kernel["service_ports"]:
+                if sport["name"] == "sshd":
+                    sshd_ports = sport["host_ports"]
+                    break
+            resp = {
+                "kernel_role": kernel["role"].name,
+                "public_host": kernel["public_host"],
+                "sshd_ports": sshd_ports,
+            }
+    return web.json_response(resp)
+
+
+@server_status_required(READ_ALLOWED)
 @auth_required
 async def get_info(request: web.Request) -> web.Response:
     # NOTE: This API should be replaced with GraphQL version.
@@ -2603,6 +2644,9 @@ def create_app(
     task_log_resource = cors.add(app.router.add_resource(r"/_/logs"))
     cors.add(task_log_resource.add_route("HEAD", get_task_logs))
     cors.add(task_log_resource.add_route("GET", get_task_logs))
+    cors.add(
+        app.router.add_route("GET", "/{session_name}/direct-access-info", get_direct_access_info)
+    )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
     cors.add(app.router.add_route("POST", "/{session_name}/interrupt", interrupt))

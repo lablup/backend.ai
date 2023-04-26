@@ -784,6 +784,7 @@ class AbstractAgent(
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
                 "addr": f"tcp://{self.local_config['agent']['rpc-listen-addr']}",
+                "public_host": self._get_public_host(),
                 "resource_slots": res_slots,
                 "version": VERSION,
                 "compute_plugins": {
@@ -882,6 +883,15 @@ class AbstractAgent(
         except Exception:
             log.exception("unhandled exception while syncing container stats")
             await self.produce_error_event()
+
+    def _get_public_host(self) -> str:
+        agent_config: Mapping[str, Any] = self.local_config["agent"]
+        container_config: Mapping[str, Any] = self.local_config["container"]
+        return (
+            agent_config.get("public-host")
+            or container_config.get("advertised-host")
+            or container_config["bind-host"]
+        )
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
         async with self.registry_lock:
