@@ -22,6 +22,7 @@ async def test_allowed_session_types_check(mock_query):
                     "allowed_session_types": ["batch"],
                 }
             ),
+            "is_public": True,
         },
         {
             "name": "b",
@@ -30,6 +31,7 @@ async def test_allowed_session_types_check(mock_query):
                     "allowed_session_types": ["interactive"],
                 }
             ),
+            "is_public": True,
         },
         {
             "name": "c",
@@ -38,6 +40,7 @@ async def test_allowed_session_types_check(mock_query):
                     "allowed_session_types": ["batch", "interactive"],
                 }
             ),
+            "is_public": True,
         },
     ]
     mock_conn = MagicMock()
@@ -137,6 +140,7 @@ async def test_allowed_session_types_check(mock_query):
                     "allowed_session_types": ["batch"],
                 }
             ),
+            "is_public": True,
         },
     ]
 
