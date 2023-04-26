@@ -103,6 +103,7 @@ from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
     AgentStatus,
+    KernelRole,
     KernelRow,
     KernelStatus,
     RoutingRow,
@@ -128,7 +129,7 @@ from ..models import (
 from ..models.session import SessionDependencyRow
 from ..models.utils import execute_with_retry
 from ..types import UserScope
-from .auth import auth_required
+from .auth import admin_required, auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
@@ -2037,6 +2038,34 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 
 
 @server_status_required(READ_ALLOWED)
+@admin_required
+async def get_direct_access_info(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name = request.match_info["session_name"]
+    _, owner_access_key = await get_access_key_scopes(request)
+
+    async with root_ctx.db.begin_session() as db_sess:
+        sess = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
+    kernel_role: KernelRole = sess.main_kernel.role
+    resp = {}
+    if kernel_role == KernelRole.SYSTEM:
+        public_host = sess.main_kernel.agent_row.public_host
+        sshd_ports: list[str] = []
+        for sport in sess.main_kernel.service_ports:
+            if sport["name"] == "sshd":
+                sshd_ports = sport["host_ports"]
+                break
+        resp = {
+            "kernel_role": kernel_role.name,
+            "public_host": public_host,
+            "sshd_ports": sshd_ports,
+        }
+    return web.json_response(resp)
+
+
+@server_status_required(READ_ALLOWED)
 @auth_required
 async def get_info(request: web.Request) -> web.Response:
     # NOTE: This API should be replaced with GraphQL version.
@@ -2775,6 +2804,9 @@ def create_app(
     task_log_resource = cors.add(app.router.add_resource(r"/_/logs"))
     cors.add(task_log_resource.add_route("HEAD", get_task_logs))
     cors.add(task_log_resource.add_route("GET", get_task_logs))
+    cors.add(
+        app.router.add_route("GET", "/{session_name}/direct-access-info", get_direct_access_info)
+    )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
     cors.add(app.router.add_route("POST", "/{session_name}/interrupt", interrupt))
