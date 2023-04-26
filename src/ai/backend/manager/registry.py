@@ -361,7 +361,7 @@ class AgentRegistry:
         resource_policy: dict,
         *,
         user_scope: UserScope,
-        public_sgroup_only: bool = True,
+        public_sgroup_first: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
         session_tag: str = None,
@@ -398,7 +398,7 @@ class AgentRegistry:
                 access_key,
                 user_scope.domain_name,
                 user_scope.group_id,
-                public_sgroup_only,
+                public_sgroup_first,
             )
             if scaling_group is None:
                 log.warning(
@@ -2835,7 +2835,7 @@ async def check_scaling_group(
     access_key: AccessKey,
     domain_name: str,
     group_id: Union[uuid.UUID, str],
-    public_sgroup_only: bool = False,
+    public_sgroup_first: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.
     # If scaling_group is not provided, it will be selected as the first one among
@@ -2846,13 +2846,13 @@ async def check_scaling_group(
         group_id,
         access_key,
     )
-    if public_sgroup_only:
-        candidates = [sgroup for sgroup in candidates if sgroup["is_public"]]
     if not candidates:
         raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
 
     stype = session_type.value.lower()
     if scaling_group is None:
+        if public_sgroup_first:
+            candidates = [sgroup for sgroup in candidates if sgroup["is_public"]]
         for sgroup in candidates:
             allowed_session_types = sgroup["scheduler_opts"].allowed_session_types
             if stype in allowed_session_types:
