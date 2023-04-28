@@ -328,7 +328,11 @@ class ScalingGroup(graphene.ObjectType):
         *,
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
-        query = sa.select([scaling_groups]).select_from(scaling_groups)
+        query = (
+            sa.select([scaling_groups])
+            .select_from(scaling_groups)
+            .where(scaling_groups.c.is_public.is_(True))
+        )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
@@ -352,7 +356,9 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_domains.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_domains.c.domain == domain)
+            sa.select([scaling_groups])
+            .select_from(j)
+            .where(sgroups_for_domains.c.domain == domain and scaling_groups.c.is_public.is_(True))
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -377,7 +383,9 @@ class ScalingGroup(graphene.ObjectType):
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups]).select_from(j).where(sgroups_for_groups.c.group == group)
+            sa.select([scaling_groups])
+            .select_from(j)
+            .where(sgroups_for_groups.c.group == group and scaling_groups.c.is_public.is_(True))
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -404,7 +412,10 @@ class ScalingGroup(graphene.ObjectType):
         query = (
             sa.select([scaling_groups])
             .select_from(j)
-            .where(sgroups_for_keypairs.c.access_key == access_key)
+            .where(
+                sgroups_for_keypairs.c.access_key == access_key
+                and scaling_groups.c.is_public.is_(True)
+            )
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
@@ -429,7 +440,9 @@ class ScalingGroup(graphene.ObjectType):
         query = (
             sa.select([scaling_groups, sgroups_for_groups.c.group])
             .select_from(j)
-            .where(sgroups_for_groups.c.group.in_(group_ids))
+            .where(
+                sgroups_for_groups.c.group.in_(group_ids) and scaling_groups.c.is_public.is_(True)
+            )
         )
         async with ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
@@ -450,7 +463,7 @@ class ScalingGroup(graphene.ObjectType):
         query = (
             sa.select([scaling_groups])
             .select_from(scaling_groups)
-            .where(scaling_groups.c.name.in_(names))
+            .where(scaling_groups.c.name.in_(names) and scaling_groups.c.is_public.is_(True))
         )
         async with ctx.db.begin_readonly() as conn:
             return await batch_result(

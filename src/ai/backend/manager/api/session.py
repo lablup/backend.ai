@@ -102,6 +102,7 @@ from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    PRIVATE_KERNEL_ROLES,
     AgentStatus,
     KernelRole,
     KernelRow,
@@ -585,6 +586,9 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             script, _ = await query_bootstrap_script(conn, owner_access_key)
             params["bootstrap_script"] = script
 
+    public_sgroup_only = True
+    if _role_str := image_row.labels.get("ai.backend.role"):
+        public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
     try:
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -623,6 +627,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                     agent_list=params["config"]["agent_list"],
                     dependency_sessions=params["dependencies"],
                     callback_url=params["callback_url"],
+                    public_sgroup_only=public_sgroup_only,
                 )
             ),
         )
@@ -2052,15 +2057,16 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
     resp = {}
     if kernel_role == KernelRole.SYSTEM:
         public_host = sess.main_kernel.agent_row.public_host
-        sshd_ports: list[str] = []
+        found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
             if sport["name"] == "sshd":
-                sshd_ports = sport["host_ports"]
-                break
+                found_ports["sshd"] = sport["host_ports"]
+            elif sport["name"] == "sftpd":
+                found_ports["sftpd"] = sport["host_ports"]
         resp = {
             "kernel_role": kernel_role.name,
             "public_host": public_host,
-            "sshd_ports": sshd_ports,
+            "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
         }
     return web.json_response(resp)
 
