@@ -60,28 +60,30 @@ def upgrade():
 
         query = (
             sa.update(kernels)
-            .values({
-                "role": cast(  # Explicit casting as described in `image_type_to_kernelrole` case.
-                    coalesce(
-                        # `sa.func.min` is introduced since it is possible (not prevented) for two
-                        # records have the same image name. Without `sa.func.min`, the records
-                        # raises multiple values error.
-                        sa.select([sa.func.min(image_type_to_kernelrole)])
-                        .select_from(images)
-                        .where(images.c.name == kernels.c.image)
-                        .as_scalar(),
-                        # Set the default role when there is no matching image.
-                        # This may occur when one of the previously used image is deleted.
-                        KernelRole.COMPUTE.value,
-                    ),
-                    EnumType(KernelRole)
-                )
-            })
+            .values(
+                {
+                    "role": cast(  # Explicit casting as described in `image_type_to_kernelrole` case.
+                        coalesce(
+                            # `sa.func.min` is introduced since it is possible (not prevented) for two
+                            # records have the same image name. Without `sa.func.min`, the records
+                            # raises multiple values error.
+                            sa.select([sa.func.min(image_type_to_kernelrole)])
+                            .select_from(images)
+                            .where(images.c.name == kernels.c.image)
+                            .as_scalar(),
+                            # Set the default role when there is no matching image.
+                            # This may occur when one of the previously used image is deleted.
+                            KernelRole.COMPUTE.value,
+                        ),
+                        EnumType(KernelRole),
+                    )
+                }
+            )
             .where(kernels.c.id.in_(kernel_ids_to_update))
         )
         result = connection.execute(query)
         total_rowcount += result.rowcount
-        print(f'total processed count: {total_rowcount} (~{kernel_ids_to_update[-1]})')
+        print(f"total processed count: {total_rowcount} (~{kernel_ids_to_update[-1]})")
 
         if result.rowcount < batch_size:
             break
