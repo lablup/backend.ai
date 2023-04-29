@@ -7,9 +7,11 @@ Create Date: 2023-04-24 11:57:53.111968
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import case, cast
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.functions import coalesce
 
-from ai.backend.manager.models import ImageRow, KernelRole, kernels
+from ai.backend.manager.models import ImageRow, ImageType, KernelRole, kernels
 from ai.backend.manager.models.base import EnumType
 
 # revision identifiers, used by Alembic.
@@ -27,26 +29,63 @@ def upgrade():
     connection = op.get_bind()
     kernelrole.create(connection)
     op.add_column("kernels", sa.Column("role", EnumType(KernelRole), nullable=True))
-    query = sa.select([sa.func.count()]).select_from(kernels)
-    count = connection.execute(query).scalar()
-    for idx in range(int(count / 100) + 1):
-        query = sa.select([kernels.c.id, kernels.c.image]).select_from(kernels).limit(100)
-        if idx > 0:
-            query = query.offset(idx * 100)
-        chunked_kernels = connection.execute(query).fetchall()
-        for kernel in chunked_kernels:
-            query = (
-                sa.select([images.c.type])
-                .select_from(images)
-                .where(images.c.name == kernel["image"])
-            )
-            image_type = connection.execute(query).scalar()
-            if image_type is None:
-                image_type = KernelRole.COMPUTE  # assume as Compute session
-            query = (
-                sa.update(kernels).values({"role": image_type}).where(kernels.c.id == kernel["id"])
-            )
-            connection.execute(query)
+
+    # As the `ImageType` and `KernelRole` enum types are incompatible, we need to explicitly map the
+    # values from `ImageType` to those of `KernelRole`.
+    # NOTE: Omitting `.value` raises an error. The reason is unclear, but appending `.value`
+    # and explicitly casting the query resolves the issue.
+    # - `Error: column "role" is of type kernelrole but expression is of type text.`
+    image_type_to_kernelrole = case(
+        [
+            (images.c.type == ImageType.COMPUTE, KernelRole.COMPUTE.value),
+            (images.c.type == ImageType.SYSTEM, KernelRole.SYSTEM.value),
+            (images.c.type == ImageType.SERVICE, KernelRole.INFERENCE.value),
+        ],
+        else_=KernelRole.COMPUTE.value,  # default value
+    )
+
+    batch_size = 1000
+    total_rowcount = 0
+    while True:
+        # Fetch records whose `role` is null only. This removes the use of offset from the query.
+        # `order_by` is not necessary, but helpful to display the currently processing kernels.
+        query = (
+            sa.select([kernels.c.id])
+            .where(kernels.c.role == None)
+            .order_by(kernels.c.id)
+            .limit(batch_size)
+        )
+        result = connection.execute(query).fetchall()
+        kernel_ids_to_update = [kid[0] for kid in result]
+
+        query = (
+            sa.update(kernels)
+            .values({
+                "role": cast(  # Explicit casting as described in `image_type_to_kernelrole` case.
+                    coalesce(
+                        # `sa.func.min` is introduced since it is possible (not prevented) for two
+                        # records have the same image name. Without `sa.func.min`, the records
+                        # raises multiple values error.
+                        sa.select([sa.func.min(image_type_to_kernelrole)])
+                        .select_from(images)
+                        .where(images.c.name == kernels.c.image)
+                        .as_scalar(),
+                        # Set the default role when there is no matching image.
+                        # This may occur when one of the previously used image is deleted.
+                        KernelRole.COMPUTE.value,
+                    ),
+                    EnumType(KernelRole)
+                )
+            })
+            .where(kernels.c.id.in_(kernel_ids_to_update))
+        )
+        result = connection.execute(query)
+        total_rowcount += result.rowcount
+        print(f'total processed count: {total_rowcount} (~{kernel_ids_to_update[-1]})')
+
+        if result.rowcount < batch_size:
+            break
+
     op.alter_column("kernels", column_name="role", nullable=False)
 
 
