@@ -32,7 +32,7 @@ def upgrade():
     for idx in range(int(count / 100) + 1):
         query = sa.select([kernels.c.id, kernels.c.image]).select_from(kernels).limit(100)
         if idx > 0:
-            query = query.skip(idx * 100)
+            query = query.offset(idx * 100)
         chunked_kernels = connection.execute(query).fetchall()
         for kernel in chunked_kernels:
             query = (
