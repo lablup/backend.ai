@@ -25,6 +25,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.models import KernelRole
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import (
@@ -322,7 +323,7 @@ existing_session_kernel_ids = [
     ),
 ]
 
-common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04")
+common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04", architecture=DEFAULT_IMAGE_ARCH)
 
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     domain_name="default",
@@ -373,6 +374,7 @@ def example_pending_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-28T23:59:59+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
             ],
             access_key=AccessKey("user01"),
@@ -423,6 +425,7 @@ def example_pending_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-02-01T23:59:59+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
             ],
             access_key=AccessKey("user02"),
@@ -473,6 +476,7 @@ def example_pending_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-01T23:59:59+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
                 KernelInfo(
                     kernel_id=pending_session_kernel_ids[2].kernel_ids[1],
@@ -497,6 +501,7 @@ def example_pending_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-01T23:59:59+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
                 KernelInfo(
                     kernel_id=pending_session_kernel_ids[2].kernel_ids[2],
@@ -521,6 +526,7 @@ def example_pending_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-12-01T23:59:59+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
             ],
             access_key=AccessKey("user03"),
@@ -577,6 +583,7 @@ def example_existing_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-02-05T00:00:00+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
                 KernelInfo(
                     kernel_id=existing_session_kernel_ids[0].kernel_ids[1],
@@ -601,6 +608,7 @@ def example_existing_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-02-05T00:00:00+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
             ],
             access_key=AccessKey("user01"),
@@ -645,6 +653,7 @@ def example_existing_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2021-09-03T00:00:00+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
             ],
             access_key=AccessKey("user02"),
@@ -689,6 +698,7 @@ def example_existing_sessions():
                     bootstrap_script=None,
                     startup_command=None,
                     created_at=dtparse("2022-01-15T00:00:00+00:00"),
+                    role=KernelRole.COMPUTE,
                 ),
             ],
             access_key=AccessKey("user03"),
