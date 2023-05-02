@@ -43,7 +43,6 @@ def upgrade():
         )
         result = connection.execute(query).fetchall()
         kernel_ids_to_update = [kid[0] for kid in result]
-        print(kernel_ids_to_update)
 
         query = (
             sa.update(kernels)
@@ -71,7 +70,6 @@ def upgrade():
         )
         result = connection.execute(query)
         total_rowcount += result.rowcount
-        print(f"total processed count: {total_rowcount} (~{kernel_ids_to_update[-1]})")
 
         if result.rowcount < batch_size:
             break
