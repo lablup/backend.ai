@@ -1041,10 +1041,10 @@ class AgentRegistry:
                 ),
             }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-            is_updated = await KernelRow.update_kernel(
+            kernel_did_update = await KernelRow.update_kernel(
                 self.db, kernel_id, new_status, update_data=update_data
             )
-            if not is_updated:
+            if not kernel_did_update:
                 return
 
             new_session_status = await SessionRow.transit_session_status(self.db, session_id)
