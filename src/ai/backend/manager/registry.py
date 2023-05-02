@@ -1499,6 +1499,7 @@ class AgentRegistry:
                     rpc_coros.append(
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
+                            str(session_id),
                             KernelLifecycleEventReason.FAILED_TO_START,
                             suppress_events=True,
                         ),
@@ -1753,7 +1754,9 @@ class AgentRegistry:
                             # internally it enqueues a "destroy" lifecycle event.
                             if kernel.status != KernelStatus.SCHEDULED:
                                 rpc_coros.append(
-                                    rpc.call.destroy_kernel(str(kernel.id), reason),
+                                    rpc.call.destroy_kernel(
+                                        str(kernel.id), str(session.id), reason
+                                    ),
                                 )
                         try:
                             await asyncio.gather(*rpc_coros)

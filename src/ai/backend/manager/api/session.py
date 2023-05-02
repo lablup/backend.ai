@@ -1511,10 +1511,7 @@ async def handle_kernel_creation_lifecycle(
             root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
-        if event.session_id is None:
-            session_id = await SessionRow.get_session_id_by_kernel(root_ctx.db, event.kernel_id)
-        else:
-            session_id = event.session_id
+        session_id = event.session_id
         await root_ctx.registry.finalize_running(event.kernel_id, session_id, event.creation_info)
         if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
             await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(str(session_id)))
@@ -1535,10 +1532,7 @@ async def handle_kernel_termination_lifecycle(
         await root_ctx.registry.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code
         )
-        if event.session_id is None:
-            session_id = await SessionRow.get_session_id_by_kernel(root_ctx.db, event.kernel_id)
-        else:
-            session_id = event.session_id
+        session_id = event.session_id
         await root_ctx.registry.check_session_terminated(session_id, event.reason)
 
 
