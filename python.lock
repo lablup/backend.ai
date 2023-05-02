@@ -23,7 +23,7 @@
 //     "aiomonitor-ng~=0.7.2",
 //     "aioresponses>=0.7.3",
 //     "aiosqlite~=0.17.0",
-//     "aiotools~=1.5.9",
+//     "aiotools~=1.6.1",
 //     "aiotusclient~=0.1.4",
 //     "alembic~=1.8.1",
 //     "appdirs~=1.4.4",
@@ -434,24 +434,25 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3a9946f047cfb33e1fca0d39845c3d6d10aeda69a6602c06a8f7dcb67c12171d",
-              "url": "https://files.pythonhosted.org/packages/e0/6b/8b7b1c5dfcb1ab49ac0baa0e59f1edb437a05b3fe618b5c5ec931e15ec56/aiotools-1.5.9-py3-none-any.whl"
+              "hash": "b181abba8388ae9ad61c71393ad21032a63743f827283b105dfaf8bc302efa23",
+              "url": "https://files.pythonhosted.org/packages/e6/28/b279594990d394029294161e7fe6543980eac79400031539608851c7148b/aiotools-1.6.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "44e7b5f50cef692e177ad37231f0d6fa058465ea93c8759da7ee06a2b5cfac97",
-              "url": "https://files.pythonhosted.org/packages/83/b9/915ad8fa49f8834841bd7ca387db3c374ba8d953e949ef2f185e86ffd652/aiotools-1.5.9.tar.gz"
+              "hash": "fd320d1b8656fe597fd4e37cfd25b9c59e5cccac0345f37e808340cd875aa5ac",
+              "url": "https://files.pythonhosted.org/packages/be/9e/789f86e36c737edb57e531ebb2e5498f5b4dc6663090ce9e09fdf1b471a0/aiotools-1.6.1.tar.gz"
             }
           ],
           "project_name": "aiotools",
           "requires_dists": [
+            "async-timeout~=4.0.2; extra == \"test\"",
             "codecov; extra == \"test\"",
             "flake8>=4.0.1; extra == \"lint\"",
             "mypy>=0.920; extra == \"typecheck\"",
-            "pytest-asyncio~=0.16.0; extra == \"test\"",
+            "pytest-asyncio~=0.20.3; extra == \"test\"",
             "pytest-cov; extra == \"test\"",
             "pytest-mock; extra == \"test\"",
-            "pytest~=6.2.5; extra == \"test\"",
+            "pytest~=7.2.2; extra == \"test\"",
             "setuptools>=51.2.0; extra == \"build\"",
             "sphinx-rtd-theme~=1.0; extra == \"docs\"",
             "sphinx~=4.3; extra == \"docs\"",
@@ -461,7 +462,7 @@
             "wheel>=0.37.0; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "1.5.9"
+          "version": "1.6.1"
         },
         {
           "artifacts": [
@@ -849,36 +850,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c7104f4f805df011dd5528aff63d712ff5261294e547724d03a3b5639bd164ac",
-              "url": "https://files.pythonhosted.org/packages/7e/b8/69413fb3371f5333a9a086a24ddcffa9ac93a08a029073719fa5d08fcbc5/boto3-1.26.119-py3-none-any.whl"
+              "hash": "ec53175eaf818dfe1eec33f7e165eca957744c1d8a82047a9efbcce9547e5cc9",
+              "url": "https://files.pythonhosted.org/packages/94/a3/c486566579f7e29784e555c438ee1adf9b1e49a4e812286dbde5bbcf2e42/boto3-1.26.124-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "13a041885068d0bfc2104255f2bcb06a1e0c036bcd009ef018f9953b31c20dde",
-              "url": "https://files.pythonhosted.org/packages/0e/10/2c30f3ad343ccf14fdff24daf1859066a0f9f2f1df30e1d63791cf55a493/boto3-1.26.119.tar.gz"
+              "hash": "4847855cfa4ff272eb66cf1fc9542068ada6d4816d56573cc9cafde51962d0ef",
+              "url": "https://files.pythonhosted.org/packages/6a/e2/d1a403502d9547cd2f39da7b1b5177e1de3a75e30b0bb305ea8dec7f6a51/boto3-1.26.124.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.30.0,>=1.29.119",
+            "botocore<1.30.0,>=1.29.124",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.26.119"
+          "version": "1.26.124"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c45709682e8c9a945a7cdfa0846599aa4c90403ffbcef8cbc412a6ea92a21d45",
-              "url": "https://files.pythonhosted.org/packages/cf/80/978403732c2066a3fdc65a3019ee29c2b27c940f5886d0ee5cecae326f05/botocore-1.29.119-py3-none-any.whl"
+              "hash": "cbcbd5b084952d332d7b8170577f10509e3e7b3b6abbc2920b1c27e93ad2ab25",
+              "url": "https://files.pythonhosted.org/packages/a2/95/49fa4a1560cd9bde97867f75254717c1b271563154b37466266afd73523f/botocore-1.29.124-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "cd79c7ecf1888dc982ed7e005515324c0e2d7f8aa9ab03a8ee8ece8a2dd3297c",
-              "url": "https://files.pythonhosted.org/packages/e3/84/614b96cf57bf097b50e77f2bb06dbccd82b878f2d3aba9fdfbf630508eb6/botocore-1.29.119.tar.gz"
+              "hash": "ebe8a83dd1db18180774ce45b1911959c60bb1843ea0db610231495527a3518a",
+              "url": "https://files.pythonhosted.org/packages/bd/8d/2e6a60cf751e7b9faf7da7ce0f0cf84196761b33f7dc22205c815fdbb700/botocore-1.29.124.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -889,7 +890,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.29.119"
+          "version": "1.29.124"
         },
         {
           "artifacts": [
@@ -2597,30 +2598,30 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ebe11c0d7a805086e99506aa331612429a72ca7cd52a1f0d277dc4adc20cb10e",
-              "url": "https://files.pythonhosted.org/packages/b2/f3/4fb5fae710fc9f22a42cd90dc0547da18ec83e2e139294ab94f04c449cf5/platformdirs-3.2.0-py3-none-any.whl"
+              "hash": "47692bc24c1958e8b0f13dd727307cff1db103fca36399f457da8e05f222fdc4",
+              "url": "https://files.pythonhosted.org/packages/ce/cf/279b73aae00f7ba9d5d7664156ef323ebbf16fb556285bb223ecc45031aa/platformdirs-3.5.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d5b638ca397f25f979350ff789db335903d7ea010ab28903f57b27e1b16c2b08",
-              "url": "https://files.pythonhosted.org/packages/15/04/3f882b46b454ab374ea75425c6f931e499150ec1385a73e55b3f45af615a/platformdirs-3.2.0.tar.gz"
+              "hash": "7954a68d0ba23558d753f73437c55f89027cf8f5108c19844d4b82e5af396335",
+              "url": "https://files.pythonhosted.org/packages/91/17/3836ffe140abb245726d0e21c5b9b984e2569e7027c20d12e969ec69bd8a/platformdirs-3.5.0.tar.gz"
             }
           ],
           "project_name": "platformdirs",
           "requires_dists": [
             "appdirs==1.4.4; extra == \"test\"",
             "covdefaults>=2.3; extra == \"test\"",
-            "furo>=2022.12.7; extra == \"docs\"",
+            "furo>=2023.3.27; extra == \"docs\"",
             "proselint>=0.13; extra == \"docs\"",
             "pytest-cov>=4; extra == \"test\"",
             "pytest-mock>=3.10; extra == \"test\"",
-            "pytest>=7.2.2; extra == \"test\"",
-            "sphinx-autodoc-typehints!=1.23.4,>=1.22; extra == \"docs\"",
+            "pytest>=7.3.1; extra == \"test\"",
+            "sphinx-autodoc-typehints!=1.23.4,>=1.23; extra == \"docs\"",
             "sphinx>=6.1.3; extra == \"docs\"",
             "typing-extensions>=4.5; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.2.0"
+          "version": "3.5.0"
         },
         {
           "artifacts": [
@@ -3289,13 +3290,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "64299f4909223da747622c030b781c0d7811e359c37124b4bd368fb8c6518baa",
-              "url": "https://files.pythonhosted.org/packages/d2/f4/274d1dbe96b41cf4e0efb70cbced278ffd61b5c7bb70338b62af94ccb25b/requests-2.28.2-py3-none-any.whl"
+              "hash": "e8f3c9be120d3333921d213eef078af392fba3933ab7ed2d1cba3b56f2568c3b",
+              "url": "https://files.pythonhosted.org/packages/cf/e1/2aa539876d9ed0ddc95882451deb57cfd7aa8dbf0b8dbce68e045549ba56/requests-2.29.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "98b1b2782e3c6c4904938b84c0eb932721069dfdb9134313beff7c83c2df24bf",
-              "url": "https://files.pythonhosted.org/packages/9d/ee/391076f5937f0a8cdf5e53b701ffc91753e87b07d66bae4a09aa671897bf/requests-2.28.2.tar.gz"
+              "hash": "f2e34a75f4749019bb0e3effb66683630e4ffeaf75819fb51bebef1bf5aef059",
+              "url": "https://files.pythonhosted.org/packages/4c/d2/70fc708727b62d55bc24e43cc85f073039023212d482553d853c44e57bdb/requests-2.29.0.tar.gz"
             }
           ],
           "project_name": "requests",
@@ -3307,8 +3308,8 @@
             "idna<4,>=2.5",
             "urllib3<1.27,>=1.21.1"
           ],
-          "requires_python": "<4,>=3.7",
-          "version": "2.28.2"
+          "requires_python": ">=3.7",
+          "version": "2.29.0"
         },
         {
           "artifacts": [
@@ -3511,23 +3512,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e3b67bda733da1dcdccaf354e71ef01b46db483a4f6236450d3f9a61efdba35a",
-              "url": "https://files.pythonhosted.org/packages/bc/ee/e7678a05310ebeba2655e4651426e3933cd3d076c57bf2df5e0a827ec3e6/SQLAlchemy-1.4.47-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "2ee26276f12614d47cc07bc85490a70f559cba965fb178b1c45d46ffa8d73fda",
+              "url": "https://files.pythonhosted.org/packages/dd/a3/b4602b7593da6d9f68cdc8ea7938245aa213e09a95999c053ec7dfa06d25/SQLAlchemy-1.4.48-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "795b5b9db573d3ed61fae74285d57d396829e3157642794d3a8f72ec2a5c719b",
-              "url": "https://files.pythonhosted.org/packages/8d/78/e4c2076e6d8cc8e4f27c6cfe19c9bd5b43399d4a7f55cf39f0c7d1307b84/SQLAlchemy-1.4.47-cp311-cp311-macosx_10_9_universal2.whl"
+              "hash": "066c2b0413e8cb980e6d46bf9d35ca83be81c20af688fedaef01450b06e4aa5e",
+              "url": "https://files.pythonhosted.org/packages/06/82/c273ae3003b427fa41df06b75d7665eb86199a92eb265c14bf63692cb873/SQLAlchemy-1.4.48-cp311-cp311-macosx_10_9_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "95fc02f7fc1f3199aaa47a8a757437134cf618e9d994c84effd53f530c38586f",
-              "url": "https://files.pythonhosted.org/packages/a0/08/3e8923b1094b61736960dc372633b0dfddbf2e12f5a0b8dd1203f7dcc8f7/SQLAlchemy-1.4.47.tar.gz"
+              "hash": "c99bf13e07140601d111a7c6f1fc1519914dd4e5228315bbda255e08412f61a4",
+              "url": "https://files.pythonhosted.org/packages/38/5f/6df9c80aea80ae427199714a007df609585c8e65da4fb39835bb7b9a4da2/SQLAlchemy-1.4.48-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "989c62b96596b7938cbc032e39431e6c2d81b635034571d6a43a13920852fb65",
-              "url": "https://files.pythonhosted.org/packages/b3/a4/83e82039405186102842ccc7a522b67dcca7a500ccd5686467f53e32b9e3/SQLAlchemy-1.4.47-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "b47bc287096d989a0838ce96f7d8e966914a24da877ed41a7531d44b55cdb8df",
+              "url": "https://files.pythonhosted.org/packages/b9/7a/6f075e189257f2b70cca85b6f3afeb7ca9cef80f0869e9f43b3e3eadd66d/SQLAlchemy-1.4.48.tar.gz"
             }
           ],
           "project_name": "sqlalchemy",
@@ -3564,7 +3565,7 @@
             "typing-extensions!=3.10.0.1; extra == \"aiosqlite\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "1.4.47"
+          "version": "1.4.48"
         },
         {
           "artifacts": [
@@ -3679,19 +3680,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5325463a7da2ef0c6bbfefb62a3dc883aebe679984709aee32a317907d0a8d3c",
-              "url": "https://files.pythonhosted.org/packages/c0/83/eb757ef200543637c40f136e370ef05158d4079ad61da2cf455fe34c508d/tomlkit-0.11.7-py3-none-any.whl"
+              "hash": "8c726c4c202bdb148667835f68d68780b9a003a9ec34167b6c673b38eff2a171",
+              "url": "https://files.pythonhosted.org/packages/ef/a8/b1c193be753c02e2a94af6e37ee45d3378a74d44fe778c2434a63af92731/tomlkit-0.11.8-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f392ef70ad87a672f02519f99967d28a4d3047133e2d1df936511465fbb3791d",
-              "url": "https://files.pythonhosted.org/packages/4d/4e/6cb8a301134315e37929763f7a45c3598dfb21e8d9b94e6846c87531886c/tomlkit-0.11.7.tar.gz"
+              "hash": "9330fc7faa1db67b541b28e62018c17d20be733177d290a13b24c62d1614e0c3",
+              "url": "https://files.pythonhosted.org/packages/10/37/dd53019ccb72ef7d73fff0bee9e20b16faff9658b47913a35d79e89978af/tomlkit-0.11.8.tar.gz"
             }
           ],
           "project_name": "tomlkit",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "0.11.7"
+          "version": "0.11.8"
         },
         {
           "artifacts": [
@@ -4180,7 +4181,7 @@
     "aiomonitor-ng~=0.7.2",
     "aioresponses>=0.7.3",
     "aiosqlite~=0.17.0",
-    "aiotools~=1.5.9",
+    "aiotools~=1.6.1",
     "aiotusclient~=0.1.4",
     "alembic~=1.8.1",
     "appdirs~=1.4.4",
