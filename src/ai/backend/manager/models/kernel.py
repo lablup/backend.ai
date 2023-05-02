@@ -598,15 +598,15 @@ class KernelRow(Base):
         *,
         status_data: Optional[Mapping[str, Any]] = None,
         reason: Optional[str] = None,
-        current_time: Optional[datetime] = None,
+        status_changed_at: Optional[datetime] = None,
     ) -> None:
         assert (
             status != KernelStatus.TERMINATED
         ), "TERMINATED status update must be handled in mark_kernel_terminated()"
-        if current_time is None:
+        if status_changed_at is None:
             now = datetime.now(tzutc())
         else:
-            now = current_time
+            now = status_changed_at
         data = {
             "status": status,
             "status_changed": now,

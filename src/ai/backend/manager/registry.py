@@ -1599,7 +1599,7 @@ class AgentRegistry:
                                 kernel.id,
                                 KernelStatus.CANCELLED,
                                 reason=reason,
-                                current_time=now,
+                                status_changed_at=now,
                             )
                             await self.event_producer.produce_event(
                                 KernelCancelledEvent(kernel.id, session_id, reason),
@@ -1611,7 +1611,7 @@ class AgentRegistry:
                                     kernel.session_id,
                                     SessionStatus.CANCELLED,
                                     reason=reason,
-                                    current_time=now,
+                                    status_changed_at=now,
                                 )
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
