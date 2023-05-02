@@ -7,11 +7,11 @@ Create Date: 2023-04-24 11:57:53.111968
 """
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy import case, cast
+from sqlalchemy import cast
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.functions import coalesce
 
-from ai.backend.manager.models import ImageRow, ImageType, KernelRole, kernels
+from ai.backend.manager.models import ImageRow, KernelRole, kernels
 from ai.backend.manager.models.base import EnumType
 
 # revision identifiers, used by Alembic.
@@ -30,20 +30,6 @@ def upgrade():
     kernelrole.create(connection)
     op.add_column("kernels", sa.Column("role", EnumType(KernelRole), nullable=True))
 
-    # As the `ImageType` and `KernelRole` enum types are incompatible, we need to explicitly map the
-    # values from `ImageType` to those of `KernelRole`.
-    # NOTE: Omitting `.value` raises an error. The reason is unclear, but appending `.value`
-    # and explicitly casting the query resolves the issue.
-    # - `Error: column "role" is of type kernelrole but expression is of type text.`
-    image_type_to_kernelrole = case(
-        [
-            (images.c.type == ImageType.COMPUTE, KernelRole.COMPUTE.value),
-            (images.c.type == ImageType.SYSTEM, KernelRole.SYSTEM.value),
-            (images.c.type == ImageType.SERVICE, KernelRole.INFERENCE.value),
-        ],
-        else_=KernelRole.COMPUTE.value,  # default value
-    )
-
     batch_size = 1000
     total_rowcount = 0
     while True:
@@ -57,6 +43,7 @@ def upgrade():
         )
         result = connection.execute(query).fetchall()
         kernel_ids_to_update = [kid[0] for kid in result]
+        print(kernel_ids_to_update)
 
         query = (
             sa.update(kernels)
@@ -67,9 +54,10 @@ def upgrade():
                             # `sa.func.min` is introduced since it is possible (not prevented) for two
                             # records have the same image name. Without `sa.func.min`, the records
                             # raises multiple values error.
-                            sa.select([sa.func.min(image_type_to_kernelrole)])
+                            sa.select([images.c.labels.op("->>")("ai.backend.role")])
                             .select_from(images)
                             .where(images.c.name == kernels.c.image)
+                            .limit(1)
                             .as_scalar(),
                             # Set the default role when there is no matching image.
                             # This may occur when one of the previously used image is deleted.
