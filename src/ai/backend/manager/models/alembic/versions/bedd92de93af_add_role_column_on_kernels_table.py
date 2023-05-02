@@ -48,10 +48,10 @@ def upgrade():
             sa.update(kernels)
             .values(
                 {
-                    "role": cast(  # Explicit casting as described in `image_type_to_kernelrole` case.
+                    "role": cast(
                         coalesce(
-                            # `sa.func.min` is introduced since it is possible (not prevented) for two
-                            # records have the same image name. Without `sa.func.min`, the records
+                            # `limit(1)` is introduced since it is possible (not prevented) for two
+                            # records have the same image name. Without `limit(1)`, the records
                             # raises multiple values error.
                             sa.select([images.c.labels.op("->>")("ai.backend.role")])
                             .select_from(images)
