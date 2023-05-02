@@ -7,7 +7,9 @@ Create Date: 2023-04-24 11:57:53.111968
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import cast
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.functions import coalesce
 
 from ai.backend.manager.models import ImageRow, KernelRole, kernels
 from ai.backend.manager.models.base import EnumType
@@ -27,17 +29,52 @@ def upgrade():
     connection = op.get_bind()
     kernelrole.create(connection)
     op.add_column("kernels", sa.Column("role", EnumType(KernelRole), nullable=True))
-    query = sa.select([kernels.c.id, kernels.c.image]).select_from(kernels)
-    all_kernels = connection.execute(query).fetchall()
-    for kernel in all_kernels:
+
+    batch_size = 1000
+    total_rowcount = 0
+    while True:
+        # Fetch records whose `role` is null only. This removes the use of offset from the query.
+        # `order_by` is not necessary, but helpful to display the currently processing kernels.
         query = (
-            sa.select([images.c.type]).select_from(images).where(images.c.name == kernel["image"])
+            sa.select([kernels.c.id])
+            .where(kernels.c.role == None)
+            .order_by(kernels.c.id)
+            .limit(batch_size)
         )
-        image_type = connection.execute(query).scalar()
-        if image_type is None:
-            image_type = KernelRole.COMPUTE  # assume as Compute session
-        query = sa.update(kernels).values({"role": image_type}).where(kernels.c.id == kernel["id"])
-        connection.execute(query)
+        result = connection.execute(query).fetchall()
+        kernel_ids_to_update = [kid[0] for kid in result]
+
+        query = (
+            sa.update(kernels)
+            .values(
+                {
+                    "role": cast(
+                        coalesce(
+                            # `limit(1)` is introduced since it is possible (not prevented) for two
+                            # records have the same image name. Without `limit(1)`, the records
+                            # raises multiple values error.
+                            sa.select([images.c.labels.op("->>")("ai.backend.role")])
+                            .select_from(images)
+                            .where(images.c.name == kernels.c.image)
+                            .limit(1)
+                            .as_scalar(),
+                            # Set the default role when there is no matching image.
+                            # This may occur when one of the previously used image is deleted.
+                            KernelRole.COMPUTE.value,
+                        ),
+                        EnumType(KernelRole),
+                    )
+                }
+            )
+            .where(kernels.c.id.in_(kernel_ids_to_update))
+        )
+        result = connection.execute(query)
+        total_rowcount += result.rowcount
+        print(f"total processed count: {total_rowcount} (~{kernel_ids_to_update[-1]})")
+
+        if result.rowcount < batch_size:
+            break
+
     op.alter_column("kernels", column_name="role", nullable=False)
 
 
