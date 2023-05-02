@@ -102,7 +102,9 @@ from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    PRIVATE_KERNEL_ROLES,
     AgentStatus,
+    KernelRole,
     KernelRow,
     KernelStatus,
     RoutingRow,
@@ -584,6 +586,9 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             script, _ = await query_bootstrap_script(conn, owner_access_key)
             params["bootstrap_script"] = script
 
+    public_sgroup_only = True
+    if _role_str := image_row.labels.get("ai.backend.role"):
+        public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
     try:
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -622,6 +627,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                     agent_list=params["config"]["agent_list"],
                     dependency_sessions=params["dependencies"],
                     callback_url=params["callback_url"],
+                    public_sgroup_only=public_sgroup_only,
                 )
             ),
         )
@@ -2037,6 +2043,35 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
 
 @server_status_required(READ_ALLOWED)
 @auth_required
+async def get_direct_access_info(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name = request.match_info["session_name"]
+    _, owner_access_key = await get_access_key_scopes(request)
+
+    async with root_ctx.db.begin_session() as db_sess:
+        sess = await SessionRow.get_session_with_main_kernel(
+            session_name, owner_access_key, db_session=db_sess
+        )
+    kernel_role: KernelRole = sess.main_kernel.role
+    resp = {}
+    if kernel_role == KernelRole.SYSTEM:
+        public_host = sess.main_kernel.agent_row.public_host
+        found_ports: dict[str, list[str]] = {}
+        for sport in sess.main_kernel.service_ports:
+            if sport["name"] == "sshd":
+                found_ports["sshd"] = sport["host_ports"]
+            elif sport["name"] == "sftpd":
+                found_ports["sftpd"] = sport["host_ports"]
+        resp = {
+            "kernel_role": kernel_role.name,
+            "public_host": public_host,
+            "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
+        }
+    return web.json_response(resp)
+
+
+@server_status_required(READ_ALLOWED)
+@auth_required
 async def get_info(request: web.Request) -> web.Response:
     # NOTE: This API should be replaced with GraphQL version.
     resp = {}
@@ -2772,6 +2807,9 @@ def create_app(
     task_log_resource = cors.add(app.router.add_resource(r"/_/logs"))
     cors.add(task_log_resource.add_route("HEAD", get_task_logs))
     cors.add(task_log_resource.add_route("GET", get_task_logs))
+    cors.add(
+        app.router.add_route("GET", "/{session_name}/direct-access-info", get_direct_access_info)
+    )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
     cors.add(app.router.add_route("POST", "/{session_name}/interrupt", interrupt))

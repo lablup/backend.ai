@@ -2191,6 +2191,7 @@ class AgentRegistry:
                             [
                                 agents.c.status,
                                 agents.c.addr,
+                                agents.c.public_host,
                                 agents.c.scaling_group,
                                 agents.c.available_slots,
                                 agents.c.version,
@@ -2218,6 +2219,7 @@ class AgentRegistry:
                                 "available_slots": available_slots,
                                 "occupied_slots": {},
                                 "addr": agent_info["addr"],
+                                "public_host": agent_info["public_host"],
                                 "first_contact": now,
                                 "lost_at": sa.null(),
                                 "version": agent_info["version"],
@@ -2235,6 +2237,8 @@ class AgentRegistry:
                             updates["scaling_group"] = sgroup
                         if row["addr"] != current_addr:
                             updates["addr"] = current_addr
+                        if row["public_host"] != agent_info["public_host"]:
+                            updates["public_host"] = agent_info["public_host"]
                         if row["version"] != agent_info["version"]:
                             updates["version"] = agent_info["version"]
                         if row["compute_plugins"] != agent_info["compute_plugins"]:
@@ -2259,6 +2263,7 @@ class AgentRegistry:
                                     "region": agent_info["region"],
                                     "scaling_group": sgroup,
                                     "addr": agent_info["addr"],
+                                    "public_host": agent_info["public_host"],
                                     "lost_at": sa.null(),
                                     "available_slots": available_slots,
                                     "version": agent_info["version"],
