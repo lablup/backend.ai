@@ -1054,6 +1054,7 @@ class SessionRow(Base):
                     noload("*"),
                     load_only(
                         KernelRow.id,
+                        KernelRow.role,
                         KernelRow.access_key,
                         KernelRow.status,
                         KernelRow.container_id,
