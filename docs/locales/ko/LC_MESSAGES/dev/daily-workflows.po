@@ -50,9 +50,9 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:26 159785b653644829b4ae44a0cf0c46d5
 msgid ""
-"If your ``scripts/install-dev.sh`` says that you need to use ``./pants-"
-"local`` instead of ``./pants``, replace all ``./pants`` in the following "
-"command examples with ``./pants-local``."
+"If your ``scripts/install-dev.sh`` says that you need to use ``pants-"
+"local`` instead of ``pants``, replace all ``pants`` in the following "
+"command examples with ``pants-local``."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:30 4b80a71b168347729a4874f7962efe2b
@@ -300,7 +300,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:243 d9b6f7dcbe8943e193864292e3ac7f70
 msgid ""
 "When the target Python version has changed when you pull a new "
-"version/branch, you need to re-run ``./pants export`` and manually update"
+"version/branch, you need to re-run ``pants export`` and manually update"
 " the Python interpreter path and mypy executable path configurations."
 msgstr ""
 
@@ -354,7 +354,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:299 04a0126650344016844ae604f100023a
 msgid ""
 "When each branch has different external package requirements, you should "
-"run ``./pants export`` before running codes after ``git switch``-ing "
+"run ``pants export`` before running codes after ``git switch``-ing "
 "between such branches."
 msgstr ""
 
@@ -423,12 +423,12 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:352 d5fd26a1a3cb479da05e72eb4baafa74
 msgid ""
 "Therefore, session-level fixtures may be executed *multiple* times during"
-" a single run of ``./pants test``."
+" a single run of ``pants test``."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:357 6da8fe5c1dbb4eb7b5a243e693a74ecc
 msgid ""
-"If you *interrupt* (Ctrl+C, SIGINT) a run of ``./pants test``, it will "
+"If you *interrupt* (Ctrl+C, SIGINT) a run of ``pants test``, it will "
 "immediately kill all pytest processes without fixture cleanup. This may "
 "accumulate unused Docker containers in your system, so it is a good "
 "practice to run ``docker ps -a`` periodically and clean up dangling "
@@ -599,9 +599,9 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:491 85c2a8adc48f49b28d3f37d6a98c0bea
 msgid ""
-"If you have run ``./pants`` or the installation script with ``sudo``, "
+"If you have run ``pants`` or the installation script with ``sudo``, "
 "some of the above directories may be owned by root and running "
-"``./pants`` as the user privilege would not work. In such cases, remove "
+"``pants`` as the user privilege would not work. In such cases, remove "
 "the directories with ``sudo`` and retry."
 msgstr ""
 
@@ -629,7 +629,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:509 8112e652b5114a21ab845c89df0e047d
 msgid ""
 "When your tests *hang*, you can try adding the ``--debug`` flag to the "
-"``./pants test`` command:"
+"``pants test`` command:"
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:515 5deebbb7a7144ce884b9847b2dc2d2fc
@@ -639,7 +639,7 @@ msgid ""
 "output and Ctrl+C to gracefully shutdown the tests  with fixture cleanup."
 " You can also apply additional pytest options such as ``--fulltrace``, "
 "``-s``, etc. by passing them after target arguments and ``--`` when "
-"executing ``./pants test`` command."
+"executing ``pants test`` command."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:522 4cfd4fa7a5f446ffb9875eb291007ea1
@@ -729,7 +729,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:580 de152b4f0834404895c77a6408bf23a5
 msgid ""
-"The size should be more than 3GB. (Running ``./pants test ::`` consumes "
+"The size should be more than 3GB. (Running ``pants test ::`` consumes "
 "about 2GB.)"
 msgstr ""
 
@@ -839,7 +839,7 @@ msgstr ""
 
 #~ msgid ""
 #~ "Whenever you re-export the venv "
-#~ "using ``./pants export``, you must "
+#~ "using ``pants export``, you must "
 #~ "*reinstall* the plugins.  There is also"
 #~ " a shrotcut script that does this "
 #~ "for you: ``scripts/reinstall-plugins.sh``."
