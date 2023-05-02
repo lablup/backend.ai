@@ -4,17 +4,31 @@ from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId
 
 
-class CUDADevice(AbstractComputeDevice):
+class MockDevice(AbstractComputeDevice):
+    plugin_name: str
     model_name: str
     mother_uuid: DeviceId
-    is_mig_device: bool
 
     def __init__(
-        self, model_name: str, mother_uuid: DeviceId, is_mig_device: bool, *args, **kwargs
+        self, plugin_name: str, model_name: str, mother_uuid: DeviceId, *args, **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
+        self.plugin_name = plugin_name
         self.model_name = model_name
         self.mother_uuid = mother_uuid
+
+    def __str__(self) -> str:
+        return f"{self.plugin_name}: {self.model_name} [{self.device_id}]"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+class CUDADevice(MockDevice):
+    is_mig_device: bool
+
+    def __init__(self, is_mig_device: bool, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.is_mig_device = is_mig_device
 
 

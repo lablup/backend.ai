@@ -33,6 +33,7 @@ agent_local_config_iv = (
                     t.Key("var-base-path", default="./var/lib/backend.ai"): tx.Path(
                         type="dir", auto_create=True
                     ),
+                    t.Key("public-host", default=None): t.Null | t.String,
                     t.Key("region", default=None): t.Null | t.String,
                     t.Key("instance-type", default=None): t.Null | t.String,
                     t.Key("scaling-group", default="default"): t.String,
@@ -104,6 +105,7 @@ agent_local_config_iv = (
                     t.Key("log-alloc-map", default=False): t.ToBool,
                     t.Key("log-events", default=False): t.ToBool,
                     t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("heartbeat-interval", default=20.0): t.Float,
                     t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {

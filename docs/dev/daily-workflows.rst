@@ -19,13 +19,7 @@ Key concepts
 
   .. code-block:: console
 
-      $ ./pants [GLOBAL_OPTS] GOAL [GOAL_OPTS] [TARGET ...]
-
-  .. warning::
-
-      If your ``scripts/install-dev.sh`` says that you need to use
-      ``./pants-local`` instead of ``./pants``, replace all ``./pants``
-      in the following command examples with ``./pants-local``.
+      $ pants [GLOBAL_OPTS] GOAL [GOAL_OPTS] [TARGET ...]
 
 * Goal: an action to execute
 
@@ -46,7 +40,7 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants list ::
+      $ pants list ::
 
   - This list includes the full enumeration of individual targets auto-generated
     by collective targets (e.g., ``python_sources()`` generates multiple
@@ -57,14 +51,14 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/common:src
+      $ pants dependencies --transitive src/ai/backend/common:src
 
 * Display all dependees of a specific target (i.e., all targets affected when
   this target is changed)
 
   .. code-block:: console
 
-      $ ./pants dependees --transitive src/ai/backend/common:src
+      $ pants dependees --transitive src/ai/backend/common:src
 
 .. note::
 
@@ -80,15 +74,15 @@ Run lint/check for all targets:
 
 .. code-block:: console
 
-    $ ./pants lint ::
-    $ ./pants check ::
+    $ pants lint ::
+    $ pants check ::
 
 To run lint/check for a specific target or a set of targets:
 
 .. code-block:: console
 
-    $ ./pants lint src/ai/backend/common:: tests/common::
-    $ ./pants check src/ai/backend/manager::
+    $ pants lint src/ai/backend/common:: tests/common::
+    $ pants check src/ai/backend/manager::
 
 Currently running mypy with pants is slow because mypy cannot utilize its own cache as pants invokes mypy per file due to its own dependency management scheme.
 (e.g., Checking all sources takes more than 1 minutes!)
@@ -105,8 +99,8 @@ If you encounter failure from ``isort``, you may run the formatter to automatica
 
 .. code-block:: console
 
-   $ ./pants fmt ::
-   $ ./pants fmt src/ai/backend/common::
+   $ pants fmt ::
+   $ pants fmt src/ai/backend/common::
 
 Running unit tests
 ------------------
@@ -115,13 +109,13 @@ Here are various methods to run tests:
 
 .. code-block:: console
 
-    $ ./pants test ::
-    $ ./pants test tests/manager/test_scheduler.py::
-    $ ./pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
-    $ ./pants test tests/common::            # Run common/**/test_*.py
-    $ ./pants test tests/common:tests        # Run common/test_*.py
-    $ ./pants test tests/common/redis::      # Run common/redis/**/test_*.py
-    $ ./pants test tests/common/redis:tests  # Run common/redis/test_*.py
+    $ pants test ::
+    $ pants test tests/manager/test_scheduler.py::
+    $ pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
+    $ pants test tests/common::            # Run common/**/test_*.py
+    $ pants test tests/common:tests        # Run common/test_*.py
+    $ pants test tests/common/redis::      # Run common/redis/**/test_*.py
+    $ pants test tests/common/redis:tests  # Run common/redis/test_*.py
 
 You may also try ``--changed-since`` option like ``lint`` and ``check``.
 
@@ -130,7 +124,7 @@ option:
 
 .. code-block:: console
 
-    $ ./pants test \
+    $ pants test \
     >   --test-extra-env-vars=MYVARIABLE=MYVALUE \
     >   tests/common:tests
 
@@ -148,7 +142,7 @@ To build a specific package:
 
 .. code-block:: console
 
-    $ ./pants \
+    $ pants \
     >   --tag="wheel" \
     >   package \
     >   src/ai/backend/common:dist
@@ -158,7 +152,7 @@ If the package content varies by the target platform, use:
 
 .. code-block:: console
 
-    $ ./pants \
+    $ pants \
     >   --tag="wheel" \
     >   --tag="+platform-specific" \
     >   --platform-specific-resources-target=linux_arm64 \
@@ -177,7 +171,7 @@ To (re-)generate the virtualenv, run:
 
 .. code-block:: console
 
-    $ ./pants export
+    $ pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
@@ -189,7 +183,7 @@ using the ``--resolve`` option like:
 
 .. code-block:: console
 
-    $ ./pants export --resolve=python-default --resolve=mypy
+    $ pants export --resolve=python-default --resolve=mypy
 
 To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
@@ -240,7 +234,7 @@ Set the following keys in the workspace settings:
 
 .. warning::
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export``
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
    and manually update the Python interpreter path and mypy executable path configurations.
 
 Vim/NeoVim
@@ -296,7 +290,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When each branch has different external package requirements, you should run ``./pants export``
+When each branch has different external package requirements, you should run ``pants export``
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
@@ -350,11 +344,11 @@ Though, there are a few key differences:
 - Tests are executed **in parallel** in the unit of test modules.
 
 - Therefore, session-level fixtures may be executed *multiple* times during a
-  single run of ``./pants test``.
+  single run of ``pants test``.
 
 .. warning::
 
-  If you *interrupt* (Ctrl+C, SIGINT) a run of ``./pants test``, it will
+  If you *interrupt* (Ctrl+C, SIGINT) a run of ``pants test``, it will
   immediately kill all pytest processes without fixture cleanup. This may
   accumulate unused Docker containers in your system, so it is a good practice
   to run ``docker ps -a`` periodically and clean up dangling containers.
@@ -451,8 +445,8 @@ Adding new external dependencies
 
   .. code-block:: console
 
-     $ ./pants generate-lockfiles
-     $ ./pants export
+     $ pants generate-lockfiles
+     $ pants export
 
 Merging lockfile conflicts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -469,7 +463,7 @@ after merging ``requirements.txt`` and ``BUILD`` files.
    $ git merge main
    ... it says a conflict on python.lock ...
    $ git checkout --theirs python.lock
-   $ ./pants generate-lockfiles --resolve=python-default
+   $ pants generate-lockfiles --resolve=python-default
    $ git add python.lock
    $ git commit
 
@@ -488,8 +482,8 @@ all cached data as necessary.
 
 .. warning::
 
-   If you have run ``./pants`` or the installation script with ``sudo``, some of the above directories
-   may be owned by root and running ``./pants`` as the user privilege would not work.
+   If you have run ``pants`` or the installation script with ``sudo``, some of the above directories
+   may be owned by root and running ``pants`` as the user privilege would not work.
    In such cases, remove the directories with ``sudo`` and retry.
 
 Changing or updating the Python runtime for Pants
@@ -506,17 +500,17 @@ update ``.pants.bootstrap`` accordingly.
 Debugging test cases (or interactively running test cases)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When your tests *hang*, you can try adding the ``--debug`` flag to the ``./pants test`` command:
+When your tests *hang*, you can try adding the ``--debug`` flag to the ``pants test`` command:
 
 .. code-block:: console
 
-   $ ./pants test --debug ...
+   $ pants test --debug ...
 
 so that Pants runs the designated test targets **serially and interactively**.
 This means that you can directly observe the console output and Ctrl+C to
 gracefully shutdown the tests  with fixture cleanup. You can also apply
 additional pytest options such as ``--fulltrace``, ``-s``, etc. by passing them
-after target arguments and ``--`` when executing ``./pants test`` command.
+after target arguments and ``--`` when executing ``pants test`` command.
 
 Installing a subset of mono-repo packages in the editable mode for other projects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -530,7 +524,7 @@ In this case, we recommend to do it as follows:
 
    .. code-block:: console
 
-      $ ./pants --tag=wheel package src/ai/backend/client:dist
+      $ pants --tag=wheel package src/ai/backend/client:dist
 
    This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
 
@@ -544,7 +538,7 @@ In this case, we recommend to do it as follows:
 
    .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/client:src \
+      $ pants dependencies --transitive src/ai/backend/client:src \
       >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
       cli
       client
@@ -578,7 +572,7 @@ the ``.tmp`` directory under the working copy root a tmpfs partition:
      tmpfs /path/to/dir/.tmp tmpfs defaults,size=4G 0 0
 
 * The size should be more than 3GB.
-  (Running ``./pants test ::`` consumes about 2GB.)
+  (Running ``pants test ::`` consumes about 2GB.)
 
 * To change the size at runtime, you could simply remount it with a new size option:
 
