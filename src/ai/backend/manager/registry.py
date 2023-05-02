@@ -1313,6 +1313,8 @@ class AgentRegistry:
                             await db_sess.execute(query)
 
                     await execute_with_retry(_update_failure)
+                reason = f"other-error ({e!r})"
+                await self.check_session_error(scheduled_session.id, reason)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
                 raise
 
@@ -2729,11 +2731,42 @@ class AgentRegistry:
                 SessionTerminatedEvent(session_id, reason),
             )
 
+    async def check_session_error(
+        self,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        async def _check_and_mark() -> None:
+            async with self.db.begin_session() as db_sess:
+                session = await SessionRow.get_session_with_kernels(
+                    session_id, allow_stale=True, db_session=db_sess
+                )
+                sibling_kernels = session.kernels
+                sess_status = determine_session_status(sibling_kernels)
+                if sess_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
+                    values = {
+                        "status": sess_status,
+                        "status_info": reason,
+                        "status_history": sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {
+                                sess_status.name: datetime.now(tzutc()).isoformat(),
+                            },
+                        ),
+                    }
+                    query = (
+                        sa.update(SessionRow).values(**values).where(SessionRow.id == session_id)
+                    )
+                    await db_sess.execute(query)
+
+        await execute_with_retry(_check_and_mark)
+
     async def mark_kernel_error(
         self,
         kernel_id: KernelId,
         reason: str,
-    ) -> None:
+    ) -> SessionId:
         now = datetime.now(tzutc())
 
         async def _mark_kernel() -> SessionId:
@@ -2759,84 +2792,7 @@ class AgentRegistry:
                 return (await db_sess.execute(query)).first()["session_id"]
 
         session_id = await execute_with_retry(_mark_kernel)
-        async with self.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_kernels(
-                session_id, allow_stale=True, db_session=db_sess
-            )
-            error_kernels = [k for k in session.kernels if k.status == KernelStatus.ERROR]
-
-        per_agent_tasks = []
-
-        async def _destroy_kernels_in_agent(
-            session: SessionRow, destroyed_kernels: List[KernelRow]
-        ) -> None:
-            async with RPCContext(
-                destroyed_kernels[0].agent,
-                destroyed_kernels[0].agent_addr,
-                invoke_timeout=None,
-                order_key=session.id,
-                keepalive_timeout=self.rpc_keepalive_timeout,
-            ) as rpc:
-                rpc_coros = []
-                for kernel in destroyed_kernels:
-                    # internally it enqueues a "destroy" lifecycle event.
-                    if kernel.status != KernelStatus.SCHEDULED:
-                        rpc_coros.append(
-                            rpc.call.destroy_kernel(str(kernel.id), reason),
-                        )
-                try:
-                    await asyncio.gather(*rpc_coros)
-                except Exception:
-                    log.exception(
-                        "destroy_kernels_in_agent(a:{}, s:{}): unexpected error",
-                        destroyed_kernels[0].agent,
-                        session.id,
-                    )
-                for kernel in destroyed_kernels:
-                    last_stat: Optional[Dict[str, Any]]
-                    last_stat = None
-                    try:
-                        raw_last_stat = await redis_helper.execute(
-                            self.redis_stat, lambda r: r.get(str(kernel.id))
-                        )
-                        if raw_last_stat is not None:
-                            last_stat = msgpack.unpackb(raw_last_stat)
-                            last_stat["version"] = 2
-                    except asyncio.TimeoutError:
-                        pass
-
-        if error_kernels:
-            per_agent_tasks.append(_destroy_kernels_in_agent(session, error_kernels))
-            # to_be_terminated.extend(unsynced_kernels)
-
-        if per_agent_tasks:
-            await asyncio.gather(*per_agent_tasks, return_exceptions=True)
-
-        candidate_status = determine_session_status(session.kernels)
-
-        async def _update_session() -> None:
-            async with self.db.begin_session() as db_session:
-                values = {
-                    "status": candidate_status,
-                    "status_info": reason,
-                    "status_history": sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            candidate_status.name: datetime.now(tzutc()).isoformat(),
-                        },
-                    ),
-                }
-                if candidate_status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
-                    values["terminated_at"] = now
-                update_query = (
-                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**values)
-                )
-                await db_session.execute(update_query)
-
-        if candidate_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
-            await execute_with_retry(_update_session)
-        await self.recalc_resource_usage()
+        return session_id
 
     async def mark_session_terminating(
         self,

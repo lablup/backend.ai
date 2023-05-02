@@ -1531,16 +1531,27 @@ async def handle_kernel_creation_lifecycle(
 async def handle_kernel_termination_lifecycle(
     app: web.Application,
     source: AgentId,
-    event: KernelTerminatingEvent | KernelTerminatedEvent | KernelErrorEvent,
+    event: KernelTerminatingEvent | KernelTerminatedEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, KernelTerminatingEvent):
         # The destroy_kernel() API handler will set the "TERMINATING" status.
         pass
     elif isinstance(event, KernelTerminatedEvent):
-        pass
-    elif isinstance(event, KernelErrorEvent):
-        await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
+        await root_ctx.registry.mark_kernel_terminated(
+            event.kernel_id, event.reason, event.exit_code
+        )
+        await root_ctx.registry.check_session_terminated(event.kernel_id, event.reason)
+
+
+async def handle_kernel_error_lifecycle(
+    app: web.Application,
+    source: AgentId,
+    event: KernelErrorEvent,
+) -> None:
+    root_ctx: RootContext = app["_root.context"]
+    session_id = await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
+    await root_ctx.registry.check_session_error(session_id, event.reason)
 
 
 async def handle_session_creation_lifecycle(
@@ -2732,7 +2743,7 @@ async def init(app: web.Application) -> None:
     evd.consume(
         KernelErrorEvent,
         app,
-        handle_kernel_termination_lifecycle,
+        handle_kernel_error_lifecycle,
         name="api.session.kerror",
     )
     evd.consume(
