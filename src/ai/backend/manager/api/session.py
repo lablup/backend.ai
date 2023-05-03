@@ -1940,7 +1940,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         params["recursive"],
     )
 
-    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
 
     if params["recursive"]:
         async with root_ctx.db.begin_readonly_session() as db_sess:
