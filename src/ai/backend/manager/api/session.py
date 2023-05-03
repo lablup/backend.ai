@@ -1548,8 +1548,8 @@ async def handle_kernel_error_lifecycle(
         event.name,
         event.kernel_id,
     )
-    session_id = await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
-    await SessionRow.transit_session_status(root_ctx.db, session_id, status_info=event.reason)
+    await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
+    await SessionRow.transit_session_status(root_ctx.db, event.session_id, status_info=event.reason)
 
 
 async def handle_session_creation_lifecycle(

@@ -2518,33 +2518,15 @@ class AgentRegistry:
         self,
         kernel_id: KernelId,
         reason: str,
-    ) -> SessionId:
+    ) -> None:
         now = datetime.now(tzutc())
-
-        async def _mark_kernel() -> SessionId:
-            async with self.db.begin_session() as db_sess:
-                values = {
-                    "status": KernelStatus.ERROR,
-                    "status_info": reason,
-                    "terminated_at": now,
-                    "status_history": sql_json_merge(
-                        KernelRow.status_history,
-                        (),
-                        {
-                            KernelStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
-                        },
-                    ),
-                }
-                query = (
-                    sa.update(KernelRow)
-                    .values(**values)
-                    .where(KernelRow.id == kernel_id)
-                    .returning(KernelRow.session_id)
-                )
-                return (await db_sess.execute(query)).first()["session_id"]
-
-        session_id = await execute_with_retry(_mark_kernel)
-        return session_id
+        await KernelRow.set_kernel_status(
+            self.db,
+            kernel_id,
+            KernelStatus.ERROR,
+            reason=reason,
+            status_changed_at=now,
+        )
 
     async def mark_session_terminating(
         self,
