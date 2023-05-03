@@ -83,6 +83,7 @@ agents = sa.Table(
     sa.Column("available_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("addr", sa.String(length=128), nullable=False),
+    sa.Column("public_host", sa.String(length=256), nullable=True),
     sa.Column("first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("version", sa.String(length=64), nullable=False),

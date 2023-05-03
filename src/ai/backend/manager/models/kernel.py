@@ -88,6 +88,7 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
+    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -97,6 +98,7 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
+    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
@@ -123,6 +125,15 @@ class KernelStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
+
+
+class KernelRole(enum.Enum):
+    INFERENCE = "INFERENCE"
+    COMPUTE = "COMPUTE"
+    SYSTEM = "SYSTEM"
+
+
+PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
 
 
 # statuses to consider when calculating current resource usage
@@ -447,6 +458,14 @@ kernels = sa.Table(
         EnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
+        nullable=False,
+        index=True,
+    ),
+    sa.Column(
+        "role",
+        EnumType(KernelRole),
+        default=KernelRole.COMPUTE,
+        server_default=KernelRole.COMPUTE.name,
         nullable=False,
         index=True,
     ),
@@ -1368,7 +1387,8 @@ async def recalc_concurrency_used(
             .select_from(KernelRow)
             .where(
                 (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
             ),
         )
         concurrency_used = result.scalar()

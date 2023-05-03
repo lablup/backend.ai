@@ -105,11 +105,13 @@ from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KERNEL_STATUS_TRANSITION_MAP,
+    PRIVATE_KERNEL_ROLES,
     SESSION_STATUS_TRANSITION_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentRow,
     AgentStatus,
     ImageRow,
+    KernelRole,
     KernelRow,
     KernelStatus,
     KeyPairResourcePolicyRow,
@@ -359,6 +361,7 @@ class AgentRegistry:
         resource_policy: dict,
         *,
         user_scope: UserScope,
+        public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
         session_tag: str = None,
@@ -395,6 +398,7 @@ class AgentRegistry:
                 access_key,
                 user_scope.domain_name,
                 user_scope.project_id,
+                public_sgroup_only,
             )
             if scaling_group is None:
                 log.warning(
@@ -693,6 +697,7 @@ class AgentRegistry:
                     # "image_id": image_row.id,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
+                    "role": KernelRole(image_row.labels.get("ai.backend.role", KernelRole.COMPUTE)),
                     "startup_command": kernel.get("startup_command"),
                     "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
@@ -1339,7 +1344,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1361,7 +1367,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.domain_name == domain_name)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1384,7 +1391,8 @@ class AgentRegistry:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.project_id == project_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1490,7 +1498,12 @@ class AgentRegistry:
                             kernels.c.occupied_slots,
                         ]
                     )
-                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    .where(
+                        (
+                            kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)
+                            & kernels.c.role.not_in(PRIVATE_KERNEL_ROLES)
+                        )
+                    )
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in await conn.stream(query):
@@ -1773,7 +1786,10 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
+                            if (
+                                kernel.cluster_role == DEFAULT_ROLE
+                                and kernel.role not in PRIVATE_KERNEL_ROLES
+                            ):
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
                                 await redis_helper.execute(
@@ -1814,7 +1830,10 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
+                            if (
+                                kernel.cluster_role == DEFAULT_ROLE
+                                and kernel.role not in PRIVATE_KERNEL_ROLES
+                            ):
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
                                 await redis_helper.execute(
@@ -2324,6 +2343,7 @@ class AgentRegistry:
                             [
                                 agents.c.status,
                                 agents.c.addr,
+                                agents.c.public_host,
                                 agents.c.scaling_group,
                                 agents.c.available_slots,
                                 agents.c.version,
@@ -2351,6 +2371,7 @@ class AgentRegistry:
                                 "available_slots": available_slots,
                                 "occupied_slots": {},
                                 "addr": agent_info["addr"],
+                                "public_host": agent_info["public_host"],
                                 "first_contact": now,
                                 "lost_at": sa.null(),
                                 "version": agent_info["version"],
@@ -2368,6 +2389,8 @@ class AgentRegistry:
                             updates["scaling_group"] = sgroup
                         if row["addr"] != current_addr:
                             updates["addr"] = current_addr
+                        if row["public_host"] != agent_info["public_host"]:
+                            updates["public_host"] = agent_info["public_host"]
                         if row["version"] != agent_info["version"]:
                             updates["version"] = agent_info["version"]
                         if row["compute_plugins"] != agent_info["compute_plugins"]:
@@ -2392,6 +2415,7 @@ class AgentRegistry:
                                     "region": agent_info["region"],
                                     "scaling_group": sgroup,
                                     "addr": agent_info["addr"],
+                                    "public_host": agent_info["public_host"],
                                     "lost_at": sa.null(),
                                     "available_slots": available_slots,
                                     "version": agent_info["version"],
@@ -2811,6 +2835,7 @@ async def check_scaling_group(
     access_key: AccessKey,
     domain_name: str,
     project_id: Union[uuid.UUID, str],
+    public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.
     # If scaling_group is not provided, it will be selected as the first one among
@@ -2821,6 +2846,8 @@ async def check_scaling_group(
         project_id,
         access_key,
     )
+    if public_sgroup_only:
+        candidates = [sgroup for sgroup in candidates if sgroup["is_public"]]
     if not candidates:
         raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
 

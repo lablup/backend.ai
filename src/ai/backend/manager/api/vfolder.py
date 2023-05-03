@@ -743,6 +743,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
                 proxy_name=proxy_name,
                 volume_name=volume_data["name"],
             ),
+            "sftp_scaling_groups": await root_ctx.storage_manager.get_sftp_scaling_groups(
+                proxy_name
+            ),
         }
         for proxy_name, volume_data in all_volumes
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
