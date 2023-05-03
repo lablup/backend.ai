@@ -950,14 +950,6 @@ class AbstractAgent(
                     kernel_obj.clean_event = ev.done_future
                 try:
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
-                    if ev.reason == KernelLifecycleEventReason.CONTAINER_ERROR:
-                        await self.produce_event(
-                            KernelErrorEvent(
-                                ev.kernel_id,
-                                ev.session_id,
-                                reason,
-                            )
-                        )
                 except Exception as e:
                     if ev.done_future is not None:
                         ev.done_future.set_exception(e)
@@ -1825,26 +1817,25 @@ class AbstractAgent(
                 cid = e.container_id
                 async with self.registry_lock:
                     self.kernel_registry[ctx.kernel_id]["container_id"] = cid
-                await self.inject_container_lifecycle_event(
-                    kernel_id,
-                    session_id,
-                    LifecycleEvent.DESTROY,
-                    KernelLifecycleEventReason.CONTAINER_ERROR,
-                    container_id=ContainerId(cid),
+                await self.produce_event(
+                    KernelErrorEvent(
+                        kernel_id,
+                        session_id,
+                        KernelLifecycleEventReason.CONTAINER_ERROR,
+                    )
                 )
                 raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
             except Exception:
                 log.warning(
-                    "Kernel failed to create container (k:{}). Kernel is going to be unregistered.",
+                    "Kernel failed to create container (k:{}).",
                     kernel_id,
                 )
-                async with self.registry_lock:
-                    del self.kernel_registry[kernel_id]
-                await self.inject_container_lifecycle_event(
-                    kernel_id,
-                    session_id,
-                    LifecycleEvent.DESTROY,
-                    KernelLifecycleEventReason.CONTAINER_ERROR,
+                await self.produce_event(
+                    KernelErrorEvent(
+                        kernel_id,
+                        session_id,
+                        KernelLifecycleEventReason.CONTAINER_ERROR,
+                    )
                 )
                 raise
             async with self.registry_lock:
