@@ -28,7 +28,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
@@ -589,19 +589,24 @@ class KernelRow(Base):
                 raise SessionNotFound
             return cand[0]
 
-    @staticmethod
+    @classmethod
     async def set_kernel_status(
+        cls,
         db: ExtendedAsyncSAEngine,
         kernel_id: KernelId,
         status: KernelStatus,
         *,
         status_data: Optional[Mapping[str, Any]] = None,
         reason: Optional[str] = None,
+        status_changed_at: Optional[datetime] = None,
     ) -> None:
         assert (
             status != KernelStatus.TERMINATED
         ), "TERMINATED status update must be handled in mark_kernel_terminated()"
-        now = datetime.now(tzutc())
+        if status_changed_at is None:
+            now = datetime.now(tzutc())
+        else:
+            now = status_changed_at
         data = {
             "status": status,
             "status_changed": now,
@@ -620,15 +625,63 @@ class KernelRow(Base):
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _transit() -> None:
-            async with db.begin_session() as db_sess:
-                kernel_query = sa.select(KernelRow.status).where(KernelRow.id == kernel_id)
-                current_status = (await db_sess.execute(kernel_query)).scalar()
-                if status in KERNEL_STATUS_TRANSITION_MAP[current_status]:
-                    query = sa.update(KernelRow).values(**data).where(KernelRow.id == kernel_id)
-                    await db_sess.execute(query)
+        await cls.update_kernel(db, kernel_id, status, update_data=data)
 
-        await execute_with_retry(_transit)
+    @classmethod
+    async def update_kernel(
+        cls,
+        db: ExtendedAsyncSAEngine,
+        kernel_id: KernelId,
+        new_status: KernelStatus,
+        update_data: Optional[Mapping[str, Any]] = None,
+    ) -> bool:
+        """
+        Update kernel by given id and data.
+        Return True if the kernel is updated, else return False.
+        """
+
+        now = datetime.now(tzutc())
+
+        async def _update() -> bool:
+            async with db.begin_session() as db_session:
+                kernel_query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kernel_id)
+                    .with_for_update()
+                    .options(
+                        noload("*"),
+                        load_only(KernelRow.status, KernelRow.session_id),
+                    )
+                )
+                kernel_row = (await db_session.scalars(kernel_query)).first()
+
+                if new_status not in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]:
+                    # TODO: log or raise error
+                    return False
+                if update_data is None:
+                    update_values = {
+                        "status": new_status,
+                        "status_history": sql_json_merge(
+                            KernelRow.status_history,
+                            (),
+                            {
+                                new_status.name: now.isoformat(),
+                            },
+                        ),
+                    }
+                else:
+                    update_values = {
+                        **update_data,
+                        "status": new_status,
+                    }
+
+                update_query = (
+                    sa.update(KernelRow).where(KernelRow.id == kernel_id).values(**update_values)
+                )
+                await db_session.execute(update_query)
+            return True
+
+        return await execute_with_retry(_update)
 
 
 DEFAULT_KERNEL_ORDERING = [

@@ -46,6 +46,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    SessionId,
     SlotName,
     VFolderMount,
     current_resource_slots,
@@ -91,6 +92,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -98,7 +100,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         static_pvc_name: str,
         restarting: bool = False,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id, session_id, kernel_config, local_config, computers, restarting=restarting
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
 
         self.scratch_dir = scratch_dir
@@ -558,6 +562,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         kernel_obj = KubernetesKernel(
             self.kernel_id,
+            self.session_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -931,6 +936,7 @@ class KubernetesAgent(
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -938,6 +944,7 @@ class KubernetesAgent(
     ) -> KubernetesKernelCreationContext:
         return KubernetesKernelCreationContext(
             kernel_id,
+            session_id,
             kernel_config,
             self.local_config,
             self.computers,

@@ -1495,14 +1495,11 @@ async def handle_kernel_creation_lifecycle(
     generated when initiating the create_kernels() agent RPC call.
     """
     root_ctx: RootContext = app["_root.context"]
-    # ck_id = (event.creation_id, event.kernel_id)
-    ck_id = event.kernel_id
-    if ck_id in root_ctx.registry.kernel_creation_tracker:
-        log.debug(
-            "handle_kernel_creation_lifecycle: ev:{} k:{}",
-            event.name,
-            event.kernel_id,
-        )
+    log.debug(
+        "handle_kernel_creation_lifecycle: ev:{} k:{}",
+        event.name,
+        event.kernel_id,
+    )
     if isinstance(event, KernelPreparingEvent):
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
         pass
@@ -1515,17 +1512,12 @@ async def handle_kernel_creation_lifecycle(
             root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
-        await root_ctx.registry.finalize_running(event.creation_info)
-        # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            tracker.set_result(None)
+        session_id = event.session_id
+        await root_ctx.registry.finalize_running(event.kernel_id, session_id, event.creation_info)
         if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
-            session_id = event.creation_info.get("session_id")
-            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(str(session_id)))
     elif isinstance(event, KernelCancelledEvent):
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            log.warning(f"Kernel cancelled, {event.reason = }")
-            tracker.cancel()
+        log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
@@ -1541,7 +1533,8 @@ async def handle_kernel_termination_lifecycle(
         await root_ctx.registry.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code
         )
-        await root_ctx.registry.check_session_terminated(event.kernel_id, event.reason)
+        session_id = event.session_id
+        await root_ctx.registry.check_session_terminated(session_id, event.reason)
 
 
 async def handle_kernel_error_lifecycle(
@@ -1551,7 +1544,7 @@ async def handle_kernel_error_lifecycle(
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     session_id = await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
-    await root_ctx.registry.check_session_error(session_id, event.reason)
+    await SessionRow.transit_session_status(root_ctx.db, session_id, status_info=event.reason)
 
 
 async def handle_session_creation_lifecycle(
@@ -1958,7 +1951,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         params["recursive"],
     )
 
-    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
 
     if params["recursive"]:
         async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -2701,19 +2694,17 @@ async def init(app: web.Application) -> None:
 
     # passive events
     evd = root_ctx.event_dispatcher
-    evd.subscribe(
+    evd.consume(
         KernelPreparingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kprep"
     )
-    evd.subscribe(
-        KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull"
-    )
-    evd.subscribe(
+    evd.consume(KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull")
+    evd.consume(
         KernelCreatingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kcreat"
     )
-    evd.subscribe(
+    evd.consume(
         KernelStartedEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
     )
-    evd.subscribe(
+    evd.consume(
         KernelCancelledEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
     )
     evd.subscribe(

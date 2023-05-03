@@ -30,6 +30,7 @@ from typing import (
     Tuple,
     Union,
 )
+from uuid import UUID
 
 import aiohttp
 import aiotools
@@ -62,6 +63,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     Sentinel,
     ServicePort,
+    SessionId,
     SlotName,
     current_resource_slots,
 )
@@ -146,6 +148,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -156,7 +159,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id, session_id, kernel_config, local_config, computers, restarting=restarting
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
 
@@ -661,6 +666,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         kernel_obj = DockerKernel(
             self.kernel_id,
+            self.session_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -725,6 +731,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
+                "ai.backend.session-id": str(self.session_id),
                 "ai.backend.internal.block-service-ports": (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
                 ),
@@ -1250,6 +1257,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1257,6 +1265,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     ) -> DockerKernelCreationContext:
         return DockerKernelCreationContext(
             kernel_id,
+            session_id,
             kernel_config,
             self.local_config,
             self.computers,
@@ -1442,8 +1451,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @preserve_termination_log
     async def monitor_docker_events(self):
         async def handle_action_start(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+            session_id = SessionId(UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"]))
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.START,
                 KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
@@ -1459,8 +1470,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 exit_code = evdata["Actor"]["Attributes"]["exitCode"]
             except KeyError:
                 exit_code = 255
+            session_id = SessionId(UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"]))
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.CLEAN,
                 reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
