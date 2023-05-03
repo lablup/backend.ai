@@ -1543,6 +1543,11 @@ async def handle_kernel_error_lifecycle(
     event: KernelErrorEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
+    log.debug(
+        "handle_kernel_error_lifecycle: ev:{} k:{}",
+        event.name,
+        event.kernel_id,
+    )
     session_id = await root_ctx.registry.mark_kernel_error(event.kernel_id, event.reason)
     await SessionRow.transit_session_status(root_ctx.db, session_id, status_info=event.reason)
 

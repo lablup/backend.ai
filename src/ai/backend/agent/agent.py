@@ -1845,7 +1845,6 @@ class AbstractAgent(
                     session_id,
                     LifecycleEvent.DESTROY,
                     KernelLifecycleEventReason.CONTAINER_ERROR,
-                    container_id=ContainerId(cid),
                 )
                 raise
             async with self.registry_lock:
