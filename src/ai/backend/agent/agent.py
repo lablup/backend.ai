@@ -1319,9 +1319,14 @@ class AbstractAgent(
                     body: MutableMapping[str, str] = json.loads(raw_body)
                     if auto_terminate:
                         log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
+                        kernel_id = KernelId(UUID(body["ID"]))
+                        kernel_obj = self.kernel_registry.get(kernel_id)
+                        if kernel_obj is None:
+                            continue
+                        session_id = kernel_obj.session_id
                         terminated_kernels[body["ID"]] = ContainerLifecycleEvent(
-                            KernelId(UUID(body["ID"])),
-                            SessionId(UUID(body["SID"])),
+                            kernel_id,
+                            session_id,
                             ContainerId(body["CID"]),
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.from_value(body.get("reason"))
@@ -1335,7 +1340,7 @@ class AbstractAgent(
                             body.get("reason"),
                         )
         finally:
-            for kernel_id, ev in terminated_kernels.items():
+            for kid, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
 
     @abstractmethod
