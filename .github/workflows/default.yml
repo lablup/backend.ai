@@ -320,6 +320,7 @@ jobs:
   build-client-image:
     needs: [build-wheels]
     runs-on: ubuntu-latest
+    environment: deploy-to-docker-hub
     steps:
       - uses: actions/checkout@v3
       - name: Set up QEMU
@@ -351,7 +352,7 @@ jobs:
             PKGVER=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Push latest
+      - name: Push to the Docker Hub
         run: |
           docker tag lablup/backend.ai-client:${{ github.ref_name }} lablup/backend.ai-client:latest
           docker push lablup/backend.ai-client:latest
