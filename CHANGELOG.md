@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.2 (2023-05-05)
+
+### Fixes
+* Downgrade yarl to 1.8.2 to fix image scanning feature not working ([#1261](https://github.com/lablup/backend.ai/issues/1261))
+
+
 ## 23.03.1 (2023-05-04)
 
 ### Features
