@@ -146,11 +146,21 @@ show_important_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
+  if [ "$?" -ne 0 ]; then
     echo 0
   else
     echo 1
   fi
+}
+
+install_indygreg_python() {
+  url="https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1+20230116-$INDYGREG_ARCH-$INDYGREG_PLATFORM-install_only.tar.gz"
+  cwd=$(pwd)
+  mkdir -p python-runtime && cd python-runtime
+  show_info "Downloading and installing standalone Python 3.11.1..."
+  curl -L $url | tar xz
+  mv python/* .
+  cd $cwd
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -174,30 +184,40 @@ DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN
 
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
+  INDYGREG_PLATFORM="apple-darwin"
 elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
   DISTRO="Debian"
+  INDYGREG_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  INDYGREG_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  INDYGREG_PLATFORM="unknown-linux-gnu"
 elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
   DISTRO="SUSE"
+  INDYGREG_PLATFORM="unknown-linux-gnu"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
+
+INDYGREG_ARCH=$(arch)
+if [ INDYGREG_ARCH == "arm64" ]; then
+  INDYGREG_ARCH="aarch64"
+fi
+
+export PYTHONPATH=$cwd/python-runtime
+if [ $DISTRO = "Darwin" ]; then
+  export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PYTHONPATH/lib
 else
-  # Ensure "readlinkf" is working...
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
-  exit 1
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PYTHONPATH/lib
+fi
+
+bpython=$(pwd)/python-runtime/bin/python3
+if [ $(has_python $bpython) -eq 0 ]; then
+  install_indygreg_python
 fi
 
 ROOT_PATH="$(pwd)"
@@ -531,6 +551,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
+$bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
 $bpython -m pip --disable-pip-version-check install -q 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
