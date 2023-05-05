@@ -292,6 +292,7 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Normalize the package version
+      shell: bash
       run: |
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
