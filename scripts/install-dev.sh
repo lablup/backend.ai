@@ -989,4 +989,7 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
 fi
 
+if [ -d $PYTHONPATH ]; then
+  rm -r $PYTHONPATH  # Remove downloaded standalone python build
+fi
 # vim: tw=0 sts=2 sw=2 et
