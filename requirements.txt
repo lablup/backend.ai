@@ -70,7 +70,7 @@ trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
 uvloop>=0.17; sys_platform != "Windows"
-yarl>=1.7
+yarl~=1.8.2  # FIXME: revert to >=1.7 after aio-libs/yarl#862 is resolved
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
