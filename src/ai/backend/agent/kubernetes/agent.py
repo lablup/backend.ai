@@ -571,6 +571,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         kernel_obj = KubernetesKernel(
             self.kernel_id,
             self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,

@@ -1386,20 +1386,25 @@ class AbstractAgent(
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
-                self.kernel_registry = pickle.load(f)
-                for kernel_obj in self.kernel_registry.values():
-                    kernel_obj.agent_config = self.local_config
-                    if kernel_obj.runner is not None:
-                        await kernel_obj.runner.__ainit__()
+                saved_registry: Mapping[KernelId, AbstractKernel] = pickle.load(f)
+                self.kernel_registry = {
+                    kernel_id: kernel_obj
+                    for kernel_id, kernel_obj in saved_registry.items()
+                    if kernel_obj.agent_id == self.local_config["agent"]["id"]
+                }
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
             )
         except FileNotFoundError:
             pass
+        for kernel_obj in self.kernel_registry.values():
+            kernel_obj.agent_config = self.local_config
+            if kernel_obj.runner is not None:
+                await kernel_obj.runner.__ainit__()
         async with self.resource_lock:
             for kernel_id, container in await self.enumerate_containers(
-                ACTIVE_STATUS_SET | DEAD_STATUS_SET,
+                ACTIVE_STATUS_SET | DEAD_STATUS_SET
             ):
                 session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                 if container.status in ACTIVE_STATUS_SET:

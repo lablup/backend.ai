@@ -675,6 +675,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         kernel_obj = DockerKernel(
             self.kernel_id,
             self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -1101,7 +1102,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None or kernel_id not in self.kernel_registry:
+                        if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
                             await container.show()
