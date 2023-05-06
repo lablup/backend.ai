@@ -92,6 +92,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginCont
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -164,6 +165,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
     kernel_id: KernelId
     session_id: SessionId
+    agent_id: AgentId
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
     kernel_features: FrozenSet[str]
@@ -177,6 +179,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -187,6 +190,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.kernel_features = frozenset(self.image_labels.get("ai.backend.features", "").split())
         self.kernel_id = kernel_id
         self.session_id = session_id
+        self.agent_id = agent_id
         self.kernel_config = kernel_config
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],

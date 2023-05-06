@@ -48,6 +48,7 @@ from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
@@ -149,6 +150,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -160,7 +162,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
         super().__init__(
-            kernel_id, session_id, kernel_config, local_config, computers, restarting=restarting
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
@@ -732,6 +740,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
                 "ai.backend.session-id": str(self.session_id),
+                "ai.backend.owner": str(self.agent_id),
                 "ai.backend.internal.block-service-ports": (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
                 ),
@@ -1266,6 +1275,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return DockerKernelCreationContext(
             kernel_id,
             session_id,
+            AgentId(self.local_config["agent"]["id"]),
             kernel_config,
             self.local_config,
             self.computers,
