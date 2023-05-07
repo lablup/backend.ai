@@ -16,7 +16,6 @@ from ai.backend.manager.models.base import EnumType
 
 # revision identifiers, used by Alembic.
 revision = "bedd92de93af"
-# down_revision = "10c58e701d87"
 down_revision = ("3efd66393bd0", "10c58e701d87")
 branch_labels = None
 depends_on = None
