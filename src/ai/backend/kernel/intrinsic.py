@@ -147,14 +147,13 @@ async def prepare_sshd_service(service_info):
 
 
 async def prepare_ttyd_service(service_info):
-    shell = "zsh"
-    if not Path("/bin/zsh").exists():
-        if Path("/bin/bash").exists():
-            shell = "bash"
-        elif Path("/bin/ash").exists():
-            shell = "ash"
-        else:
-            shell = "sh"
+    shell = "sh"
+    if Path("/bin/zsh"):
+        shell = "zsh"
+    elif Path("/bin/bash"):
+        shell = "bash"
+    elif Path("/bin/ash"):
+        shell = "ash"
 
     cmdargs = ["/opt/backend.ai/bin/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
     if shell != "ash":  # Currently Alpine-based containers are not supported.
