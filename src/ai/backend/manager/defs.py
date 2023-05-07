@@ -52,6 +52,11 @@ RESERVED_VFOLDERS = [
 ]
 RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 
+# Mapping between vfolder names and their in-container paths.
+VFOLDER_DSTPATHS_MAP = {
+    ".linuxbrew": "/home/linuxbrew/.linuxbrew",
+}
+
 # Redis database IDs depending on purposes
 REDIS_STAT_DB: Final = 0
 REDIS_RLIM_DB: Final = 1

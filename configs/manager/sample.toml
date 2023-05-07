@@ -53,7 +53,7 @@ ssl-enabled = false
 #ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
 
 # Set the timeout for agent heartbeats in seconds.
-heartbeat-timeout = 30.0
+heartbeat-timeout = 40.0
 
 # Override the name of this manager node.
 # If empty or unspecified, the agent builds this from the hostname by prefixing it with "i-",

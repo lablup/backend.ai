@@ -19,7 +19,7 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -35,6 +35,7 @@ class KubernetesKernel(AbstractKernel):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         image: ImageRef,
         version: int,
         *,
@@ -46,6 +47,7 @@ class KubernetesKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
             image,
             version,
             agent_config=agent_config,
@@ -278,8 +280,7 @@ class KubernetesKernel(AbstractKernel):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -300,8 +301,7 @@ class KubernetesKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
         async with watch.Watch().stream(
