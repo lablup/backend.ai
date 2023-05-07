@@ -150,6 +150,11 @@ async def prepare_ttyd_service(service_info):
     shell = "sh"
     if Path("/bin/zsh"):
         shell = "zsh"
+        zshrc_path = Path("~/.zshrc").expanduser()
+        with zshrc_path.open("w") as f:
+            f.write("export PATH=$PATH:/opt/backend.ai/bin\n")
+            f.write("export TERM=xterm-256color\n")
+            f.write("autoload -Uz compinit && compinit\n")
     elif Path("/bin/bash"):
         shell = "bash"
     elif Path("/bin/ash"):
