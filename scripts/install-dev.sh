@@ -153,11 +153,11 @@ has_python() {
   fi
 }
 
-install_indygreg_python() {
-  url="https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1+20230116-$INDYGREG_ARCH-$INDYGREG_PLATFORM-install_only.tar.gz"
+install_static_python() {
+  url="https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.11.1+20230116-$STANDALONE_PYTHON_ARCH-$STANDALONE_PYTHON_ARCH-install_only.tar.gz"
   cwd=$(pwd)
-  mkdir -p python-runtime && cd python-runtime
-  show_info "Downloading and installing standalone Python 3.11.1..."
+  mkdir -p .python-runtime && cd .python-runtime
+  show_info "Downloading and installing static Python 3.11.1..."
   curl -L $url | tar xz
   mv python/* .
   cd $cwd
@@ -184,40 +184,40 @@ DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN
 
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
-  INDYGREG_PLATFORM="apple-darwin"
+  STANDALONE_PYTHON_ARCH="apple-darwin"
 elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
   DISTRO="Debian"
-  INDYGREG_PLATFORM="unknown-linux-gnu"
+  STANDALONE_PYTHON_ARCH="unknown-linux-gnu"
 elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
-  INDYGREG_PLATFORM="unknown-linux-gnu"
+  STANDALONE_PYTHON_ARCH="unknown-linux-gnu"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
-  INDYGREG_PLATFORM="unknown-linux-gnu"
+  STANDALONE_PYTHON_ARCH="unknown-linux-gnu"
 elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
   DISTRO="SUSE"
-  INDYGREG_PLATFORM="unknown-linux-gnu"
+  STANDALONE_PYTHON_ARCH="unknown-linux-gnu"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
 
-INDYGREG_ARCH=$(arch)
-if [ INDYGREG_ARCH == "arm64" ]; then
-  INDYGREG_ARCH="aarch64"
+STANDALONE_PYTHON_ARCH=$(arch)
+if [ STANDALONE_PYTHON_ARCH == "arm64" ]; then
+  STANDALONE_PYTHON_ARCH="aarch64"
 fi
 
-export PYTHONPATH=$cwd/python-runtime
+export PYTHONPATH="$(pwd)/.python-runtime"
 if [ $DISTRO = "Darwin" ]; then
   export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PYTHONPATH/lib
 else
   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PYTHONPATH/lib
 fi
 
-bpython=$(pwd)/python-runtime/bin/python3
+bpython="$PYTHONPATH/bin/python3"
 if [ $(has_python $bpython) -eq 0 ]; then
-  install_indygreg_python
+  install_static_python
 fi
 
 ROOT_PATH="$(pwd)"
@@ -990,6 +990,6 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
 fi
 
 if [ -d $PYTHONPATH ]; then
-  rm -r $PYTHONPATH  # Remove downloaded standalone python build
+  rm -r "$(readlink -f $PYTHONPATH/..lib)"  # Remove downloaded static python build
 fi
 # vim: tw=0 sts=2 sw=2 et
