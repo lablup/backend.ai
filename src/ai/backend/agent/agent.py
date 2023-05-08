@@ -92,6 +92,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginCont
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -164,6 +165,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
     kernel_id: KernelId
     session_id: SessionId
+    agent_id: AgentId
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
     kernel_features: FrozenSet[str]
@@ -177,6 +179,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -187,6 +190,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.kernel_features = frozenset(self.image_labels.get("ai.backend.features", "").split())
         self.kernel_id = kernel_id
         self.session_id = session_id
+        self.agent_id = agent_id
         self.kernel_config = kernel_config
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
@@ -507,6 +511,7 @@ class ComputerContext:
 class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
+    id: AgentId
     loop: asyncio.AbstractEventLoop
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
@@ -547,6 +552,7 @@ class AbstractAgent(
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
+        self.id = AgentId(local_config["agent"]["id"])
         self.local_instance_id = generate_local_instance_id(__file__)
         self.kernel_registry = {}
         self.computers = {}
@@ -704,7 +710,7 @@ class AbstractAgent(
                             continue
         if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
             await self.save_last_registry()
-        await self.event_producer.produce_event(event, source=self.local_config["agent"]["id"])
+        await self.event_producer.produce_event(event, source=str(self.id))
 
     async def produce_error_event(
         self,
@@ -1383,16 +1389,16 @@ class AbstractAgent(
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
                 self.kernel_registry = pickle.load(f)
-                for kernel_obj in self.kernel_registry.values():
-                    kernel_obj.agent_config = self.local_config
-                    if kernel_obj.runner is not None:
-                        await kernel_obj.runner.__ainit__()
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
             )
         except FileNotFoundError:
             pass
+        for kernel_obj in self.kernel_registry.values():
+            kernel_obj.agent_config = self.local_config
+            if kernel_obj.runner is not None:
+                await kernel_obj.runner.__ainit__()
         async with self.resource_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,

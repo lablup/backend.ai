@@ -38,7 +38,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, ServicePort, SessionId, aobject
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -155,6 +155,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     agent_config: Mapping[str, Any]
     session_id: SessionId
     kernel_id: KernelId
+    agent_id: AgentId
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
@@ -175,6 +176,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -187,6 +189,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.agent_config = agent_config
         self.kernel_id = kernel_id
         self.session_id = session_id
+        self.agent_id = agent_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
