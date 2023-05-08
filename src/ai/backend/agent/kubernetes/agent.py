@@ -36,6 +36,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginCont
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -45,6 +46,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    SessionId,
     SlotName,
     VFolderMount,
     current_resource_slots,
@@ -70,7 +72,7 @@ from .kube_object import (
 )
 from .resources import detect_resources
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.kubernetes.agent"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -90,6 +92,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -97,7 +100,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         static_pvc_name: str,
         restarting: bool = False,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id, session_id, kernel_config, local_config, computers, restarting=restarting
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
 
         self.scratch_dir = scratch_dir
@@ -237,7 +242,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
@@ -557,6 +562,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         kernel_obj = KubernetesKernel(
             self.kernel_id,
+            self.session_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -620,7 +626,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ):
             rollback_functions: List[Optional[functools.partial]] = []
 
-            for (rollup_function, future_rollback_function) in functions:
+            for rollup_function, future_rollback_function in functions:
                 try:
                     if rollup_function:
                         await rollup_function()
@@ -800,7 +806,10 @@ class KubernetesAgent(
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    f'Scratch type {self.local_config["container"]["scratch-type"]} is not supported',
+                    (
+                        f'Scratch type {self.local_config["container"]["scratch-type"]} is not'
+                        " supported"
+                    ),
                 )
 
             try:
@@ -927,12 +936,15 @@ class KubernetesAgent(
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
         return KubernetesKernelCreationContext(
             kernel_id,
+            session_id,
             kernel_config,
             self.local_config,
             self.computers,
@@ -976,17 +988,11 @@ class KubernetesAgent(
             scratch_dir = self.local_config["container"]["scratch-root"] / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
-    async def create_overlay_network(self, network_name: str) -> None:
-        return await super().create_overlay_network(network_name)
-
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        return await super().destroy_overlay_network(network_name)
-
     async def create_local_network(self, network_name: str) -> None:
-        return await super().create_local_network(network_name)
+        raise NotImplementedError
 
     async def destroy_local_network(self, network_name: str) -> None:
-        return await super().destroy_local_network(network_name)
+        raise NotImplementedError
 
     async def restart_kernel__load_config(
         self,

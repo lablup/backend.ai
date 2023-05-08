@@ -15,11 +15,13 @@ import inquirer
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from faker import Faker
 from humanize import naturalsize
 from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
@@ -49,7 +51,7 @@ def _create_cmd(docs: str = None):
         "--name",
         "--client-token",
         metavar="NAME",
-        help="Specify a human-readable session name. " "If not set, a random hex string is used.",
+        help="Specify a human-readable session name. If not set, a random hex string is used.",
     )
     @click.option(
         "-o",
@@ -99,8 +101,10 @@ def _create_cmd(docs: str = None):
         metavar="SESSION_ID",
         type=str,
         multiple=True,
-        help="Set the list of session ID or names that the newly created session depends on. "
-        "The session will get scheduled after all of them successfully finish.",
+        help=(
+            "Set the list of session ID or names that the newly created session depends on. "
+            "The session will get scheduled after all of them successfully finish."
+        ),
     )
     @click.option(
         "--callback-url",
@@ -129,6 +133,15 @@ def _create_cmd(docs: str = None):
     @click.option(
         "--tag", type=str, default=None, help="User-defined tag string to annotate sessions."
     )
+    @click.option(
+        "--arch",
+        "--architecture",
+        "architecture",
+        metavar="ARCH_NAME",
+        type=str,
+        default=DEFAULT_IMAGE_ARCH,
+        help="Architecture of the image to use.",
+    )
     # resource spec
     @click.option(
         "-v",
@@ -139,20 +152,24 @@ def _create_cmd(docs: str = None):
         metavar="NAME[=PATH]",
         type=str,
         multiple=True,
-        help="User-owned virtual folder names to mount. "
-        "If path is not provided, virtual folder will be mounted under /home/work. "
-        "When the target path is relative, it is placed under /home/work "
-        "with auto-created parent directories if any. "
-        "Absolute paths are mounted as-is, but it is prohibited to "
-        "override the predefined Linux system directories.",
+        help=(
+            "User-owned virtual folder names to mount. "
+            "If path is not provided, virtual folder will be mounted under /home/work. "
+            "When the target path is relative, it is placed under /home/work "
+            "with auto-created parent directories if any. "
+            "Absolute paths are mounted as-is, but it is prohibited to "
+            "override the predefined Linux system directories."
+        ),
     )
     @click.option(
         "--scaling-group",
         "--sgroup",
         type=str,
         default=None,
-        help="The scaling group to execute session. If not specified, "
-        "all available scaling groups are included in the scheduling.",
+        help=(
+            "The scaling group to execute session. If not specified, "
+            "all available scaling groups are included in the scheduling."
+        ),
     )
     @click.option(
         "-r",
@@ -160,10 +177,12 @@ def _create_cmd(docs: str = None):
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Set computation resources used by the session "
-        "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
-        "1 slot of cpu/gpu represents 1 core. "
-        "The unit of mem(ory) is MiB.",
+        help=(
+            "Set computation resources used by the session "
+            "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
+            "1 slot of cpu/gpu represents 1 core. "
+            "The unit of mem(ory) is MiB."
+        ),
     )
     @click.option(
         "--cluster-size",
@@ -184,7 +203,7 @@ def _create_cmd(docs: str = None):
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Resource options for creating compute session " "(e.g: shmem=64m)",
+        help="Resource options for creating compute session (e.g: shmem=64m)",
     )
     @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
     # resource grouping
@@ -193,24 +212,30 @@ def _create_cmd(docs: str = None):
         "--domain",
         metavar="DOMAIN_NAME",
         default=None,
-        help="Domain name where the session will be spawned. "
-        "If not specified, config's domain name will be used.",
+        help=(
+            "Domain name where the session will be spawned. "
+            "If not specified, config's domain name will be used."
+        ),
     )
     @click.option(
         "-g",
         "--group",
         metavar="GROUP_NAME",
         default=None,
-        help="Group name where the session is spawned. "
-        "User should be a member of the group to execute the code.",
+        help=(
+            "Group name where the session is spawned. "
+            "User should be a member of the group to execute the code."
+        ),
     )
     @click.option(
         "--assign-agent",
         default=None,
         type=list_expr,
-        help="Show mapping list of tuple which mapped containers with agent. "
-        "When user role is Super Admin. "
-        "(e.g., --assign-agent agent_id_1,agent_id_2,...)",
+        help=(
+            "Show mapping list of tuple which mapped containers with agent. "
+            "When user role is Super Admin. "
+            "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
+        ),
     )
     def create(
         # base args
@@ -231,6 +256,7 @@ def _create_cmd(docs: str = None):
         # extra options
         bootstrap_script: IO | None,
         tag: str | None,
+        architecture: str,
         # resource spec
         mount: Sequence[str],
         scaling_group: str | None,
@@ -256,7 +282,8 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         else:
             name = name
 
@@ -292,10 +319,11 @@ def _create_cmd(docs: str = None):
                     domain_name=domain,
                     group_name=group,
                     scaling_group=scaling_group,
-                    bootstrap_script=bootstrap_script.read()
-                    if bootstrap_script is not None
-                    else None,
+                    bootstrap_script=(
+                        bootstrap_script.read() if bootstrap_script is not None else None
+                    ),
                     tag=tag,
+                    architecture=architecture,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
                 )
@@ -343,9 +371,8 @@ def _create_cmd(docs: str = None):
                     )
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            compute_session.id
-                        )
+                        "Session ID {0} has an error during scheduling/startup or cancelled."
+                        .format(compute_session.id)
                     )
 
     if docs is not None:
@@ -365,7 +392,7 @@ def _create_from_template_cmd(docs: str = None):
         "--client-token",
         metavar="NAME",
         default=undefined,
-        help="Specify a human-readable session name. " "If not set, a random hex string is used.",
+        help="Specify a human-readable session name. If not set, a random hex string is used.",
     )
     @click.option(
         "-o",
@@ -419,15 +446,17 @@ def _create_from_template_cmd(docs: str = None):
         metavar="SESSION_ID",
         type=str,
         multiple=True,
-        help="Set the list of session ID or names that the newly created session depends on. "
-        "The session will get scheduled after all of them successfully finish.",
+        help=(
+            "Set the list of session ID or names that the newly created session depends on. "
+            "The session will get scheduled after all of them successfully finish."
+        ),
     )
     @click.option(
         "--callback-url",
         metavar="CALLBACK_URL",
         type=str,
         default=None,
-        help="Callback URL which will be called upon sesison lifecycle events.",
+        help="Callback URL which will be called upon session lifecycle events.",
     )
     # execution environment
     @click.option(
@@ -449,19 +478,23 @@ def _create_from_template_cmd(docs: str = None):
         metavar="NAME[=PATH]",
         type=str,
         multiple=True,
-        help="User-owned virtual folder names to mount. "
-        "When the target path is relative, it is placed under /home/work "
-        "with auto-created parent directories if any. "
-        "Absolute paths are mounted as-is, but it is prohibited to "
-        "override the predefined Linux system directories.",
+        help=(
+            "User-owned virtual folder names to mount. "
+            "When the target path is relative, it is placed under /home/work "
+            "with auto-created parent directories if any. "
+            "Absolute paths are mounted as-is, but it is prohibited to "
+            "override the predefined Linux system directories."
+        ),
     )
     @click.option(
         "--scaling-group",
         "--sgroup",
         type=str,
         default=undefined,
-        help="The scaling group to execute session. If not specified, "
-        "all available scaling groups are included in the scheduling.",
+        help=(
+            "The scaling group to execute session. If not specified, "
+            "all available scaling groups are included in the scheduling."
+        ),
     )
     @click.option(
         "-r",
@@ -469,10 +502,12 @@ def _create_from_template_cmd(docs: str = None):
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Set computation resources used by the session "
-        "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
-        "1 slot of cpu/gpu represents 1 core. "
-        "The unit of mem(ory) is MiB.",
+        help=(
+            "Set computation resources used by the session "
+            "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
+            "1 slot of cpu/gpu represents 1 core. "
+            "The unit of mem(ory) is MiB."
+        ),
     )
     @click.option(
         "--cluster-size",
@@ -486,7 +521,7 @@ def _create_from_template_cmd(docs: str = None):
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Resource options for creating compute session " "(e.g: shmem=64m)",
+        help="Resource options for creating compute session (e.g: shmem=64m)",
     )
     # resource grouping
     @click.option(
@@ -494,35 +529,45 @@ def _create_from_template_cmd(docs: str = None):
         "--domain",
         metavar="DOMAIN_NAME",
         default=None,
-        help="Domain name where the session will be spawned. "
-        "If not specified, config's domain name will be used.",
+        help=(
+            "Domain name where the session will be spawned. "
+            "If not specified, config's domain name will be used."
+        ),
     )
     @click.option(
         "-g",
         "--group",
         metavar="GROUP_NAME",
         default=None,
-        help="Group name where the session is spawned. "
-        "User should be a member of the group to execute the code.",
+        help=(
+            "Group name where the session is spawned. "
+            "User should be a member of the group to execute the code."
+        ),
     )
     # template overrides
     @click.option(
         "--no-mount",
         is_flag=True,
-        help="If specified, client.py will tell server not to mount "
-        "any vFolders specified at template,",
+        help=(
+            "If specified, client.py will tell server not to mount "
+            "any vFolders specified at template,"
+        ),
     )
     @click.option(
         "--no-env",
         is_flag=True,
-        help="If specified, client.py will tell server not to add "
-        "any environs specified at template,",
+        help=(
+            "If specified, client.py will tell server not to add "
+            "any environs specified at template,"
+        ),
     )
     @click.option(
         "--no-resource",
         is_flag=True,
-        help="If specified, client.py will tell server not to add "
-        "any resource specified at template,",
+        help=(
+            "If specified, client.py will tell server not to add "
+            "any resource specified at template,"
+        ),
     )
     def create_from_template(
         # base args
@@ -564,8 +609,7 @@ def _create_from_template_cmd(docs: str = None):
         command.
 
         \b
-        IMAGE: The name (and version/platform tags appended after a colon) of session
-               runtime or programming language.
+        TEMPLATE_ID: The template ID to create a session from.
         """
         if name is undefined:
             name = f"pysdk-{secrets.token_hex(5)}"
@@ -638,9 +682,8 @@ def _create_from_template_cmd(docs: str = None):
                     print_info("Session ID {0} is still on the job queue.".format(name))
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            name
-                        )
+                        "Session ID {0} has an error during scheduling/startup or cancelled."
+                        .format(name)
                     )
 
     if docs is not None:
@@ -672,7 +715,10 @@ def _destroy_cmd(docs: str = None):
     @click.option(
         "-s", "--stats", is_flag=True, help="Show resource usage statistics after termination"
     )
-    def destroy(session_names, forced, owner, stats):
+    @click.option(
+        "-r", "--recursive", is_flag=True, help="Cancel all the dependant sessions recursively"
+    )
+    def destroy(session_names, forced, owner, stats, recursive):
         """
         Terminate and destroy the given session.
 
@@ -687,7 +733,8 @@ def _destroy_cmd(docs: str = None):
             for session_name in session_names:
                 try:
                     compute_session = session.ComputeSession(session_name, owner)
-                    ret = compute_session.destroy(forced=forced)
+                    ret = compute_session.destroy(forced=forced, recursive=recursive)
+
                 except BackendAPIError as e:
                     print_error(e)
                     if e.status == 404:
@@ -935,21 +982,21 @@ def status_history(session_id):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-@click.argument("new_id", metavar="NEWID")
-def rename(session_id, new_id):
+@click.argument("new_name", metavar="NEWNAME")
+def rename(session_id, new_name):
     """
     Renames session name of running session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
-    NEWID: New Session ID to rename to.
+    NEWNAME: New Session name.
     """
 
     with Session() as session:
         try:
             kernel = session.ComputeSession(session_id)
-            kernel.rename(new_id)
-            print_done(f"Session renamed to {new_id}.")
+            kernel.rename(new_name)
+            print_done(f"Session renamed to {new_name}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -1180,7 +1227,11 @@ def _events_cmd(docs: str = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        print(click.style(ev.event, fg="cyan", bold=True), json.loads(ev.data))
+                        click.echo(
+                            click.style(ev.event, fg="cyan", bold=True)
+                            + " "
+                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+                        )
 
         try:
             asyncio_run(_run_events())
@@ -1205,12 +1256,10 @@ def _fetch_session_names():
             "PENDING",
             "SCHEDULED",
             "PREPARING",
-            "PULLING",
             "RUNNING",
+            "RUNNING_DEGRADED",
             "RESTARTING",
             "TERMINATING",
-            "RESIZING",
-            "SUSPENDED",
             "ERROR",
         ]
     )
@@ -1218,7 +1267,7 @@ def _fetch_session_names():
         session_fields["name"],
         session_fields["session_id"],
         session_fields["group_name"],
-        session_fields["kernel_id"],
+        session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],
         session_fields["status"],
@@ -1237,7 +1286,7 @@ def _fetch_session_names():
             order=None,
         )
 
-    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+    return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
 def _watch_cmd(docs: Optional[str] = None):
@@ -1363,7 +1412,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                sys.exit(ExitCode.TIMEOUT)
+                sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
             if max_wait > 0:

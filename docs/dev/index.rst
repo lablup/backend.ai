@@ -4,7 +4,8 @@ Developer Guides
 .. toctree::
    :maxdepth: 2
 
-
-   ../install/development-setup
+   development-setup
    daily-workflows
    adding-kernels
+   using-mock-accelerator
+   version-management-and-upgrades

@@ -28,7 +28,7 @@ import janus
 import msgpack
 import zmq
 from async_timeout import timeout
-from jupyter_client import KernelManager
+from jupyter_client import AsyncKernelClient, AsyncKernelManager
 from jupyter_client.kernelspec import KernelSpecManager
 
 from .compat import current_loop
@@ -80,31 +80,51 @@ async def terminate_and_wait(proc: asyncio.subprocess.Process, timeout: float = 
         pass
 
 
-def promote_path(path_env: str, path_to_promote: Union[Path, str]) -> str:
+def glob_path(base: Path | str, pattern: str) -> Path | None:
+    paths = [*Path(base).glob(pattern)]
+    if paths:
+        return paths[0]
+    return None
+
+
+def promote_path(path_env: str, path_to_promote: Path | str | None) -> str:
+    if not path_to_promote:
+        return path_env
     paths = path_env.split(":")
-    print(f"promote_path: {path_to_promote=} {path_env=}", file=sys.stderr)
-    path_to_promote = str(path_to_promote)
+    path_to_promote = os.fsdecode(path_to_promote)
     result_paths = [p for p in paths if path_to_promote != p]
     result_paths.insert(0, path_to_promote)
     return ":".join(result_paths)
 
 
 class BaseRunner(metaclass=ABCMeta):
-
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
     default_runtime_path: ClassVar[Optional[str]] = None
-    default_child_env: ClassVar[MutableMapping[str, str]] = {
+    default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
-        "SHELL": "/bin/sh",
         "HOME": "/home/work",
+        "TERM": "xterm",
         "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
         "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
+        "SSH_AUTH_SOCK": os.environ.get("SSH_AUTH_SOCK", ""),
+        "SSH_AGENT_PID": os.environ.get("SSH_AGENT_PID", ""),
     }
+    default_child_env_path = ":".join(
+        [
+            "/usr/local/sbin",
+            "/usr/local/bin",
+            "/usr/sbin",
+            "/usr/bin",
+            "/sbin",
+            "/bin",
+        ]
+    )
+    default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
-    kernel_mgr = None
-    kernel_client = None
+    kernel_mgr: Optional[AsyncKernelManager] = None
+    kernel_client: Optional[AsyncKernelClient] = None
 
     child_env: MutableMapping[str, str]
     subproc: Optional[asyncio.subprocess.Process]
@@ -112,6 +132,8 @@ class BaseRunner(metaclass=ABCMeta):
     runtime_path: Path
 
     services_running: Dict[str, asyncio.subprocess.Process]
+
+    intrinsic_host_ports_mapping: Mapping[str, int]
 
     _build_success: Optional[bool]
 
@@ -121,12 +143,12 @@ class BaseRunner(metaclass=ABCMeta):
     def __init__(self, runtime_path: Path) -> None:
         self.subproc = None
         self.runtime_path = runtime_path
-
-        default_child_env_path = self.default_child_env.pop("PATH", None)
         self.child_env = {**os.environ, **self.default_child_env}
-        if default_child_env_path is not None and "PATH" not in self.child_env:
-            # set the default PATH env-var only when it's missing from the image
-            self.child_env["PATH"] = default_child_env_path
+        # set some defaults only when they are missing from the image
+        if "PATH" not in self.child_env:
+            self.child_env["PATH"] = self.default_child_env_path
+        if "SHELL" not in self.child_env:
+            self.child_env["SHELL"] = self.default_child_env_shell
         config_dir = Path("/home/config")
         try:
             evdata = (config_dir / "environ.txt").read_text()
@@ -139,12 +161,20 @@ class BaseRunner(metaclass=ABCMeta):
         except Exception:
             log.exception("Reading /home/config/environ.txt failed!")
 
-        # Add ~/.local/bin to the default PATH
-        self.child_env["PATH"] += os.pathsep + "~/.local/bin"
-        os.environ["PATH"] += os.pathsep + "~/.local/bin"
+        path_env = self.child_env["PATH"]
+        if Path("/usr/local/cuda/bin").is_dir():
+            path_env = promote_path(path_env, "/usr/local/cuda/bin")
+        if Path("/usr/local/nvidia/bin").is_dir():
+            path_env = promote_path(path_env, "/usr/local/nvidia/bin")
+        if Path("/home/linuxbrew/.linuxbrew").is_dir():
+            path_env = promote_path(path_env, "/home/linuxbrew/.linuxbrew/bin")
+        path_env = promote_path(path_env, "/home/work/.local/bin")
+        self.child_env["PATH"] = path_env
 
         self.started_at: float = time.monotonic()
         self.services_running = {}
+
+        self.intrinsic_host_ports_mapping = {}
 
         # If the subclass implements interatcive user inputs, it should set a
         # asyncio.Queue-like object to self.user_input_queue in the
@@ -164,10 +194,25 @@ class BaseRunner(metaclass=ABCMeta):
         loop.set_default_executor(executor)
 
         self.zctx = zmq.asyncio.Context()
+
+        intrinsic_host_ports_mapping_path = Path("/home/config/intrinsic-ports.json")
+        if intrinsic_host_ports_mapping_path.is_file():
+            intrinsic_host_ports_mapping = json.loads(
+                await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    lambda: intrinsic_host_ports_mapping_path.read_text(),
+                )
+            )
+            self.intrinsic_host_ports_mapping = intrinsic_host_ports_mapping
+
+        insock_port = self.intrinsic_host_ports_mapping.get("replin", "2000")
+        outsock_port = self.intrinsic_host_ports_mapping.get("replout", "2001")
         self.insock = self.zctx.socket(zmq.PULL)
-        self.insock.bind("tcp://*:2000")
+        self.insock.bind(f"tcp://*:{insock_port}")
+        print(f"binding to tcp://*:{insock_port}")
         self.outsock = self.zctx.socket(zmq.PUSH)
-        self.outsock.bind("tcp://*:2001")
+        self.outsock.bind(f"tcp://*:{outsock_port}")
+        print(f"binding to tcp://*:{outsock_port}")
 
         self.log_queue = janus.Queue()
         self.task_queue = asyncio.Queue()
@@ -238,15 +283,16 @@ class BaseRunner(metaclass=ABCMeta):
         for kname in kspecs:
             if self.jupyter_kspec_name in kname:
                 log.debug("starting " + kname + " kernel...")
-                self.kernel_mgr = KernelManager(kernel_name=kname)
-                self.kernel_mgr.start_kernel()
-                if not self.kernel_mgr.is_alive():
-                    log.error("jupyter query mode is disabled: " "failed to start jupyter kernel")
+                self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
+                await self.kernel_mgr.start_kernel()
+                if not await self.kernel_mgr.is_alive():
+                    log.error("jupyter query mode is disabled: failed to start jupyter kernel")
                 else:
-                    self.kernel_client = self.kernel_mgr.client()
+                    self.kernel_client = self.kernel_mgr.client()  # type: ignore
+                    assert self.kernel_client is not None
                     self.kernel_client.start_channels(shell=True, iopub=True, stdin=True, hb=True)
                     try:
-                        self.kernel_client.wait_for_ready(timeout=10)
+                        await self.kernel_client.wait_for_ready(timeout=10)
                         # self.init_jupyter_kernel()
                     except RuntimeError:
                         # Clean up for client and kernel will be done in `shutdown`.
@@ -254,15 +300,16 @@ class BaseRunner(metaclass=ABCMeta):
                         self.kernel_mgr = None
                 break
         else:
-            log.debug("jupyter query mode is not available: " "no jupyter kernelspec found")
+            log.debug("jupyter query mode is not available: no jupyter kernelspec found")
             self.kernel_mgr = None
 
     async def _shutdown_jupyter_kernel(self):
-        if self.kernel_mgr and self.kernel_mgr.is_alive():
+        if self.kernel_mgr and await self.kernel_mgr.is_alive():
+            assert self.kernel_client is not None
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
+            await self.kernel_mgr.shutdown_kernel()
             self.kernel_client.stop_channels()
-            self.kernel_mgr.shutdown_kernel()
-            assert not self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
+            assert not await self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
 
     async def _init_with_loop(self) -> None:
         if self.init_done is not None:
@@ -397,9 +444,10 @@ class BaseRunner(metaclass=ABCMeta):
         `Runner` subclass should override this method.
         """
         if not hasattr(self, "kernel_mgr") or self.kernel_mgr is None:
-            log.error("query mode is disabled: " "failed to start jupyter kernel")
+            log.error("query mode is disabled: failed to start jupyter kernel")
             return 127
 
+        assert self.kernel_client is not None
         log.debug("executing in query mode...")
 
         async def output_hook(msg):
@@ -451,6 +499,8 @@ class BaseRunner(metaclass=ABCMeta):
                     )
 
         async def stdin_hook(msg):
+            assert self.kernel_client is not None
+            assert self.user_input_queue is not None
             if msg["msg_type"] == "input_request":
                 prompt = msg["content"]["prompt"]
                 password = msg["content"]["password"]
@@ -459,7 +509,7 @@ class BaseRunner(metaclass=ABCMeta):
                 await self.outsock.send_multipart(
                     [b"waiting-input", json.dumps({"is_password": password}).encode("utf-8")]
                 )
-                user_input = await self.user_input_queue.async_q.get()
+                user_input = await self.user_input_queue.get()
                 self.kernel_client.input(user_input)
 
         # Run jupyter kernel's blocking execution method in an executor pool.
@@ -475,7 +525,7 @@ class BaseRunner(metaclass=ABCMeta):
                 stdin_hook=stdin_hook,
             )
         except Exception as e:
-            log.error(str(e))
+            log.exception(str(e))
             return 127
         return 0
 
@@ -527,7 +577,7 @@ class BaseRunner(metaclass=ABCMeta):
         `Runner` subclass should implement its own `complete` method.
         """
         if hasattr(self, "kernel_mgr") and self.kernel_mgr is not None:
-            self.kernel_mgr.interrupt_kernel()
+            await self.kernel_mgr.interrupt_kernel()
 
     async def _send_status(self):
         data = {
@@ -676,8 +726,10 @@ class BaseRunner(metaclass=ABCMeta):
             kernel_id = os.environ["BACKENDAI_KERNEL_ID"]
             kernel_id_hex = uuid.UUID(kernel_id).hex
             log_path = Path(
-                "/home/work/.logs/task/"
-                f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log",
+                (
+                    "/home/work/.logs/task/"
+                    f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log"
+                ),
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)
         else:
@@ -797,12 +849,18 @@ class BaseRunner(metaclass=ABCMeta):
         )
 
     async def main_loop(self, cmdargs):
-        user_input_server = await asyncio.start_server(self.handle_user_input, "127.0.0.1", 65000)
+        log.debug("starting user input server...")
+        user_input_server = await asyncio.start_unix_server(
+            self.handle_user_input, "/tmp/bai-user-input.sock"
+        )
+        log.debug("initializing krunner...")
         await self._init_with_loop()
+        log.debug("initializing jupyter kernel...")
         await self._init_jupyter_kernel()
 
         user_bootstrap_path = Path("/home/work/bootstrap.sh")
         if user_bootstrap_path.is_file():
+            log.debug("running user bootstrap script...")
             await self._bootstrap(user_bootstrap_path)
 
         log.debug("starting intrinsic services: sshd, ttyd ...")
@@ -811,7 +869,7 @@ class BaseRunner(metaclass=ABCMeta):
             self._start_service(
                 {
                     "name": "sshd",
-                    "port": 2200,
+                    "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
                 user_requested=False,
@@ -821,7 +879,7 @@ class BaseRunner(metaclass=ABCMeta):
             self._start_service(
                 {
                     "name": "ttyd",
-                    "port": 7681,
+                    "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
                 user_requested=False,

@@ -32,7 +32,7 @@ from ..types import (
 )
 from ..utils import fstime2datetime
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def run(cmd: Sequence[Union[str, Path]]) -> str:
@@ -48,7 +48,6 @@ async def run(cmd: Sequence[Union[str, Path]]) -> str:
 
 
 class BaseVolume(AbstractVolume):
-
     # ------ volume operations -------
 
     async def get_capabilities(self) -> FrozenSet[str]:
@@ -85,36 +84,41 @@ class BaseVolume(AbstractVolume):
             except FileNotFoundError:
                 pass
             # remove intermediate prefix directories if they become empty
-            if not os.listdir(vfpath.parent):
-                vfpath.parent.rmdir()
-            if not os.listdir(vfpath.parent.parent):
-                vfpath.parent.parent.rmdir()
+            try:
+                if not os.listdir(vfpath.parent):
+                    vfpath.parent.rmdir()
+            except FileNotFoundError:
+                pass
+            try:
+                if not os.listdir(vfpath.parent.parent):
+                    vfpath.parent.parent.rmdir()
+            except FileNotFoundError:
+                pass
 
         await loop.run_in_executor(None, _delete_vfolder)
 
     async def clone_vfolder(
         self,
         src_vfid: UUID,
-        dst_volume: AbstractVolume,
         dst_vfid: UUID,
         options: VFolderCreationOptions = None,
     ) -> None:
         # check if there is enough space in the destination
-        fs_usage = await dst_volume.get_fs_usage()
+        fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise ExecutionError("Not enough space available for clone.")
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
-        await dst_volume.create_vfolder(dst_vfid, options=options, exist_ok=True)
-        dst_vfpath = dst_volume.mangle_vfpath(dst_vfid)
+        await self.create_vfolder(dst_vfid, options=options, exist_ok=True)
+        dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
         try:
             await self.copy_tree(src_vfpath, dst_vfpath)
         except Exception:
-            await dst_volume.delete_vfolder(dst_vfid)
+            await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
             raise ExecutionError("Copying files from source directories failed.")
 

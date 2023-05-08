@@ -2,17 +2,37 @@
 set -e
 
 arch=$(uname -m)
-distros=("glibc" "musl")
+distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "ubuntu22.04" "alpine3.8")
 
-glibc_builder_dockerfile=$(cat <<'EOF'
+ubuntu1604_builder_dockerfile=$(cat <<'EOF'
+FROM ubuntu:16.04
+RUN apt-get update
+RUN apt-get install -y make gcc
+RUN apt-get install -y autoconf automake zlib1g-dev
+EOF
+)
+ubuntu1804_builder_dockerfile=$(cat <<'EOF'
+FROM ubuntu:18.04
+RUN apt-get update
+RUN apt-get install -y make gcc
+RUN apt-get install -y autoconf automake zlib1g-dev
+EOF
+)
+ubuntu2004_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:20.04
 RUN apt-get update
 RUN apt-get install -y make gcc
 RUN apt-get install -y autoconf automake zlib1g-dev
 EOF
 )
-
-musl_builder_dockerfile=$(cat <<'EOF'
+ubuntu2204_builder_dockerfile=$(cat <<'EOF'
+FROM ubuntu:22.04
+RUN apt-get update
+RUN apt-get install -y make gcc
+RUN apt-get install -y autoconf automake zlib1g-dev
+EOF
+)
+alpine_builder_dockerfile=$(cat <<'EOF'
 FROM alpine:3.8
 RUN apk add --no-cache make gcc musl-dev
 RUN apk add --no-cache autoconf automake zlib-dev
@@ -49,8 +69,11 @@ temp_dir=$(mktemp -d -t dropbear-build.XXXXX)
 echo "Using temp directory: $temp_dir"
 echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
-echo "$glibc_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.glibc.dockerfile"
-echo "$musl_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.musl.dockerfile"
+echo "$ubuntu1604_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu16.04.dockerfile"
+echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu18.04.dockerfile"
+echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu20.04.dockerfile"
+echo "$ubuntu2204_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.ubuntu22.04.dockerfile"
+echo "$alpine_builder_dockerfile" > "$SCRIPT_DIR/dropbear-builder.alpine3.8.dockerfile"
 
 for distro in "${distros[@]}"; do
   docker build -t dropbear-builder:$distro \
@@ -72,8 +95,8 @@ for distro in "${distros[@]}"; do
 done
 
 ls -l .
-cp dropbear.*.bin        $SCRIPT_DIR/../src/ai/backend/runner
-cp dropbearkey.*.bin     $SCRIPT_DIR/../src/ai/backend/runner
-cp dropbearconvert.*.bin $SCRIPT_DIR/../src/ai/backend/runner
+cp dropbear.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
+cp dropbearkey.*.bin     $SCRIPT_DIR/../../src/ai/backend/runner
+cp dropbearconvert.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 
 rm -rf "$temp_dir"

@@ -22,7 +22,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Literal,
     Mapping,
     Optional,
@@ -48,7 +47,7 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -58,6 +57,7 @@ from ai.backend.common.types import (
     HostPortPair,
     KernelCreationConfig,
     KernelId,
+    LogSeverity,
     SessionId,
     aobject,
 )
@@ -73,12 +73,12 @@ from .config import (
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
-from .utils import get_subnet_ip
+from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -119,7 +119,7 @@ async def get_extra_volumes(docker, lang):
             mount_list.append(vol)
         else:
             log.info(
-                "skipped attaching extra volume {0} " "to a kernel based on image {1}",
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
                 vol.name,
                 lang,
             )
@@ -139,7 +139,6 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-
     functions: Set[str]
 
     def __init__(self) -> None:
@@ -351,7 +350,6 @@ class AgentRPCServer(aobject):
     @collect_error
     async def create_kernels(
         self,
-        creation_id: str,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
@@ -361,6 +359,7 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         raw_results = []
         coros = []
+        throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
@@ -371,11 +370,11 @@ class AgentRPCServer(aobject):
             kernel_config = cast(KernelCreationConfig, raw_config)
             coros.append(
                 self.agent.create_kernel(
-                    creation_id,
                     session_id,
                     kernel_id,
                     kernel_config,
                     cluster_info,
+                    throttle_sema=throttle_sema,
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
@@ -397,6 +396,8 @@ class AgentRPCServer(aobject):
                 "container_id": result["container_id"],
                 "resource_spec": result["resource_spec"],
                 "attached_devices": result["attached_devices"],
+                "agent_addr": result["agent_addr"],
+                "scaling_group": result["scaling_group"],
             }
             for result in results
         ]
@@ -407,7 +408,8 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
-        reason: Optional[str] = None,
+        session_id: str,
+        reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
         loop = asyncio.get_running_loop()
@@ -415,8 +417,9 @@ class AgentRPCServer(aobject):
         log.info("rpc::destroy_kernel(k:{0})", kernel_id)
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
+            SessionId(UUID(session_id)),
             LifecycleEvent.DESTROY,
-            reason or "user-requested",
+            reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
             suppress_events=suppress_events,
         )
@@ -444,14 +447,12 @@ class AgentRPCServer(aobject):
     @collect_error
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: str,
         kernel_id: str,
         updated_config: dict,
-    ):
+    ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
-            creation_id,
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             cast(KernelCreationConfig, updated_config),
@@ -461,15 +462,15 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
-        kernel_id,  # type: str
-        api_version,  # type: int
-        run_id,  # type: str
-        mode,  # type: Literal['query', 'batch', 'continue', 'input']
-        code,  # type: str
-        opts,  # type: Dict[str, Any]
-        flush_timeout,  # type: float
-    ):
-        # type: (...) -> Dict[str, Any]
+        session_id: str,
+        kernel_id: str,
+        api_version: int,
+        run_id: str,
+        mode: Literal["query", "batch", "continue", "input"],
+        code: str,
+        opts: dict[str, Any],
+        flush_timeout: float,
+    ) -> dict[str, Any]:
         if mode != "continue":
             log.info(
                 "rpc::execute(k:{0}, run-id:{1}, mode:{2}, code:{3!r})",
@@ -479,6 +480,7 @@ class AgentRPCServer(aobject):
                 code[:20] + "..." if len(code) > 20 else code,
             )
         result = await self.agent.execute(
+            SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             run_id,
             mode,
@@ -491,29 +493,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def execute_batch(
-        self,
-        kernel_id,  # type: str
-        startup_command,  # type: str
-    ) -> None:
-        # DEPRECATED
-        asyncio.create_task(
-            self.agent.execute_batch(
-                KernelId(UUID(kernel_id)),
-                startup_command,
-            )
-        )
-        await asyncio.sleep(0)
-
-    @rpc_function
-    @collect_error
     async def start_service(
         self,
-        kernel_id,  # type: str
-        service,  # type: str
-        opts,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        service: str,
+        opts: dict[str, Any],
+    ) -> dict[str, Any]:
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
@@ -521,9 +506,9 @@ class AgentRPCServer(aobject):
     @collect_error
     async def get_commit_status(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+    ) -> dict[str, Any]:
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
         status: CommitStatus = await self.agent.get_commit_status(
@@ -539,10 +524,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def commit(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-        filename,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+        filename: str,
+    ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
@@ -629,18 +614,6 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def create_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::create_overlay_network(name:{})", network_name)
-        return await self.agent.create_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::destroy_overlay_network(name:{})", network_name)
-        return await self.agent.destroy_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
     async def create_local_network(self, network_name: str) -> None:
         log.debug("rpc::create_local_network(name:{})", network_name)
         return await self.agent.create_local_network(network_name)
@@ -666,6 +639,18 @@ class AgentRPCServer(aobject):
                 log.exception("reset: destroying {0}", kernel_id)
         await asyncio.gather(*tasks)
 
+    @rpc_function
+    @collect_error
+    async def assign_port(self):
+        log.debug("rpc::assign_port()")
+        return self.agent.port_pool.pop()
+
+    @rpc_function
+    @collect_error
+    async def release_port(self, port_no: int):
+        log.debug("rpc::release_port(port_no:{})", port_no)
+        self.agent.port_pool.add(port_no)
+
 
 @aiotools.server
 async def server_main_logwrapper(
@@ -688,6 +673,24 @@ async def server_main(
     _args: Tuple[Any, ...],
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config = _args[0]
+
+    # Start aiomonitor.
+    # Port is set by config (default=50200).
+    loop.set_debug(local_config["debug"]["asyncio"])
+    monitor = aiomonitor.Monitor(
+        loop,
+        port=local_config["agent"]["aiomonitor-port"],
+        console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
+    )
+    monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
@@ -763,19 +766,6 @@ async def server_main(
     # Pre-load compute plugin configurations.
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
 
-    # Start aiomonitor.
-    # Port is set by config (default=50200).
-    loop.set_debug(local_config["debug"]["asyncio"])
-    monitor = aiomonitor.Monitor(
-        loop,
-        port=local_config["agent"]["aiomonitor-port"],
-        console_enabled=False,
-        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
-    )
-    monitor.prompt = "monitor (agent) >>> "
-    monitor.console_locals["local_config"] = local_config
-    monitor.start()
-
     # Start RPC server.
     global agent_instance
     agent = await AgentRPCServer.new(
@@ -792,7 +782,8 @@ async def server_main(
             stop_signal = yield
             agent.mark_stop_signal(stop_signal)
     finally:
-        monitor.close()
+        if aiomon_started:
+            monitor.close()
 
 
 @click.group(invoke_without_command=True)
@@ -802,19 +793,31 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. " "(default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    debug: bool,
+    log_level: LogSeverity,
+    debug: bool = False,
 ) -> int:
+    # Delete this part when you remove --debug option
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
@@ -833,10 +836,10 @@ def main(
     config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
-    if debug:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
-        config.override_key(raw_cfg, ("logging", "level"), "DEBUG")
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -861,11 +864,19 @@ def main(
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
+    # FIXME: Remove this after ARM64 support lands on Jail
+    current_arch = get_arch_name()
+    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+        print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
+        raise click.Abort()
+
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            "ConfigurationError: "
-            "Cannot use link-local or unspecified IP address as the RPC listening host.",
+            (
+                "ConfigurationError: "
+                "Cannot use link-local or unspecified IP address as the RPC listening host."
+            ),
             file=sys.stderr,
         )
         raise click.Abort()
@@ -878,21 +889,21 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
-                    "ConfigurationError: "
-                    "Storing container coredumps is only supported in Linux.",
+                    "ConfigurationError: Storing container coredumps is only supported in Linux.",
                     file=sys.stderr,
                 )
                 raise click.Abort()
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    "ConfigurationError: "
-                    "/proc/sys/kernel/core_pattern must be an absolute path "
-                    "to enable container coredumps.",
+                    (
+                        "ConfigurationError: "
+                        "/proc/sys/kernel/core_pattern must be an absolute path "
+                        "to enable container coredumps."
+                    ),
                     file=sys.stderr,
                 )
                 raise click.Abort()
@@ -915,7 +926,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if debug:
+                if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":

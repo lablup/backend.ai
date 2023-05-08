@@ -1,5 +1,5 @@
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
@@ -58,13 +58,11 @@ class Group(BaseFunction):
         :param domain_name: Name of domain to get groups from.
         :param fields: Per-group query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($name: String!, $domain_name: String) {
                 groups_by_name(name: $name, domain_name: $domain_name) {$fields}
             }
-        """
-        )
+        """)
         resolved_fields = resolve_fields(fields, group_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -89,13 +87,11 @@ class Group(BaseFunction):
         """
         if fields is None:
             fields = _default_list_fields
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($domain_name: String) {
                 groups(domain_name: $domain_name) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
@@ -116,13 +112,11 @@ class Group(BaseFunction):
         """
         if fields is None:
             fields = _default_detail_fields
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($gid: UUID!) {
                 group(id: $gid) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
@@ -136,8 +130,8 @@ class Group(BaseFunction):
         name: str,
         description: str = "",
         is_active: bool = True,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -145,15 +139,13 @@ class Group(BaseFunction):
         Creates a new group with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($name: String!, $input: GroupInput!) {
                 create_group(name: $name, props: $input) {
                     ok msg group {$fields}
                 }
             }
-        """
-        )
+        """)
         resolved_fields = resolve_fields(
             fields,
             group_fields,
@@ -182,8 +174,8 @@ class Group(BaseFunction):
         name: str = None,
         description: str = None,
         is_active: bool = None,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -191,15 +183,13 @@ class Group(BaseFunction):
         Update existing group.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!, $input: ModifyGroupInput!) {
                 modify_group(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "gid": gid,
             "input": {
@@ -220,15 +210,13 @@ class Group(BaseFunction):
         """
         Inactivates the existing group. Does not actually delete it for safety.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!) {
                 delete_group(gid: $gid) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_group"]
@@ -239,15 +227,13 @@ class Group(BaseFunction):
         """
         Delete the existing group. This action cannot be undone.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!) {
                 purge_group(gid: $gid) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
         return data["purge_group"]
@@ -261,15 +247,13 @@ class Group(BaseFunction):
         Add users to a group.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!, $input: ModifyGroupInput!) {
                 modify_group(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "gid": gid,
             "input": {
@@ -289,15 +273,13 @@ class Group(BaseFunction):
         Remove users from a group.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($gid: UUID!, $input: ModifyGroupInput!) {
                 modify_group(gid: $gid, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "gid": gid,
             "input": {

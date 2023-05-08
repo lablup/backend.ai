@@ -2,8 +2,7 @@ import os
 import socket
 import sys
 
-input_host = "127.0.0.1"
-input_port = 65000
+socket_path = "/tmp/bai-user-input.sock"
 
 batch_enabled = int(os.environ.get("_BACKEND_BATCH_MODE", "0"))
 if batch_enabled:
@@ -15,9 +14,9 @@ if batch_enabled:
         def _input(prompt=""):
             sys.stdout.write(prompt)
             sys.stdout.flush()
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 try:
-                    sock.connect((input_host, input_port))
+                    sock.connect("/tmp/bai-user-input.sock")
                     userdata = sock.recv(1024)
                 except ConnectionRefusedError:
                     userdata = b"<user-input-unavailable>"
@@ -28,7 +27,7 @@ if batch_enabled:
     else:
         # __builtins__ is an alias dict for __builtin__ in modules other than __main__.
         # Thus, we have to explicitly import __builtin__ module in Python 2.
-        import __builtin__
+        import __builtin__  # pants: no-infer-dep
 
         builtins = __builtin__
 
@@ -36,8 +35,8 @@ if batch_enabled:
             sys.stdout.write(prompt)
             sys.stdout.flush()
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.connect((input_host, input_port))
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.connect("/tmp/bai-user-input.sock")
                 userdata = sock.recv(1024)
             except socket.error:
                 userdata = b"<user-input-unavailable>"

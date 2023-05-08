@@ -42,6 +42,7 @@ resources(
         "*.css",
         "*.ttf",
         "*.dockerfile",
+        "*.json",
         ".bash_profile",
         ".bashrc",
         ".tmux.conf",
@@ -55,6 +56,8 @@ platform_resources(
     dependency_map={
         "linux_x86_64": ":linux-x86_64-binaries",
         "linux_arm64": ":linux-arm64-binaries",
+        "macos_x86_64": ":linux-x86_64-binaries",
+        "macos_arm64": ":linux-arm64-binaries",
     },
 )
 

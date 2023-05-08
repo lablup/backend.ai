@@ -1,5 +1,5 @@
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import domain_fields
 from ai.backend.client.output.types import FieldSpec
@@ -55,13 +55,11 @@ class Domain(BaseFunction):
 
         :param fields: Additional per-domain query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query {
                 domains {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
         return data["domains"]
@@ -79,13 +77,11 @@ class Domain(BaseFunction):
         :param name: Name of the domain to fetch.
         :param fields: Additional per-domain query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($name: String) {
                 domain(name: $name) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
@@ -98,8 +94,8 @@ class Domain(BaseFunction):
         name: str,
         description: str = "",
         is_active: bool = True,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
@@ -108,15 +104,13 @@ class Domain(BaseFunction):
         Creates a new domain with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($name: String!, $input: DomainInput!) {
                 create_domain(name: $name, props: $input) {
                     ok msg domain {$fields}
                 }
             }
-        """
-        )
+        """)
         resolved_fields = resolve_fields(fields, domain_fields, (domain_fields["name"],))
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -141,8 +135,8 @@ class Domain(BaseFunction):
         new_name: str = None,
         description: str = None,
         is_active: bool = None,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
@@ -151,15 +145,13 @@ class Domain(BaseFunction):
         Update existing domain.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($name: String!, $input: ModifyDomainInput!) {
                 modify_domain(name: $name, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "name": name,
             "input": {
@@ -181,15 +173,13 @@ class Domain(BaseFunction):
         """
         Inactivates an existing domain.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($name: String!) {
                 delete_domain(name: $name) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_domain"]
@@ -200,15 +190,13 @@ class Domain(BaseFunction):
         """
         Deletes an existing domain.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($name: String!) {
                 purge_domain(name: $name) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
         return data["purge_domain"]

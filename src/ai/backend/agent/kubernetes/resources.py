@@ -17,7 +17,7 @@ from ..resources import (
     known_slot_types,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def detect_resources(
@@ -65,8 +65,7 @@ async def detect_resources(
             if sname not in {"cpu", "mem"}
         ):
             raise InitializationError(
-                "Slot types defined by an accelerator plugin must be prefixed "
-                "by the plugin's key.",
+                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
                 invalid_name,  # noqa: F821
                 plugin_instance.key,
             )

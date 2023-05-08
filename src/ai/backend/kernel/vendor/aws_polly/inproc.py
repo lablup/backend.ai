@@ -5,7 +5,7 @@ import logging
 import threading
 
 from boto3 import Session
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import BotoCoreError, ClientError  # pants: no-infer-dep
 
 log = logging.getLogger()
 

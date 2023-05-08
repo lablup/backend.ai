@@ -71,6 +71,15 @@ def list(ctx: CLIContext) -> None:
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
+@click.option(
+    "-p",
+    "--private",
+    is_flag=True,
+    help=(
+        "New scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
+    ),
+)
 @click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
     "--driver-opts", type=JSONParamType(), default="{}", help="Set driver options as a JSON string."
@@ -82,8 +91,20 @@ def list(ctx: CLIContext) -> None:
     default="{}",
     help="Set scheduler options as a JSON string.",
 )
+@click.option(
+    "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
+)
 def add(
-    ctx: CLIContext, name, description, inactive, driver, driver_opts, scheduler, scheduler_opts
+    ctx: CLIContext,
+    name,
+    description,
+    inactive,
+    private,
+    driver,
+    driver_opts,
+    scheduler,
+    scheduler_opts,
+    use_host_network,
 ):
     """
     Add a new scaling group.
@@ -96,10 +117,12 @@ def add(
                 name,
                 description=description,
                 is_active=not inactive,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
+                use_host_network=use_host_network,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -126,6 +149,15 @@ def add(
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
+@click.option(
+    "-p",
+    "--private",
+    is_flag=True,
+    help=(
+        "The scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
+    ),
+)
 @click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
     "--driver-opts", type=JSONParamType(), default=None, help="Set driver options as a JSON string."
@@ -137,8 +169,20 @@ def add(
     default=None,
     help="Set scheduler options as a JSON string.",
 )
+@click.option(
+    "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
+)
 def update(
-    ctx: CLIContext, name, description, inactive, driver, driver_opts, scheduler, scheduler_opts
+    ctx: CLIContext,
+    name,
+    description,
+    inactive,
+    private,
+    driver,
+    driver_opts,
+    scheduler,
+    scheduler_opts,
+    use_host_network,
 ):
     """
     Update existing scaling group.
@@ -151,10 +195,12 @@ def update(
                 name,
                 description=description,
                 is_active=not inactive,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
+                use_host_network=use_host_network,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -244,7 +290,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                "detail_msg": "Scaling group {} is assocatiated with domain {}.".format(
+                "detail_msg": "Scaling group {} is associated with domain {}.".format(
                     scaling_group, domain
                 ),
             },

@@ -9,50 +9,68 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../client/func/session-template.rst:2 dddd59ad54254dfd855373d0defb269c
+#: ../../client/func/session-template.rst:2 655464759d5549c9ba5cf86f9e45b7b2
 msgid "Session Template Functions"
 msgstr ""
 
-#: 013f5e841f5347369d92b07789c8cfb1 0aeadf8d8ff5419e84f86af0ec90decc
-#: 40d32518e05144879354a4b4e29ac5af 4624c186608a4c69aa01a3c2cc2b9e24
+#: 37828ed4a9f342d8a7bcc5d217c97945 38e753f046124293abf68e84c98b0b07
+#: 551c0e1fb1af428fad8240ebbf14edd3 5c95644d789e4130bc009c9c52d42570
 #: ai.backend.client.func.session_template.SessionTemplate.create
 #: ai.backend.client.func.session_template.SessionTemplate.delete
 #: ai.backend.client.func.session_template.SessionTemplate.get
 #: ai.backend.client.func.session_template.SessionTemplate.list_templates
 #: ai.backend.client.func.session_template.SessionTemplate.put
-#: c17da6d5759e4889a77c90f21024fc17 of
+#: e6843932a7514f638ba0d79a43ab5b83 of
 msgid "Return type"
 msgstr ""
 
-#: 76e332b4dc34483ea3c9bfbdb5dfb676
+#: 10de515b1f664821bf1351ab63f32f72
 #: ai.backend.client.func.session_template.SessionTemplate.create:2 of
 msgid ":py:class:`~ai.backend.client.func.session_template.SessionTemplate`"
 msgstr ""
 
-#: 77c0d1424d8242c787393d512cc34728
+#: a0e0c6984a7e4509a5a4a6b4ab16805d
 #: ai.backend.client.func.session_template.SessionTemplate.list_templates:2 of
 msgid ""
-":py:class:`~typing.List`\\[:py:class:`~typing.Mapping`\\[:py:class:`str`, :"
-"py:class:`str`]]"
+":py:class:`~typing.List`\\[:py:class:`~typing.Mapping`\\[:py:class:`str`,"
+" :py:class:`str`]]"
 msgstr ""
 
-#: 4eb1ae0474674fa699f93aef5c899037
-#: ai.backend.client.func.session_template.SessionTemplate.get:2 of
+#: ai.backend.client.func.session_template.SessionTemplate.get:2
+#: ce26c042cdc14ffba3291405942a5a1b of
 msgid ":py:class:`str`"
 msgstr ""
 
-#: 2b21c08452224d12b8f6bf04367d8398
+#: 1060688d4b2749fbb7b222d2e3e78b55
 #: ai.backend.client.func.session_template.SessionTemplate.delete:2
 #: ai.backend.client.func.session_template.SessionTemplate.put:2
-#: b651fa75557042839e629f79f3be84eb of
+#: d82051a8d9ca41cf8d6c9e8c9f5a40e5 of
 msgid ":py:data:`~typing.Any`"
 msgstr ""
+
+#~ msgid "Return type"
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.func.session_template.SessionTemplate`"
+#~ msgstr ""
+
+#~ msgid ""
+#~ ":py:class:`~typing.List`\\[:py:class:`~typing.Mapping`\\[:py:class:`str`,"
+#~ " :py:class:`str`]]"
+#~ msgstr ""
+
+#~ msgid ":py:class:`str`"
+#~ msgstr ""
+
+#~ msgid ":py:data:`~typing.Any`"
+#~ msgstr ""
+

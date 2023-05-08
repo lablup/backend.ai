@@ -77,9 +77,10 @@ def asyncio_run_forever(setup_coro, shutdown_coro, *, stop_signals={signal.SIGIN
         for stop_sig in stop_signals:
             loop.add_signal_handler(stop_sig, future.set_result, stop_sig)
         try:
-            recv_sig = await future
+            await future
         finally:
-            loop.remove_signal_handler(recv_sig)
+            for stop_sig in stop_signals:
+                loop.remove_signal_handler(stop_sig)
 
     loop = asyncio.new_event_loop()
     try:

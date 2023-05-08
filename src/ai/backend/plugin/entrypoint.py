@@ -7,7 +7,7 @@ from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 def scan_entrypoints(
@@ -40,8 +40,10 @@ def scan_entrypoints(
                 continue
             else:
                 raise RuntimeError(
-                    f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
-                    f"from {existing_entrypoint.value} and {entrypoint.value}",
+                    (
+                        f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
+                        f"from {existing_entrypoint.value} and {entrypoint.value}"
+                    ),
                 )
         existing_names[entrypoint.name] = entrypoint
         yield entrypoint
