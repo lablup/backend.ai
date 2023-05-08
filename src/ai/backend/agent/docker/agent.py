@@ -1105,13 +1105,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
-                            await container.show()
-                            result.append(
-                                (
-                                    kernel_id,
-                                    container_from_docker_container(container),
-                                ),
-                            )
+                            owner_id = container["Config"]["Labels"].get("ai.backend.owner")
+                            if self.local_config["agent"]["id"] == owner_id:
+                                await container.show()
+                                result.append(
+                                    (
+                                        kernel_id,
+                                        container_from_docker_container(container),
+                                    ),
+                                )
                     except asyncio.CancelledError:
                         pass
                     except Exception:
