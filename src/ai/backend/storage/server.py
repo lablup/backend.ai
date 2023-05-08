@@ -31,7 +31,6 @@ from .context import Context
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-
 @aiotools.server
 async def server_main_logwrapper(loop, pidx, _args):
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")

@@ -346,8 +346,10 @@ async def prepare_tus_session_headers(
     headers["Upload-Length"] = str(token_data["size"])
     return headers
 
+
 async def status(request: web.Request) -> web.Response:
     return web.json_response({"status": "OK"})
+
 
 async def init_client_app(ctx: Context) -> web.Application:
     app = web.Application()
