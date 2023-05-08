@@ -511,6 +511,7 @@ class ComputerContext:
 class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
+    id: AgentId
     loop: asyncio.AbstractEventLoop
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
@@ -551,6 +552,7 @@ class AbstractAgent(
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
+        self.id = AgentId(local_config["agent"]["id"])
         self.local_instance_id = generate_local_instance_id(__file__)
         self.kernel_registry = {}
         self.computers = {}
@@ -708,7 +710,7 @@ class AbstractAgent(
                             continue
         if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
             await self.save_last_registry()
-        await self.event_producer.produce_event(event, source=self.local_config["agent"]["id"])
+        await self.event_producer.produce_event(event, source=str(self.id))
 
     async def produce_error_event(
         self,

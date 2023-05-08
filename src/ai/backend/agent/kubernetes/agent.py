@@ -954,7 +954,7 @@ class KubernetesAgent(
         return KubernetesKernelCreationContext(
             kernel_id,
             session_id,
-            AgentId(self.local_config["agent"]["id"]),
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,

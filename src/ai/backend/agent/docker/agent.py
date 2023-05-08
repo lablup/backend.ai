@@ -1105,8 +1105,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
-                            owner_id = container["Config"]["Labels"].get("ai.backend.owner")
-                            if self.local_config["agent"]["id"] == owner_id:
+                            owner_id = AgentId(
+                                container["Config"]["Labels"].get("ai.backend.owner", "")
+                            )
+                            if self.id == owner_id:
                                 await container.show()
                                 result.append(
                                     (
@@ -1278,7 +1280,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return DockerKernelCreationContext(
             kernel_id,
             session_id,
-            AgentId(self.local_config["agent"]["id"]),
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
