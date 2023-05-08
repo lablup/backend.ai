@@ -8,7 +8,7 @@ aiodns>=3.0
 aiomonitor-ng~=0.7.2
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
-aiotools~=1.5.9
+aiotools~=1.6.1
 aiotusclient~=0.1.4
 alembic~=1.8.1
 appdirs~=1.4.4
@@ -70,7 +70,7 @@ trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
 uvloop>=0.17; sys_platform != "Windows"
-yarl~=1.8.2
+yarl~=1.8.2  # FIXME: revert to >=1.7 after aio-libs/yarl#862 is resolved
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)

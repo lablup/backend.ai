@@ -164,6 +164,7 @@ jobs:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v3
     - name: Fetch remote tags
@@ -291,6 +292,7 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Normalize the package version
+      shell: bash
       run: |
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
@@ -319,6 +321,7 @@ jobs:
   build-client-image:
     needs: [build-wheels]
     runs-on: ubuntu-latest
+    environment: deploy-to-docker-hub
     steps:
       - uses: actions/checkout@v3
       - name: Set up QEMU
@@ -341,7 +344,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./client.Dockerfile
+          file: ./backend.ai-client.Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: lablup/backend.ai-client:${{ github.ref_name }}
@@ -350,7 +353,7 @@ jobs:
             PKGVER=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Push latest
+      - name: Push to the Docker Hub
         run: |
           docker tag lablup/backend.ai-client:${{ github.ref_name }} lablup/backend.ai-client:latest
           docker push lablup/backend.ai-client:latest
