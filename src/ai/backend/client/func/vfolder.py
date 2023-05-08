@@ -413,8 +413,8 @@ class VFolder(BaseFunction):
             src_paths = [Path(src).resolve() for src in sources]
         if recursive:
             await self._upload_recursively(src_paths, basedir, dst_dir, chunk_size, address_map)
-            return
-        await self._upload_files(src_paths, basedir, dst_dir, chunk_size, address_map)
+        else:
+            await self._upload_files(src_paths, basedir, dst_dir, chunk_size, address_map)
 
     async def _mkdir(
         self,
@@ -439,7 +439,7 @@ class VFolder(BaseFunction):
         path: Union[str, Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
-    ):
+    ) -> str:
         return await self._mkdir(path, parents, exist_ok)
 
     @api_function
