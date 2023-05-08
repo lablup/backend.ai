@@ -253,7 +253,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         async with ctx.get_volume(token_data["volume"]) as volume:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path = vfpath / ".upload" / token_data["session"]
+            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
 
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,
@@ -266,7 +266,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             current_size = Path(upload_temp_path).stat().st_size
             if current_size >= int(token_data["size"]):
-                target_path = vfpath / token_data["relpath"]
+                target_path: Path = vfpath / token_data["relpath"]
+                if not target_path.parent.exists():
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()
