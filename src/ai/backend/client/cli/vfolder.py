@@ -229,6 +229,12 @@ def info(name):
     ),
 )
 @click.option(
+    "-r",
+    "--recursive",
+    is_flag=True,
+    help="Upload the given directory recursively.",
+)
+@click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
@@ -249,7 +255,7 @@ def info(name):
         "or the hostname and may include the protocol part and the port number to replace."
     ),
 )
-def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
+def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy):
     """
     TUS Upload a file to the virtual folder from the current working directory.
     The files with the same names will be overwritten.
@@ -263,6 +269,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
             session.VFolder(name).upload(
                 filenames,
                 basedir=base_dir,
+                recursive=recursive,
                 chunk_size=chunk_size,
                 show_progress=True,
                 address_map=override_storage_proxy

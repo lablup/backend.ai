@@ -317,22 +317,19 @@ class VFolder(BaseFunction):
                 file_path, download_url, chunk_size, max_retries, show_progress
             )
 
-    @api_function
-    async def upload(
+    async def _upload_files(
         self,
-        files: Sequence[Union[str, Path]],
-        *,
+        file_paths: Sequence[Path],
         basedir: Union[str, Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
-        show_progress: bool = False,
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
-        if basedir:
-            files = [basedir / Path(file) for file in files]
-        else:
-            files = [Path(file).resolve() for file in files]
-        for file_path in files:
+        for file_path in file_paths:
+            if file_path.is_dir():
+                raise BackendClientError(
+                    f"Failed to upload {file_path}. Use recursive option to upload directories."
+                )
             file_size = Path(file_path).stat().st_size
             rqst = Request("POST", "/folders/{}/request-upload".format(self.name))
             rqst.set_json(
@@ -372,15 +369,55 @@ class VFolder(BaseFunction):
                 upload_checksum=False,
                 chunk_size=chunk_size,
             )
-            return await uploader.upload()
+            await uploader.upload()
+            input_file.close()
+
+    async def _upload_recursively(
+        self,
+        source: Sequence[Path],
+        basedir: Union[str, Path] = None,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+        address_map: Optional[Mapping[str, str]] = None,
+    ) -> None:
+        dir_list: list[Path] = []
+        file_list: list[Path] = []
+        base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
+        for path in source:
+            if path.is_file():
+                file_list.append(path)
+            else:
+                await self._mkdir(path.relative_to(base_path))
+                dir_list.append(path)
+        await self._upload_files(file_list, basedir, chunk_size, address_map)
+        for dir in dir_list:
+            await self._upload_recursively(list(dir.glob("*")), basedir, chunk_size, address_map)
 
     @api_function
-    async def mkdir(
+    async def upload(
+        self,
+        sources: Sequence[Union[str, Path]],
+        *,
+        basedir: Union[str, Path] = None,
+        recursive: bool = False,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+        address_map: Optional[Mapping[str, str]] = None,
+        show_progress: bool = False,
+    ) -> None:
+        if basedir:
+            src_paths = [basedir / Path(src) for src in sources]
+        else:
+            src_paths = [Path(src).resolve() for src in sources]
+        if recursive:
+            await self._upload_recursively(src_paths, basedir, chunk_size, address_map)
+        else:
+            await self._upload_files(src_paths, basedir, chunk_size, address_map)
+
+    async def _mkdir(
         self,
         path: Union[str, Path],
         parents: Optional[bool] = False,
         exist_ok: Optional[bool] = False,
-    ):
+    ) -> str:
         rqst = Request("POST", "/folders/{}/mkdir".format(self.name))
         rqst.set_json(
             {
@@ -391,6 +428,15 @@ class VFolder(BaseFunction):
         )
         async with rqst.fetch() as resp:
             return await resp.text()
+
+    @api_function
+    async def mkdir(
+        self,
+        path: Union[str, Path],
+        parents: Optional[bool] = False,
+        exist_ok: Optional[bool] = False,
+    ) -> str:
+        return await self._mkdir(path, parents, exist_ok)
 
     @api_function
     async def rename_file(self, target_path: str, new_name: str):
