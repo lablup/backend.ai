@@ -48,6 +48,7 @@ from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
@@ -149,6 +150,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -160,7 +162,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
         super().__init__(
-            kernel_id, session_id, kernel_config, local_config, computers, restarting=restarting
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
@@ -667,6 +675,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         kernel_obj = DockerKernel(
             self.kernel_id,
             self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -732,6 +741,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
                 "ai.backend.session-id": str(self.session_id),
+                "ai.backend.owner": str(self.agent_id),
                 "ai.backend.internal.block-service-ports": (
                     "1" if self.internal_data.get("block_service_ports", False) else "0"
                 ),
@@ -1092,16 +1102,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None or kernel_id not in self.kernel_registry:
+                        if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
-                            await container.show()
-                            result.append(
-                                (
-                                    kernel_id,
-                                    container_from_docker_container(container),
-                                ),
+                            owner_id = AgentId(
+                                container["Config"]["Labels"].get("ai.backend.owner", "")
                             )
+                            if self.id == owner_id:
+                                await container.show()
+                                result.append(
+                                    (
+                                        kernel_id,
+                                        container_from_docker_container(container),
+                                    ),
+                                )
                     except asyncio.CancelledError:
                         pass
                     except Exception:
@@ -1266,6 +1280,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return DockerKernelCreationContext(
             kernel_id,
             session_id,
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
