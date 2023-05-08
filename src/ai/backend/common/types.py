@@ -356,8 +356,8 @@ class MountTypes(str, enum.Enum):
 
 
 class MountedAppConfig(TypedDict):
-    service_def: Path
-    metadata: Path
+    service_def: Path | None
+    metadata: Path | None
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):

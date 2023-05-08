@@ -14,6 +14,7 @@ import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
@@ -182,6 +183,11 @@ vfolders = sa.Table(
         EnumValueType(VFolderUsageMode),
         default=VFolderUsageMode.GENERAL,
         nullable=False,
+    ),
+    sa.Column(
+        "metadata",
+        pgsql.JSONB(),
+        nullable=True,
     ),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
