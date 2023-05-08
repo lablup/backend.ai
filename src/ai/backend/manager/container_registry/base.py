@@ -188,31 +188,19 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
-        tag: str,
+        digest: str,
+        tag: Optional[str] = None,
     ) -> None:
-        async def _load_manifest(_tag: str):
+        async with self.sema.get():
             async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{_tag}", **rqst_args
+                self.registry_url / f"v2/{image}/manifests/{digest}", **rqst_args
             ) as resp:
                 if resp.status == 404:
                     # ignore missing tags
                     # (may occur after deleting an image from the docker hub)
-                    return {}
+                    return
                 resp.raise_for_status()
                 data = await resp.json()
-
-                if data["mediaType"] == "application/vnd.docker.distribution.manifest.list.v2+json":
-                    # recursively call _load_manifests with detected arch and corresponding image digest
-                    ret = {}
-                    for m in data["manifests"]:
-                        ret.update(
-                            await _load_manifest(
-                                m["digest"],
-                            ),
-                        )
-                    if (reporter := self.reporter.get()) is not None:
-                        reporter.total_progress += len(ret) - 1
-                    return ret
 
                 config_digest = data["config"]["digest"]
                 size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
@@ -228,24 +216,25 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         if raw_labels:
                             labels.update(raw_labels)
                         else:
-                            log.warn("label not found on image {}:{}/{}", image, _tag, architecture)
+                            log.warn(
+                                "label not found on image {}:{}/{}", image, digest, architecture
+                            )
                     else:
                         raw_labels = data["config"].get("Labels")
                         if raw_labels:
                             labels.update(raw_labels)
                         else:
-                            log.warn("label not found on image {}:{}/{}", image, _tag, architecture)
-                    return {
+                            log.warn(
+                                "label not found on image {}:{}/{}", image, digest, architecture
+                            )
+                    manifest = {
                         architecture: {
                             "size": size_bytes,
                             "labels": labels,
                             "digest": config_digest,
                         },
                     }
-
-        async with self.sema.get():
-            manifests = await _load_manifest(tag)
-        await self._read_manifest(image, tag, manifests)
+        await self._read_manifest(image, tag or digest, manifest)
 
     async def _read_manifest(
         self,

@@ -42,6 +42,7 @@ from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentStatus,
+    KernelRole,
     KernelRow,
     KernelStatus,
     ScalingGroupRow,
@@ -273,9 +274,27 @@ class SchedulerDispatcher(aobject):
 
         if cancelled_sessions:
             now = datetime.now(tzutc())
+            session_ids = [item.id for item in cancelled_sessions]
 
             async def _apply_cancellation():
                 async with self.db.begin_session() as db_sess:
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .values(
+                            status=KernelStatus.CANCELLED,
+                            status_info="pending-timeout",
+                            terminated_at=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.CANCELLED.name: now.isoformat(),
+                                },
+                            ),
+                        )
+                        .where(KernelRow.session_id.in_(session_ids))
+                    )
+                    await db_sess.execute(kernel_query)
                     query = (
                         sa.update(SessionRow)
                         .values(
@@ -290,7 +309,7 @@ class SchedulerDispatcher(aobject):
                                 },
                             ),
                         )
-                        .where(SessionRow.id.in_([item.id for item in cancelled_sessions]))
+                        .where(SessionRow.id.in_(session_ids))
                     )
                     await db_sess.execute(query)
 
@@ -349,26 +368,29 @@ class SchedulerDispatcher(aobject):
             async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
                 check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
                 async with self.db.begin_session() as db_sess:
-                    predicates: Sequence[Tuple[str, Awaitable[PredicateResult]]] = [
+                    predicates: list[Tuple[str, Awaitable[PredicateResult]]] = [
                         (
                             "reserved_time",
                             check_reserved_batch_session(db_sess, sched_ctx, sess_ctx),
                         ),
-                        ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
                         ("dependencies", check_dependencies(db_sess, sched_ctx, sess_ctx)),
-                        (
-                            "keypair_resource_limit",
-                            check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
-                        ),
-                        (
-                            "user_group_resource_limit",
-                            check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
-                        ),
-                        (
-                            "domain_resource_limit",
-                            check_domain_resource_limit(db_sess, sched_ctx, sess_ctx),
-                        ),
                     ]
+                    if any([kernel.role != KernelRole.SYSTEM for kernel in sess_ctx.kernels]):
+                        predicates += [
+                            ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
+                            (
+                                "keypair_resource_limit",
+                                check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "user_group_resource_limit",
+                                check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "domain_resource_limit",
+                                check_domain_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                        ]
                     for predicate_name, check_coro in predicates:
                         try:
                             check_results.append((predicate_name, await check_coro))
