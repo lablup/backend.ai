@@ -1,10 +1,12 @@
 """add_vfolder_usage_mode_type
 
 Revision ID: 5e22558221ce
-Revises: 360af8f33d4e
-Create Date: 2022-10-12 12:17:07.675013
+Revises: fdc9d6ac49b4
+Create Date: 2023-05-08 13:17:07.675013
 
 """
+import textwrap
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import ENUM
@@ -15,7 +17,7 @@ from ai.backend.manager.models.vfolder import VFolderUsageMode
 
 # revision identifiers, used by Alembic.
 revision = "5e22558221ce"
-down_revision = "360af8f33d4e"
+down_revision = "fdc9d6ac49b4"
 branch_labels = None
 depends_on = None
 
@@ -56,10 +58,10 @@ def downgrade():
     )
     connection.execute(vfolder_fetch_query)
 
-    sql = f"""DELETE FROM pg_enum
+    sql = textwrap.dedent(f"""DELETE FROM pg_enum
         WHERE enumlabel = '{enum_val}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""
+        )""")
     op.execute(text(sql))
     # ### end Alembic commands ###
