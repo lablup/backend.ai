@@ -346,6 +346,8 @@ async def prepare_tus_session_headers(
     headers["Upload-Length"] = str(token_data["size"])
     return headers
 
+async def health_check(request: web.Request) -> web.Response:
+    return web.json_response({"status": "OK"})
 
 async def init_client_app(ctx: Context) -> web.Application:
     app = web.Application()
@@ -365,4 +367,5 @@ async def init_client_app(ctx: Context) -> web.Application:
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
+    cors.add(app.router.add_route("GET", r"/health_check", health_check))
     return app

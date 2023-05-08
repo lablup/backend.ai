@@ -31,9 +31,6 @@ from .context import Context
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-async def health_check(request: web.Request) -> web.Response:
-    return web.json_response({"status": "OK"})
-
 
 @aiotools.server
 async def server_main_logwrapper(loop, pidx, _args):
@@ -144,9 +141,6 @@ async def server_main(
             os.setuid(uid)
             log.info("Changed process uid:gid to {}:{}", uid, gid)
         log.info("Started service.")
-        app = web.Application()
-        app.router.add_get("health_check", health_check)
-
         try:
             yield
         finally:
