@@ -61,5 +61,8 @@ def main(pr_number: str) -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(f"Usage: python ${sys.argv[0]} <PR Number>")
+        exit(0)
     pr_number = sys.argv[1]
     main(pr_number)
