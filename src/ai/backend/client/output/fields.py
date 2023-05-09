@@ -154,6 +154,7 @@ scaling_group_fields = FieldSet(
         FieldSpec("name"),
         FieldSpec("description"),
         FieldSpec("is_active"),
+        FieldSpec("is_public"),
         FieldSpec("created_at"),
         FieldSpec("driver"),
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
