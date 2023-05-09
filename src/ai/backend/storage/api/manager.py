@@ -374,6 +374,14 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
             )
 
 
+async def status(request: web.Request) -> web.Response:
+    return web.json_response(
+        {
+            "status": "ok",
+        },
+    )
+
+
 async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
     async with check_params(
         request,
@@ -679,4 +687,5 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+    app.router.add_route("GET", "/status", status)
     return app

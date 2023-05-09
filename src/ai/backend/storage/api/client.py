@@ -347,10 +347,6 @@ async def prepare_tus_session_headers(
     return headers
 
 
-async def status(request: web.Request) -> web.Response:
-    return web.json_response({"status": "OK"})
-
-
 async def init_client_app(ctx: Context) -> web.Application:
     app = web.Application()
     app["ctx"] = ctx
@@ -369,5 +365,5 @@ async def init_client_app(ctx: Context) -> web.Application:
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
-    cors.add(app.router.add_route("GET", r"/status", status))
+
     return app
