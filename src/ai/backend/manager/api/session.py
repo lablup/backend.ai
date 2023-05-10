@@ -102,6 +102,7 @@ from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    PRIVATE_KERNEL_ROLES,
     AgentStatus,
     KernelRole,
     KernelRow,
@@ -585,6 +586,9 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             script, _ = await query_bootstrap_script(conn, owner_access_key)
             params["bootstrap_script"] = script
 
+    public_sgroup_only = True
+    if _role_str := image_row.labels.get("ai.backend.role"):
+        public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
     try:
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -623,6 +627,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                     agent_list=params["config"]["agent_list"],
                     dependency_sessions=params["dependencies"],
                     callback_url=params["callback_url"],
+                    public_sgroup_only=public_sgroup_only,
                 )
             ),
         )
@@ -1489,14 +1494,11 @@ async def handle_kernel_creation_lifecycle(
     generated when initiating the create_kernels() agent RPC call.
     """
     root_ctx: RootContext = app["_root.context"]
-    # ck_id = (event.creation_id, event.kernel_id)
-    ck_id = event.kernel_id
-    if ck_id in root_ctx.registry.kernel_creation_tracker:
-        log.debug(
-            "handle_kernel_creation_lifecycle: ev:{} k:{}",
-            event.name,
-            event.kernel_id,
-        )
+    log.debug(
+        "handle_kernel_creation_lifecycle: ev:{} k:{}",
+        event.name,
+        event.kernel_id,
+    )
     if isinstance(event, KernelPreparingEvent):
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
         pass
@@ -1509,17 +1511,12 @@ async def handle_kernel_creation_lifecycle(
             root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
-        await root_ctx.registry.finalize_running(event.creation_info)
-        # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            tracker.set_result(None)
+        session_id = event.session_id
+        await root_ctx.registry.finalize_running(event.kernel_id, session_id, event.creation_info)
         if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
-            session_id = event.creation_info.get("session_id")
-            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(str(session_id)))
     elif isinstance(event, KernelCancelledEvent):
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            log.warning(f"Kernel cancelled, {event.reason = }")
-            tracker.cancel()
+        log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
@@ -1535,7 +1532,8 @@ async def handle_kernel_termination_lifecycle(
         await root_ctx.registry.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code
         )
-        await root_ctx.registry.check_session_terminated(event.kernel_id, event.reason)
+        session_id = event.session_id
+        await root_ctx.registry.check_session_terminated(session_id, event.reason)
 
 
 async def handle_session_creation_lifecycle(
@@ -1942,7 +1940,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         params["recursive"],
     )
 
-    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
 
     if params["recursive"]:
         async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -2052,15 +2050,16 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
     resp = {}
     if kernel_role == KernelRole.SYSTEM:
         public_host = sess.main_kernel.agent_row.public_host
-        sshd_ports: list[str] = []
+        found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
             if sport["name"] == "sshd":
-                sshd_ports = sport["host_ports"]
-                break
+                found_ports["sshd"] = sport["host_ports"]
+            elif sport["name"] == "sftpd":
+                found_ports["sftpd"] = sport["host_ports"]
         resp = {
             "kernel_role": kernel_role.name,
             "public_host": public_host,
-            "sshd_ports": sshd_ports,
+            "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
         }
     return web.json_response(resp)
 
@@ -2684,19 +2683,17 @@ async def init(app: web.Application) -> None:
 
     # passive events
     evd = root_ctx.event_dispatcher
-    evd.subscribe(
+    evd.consume(
         KernelPreparingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kprep"
     )
-    evd.subscribe(
-        KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull"
-    )
-    evd.subscribe(
+    evd.consume(KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull")
+    evd.consume(
         KernelCreatingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kcreat"
     )
-    evd.subscribe(
+    evd.consume(
         KernelStartedEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
     )
-    evd.subscribe(
+    evd.consume(
         KernelCancelledEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
     )
     evd.subscribe(
