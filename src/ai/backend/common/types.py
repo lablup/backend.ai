@@ -12,7 +12,7 @@ from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -356,8 +356,9 @@ class MountTypes(str, enum.Enum):
 
 
 class MountedAppConfig(TypedDict):
-    service_def: Path | None
-    metadata: Path | None
+    service_name: str
+    service_def: Mapping[str, str]
+    metadata: Mapping[str, str]
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
@@ -786,6 +787,7 @@ class VFolderMount(JSONSerializableMixin):
     host_path: PurePosixPath
     kernel_path: PurePosixPath
     mount_perm: MountPermission
+    app_config: MountedAppConfig | None = attrs.field(default=None)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -795,6 +797,7 @@ class VFolderMount(JSONSerializableMixin):
             "host_path": str(self.host_path),
             "kernel_path": str(self.kernel_path),
             "mount_perm": self.mount_perm.value,
+            "app_config": self.app_config,
         }
 
     @classmethod
@@ -813,6 +816,7 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
+                t.Key("app_config", default=None): t.Dict | t.Null,
             }
         )
 

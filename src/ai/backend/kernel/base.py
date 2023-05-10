@@ -13,6 +13,7 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 from pathlib import Path
 from typing import (
+    Any,
     Awaitable,
     ClassVar,
     Dict,
@@ -129,6 +130,7 @@ class BaseRunner(metaclass=ABCMeta):
     child_env: MutableMapping[str, str]
     subproc: Optional[asyncio.subprocess.Process]
     service_parser: Optional[ServiceParser]
+    mounted_service_parsers: dict[str, ServiceParser]
     runtime_path: Path
 
     services_running: Dict[str, asyncio.subprocess.Process]
@@ -183,6 +185,8 @@ class BaseRunner(metaclass=ABCMeta):
 
         # build status tracker to skip the execute step
         self._build_success = None
+
+        self.mounted_service_parsers = {}
 
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
@@ -595,6 +599,115 @@ class BaseRunner(metaclass=ABCMeta):
         """Start an application service daemon."""
         return None, {}
 
+    async def _run_cmd(
+        self,
+        cmdargs: Sequence[Union[str, os.PathLike]],
+        cwd: Path,
+        service_env: Mapping[str, Any],
+        service_info: Mapping[str, str],
+    ) -> dict[str, str]:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *map(str, cmdargs),
+                env=service_env,
+                cwd=cwd,
+            )
+            self.services_running[service_info["name"]] = proc
+            asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
+            with timeout(5.0):
+                await wait_local_port_open(service_info["port"])
+            log.info(
+                "Service {} has started (pid: {}, port: {})",
+                service_info["name"],
+                proc.pid,
+                service_info["port"],
+            )
+            result = {"status": "started"}
+        except asyncio.CancelledError:
+            # This may happen if the service process gets started but it fails to
+            # open the port and then terminates (with an error).
+            result = {
+                "status": "failed",
+                "error": f"the process did not start properly: {cmdargs[0]}",
+            }
+        except asyncio.TimeoutError:
+            # Takes too much time to open a local port.
+            if service_info["name"] in self.services_running:
+                await terminate_and_wait(proc, timeout=10.0)
+                self.services_running.pop(service_info["name"], None)
+            result = {
+                "status": "failed",
+                "error": f"opening the service port timed out: {service_info['name']}",
+            }
+        except PermissionError:
+            result = {
+                "status": "failed",
+                "error": f"the target file is not executable: {cmdargs[0]}",
+            }
+        except FileNotFoundError:
+            result = {
+                "status": "failed",
+                "error": f"the executable file is not found: {cmdargs[0]}",
+            }
+        return result
+
+    async def _start_mounted_service(
+        self, service_info: Mapping[str, Any], user_requested: bool = True
+    ) -> None:
+        async with self._service_lock:
+            try:
+                service_name = service_info["name"]
+                mount_path = service_info["service_info"]
+                if service_name not in self.mounted_service_parsers:
+                    service_def_folder = Path(mount_path) / "service-defs"
+                    if service_def_folder.is_dir():
+                        service_parser = ServiceParser(
+                            {
+                                "runtime_path": str(self.runtime_path),
+                            }
+                        )
+                        await service_parser.parse(service_def_folder)
+                        log.debug("Loaded new-style service definitions.")
+                    self.mounted_service_parsers[service_name] = service_parser
+                service_parser = self.mounted_service_parsers[service_name]
+                service_parser.variables["ports"] = service_info["ports"]
+                cmdargs, env = await service_parser.start_service(
+                    service_info["name"],
+                    self.child_env.keys(),
+                    service_info["options"],
+                )
+                if cmdargs is None:
+                    log.warning("The service {0} is not supported.", service_info["name"])
+                    result = {
+                        "status": "failed",
+                        "error": "unsupported service",
+                    }
+                    return
+                log.debug("cmdargs: {0}", cmdargs)
+                log.debug("env: {0}", env)
+                cwd = Path.cwd()
+                service_env = {**self.child_env, **env}
+                if "LD_LIBRARY_PATH" in service_env:
+                    # avoid conflicts with Python binary used by service apps.
+                    service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
+                        "/opt/backend.ai/lib:", ""
+                    )
+                result = await self._run_cmd(cmdargs, cwd, service_env, service_info)
+            except Exception as e:
+                log.exception("start_service: unexpected error")
+                result = {
+                    "status": "failed",
+                    "error": repr(e),
+                }
+            finally:
+                if user_requested:
+                    await self.outsock.send_multipart(
+                        [
+                            b"service-result",
+                            json.dumps(result).encode("utf8"),
+                        ]
+                    )
+
     async def _start_service(self, service_info, user_requested: bool = True):
         async with self._service_lock:
             try:
@@ -645,54 +758,12 @@ class BaseRunner(metaclass=ABCMeta):
                 log.debug("cmdargs: {0}", cmdargs)
                 log.debug("env: {0}", env)
                 service_env = {**self.child_env, **env}
-                # avoid conflicts with Python binary used by service apps.
                 if "LD_LIBRARY_PATH" in service_env:
+                    # avoid conflicts with Python binary used by service apps.
                     service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
                         "/opt/backend.ai/lib:", ""
                     )
-                try:
-                    proc = await asyncio.create_subprocess_exec(
-                        *map(str, cmdargs),
-                        env=service_env,
-                        cwd=cwd,
-                    )
-                    self.services_running[service_info["name"]] = proc
-                    asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-                    with timeout(5.0):
-                        await wait_local_port_open(service_info["port"])
-                    log.info(
-                        "Service {} has started (pid: {}, port: {})",
-                        service_info["name"],
-                        proc.pid,
-                        service_info["port"],
-                    )
-                    result = {"status": "started"}
-                except asyncio.CancelledError:
-                    # This may happen if the service process gets started but it fails to
-                    # open the port and then terminates (with an error).
-                    result = {
-                        "status": "failed",
-                        "error": f"the process did not start properly: {cmdargs[0]}",
-                    }
-                except asyncio.TimeoutError:
-                    # Takes too much time to open a local port.
-                    if service_info["name"] in self.services_running:
-                        await terminate_and_wait(proc, timeout=10.0)
-                        self.services_running.pop(service_info["name"], None)
-                    result = {
-                        "status": "failed",
-                        "error": f"opening the service port timed out: {service_info['name']}",
-                    }
-                except PermissionError:
-                    result = {
-                        "status": "failed",
-                        "error": f"the target file is not executable: {cmdargs[0]}",
-                    }
-                except FileNotFoundError:
-                    result = {
-                        "status": "failed",
-                        "error": f"the executable file is not found: {cmdargs[0]}",
-                    }
+                result = await self._run_cmd(cmdargs, cwd, service_env, service_info)
             except Exception as e:
                 log.exception("start_service: unexpected error")
                 result = {
@@ -923,6 +994,9 @@ class BaseRunner(metaclass=ABCMeta):
                 elif op_type == "start-service":  # activate a service port
                     data = json.loads(text)
                     asyncio.create_task(self._start_service(data))
+                elif op_type == "start-mounted-service":
+                    data = json.loads(text)
+                    asyncio.create_task(self._start_mounted_service(data))
                 elif op_type == "shutdown-service":  # shutdown the service by its name
                     data = json.loads(text)
                     await self._shutdown_service(data)

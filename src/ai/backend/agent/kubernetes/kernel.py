@@ -174,7 +174,9 @@ class KubernetesKernel(AbstractKernel):
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
-    async def start_service(self, service: str, opts: Mapping[str, Any]):
+    async def start_service(
+        self, service: str, opts: Mapping[str, Any], mount_path: Optional[Path] = None
+    ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
             return {
@@ -186,15 +188,27 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service(
-            {
-                "name": service,
-                "port": sport["container_ports"][0],  # primary port
-                "ports": sport["container_ports"],
-                "protocol": sport["protocol"],
-                "options": opts,
-            }
-        )
+        if mount_path is None:
+            result = await self.runner.feed_start_service(
+                {
+                    "name": service,
+                    "port": sport["container_ports"][0],  # primary port
+                    "ports": sport["container_ports"],
+                    "protocol": sport["protocol"],
+                    "options": opts,
+                }
+            )
+        else:
+            result = await self.runner.feed_start_mounted_service(
+                {
+                    "name": service,
+                    "port": sport["container_ports"][0],  # primary port
+                    "ports": sport["container_ports"],
+                    "protocol": sport["protocol"],
+                    "options": opts,
+                    "mount_path": mount_path,
+                }
+            )
         return result
 
     async def shutdown_service(self, service: str):

@@ -20,7 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import (
+    MountedAppConfig,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderMount,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
@@ -184,11 +189,7 @@ vfolders = sa.Table(
         default=VFolderUsageMode.GENERAL,
         nullable=False,
     ),
-    sa.Column(
-        "metadata",
-        pgsql.JSONB(),
-        nullable=True,
-    ),
+    sa.Column("metadata", pgsql.JSONB(), nullable=True),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
     sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
@@ -335,6 +336,7 @@ async def query_accessible_vfolders(
         vfolders.c.cloneable,
         vfolders.c.status,
         vfolders.c.cur_size,
+        vfolders.c.metadata,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -699,6 +701,15 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
                     mount_perm=vfolder["permission"],
+                    app_config=(
+                        MountedAppConfig(
+                            service_name=vfolder["name"],
+                            metadata=vfolder["metadata"],
+                            service_def={},
+                        )
+                        if vfolder["metadata"] is not None
+                        else None
+                    ),
                 )
             )
         else:
@@ -718,6 +729,15 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
+                    app_config=(
+                        MountedAppConfig(
+                            service_name=vfolder["name"],
+                            metadata=vfolder["metadata"],
+                            service_def={},
+                        )
+                        if vfolder["metadata"] is not None
+                        else None
+                    ),
                 )
             )
 

@@ -352,6 +352,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 Path(vfolder.host_path),
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
+                app_config=vfolder.app_config,
             )
             resource_spec.mounts.append(mount)
 
@@ -1747,6 +1748,25 @@ class AbstractAgent(
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
+                            "is_inference": False,
+                        }
+                    )
+                    exposed_ports.append(port)
+                for mount in resource_spec.mounts:
+                    if (
+                        mount.app_config is None
+                        or mount.app_config.get("metadata") is None
+                        or mount.app_config["metadata"].get("container_port") is None
+                    ):
+                        continue
+                    container_port = int(mount.app_config["metadata"]["container_port"])
+                    host_port = int(mount.app_config["metadata"]["host_port"])
+                    service_ports.append(
+                        {
+                            "name": str(mount),
+                            "protocol": ServicePortProtocols.PREOPEN,
+                            "container_ports": (container_port,),
+                            "host_ports": (host_port,),
                             "is_inference": False,
                         }
                     )
