@@ -5,10 +5,10 @@ aiohttp~=3.8.1
 aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiodns>=3.0
-aiomonitor-ng~=0.7.0
+aiomonitor-ng~=0.7.2
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
-aiotools~=1.5.9
+aiotools~=1.6.1
 aiotusclient~=0.1.4
 alembic~=1.8.1
 appdirs~=1.4.4
@@ -26,10 +26,10 @@ coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
-etcetra==0.1.14
+etcetra==0.1.15
 faker~=13.12.0
 graphene~=2.1.9
-hiredis~=2.2.2
+hiredis~=2.2.3
 humanize>=3.1.0
 ifaddr~=0.2
 inquirer~=2.9.2
@@ -55,7 +55,7 @@ pyzmq~=24.0.1
 PyJWT~=2.0
 PyYAML~=6.0
 packaging>=21.3
-redis[hiredis]~=4.3.4
+redis[hiredis]~=4.5.5
 rich~=12.2
 SQLAlchemy[postgresql_asyncpg]~=1.4.40
 setproctitle~=1.2.2
@@ -70,7 +70,7 @@ trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
 uvloop>=0.17; sys_platform != "Windows"
-yarl>=1.7
+yarl~=1.8.2  # FIXME: revert to >=1.7 after aio-libs/yarl#862 is resolved
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)

@@ -313,9 +313,9 @@ def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
             t.Key("usage_mode", default="general"): tx.Enum(VFolderUsageMode) | t.Null,
             t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
             tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
-            tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID
-            | t.String
-            | t.Null,
+            tx.AliasedKey(["group", "groupId", "group_id"], default=None): (
+                tx.UUID | t.String | t.Null
+            ),
             t.Key("quota", default=None): tx.BinarySize | t.Null,
             t.Key("cloneable", default=False): t.Bool,
         }
@@ -352,8 +352,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
             if not folder_host:
                 raise InvalidAPIParameters(
-                    "You must specify the vfolder host "
-                    "because the default host is not configured."
+                    "You must specify the vfolder host because the default host is not configured."
                 )
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     for vf_type in allowed_vfolder_types:
@@ -738,6 +737,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
                 proxy_name=proxy_name,
                 volume_name=volume_data["name"],
             ),
+            "sftp_scaling_groups": await root_ctx.storage_manager.get_sftp_scaling_groups(
+                proxy_name
+            ),
         }
         for proxy_name, volume_data in all_volumes
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
@@ -1119,13 +1121,13 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         for entry in entries:
             if entry["name"] == new_name:
                 raise InvalidAPIParameters(
-                    "One of your accessible vfolders already has " "the name you requested."
+                    "One of your accessible vfolders already has the name you requested."
                 )
         for entry in entries:
             if entry["name"] == old_name:
                 if not entry["is_owner"]:
                     raise InvalidAPIParameters(
-                        "Cannot change the name of a vfolder " "that is not owned by myself."
+                        "Cannot change the name of a vfolder that is not owned by myself."
                     )
                 await ensure_host_permission_allowed(
                     conn,
@@ -1186,7 +1188,7 @@ async def update_vfolder_options(
         updated_fields["permission"] = params["permission"]
     if not row["is_owner"]:
         raise InvalidAPIParameters(
-            "Cannot change the options of a vfolder " "that is not owned by myself."
+            "Cannot change the options of a vfolder that is not owned by myself."
         )
 
     if len(updated_fields) > 0:
@@ -2367,7 +2369,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         target_folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
         if not target_folder_host:
             raise InvalidAPIParameters(
-                "You must specify the vfolder host " "because the default host is not configured."
+                "You must specify the vfolder host because the default host is not configured."
             )
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -2397,7 +2399,8 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             or VFolderHostPermission.CREATE not in allowed_hosts[target_folder_host]
         ):
             raise InvalidAPIParameters(
-                f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder host(`{target_folder_host}`)"
+                f"`{VFolderHostPermission.CREATE}` Not allowed in vfolder"
+                f" host(`{target_folder_host}`)"
             )
         # TODO: handle legacy host lists assuming that volume names don't overlap?
         if target_folder_host not in allowed_hosts:
@@ -2635,15 +2638,19 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
             raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
         except Exception:
             log.exception(
-                "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
-                "unexpected error while reading from watcher (agent:{})",
+                (
+                    "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
+                    "unexpected error while reading from watcher (agent:{})"
+                ),
                 access_key,
                 params["agent_id"],
             )
             raise InternalServerError
     else:
         resp = {
-            "content": "# Since Backend.AI 20.09, reading the manager fstab is no longer supported.",
+            "content": (
+                "# Since Backend.AI 20.09, reading the manager fstab is no longer supported."
+            ),
             "node": "manager",
             "node_id": "manager",
         }
@@ -2723,8 +2730,10 @@ async def list_mounts(request: web.Request) -> web.Response:
                 raise
             except Exception:
                 log.exception(
-                    "VFOLDER.LIST_MOUNTS(u:{}): "
-                    "unexpected error while reading from watcher (agent:{})",
+                    (
+                        "VFOLDER.LIST_MOUNTS(u:{}): "
+                        "unexpected error while reading from watcher (agent:{})"
+                    ),
                     access_key,
                     agent_id,
                 )
