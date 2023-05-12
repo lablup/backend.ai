@@ -498,9 +498,13 @@ class AgentRPCServer(aobject):
         kernel_id: str,
         service: str,
         opts: dict[str, Any],
+        mount_path: Optional[str] = None,
     ) -> dict[str, Any]:
+        path: Optional[Path] = None
+        if mount_path is not None:
+            path = Path(mount_path)
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
-        return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
+        return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts, path)
 
     @rpc_function
     @collect_error

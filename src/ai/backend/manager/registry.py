@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -2021,6 +2022,12 @@ class AgentRegistry:
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
+        vfolder_mounts = session.vfolder_mounts
+        mount_path: Optional[Path] = None
+        for mount in vfolder_mounts:
+            if mount["name"] == service:
+                mount_path = mount["kernel_path"]
+                break
         async with handle_session_exception(self.db, "execute", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2029,7 +2036,9 @@ class AgentRegistry:
                 order_key=session.main_kernel.id,
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.start_service(str(session.main_kernel.id), service, opts)
+                return await rpc.call.start_service(
+                    str(session.main_kernel.id), service, opts, mount_path
+                )
 
     async def shutdown_service(
         self,
