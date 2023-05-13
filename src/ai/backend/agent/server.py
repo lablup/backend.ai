@@ -408,6 +408,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
+        session_id: str,
         reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
@@ -416,6 +417,7 @@ class AgentRPCServer(aobject):
         log.info("rpc::destroy_kernel(k:{0})", kernel_id)
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
+            SessionId(UUID(session_id)),
             LifecycleEvent.DESTROY,
             reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,

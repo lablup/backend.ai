@@ -59,7 +59,8 @@
       "PleaseChangeYourPassword": "Please change your password.",
       "PasswordChangePlace": "Click the person icon on the top bar and go to the \"My Account\" menu.",
       "SetupTotp": "2FA Setup",
-      "TotpActivated": "2FA Enabled"
+      "TotpActivated": "2FA Enabled",
+      "AIAccelerator": "AI Accelerator"
     },
     "LOGINREQUIRED": "LOGIN REQUIRED",
     "YouAreOffline": "You are now offline",
@@ -121,7 +122,9 @@
     "AcceptSharedVFolder": "You can now access folder: ",
     "DeclineSharedVFolder": "Folder invitation is deleted: ",
     "connectingToCluster": "Connecting to Backend.AI Cluster...",
-    "DownloadWebUIApp": "Download Backend.AI Web UI App"
+    "DownloadWebUIApp": "Download Backend.AI Web UI App",
+    "IPUEnabled": "IPU NPU Enabled",
+    "ATOMEnabled": "ATOM NPU Enabled"
   },
   "session": {
     "launcher": {
@@ -156,6 +159,7 @@
       "Start": "Start",
       "FolderToMount": "Folder to mount",
       "FolderToMountList": "Folder to mount",
+      "ModelStorageToMount": "Model storage to mount",
       "MountedFolders": "Mounted folders",
       "ResourceAllocation": "Resource allocation",
       "NoSuitablePreset": "No suitable preset",
@@ -182,7 +186,7 @@
       "DescCPU": "<p>The CPU performs basic arithmetic, logic, controlling, and input/output (I/O) operations specified by the instructions.</p><p>For high performance computing workloads, many CPUs are helpful, but the program code must be written to use multiple CPUs.</p>",
       "DescMemory": "<p>Computer memory is a temporary storage area.</p><p>It holds the data and instructions that the Central Processing Unit (CPU) needs.</p><p>When using a GPU in a machine learning workload, you must allocate at least twice the memory of the GPU to memory. Otherwise, the GPU's idle time will increase, resulting in a performance penalty.</p>",
       "DescSharedMemory": "<p>Shared memory is memory that may be simultaneously accessed by multiple programs with an intent to provide communication among them or avoid redundant copies.</p><p>For multi-CPU or multi-threaded workloads, shared memory is important because it is used for inter-thread communication. For deep learning workloads and high performance computing workloads using multi-threaded, we recommend setting this value to 1 GB or higher.</p>",
-      "DescGPU": "<p>GPUs are well-suited for the matrix/vector computations involved in machine learning. GPUs speed up training algorithms by orders of magnitude, reducing running times from weeks to days.</p>",
+      "DescGPU": "<p>AI accelerators (GPUs or NPUs) are well-suited for the matrix/vector computations involved in machine learning. AI accelerators speed up training / inference algorithms by orders of magnitude, reducing running times from weeks to days.</p>",
       "DescSession": "<p>A session is a unit of computational environment that is created according to a specified environment and resources.</p><p>If this value is set to a value greater than 1, multiple sessions corresponding to the resource set above are created.</p><p>If there are not enough resources available, requests to create sessions that cannot be created are put on the waiting queue.</p>",
       "DescSingleNode": "<p>When running a session, the managed node and worker nodes are placed on a single physical node or virtual machine.</p>",
       "DescMultiNode": "<p>When running a session, one managed node and one or more worker nodes are split across multiple physical nodes or virtual machines.</p>",
@@ -212,6 +216,7 @@
       "DuplicatedSessionName": "Duplicated session name not allowed",
       "SessionNameAllowCondition": "Session name should have 4-64 alphabets/numbers without any whitespaces.",
       "NoFolderExists": "No Folder Exists",
+      "SessionAlreadyExists": "Session name already exists",
       "sessionStillPreparing": "The session is still in preparation. After the session starts, tap the app icon to start the app.",
       "UnSelectAllVFolders": "UNSELECT ALL",
       "ResourceMonitorToggle": "See resource monitor",
@@ -246,7 +251,12 @@
       "NumOpenMPthreads": "Number of OpenMP threads",
       "NumOpenBLASthreads": "Number of OpenBLAS threads",
       "SwitchOpenMPoptimization": "Use automatic OpenMP optimization",
-      "Architecture": "Architecture"
+      "Architecture": "Architecture",
+      "StartModelServing": "Start Model Serving",
+      "InferenceMode": "Inference",
+      "ImageDoesNotProvideModelPath": "Container image does not provide model path. It should be modified.",
+      "AIAccelerator": "AI Accelerator",
+      "DescAIAccelerator": "<p>AI accelerators (GPUs or NPUs) are well-suited for the matrix/vector computations involved in machine learning. AI accelerators speed up training / inference algorithms by orders of magnitude, reducing running times from weeks to days.</p>"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -298,7 +308,8 @@
       "AppMustBeRun": "Start only when the app is already running",
       "AppMustBeRunDialog": "This app can only be accessed and used if it is already running through the terminal. If not, you will be directed to an error page that occurs when the app is not running.",
       "ConfirmAndRun": "I checked and I'll start",
-      "Prepared": "Prepared"
+      "Prepared": "Prepared",
+      "App": "App"
     },
     "TensorboardPath": "Log directory for TensorBoard",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",
@@ -327,7 +338,34 @@
     },
     "EnterValidSessionName": "EnterValidSessionName",
     "EnvironmentInfo": "Environment Info",
-    "DownloadingSessionLogs": "Downloading session logs."
+    "DownloadingSessionLogs": "Downloading session logs.",
+    "ElapsedTime": "Elapsed Time",
+    "Timeout": "Timeout",
+    "TimeoutExceeded": "Time reached. Checking...",
+    "Inference": "Inference",
+    "UseSubdomain": "UseSubdomain",
+    "BypassAuthentication": "Bypass authentication",
+    "App": "App",
+    "SeeAppDialog": "See App Dialog",
+    "ExecuteTerminalApp": "Execute Terminal App",
+    "TerminateSession": "Terminate Session",
+    "SeeContainerLogs": "See Container Logs",
+    "RequestContainerCommit": "Request Container Commit",
+    "MaxSessionLifetime": "Max Session Lifetime",
+    "NetworkIdleTimeout": "Network Idle Timeout",
+    "UtilizationIdleTimeout": "Utilization Checker",
+    "IdleChecks": "Idle Checks",
+    "Utilization": "Utilization",
+    "Threshold": "Threshold",
+    "UtilizationThreshold": "Utilization Threshold",
+    "ExpiresAfter": "Expires After",
+    "GracePeriod": "Grace Period",
+    "IdleChecksDesc": "Backend.AI supports three types of inactivity (idleness) criteria for automatic garbage collection of compute sessions.",
+    "MaxSessionLifetimeDesc": "Force-terminate sessions after this time from creation. It prevents the session from running infinitely.",
+    "NetworkIdleTimeoutDesc": "Force-terminate sessions that do not exchange data with the user (browser or web app) after this time. Traffic between the user and the compute session continuously occurs when the user interacts with an app, like terminal or Jupyter, by keyboard input, Jupyter cell creation, etc. Jupyter cell creation, etc. If there is no interaction for a certain period, the condition of garbage collection will be met. Even if there is a process executing a job in the compute session, it is subject to termination if there is no user interaction.",
+    "UtilizationIdleTimeoutDesc": "Force-terminate sessions based only on the utilization of resources allocated to them.",
+    "GracePeriodDesc": "Utilization idle checker will be activated after this initial grace time. During this time, sessions are not terminated even if utilization is low.",
+    "UtilizationThresholdDesc": "Threshold criteria of each compute resource. When one or more resource of a compute session does not exceed the configured threshold criteria for a certain time, the session will be garbage collected (terminated). For example, if you set 1% of CUDA utilization threshold, compute sessions that show less than 1% CUDA GPU utilization, for a certain duration of time, will be destroyed. Resources with empty values are excluded from the garbage collection criteria."
   },
   "button": {
     "Cancel": "Cancel",
@@ -488,7 +526,9 @@
     "UserNotFound": "Credential creation failed, since the following user ID could't be found : ",
     "UserIDRequired": "User ID is required.",
     "KeypairDetail": "Keypair Detail",
-    "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible."
+    "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
+    "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
+    "SignoutSeccessfullyFinished": "Signout is seccessfully finished"
   },
   "data": {
     "Folders": "Folders",
@@ -510,6 +550,15 @@
     "FolderNameTooLong": "Enter folder name less than 64 characters",
     "EnterDifferentValue": "Please enter a value different from the existing file or folder name. Please Check whether space character in the input field or not.",
     "Host": "Host",
+    "HostUsage": "Host Usage",
+    "usage": {
+      "Adequate": "Adequate",
+      "Caution": "Caution",
+      "Insufficient": "Insufficient",
+      "StatusOfSelectedHost": "Status Of Selected Host",
+      "Status": "Status",
+      "used": "used"
+    },
     "Foldername": "Folder name",
     "FolderToUpdate": "Folder to update",
     "FolderToCopy": "Folder to copy",
@@ -567,7 +616,8 @@
       "FolderUsage": "Folder usage",
       "FolderUsing": "Using",
       "FolderQuota": "Capacity",
-      "MaxFolderQuota": "Max Folder Quota"
+      "MaxFolderQuota": "Max Folder Quota",
+      "Serve": "Serve"
     },
     "explorer": {
       "Delete": "Delete...",
@@ -628,7 +678,8 @@
       "NoChanges": "No changes made",
       "PermissionModified": "Permission updated"
     },
-    "NoStorageDescriptionFound": "No description."
+    "NoStorageDescriptionFound": "No description.",
+    "DialogModelFolder": "You can serve and manage models."
   },
   "dialog": {
     "warning": {
@@ -890,7 +941,8 @@
     "TimeoutSeconds": "Seconds",
     "ResourceGroupDetail": "Resource Group Detail",
     "RetriesToSkip": "Times",
-    "NoGroupToDisplay": "NoGroupToDisplay"
+    "NoGroupToDisplay": "NoGroupToDisplay",
+    "AllowedSessionTypes": "Allowed session types"
   },
   "maintenance": {
     "General": "General",
@@ -1028,7 +1080,13 @@
     "OverlayNetworkConfiguration": "Configuration to use when creating overlay networks.",
     "OverlayNetworkSettings": "Overlay Network settings",
     "OverlayNetworkSettingsDescription": "An overlay network is a computer network that is layered on top of another network. The overlay network creates a distributed network among multiple Docker daemon hosts of the Backend.AI manager.",
-    "MTUDescription": "Maximum transmission unit, the size of the largest packet that a network protocol can transmit."
+    "MTUDescription": "Maximum transmission unit, the size of the largest packet that a network protocol can transmit.",
+    "IPUsupport": "IPU",
+    "DescIPUsupport": "Use GraphCore IPU accelerator",
+    "ATOMsupport": "ATOM",
+    "DescATOMsupport": "Use Rebellions ATOM accelerator",
+    "RequireIPUPlugin": "Requires Backend.AI IPU Plugin.",
+    "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",

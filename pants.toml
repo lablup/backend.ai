@@ -18,7 +18,8 @@ pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
-    "*.log"
+    "*.log",
+    "tools/pants-plugins",
 ]
 
 [anonymous-telemetry]
@@ -44,7 +45,6 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.11.3"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.11.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -94,13 +94,13 @@ install_from_resolve = "isort"
 [pytest]
 install_from_resolve = "pytest"
 extra_requirements.add = [
-    "pytest-asyncio",
-    "pytest-aiohttp",
-    "pytest-cov",
-    "pytest-custom_exit_code",
-    "pytest-dependency",
-    "pytest-mock",
-    "aioresponses",
+    "pytest-asyncio>=0.19",
+    "pytest-aiohttp>=1.0.4",
+    "pytest-custom_exit_code>=0.3.0",
+    "pytest-dependency>=0.5.1",
+    "pytest-mock>=3.8.2",
+    "aioresponses>=0.7.3",
+    "yarl~=1.8.2"  # FIXME: remove after docker crash issue is resolved
 ]
 args = ["-v", "--suppress-no-test-exit-code"]
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
