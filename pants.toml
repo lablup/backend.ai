@@ -80,28 +80,15 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.11.3"]  # don't know why this is required... (maybe a Pants bug?)
 
 [flake8]
 install_from_resolve = "flake8"
-extra_requirements.add = [
-    "setuptools",
-]
 
 [isort]
 install_from_resolve = "isort"
 
 [pytest]
 install_from_resolve = "pytest"
-extra_requirements.add = [
-    "pytest-asyncio>=0.19",
-    "pytest-aiohttp>=1.0.4",
-    "pytest-custom_exit_code>=0.3.0",
-    "pytest-dependency>=0.5.1",
-    "pytest-mock>=3.8.2",
-    "aioresponses>=0.7.3",
-    "yarl~=1.8.2"  # FIXME: remove after docker crash issue is resolved
-]
 args = ["-v", "--suppress-no-test-exit-code"]
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
@@ -111,8 +98,6 @@ report = ["xml", "console"]
 
 [mypy]
 install_from_resolve = "mypy"
-extra_requirements.add = [
-]
 extra_type_stubs = [
     "types-six",
     "types-setuptools",
@@ -130,5 +115,3 @@ extra_type_stubs_lockfile = "tools/mypy-extra-type-stubs.lock"
 
 [towncrier]
 install_from_resolve = "towncrier"
-extra_requirements.add = [
-]
