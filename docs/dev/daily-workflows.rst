@@ -165,21 +165,33 @@ Using IDEs and editors
 
 Pants has an ``export`` goal to auto-generate a virtualenv that contains all
 external dependencies installed in a single place.
-This is very useful when you work with IDEs and editors.
+This is very useful when you use IDEs and editors.
 
-To (re-)generate the virtualenv, run:
+To (re-)generate the virtualenv(s), run:
 
 .. code-block:: console
 
-    $ pants export
+    $ pants export --resolve=RESOLVE_NAME  # you may add multiple --resolve options
+
+You may display the available resolve names by (the command works with Python 3.11 or later):
+
+.. code-block:: console
+
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))'
+
+Similarly, you can export all virtualenvs at once:
+
+.. code-block:: console
+
+    $ python -c 'import tomllib,pathlib;print("\n".join(tomllib.loads(pathlib.Path("pants.toml").read_text())["python"]["resolves"].keys()))' | sed 's/^/--resolve=/' | xargs ./pants export
 
 Then configure your IDEs/editors to use
-``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
-interpreter for your code, where ``VERSION`` is the interpreter version
+``dist/export/python/virtualenvs/python-default/PYTHON_VERSION/bin/python`` as the
+interpreter for your code, where ``PYTHON_VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
-As of Pants 2.16, you may also export the virtualenvs by the individual lockfiles
-using the ``--resolve`` option like:
+As of Pants 2.16, you must export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option, as all tools are unified to use the same custom resolve subsystem of Pants and the ``::`` target no longer works properly, like:
 
 .. code-block:: console
 
@@ -190,13 +202,22 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 ``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
 For linters and formatters, configure the tool executable paths to indicate
-``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
+``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, flake8's executable path is
-``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
+``dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8``.
 
-Currently we have four Python tools to configure in this way:
+Currently we have the following Python tools to configure in this way:
 
 * ``flake8``: Validates PEP-8 coding style
+
+  .. info::
+
+     Due to limitation of Pants, ``./pants export --resolve=flake8`` only creates a venv
+     for the Python version of the ``python-default`` resolve, while the
+     ``pants-plugins`` resolve uses Python 3.9.x.
+     ``./pants lint`` correctly uses both Python versions because it can infer
+     existence of multiple resolve partitions from the entire sourec tree, but
+     this is not the case for ``./pants export``.
 
 * ``mypy``: Validates the type annotations
 
@@ -218,6 +239,12 @@ Currently we have four Python tools to configure in this way:
 * ``isort``: Validates and reorders import statements in a fixed order depending on
   the categories of imported packages (such as bulitins, first-parties, and
   third-parties), the alphabetical order, and whether it uses ``from`` or not.
+
+* ``pytest``: The unit test runner framework.
+
+* ``coverage-py``: Generates reports about which source lines were visited during execution of a pytest session.
+
+* ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
 VSCode
 ~~~~~~
@@ -258,10 +285,10 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/tools/isort/bin/isort'  " requires absolute path
-   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/tools/black/bin/black'  " requires absolute path
-   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/tools/flake8/bin/flake8'
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/tools/mypy/bin/mypy'
+   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/isort/3.11.3/bin/isort'  " requires absolute path
+   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.3/bin/black'  " requires absolute path
+   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.3/bin/mypy'
    let g:ale_fixers = {'python': ['isort', 'black']}
    let g:ale_fix_on_save = 1
 
@@ -276,14 +303,14 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.9/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.3/bin/python",
      "python.formatting.provider": "black",
-     "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
-     "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.3/bin/black",
+     "python.sortImports.path": "dist/export/python/virtualenvs/isort/3.11.3/bin/isort",
      "python.linting.mypyEnabled": true,
      "python.linting.flake8Enabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
-     "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.3/bin/mypy",
+     "python.linting.flake8Path": "dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8"
    }
 
 
