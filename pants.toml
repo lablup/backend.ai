@@ -80,6 +80,7 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
+interpreter_constraints = ["CPython==3.11.3"]  # don't know why this is required... (maybe a Pants bug?)
 
 [flake8]
 install_from_resolve = "flake8"
