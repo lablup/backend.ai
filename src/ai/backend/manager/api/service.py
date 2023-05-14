@@ -20,15 +20,16 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, SessionTypes
-from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
     ImageRow,
+    KernelRole,
     UserRow,
     VFolderUsageMode,
     query_accessible_vfolders,
+    resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
@@ -257,6 +258,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 params["image"],
             ],
         )
+    if image_row.labels.get("ai.backend.role") != KernelRole.INFERENCE:
+        raise InvalidAPIParameters("Cannot create service with non-inference image")
+
     params["config"]["mount_map"] = {
         params["config"]["model_id"]: params["config"]["model_mount_path"]
     }
@@ -580,7 +584,7 @@ def create_app(
     cors.add(root_resource.add_route("POST", create))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
-    cors.add(add_route("POST", "/{service_id}/scale-up", scale))
+    cors.add(add_route("POST", "/{service_id}/scale", scale))
     cors.add(add_route("POST", "/{service_id}/sync", sync))
     cors.add(add_route("PUT", "/{service_id}/routings/{route_id}", update_route))
     cors.add(add_route("DELETE", "/{service_id}/routings/{route_id}", delete_route))

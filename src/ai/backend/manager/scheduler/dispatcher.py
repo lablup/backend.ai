@@ -1082,7 +1082,10 @@ class SchedulerDispatcher(aobject):
                         [
                             route
                             for route in endpoint.routings
-                            if route.status != RouteStatus.PROVISIONING
+                            if (
+                                route.status != RouteStatus.PROVISIONING
+                                and route.status != RouteStatus.TERMINATING
+                            )
                         ],
                         key=lambda r: r.status == RouteStatus.UNHEALTHY,
                     )

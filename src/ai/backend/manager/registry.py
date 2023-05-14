@@ -3442,7 +3442,7 @@ async def invoke_session_callback(
                         if isinstance(event, SessionStartedEvent):
                             new_route_status = RouteStatus.HEALTHY
                         elif isinstance(event, SessionTerminatingEvent):
-                            new_route_status = RouteStatus.UNHEALTHY
+                            new_route_status = RouteStatus.TERMINATING
 
                         if new_route_status:
                             query = (
