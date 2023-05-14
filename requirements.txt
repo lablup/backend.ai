@@ -74,7 +74,7 @@ yarl~=1.8.2  # FIXME: revert to >=1.7 after aio-libs/yarl#862 is resolved
 zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
-pytest>=7.1.2
+pytest>=7.3.1
 pytest-dependency>=0.5.1
 
 # type stubs
