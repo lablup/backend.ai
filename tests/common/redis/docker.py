@@ -158,24 +158,26 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 "REDIS_SENTINEL2_PORT": await _get_free_port(),
                 "REDIS_SENTINEL3_PORT": await _get_free_port(),
             }
-            os.environ.update({k: str(v) for k, v in ports.items()})
-            os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
-            async with async_timeout.timeout(30.0):
-                p = await simple_run_cmd(
-                    [
-                        *compose_cmd,
-                        "-p",
-                        project_name,
-                        "-f",
-                        str(compose_cfg),
-                        "up",
-                        "-d",
-                        "--build",
-                    ],
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                assert p.returncode == 0, "Compose cluster creation has failed."
+
+        os.environ.update({k: str(v) for k, v in ports.items()})
+        os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
+        async with async_timeout.timeout(30.0):
+            p = await simple_run_cmd(
+                [
+                    *compose_cmd,
+                    "-p",
+                    project_name,
+                    "-f",
+                    str(compose_cfg),
+                    "up",
+                    "-d",
+                    "--build",
+                ],
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            assert p.returncode == 0, "Compose cluster creation has failed."
+
         await asyncio.sleep(2)
         try:
             p = await simple_run_cmd(
