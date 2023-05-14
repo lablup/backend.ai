@@ -756,6 +756,31 @@ class EventDispatcher(aobject):
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
+    async def wait(self, event: type[AbstractEvent]) -> Optional[AbstractEvent]:
+        # Should I dispatch subscribers or consumers of waited events?
+        async with aclosing(
+            redis_helper.read_stream_by_group(
+                self.redis_client,
+                self._stream_key,
+                self._consumer_group,
+                self._consumer_name,
+            )
+        ) as agen:
+            async for msg_id, msg_data in agen:
+                if self._closed:
+                    return None
+                if msg_data is None:
+                    continue
+                try:
+                    args = msgpack.unpackb(msg_data[b"args"])
+                    return event.deserialize(args)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("EventDispatcher.wait(): unexpected-error")
+                    raise
+        return None
+
     async def handle(self, evh_type: str, evh: EventHandler, source: AgentId, args: tuple) -> None:
         coalescing_opts = evh.coalescing_opts
         coalescing_state = evh.coalescing_state
