@@ -117,6 +117,8 @@ class QTreeQuotaModel(BaseQuotaModel):
 class XCPFSOpModel(BaseFSOpModel):
     """
     Accelerates filesystem operations using NetApp's XCP tool.
+    If the tool is not installed or its license is not available, it will gracefully fallback to the
+    BaseFSOpModel's standard implementations.
 
     ref) https://docs.netapp.com/us-en/xcp/xcp-install-xcp.html#install-and-configure-workflow
     """
