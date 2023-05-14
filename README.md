@@ -181,13 +181,14 @@ $ git subtree pull --squash --prefix=src/ai/backend/web/static webui-package mai
 
 ### Kernels
 
+Computing environment recipes (Dockerfile) to build the container images to execute
+on top of the Backend.AI platform.
+
 * https://github.com/lablup/backend.ai-kernels
-  - Computing environment recipes (Dockerfile) to build the container images to execute
-    on top of the Backend.AI platform
 
 ### Jail
 
-A programmable sandbox implemented using ptrace-based system call filtering written in Go.
+A programmable sandbox implemented using ptrace-based system call filtering written in Rust.
 
 * https://github.com/lablup/backend.ai-jail
 
@@ -226,7 +227,7 @@ Plugins
   - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
     - This emulates the presence of CUDA devices without actual CUDA devices,
       so that developers can work on CUDA integration without real GPUs.
-  - [`ai.backend.accelerator.rocm`]: ROCm accelerator plugin
+  - [`ai.backend.accelerator.rocm`](): ROCm accelerator plugin
   - More available in the enterprise edition!
 * `backendai_monitor_stats_v10`
   - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)
