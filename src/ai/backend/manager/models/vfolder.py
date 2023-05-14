@@ -570,13 +570,34 @@ async def prepare_vfolder_mounts(
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
     resource_policy: Mapping[str, Any],
-    requested_mounts: Sequence[str],
-    requested_mount_map: Mapping[str, str],
+    requested_mount_references: Sequence[str | uuid.UUID],
+    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
+    requested_mounts: list[str] = [
+        name for name in requested_mount_references if isinstance(name, str)
+    ]
+    requested_mount_map: dict[str, str] = {
+        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+
+    vfolder_ids_to_resolve = [
+        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
+    ]
+    query = (
+        sa.select([vfolders.c.id, vfolders.c.name])
+        .select_from(vfolders)
+        .where(vfolders.c.id.in_(vfolder_ids_to_resolve))
+    )
+    result = await conn.execute(query)
+
+    for vfid, name in result.fetchall():
+        requested_mounts.append(name)
+        if path := requested_mount_map.get(vfid):
+            requested_mount_map[name] = path
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}

@@ -1,14 +1,19 @@
 import uuid
-from typing import TYPE_CHECKING, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
+import yarl
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.types import ClusterMode
+
 from ..api.exceptions import EndpointNotFound
-from .base import GUID, Base, EndpointIDColumn, Item, PaginatedList, ResourceSlotColumn
+from .base import GUID, Base, EndpointIDColumn, Item, PaginatedList, ResourceSlotColumn, URLColumn
+from .image import ImageRow
 from .routing import Routing
 
 if TYPE_CHECKING:
@@ -21,11 +26,29 @@ class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     id = EndpointIDColumn()
+    name = sa.Column("name", sa.String(length=512), nullable=False, unique=True)
+    created_user = sa.Column(
+        "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
+    )
+    session_owner = sa.Column(
+        "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
+    )
+    # minus session count means this endpoint is requested for removal
+    desired_session_count = sa.Column(
+        "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
+    )
     image = sa.Column(
         "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
     model = sa.Column(
         "model", GUID, sa.ForeignKey("vfolders.id", ondelete="RESTRICT"), nullable=False
+    )
+    model_mount_destiation = sa.Column(
+        "model_mount_destiation",
+        sa.String(length=1024),
+        nullable=False,
+        default="/models",
+        server_default="/models",
     )
     domain = sa.Column(
         "domain",
@@ -45,30 +68,107 @@ class EndpointRow(Base):
         index=True,
         nullable=False,
     )
+    tag = sa.Column("tag", sa.String(length=64), nullable=True)
+    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
+    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
+    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
+    environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
+    open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
 
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
-    url = sa.Column("url", sa.String(length=1024), nullable=False, unique=True)
+    url = sa.Column("url", sa.String(length=1024), unique=True)
+    resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
+    cluster_mode = sa.Column(
+        "cluster_mode",
+        sa.String(length=16),
+        nullable=False,
+        default=ClusterMode.SINGLE_NODE,
+        server_default=ClusterMode.SINGLE_NODE.name,
+    )
+    cluster_size = sa.Column(
+        "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
+    )
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
 
+    def __init__(
+        self,
+        name: str,
+        created_user: uuid.UUID,
+        session_owner: uuid.UUID,
+        desired_session_count: int,
+        image: ImageRow,
+        model: uuid.UUID,
+        domain: str,
+        project: uuid.UUID,
+        resource_group: str,
+        resource_slots: Mapping[str, Any],
+        cluster_mode: ClusterMode,
+        cluster_size: int,
+        model_mount_destination: Optional[str] = None,
+        tag: Optional[str] = None,
+        startup_command: Optional[str] = None,
+        bootstrap_script: Optional[str] = None,
+        callback_url: Optional[yarl.URL] = None,
+        environ: Optional[Mapping[str, Any]] = None,
+        resource_opts: Optional[Mapping[str, Any]] = None,
+        open_to_public=False,
+    ):
+        self.id = uuid.uuid4()
+        self.name = name
+        self.created_user = created_user
+        self.session_owner = session_owner
+        self.desired_session_count = desired_session_count
+        self.image = image.id
+        self.model = model
+        self.domain = domain
+        self.project = project
+        self.resource_group = resource_group
+        self.resource_slots = resource_slots
+        self.cluster_mode = cluster_mode.name
+        self.cluster_size = cluster_size
+        self.model_mount_destination = model_mount_destination
+        self.tag = tag
+        self.startup_command = startup_command
+        self.bootstrap_script = bootstrap_script
+        self.callback_url = callback_url
+        self.environ = environ
+        self.resource_opts = resource_opts
+        self.open_to_public = open_to_public
+
     @classmethod
-    async def get(cls, session: AsyncSession, endpoint_id: uuid.UUID) -> "EndpointRow":
+    async def get(
+        cls, session: AsyncSession, endpoint_id: uuid.UUID, load_routes=False, load_image=False
+    ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
         query = sa.select(EndpointRow).filter(EndpointRow.id == endpoint_id)
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_image:
+            query = query.options(selectinload(EndpointRow.image_row))
         result = await session.execute(query)
-        try:
-            return result.one()
-        except NoResultFound:
-            raise
+        row = result.scalar()
+        if row is None:
+            raise NoResultFound
+        return row
 
     @classmethod
     async def list(
-        cls, session: AsyncSession, project: uuid.UUID | None = None
+        cls,
+        session: AsyncSession,
+        project: uuid.UUID | None = None,
+        load_routes=False,
+        load_image=False,
     ) -> List["EndpointRow"]:
         query = sa.select(EndpointRow)
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_image:
+            query = query.options(selectinload(EndpointRow.image_row))
+
         if project:
             query = query.filter(EndpointRow.project == project)
         result = await session.execute(query)

@@ -941,7 +941,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
-    startup_command: str
+    startup_command: Optional[str]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:

@@ -1,23 +1,35 @@
+import logging
 import uuid
+from enum import Enum
 from typing import TYPE_CHECKING, Sequence
 
 import graphene
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.logging_utils import BraceStyleAdapter
+
 from ..api.exceptions import RoutingNotFound
-from .base import GUID, Base, IDColumn, Item, PaginatedList
-from .utils import ExtendedAsyncSAEngine, execute_with_retry
+from .base import GUID, Base, EnumValueType, IDColumn, Item, PaginatedList
 
 if TYPE_CHECKING:
     # from .gql import GraphQueryContext
     pass
 
 
-__all__ = ("RoutingRow", "Routing", "RoutingList")
+__all__ = ("RoutingRow", "Routing", "RoutingList", "RouteStatus")
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+
+
+class RouteStatus(Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    PROVISIONING = "provisioning"
+    FAILED_TO_START = "failed_to_start"
 
 
 class RoutingRow(Base):
@@ -33,52 +45,63 @@ class RoutingRow(Base):
     session = sa.Column(
         "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=False
     )
+    status = sa.Column(
+        "status",
+        EnumValueType(RouteStatus),
+        nullable=False,
+        default=RouteStatus.PROVISIONING,
+    )
 
     traffic_ratio = sa.Column("traffic_ratio", sa.Float(), nullable=False)
 
     endpoint_row = relationship("EndpointRow", back_populates="routings")
+    session_row = relationship("SessionRow", back_populates="routing")
 
     @classmethod
-    async def get(cls, session: AsyncSession, routing_id: uuid.UUID) -> "RoutingRow":
+    async def get_by_session(
+        cls, db_sess: AsyncSession, session_id: uuid.UUID, load_endpoint=False
+    ) -> "RoutingRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
-        query = sa.select(RoutingRow).filter(RoutingRow.id == routing_id)
-        result = await session.execute(query)
-        try:
-            return result.one()
-        except NoResultFound:
-            raise
+        query = sa.select(RoutingRow).where(RoutingRow.session == session_id)
+        if load_endpoint:
+            query = query.options(selectinload(RoutingRow.endpoint_row))
+        result = await db_sess.execute(query)
+        row = result.scalar()
+        if row is None:
+            raise NoResultFound
+        return row
 
     @classmethod
-    async def create(
-        cls,
-        engine: ExtendedAsyncSAEngine,
-        endpoint_id: uuid.UUID,
-        session_id: uuid.UUID,
-        traffic_ratio: float = 100.0,
-    ) -> uuid.UUID:
-        # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
+    async def get(
+        cls, db_sess: AsyncSession, route_id: uuid.UUID, load_session=False, load_endpoint=False
+    ) -> "RoutingRow":
+        """
+        :raises: sqlalchemy.orm.exc.NoResultFound
+        """
+        query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
+        if load_session:
+            query = query.options(selectinload(RoutingRow.session_row))
+        if load_endpoint:
+            query = query.options(selectinload(RoutingRow.endpoint_row))
+        result = await db_sess.execute(query)
+        row = result.scalar()
+        if row is None:
+            raise NoResultFound
+        return row
 
-        async def _create_routing() -> uuid.UUID:
-            async with engine.begin_session() as db_sess:
-                routing_id = uuid.uuid4()
-                query = (
-                    psql.insert(RoutingRow)
-                    .values(
-                        id=routing_id,
-                        endpoint=endpoint_id,
-                        session=session_id,
-                        traffic_ratio=traffic_ratio,
-                    )
-                    .on_conflict_do_nothing(
-                        index_elements=[RoutingRow.endpoint, RoutingRow.session]
-                    )
-                )
-                await db_sess.execute(query)
-                return routing_id
-
-        return await execute_with_retry(_create_routing)
+    def __init__(
+        self,
+        endpoint: uuid.UUID,
+        session: uuid.UUID,
+        status=RouteStatus.PROVISIONING,
+        traffic_ratio=1.0,
+    ) -> None:
+        self.endpoint = endpoint
+        self.session = session
+        self.status = status
+        self.traffic_ratio = traffic_ratio
 
 
 class Routing(graphene.ObjectType):
@@ -159,7 +182,7 @@ class Routing(graphene.ObjectType):
     ) -> "Routing":
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await RoutingRow.get(session, routing_id=routing_id)
+                row = await RoutingRow.get(session, routing_id)
         except NoResultFound:
             raise RoutingNotFound
         return await Routing.from_row(ctx, row)
