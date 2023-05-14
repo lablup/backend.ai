@@ -531,7 +531,8 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
+# FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
+$bpython -m pip --disable-pip-version-check install -q 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
