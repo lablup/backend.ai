@@ -180,7 +180,7 @@ $ git subtree pull --squash --prefix=src/ai/backend/web/static webui-package mai
 ### Kernels
 
 Computing environment recipes (Dockerfile) to build the container images to execute
-    on top of the Backend.AI platform.
+on top of the Backend.AI platform.
 
 * https://github.com/lablup/backend.ai-kernels
 
