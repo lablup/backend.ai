@@ -59,6 +59,9 @@ def wait_health_check(container_id):
             capture_output=True,
         )
         container_info = json.loads(proc.stdout)
+        if not container_info:  # maybe empty if container is not yet initialized
+            time.sleep(0.1)
+            continue
         health_info = container_info[0]["State"].get("Health")
         if health_info is not None and health_info["Status"].lower() != "healthy":
             time.sleep(0.2)
