@@ -20,13 +20,9 @@ jobs:
         fetch-depth: 2
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
@@ -34,16 +30,15 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      # See: github.com/pantsbuild/actions/tree/main/init-pants/
+      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check '::'
+      run: pants tailor --check update-build-files --check '::'
     - name: Check forbidden cross imports
       run: ./scripts/check-cross-imports.sh
     - name: Lint
@@ -59,7 +54,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
+        pants lint --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -77,13 +72,9 @@ jobs:
         fetch-depth: 2
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
@@ -91,12 +82,9 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
@@ -112,7 +100,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
+        pants check --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -140,13 +128,9 @@ jobs:
       run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
@@ -154,12 +138,9 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -170,7 +151,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
+        pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -183,6 +164,7 @@ jobs:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v3
     - name: Fetch remote tags
@@ -199,15 +181,11 @@ jobs:
       run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Prepare the pip cache directory
       run: mkdir -p ~/.cache/pip
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
@@ -215,12 +193,9 @@ jobs:
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Install local dependencies for packaging
@@ -232,11 +207,11 @@ jobs:
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
         # Build non-platform-specific wheels
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
         # Build x86_64 wheels
         MANYLINUX_PTAG=manylinux2014_x86_64
         MACOS_PTAG=macosx_11_0_x86_64
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
@@ -244,7 +219,7 @@ jobs:
         # Build arm64 wheels
         MANYLINUX_PTAG=manylinux2014_aarch64
         MACOS_PTAG=macosx_11_0_arm64
-        ./pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
@@ -254,7 +229,7 @@ jobs:
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `./pants publish ::` because we manually rename the
+      # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
@@ -274,6 +249,7 @@ jobs:
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
           dist/*.whl
+          dist/*.tar.gz
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -304,7 +280,7 @@ jobs:
       shell: bash
       run: |
         export LANG=C.UTF-8
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
@@ -312,7 +288,11 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
     - name: Normalize the package version
+      shell: bash
       run: |
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
@@ -341,6 +321,7 @@ jobs:
   build-client-image:
     needs: [build-wheels]
     runs-on: ubuntu-latest
+    environment: deploy-to-docker-hub
     steps:
       - uses: actions/checkout@v3
       - name: Set up QEMU
@@ -356,14 +337,14 @@ jobs:
         shell: bash
         run: |
           export LANG=C.UTF-8
-          PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+          PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
           echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
           echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./client.Dockerfile
+          file: ./backend.ai-client.Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: lablup/backend.ai-client:${{ github.ref_name }}
@@ -372,7 +353,7 @@ jobs:
             PKGVER=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Push latest
+      - name: Push to the Docker Hub
         run: |
           docker tag lablup/backend.ai-client:${{ github.ref_name }} lablup/backend.ai-client:latest
           docker push lablup/backend.ai-client:latest

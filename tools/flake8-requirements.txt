@@ -1,0 +1,2 @@
+flake8~=6.0
+setuptools>=60.0
