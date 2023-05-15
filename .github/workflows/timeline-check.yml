@@ -7,7 +7,7 @@ on:
 
 jobs:
   pr-number-assign:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }} && ${{ github.event.pull_request.number != null }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null }}
     uses: ./.github/workflows/pr-number-assign.yml
 
   towncrier:
