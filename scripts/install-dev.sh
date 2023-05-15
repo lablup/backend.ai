@@ -218,7 +218,8 @@ if [ STANDALONE_PYTHON_ARCH == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
 
-export PYTHONPATH="$(pwd)/.python-runtime"
+export PYTHONPATH="$HOME/.cache/python-runtime"
+mkdir -p "$PYTHONPATH"
 if [ $DISTRO = "Darwin" ]; then
   export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PYTHONPATH/lib
 else
@@ -999,9 +1000,5 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
 fi
 if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
-fi
-
-if [ -d $PYTHONPATH ]; then
-  rm -r "$(readlink -f $PYTHONPATH/..lib)"  # Remove downloaded static python build
 fi
 # vim: tw=0 sts=2 sw=2 et
