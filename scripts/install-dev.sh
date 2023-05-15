@@ -155,22 +155,23 @@ has_python() {
 
 install_static_python() {
   local build_date="20230507"
-  local build_version="3.11.3"
+  local build_version="${STANDALONE_PYTHON_VERSION}"
   local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
   dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
-  checksum_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz.sha256"
-  cwd=$(pwd)
-  mkdir -p .python-runtime && cd .python-runtime
+  checksum_url="${dist_url}.sha256"
+  cwd="$(pwd)"
+  mkdir -p "${STANDALONE_PYTHON_PATH}"
+  cd "${STANDALONE_PYTHON_PATH}"
   show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
   curl -o dist.tar.gz -L "$dist_url"
-  echo "$(curl -sL $checksum_url) dist.tar.gz" | sha256sum --check --status
+  echo "$(curl -sL $checksum_url) *dist.tar.gz" | shasum -a 256 --check --status
   if [ $? -ne 0 ]; then
     echo "Failed to validate the downloaded static build of Python binary!"
     exit 1
   fi
   tar xzf dist.tar.gz && rm dist.tar.gz
   mv python/* . && rmdir python
-  cd $cwd
+  cd "${cwd}"
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -213,23 +214,17 @@ else
   exit 1
 fi
 
+STANDALONE_PYTHON_VERSION="3.11.3"
 STANDALONE_PYTHON_ARCH=$(arch)
-if [ STANDALONE_PYTHON_ARCH == "arm64" ]; then
+STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
+if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
-
-export PYTHONPATH="$(pwd)/.python-runtime"
-if [ $DISTRO = "Darwin" ]; then
-  export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PYTHONPATH/lib
-else
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PYTHONPATH/lib
-fi
-
-bpython="$PYTHONPATH/bin/python3"
 if [ $(has_python $bpython) -eq 0 ]; then
   install_static_python
 fi
 show_info "Checking the bootstrapper Python version..."
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
 $bpython -c 'import sys;print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
@@ -565,7 +560,7 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q 'urllib3<2.0' requests requests-unixsocket
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
@@ -999,9 +994,5 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
 fi
 if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
-fi
-
-if [ -d $PYTHONPATH ]; then
-  rm -r "$(readlink -f $PYTHONPATH/..lib)"  # Remove downloaded static python build
 fi
 # vim: tw=0 sts=2 sw=2 et
