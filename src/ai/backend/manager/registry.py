@@ -2025,7 +2025,7 @@ class AgentRegistry:
         vfolder_mounts = session.vfolder_mounts
         mount_path: Optional[Path] = None
         for mount in vfolder_mounts:
-            if mount["name"] == service:
+            if mount["app_config"]["service_name"] == service:
                 mount_path = mount["kernel_path"]
                 break
         async with handle_session_exception(self.db, "execute", session.id):

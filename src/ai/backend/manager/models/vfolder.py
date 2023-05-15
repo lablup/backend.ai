@@ -189,7 +189,7 @@ vfolders = sa.Table(
         default=VFolderUsageMode.GENERAL,
         nullable=False,
     ),
-    sa.Column("metadata", pgsql.JSONB(), nullable=True),
+    sa.Column("app_config", pgsql.JSONB(), nullable=True),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
     sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
@@ -703,11 +703,11 @@ async def prepare_vfolder_mounts(
                     mount_perm=vfolder["permission"],
                     app_config=(
                         MountedAppConfig(
-                            service_name=vfolder["name"],
-                            metadata=vfolder["metadata"],
-                            service_def={},
+                            service_name=vfolder["app_config"]["service_name"],
+                            metadata=vfolder["app_config"]["metadata"],
+                            service_def=vfolder["app_config"]["service_def"],
                         )
-                        if vfolder["metadata"] is not None
+                        if vfolder["app_config"] is not None
                         else None
                     ),
                 )
@@ -731,11 +731,11 @@ async def prepare_vfolder_mounts(
                     mount_perm=vfolder["permission"],
                     app_config=(
                         MountedAppConfig(
-                            service_name=vfolder["name"],
-                            metadata=vfolder["metadata"],
-                            service_def={},
+                            service_name=vfolder["app_config"]["service_name"],
+                            metadata=vfolder["app_config"]["metadata"],
+                            service_def=vfolder["app_config"]["service_def"],
                         )
-                        if vfolder["metadata"] is not None
+                        if vfolder["app_config"] is not None
                         else None
                     ),
                 )
