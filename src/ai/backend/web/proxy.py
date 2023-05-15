@@ -152,13 +152,19 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     first_path = request.path.lstrip("/").partition("/")[
         0
     ]  # extract the first path  # extract the first path
-    if is_anonymous:
+    if first_path == "pipeline":
+        if not (pipeline_endpoint := request.app["config"]["pipeline"]["endpoint"]):
+            log.error("WEB_HANDLER: 'pipeline.endpoint' has not been set.")
+        else:
+            log.info(
+                f"WEB_HANDLER: {request.path} ->"
+                f" {pipeline_endpoint}/{request.path.lstrip('/').partition('/')[-1]}"
+            )
+        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
+    elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
-    if first_path == "pipeline":
-        pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
-        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
