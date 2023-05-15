@@ -92,7 +92,7 @@ def list_allowed_types():
     help=(
         'Purpose of the folder. Normal folders are usually set to "general". '
         'Available options: "general", "data" (provides data to users), '
-        'and "model" (provides pre-trained models).'
+        '"model" (provides pre-trained models), and "app" (can be used as a mountable plugin).'
     ),
 )
 @click.option(
@@ -126,7 +126,8 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, usage_mode, permission, quota, cloneable):
+@click.option("--app-config", type=JSONParamType(), help="App type vfolder's configuration.")
+def create(name, host, group, host_path, usage_mode, permission, quota, cloneable, app_config):
     """Create a new virtual folder.
 
     \b
@@ -144,6 +145,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     permission=permission,
                     quota=quota,
                     cloneable=cloneable,
+                    app_config=app_config,
                 )
             else:
                 result = session.VFolder.create(
@@ -154,6 +156,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     permission=permission,
                     quota=quota,
                     cloneable=cloneable,
+                    app_config=app_config,
                 )
             print('Virtual folder "{0}" is created.'.format(result["name"]))
         except Exception as e:

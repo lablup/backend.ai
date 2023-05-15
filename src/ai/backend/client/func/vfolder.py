@@ -61,6 +61,7 @@ class VFolder(BaseFunction):
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,
+        app_config: Optional[Mapping[str, Any]] = None,
     ):
         rqst = Request("POST", "/folders")
         rqst.set_json(
@@ -73,6 +74,7 @@ class VFolder(BaseFunction):
                 "permission": permission,
                 "quota": quota,
                 "cloneable": cloneable,
+                "app_config": app_config,
             }
         )
         async with rqst.fetch() as resp:

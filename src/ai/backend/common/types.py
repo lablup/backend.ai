@@ -816,7 +816,16 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
-                t.Key("app_config", default=None): t.Dict | t.Null,
+                t.Key("app_config", default=None): (
+                    t.Dict(
+                        {
+                            t.Key("service_name"): t.String,
+                            t.Key("metadata", default={}): t.Dict().allow_extra("*"),
+                            t.Key("service_def", default={}): t.Dict().allow_extra("*"),
+                        }
+                    ).allow_extra("*")
+                    | t.Null
+                ),
             }
         )
 

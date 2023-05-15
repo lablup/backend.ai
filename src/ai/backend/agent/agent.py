@@ -1765,7 +1765,7 @@ class AbstractAgent(
                         continue
                     service_ports.append(
                         {
-                            "name": str(mount),
+                            "name": mount.app_config["service_name"],
                             "protocol": ServicePortProtocols.PREOPEN,
                             "container_ports": (int(cntr_port),),
                             "host_ports": (int(hport),),

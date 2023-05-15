@@ -317,7 +317,16 @@ def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
             ),
             t.Key("quota", default=None): tx.BinarySize | t.Null,
             t.Key("cloneable", default=False): t.Bool,
-            t.Key("app_config", default=None): t.Dict | t.Null,
+            t.Key("app_config", default=None): (
+                t.Dict(
+                    {
+                        t.Key("service_name"): t.String,
+                        t.Key("metadata", default={}): t.Dict().allow_extra("*"),
+                        t.Key("service_def", default={}): t.Dict().allow_extra("*"),
+                    }
+                ).allow_extra("*")
+                | t.Null
+            ),
         }
     ),
 )
@@ -1160,7 +1169,16 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         {
             t.Key("cloneable", default=None): t.Bool | t.Null,
             t.Key("permission", default=None): tx.Enum(VFolderPermission) | t.Null,
-            t.Key("app_config", default=None): t.Dict | t.Null,
+            t.Key("app_config", default=None): (
+                t.Dict(
+                    {
+                        t.Key("service_name"): t.String,
+                        t.Key("metadata", default={}): t.Dict().allow_extra("*"),
+                        t.Key("service_def", default={}): t.Dict().allow_extra("*"),
+                    }
+                ).allow_extra("*")
+                | t.Null
+            ),
         }
     )
 )
