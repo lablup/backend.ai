@@ -48,9 +48,11 @@ jobs:
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
-        if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF}"
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          git remote set-branches origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -94,9 +96,11 @@ jobs:
         else
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
-        if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF}"
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          git remote set-branches origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -145,9 +149,11 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Test
       run: |
-        if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF}"
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          git remote set-branches origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi

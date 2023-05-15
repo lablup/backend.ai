@@ -3,7 +3,16 @@ from __future__ import annotations
 import asyncio
 import functools
 import sys
-from typing import TYPE_CHECKING, Awaitable, Callable, Final, Sequence, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Final,
+    Optional,
+    Sequence,
+    TypeVar,
+    Union,
+)
 
 import async_timeout
 from redis.asyncio import Redis
@@ -36,7 +45,7 @@ async def simple_run_cmd(
     return p
 
 
-async def wait_redis_ready(host: str, port: int, password: str = None) -> None:
+async def wait_redis_ready(host: str, port: int, password: Optional[str] = None) -> None:
     r = Redis.from_url(f"redis://{host}:{port}", password=password, socket_timeout=0.2)
     while True:
         try:
