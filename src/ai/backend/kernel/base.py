@@ -657,19 +657,34 @@ class BaseRunner(metaclass=ABCMeta):
         async with self._service_lock:
             try:
                 service_name = service_info["name"]
-                mount_path = service_info["service_info"]
+                mount_path = service_info["mount_path"]
+                opts = service_info["options"]
                 if service_name not in self.mounted_service_parsers:
                     service_def_folder = Path(mount_path) / "service-defs"
-                    if service_def_folder.is_dir():
-                        service_parser = ServiceParser(
-                            {
-                                "runtime_path": str(self.runtime_path),
-                            }
+                    if not service_def_folder.is_dir():
+                        log.warning(
+                            "Service definition directory not found. (name: {0}, mount_path: {1})",
+                            service_info["name"],
+                            mount_path,
                         )
-                        await service_parser.parse(service_def_folder)
-                        log.debug("Loaded new-style service definitions.")
+                        result = {
+                            "status": "failed",
+                            "error": "service definition not found",
+                        }
+                        return
+                    service_parser = ServiceParser(
+                        {
+                            "runtime_path": str(self.runtime_path),
+                            "mount_path": mount_path,
+                            "port": service_info["port"],
+                            "password": opts.get("password", "password"),
+                        }
+                    )
+                    await service_parser.parse(service_def_folder)
+                    log.debug("Loaded new-style service definitions.")
                     self.mounted_service_parsers[service_name] = service_parser
-                service_parser = self.mounted_service_parsers[service_name]
+                else:
+                    service_parser = self.mounted_service_parsers[service_name]
                 service_parser.variables["ports"] = service_info["ports"]
                 cmdargs, env = await service_parser.start_service(
                     service_info["name"],

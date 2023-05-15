@@ -1,0 +1,32 @@
+{
+    "prestart": [
+      {
+        "action": "run_command",
+        "args": {
+          "command": [
+            "mkdir -p ~/.local/lib ~/.local/bin",
+            "tar -zxvf {mount_path}/code-server.tar.gz",
+            "mv {mount_path}/code-server ~/.local/lib/code-server",
+            "ln -s ~/.local/lib/code-server/bin/code-server ~/.local/bin/code-server",
+            "PATH=\"~/.local/bin:$PATH\""
+          ]
+        },
+        "ref": "pre_start_result"
+      },
+      {
+        "action": "write_file",
+        "args": {
+          "filename": "~/.config/code-server/config.yaml",
+          "body": [
+            "bind-addr: 127.0.0.1:{port}\n",
+            "auth: password",
+            "password: {password}",
+            "cert: false"
+          ]
+        },
+        "ref": "write_conf_file"
+      }
+    ],
+    "command": ["~/.local/bin/code-server"],
+    "url_template": ""
+}

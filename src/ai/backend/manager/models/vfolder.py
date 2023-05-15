@@ -336,7 +336,7 @@ async def query_accessible_vfolders(
         vfolders.c.cloneable,
         vfolders.c.status,
         vfolders.c.cur_size,
-        vfolders.c.metadata,
+        vfolders.c.app_config,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -707,7 +707,7 @@ async def prepare_vfolder_mounts(
                             metadata=vfolder["app_config"]["metadata"],
                             service_def=vfolder["app_config"]["service_def"],
                         )
-                        if vfolder["app_config"] is not None
+                        if vfolder.get("app_config") is not None
                         else None
                     ),
                 )
@@ -735,7 +735,7 @@ async def prepare_vfolder_mounts(
                             metadata=vfolder["app_config"]["metadata"],
                             service_def=vfolder["app_config"]["service_def"],
                         )
-                        if vfolder["app_config"] is not None
+                        if vfolder.get("app_config") is not None
                         else None
                     ),
                 )
