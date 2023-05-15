@@ -164,7 +164,7 @@ install_static_python() {
   cd "${STANDALONE_PYTHON_PATH}"
   show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
   curl -o dist.tar.gz -L "$dist_url"
-  echo "$(curl -sL $checksum_url) dist.tar.gz" | sha256sum --check --status
+  echo "$(curl -sL $checksum_url) *dist.tar.gz" | shasum -a 256 --check --status
   if [ $? -ne 0 ]; then
     echo "Failed to validate the downloaded static build of Python binary!"
     exit 1
