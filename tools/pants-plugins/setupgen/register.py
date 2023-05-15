@@ -59,6 +59,15 @@ async def setup_kwargs_plugin(
             f"Missing a `description` kwarg in the `provides` field for {request.target.address}.",
         )
 
+    # Override the interpreter compatibility range
+    interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)  # type: ignore
+    m = re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires)
+    if m is not None:
+        major = int(m.group("major"))
+        minor = int(m.group("minor"))
+        kwargs["python_requires"] = f">={major}.{minor},<{major}.{minor + 1}"
+
     # Add classifiers. We preserve any that were already set.
     standard_classifiers = [
         "Intended Audience :: Developers",
@@ -80,6 +89,7 @@ async def setup_kwargs_plugin(
         standard_classifiers.append("Development Status :: 4 - Beta")
     else:
         standard_classifiers.append("Development Status :: 5 - Production/Stable")
+    standard_classifiers.append("Programming Language :: Python :: " + f"{major}.{minor}")
 
     license_classifier = license_classifier_map.get(kwargs["license"])
     if license_classifier:
@@ -131,15 +141,6 @@ async def setup_kwargs_plugin(
             ),
         )
     kwargs.update(hardcoded_kwargs)
-
-    # Override the interpreter compatibility range
-    interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
-    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)  # type: ignore
-    m = re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires)
-    if m is not None:
-        major = int(m.group("major"))
-        minor = int(m.group("minor"))
-        kwargs["python_requires"] = f">={major}.{minor},<{major}.{minor + 1}"
 
     return SetupKwargs(kwargs, address=request.target.address)
 

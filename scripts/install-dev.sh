@@ -146,11 +146,31 @@ show_important_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
+  if [ "$?" -ne 0 ]; then
     echo 0
   else
     echo 1
   fi
+}
+
+install_static_python() {
+  local build_date="20230507"
+  local build_version="3.11.3"
+  local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
+  dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
+  checksum_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz.sha256"
+  cwd=$(pwd)
+  mkdir -p .python-runtime && cd .python-runtime
+  show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
+  curl -o dist.tar.gz -L "$dist_url"
+  echo "$(curl -sL $checksum_url) dist.tar.gz" | sha256sum --check --status
+  if [ $? -ne 0 ]; then
+    echo "Failed to validate the downloaded static build of Python binary!"
+    exit 1
+  fi
+  tar xzf dist.tar.gz && rm dist.tar.gz
+  mv python/* . && rmdir python
+  cd $cwd
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -174,31 +194,43 @@ DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN
 
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
+  STANDALONE_PYTHON_PLATFORM="apple-darwin"
 elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
   DISTRO="Debian"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
   DISTRO="SUSE"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
-else
-  # Ensure "readlinkf" is working...
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
-  exit 1
+
+STANDALONE_PYTHON_ARCH=$(arch)
+if [ STANDALONE_PYTHON_ARCH == "arm64" ]; then
+  STANDALONE_PYTHON_ARCH="aarch64"
 fi
+
+export PYTHONPATH="$(pwd)/.python-runtime"
+if [ $DISTRO = "Darwin" ]; then
+  export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PYTHONPATH/lib
+else
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PYTHONPATH/lib
+fi
+
+bpython="$PYTHONPATH/bin/python3"
+if [ $(has_python $bpython) -eq 0 ]; then
+  install_static_python
+fi
+show_info "Checking the bootstrapper Python version..."
+$bpython -c 'import sys;print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -531,6 +563,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
+$bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
 $bpython -m pip --disable-pip-version-check install -q 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
@@ -968,4 +1001,7 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
 fi
 
+if [ -d $PYTHONPATH ]; then
+  rm -r "$(readlink -f $PYTHONPATH/..lib)"  # Remove downloaded static python build
+fi
 # vim: tw=0 sts=2 sw=2 et
