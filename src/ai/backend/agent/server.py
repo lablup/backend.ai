@@ -73,7 +73,7 @@ from .config import (
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
-from .utils import get_subnet_ip
+from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
@@ -119,7 +119,7 @@ async def get_extra_volumes(docker, lang):
             mount_list.append(vol)
         else:
             log.info(
-                "skipped attaching extra volume {0} " "to a kernel based on image {1}",
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
                 vol.name,
                 lang,
             )
@@ -139,7 +139,6 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-
     functions: Set[str]
 
     def __init__(self) -> None:
@@ -351,7 +350,6 @@ class AgentRPCServer(aobject):
     @collect_error
     async def create_kernels(
         self,
-        creation_id: str,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
@@ -361,6 +359,7 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         raw_results = []
         coros = []
+        throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
@@ -371,11 +370,11 @@ class AgentRPCServer(aobject):
             kernel_config = cast(KernelCreationConfig, raw_config)
             coros.append(
                 self.agent.create_kernel(
-                    creation_id,
                     session_id,
                     kernel_id,
                     kernel_config,
                     cluster_info,
+                    throttle_sema=throttle_sema,
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
@@ -409,6 +408,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
+        session_id: str,
         reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
@@ -417,6 +417,7 @@ class AgentRPCServer(aobject):
         log.info("rpc::destroy_kernel(k:{0})", kernel_id)
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
+            SessionId(UUID(session_id)),
             LifecycleEvent.DESTROY,
             reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
@@ -446,14 +447,12 @@ class AgentRPCServer(aobject):
     @collect_error
     async def restart_kernel(
         self,
-        creation_id: str,
         session_id: str,
         kernel_id: str,
         updated_config: dict,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
-            creation_id,
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             cast(KernelCreationConfig, updated_config),
@@ -463,6 +462,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
+        session_id: str,
         kernel_id: str,
         api_version: int,
         run_id: str,
@@ -480,6 +480,7 @@ class AgentRPCServer(aobject):
                 code[:20] + "..." if len(code) > 20 else code,
             )
         result = await self.agent.execute(
+            SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             run_id,
             mode,
@@ -489,22 +490,6 @@ class AgentRPCServer(aobject):
             flush_timeout=flush_timeout,
         )
         return result
-
-    @rpc_function
-    @collect_error
-    async def execute_batch(
-        self,
-        kernel_id: str,
-        startup_command: str,
-    ) -> None:
-        # DEPRECATED
-        asyncio.create_task(
-            self.agent.execute_batch(
-                KernelId(UUID(kernel_id)),
-                startup_command,
-            )
-        )
-        await asyncio.sleep(0)
 
     @rpc_function
     @collect_error
@@ -808,7 +793,7 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. " "(default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
@@ -828,7 +813,6 @@ def main(
     log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
-
     # Delete this part when you remove --debug option
     if debug:
         click.echo("Please use --log-level options instead")
@@ -880,11 +864,19 @@ def main(
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
+    # FIXME: Remove this after ARM64 support lands on Jail
+    current_arch = get_arch_name()
+    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+        print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
+        raise click.Abort()
+
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            "ConfigurationError: "
-            "Cannot use link-local or unspecified IP address as the RPC listening host.",
+            (
+                "ConfigurationError: "
+                "Cannot use link-local or unspecified IP address as the RPC listening host."
+            ),
             file=sys.stderr,
         )
         raise click.Abort()
@@ -897,21 +889,21 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
-                    "ConfigurationError: "
-                    "Storing container coredumps is only supported in Linux.",
+                    "ConfigurationError: Storing container coredumps is only supported in Linux.",
                     file=sys.stderr,
                 )
                 raise click.Abort()
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    "ConfigurationError: "
-                    "/proc/sys/kernel/core_pattern must be an absolute path "
-                    "to enable container coredumps.",
+                    (
+                        "ConfigurationError: "
+                        "/proc/sys/kernel/core_pattern must be an absolute path "
+                        "to enable container coredumps."
+                    ),
                     file=sys.stderr,
                 )
                 raise click.Abort()

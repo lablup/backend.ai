@@ -78,6 +78,7 @@ domain_fields = FieldSet(
     ]
 )
 
+
 group_fields = FieldSet(
     [
         FieldSpec("id"),
@@ -153,6 +154,7 @@ scaling_group_fields = FieldSet(
         FieldSpec("name"),
         FieldSpec("description"),
         FieldSpec("is_active"),
+        FieldSpec("is_public"),
         FieldSpec("created_at"),
         FieldSpec("driver"),
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
@@ -207,6 +209,7 @@ session_fields = FieldSet(
             formatter=DependencyListFormatter(),
         ),
         FieldSpec("abusing_reports"),
+        FieldSpec("idle_checks"),
     ]
 )
 
@@ -268,6 +271,7 @@ user_fields = FieldSet(
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
         FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
     ]
 )
 
@@ -295,8 +299,23 @@ vfolder_fields = FieldSet(
     ]
 )
 
+
 permission_fields = FieldSet(
     [
         FieldSpec("vfolder_host_permission_list"),
+    ]
+)
+
+
+service_fields = FieldSet(
+    [
+        FieldSpec("model_id"),
+        FieldSpec("model_version"),
+        FieldSpec("image_ref"),
+        FieldSpec("project"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("endpoint_id"),
+        FieldSpec("service_id"),
+        FieldSpec("service_name"),
     ]
 )

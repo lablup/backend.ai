@@ -38,7 +38,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, ServicePort, aobject
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -103,7 +103,6 @@ default_api_version = 4
 
 
 class RunEvent(Exception):
-
     data: Any
 
     def __init__(self, data=None):
@@ -152,10 +151,11 @@ class NextResult(TypedDict, total=False):
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
-
     version: int
     agent_config: Mapping[str, Any]
+    session_id: SessionId
     kernel_id: KernelId
+    agent_id: AgentId
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
@@ -175,6 +175,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -186,6 +188,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.agent_id = agent_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
@@ -202,7 +206,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     async def init(self) -> None:
         log.debug(
-            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): " "starting new runner",
+            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,
             default_api_version,
             default_client_features,
@@ -280,7 +284,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir):
+    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
@@ -351,7 +355,6 @@ _zctx = None
 
 
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
-
     kernel_id: KernelId
     started_at: float
     finished_at: Optional[float]
@@ -644,9 +647,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     def aggregate_console(
         result: NextResult, records: Sequence[ResultRecord], api_ver: int
     ) -> None:
-
         if api_ver == 1:
-
             stdout_items = []
             stderr_items = []
             media_items = []
@@ -669,13 +670,11 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             result["html"] = html_items
 
         elif api_ver >= 2:
-
             console_items: List[Tuple[ConsoleItemType, Union[str, Tuple[str, str]]]] = []
             last_stdout = io.StringIO()
             last_stderr = io.StringIO()
 
             for rec in records:
-
                 if last_stdout.tell() and rec.msg_type != "stdout":
                     console_items.append(("stdout", last_stdout.getvalue()))
                     last_stdout.seek(0)
@@ -785,7 +784,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning("Execution timeout detected on kernel " f"{self.kernel_id}")
+            log.warning(f"Execution timeout detected on kernel {self.kernel_id}")
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
@@ -938,6 +937,13 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     joined by single dots (e.g., "1.2.3", "18.04").
     """
     rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
+
+    def _extract_version(key: str) -> Tuple[int, ...]:
+        m = rx_ver_suffix.search(key)
+        if m is not None:
+            return tuple(map(int, m.group(1).split(".")))
+        return (0,)
+
     m = rx_ver_suffix.search(distro)
     if m is None:
         # Assume latest
@@ -945,7 +951,7 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
         distro_ver = None
     else:
         distro_prefix = distro[: -len(m.group(1))]
-        distro_ver = m.group(1)
+        distro_ver = tuple(map(int, m.group(1).split(".")))
 
     # Check if there are static-build krunners first.
     if distro_prefix == "alpine":
@@ -958,23 +964,17 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
 
     # Search through the per-distro versions
     match_list = [
-        (distro_key, value)
+        (distro_key, value, _extract_version(distro_key))
         for distro_key, value in data.items()
         if distro_key.startswith(distro_prefix)
     ]
 
-    def _extract_version(item: Tuple[str, Any]) -> Tuple[int, ...]:
-        m = rx_ver_suffix.search(item[0])
-        if m is not None:
-            return tuple(map(int, m.group(1).split(".")))
-        return (0,)
-
-    match_list = sorted(match_list, key=_extract_version, reverse=True)
+    match_list = sorted(match_list, key=lambda x: x[2], reverse=True)
     if match_list:
         if distro_ver is None:
-            return match_list[0]
-        for distro_key, value in match_list:
-            if distro_key == distro:
+            return match_list[0][:-1]  # return latest
+        for distro_key, value, matched_distro_ver in match_list:
+            if distro_ver >= matched_distro_ver:
                 return (distro_key, value)
-        return match_list[0]  # fallback to the latest of its kind
+        return match_list[-1][:-1]  # fallback to the latest of its kind
     raise UnsupportedBaseDistroError(distro)

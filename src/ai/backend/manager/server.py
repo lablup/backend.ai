@@ -94,6 +94,8 @@ VALID_VERSIONS: Final = frozenset(
         "v6.20220315",
         # added payload encryption / decryption on selected transfer
         "v6.20220615",
+        # added config/resource-slots/details, model mgmt & serving APIs
+        "v6.20230315",
     ]
 )
 LATEST_REV_DATES: Final = {
@@ -102,9 +104,9 @@ LATEST_REV_DATES: Final = {
     3: "20181215",
     4: "20190615",
     5: "20191215",
-    6: "20220615",
+    6: "20230315",
 }
-LATEST_API_VERSION: Final = "v6.20220615"
+LATEST_API_VERSION: Final = "v6.20230315"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -416,6 +418,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        debug=root_ctx.local_config["debug"]["enabled"],
     )
     await root_ctx.registry.init()
     yield
@@ -667,6 +670,7 @@ async def server_main(
         ".ratelimit",
         ".vfolder",
         ".admin",
+        ".service",
         ".session",
         ".stream",
         ".manager",

@@ -7,7 +7,7 @@ import pwd
 import ssl
 import sys
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pprint
 from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
@@ -16,7 +16,7 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import config
+from ai.backend.common.config import ConfigurationError, override_key
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
@@ -25,7 +25,7 @@ from ai.backend.common.utils import env_info
 from . import __version__ as VERSION
 from .api.client import init_client_app
 from .api.manager import init_manager_app
-from .config import local_config_iv
+from .config import load_local_config
 from .context import Context
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -158,8 +158,10 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. "
-    "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)",
+    help=(
+        "The config file path. "
+        "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)"
+    ),
 )
 @click.option(
     "--debug",
@@ -173,47 +175,31 @@ async def server_main(
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, log_level, debug=False):
-
+def main(
+    cli_ctx,
+    config_path: Path,
+    log_level: LogSeverity,
+    debug: bool = False,
+) -> int:
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
 
-    # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")
-
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    if log_level == LogSeverity.DEBUG:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
-
     try:
-        local_config = config.check(raw_cfg, local_config_iv)
-        local_config["_src"] = cfg_src_path
-    except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of agent configuration has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
+        local_config = load_local_config(config_path, debug=debug)
+    except ConfigurationError:
         raise click.Abort()
-
-    config.override_key(local_config, ("logging", "level"), log_level.name)
-    config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
-
-    # if os.getuid() != 0:
-    #     print('Storage agent can only be run as root', file=sys.stderr)
-    #     raise click.Abort()
+    override_key(local_config, ("logging", "level"), log_level.name)
+    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
     multiprocessing.set_start_method("spawn")
 
     if cli_ctx.invoked_subcommand is None:
         local_config["storage-proxy"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
         log_sockpath = Path(
-            f"/tmp/backend.ai/ipc/storage-proxy-logger-{os.getpid()}.sock",
+            ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"

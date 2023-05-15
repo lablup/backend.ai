@@ -6,7 +6,7 @@ from uuid import UUID
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
-from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractVolume
+from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
 from ai.backend.storage.vfs import BaseVolume
 
@@ -18,7 +18,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class GPFSVolume(BaseVolume):
-
     api_client: GPFSAPIClient
 
     fs: str
@@ -142,14 +141,12 @@ class GPFSVolume(BaseVolume):
     async def clone_vfolder(
         self,
         src_vfid: UUID,
-        dst_volume: AbstractVolume,
         dst_vfid: UUID,
         options: Optional[VFolderCreationOptions] = None,
     ) -> None:
-        assert isinstance(dst_volume, GPFSVolume)
-        await dst_volume.create_vfolder(dst_vfid, options=options)
+        await self.create_vfolder(dst_vfid, options=options)
 
-        fs_usage = await dst_volume.get_fs_usage()
+        fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise VFolderCreationError("Not enough space available for clone")
@@ -158,8 +155,8 @@ class GPFSVolume(BaseVolume):
         await self.api_client.copy_folder(
             self.fs,
             self.mangle_vfpath(src_vfid),
-            dst_volume.fs,
-            dst_volume.mangle_vfpath(dst_vfid),
+            self.fs,
+            self.mangle_vfpath(dst_vfid),
         )
 
     async def delete_vfolder(self, vfid: UUID) -> None:

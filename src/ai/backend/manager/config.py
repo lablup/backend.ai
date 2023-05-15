@@ -134,11 +134,15 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "http://localhost:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+         - sftp_scaling_groups: "group-1,group-2,..."
        + "mynas1"
          - client_api: "https://proxy1.example.com:6021"
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+         - sftp_scaling_groups: "group-3,group-4,..."
+     # 23.03 and later
+       + exposed_volume_info: "percentage"
        ...
      ...
    ...
@@ -248,7 +252,7 @@ manager_local_config_iv = (
                     t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
                     t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
                     t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
-                    t.Key("heartbeat-timeout", default=5.0): t.Float[1.0:],  # type: ignore
+                    t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
                     t.Key("secret", default=None): t.Null | t.String,
                     t.Key("ssl-enabled", default=False): t.ToBool,
                     t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
@@ -269,6 +273,11 @@ manager_local_config_iv = (
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
+            ).allow_extra("*"),
+            t.Key("pipeline", default=None): t.Null | t.Dict(
+                {
+                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
+                },
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
@@ -347,8 +356,9 @@ shared_config_iv = t.Dict(
         t.Key("redis", default=_shdefs["redis"]): t.Dict(
             {
                 t.Key("addr", default=_shdefs["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null
-                | tx.DelimiterSeperatedList(tx.HostPortPair),
+                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                    tx.HostPortPair
+                ),
                 t.Key("service_name", default=None): t.Null | t.String,
                 t.Key("password", default=_shdefs["redis"]["password"]): t.Null | t.String,
             }
@@ -378,8 +388,7 @@ shared_config_iv = t.Dict(
                         ): tx.IPNetwork,
                     }
                 ).allow_extra("*"),
-                t.Key("overlay", default=None): t.Null
-                | t.Dict(
+                t.Key("overlay", default=None): t.Null | t.Dict(
                     {
                         t.Key("mtu", default=1500): t.Int[1:],
                     }
@@ -405,9 +414,13 @@ volume_config_iv = t.Dict(
                     t.Key("manager_api"): t.String,
                     t.Key("secret"): t.String,
                     t.Key("ssl_verify"): t.ToBool,
+                    t.Key("sftp_scaling_groups", default=None): t.Null | tx.StringList(
+                        delimiter=","
+                    ),
                 }
             ),
         ),
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 
@@ -416,7 +429,6 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
 class AbstractConfig(UserDict):
-
     _watch_callbacks: List[ConfigWatchCallback]
 
     def __init__(self, initial_data: Mapping[str, Any] = None) -> None:
@@ -441,7 +453,6 @@ class LocalConfig(AbstractConfig):
 
 
 def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 

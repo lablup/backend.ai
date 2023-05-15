@@ -46,6 +46,7 @@ __all__ = (
     "JSONSerializableMixin",
     "DeviceId",
     "ContainerId",
+    "EndpointId",
     "SessionId",
     "KernelId",
     "MetricKey",
@@ -200,6 +201,7 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
+EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
@@ -271,6 +273,7 @@ class ServicePortProtocols(str, enum.Enum):
 class SessionTypes(str, enum.Enum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
+    INFERENCE = "inference"
 
 
 class SessionResult(str, enum.Enum):
@@ -561,7 +564,6 @@ class BinarySize(int):
 
 
 class ResourceSlot(UserDict):
-
     __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:
@@ -853,6 +855,7 @@ class ImageConfig(TypedDict):
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
+    is_local: bool
 
 
 class ServicePort(TypedDict):
@@ -860,6 +863,7 @@ class ServicePort(TypedDict):
     protocol: ServicePortProtocols
     container_ports: Sequence[int]
     host_ports: Sequence[Optional[int]]
+    is_inference: bool
 
 
 ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
@@ -921,6 +925,7 @@ class KernelCreationConfig(TypedDict):
     allocated_host_ports: List[int]
     scaling_group: str
     agent_addr: str
+    endpoint_id: Optional[str]
 
 
 class SessionEnqueueingConfig(TypedDict):
@@ -983,3 +988,17 @@ class RedisConnectionInfo:
     async def close(self) -> None:
         if isinstance(self.client, Redis):
             await self.client.close()
+
+
+class AcceleratorNumberFormat(TypedDict):
+    binary: bool
+    round_length: int
+
+
+class AcceleratorMetadata(TypedDict):
+    slot_name: str
+    description: str
+    human_readable_name: str
+    display_unit: str
+    number_format: AcceleratorNumberFormat
+    display_icon: str
