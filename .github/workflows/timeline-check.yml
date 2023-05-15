@@ -6,8 +6,12 @@ on:
   merge_group:
 
 jobs:
+  pr-number-assign:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null }}
+    uses: ./.github/workflows/pr-number-assign.yml
+
   towncrier:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
+    needs: [pr-number-assign]
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
@@ -25,7 +29,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install -U pip setuptools
-        python -m pip install -U towncrier~=21.9
+        python -m pip install -U towncrier~=22.12
     - name: Check existence of news fragment
       run: |
         git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
