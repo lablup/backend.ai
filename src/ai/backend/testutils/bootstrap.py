@@ -28,7 +28,7 @@ def get_free_port():
 def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2):
     if not path.exists():
         path.touch()
-    file = open(path, "rb")
+    file = open(path, "wb")
     acquired = False
     try:
         for _ in range(max_retries):
@@ -60,7 +60,7 @@ def wait_health_check(container_id):
         )
         container_info = json.loads(proc.stdout)
         if not container_info:  # maybe empty if container is not yet initialized
-            time.sleep(0.1)
+            time.sleep(0.2)
             continue
         health_info = container_info[0]["State"].get("Health")
         if health_info is not None and health_info["Status"].lower() != "healthy":
@@ -69,7 +69,7 @@ def wait_health_check(container_id):
         if health_info is None and (err_info := container_info[0]["State"].get("Error")):
             raise RuntimeError(f"Container spawn failed: {err_info}")
         # Give extra grace period to avoid intermittent connection failure.
-        time.sleep(0.1)
+        time.sleep(0.2)
         return container_info
 
 
@@ -129,14 +129,10 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
                 "docker",
                 "run",
                 "-d",
-                "--health-cmd",
-                "redis-cli ping | grep PONG",
                 "-p",
                 f"0.0.0.0:{redis_allocated_port}:6379",
-                "--health-interval",
-                "1s",
-                "--health-start-period",
-                "0.3s",
+                # IMPORTANT: We have intentionally omitted the healthcheck here
+                # to avoid intermittent failures when pausing/unpausing containers.
                 "redis:7-alpine",
             ],
             capture_output=True,
