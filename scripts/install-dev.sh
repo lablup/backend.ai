@@ -229,8 +229,8 @@ bpython="$PYTHONPATH/bin/python3"
 if [ $(has_python $bpython) -eq 0 ]; then
   install_static_python
 fi
+show_info "Checking the bootstrapper Python version..."
 $bpython -c 'import sys;print(sys.version_info)'
-exit 0
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
