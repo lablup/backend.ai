@@ -160,7 +160,7 @@ install_static_python() {
   dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
   checksum_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz.sha256"
   cwd=$(pwd)
-  cd $STATIC_PYTHON_PATH
+  cd $STANDALONE_PYTHON_PATH
   show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
   curl -o dist.tar.gz -L "$dist_url"
   echo "$(curl -sL $checksum_url) dist.tar.gz" | sha256sum --check --status
@@ -192,6 +192,7 @@ fi
 KNOWN_DISTRO="(Debian|Ubuntu|RedHat|CentOS|openSUSE|Amazon|Arista|SUSE)"
 DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN_DISTRO /etc/issue 2>/dev/null || uname -s)
 
+STANDALONE_PYTHON_PATH="$HOME/.cache/python-runtime"
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
   STANDALONE_PYTHON_PLATFORM="apple-darwin"
@@ -217,16 +218,7 @@ STANDALONE_PYTHON_ARCH=$(arch)
 if [ STANDALONE_PYTHON_ARCH == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
-
-export STATIC_PYTHON_PATH="$HOME/.cache/python-runtime"
-mkdir -p "$STATIC_PYTHON_PATH"
-if [ $DISTRO = "Darwin" ]; then
-  export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$STATIC_PYTHON_PATH/lib
-else
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$STATIC_PYTHON_PATH/lib
-fi
-
-bpython="$STATIC_PYTHON_PATH/bin/python3"
+bpython="$STANDALONE_PYTHON_PATH/bin/python3"
 if [ $(has_python $bpython) -eq 0 ]; then
   install_static_python
 fi
