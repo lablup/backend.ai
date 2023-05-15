@@ -101,15 +101,6 @@
         "src": "./resources/icons/vscode.svg"
       }
     ],
-    "triton-server": [
-      {
-        "name": "triton-server",
-        "title": "Triton Server",
-        "category": "3.Machine Learning Tools",
-        "redirect": "",
-        "src": "./resources/icons/terminal.svg"
-      }
-    ],
     "nniboard": [
       {
         "name": "nniboard",
@@ -225,6 +216,51 @@
         "category": "7.Scientific Computing",
         "redirect": "",
         "src": "./resources/icons/default_app.svg"
+      }
+    ],
+    "triton-server": [
+      {
+        "name": "triton-server",
+        "title": "Triton Server",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/nvidia.png"
+      }
+    ],
+    "triton-server-http": [
+      {
+        "name": "triton-server-http",
+        "title": "Triton Server (HTTP)",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/nvidia.png"
+      }
+    ],
+    "orbit-server-http": [
+      {
+        "name": "orbit-server-http",
+        "title": "Orbit Inference Server (HTTP)",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/orbit.svg"
+      }
+    ],
+    "gradio-cat-client": [
+      {
+        "name": "gradio-cat-client",
+        "title": "Cat Generator",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/kitty.png"
+      }
+    ],
+    "gradio-resnet-client": [
+      {
+        "name": "gradio-resnet-client",
+        "title": "Image Classifier",
+        "category": "8.AI Inference Service",
+        "redirect": "",
+        "src": "./resources/icons/classification.svg"
       }
     ],
     "submit": [

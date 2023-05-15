@@ -77,6 +77,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
                 19000 + 200 * get_parallel_slot(),
                 19200 + 200 * get_parallel_slot(),
             ],
+            "bind-host": "127.0.0.1",
         },
         "resource": {
             "reserved-cpu": 1,

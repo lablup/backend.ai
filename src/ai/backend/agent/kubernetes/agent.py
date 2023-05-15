@@ -34,6 +34,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -93,6 +94,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -101,7 +103,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         restarting: bool = False,
     ) -> None:
         super().__init__(
-            kernel_id, session_id, kernel_config, local_config, computers, restarting=restarting
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
 
@@ -563,6 +571,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         kernel_obj = KubernetesKernel(
             self.kernel_id,
             self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -945,6 +954,7 @@ class KubernetesAgent(
         return KubernetesKernelCreationContext(
             kernel_id,
             session_id,
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
