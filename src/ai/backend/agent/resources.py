@@ -29,6 +29,7 @@ import attrs
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
+    AcceleratorMetadata,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -113,8 +114,7 @@ class KernelResourceSpec:
             for slot_name, per_device_alloc in slots.items():
                 if not (slot_name.startswith(f"{device_name}.") or slot_name == device_name):
                     raise ValueError(
-                        f"device_name ({device_name}) must be a prefix of "
-                        f"slot_name ({slot_name})"
+                        f"device_name ({device_name}) must be a prefix of slot_name ({slot_name})"
                     )
                 pieces = []
                 for dev_id, alloc in per_device_alloc.items():
@@ -162,8 +162,10 @@ class KernelResourceSpec:
                             alloc = Decimal(raw_alloc)
                     except KeyError as e:
                         log.warning(
-                            "A previously launched container has "
-                            "unknown slot type: {}. Ignoring it.",
+                            (
+                                "A previously launched container has "
+                                "unknown slot type: {}. Ignoring it."
+                            ),
                             e.args[0],
                         )
                         continue
@@ -254,10 +256,17 @@ class AbstractComputeDevice:
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
-
     key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]
+
+    @abstractmethod
+    def get_metadata(self) -> AcceleratorMetadata:
+        """
+        Return human-readable information of the accelerator managed
+        by the plugin.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
@@ -453,7 +462,7 @@ class Mount:
                 type = MountTypes.VOLUME
             else:
                 raise ValueError(
-                    "Mount source must be an absolute path " "if it is not a volume name.", source
+                    "Mount source must be an absolute path if it is not a volume name.", source
                 )
         target = Path(target)
         if not target.is_absolute():

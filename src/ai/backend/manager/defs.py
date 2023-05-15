@@ -3,11 +3,12 @@ Common definitions/constants used throughout the manager.
 """
 
 import enum
-import platform
 import re
 from typing import Final
 
-from ai.backend.common.docker import arch_name_aliases
+from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH as DEFAULT_IMAGE_ARCH_
+from ai.backend.common.arch import arch_name_aliases as arch_name_aliases_
 from ai.backend.common.types import SlotName, SlotTypes
 
 INTRINSIC_SLOTS: Final = {
@@ -15,11 +16,9 @@ INTRINSIC_SLOTS: Final = {
     SlotName("mem"): SlotTypes("bytes"),
 }
 
-MANAGER_ARCH = platform.machine().lower().strip()
-
-
-DEFAULT_IMAGE_ARCH = arch_name_aliases.get(MANAGER_ARCH, MANAGER_ARCH)
-# DEFAULT_IMAGE_ARCH = 'x86_64'
+arch_name_aliases: Final = arch_name_aliases_
+DEFAULT_IMAGE_ARCH: Final = DEFAULT_IMAGE_ARCH_
+MANAGER_ARCH: Final = CURRENT_ARCH
 
 # The default container role name for multi-container sessions
 DEFAULT_ROLE: Final = "main"
@@ -52,6 +51,11 @@ RESERVED_VFOLDERS = [
     "/home",
 ]
 RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
+
+# Mapping between vfolder names and their in-container paths.
+VFOLDER_DSTPATHS_MAP = {
+    ".linuxbrew": "/home/linuxbrew/.linuxbrew",
+}
 
 # Redis database IDs depending on purposes
 REDIS_STAT_DB: Final = 0

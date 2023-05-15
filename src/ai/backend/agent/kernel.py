@@ -38,7 +38,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, ServicePort, aobject
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -103,7 +103,6 @@ default_api_version = 4
 
 
 class RunEvent(Exception):
-
     data: Any
 
     def __init__(self, data=None):
@@ -152,10 +151,11 @@ class NextResult(TypedDict, total=False):
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
-
     version: int
     agent_config: Mapping[str, Any]
+    session_id: SessionId
     kernel_id: KernelId
+    agent_id: AgentId
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
@@ -175,6 +175,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -186,6 +188,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.agent_id = agent_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
@@ -202,7 +206,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     async def init(self) -> None:
         log.debug(
-            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): " "starting new runner",
+            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,
             default_api_version,
             default_client_features,
@@ -280,7 +284,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir):
+    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod
@@ -351,7 +355,6 @@ _zctx = None
 
 
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
-
     kernel_id: KernelId
     started_at: float
     finished_at: Optional[float]
@@ -644,9 +647,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     def aggregate_console(
         result: NextResult, records: Sequence[ResultRecord], api_ver: int
     ) -> None:
-
         if api_ver == 1:
-
             stdout_items = []
             stderr_items = []
             media_items = []
@@ -669,13 +670,11 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             result["html"] = html_items
 
         elif api_ver >= 2:
-
             console_items: List[Tuple[ConsoleItemType, Union[str, Tuple[str, str]]]] = []
             last_stdout = io.StringIO()
             last_stderr = io.StringIO()
 
             for rec in records:
-
                 if last_stdout.tell() and rec.msg_type != "stdout":
                     console_items.append(("stdout", last_stdout.getvalue()))
                     last_stdout.seek(0)
@@ -785,7 +784,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning("Execution timeout detected on kernel " f"{self.kernel_id}")
+            log.warning(f"Execution timeout detected on kernel {self.kernel_id}")
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result

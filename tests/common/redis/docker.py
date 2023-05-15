@@ -128,7 +128,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         ):  # FIXME: Remove this after we find out how to change pytest rootdir
             files = [
                 "redis-cluster.yml",
-                "redis-sentinel.dockerfile",
+                "redis-sentinel.Dockerfile",
                 "sentinel.conf",
             ]
             snap_compose_dir = Path.home() / "tmp" / f"bai-redis-test-{get_parallel_slot()}"
@@ -176,6 +176,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     stderr=asyncio.subprocess.DEVNULL,
                 )
                 assert p.returncode == 0, "Compose cluster creation has failed."
+
         await asyncio.sleep(2)
         try:
             p = await simple_run_cmd(
@@ -236,9 +237,9 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 )
 
             for container in inspect_output:
-                cid_mapping[
-                    container["Config"]["Labels"]["com.docker.compose.service"]
-                ] = container["Id"]
+                cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
+                    container["Id"]
+                )
 
             yield RedisClusterInfo(
                 node_addrs=[

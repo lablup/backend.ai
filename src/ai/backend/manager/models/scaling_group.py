@@ -13,6 +13,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import JSONSerializableMixin, SessionTypes
@@ -58,7 +59,11 @@ __all__: Sequence[str] = (
 @attr.define(slots=True)
 class ScalingGroupOpts(JSONSerializableMixin):
     allowed_session_types: list[SessionTypes] = attr.Factory(
-        lambda: [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.INFERENCE],
+        lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
@@ -94,6 +99,9 @@ scaling_groups = sa.Table(
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, index=True, default=True),
+    sa.Column(
+        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    ),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
     sa.Column("driver", sa.String(length=64), nullable=False),
@@ -282,6 +290,7 @@ class ScalingGroup(graphene.ObjectType):
     name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean()
+    is_public = graphene.Boolean()
     created_at = GQLDateTime()
     wsproxy_addr = graphene.String()
     driver = graphene.String()
@@ -302,6 +311,7 @@ class ScalingGroup(graphene.ObjectType):
             name=row["name"],
             description=row["description"],
             is_active=row["is_active"],
+            is_public=row["is_public"],
             created_at=row["created_at"],
             wsproxy_addr=row["wsproxy_addr"],
             driver=row["driver"],
@@ -456,6 +466,7 @@ class ScalingGroup(graphene.ObjectType):
 class CreateScalingGroupInput(graphene.InputObjectType):
     description = graphene.String(required=False, default="")
     is_active = graphene.Boolean(required=False, default=True)
+    is_public = graphene.Boolean(required=False, default=True)
     wsproxy_addr = graphene.String(required=False)
     driver = graphene.String(required=True)
     driver_opts = graphene.JSONString(required=False, default={})
@@ -467,6 +478,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
 class ModifyScalingGroupInput(graphene.InputObjectType):
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
+    is_public = graphene.Boolean(required=False)
     wsproxy_addr = graphene.String(required=False)
     driver = graphene.String(required=False)
     driver_opts = graphene.JSONString(required=False)
@@ -476,7 +488,6 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
 
 
 class CreateScalingGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -499,6 +510,7 @@ class CreateScalingGroup(graphene.Mutation):
             "name": name,
             "description": props.description,
             "is_active": bool(props.is_active),
+            "is_public": bool(props.is_public),
             "wsproxy_addr": props.wsproxy_addr,
             "driver": props.driver,
             "driver_opts": props.driver_opts,
@@ -516,7 +528,6 @@ class CreateScalingGroup(graphene.Mutation):
 
 
 class ModifyScalingGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -537,6 +548,7 @@ class ModifyScalingGroup(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
+        set_if_set(props, data, "is_public")
         set_if_set(props, data, "driver")
         set_if_set(props, data, "wsproxy_addr")
         set_if_set(props, data, "driver_opts")
@@ -550,7 +562,6 @@ class ModifyScalingGroup(graphene.Mutation):
 
 
 class DeleteScalingGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -571,7 +582,6 @@ class DeleteScalingGroup(graphene.Mutation):
 
 
 class AssociateScalingGroupWithDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -599,7 +609,6 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
 
 
 class DisassociateScalingGroupWithDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -625,7 +634,6 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
 
 
 class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -646,7 +654,6 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
 
 
 class AssociateScalingGroupWithUserGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -674,7 +681,6 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
 
 
 class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -700,7 +706,6 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
 
 
 class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -721,7 +726,6 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
 
 
 class AssociateScalingGroupWithKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -749,7 +753,6 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
 
 
 class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

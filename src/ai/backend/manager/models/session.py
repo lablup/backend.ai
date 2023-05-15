@@ -26,11 +26,12 @@ from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -612,9 +613,6 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    # status_changed = sa.Column(
-    #     "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
-    # )
     status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
 
     status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
@@ -711,6 +709,70 @@ class SessionRow(Base):
             )
         return kerns[0]
 
+    @classmethod
+    async def get_session_id_by_kernel(
+        cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
+    ) -> SessionId:
+        query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
+        async with db.begin_readonly_session() as db_session:
+            return await db_session.scalar(query)
+
+    @classmethod
+    async def transit_session_status(
+        cls,
+        db: ExtendedAsyncSAEngine,
+        session_id: SessionId,
+        *,
+        status_info: str | None = None,
+    ) -> SessionStatus | None:
+        """
+        Check status of session's sibling kernels and transit the status of session.
+        Return the new status of session.
+        """
+        now = datetime.now(tzutc())
+
+        async def _check_and_update() -> SessionStatus | None:
+            async with db.begin_session() as db_session:
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .with_for_update()
+                    .options(
+                        noload("*"),
+                        load_only(SessionRow.status),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"), load_only(KernelRow.status, KernelRow.cluster_role)
+                        ),
+                    )
+                )
+                session_row: SessionRow = (await db_session.scalars(session_query)).first()
+                determined_status = determine_session_status(session_row.kernels)
+                if determined_status not in SESSION_STATUS_TRANSITION_MAP[session_row.status]:
+                    # TODO: log or raise error
+                    return None
+
+                update_values = {
+                    "status": determined_status,
+                    "status_history": sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            determined_status.name: now.isoformat(),
+                        },
+                    ),
+                }
+                if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+                    update_values["terminated_at"] = now
+                if status_info is not None:
+                    update_values["status_info"] = status_info
+                update_query = (
+                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**update_values)
+                )
+                await db_session.execute(update_query)
+            return determined_status
+
+        return await execute_with_retry(_check_and_update)
+
     @staticmethod
     async def set_session_status(
         db: ExtendedAsyncSAEngine,
@@ -719,8 +781,12 @@ class SessionRow(Base):
         *,
         status_data: Optional[Mapping[str, Any]] = None,
         reason: Optional[str] = None,
+        status_changed_at: Optional[datetime] = None,
     ) -> None:
-        now = datetime.now(tzutc())
+        if status_changed_at is None:
+            now = datetime.now(tzutc())
+        else:
+            now = status_changed_at
         data = {
             "status": status,
             "status_history": sql_json_merge(
@@ -738,12 +804,12 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _transit() -> None:
+        async def _update() -> None:
             async with db.begin_session() as db_sess:
                 query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
                 await db_sess.execute(query)
 
-        await execute_with_retry(_transit)
+        await execute_with_retry(_update)
 
     async def set_session_result(
         db: ExtendedAsyncSAEngine,
@@ -974,6 +1040,51 @@ class SessionRow(Base):
         result = await db_sess.execute(query)
         return result.scalars().all()
 
+    @classmethod
+    async def get_session_to_destroy(
+        cls, db: ExtendedAsyncSAEngine, session_id: SessionId
+    ) -> SessionRow:
+        query = (
+            sa.select(SessionRow)
+            .where(SessionRow.id == session_id)
+            .options(
+                noload("*"),
+                load_only(SessionRow.creation_id, SessionRow.status),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.role,
+                        KernelRow.access_key,
+                        KernelRow.status,
+                        KernelRow.container_id,
+                        KernelRow.cluster_role,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                    ),
+                ),
+            )
+        )
+        async with db.begin_readonly_session() as db_session:
+            return (await db_session.scalars(query)).first()
+
+    @classmethod
+    async def get_session_to_produce_event(
+        cls, db: ExtendedAsyncSAEngine, session_id: SessionId
+    ) -> SessionRow:
+        query = (
+            sa.select(SessionRow)
+            .where(SessionRow.id == session_id)
+            .options(
+                noload("*"),
+                load_only(
+                    SessionRow.id, SessionRow.name, SessionRow.creation_id, SessionRow.access_key
+                ),
+            )
+        )
+        async with db.begin_readonly_session() as db_session:
+            return (await db_session.scalars(query)).first()
+
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
@@ -1055,6 +1166,7 @@ class ComputeSession(graphene.ObjectType):
     group_name = graphene.String()
     group_id = graphene.UUID()
     user_email = graphene.String()
+    full_name = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
     created_user_email = graphene.String()
@@ -1073,6 +1185,7 @@ class ComputeSession(graphene.ObjectType):
     result = graphene.String()
     commit_status = graphene.String()
     abusing_reports = graphene.List(lambda: graphene.JSONString)
+    idle_checks = graphene.JSONString()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -1092,10 +1205,13 @@ class ComputeSession(graphene.ObjectType):
     # relations
     dependencies = graphene.List(lambda: ComputeSession)
 
+    inference_metrics = graphene.JSONString()
+
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         assert row is not None
         email = getattr(row, "email")
+        full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
         return {
@@ -1119,6 +1235,7 @@ class ComputeSession(graphene.ObjectType):
             "group_name": group_name,
             "group_id": row.group_id,
             "user_email": email,
+            "full_name": full_name,
             "user_id": row.user_uuid,
             "access_key": row.access_key,
             "created_user_email": None,  # TODO: implement
@@ -1167,6 +1284,15 @@ class ComputeSession(graphene.ObjectType):
             ),
             start=zero,
         ).to_json()
+
+    async def resolve_inference_metrics(
+        self, info: graphene.ResolveInfo
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
+        )
+        return await loader.load(self.id)
 
     # legacy
     async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
@@ -1217,6 +1343,10 @@ class ComputeSession(graphene.ObjectType):
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
+    async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
@@ -1224,7 +1354,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("groups_name", None),
         "user_email": ("users_email", None),
-        "user_name": ("users_username", None),
+        "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
@@ -1248,7 +1378,7 @@ class ComputeSession(graphene.ObjectType):
         "domain_name": "sessions_domain_name",
         "group_name": "groups_name",
         "user_email": "users_email",
-        "user_name": "users_username",
+        "full_name": "users_full_name",
         "access_key": "sessions_access_key",
         "scaling_group": "sessions_scaling_group_name",
         "cluster_mode": "sessions_cluster_mode",
@@ -1324,6 +1454,7 @@ class ComputeSession(graphene.ObjectType):
                 SessionRow,
                 GroupRow.name.label("group_name"),
                 UserRow.email,
+                UserRow.full_name,
             )
             .select_from(j)
             .options(selectinload(SessionRow.kernels))
@@ -1366,6 +1497,7 @@ class ComputeSession(graphene.ObjectType):
                 SessionRow,
                 GroupRow.name.label("group_name"),
                 UserRow.email,
+                UserRow.full_name,
             )
             .select_from(j)
             .where(SessionRow.id.in_(session_ids))

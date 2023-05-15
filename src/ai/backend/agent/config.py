@@ -33,6 +33,7 @@ agent_local_config_iv = (
                     t.Key("var-base-path", default="./var/lib/backend.ai"): tx.Path(
                         type="dir", auto_create=True
                     ),
+                    t.Key("public-host", default=None): t.Null | t.String,
                     t.Key("region", default=None): t.Null | t.String,
                     t.Key("instance-type", default=None): t.Null | t.String,
                     t.Key("scaling-group", default="default"): t.String,
@@ -48,9 +49,11 @@ agent_local_config_iv = (
                     t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                         type="dir", auto_create=True
                     ),
-                    t.Key("abuse-report-path", default=None): t.Null
-                    | tx.Path(type="dir", allow_nonexisting=True),
+                    t.Key("abuse-report-path", default=None): t.Null | tx.Path(
+                        type="dir", allow_nonexisting=True
+                    ),
                     t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
+                    t.Key("kernel-creation-concurrency", default=4): t.ToInt[1:32],
                 }
             ).allow_extra("*"),
             t.Key("container"): t.Dict(
@@ -60,8 +63,9 @@ agent_local_config_iv = (
                     t.Key("bind-host", default=""): t.String(allow_blank=True),
                     t.Key("advertised-host", default=None): t.Null | t.String(),
                     t.Key("port-range", default=(30000, 31000)): tx.PortRange,
-                    t.Key("stats-type", default="docker"): t.Null
-                    | t.Enum(*[e.value for e in StatModes]),
+                    t.Key("stats-type", default="docker"): t.Null | t.Enum(
+                        *[e.value for e in StatModes]
+                    ),
                     t.Key("sandbox-type", default="docker"): t.Enum("docker", "jail"),
                     t.Key("jail-args", default=[]): t.List(t.String),
                     t.Key("scratch-type"): t.Enum("hostdir", "memory", "k8s-nfs"),
@@ -101,6 +105,7 @@ agent_local_config_iv = (
                     t.Key("log-alloc-map", default=False): t.ToBool,
                     t.Key("log-events", default=False): t.ToBool,
                     t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("heartbeat-interval", default=20.0): t.Float,
                     t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {
