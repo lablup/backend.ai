@@ -160,7 +160,7 @@ install_static_python() {
   dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
   checksum_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz.sha256"
   cwd=$(pwd)
-  mkdir -p .python-runtime && cd .python-runtime
+  cd $PYTHONPATH
   show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
   curl -o dist.tar.gz -L "$dist_url"
   echo "$(curl -sL $checksum_url) dist.tar.gz" | sha256sum --check --status
