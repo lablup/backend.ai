@@ -1289,7 +1289,12 @@ class AgentRegistry:
                 async with self.db.begin_session() as db_sess:
                     if endpoint_id:
                         routing_row = RoutingRow(
-                            endpoint_id, session_id, traffic_ratio=traffic_ratio or 1.0
+                            endpoint_id,
+                            session_id,
+                            user_scope.user_uuid,
+                            user_scope.domain_name,
+                            user_scope.group_id,
+                            traffic_ratio=traffic_ratio or 1.0,
                         )
                         db_sess.add(routing_row)
 
@@ -3242,6 +3247,7 @@ class AgentRegistry:
             async with session.post(
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
                 json={
+                    "service_name": endpoint.name,
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
                 },  # TODO: support for multiple inference apps

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
 
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode
 
 from ..api.exceptions import EndpointNotFound
@@ -20,6 +22,9 @@ if TYPE_CHECKING:
     pass  # from .gql import GraphQueryContext
 
 __all__ = ("EndpointRow", "Endpoint", "EndpointList")
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 class EndpointRow(Base):
@@ -139,7 +144,14 @@ class EndpointRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, endpoint_id: uuid.UUID, load_routes=False, load_image=False
+        cls,
+        session: AsyncSession,
+        endpoint_id: uuid.UUID,
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        load_routes=False,
+        load_image=False,
     ) -> "EndpointRow":
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -149,6 +161,12 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.routings))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if project:
+            query = query.filter(EndpointRow.project == project)
+        if domain:
+            query = query.filter(EndpointRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         row = result.scalar()
         if row is None:
@@ -159,7 +177,9 @@ class EndpointRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        project: uuid.UUID | None = None,
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
         load_routes=False,
         load_image=False,
     ) -> List["EndpointRow"]:
@@ -168,9 +188,12 @@ class EndpointRow(Base):
             query = query.options(selectinload(EndpointRow.routings))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
-
         if project:
             query = query.filter(EndpointRow.project == project)
+        if domain:
+            query = query.filter(EndpointRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -181,12 +204,27 @@ class Endpoint(graphene.ObjectType):
 
     endpoint_id = graphene.UUID()
     image = graphene.String()
-    model = graphene.UUID()
     domain = graphene.String()
-    project = graphene.UUID()
+    project = graphene.String()
     resource_group = graphene.String()
     resource_slots = graphene.JSONString()
     url = graphene.String()
+    model = graphene.UUID()
+    model_mount_destiation = graphene.String()
+    created_user = graphene.UUID()
+    session_owner = graphene.UUID()
+    tag = graphene.String()
+    startup_command = graphene.String()
+    bootstrap_script = graphene.String()
+    callback_url = graphene.String()
+    environ = graphene.JSONString()
+    name = graphene.String()
+    resource_opts = graphene.JSONString()
+    desired_session_count = graphene.Int()
+    cluster_mode = graphene.String()
+    cluster_size = graphene.Int()
+    open_to_public = graphene.Boolean()
+
     routings = graphene.List(Routing)
 
     @classmethod
@@ -197,13 +235,27 @@ class Endpoint(graphene.ObjectType):
     ) -> "Endpoint":
         return cls(
             endpoint_id=row.id,
-            image=row.image_row.image,
-            model=row.model,
+            image=row.image_row.name,
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
             resource_slots=row.resource_slots,
             url=row.url,
+            model=row.model,
+            model_mount_destiation=row.model_mount_destiation,
+            created_user=row.created_user,
+            session_owner=row.session_owner,
+            tag=row.tag,
+            startup_command=row.startup_command,
+            bootstrap_script=row.bootstrap_script,
+            callback_url=row.callback_url,
+            environ=row.environ,
+            name=row.name,
+            resource_opts=row.resource_opts,
+            desired_session_count=row.desired_session_count,
+            cluster_mode=row.cluster_mode,
+            cluster_size=row.cluster_size,
+            open_to_public=row.open_to_public,
             routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
         )
 
@@ -213,10 +265,16 @@ class Endpoint(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         *,
         project: uuid.UUID | None = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(EndpointRow)
         if project is not None:
             query = query.where(EndpointRow.project == project)
+        if domain_name is not None:
+            query = query.where(Endpoint.domain == domain_name)
+        if user_uuid is not None:
+            query = query.where(Endpoint.session_owner == user_uuid)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
@@ -228,13 +286,25 @@ class Endpoint(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
         project: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence["Endpoint"]:
-        query = sa.select(EndpointRow).limit(limit).offset(offset)
+        query = (
+            sa.select(EndpointRow)
+            .limit(limit)
+            .offset(offset)
+            .options(selectinload(EndpointRow.image_row))
+            .options(selectinload(EndpointRow.routings))
+        )
         if project is not None:
             query = query.where(EndpointRow.project == project)
+        if domain_name is not None:
+            query = query.where(Endpoint.domain == domain_name)
+        if user_uuid is not None:
+            query = query.where(Endpoint.session_owner == user_uuid)
         """
         if filter is not None:
             parser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -244,17 +314,22 @@ class Endpoint(graphene.ObjectType):
             query = parser.append_ordering(query, order)
         """
         async with ctx.db.begin_readonly_session() as session:
-            return [await cls.from_row(ctx, row) async for row in (await session.stream(query))]
+            result = await session.execute(query)
+            return [await cls.from_row(ctx, row) for row in result.scalars().all()]
 
     @classmethod
     async def load_all(
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        project: uuid.UUID | None = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[uuid.UUID] = None,
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await EndpointRow.list(session, project=project)
+            rows = await EndpointRow.list(
+                session, project=project, domain=domain_name, user_uuid=user_uuid, load_image=True
+            )
         return [await Endpoint.from_row(ctx, row) for row in rows]
 
     @classmethod
@@ -263,13 +338,24 @@ class Endpoint(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         *,
         endpoint_id: uuid.UUID,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        project: uuid.UUID | None = None,
     ) -> "Endpoint":
         """
         :raises: ai.backend.manager.api.exceptions.EndpointNotFound
         """
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await EndpointRow.get(session, endpoint_id=endpoint_id)
+                row = await EndpointRow.get(
+                    session,
+                    endpoint_id=endpoint_id,
+                    domain=domain_name,
+                    user_uuid=user_uuid,
+                    project=project,
+                    load_image=True,
+                    load_routes=True,
+                )
         except NoResultFound:
             raise EndpointNotFound
         return await Endpoint.from_row(ctx, row)

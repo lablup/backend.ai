@@ -120,6 +120,30 @@ def upgrade():
         ),
     )
     op.add_column(
+        "routings",
+        sa.Column(
+            "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
+        ),
+    )
+    op.add_column(
+        "routings",
+        sa.Column(
+            "domain",
+            sa.String(length=64),
+            sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+    )
+    op.add_column(
+        "routings",
+        sa.Column(
+            "project",
+            GUID,
+            sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+    )
+    op.add_column(
         "scaling_groups",
         sa.Column(
             "wsproxy_api_token",
@@ -149,4 +173,7 @@ def downgrade():
     op.drop_column("scaling_groups", "wsproxy_api_token")
     op.alter_column("endpoints", "url", nullable=False)
     op.drop_column("routings", "status")
+    op.drop_column("routings", "session_owner")
+    op.drop_column("routings", "domain")
+    op.drop_column("routings", "project")
     routestatus.drop(op.get_bind())

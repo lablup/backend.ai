@@ -133,7 +133,7 @@ async def get_info(request: web.Request) -> web.Response:
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
     resp = {
-        "id": str(endpoint.id),
+        "endpoint_id": str(endpoint.id),
         "name": endpoint.name,
         "desired_session_count": endpoint.desired_session_count,
         "active_routes": [
@@ -170,7 +170,7 @@ async def get_info(request: web.Request) -> web.Response:
                 ClusterMode
             ),  # new in APIv6
             t.Key("tag", default=None): t.Null | t.String,
-            t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
+            tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
             tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
             tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
                 t.Null | tx.URL
@@ -184,7 +184,7 @@ async def get_info(request: web.Request) -> web.Response:
                         t.Null | t.String
                     ),
                     tx.AliasedKey(
-                        ["model_mount_path", "modelMountPath"], default="/models"
+                        ["model_mount_destination", "modelMountDestination"], default="/models"
                     ): t.String,
                     t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
                     # cluster_size is moved to the root-level parameters
@@ -258,11 +258,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 params["image"],
             ],
         )
-    if image_row.labels.get("ai.backend.role") != KernelRole.INFERENCE:
+    if image_row.labels.get("ai.backend.role") != KernelRole.INFERENCE.name:
         raise InvalidAPIParameters("Cannot create service with non-inference image")
 
     params["config"]["mount_map"] = {
-        params["config"]["model_id"]: params["config"]["model_mount_path"]
+        params["config"]["model_id"]: params["config"]["model_mount_destination"]
     }
 
     # check if session is valid to be created
@@ -308,7 +308,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             params["config"]["resources"],
             params["cluster_mode"],
             params["cluster_size"],
-            model_mount_destination=params["config"]["model_mount_path"],
+            model_mount_destination=params["config"]["model_mount_destination"],
             tag=params["tag"],
             startup_command=params["startup_command"],
             callback_url=params["callback_url"],
