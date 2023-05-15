@@ -15,7 +15,12 @@ from ai.backend.client.session import Session
 
 from ..compat import asyncio_run
 from ..session import AsyncSession
-from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
+from .params import (
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+    JSONParamType,
+)
 from .pretty import (
     ProgressViewer,
     print_done,
@@ -809,7 +814,8 @@ def clone(name, target_name, target_host, usage_mode, permission):
         "If not set, the cloneable property is not changed."
     ),
 )
-def update_options(name, permission, set_cloneable):
+@click.option("--app-config", type=JSONParamType(), help="App type vfolder's configuration.")
+def update_options(name, permission, set_cloneable, app_config):
     """Update an existing virtual folder.
 
     \b
@@ -825,6 +831,7 @@ def update_options(name, permission, set_cloneable):
                 name,
                 permission=permission,
                 cloneable=set_cloneable,
+                app_config=app_config,
             )
             print_done("Updated.")
         except Exception as e:

@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -634,12 +634,19 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def update_options(self, name: str, permission: str = None, cloneable: bool = None):
+    async def update_options(
+        self,
+        name: str,
+        permission: str = None,
+        cloneable: bool = None,
+        app_config: Optional[Mapping[str, Any]] = None,
+    ):
         rqst = Request("POST", "/folders/{}/update-options".format(self.name))
         rqst.set_json(
             {
                 "cloneable": cloneable,
                 "permission": permission,
+                "app_config": app_config,
             }
         )
         async with rqst.fetch() as resp:
