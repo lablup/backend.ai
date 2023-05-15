@@ -160,7 +160,7 @@ install_static_python() {
   dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
   checksum_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz.sha256"
   cwd=$(pwd)
-  cd $PYTHONPATH
+  cd $STATIC_PYTHON_PATH
   show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
   curl -o dist.tar.gz -L "$dist_url"
   echo "$(curl -sL $checksum_url) dist.tar.gz" | sha256sum --check --status
@@ -218,15 +218,15 @@ if [ STANDALONE_PYTHON_ARCH == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
 
-export PYTHONPATH="$HOME/.cache/python-runtime"
-mkdir -p "$PYTHONPATH"
+export STATIC_PYTHON_PATH="$HOME/.cache/python-runtime"
+mkdir -p "$STATIC_PYTHON_PATH"
 if [ $DISTRO = "Darwin" ]; then
-  export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$PYTHONPATH/lib
+  export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$STATIC_PYTHON_PATH/lib
 else
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PYTHONPATH/lib
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$STATIC_PYTHON_PATH/lib
 fi
 
-bpython="$PYTHONPATH/bin/python3"
+bpython="$STATIC_PYTHON_PATH/bin/python3"
 if [ $(has_python $bpython) -eq 0 ]; then
   install_static_python
 fi
