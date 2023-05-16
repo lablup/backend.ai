@@ -158,7 +158,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         container_data[0]["NetworkSettings"]["Ports"]["6379/tcp"][0]["HostPort"]
     )
     log.info("spawning redis container on port %d", redis_allocated_port)
-    wait_health_check(container_id)
+    time.sleep(0.3)
     yield container_id, HostPortPair("127.0.0.1", redis_allocated_port)
     subprocess.run(
         [

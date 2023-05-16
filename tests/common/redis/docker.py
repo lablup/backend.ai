@@ -11,8 +11,6 @@ import aiohttp
 import async_timeout
 import pytest
 
-from ai.backend.common.lock import FileLock
-from ai.backend.testutils.bootstrap import get_free_port
 from ai.backend.testutils.pants import get_parallel_slot
 
 from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
@@ -145,37 +143,34 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             await asyncio.get_running_loop().run_in_executor(None, _copy_files)
             compose_cfg = snap_compose_dir / "redis-cluster.yml"
 
-        async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True, timeout=30)):
-
-            async def _get_free_port() -> int:
-                return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
-
-            ports = {
-                "REDIS_MASTER_PORT": await _get_free_port(),
-                "REDIS_SLAVE1_PORT": await _get_free_port(),
-                "REDIS_SLAVE2_PORT": await _get_free_port(),
-                "REDIS_SENTINEL1_PORT": await _get_free_port(),
-                "REDIS_SENTINEL2_PORT": await _get_free_port(),
-                "REDIS_SENTINEL3_PORT": await _get_free_port(),
-            }
-            os.environ.update({k: str(v) for k, v in ports.items()})
-            os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
-            async with async_timeout.timeout(30.0):
-                p = await simple_run_cmd(
-                    [
-                        *compose_cmd,
-                        "-p",
-                        project_name,
-                        "-f",
-                        str(compose_cfg),
-                        "up",
-                        "-d",
-                        "--build",
-                    ],
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                assert p.returncode == 0, "Compose cluster creation has failed."
+        base_port = 9000 + get_parallel_slot() * 16
+        ports = {
+            "REDIS_MASTER_PORT": base_port,
+            "REDIS_SLAVE1_PORT": base_port + 1,
+            "REDIS_SLAVE2_PORT": base_port + 2,
+            "REDIS_SENTINEL1_PORT": base_port + 3,
+            "REDIS_SENTINEL2_PORT": base_port + 4,
+            "REDIS_SENTINEL3_PORT": base_port + 5,
+        }
+        os.environ.update({k: str(v) for k, v in ports.items()})
+        os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
+        async with async_timeout.timeout(30.0):
+            p = await simple_run_cmd(
+                [
+                    *compose_cmd,
+                    "-p",
+                    project_name,
+                    "-f",
+                    str(compose_cfg),
+                    "up",
+                    "-d",
+                    "--build",
+                ],
+                env=os.environ,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            assert p.returncode == 0, "Compose cluster creation has failed."
 
         await asyncio.sleep(2)
         try:
