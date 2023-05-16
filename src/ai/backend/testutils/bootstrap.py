@@ -76,34 +76,44 @@ def wait_health_check(container_id):
 @pytest.fixture(scope="session", autouse=False)
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    with sync_file_lock(Path("/tmp/bai-test-port-alloc.lock")):
-        etcd_allocated_port = get_free_port()
-        log.info("spawning etcd container on port %d", etcd_allocated_port)
-        proc = subprocess.run(
-            [
-                "docker",
-                "run",
-                "-d",
-                "-p",
-                f"0.0.0.0:{etcd_allocated_port}:2379",
-                "-p",
-                ":4001",
-                "--health-cmd",
-                "etcdctl endpoint health",
-                "--health-interval",
-                "2s",
-                "--health-start-period",
-                "1s",
-                "quay.io/coreos/etcd:v3.5.4",
-                "/usr/local/bin/etcd",
-                "-advertise-client-urls",
-                "http://0.0.0.0:2379",
-                "-listen-client-urls",
-                "http://0.0.0.0:2379",
-            ],
-            capture_output=True,
-        )
+    proc = subprocess.run(
+        [
+            "docker",
+            "run",
+            "-d",
+            "-p",
+            ":2379",
+            "-p",
+            ":4001",
+            "--health-cmd",
+            "etcdctl endpoint health",
+            "--health-interval",
+            "2s",
+            "--health-start-period",
+            "1s",
+            "quay.io/coreos/etcd:v3.5.4",
+            "/usr/local/bin/etcd",
+            "-advertise-client-urls",
+            "http://0.0.0.0:2379",
+            "-listen-client-urls",
+            "http://0.0.0.0:2379",
+        ],
+        capture_output=True,
+    )
     container_id = proc.stdout.decode().strip()
+    proc = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            container_id,
+        ],
+        capture_output=True,
+    )
+    container_data = json.loads(proc.stdout.decode().strip())
+    etcd_allocated_port = int(
+        container_data[0]["NetworkSettings"]["Ports"]["2379/tcp"][0]["HostPort"]
+    )
+    log.info("spawning etcd container on port %d", etcd_allocated_port)
     wait_health_check(container_id)
     yield container_id, HostPortPair("127.0.0.1", etcd_allocated_port)
     subprocess.run(
@@ -120,24 +130,34 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 
 @pytest.fixture(scope="session", autouse=False)
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
-    with sync_file_lock(Path("/tmp/bai-test-port-alloc.lock")):
-        # Spawn a single-node etcd container for a testing session.
-        redis_allocated_port = get_free_port()
-        log.info("spawning redis container on port %d", redis_allocated_port)
-        proc = subprocess.run(
-            [
-                "docker",
-                "run",
-                "-d",
-                "-p",
-                f"0.0.0.0:{redis_allocated_port}:6379",
-                # IMPORTANT: We have intentionally omitted the healthcheck here
-                # to avoid intermittent failures when pausing/unpausing containers.
-                "redis:7-alpine",
-            ],
-            capture_output=True,
-        )
+    # Spawn a single-node etcd container for a testing session.
+    proc = subprocess.run(
+        [
+            "docker",
+            "run",
+            "-d",
+            "-p",
+            ":6379",
+            # IMPORTANT: We have intentionally omitted the healthcheck here
+            # to avoid intermittent failures when pausing/unpausing containers.
+            "redis:7-alpine",
+        ],
+        capture_output=True,
+    )
     container_id = proc.stdout.decode().strip()
+    proc = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            container_id,
+        ],
+        capture_output=True,
+    )
+    container_data = json.loads(proc.stdout.decode().strip())
+    redis_allocated_port = int(
+        container_data[0]["NetworkSettings"]["Ports"]["6379/tcp"][0]["HostPort"]
+    )
+    log.info("spawning redis container on port %d", redis_allocated_port)
     wait_health_check(container_id)
     yield container_id, HostPortPair("127.0.0.1", redis_allocated_port)
     subprocess.run(
@@ -154,32 +174,42 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 
 @pytest.fixture(scope="session", autouse=False)
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
-    with sync_file_lock(Path("/tmp/bai-test-port-alloc.lock")):
-        # Spawn a single-node etcd container for a testing session.
-        postgres_allocated_port = get_free_port()
-        log.info("spawning postgres container on port %d", postgres_allocated_port)
-        proc = subprocess.run(
-            [
-                "docker",
-                "run",
-                "-d",
-                "-p",
-                f"0.0.0.0:{postgres_allocated_port}:5432",
-                "-e",
-                "POSTGRES_PASSWORD=develove",
-                "-e",
-                "POSTGRES_DB=testing",
-                "--health-cmd",
-                "pg_isready -U postgres",
-                "--health-interval",
-                "1s",
-                "--health-start-period",
-                "2s",
-                "postgres:13.6-alpine",
-            ],
-            capture_output=True,
-        )
+    # Spawn a single-node etcd container for a testing session.
+    proc = subprocess.run(
+        [
+            "docker",
+            "run",
+            "-d",
+            "-p",
+            ":5432",
+            "-e",
+            "POSTGRES_PASSWORD=develove",
+            "-e",
+            "POSTGRES_DB=testing",
+            "--health-cmd",
+            "pg_isready -U postgres",
+            "--health-interval",
+            "1s",
+            "--health-start-period",
+            "2s",
+            "postgres:13.6-alpine",
+        ],
+        capture_output=True,
+    )
     container_id = proc.stdout.decode().strip()
+    proc = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            container_id,
+        ],
+        capture_output=True,
+    )
+    container_data = json.loads(proc.stdout.decode().strip())
+    postgres_allocated_port = int(
+        container_data[0]["NetworkSettings"]["Ports"]["5432/tcp"][0]["HostPort"]
+    )
+    log.info("spawning postgres container on port %d", postgres_allocated_port)
     wait_health_check(container_id)
     yield container_id, HostPortPair("127.0.0.1", postgres_allocated_port)
     subprocess.run(
