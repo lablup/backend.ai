@@ -33,13 +33,22 @@ async def token_auth_middleware(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> web.StreamResponse:
-    token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
-    if not token:
-        raise web.HTTPForbidden()
-    ctx: Context = request.app["ctx"]
-    if token != ctx.local_config["api"]["manager"]["secret"]:
-        raise web.HTTPForbidden()
+    skip_token_check = getattr(handler, "skip_token_check", False)
+    if not skip_token_check:
+        token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
+        if not token:
+            raise web.HTTPForbidden()
+        ctx: Context = request.app["ctx"]
+        if token != ctx.local_config["api"]["manager"]["secret"]:
+            raise web.HTTPForbidden()
     return await handler(request)
+
+
+def skip_token_check(
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
+    setattr(handler, "skip_token_check", True)
+    return handler
 
 
 async def get_status(request: web.Request) -> web.Response:
@@ -374,6 +383,15 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
             )
 
 
+@skip_token_check
+async def status(request: web.Request) -> web.Response:
+    return web.json_response(
+        {
+            "status": "ok",
+        },
+    )
+
+
 async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
     async with check_params(
         request,
@@ -679,4 +697,5 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+    app.router.add_route("GET", "/status", status)
     return app
