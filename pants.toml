@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.16.0.dev7"
+pants_version = "2.16.0rc2"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
@@ -18,7 +18,8 @@ pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
-    "*.log"
+    "*.log",
+    "tools/pants-plugins",
 ]
 
 [anonymous-telemetry]
@@ -42,9 +43,8 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.11.2"]
+interpreter_constraints = ["CPython==3.11.3"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.11.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -56,6 +56,13 @@ indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
+black = "tools/black.lock"
+flake8 = "tools/flake8.lock"
+isort = "tools/isort.lock"
+pytest = "tools/pytest.lock"
+coverage-py = "tools/coverage-py.lock"
+mypy = "tools/mypy.lock"
+towncrier = "tools/towncrier.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
@@ -72,47 +79,26 @@ pants-plugins = "tools/pants-plugins.lock"
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [black]
-version = "black~=23.3"
-interpreter_constraints = ["CPython>=3.11,<4"]
-lockfile = "tools/black.lock"
+install_from_resolve = "black"
+interpreter_constraints = ["CPython==3.11.3"]  # don't know why this is required... (maybe a Pants bug?)
 
 [flake8]
-version = "flake8>=4.0.1"
-extra_requirements.add = [
-    "setuptools>=60.0",
-]
-lockfile = "tools/flake8.lock"
+install_from_resolve = "flake8"
 
 [isort]
-lockfile = "tools/isort.lock"
-interpreter_constraints = ["CPython>=3.11,<4"]
+install_from_resolve = "isort"
 
 [pytest]
-version = "pytest>=7.1.2"
-extra_requirements.add = [
-    "pytest-asyncio>=0.19",
-    "pytest-aiohttp>=1.0.4",
-    "pytest-custom_exit_code>=0.3.0",
-    "pytest-dependency>=0.5.1",
-    "pytest-mock>=3.8.2",
-    "aioresponses>=0.7.3",
-]
+install_from_resolve = "pytest"
 args = ["-v", "--suppress-no-test-exit-code"]
-lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
 [coverage-py]
-version = "coverage[toml]>=6.4,<7.0"
-interpreter_constraints = ["CPython>=3.11,<4"]
+install_from_resolve = "coverage-py"
 report = ["xml", "console"]
-lockfile = "tools/coverage-py.lock"
 
 [mypy]
-version = "mypy==1.2.0"
-interpreter_constraints = ["CPython>=3.11,<4"]
-extra_requirements.add = [
-]
-lockfile = "tools/mypy.lock"
+install_from_resolve = "mypy"
 extra_type_stubs = [
     "types-six",
     "types-setuptools",
@@ -129,7 +115,4 @@ extra_type_stubs = [
 extra_type_stubs_lockfile = "tools/mypy-extra-type-stubs.lock"
 
 [towncrier]
-version = "towncrier>=21.9"
-extra_requirements.add = [
-]
-lockfile = "tools/towncrier.lock"
+install_from_resolve = "towncrier"

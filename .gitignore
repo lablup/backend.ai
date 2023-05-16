@@ -100,6 +100,7 @@ ENV/
 /storage-proxy.toml
 /webserver.conf
 /cuda-mock.toml
+/mock-accelerator.toml
 /.pants.env
 /.pants.bootstrap
 /docker-compose.halfstack.current.yml
@@ -124,3 +125,5 @@ ENV/
 
 # macOS specific
 .DS_Store
+
+.python-runtime

@@ -20,7 +20,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    Sequence,
     Type,
     TypedDict,
     TypeVar,
@@ -228,12 +227,14 @@ class KernelLifecycleEventReason(str, enum.Enum):
 @attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
     reason: str = attrs.field(default="")
     creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
+            str(self.session_id),
             self.reason,
             self.creation_info,
         )
@@ -242,8 +243,9 @@ class KernelCreationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
-            reason=value[1],
-            creation_info=value[2],
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
+            creation_info=value[3],
         )
 
 
@@ -296,12 +298,14 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 @attrs.define(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
     reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
+            str(self.session_id),
             self.reason,
             self.exit_code,
         )
@@ -310,8 +314,9 @@ class KernelTerminationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             KernelId(uuid.UUID(value[0])),
-            value[1],
-            value[2],
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
+            exit_code=value[3],
         )
 
 
@@ -440,22 +445,6 @@ class DoSyncKernelLogsEvent(AbstractEvent):
         return cls(
             KernelId(uuid.UUID(value[0])),
             value[1],
-        )
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class DoSyncKernelStatsEvent(AbstractEvent):
-    name = "do_sync_kernel_stats"
-
-    kernel_ids: Sequence[KernelId] = attrs.field()
-
-    def serialize(self) -> tuple:
-        return ([*map(str, self.kernel_ids)],)
-
-    @classmethod
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_ids=tuple(KernelId(uuid.UUID(item)) for item in value[0]),
         )
 
 
