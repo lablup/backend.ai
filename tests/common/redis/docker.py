@@ -143,7 +143,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             await asyncio.get_running_loop().run_in_executor(None, _copy_files)
             compose_cfg = snap_compose_dir / "redis-cluster.yml"
 
-        base_port = 9000 + get_parallel_slot() * 16
+        base_port = 9200 + get_parallel_slot() * 8
         ports = {
             "REDIS_MASTER_PORT": base_port,
             "REDIS_SLAVE1_PORT": base_port + 1,
@@ -172,7 +172,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             )
             assert p.returncode == 0, "Compose cluster creation has failed."
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(200)
         try:
             p = await simple_run_cmd(
                 [
