@@ -503,7 +503,7 @@ class AgentRPCServer(aobject):
         path: Optional[Path] = None
         if mount_path is not None:
             path = Path(mount_path)
-        log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
+        log.info("rpc::start_service(k:{0}, app:{1}, app_path:{2})", kernel_id, service, path)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts, path)
 
     @rpc_function
