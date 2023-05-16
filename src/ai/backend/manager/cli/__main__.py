@@ -9,17 +9,14 @@ from functools import partial
 from pathlib import Path
 
 import click
-import psycopg2
-import sqlalchemy as sa
 from more_itertools import chunked
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
 from ..config import load as load_config
@@ -28,7 +25,7 @@ from .context import CLIContext, init_logger, redis_ctx
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
-@click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "-f",
     "--config-path",
@@ -40,10 +37,16 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx, config_path, debug):
+def main(ctx, config_path, log_level, debug):
     """
     Manager Administration CLI
     """
@@ -66,18 +69,20 @@ def main(ctx, config_path, debug):
     type=str,
     default=None,
     metavar="ID_OR_NAME",
-    help="Open a postgres client shell using the psql executable "
-    "shipped with the given postgres container. "
-    'If not set or set as an empty string "", it will auto-detect '
-    "the psql container from the halfstack. "
-    'If set "-", it will use the host-provided psql executable. '
-    "You may append additional arguments passed to the psql cli command. "
-    "[default: auto-detect from halfstack]",
+    help=(
+        "Open a postgres client shell using the psql executable "
+        "shipped with the given postgres container. "
+        'If not set or set as an empty string "", it will auto-detect '
+        "the psql container from the halfstack. "
+        'If set "-", it will use the host-provided psql executable. '
+        "You may append additional arguments passed to the psql cli command. "
+        "[default: auto-detect from halfstack]"
+    ),
 )
 @click.option(
     "--psql-help",
     is_flag=True,
-    help="Show the help text of the psql command instead of " "this dbshell command.",
+    help="Show the help text of the psql command instead of this dbshell command.",
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
@@ -101,8 +106,10 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         )
         if not candidate_container_names:
             click.echo(
-                "Could not find the halfstack postgres container. "
-                "Please set the container name explicitly.",
+                (
+                    "Could not find the halfstack postgres container. "
+                    "Please set the container name explicitly."
+                ),
                 err=True,
             )
             sys.exit(ExitCode.FAILURE)
@@ -164,29 +171,35 @@ def generate_keypair(cli_ctx: CLIContext):
     "--vacuum-full",
     type=bool,
     default=False,
-    help="Reclaim storage occupied by dead tuples."
-    "If not set or set False, it will run VACUUM without FULL."
-    "If set True, it will run VACUUM FULL."
-    "When VACUUM FULL is being processed, the database is locked."
-    "[default: False]",
+    help=(
+        "Reclaim storage occupied by dead tuples."
+        "If not set or set False, it will run VACUUM without FULL. "
+        "If set True, it will run VACUUM FULL. "
+        "When VACUUM FULL is being processed, the database is locked. "
+        "[default: False]"
+    ),
 )
 @click.option(
     "-e",
     "--entry",
     type=click.Choice(["kernels", "audit_logs"], case_sensitive=False),
     default="kernels",
-    help="Which table to run the operation on. Options available are kernels and audit_logs. "
-    "If not set or set to kernels, it will run the operation on kernels table. "
-    "If set to audit_logs, it will run on audit_logs table. "
-    "[default: kernels]",
+    help=(
+        "Which table to run the operation on. Options available are kernels and audit_logs. "
+        "If not set or set to kernels, it will run the operation on kernels table. "
+        "If set to audit_logs, it will run on audit_logs table. "
+        "[default: kernels]"
+    ),
 )
 @click.option(
     "--target",
     type=str,
     default=None,
-    help="For audit_logs you can chose which audit target object to run the operation on. "
-    "To run on a desired target between user, keypairs or vfolder use respectively user.uuid, keypairs.access_key, or vfolders.id. "
-    "If not set, it will run on all targets. ",
+    help=(
+        "For audit_logs you can chose which audit target object to run the operation on. To run on"
+        " a desired target between user, keypairs or vfolder use respectively user.uuid,"
+        " keypairs.access_key, or vfolders.id. If not set, it will run on all targets. "
+    ),
 )
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) -> None:
@@ -194,15 +207,17 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) ->
     Delete old records from the kernels table and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
+    import sqlalchemy as sa
+    from redis.asyncio import Redis
+    from redis.asyncio.client import Pipeline
+
     from ai.backend.manager.models import kernels
     from ai.backend.manager.models.utils import connect_database
 
-    local_config = cli_ctx.local_config
     with cli_ctx.logger:
         today = datetime.now()
         duration = TimeDuration()
-        expiration = today - duration.check_and_return(retention)
-        expiration_date = expiration.strftime("%Y-%m-%d %H:%M:%S")
+        expiration_date = today - duration.check_and_return(retention)
 
         async def _clear_redis_history():
             try:
@@ -212,7 +227,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) ->
                             sa.select([kernels.c.id])
                             .select_from(kernels)
                             .where(
-                                (kernels.c.terminated_at < expiration),
+                                (kernels.c.terminated_at < expiration_date),
                             )
                         )
                         result = await conn.execute(query)
@@ -265,81 +280,57 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) ->
             except Exception:
                 log.exception("Unexpected error while cleaning up redis history")
 
-        asyncio.run(_clear_redis_history())
+        async def _clear_terminated_sessions():
+            async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+                async with db.begin() as conn:
+                    log.info("Deleting old records...")
+                    result = await conn.execute(
+                        sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
+                    )
+                    deleted_count = result.rowcount
 
-        conn = psycopg2.connect(
-            host=local_config["db"]["addr"][0],
-            port=local_config["db"]["addr"][1],
-            dbname=local_config["db"]["name"],
-            user=local_config["db"]["user"],
-            password=local_config["db"]["password"],
-        )
-        with conn.cursor() as curs:
-            if vacuum_full:
-                vacuum_sql = "VACUUM FULL"
-            else:
-                vacuum_sql = "VACUUM"
-            if entry == "audit_logs":
-                if target is not None:
-                    curs.execute(
-                        f"""
-                    SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}'
-                    AND target = '{target}';
-                    """
-                    )
-                else:
-                    curs.execute(
-                        f"""
-                    SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}';
-                    """
-                    )
-            else:
-                curs.execute(
-                    f"""
-                SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
-                """
-                )
-            deleted_count = curs.fetchone()[0]
+                    vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
+                    log.info(f"Perfoming {vacuum_sql} operation...")
+                    await conn.exec_driver_sql(vacuum_sql)
 
-            conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-            log.info("Deleting old records...")
-            if entry == "audit_logs":
-                if target is not None:
-                    curs.execute(
-                        f"""
-                    DELETE FROM {entry} WHERE created_at < '{expiration_date}'
-                    AND target = '{target}';
-                    """
-                    )
-                    log.info(
-                        f"Perfoming {vacuum_sql} operation on {entry} where target object is {target}..."
-                    )
-                else:
-                    curs.execute(
-                        f"""
-                    DELETE FROM {entry} WHERE created_at < '{expiration_date}';
-                    """
-                    )
-                    log.info(f"Perfoming {vacuum_sql} operation on {entry}...")
-            else:
-                curs.execute(
-                    f"""
-                DELETE FROM kernels WHERE terminated_at < '{expiration_date}';
-                """
-                )
-            log.info(f"Perfoming {vacuum_sql} operation...")
-            curs.execute(vacuum_sql)
-            conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
-
-            curs.execute(
-                f"""
-            SELECT COUNT(*) FROM {entry};
-            """
+                    curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
+                    if ret := curs.fetchone():
+                        table_size = ret[0]
+                        log.info(
+                            "The number of rows of the `kernels` tables after cleanup: {}",
+                            table_size,
+                        )
+            log.info(
+                "Cleaned up {:,} database records older than {}.",
+                deleted_count,
+                expiration_date,
             )
-            table_size = curs.fetchone()[0]
-            log.info(f"{entry} table size: {table_size}")
 
-        log.info("Cleaned up {:,} database records older than {:}.", deleted_count, expiration_date)
+        asyncio.run(_clear_redis_history())
+        asyncio.run(_clear_terminated_sessions())
+
+        # TODO: rewrite like above async-wrapped functions
+        #     if entry == "audit_logs":
+        #         if target is not None:
+        #             curs.execute(
+        #                 f"""
+        #             SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}'
+        #             AND target = '{target}';
+        #             """
+        #             )
+        #         else:
+        #             curs.execute(
+        #                 f"""
+        #             SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}';
+        #             """
+        #             )
+        #     else:
+        #         curs.execute(
+        #             f"""
+        #         SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
+        #         """
+        #         )
+        #     deleted_count = curs.fetchone()[0]
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")

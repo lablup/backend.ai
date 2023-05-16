@@ -5,7 +5,7 @@ from typing import Dict, Sequence, Union
 
 from ai.backend.client.output.fields import auditlog_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
@@ -63,7 +63,7 @@ class AuditLog(BaseFunction):
             "order": (order, "String"),
         }
 
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "auditlog_list",
             variables,
             fields,
@@ -88,15 +88,13 @@ class AuditLog(BaseFunction):
         Creates a new audit log entry.
         """
 
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($input: AuditLogInput!) {
                 create_audit_logs(props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
 
         variables = {
             "input": {

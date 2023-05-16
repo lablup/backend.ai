@@ -6,13 +6,13 @@ import re
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
-import attr
+import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
-from graphql.error import GraphQLError, format_error
-from graphql.execution import ExecutionResult
-from graphql.execution.executors.asyncio import AsyncioExecutor
+from graphql.error import GraphQLError, format_error  # pants: no-infer-dep
+from graphql.execution import ExecutionResult  # pants: no-infer-dep
+from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
@@ -28,7 +28,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _rx_mutation_hdr = re.compile(r"^mutation(\s+\w+)?\s*(\(|{|@)", re.M)
 
@@ -64,11 +64,13 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         db=root_ctx.db,
         redis_stat=root_ctx.redis_stat,
         redis_image=root_ctx.redis_image,
+        redis_live=root_ctx.redis_live,
         manager_status=manager_status,
         known_slot_types=known_slot_types,
         background_task_manager=root_ctx.background_task_manager,
         storage_manager=root_ctx.storage_manager,
         registry=root_ctx.registry,
+        idle_checker_host=root_ctx.idle_checker_host,
     )
     result = app_ctx.gql_schema.execute(
         params["query"],
@@ -130,7 +132,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     return web.json_response(result.data, status=200)
 
 
-@attr.s(auto_attribs=True, slots=True, init=False)
+@attrs.define(auto_attribs=True, slots=True, init=False)
 class PrivateContext:
     gql_executor: AsyncioExecutor
     gql_schema: graphene.Schema

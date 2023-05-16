@@ -5,7 +5,7 @@ import contextlib
 import os
 from typing import TYPE_CHECKING, AsyncIterator
 
-import attr
+import attrs
 
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
@@ -18,13 +18,13 @@ if TYPE_CHECKING:
     from ..config import LocalConfig
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attrs.define(auto_attribs=True, frozen=True, slots=True)
 class CLIContext:
     logger: AbstractLogger
     local_config: LocalConfig
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attrs.define(auto_attribs=True, frozen=True, slots=True)
 class RedisConnectionSet:
     live: RedisConnectionInfo
     stat: RedisConnectionInfo

@@ -58,6 +58,7 @@ agent_fields = FieldSet(
         FieldSpec(
             "compute_containers", subfields=container_fields, formatter=ContainerListFormatter()
         ),
+        FieldSpec("local_config", formatter=nested_dict_formatter),
         # legacy fields
         FieldSpec("cpu_cur_pct", "CPU Usage (%)"),
         FieldSpec("mem_cur_bytes", "Used Memory (MiB)", formatter=mibytes_output_formatter),
@@ -76,6 +77,7 @@ domain_fields = FieldSet(
         FieldSpec("integration_id"),
     ]
 )
+
 
 group_fields = FieldSet(
     [
@@ -152,22 +154,24 @@ scaling_group_fields = FieldSet(
         FieldSpec("name"),
         FieldSpec("description"),
         FieldSpec("is_active"),
+        FieldSpec("is_public"),
         FieldSpec("created_at"),
         FieldSpec("driver"),
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
+        FieldSpec("use_host_network"),
     ]
 )
 
 
 session_fields = FieldSet(
     [
-        FieldSpec("id", "Kernel ID", alt_name="kernel_id"),
+        FieldSpec("id", "Session ID", alt_name="session_id"),
+        FieldSpec("main_kernel_id", "Main Kernel ID"),
         FieldSpec("tag"),
         FieldSpec("name"),
         FieldSpec("type"),
-        FieldSpec("session_id", "Session ID"),
         FieldSpec("image"),
         FieldSpec("registry"),
         FieldSpec("cluster_template"),
@@ -194,7 +198,7 @@ session_fields = FieldSet(
         FieldSpec("scaling_group"),
         FieldSpec("service_ports", formatter=nested_dict_formatter),
         FieldSpec("mounts"),
-        FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("occupying_slots", formatter=resource_slot_formatter),
         FieldSpec(
             "containers",
             subfields=container_fields,
@@ -204,6 +208,8 @@ session_fields = FieldSet(
             "dependencies { name id }",
             formatter=DependencyListFormatter(),
         ),
+        FieldSpec("abusing_reports"),
+        FieldSpec("idle_checks"),
     ]
 )
 
@@ -264,6 +270,8 @@ user_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
+        FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
     ]
 )
 
@@ -276,6 +284,7 @@ vfolder_fields = FieldSet(
         FieldSpec("user", alt_name="user_id"),
         FieldSpec("group", alt_name="group_id"),
         FieldSpec("creator"),
+        FieldSpec("status"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
         FieldSpec("permission"),
@@ -290,6 +299,13 @@ vfolder_fields = FieldSet(
     ]
 )
 
+permission_fields = FieldSet(
+    [
+        FieldSpec("vfolder_host_permission_list"),
+    ]
+)
+
+
 auditlog_fields = FieldSet(
     [
         FieldSpec("type"),
@@ -301,5 +317,19 @@ auditlog_fields = FieldSet(
         FieldSpec("target_type"),
         FieldSpec("target"),
         FieldSpec("created_at"),
+    ]
+)
+
+
+service_fields = FieldSet(
+    [
+        FieldSpec("model_id"),
+        FieldSpec("model_version"),
+        FieldSpec("image_ref"),
+        FieldSpec("project"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("endpoint_id"),
+        FieldSpec("service_id"),
+        FieldSpec("service_name"),
     ]
 )

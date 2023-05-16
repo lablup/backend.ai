@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, overload
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
 
 import attr
 import graphene
@@ -12,15 +12,18 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import JSONSerializableMixin, SessionTypes
 
 from .base import (
+    Base,
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -34,6 +37,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     # table defs
     "scaling_groups",
+    "ScalingGroupRow",
     "sgroups_for_domains",
     "sgroups_for_groups",
     "sgroups_for_keypairs",
@@ -55,7 +59,11 @@ __all__: Sequence[str] = (
 @attr.define(slots=True)
 class ScalingGroupOpts(JSONSerializableMixin):
     allowed_session_types: list[SessionTypes] = attr.Factory(
-        lambda: [SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+        lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
@@ -87,15 +95,19 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 scaling_groups = sa.Table(
     "scaling_groups",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, index=True, default=True),
+    sa.Column(
+        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    ),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
     sa.Column("driver", sa.String(length=64), nullable=False),
     sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("scheduler", sa.String(length=64), nullable=False),
+    sa.Column("use_host_network", sa.Boolean, nullable=False, default=False),
     sa.Column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),
@@ -111,59 +123,83 @@ scaling_groups = sa.Table(
 
 sgroups_for_domains = sa.Table(
     "sgroups_for_domains",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
 )
 
 
 sgroups_for_groups = sa.Table(
     "sgroups_for_groups",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
 )
 
 
 sgroups_for_keypairs = sa.Table(
     "sgroups_for_keypairs",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
 )
+
+
+class ScalingGroupRow(Base):
+    __table__ = scaling_groups
+    sessions = relationship("SessionRow", back_populates="scaling_group")
+    agents = relationship("AgentRow", back_populates="scaling_group_row")
+    domains = relationship(
+        "DomainRow",
+        secondary=sgroups_for_domains,
+        back_populates="scaling_groups",
+    )
+    groups = relationship(
+        "GroupRow",
+        secondary=sgroups_for_groups,
+        back_populates="scaling_groups",
+    )
+    keypairs = relationship(
+        "KeyPairRow",
+        secondary=sgroups_for_keypairs,
+        back_populates="scaling_groups",
+    )
 
 
 @overload
@@ -216,13 +252,15 @@ async def query_allowed_sgroups(
     result = await db_conn.execute(query)
     from_domain = {row["scaling_group"] for row in result}
 
-    if isinstance(group, Iterable):
-        group_ids = await resolve_groups(db_conn, domain_name, group)
-    else:
-        if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
-            group_ids = [group_id]
-        else:
-            group_ids = []
+    group_ids: Iterable[uuid.UUID] = []
+    match group:
+        case uuid.UUID() | str():
+            if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
+                group_ids = [group_id]
+            else:
+                group_ids = []
+        case list() | tuple() | set():
+            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
     from_group: Set[str]
     if not group_ids:
         from_group = set()  # empty
@@ -252,12 +290,14 @@ class ScalingGroup(graphene.ObjectType):
     name = graphene.String()
     description = graphene.String()
     is_active = graphene.Boolean()
+    is_public = graphene.Boolean()
     created_at = GQLDateTime()
     wsproxy_addr = graphene.String()
     driver = graphene.String()
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
+    use_host_network = graphene.Boolean()
 
     @classmethod
     def from_row(
@@ -271,12 +311,14 @@ class ScalingGroup(graphene.ObjectType):
             name=row["name"],
             description=row["description"],
             is_active=row["is_active"],
+            is_public=row["is_public"],
             created_at=row["created_at"],
             wsproxy_addr=row["wsproxy_addr"],
             driver=row["driver"],
             driver_opts=row["driver_opts"],
             scheduler=row["scheduler"],
             scheduler_opts=row["scheduler_opts"].to_json(),
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -424,25 +466,28 @@ class ScalingGroup(graphene.ObjectType):
 class CreateScalingGroupInput(graphene.InputObjectType):
     description = graphene.String(required=False, default="")
     is_active = graphene.Boolean(required=False, default=True)
+    is_public = graphene.Boolean(required=False, default=True)
     wsproxy_addr = graphene.String(required=False)
     driver = graphene.String(required=True)
     driver_opts = graphene.JSONString(required=False, default={})
     scheduler = graphene.String(required=True)
     scheduler_opts = graphene.JSONString(required=False, default={})
+    use_host_network = graphene.Boolean(required=False, default=False)
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
+    is_public = graphene.Boolean(required=False)
     wsproxy_addr = graphene.String(required=False)
     driver = graphene.String(required=False)
     driver_opts = graphene.JSONString(required=False)
     scheduler = graphene.String(required=False)
     scheduler_opts = graphene.JSONString(required=False)
+    use_host_network = graphene.Boolean(required=False)
 
 
 class CreateScalingGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -465,11 +510,13 @@ class CreateScalingGroup(graphene.Mutation):
             "name": name,
             "description": props.description,
             "is_active": bool(props.is_active),
+            "is_public": bool(props.is_public),
             "wsproxy_addr": props.wsproxy_addr,
             "driver": props.driver,
             "driver_opts": props.driver_opts,
             "scheduler": props.scheduler,
             "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
+            "use_host_network": bool(props.use_host_network),
         }
         insert_query = sa.insert(scaling_groups).values(data)
         return await simple_db_mutate_returning_item(
@@ -481,7 +528,6 @@ class CreateScalingGroup(graphene.Mutation):
 
 
 class ModifyScalingGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -502,6 +548,7 @@ class ModifyScalingGroup(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
+        set_if_set(props, data, "is_public")
         set_if_set(props, data, "driver")
         set_if_set(props, data, "wsproxy_addr")
         set_if_set(props, data, "driver_opts")
@@ -509,12 +556,12 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(
             props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
         )
+        set_if_set(props, data, "use_host_network")
         update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
         return await simple_db_mutate(cls, info.context, update_query)
 
 
 class DeleteScalingGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -535,7 +582,6 @@ class DeleteScalingGroup(graphene.Mutation):
 
 
 class AssociateScalingGroupWithDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -563,7 +609,6 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
 
 
 class DisassociateScalingGroupWithDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -589,7 +634,6 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
 
 
 class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -610,7 +654,6 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
 
 
 class AssociateScalingGroupWithUserGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -638,7 +681,6 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
 
 
 class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -664,7 +706,6 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
 
 
 class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -685,7 +726,6 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
 
 
 class AssociateScalingGroupWithKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -713,7 +753,6 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
 
 
 class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

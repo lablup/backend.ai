@@ -6,7 +6,6 @@ from pathlib import Path
 import click
 import humanize
 from tabulate import tabulate
-from tqdm import tqdm
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
@@ -17,7 +16,15 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
-from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
+from .pretty import (
+    ProgressViewer,
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
 
 
 @main.group()
@@ -66,8 +73,10 @@ def list_allowed_types():
     "host_path",
     type=bool,
     is_flag=True,
-    help="Treats HOST as a mount point of unmanaged virtual folder. "
-    "This option can only be used by Admin or Superadmin.",
+    help=(
+        "Treats HOST as a mount point of unmanaged virtual folder. "
+        "This option can only be used by Admin or Superadmin."
+    ),
 )
 @click.option(
     "-m",
@@ -75,9 +84,11 @@ def list_allowed_types():
     metavar="USAGE_MODE",
     type=str,
     default="general",
-    help='Purpose of the folder. Normal folders are usually set to "general". '
-    'Available options: "general", "data" (provides data to users), '
-    'and "model" (provides pre-trained models).',
+    help=(
+        'Purpose of the folder. Normal folders are usually set to "general". '
+        'Available options: "general", "data" (provides data to users), '
+        'and "model" (provides pre-trained models).'
+    ),
 )
 @click.option(
     "-p",
@@ -85,9 +96,11 @@ def list_allowed_types():
     metavar="PERMISSION",
     type=str,
     default="rw",
-    help="Folder's innate permission. "
-    'Group folders can be shared as read-only by setting this option to "ro".'
-    "Invited folders override this setting by its own invitation permission.",
+    help=(
+        "Folder's innate permission. "
+        'Group folders can be shared as read-only by setting this option to "ro". '
+        "Invited folders override this setting by its own invitation permission. "
+    ),
 )
 @click.option(
     "-q",
@@ -95,9 +108,11 @@ def list_allowed_types():
     metavar="QUOTA",
     type=ByteSizeParamCheckType(),
     default="0",
-    help="Quota of the virtual folder. "
-    "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
-    "Default is maximum amount possible.",
+    help=(
+        "Quota of the virtual folder. "
+        "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
+        "Default is maximum amount possible."
+    ),
 )
 @click.option(
     "--cloneable",
@@ -146,6 +161,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 def delete(name):
     """Delete the given virtual folder. This operation is irreversible!
 
+    \b
     NAME: Name of a virtual folder.
     """
     with Session() as session:
@@ -166,6 +182,7 @@ def rename(old_name, new_name):
     and the new name must be unique among all your accessible vfolders
     including the shared ones.
 
+    \b
     OLD_NAME: The current name of a virtual folder.
     NEW_NAME: The new name of a virtual folder.
     """
@@ -183,6 +200,7 @@ def rename(old_name, new_name):
 def info(name):
     """Show the information of the given virtual folder.
 
+    \b
     NAME: Name of a virtual folder.
     """
     with Session() as session:
@@ -191,6 +209,7 @@ def info(name):
             print('Virtual folder "{0}" (ID: {1})'.format(result["name"], result["id"]))
             print("- Owner:", result["is_owner"])
             print("- Permission:", result["permission"])
+            print("- Status: {0}".format(result["status"]))
             print("- Number of files: {0}".format(result["numFiles"]))
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
@@ -211,30 +230,42 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
-    "[default: current working directry]",
+    help=(
+        "The local parent directory which contains the file to be uploaded. "
+        "[default: current working directory]"
+    ),
+)
+@click.option(
+    "-r",
+    "--recursive",
+    is_flag=True,
+    help="Upload the given directory recursively.",
 )
 @click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
-    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-    "and networks (e.g., 40 GbE) for the maximum throughput.",
+    help=(
+        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+        "and networks (e.g., 40 GbE) for the maximum throughput."
+    ),
 )
 @click.option(
     "--override-storage-proxy",
     type=CommaSeparatedKVListParamType(),
     default=None,
-    help="Overrides storage proxy address. "
-    'The value must shape like "X1=Y1,X2=Y2...". '
-    "Each Yn address must at least include the IP address "
-    "or the hostname and may include the protocol part and the port number to replace.",
+    help=(
+        "Overrides storage proxy address. "
+        'The value must shape like "X1=Y1,X2=Y2...". '
+        "Each Yn address must at least include the IP address "
+        "or the hostname and may include the protocol part and the port number to replace."
+    ),
 )
-def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
+def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy):
     """
     TUS Upload a file to the virtual folder from the current working directory.
-    The files with the same names will be overwirtten.
+    The files with the same names will be overwritten.
 
     \b
     NAME: Name of a virtual folder.
@@ -245,6 +276,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
             session.VFolder(name).upload(
                 filenames,
                 basedir=base_dir,
+                recursive=recursive,
                 chunk_size=chunk_size,
                 show_progress=True,
                 address_map=override_storage_proxy
@@ -264,30 +296,42 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
-    "[default: current working directry]",
+    help=(
+        "The local parent directory which will contain the downloaded file.  "
+        "[default: current working directory]"
+    ),
 )
 @click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
-    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-    "and networks (e.g., 40 GbE) for the maximum throughput.",
+    help=(
+        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+        "and networks (e.g., 40 GbE) for the maximum throughput."
+    ),
 )
 @click.option(
     "--override-storage-proxy",
     type=CommaSeparatedKVListParamType(),
     default=None,
-    help="Overrides storage proxy address. "
-    'The value must shape like "X1=Y1,X2=Y2...". '
-    "Each Yn address must at least include the IP address "
-    "or the hostname and may include the protocol part and the port number to replace.",
+    help=(
+        "Overrides storage proxy address. "
+        'The value must shape like "X1=Y1,X2=Y2...". '
+        "Each Yn address must at least include the IP address "
+        "or the hostname and may include the protocol part and the port number to replace."
+    ),
 )
-def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
+@click.option(
+    "--max-retries",
+    type=int,
+    default=20,
+    help="Maximum retry attempt when any failure occurs.",
+)
+def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
     """
     Download a file from the virtual folder to the current working directory.
-    The files with the same names will be overwirtten.
+    The files with the same names will be overwritten.
 
     \b
     NAME: Name of a virtual folder.
@@ -302,6 +346,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
                 show_progress=True,
                 address_map=override_storage_proxy
                 or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                max_retries=max_retries,
             )
             print_done("Done.")
         except Exception as e:
@@ -314,7 +359,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
 @click.argument("filename", type=Path)
 def request_download(name, filename):
     """
-    Request JWT-formated download token for later use.
+    Request JWT-formatted download token for later use.
 
     \b
     NAME: Name of a virtual folder.
@@ -334,6 +379,7 @@ def request_download(name, filename):
 def cp(filenames):
     """An scp-like shortcut for download/upload commands.
 
+    \b
     FILENAMES: Paths of the files to operate on. The last one is the target while all
                others are the sources.  Either source paths or the target path should
                be prefixed with "<vfolder-name>:" like when using the Linux scp
@@ -473,7 +519,7 @@ def ls(name, path):
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
                 row = [file["filename"], file["size"], mtime, file["mode"]]
                 table.append(row)
-            print_done("Retrived.")
+            print_done("Retrieved.")
             print(tabulate(table, headers=headers))
         except Exception as e:
             print_error(e)
@@ -502,7 +548,7 @@ def invite(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
-            if len(invited_ids) > 0:
+            if invited_ids:
                 print("Invitation sent to:")
                 for invitee in invited_ids:
                     print("\t- " + invitee)
@@ -587,7 +633,7 @@ def share(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
-            if len(shared_emails) > 0:
+            if shared_emails:
                 print("Shared with {} permission to:".format(perm))
                 for _email in shared_emails:
                     print("\t- " + _email)
@@ -612,7 +658,7 @@ def unshare(name, emails):
         try:
             result = session.VFolder(name).unshare(emails)
             unshared_emails = result.get("unshared_emails", [])
-            if len(unshared_emails) > 0:
+            if unshared_emails:
                 print("Unshared from:")
                 for _email in unshared_emails:
                     print("\t- " + _email)
@@ -625,9 +671,18 @@ def unshare(name, emails):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def leave(name):
-    """Leave the shared virutal folder.
+@click.option(
+    "-s",
+    "--shared-user-uuid",
+    metavar="SHARED_USER_UUID",
+    type=str,
+    default=None,
+    help="The ID of the person who wants to leave (the person who shared the vfolder).",
+)
+def leave(name, shared_user_uuid):
+    """Leave the shared virtual folder.
 
+    \b
     NAME: Name of a virtual folder
     """
     with Session() as session:
@@ -639,7 +694,7 @@ def leave(name):
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
-            session.VFolder(name).leave()
+            session.VFolder(name).leave(shared_user_uuid)
             print('Left the shared virtual folder "{}".'.format(name))
 
         except Exception as e:
@@ -657,7 +712,7 @@ def leave(name):
     metavar="USAGE_MODE",
     type=str,
     default="general",
-    help="Purpose of the cloned virtual folder. " "Default value is 'general'.",
+    help="Purpose of the cloned virtual folder. Default value is 'general'.",
 )
 @click.option(
     "-p",
@@ -665,7 +720,7 @@ def leave(name):
     metavar="PERMISSION",
     type=str,
     default="rw",
-    help="Cloned virtual folder's permission. " "Default value is 'rw'.",
+    help="Cloned virtual folder's permission. Default value is 'rw'.",
 )
 def clone(name, target_name, target_host, usage_mode, permission):
     """Clone a virtual folder.
@@ -695,34 +750,42 @@ def clone(name, target_name, target_host, usage_mode, permission):
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
+    # NOTE: Tracking the progress from the storage-proxy is not supported yet. (See #1033)
     async def clone_vfolder_tracker(bgtask_id):
-        print_wait(
-            "Cloning the vfolder... "
-            "(This may take a while depending on its size and number of files!)",
-        )
         async with AsyncSession() as session:
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
-                async with bgtask.listen_events() as response:
-                    # TODO: get the unit of progress from response
-                    with tqdm(unit="bytes", disable=True) as pbar:
-                        async for ev in response:
-                            data = json.loads(ev.data)
-                            if ev.event == "bgtask_updated":
+                async with (
+                    bgtask.listen_events() as response,
+                    ProgressViewer(
+                        (
+                            "Cloning the vfolder... "
+                            "(This may take a while depending on its size and number of files!)"
+                        ),
+                    ) as viewer,
+                ):
+                    async for ev in response:
+                        data = json.loads(ev.data)
+                        if ev.event == "bgtask_updated":
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm()
+                            else:
                                 pbar.total = data["total_progress"]
                                 pbar.write(data["message"])
                                 pbar.update(data["current_progress"] - pbar.n)
-                            elif ev.event == "bgtask_failed":
-                                error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
-                                    f"Error during the operation: {error_msg}",
-                                )
-                            elif ev.event == "bgtask_cancelled":
-                                completion_msg_func = lambda: print_warn(
+                        elif ev.event == "bgtask_failed":
+                            error_msg = data["message"]
+                            completion_msg_func = lambda: print_fail(
+                                f"Error during the operation: {error_msg}",
+                            )
+                        elif ev.event == "bgtask_cancelled":
+                            completion_msg_func = lambda: print_warn(
+                                (
                                     "The operation has been cancelled in the middle. "
-                                    "(This may be due to server shutdown.)",
-                                )
+                                    "(This may be due to server shutdown.)"
+                                ),
+                            )
             finally:
                 completion_msg_func()
 
@@ -741,8 +804,10 @@ def clone(name, target_name, target_host, usage_mode, permission):
     "--set-cloneable",
     type=bool,
     metavar="BOOLEXPR",
-    help="A boolean-interpretable string whether a virtual folder can be cloned. "
-    "If not set, the cloneable property is not changed.",
+    help=(
+        "A boolean-interpretable string whether a virtual folder can be cloned. "
+        "If not set, the cloneable property is not changed."
+    ),
 )
 def update_options(name, permission, set_cloneable):
     """Update an existing virtual folder.

@@ -17,7 +17,7 @@ from ..resources import (
     known_slot_types,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def detect_resources(
@@ -46,7 +46,10 @@ async def detect_resources(
         etcd,
         local_config,
     )
-    await compute_plugin_ctx.init(allowlist=local_config["agent"]["allow-compute-plugins"])
+    await compute_plugin_ctx.init(
+        allowlist=local_config["agent"]["allow-compute-plugins"],
+        blocklist=local_config["agent"]["block-compute-plugins"],
+    )
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config)
@@ -62,8 +65,7 @@ async def detect_resources(
             if sname not in {"cpu", "mem"}
         ):
             raise InitializationError(
-                "Slot types defined by an accelerator plugin must be prefixed "
-                "by the plugin's key.",
+                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
                 invalid_name,  # noqa: F821
                 plugin_instance.key,
             )

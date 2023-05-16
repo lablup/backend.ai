@@ -9,7 +9,6 @@ from .models.utils import ExtendedAsyncSAEngine
 
 
 class PgAdvisoryLock(AbstractDistributedLock):
-
     _lock_ctx: AsyncContextManager | None
 
     def __init__(self, db: ExtendedAsyncSAEngine, lock_id: LockID) -> None:

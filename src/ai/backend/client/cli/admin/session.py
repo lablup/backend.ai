@@ -57,7 +57,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--access-key",
         type=str,
         default=None,
-        help="Get sessions for a specific access key " "(only works if you are a super-admin)",
+        help="Get sessions for a specific access key (only works if you are a super-admin)",
     )
     @click.option("--name-only", is_flag=True, help="Display session names only.")
     @click.option(
@@ -81,6 +81,16 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--offset", default=0, type=int, help="The index of the current page start for pagination."
     )
     @click.option("--limit", default=None, type=int, help="The page size for pagination.")
+    @click.option(
+        "-a",
+        "--all",
+        is_flag=True,
+        default=False,
+        help=(
+            'Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status.'
+            " Ignores --status option."
+        ),
+    )
     def list(
         ctx: CLIContext,
         status: str | None,
@@ -95,6 +105,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         order: str | None,
         offset: int,
         limit: int | None,
+        all: bool,
     ) -> None:
         """
         List and manage compute sessions.
@@ -124,7 +135,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 fields.extend(
                     [
                         session_fields["group_name"],
-                        session_fields["kernel_id"],
+                        session_fields["main_kernel_id"],
                         session_fields["image"],
                         session_fields["type"],
                         session_fields["status"],
@@ -138,7 +149,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                         [
                             session_fields["tag"],
                             session_fields["created_at"],
-                            session_fields["occupied_slots"],
+                            session_fields["occupying_slots"],
                         ]
                     )
 
@@ -149,12 +160,8 @@ def _list_cmd(name: str = "list", docs: str = None):
                     "PENDING",
                     "SCHEDULED",
                     "PREPARING",
-                    "PULLING",
                     "RUNNING",
-                    "RESTARTING",
                     "TERMINATING",
-                    "RESIZING",
-                    "SUSPENDED",
                     "ERROR",
                 ]
             )
@@ -163,7 +170,6 @@ def _list_cmd(name: str = "list", docs: str = None):
             status = ",".join(
                 [
                     "PREPARING",
-                    "PULLING",
                     "RUNNING",
                 ]
             )
@@ -176,18 +182,15 @@ def _list_cmd(name: str = "list", docs: str = None):
                 ]
             )
             no_match_name = "dead"
-        if status == "ALL":
+        if status == "ALL" or all:
             status = ",".join(
                 [
                     "PENDING",
                     "SCHEDULED",
                     "PREPARING",
-                    "PULLING",
                     "RUNNING",
-                    "RESTARTING",
+                    "RUNNING_DEGRADED",
                     "TERMINATING",
-                    "RESIZING",
-                    "SUSPENDED",
                     "ERROR",
                     "CANCELLED",
                     "TERMINATED",
@@ -244,7 +247,7 @@ def _info_cmd(docs: str = None):
             ]
             if session_.api_version[0] >= 6:
                 fields.append(session_fields["session_id"])
-                fields.append(session_fields["kernel_id"])
+                fields.append(session_fields["main_kernel_id"])
             fields.extend(
                 [
                     session_fields["image"],
@@ -254,7 +257,8 @@ def _info_cmd(docs: str = None):
                     session_fields["status"],
                     session_fields["status_info"],
                     session_fields["status_data"],
-                    session_fields["occupied_slots"],
+                    session_fields["occupying_slots"],
+                    session_fields["idle_checks"],
                 ]
             )
             if session_.api_version[0] >= 6:
@@ -262,7 +266,7 @@ def _info_cmd(docs: str = None):
             else:
                 fields.append(session_fields_v5["containers"])
             fields.append(session_fields["dependencies"])
-            q = "query($id: UUID!) {" "  compute_session(id: $id) {" "    $fields" "  }" "}"
+            q = "query($id: UUID!) {  compute_session(id: $id) {    $fields  }}"
             try:
                 uuid.UUID(session_id)
             except ValueError:

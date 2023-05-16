@@ -48,7 +48,14 @@ def format_nested_dicts(value: Mapping[str, Mapping[str, Any]]) -> str:
                 if outer_value is None:
                     rows.append(f"- {outer_key}: (null)")
                 else:
-                    rows.append(f"- {outer_key}: {outer_value}")
+                    # TODO: refactor as a formatter
+                    if outer_key == "shmem":
+                        rows.append(
+                            f"- {outer_key}:"
+                            f" {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
+                        )
+                    else:
+                        rows.append(f"- {outer_key}: {outer_value}")
     return "\n".join(rows)
 
 
@@ -117,11 +124,11 @@ class MiBytesOutputFormatter(OutputFormatter):
 
 class SizeBytesOutputFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        value = humanize.naturalsize(value, binary=True)
+        value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_console(value, field)
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
-        value = humanize.naturalsize(value, binary=True)
+        value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_json(value, field)
 
 
@@ -141,6 +148,7 @@ class ResourceSlotFormatter(OutputFormatter):
         value = json.loads(value)
         if mem := value.get("mem"):
             value["mem"] = humanize.naturalsize(mem, binary=True, gnu=True)
+
         return ", ".join(f"{k}:{v}" for k, v in value.items())
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
@@ -156,25 +164,28 @@ sizebytes_output_formatter = SizeBytesOutputFormatter()
 
 class AgentStatFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
-        raw_stats = json.loads(value)
+        try:
+            raw_stats = json.loads(value)
+        except TypeError:
+            return ""
 
         value_formatters = {
-            "bytes": lambda m: "{} / {}".format(
-                humanize.naturalsize(int(m["current"]), binary=True),
-                humanize.naturalsize(int(m["capacity"]), binary=True),
+            "bytes": lambda metric, binary: "{} / {}".format(
+                humanize.naturalsize(int(metric["current"]), binary, gnu=binary),
+                humanize.naturalsize(int(metric["capacity"]), binary, gnu=binary),
             ),
-            "Celsius": lambda m: "{:,} C".format(
-                float(m["current"]),
+            "Celsius": lambda metric, _: "{:,} C".format(
+                float(metric["current"]),
             ),
-            "bps": lambda m: "{}/s".format(
-                humanize.naturalsize(float(m["current"])),
+            "bps": lambda metric, _: "{}/s".format(
+                humanize.naturalsize(float(metric["current"])),
             ),
-            "pct": lambda m: "{} %".format(
-                m["pct"],
+            "pct": lambda metric, _: "{} %".format(
+                metric["pct"],
             ),
         }
 
-        def format_value(metric):
+        def format_value(metric, binary):
             formatter = value_formatters.get(
                 metric["unit_hint"],
                 lambda m: "{} / {} {}".format(
@@ -183,7 +194,7 @@ class AgentStatFormatter(OutputFormatter):
                     m["unit_hint"],
                 ),
             )
-            return formatter(metric)
+            return formatter(metric, binary)
 
         bufs = []
         node_metric_bufs = []
@@ -195,7 +206,9 @@ class AgentStatFormatter(OutputFormatter):
                 else:
                     node_metric_bufs.append(f"{stat_key}: {metric['pct']} % ({num_cores} cores)")
             else:
-                node_metric_bufs.append(f"{stat_key}: {format_value(metric)}")
+                binary = stat_key == "mem"
+                node_metric_bufs.append(f"{stat_key}: {format_value(metric, binary)}")
+
         bufs.append(", ".join(node_metric_bufs))
         dev_metric_bufs = []
         for stat_key, per_dev_metric in raw_stats["devices"].items():
@@ -205,9 +218,10 @@ class AgentStatFormatter(OutputFormatter):
                     "  - (per-core stats hidden for large CPUs with more than 8 cores)",
                 )
             else:
+                binary = stat_key == "mem"
                 for dev_id, metric in per_dev_metric.items():
                     dev_metric_bufs.append(
-                        f"  - {dev_id}: {format_value(metric)}",
+                        f"  - {dev_id}: {format_value(metric, binary)}",
                     )
         bufs.append("\n".join(dev_metric_bufs))
         return "\n".join(bufs)

@@ -92,7 +92,8 @@ async def test_allowed_session_types_check(mock_query):
     assert (
         f"The scaling group '{scaling_group}' does not exist "
         f"or you do not have access to the scaling group '{scaling_group}'."
-    ) in str(e.value)
+        in str(e.value)
+    )
 
     # No preferred scaling group with partially matching allowed sgroups
 

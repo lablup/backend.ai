@@ -15,6 +15,7 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
@@ -27,12 +28,13 @@ if TYPE_CHECKING:
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
+    Base,
     ForeignKeyIDColumn,
     Item,
     PaginatedList,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -45,6 +47,7 @@ log = BraceStyleAdapter(logging.getLogger(__file__))
 
 __all__: Sequence[str] = (
     "keypairs",
+    "KeyPairRow",
     "KeyPair",
     "KeyPairList",
     "UserInfo",
@@ -64,7 +67,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 keypairs = sa.Table(
     "keypairs",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("user_id", sa.String(length=256), index=True),
     sa.Column("access_key", sa.String(length=20), primary_key=True),
     sa.Column("secret_key", sa.String(length=40)),
@@ -81,8 +84,8 @@ keypairs = sa.Table(
     sa.Column("rate_limit", sa.Integer),
     sa.Column("num_queries", sa.Integer, server_default="0"),
     # SSH Keypairs.
-    sa.Column("ssh_public_key", sa.String(length=750), nullable=True),
-    sa.Column("ssh_private_key", sa.String(length=2000), nullable=True),
+    sa.Column("ssh_public_key", sa.Text, nullable=True),
+    sa.Column("ssh_private_key", sa.Text, nullable=True),
     ForeignKeyIDColumn("user", "users.uuid", nullable=False),
     sa.Column(
         "resource_policy",
@@ -98,6 +101,17 @@ keypairs = sa.Table(
         "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=""
     ),
 )
+
+
+class KeyPairRow(Base):
+    __table__ = keypairs
+    sessions = relationship("SessionRow", back_populates="access_key_row")
+    resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
+    scaling_groups = relationship(
+        "ScalingGroupRow",
+        secondary="sgroups_for_keypairs",
+        back_populates="keypairs",
+    )
 
 
 class UserInfo(graphene.ObjectType):
@@ -168,8 +182,9 @@ class KeyPair(graphene.ObjectType):
 
     # Deprecated
     concurrency_limit = graphene.Int(
-        deprecation_reason="Moved to KeyPairResourcePolicy object as "
-        "the max_concurrent_sessions field."
+        deprecation_reason=(
+            "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
+        )
     )
 
     async def resolve_user_info(
@@ -452,7 +467,6 @@ class ModifyKeyPairInput(graphene.InputObjectType):
 
 
 class CreateKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -530,7 +544,6 @@ class CreateKeyPair(graphene.Mutation):
 
 
 class ModifyKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -600,7 +613,6 @@ class ModifyKeyPair(graphene.Mutation):
 
 
 class DeleteKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -699,6 +711,8 @@ def generate_ssh_keypair() -> Tuple[str, str]:
         )
         .decode("utf-8")
     )
+    public_key = f"{public_key.rstrip()}\n"
+    private_key = f"{private_key.rstrip()}\n"
     return (public_key, private_key)
 
 

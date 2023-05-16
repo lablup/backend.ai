@@ -1,11 +1,14 @@
 import asyncio
 import enum
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 
-import attr
+import attrs
+from aiohttp import web
+from aiohttp.typedefs import Handler
 
-from ai.backend.common.types import ContainerId, KernelId, MountTypes
+from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.types import ContainerId, KernelId, MountTypes, SessionId
 
 
 class AgentBackend(enum.Enum):
@@ -14,21 +17,21 @@ class AgentBackend(enum.Enum):
     KUBERNETES = "kubernetes"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class VolumeInfo:
     name: str  # volume name
     container_path: str  # in-container path as str
     mode: str  # 'rw', 'ro', 'rwm'
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class MountInfo:
     mode: MountTypes
     src_path: Path
     dst_path: Path
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Port:
     host: str
     private_port: int
@@ -44,7 +47,7 @@ class ContainerStatus(str, enum.Enum):
     REMOVING = "removing"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Container:
     id: ContainerId
     status: ContainerStatus
@@ -60,12 +63,13 @@ class LifecycleEvent(int, enum.Enum):
     START = 2
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ContainerLifecycleEvent:
     kernel_id: KernelId
+    session_id: SessionId
     container_id: Optional[ContainerId]
     event: LifecycleEvent
-    reason: str
+    reason: KernelLifecycleEventReason
     done_future: Optional[asyncio.Future] = None
     exit_code: Optional[int] = None
     suppress_events: bool = False
@@ -76,9 +80,15 @@ class ContainerLifecycleEvent:
         else:
             cid = "unknown"
         return (
-            f"LifecycleEvent("
+            "LifecycleEvent("
             f"{self.event.name}, "
             f"k:{self.kernel_id}, "
             f"c:{cid}, "
             f"reason:{self.reason!r})"
         )
+
+
+WebMiddleware = Callable[
+    [web.Request, Handler],
+    Awaitable[web.StreamResponse],
+]

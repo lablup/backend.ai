@@ -46,14 +46,14 @@ _keepalive_options: MutableMapping[int, int] = {}
 
 # macOS does not support several TCP_ options
 # so check if socket package includes TCP options before adding it
-if hasattr(socket, "TCP_KEEPIDLE"):
-    _keepalive_options[socket.TCP_KEEPIDLE] = 20
+if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
+    _keepalive_options[_TCP_KEEPIDLE] = 20
 
-if hasattr(socket, "TCP_KEEPINTVL"):
-    _keepalive_options[socket.TCP_KEEPINTVL] = 5
+if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
+    _keepalive_options[_TCP_KEEPINTVL] = 5
 
-if hasattr(socket, "TCP_KEEPCNT"):
-    _keepalive_options[socket.TCP_KEEPCNT] = 3
+if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
+    _keepalive_options[_TCP_KEEPCNT] = 3
 
 
 _default_conn_opts: Mapping[str, Any] = {
@@ -66,7 +66,7 @@ _default_conn_opts: Mapping[str, Any] = {
 
 _scripts: Dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ConnectionNotAvailable(Exception):
@@ -246,7 +246,7 @@ async def execute(
                     aw_or_pipe = func(r)
                 else:
                     raise TypeError(
-                        "The func must be a function or a coroutinefunction " "with no arguments."
+                        "The func must be a function or a coroutinefunction with no arguments."
                     )
                 if isinstance(aw_or_pipe, Pipeline):
                     result = await aw_or_pipe.execute()
@@ -364,7 +364,7 @@ async def read_stream(
                     block=block_timeout,
                 ),
             )
-            if reply is None:
+            if not reply:
                 continue
             # Keep some latest messages so that other manager
             # processes to have chances of fetching them.

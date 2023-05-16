@@ -9,55 +9,55 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.12.1\n"
 
-#: ../../client/func/config.rst:2 0b5c3189d9d245ba8423f28cfbb62f2d
+#: ../../client/func/config.rst:2 54e97f2795e24ca2ab2f0eae1ec06f9a
 msgid "Configuration"
 msgstr ""
 
-#: 9182a38d25364bb48ca2f6ff827362f9 ai.backend.client.config.get_env:1 of
+#: 734169f081364489b2df16e873cca59c ai.backend.client.config.get_env:1 of
 msgid ""
-"Retrieves a configuration value from the environment variables. The given "
-"*key* is uppercased and prefixed by ``\"BACKEND_\"`` and then ``\"SORNA_\"`` "
-"if the former does not exist."
+"Retrieves a configuration value from the environment variables. The given"
+" *key* is uppercased and prefixed by ``\"BACKEND_\"`` and then "
+"``\"SORNA_\"`` if the former does not exist."
 msgstr ""
 
-#: 01944912c4fc4603844ddfd18a3dc691 43c5d9ecd80546d0808a132c0115fd4a
+#: 0d022ab44ae241bcb22ecec3da494a5e 67cfa3a7b9864282af1d1921a8ddae9e
 #: ai.backend.client.config.APIConfig ai.backend.client.config.get_env of
 msgid "Parameters"
 msgstr ""
 
-#: ai.backend.client.config.get_env:6 c730484ed6be4955a9284b948d65432d of
+#: 7851e8edbed24381ba04e7d7d21b0a40 ai.backend.client.config.get_env:6 of
 msgid "The key name."
 msgstr ""
 
-#: 5f87a802ad3b4fa8af551c314e7b7ad2 ai.backend.client.config.get_env:8 of
+#: 23c2247102dc47bc9aabbf1088645d88 ai.backend.client.config.get_env:8 of
 msgid ""
 "The default value returned when there is no corresponding environment "
 "variable."
 msgstr ""
 
-#: abbb564592324af1912ec72b61a292d3 ai.backend.client.config.get_env:11 of
+#: 6bc650add97c431c93419efc1a8bc398 ai.backend.client.config.get_env:11 of
 msgid ""
-"A single-argument function that is applied to the result of lookup (in both "
-"successes and the default value for failures). The default is returning the "
-"value as-is."
+"A single-argument function that is applied to the result of lookup (in "
+"both successes and the default value for failures). The default is "
+"returning the value as-is."
 msgstr ""
 
-#: 0d22cd201bc84687a2834dd9725ee3aa 403ee88926794ed0b93bc613221c2722
-#: 49f941ab36fc4ccdbc1a8ad6b3c71b30 4e1b4442dfed4af99a2eb386befd6f7d
-#: 51818f00221f48bb854ef17c3344fe96 53618de7af03430f9adb2de65101f66b
-#: 5b9364f8ad76410c8e1ef65f24d78b4e 5cc37f8dcd564f3fad2e2d94162408d0
-#: 78b1bf3e6f2e47f9b3fb688a18a23fb7 7bb32073efd64b8c9030c89c210d18af
-#: 87395ea23aec4c47b0d794659c1fabbe 9035ce80733642698c1ef3b47c56f8cc
-#: a8ab610958984710be9f2e17f72d7f26 adcaa6edebec467fba45f0b805fdd4e4
+#: 0be7fd81cfe24bd88f345e87c787a7d0 17c6565c31f94a2f82cfe6d86dce2455
+#: 21e1f28e5b4046059c8d5a3781d22851 2e7347fe5e3243939bdb7f06aec67518
+#: 3c94887fadc94defb6996493cc74f18b 49c7a35f66e74e9db1cdabc4e212fcba
+#: 52821fc3a77043ce987ee6e728a4ac57 5deb5516ca554965a0ec7832afca1953
+#: 61b0572f47ba449ab13220cd16323a0f 75b1eb93bc5240f894cef9682078e240
+#: 7a3727b00b3a432ba3108ca5a8273ea1 89ee3892bbd74ef3910ce1fe4c9a3cc6
+#: 989cd7ea8cb941e6abae15498a8454b0
 #: ai.backend.client.config.APIConfig.access_key
 #: ai.backend.client.config.APIConfig.announcement_handler
 #: ai.backend.client.config.APIConfig.connection_timeout
@@ -74,129 +74,141 @@ msgstr ""
 #: ai.backend.client.config.APIConfig.user_agent
 #: ai.backend.client.config.APIConfig.version
 #: ai.backend.client.config.APIConfig.vfolder_mounts
-#: ai.backend.client.config.get_env b2935181c8dd4a90be1940cf3f60b6b0
-#: d1bcc387e7b448959134eb80a5dc4a30 de27219c19dc42718bed1206b0de54f5 of
+#: ai.backend.client.config.get_config ai.backend.client.config.get_env
+#: ai.backend.client.config.set_config b2a9c409927647ce99c38de419863125
+#: c78abfb1ff2740cf8659ac7f24453457 cadedb89cf13488ba76dc5b7d810adaa
+#: d393e3cdb0ff4873b3829f1df0be4dd1 dad42654c71e4edc9448fb4d25e13da3
+#: f617107f451645f2af333cd24fd69499 of
 msgid "Return type"
 msgstr ""
 
-#: ai.backend.client.config.get_env b69c6bd4aadb490f9040f89d1eb42e97 of
+#: 7976f20c243549faa8aea0a285e15ed4 ai.backend.client.config.get_env of
 msgid "Returns"
 msgstr ""
 
-#: 852aaf2516eb4d26a6d130ec2b08b0bf ai.backend.client.config.get_env:16 of
+#: a00f63303b8c40f4bf80849798ac8071 ai.backend.client.config.get_env:16 of
 msgid "The value processed by the *clean* function."
 msgstr ""
 
-#: ai.backend.client.config.get_config:1 fa63be35d0754dc3bbbec430de9e199c of
+#: ai.backend.client.config.get_config:1 fa0002f9d6244cb6a3bc291f7436151b of
 msgid ""
-"Returns the configuration for the current process. If there is no explicitly "
-"set :class:`APIConfig` instance, it will generate a new one from the current "
-"environment variables and defaults."
+"Returns the configuration for the current process. If there is no "
+"explicitly set :class:`APIConfig` instance, it will generate a new one "
+"from the current environment variables and defaults."
 msgstr ""
 
-#: 166497b031634a6898c5fb97c81e3892 ai.backend.client.config.set_config:1 of
+#: ai.backend.client.config.get_config:7 c7415a8d118043c4a1d7dee4c51482bb of
+msgid ":py:class:`~ai.backend.client.config.APIConfig`"
+msgstr ""
+
+#: 1061dc2f3a0d4386910b0aeba34d851f ai.backend.client.config.set_config:1 of
 msgid "Sets the configuration used throughout the current process."
 msgstr ""
 
-#: 23d8a6f7a508494f8782c10fa8445ee6 ai.backend.client.config.APIConfig:1 of
-msgid ""
-"Represents a set of API client configurations. The access key and secret key "
-"are mandatory -- they must be set in either environment variables or as the "
-"explicit arguments."
+#: a0b36069293b4c6ca9f1318431e594d3 ai.backend.client.config.set_config:4 of
+msgid ":py:obj:`None`"
 msgstr ""
 
-#: 860ffb1a1a8b4a1d9f993d54cf6fafd5 ai.backend.client.config.APIConfig:6 of
+#: 5b0600fcef0e462d9763e2acf0713108 ai.backend.client.config.APIConfig:1 of
+msgid ""
+"Represents a set of API client configurations. The access key and secret "
+"key are mandatory -- they must be set in either environment variables or "
+"as the explicit arguments."
+msgstr ""
+
+#: 60917ffd516d4594bf43ce3971a891e5 ai.backend.client.config.APIConfig:6 of
 msgid ""
 "The URL prefix to make API requests via HTTP/HTTPS. If this is given as "
-"``str`` and contains multiple URLs separated by comma, the underlying HTTP "
-"request-response facility will perform client-side load balancing and "
-"automatic fail-over using them, assuming that all those URLs indicates a "
-"single, same cluster. The users of the API and CLI will get network "
-"connection errors only when all of the given endpoints fail -- intermittent "
-"failures of a subset of endpoints will be hidden with a little increased "
-"latency."
+"``str`` and contains multiple URLs separated by comma, the underlying "
+"HTTP request-response facility will perform client-side load balancing "
+"and automatic fail-over using them, assuming that all those URLs "
+"indicates a single, same cluster. The users of the API and CLI will get "
+"network connection errors only when all of the given endpoints fail -- "
+"intermittent failures of a subset of endpoints will be hidden with a "
+"little increased latency."
 msgstr ""
 
-#: a0886f76e9ba4ba4a4328e9191a8b232 ai.backend.client.config.APIConfig:15 of
+#: 51027fd62d3c48b19d715d50e7415fc7 ai.backend.client.config.APIConfig:15 of
 msgid ""
-"Either ``\"api\"`` or ``\"session\"``. If the endpoint type is ``\"api\"`` "
-"(the default if unspecified), it uses the access key and secret key in the "
-"configuration to access the manager API server directly. If the endpoint "
-"type is ``\"session\"``, it assumes the endpoint is a Backend.AI console "
-"server which provides cookie-based authentication with username and "
-"password. In the latter, users need to use ``backend.ai login`` and "
-"``backend.ai logout`` to manage their sign-in status, or the API equivalent "
-"in :meth:`~ai.backend.client.auth.Auth.login` and :meth:`~ai.backend.client."
-"auth.Auth.logout` methods."
+"Either ``\"api\"`` or ``\"session\"``. If the endpoint type is "
+"``\"api\"`` (the default if unspecified), it uses the access key and "
+"secret key in the configuration to access the manager API server "
+"directly. If the endpoint type is ``\"session\"``, it assumes the "
+"endpoint is a Backend.AI console server which provides cookie-based "
+"authentication with username and password. In the latter, users need to "
+"use ``backend.ai login`` and ``backend.ai logout`` to manage their sign-"
+"in status, or the API equivalent in "
+":meth:`~ai.backend.client.auth.Auth.login` and "
+":meth:`~ai.backend.client.auth.Auth.logout` methods."
 msgstr ""
 
-#: 742d27f039d04e08a387765dd4b48c4c ai.backend.client.config.APIConfig:25 of
+#: ai.backend.client.config.APIConfig:25 de69525e81984d80aab394db668b9d1f of
 msgid "The API protocol version."
 msgstr ""
 
-#: 7d5a65acf48f4685ab1187dbe3f6b273 ai.backend.client.config.APIConfig:27 of
+#: ai.backend.client.config.APIConfig:27 ba955111c7a4425c8a2b3eb7c177f1c4 of
 msgid ""
 "A custom user-agent string which is sent to the API server as a ``User-"
 "Agent`` HTTP header."
 msgstr ""
 
-#: 2bd22c55db6c4996a02eb25d9337e316 ai.backend.client.config.APIConfig:30 of
+#: 07820034688d488e944d6889a9d61ecb ai.backend.client.config.APIConfig:30 of
 msgid ""
 "The API access key.  If deliberately set to an empty string, the API "
 "requests will be made without signatures (anonymously)."
 msgstr ""
 
-#: ai.backend.client.config.APIConfig:33 da6f98629e5b457aa863a54e1d9bbe90 of
+#: a73f9d669e0840e9a1cf577cab566f3c ai.backend.client.config.APIConfig:33 of
 msgid "The API secret key."
 msgstr ""
 
-#: 83627b0b74ea4f898a2f881b3ff9bba6 ai.backend.client.config.APIConfig:35 of
+#: 598432b193a142209c7596cbb90b3170 ai.backend.client.config.APIConfig:35 of
 msgid "The hash type to generate per-request authentication signatures."
 msgstr ""
 
-#: 53fc73c81c3d4beba731334f79caaf4d ai.backend.client.config.APIConfig:38 of
+#: 4e3f233fff79488bb3994bbfe441c88e ai.backend.client.config.APIConfig:38 of
 msgid ""
 "A list of vfolder names (that must belong to the given access key) to be "
-"automatically mounted upon any :func:`Kernel.get_or_create() <ai.backend."
-"client.kernel.Kernel.get_or_create>` calls."
+"automatically mounted upon any :func:`Kernel.get_or_create() "
+"<ai.backend.client.kernel.Kernel.get_or_create>` calls."
 msgstr ""
 
-#: ../../docstring 73c74b216f6f49ef85ef6b86c4b87335
+#: ../../docstring 45db8e85319a4f9bb8b9a513a6f657cb
 #: ai.backend.client.config.APIConfig.DEFAULTS:1 of
 msgid ""
-"The default values for config parameterse settable via environment variables "
-"xcept the access and secret keys."
+"The default values for config parameters settable via environment "
+"variables except the access and secret keys."
 msgstr ""
 
 #: ai.backend.client.config.APIConfig.endpoint:1
-#: b7ac66b2ac944ad5b97ee6f1e16a76b7 of
+#: ef7c1569614f4cf3b2abdf7d937ae42a of
 msgid ""
 "The currently active endpoint URL. This may change if there are multiple "
 "configured endpoints and the current one is not accessible."
 msgstr ""
 
-#: ai.backend.client.config.APIConfig.endpoint:6
-#: b084df45767b455a99de7746b75c6471 of
+#: 24fc266801b64aaf87eba21e2fc09825
+#: ai.backend.client.config.APIConfig.endpoint:6 of
 msgid ":py:class:`~yarl.URL`"
 msgstr ""
 
-#: 3d6141e40bc44333b3899bafae5251b5
+#: 1b97ab03a5df43238efa8652eb606919
 #: ai.backend.client.config.APIConfig.endpoints:1 of
 msgid "All configured endpoint URLs."
 msgstr ""
 
 #: ai.backend.client.config.APIConfig.endpoints:4
-#: d5c380d0f94f4aba87dbd5190175bb8d of
+#: f1e86aeb799d4d4aa444e34c5e8a80ec of
 msgid ":py:class:`~typing.Sequence`\\[:py:class:`~yarl.URL`]"
 msgstr ""
 
-#: 078bb7d70f9040f4a9aea767d797940a
-#: ai.backend.client.config.APIConfig.endpoint_type:1 of
+#: ai.backend.client.config.APIConfig.endpoint_type:1
+#: eb1f30ccd16142d8b226e3f676bc7624 of
 msgid "The configured endpoint type."
 msgstr ""
 
-#: 0f060dcb8044486d8f4f4b62312fa205 230189193ffa4c4b95354307f029511c
-#: 9d1ee2071a5d41eebc682fe266218428 a8c687fbac394ce2a101379e09b19c98
+#: 185a560805dc4dadbe850927d6c279bb 715140524283462b85e4cc938ab7b75f
+#: 846012d7dba0428284b0251f9374d495 8ae89fbfcd724d3a84efe40b2f4eed52
 #: ai.backend.client.config.APIConfig.access_key:4
 #: ai.backend.client.config.APIConfig.domain:4
 #: ai.backend.client.config.APIConfig.endpoint_type:4
@@ -205,102 +217,314 @@ msgstr ""
 #: ai.backend.client.config.APIConfig.secret_key:4
 #: ai.backend.client.config.APIConfig.user_agent:4
 #: ai.backend.client.config.APIConfig.version:4
-#: b4bd4daaa1b14a66912f1d6f4643948d b7a923ef64fc4628be000e4438f0bc28
-#: db76f5ea27574e0b98e0fbbb8548faa5 de1c9f320ebb41cc8785658103b23292 of
+#: b155e46eb8074e47a27ef08003f296ae c957b8fd12304da58d91e74d2d0f6f91
+#: ed23ebd8f5aa4df4a84c5dd48bbcd669 fa062310d84343e998cf289746765bf5 of
 msgid ":py:class:`str`"
 msgstr ""
 
-#: ai.backend.client.config.APIConfig.domain:1 d762d8b9bcdc41e1aa486ded2f7c81ad
+#: 3fa983cd191d416c9c1dddfeb7670533 ai.backend.client.config.APIConfig.domain:1
 #: of
 msgid "The configured domain."
 msgstr ""
 
-#: ai.backend.client.config.APIConfig.group:1 f6048aecf2384cc593ccb6e8b8724122
+#: 935ddd609f1749e89b8892b62ee5cec7 ai.backend.client.config.APIConfig.group:1
 #: of
 msgid "The configured group."
 msgstr ""
 
-#: 7e81e04dde234851b6476e30bebafd18
-#: ai.backend.client.config.APIConfig.storage_proxy_address_map:1 of
+#: ai.backend.client.config.APIConfig.storage_proxy_address_map:1
+#: ecc793b7e6834c7882d620fb47da86a9 of
 msgid "The storage proxy address map for overriding."
 msgstr ""
 
-#: 41e3df7680e44d9585329a56f1241e90
+#: 58bcc0d1a8074138b858790f46a0f545
 #: ai.backend.client.config.APIConfig.storage_proxy_address_map:4 of
 msgid ":py:class:`~typing.Mapping`\\[:py:class:`str`, :py:class:`str`]"
 msgstr ""
 
-#: 264bfb0e3c3344f8a6d4f740fb21f12d
+#: 775b3752609b4984be387dfc4efd57b2
 #: ai.backend.client.config.APIConfig.user_agent:1 of
 msgid "The configured user agent string."
 msgstr ""
 
-#: 2ca05c8fbcef44a7b2ea419343e7041a
+#: 1cc9ab1944d643c5b376c2e226a13e56
 #: ai.backend.client.config.APIConfig.access_key:1 of
 msgid "The configured API access key."
 msgstr ""
 
-#: ai.backend.client.config.APIConfig.secret_key:1
-#: daf6f829711f48299d7b8f2e553736cc of
+#: 9c5bc49bc0584b92becc495d84028aa9
+#: ai.backend.client.config.APIConfig.secret_key:1 of
 msgid "The configured API secret key."
 msgstr ""
 
-#: 4401d63aae9c456ebd35d78999dc9577
-#: ai.backend.client.config.APIConfig.version:1 of
+#: ai.backend.client.config.APIConfig.version:1
+#: bc02eb112d0f49169a12dd6c1d9e0270 of
 msgid "The configured API protocol version."
 msgstr ""
 
-#: 6cd8bbce2691470990cfada3be0a0d4b
+#: 95a45b9af05441b79527d4fa0aa2e91c
 #: ai.backend.client.config.APIConfig.hash_type:1 of
 msgid "The configured hash algorithm for API authentication signatures."
 msgstr ""
 
 #: ai.backend.client.config.APIConfig.vfolder_mounts:1
-#: c1d5e7b5ce6841f98ca3c85bb2e02b8f of
+#: f7bcab2260c840dcabdbb52e64fa5efe of
 msgid "The configured auto-mounted vfolder list."
 msgstr ""
 
-#: 1e2c2c3990154bd2afd7f31cbab16a94
+#: 1dd16ac988884ccdbdadc51256e75b18
 #: ai.backend.client.config.APIConfig.vfolder_mounts:4 of
 msgid ":py:class:`~typing.Sequence`\\[:py:class:`str`]"
 msgstr ""
 
-#: ai.backend.client.config.APIConfig.skip_sslcert_validation:1
-#: c152e4831af64b15916f9b9d1e21b03f of
+#: 75b2da41f0ee467a88071e8a260a67f9
+#: ai.backend.client.config.APIConfig.skip_sslcert_validation:1 of
 msgid "Whether to skip SSL certificate validation for the API gateway."
 msgstr ""
 
 #: ai.backend.client.config.APIConfig.skip_sslcert_validation:4
-#: c822b566c1d54dc2bdc4d65f388a843d of
+#: d05bee887b284d709420b0d03cac145a of
 msgid ":py:class:`bool`"
 msgstr ""
 
-#: 0ecd7bc88cda429985293a0c9d21fbbf
-#: ai.backend.client.config.APIConfig.connection_timeout:1 of
+#: ai.backend.client.config.APIConfig.connection_timeout:1
+#: f9dd5031614a4588a6e2115f627bf82b of
 msgid "The maximum allowed duration for making TCP connections to the server."
 msgstr ""
 
+#: 87129f34896549fb97d522dfe8530d86
 #: ai.backend.client.config.APIConfig.connection_timeout:4
 #: ai.backend.client.config.APIConfig.read_timeout:4
-#: d286c4443c1e4358a840ad6a8f6ad8a5 fc9a91e9ed244982a46b825cc1c4408b of
+#: cecb5ebaf6ce4ba780f179e77ff2a07f of
 msgid ":py:class:`float`"
 msgstr ""
 
-#: 92ffb64855574f618ac840a9731a6446
-#: ai.backend.client.config.APIConfig.read_timeout:1 of
+#: ai.backend.client.config.APIConfig.read_timeout:1
+#: b0755dfce2134523afe44b3b56bf6d0c of
 msgid ""
-"The maximum allowed waiting time for the first byte of the response from the "
-"server."
+"The maximum allowed waiting time for the first byte of the response from "
+"the server."
 msgstr ""
 
-#: 2e54aaf527cc49cb979e629a3e17df2a
+#: 0d1ea3588dc24ef699bc43b4ce149fbd
 #: ai.backend.client.config.APIConfig.announcement_handler:1 of
 msgid "The announcement handler to display server-set announcements."
 msgstr ""
 
-#: 614f033b746b4b92858d631f9db292d7
+#: 4c3a8e83187243dc8843e8567fbe4f8c
 #: ai.backend.client.config.APIConfig.announcement_handler:4 of
 msgid ""
-":py:data:`~typing.Optional`\\[:py:data:`~typing.Callable`\\[\\[:py:class:"
-"`str`], :py:obj:`None`], :py:obj:`None`]"
+":py:data:`~typing.Optional`\\[:py:data:`~typing.Callable`\\[\\[:py:class:`str`],"
+" :py:obj:`None`], :py:obj:`None`]"
 msgstr ""
+
+#~ msgid ""
+#~ "Retrieves a configuration value from the"
+#~ " environment variables. The given *key* "
+#~ "is uppercased and prefixed by "
+#~ "``\"BACKEND_\"`` and then ``\"SORNA_\"`` if"
+#~ " the former does not exist."
+#~ msgstr ""
+
+#~ msgid "Parameters"
+#~ msgstr ""
+
+#~ msgid "The key name."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The default value returned when there"
+#~ " is no corresponding environment variable."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A single-argument function that is "
+#~ "applied to the result of lookup "
+#~ "(in both successes and the default "
+#~ "value for failures). The default is "
+#~ "returning the value as-is."
+#~ msgstr ""
+
+#~ msgid "Return type"
+#~ msgstr ""
+
+#~ msgid "Returns"
+#~ msgstr ""
+
+#~ msgid "The value processed by the *clean* function."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns the configuration for the "
+#~ "current process. If there is no "
+#~ "explicitly set :class:`APIConfig` instance, it"
+#~ " will generate a new one from "
+#~ "the current environment variables and "
+#~ "defaults."
+#~ msgstr ""
+
+#~ msgid "Sets the configuration used throughout the current process."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Represents a set of API client "
+#~ "configurations. The access key and "
+#~ "secret key are mandatory -- they "
+#~ "must be set in either environment "
+#~ "variables or as the explicit arguments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The URL prefix to make API "
+#~ "requests via HTTP/HTTPS. If this is "
+#~ "given as ``str`` and contains multiple"
+#~ " URLs separated by comma, the "
+#~ "underlying HTTP request-response facility "
+#~ "will perform client-side load balancing"
+#~ " and automatic fail-over using them,"
+#~ " assuming that all those URLs "
+#~ "indicates a single, same cluster. The"
+#~ " users of the API and CLI will"
+#~ " get network connection errors only "
+#~ "when all of the given endpoints "
+#~ "fail -- intermittent failures of a "
+#~ "subset of endpoints will be hidden "
+#~ "with a little increased latency."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Either ``\"api\"`` or ``\"session\"``. If "
+#~ "the endpoint type is ``\"api\"`` (the"
+#~ " default if unspecified), it uses the"
+#~ " access key and secret key in "
+#~ "the configuration to access the manager"
+#~ " API server directly. If the endpoint"
+#~ " type is ``\"session\"``, it assumes "
+#~ "the endpoint is a Backend.AI console "
+#~ "server which provides cookie-based "
+#~ "authentication with username and password. "
+#~ "In the latter, users need to use"
+#~ " ``backend.ai login`` and ``backend.ai "
+#~ "logout`` to manage their sign-in "
+#~ "status, or the API equivalent in "
+#~ ":meth:`~ai.backend.client.auth.Auth.login` and "
+#~ ":meth:`~ai.backend.client.auth.Auth.logout` methods."
+#~ msgstr ""
+
+#~ msgid "The API protocol version."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A custom user-agent string which "
+#~ "is sent to the API server as "
+#~ "a ``User-Agent`` HTTP header."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The API access key.  If deliberately "
+#~ "set to an empty string, the API"
+#~ " requests will be made without "
+#~ "signatures (anonymously)."
+#~ msgstr ""
+
+#~ msgid "The API secret key."
+#~ msgstr ""
+
+#~ msgid "The hash type to generate per-request authentication signatures."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A list of vfolder names (that must"
+#~ " belong to the given access key) "
+#~ "to be automatically mounted upon any "
+#~ ":func:`Kernel.get_or_create() "
+#~ "<ai.backend.client.kernel.Kernel.get_or_create>` calls."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The default values for config "
+#~ "parameterse settable via environment variables"
+#~ " xcept the access and secret keys."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The currently active endpoint URL. This"
+#~ " may change if there are multiple "
+#~ "configured endpoints and the current one"
+#~ " is not accessible."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~yarl.URL`"
+#~ msgstr ""
+
+#~ msgid "All configured endpoint URLs."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~typing.Sequence`\\[:py:class:`~yarl.URL`]"
+#~ msgstr ""
+
+#~ msgid "The configured endpoint type."
+#~ msgstr ""
+
+#~ msgid ":py:class:`str`"
+#~ msgstr ""
+
+#~ msgid "The configured domain."
+#~ msgstr ""
+
+#~ msgid "The configured group."
+#~ msgstr ""
+
+#~ msgid "The storage proxy address map for overriding."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~typing.Mapping`\\[:py:class:`str`, :py:class:`str`]"
+#~ msgstr ""
+
+#~ msgid "The configured user agent string."
+#~ msgstr ""
+
+#~ msgid "The configured API access key."
+#~ msgstr ""
+
+#~ msgid "The configured API secret key."
+#~ msgstr ""
+
+#~ msgid "The configured API protocol version."
+#~ msgstr ""
+
+#~ msgid "The configured hash algorithm for API authentication signatures."
+#~ msgstr ""
+
+#~ msgid "The configured auto-mounted vfolder list."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~typing.Sequence`\\[:py:class:`str`]"
+#~ msgstr ""
+
+#~ msgid "Whether to skip SSL certificate validation for the API gateway."
+#~ msgstr ""
+
+#~ msgid ":py:class:`bool`"
+#~ msgstr ""
+
+#~ msgid "The maximum allowed duration for making TCP connections to the server."
+#~ msgstr ""
+
+#~ msgid ":py:class:`float`"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The maximum allowed waiting time for "
+#~ "the first byte of the response "
+#~ "from the server."
+#~ msgstr ""
+
+#~ msgid "The announcement handler to display server-set announcements."
+#~ msgstr ""
+
+#~ msgid ""
+#~ ":py:data:`~typing.Optional`\\[:py:data:`~typing.Callable`\\[\\[:py:class:`str`],"
+#~ " :py:obj:`None`], :py:obj:`None`]"
+#~ msgstr ""
+

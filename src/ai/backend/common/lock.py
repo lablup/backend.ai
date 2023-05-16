@@ -28,7 +28,7 @@ from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):
@@ -46,7 +46,6 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
 
 
 class FileLock(AbstractDistributedLock):
-
     default_timeout: float = 3  # not allow infinite timeout for safety
 
     _file: IOBase | None
@@ -84,7 +83,7 @@ class FileLock(AbstractDistributedLock):
         assert not self._locked
         if not self._path.exists():
             self._path.touch()
-        self._file = open(self._path, "rb")
+        self._file = open(self._path, "wb")
         stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
         try:
             async for attempt in AsyncRetrying(
@@ -115,8 +114,11 @@ class FileLock(AbstractDistributedLock):
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
         self._file.close()
-        if self._locked and self._remove_when_unlock:
-            self._path.unlink()
+        if self._remove_when_unlock:
+            try:
+                self._path.unlink()
+            except FileNotFoundError:
+                pass
         self._file = None
 
     async def __aenter__(self) -> FileLock:
@@ -142,7 +144,6 @@ class FileLock(AbstractDistributedLock):
 
 
 class EtcdLock(AbstractDistributedLock):
-
     _con_mgr: Optional[EtcdConnectionManager]
     _debug: bool
 
@@ -191,7 +192,6 @@ class EtcdLock(AbstractDistributedLock):
 
 
 class RedisLock(AbstractDistributedLock):
-
     debug: bool
     _redis: Redis
     _timeout: Optional[float]

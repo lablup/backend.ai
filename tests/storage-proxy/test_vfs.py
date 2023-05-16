@@ -78,7 +78,7 @@ async def test_vfs_clone(vfs):
     (vfpath1 / "test.txt").write_bytes(b"12345")
     (vfpath1 / "inner").mkdir()
     (vfpath1 / "inner" / "hello.txt").write_bytes(b"678")
-    await vfs.clone_vfolder(vfid1, vfs, vfid2)
+    await vfs.clone_vfolder(vfid1, vfid2)
     assert vfpath2.is_dir()
     assert (vfpath2 / "test.txt").is_file()
     assert (vfpath2 / "inner").is_dir()

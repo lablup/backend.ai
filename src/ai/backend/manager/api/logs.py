@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 
 import aiohttp_cors
-import attr
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -31,7 +31,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class DoLogCleanupEvent(EmptyEventArgs, AbstractEvent):
@@ -224,8 +224,10 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
     except ValueError:
         lifetime = dt.timedelta(days=90)
         log.warning(
-            "Failed to parse the error log retention period ({}) read from etcd; "
-            "falling back to 90 days",
+            (
+                "Failed to parse the error log retention period ({}) read from etcd; "
+                "falling back to 90 days"
+            ),
             raw_lifetime,
         )
     boundary = datetime.now() - lifetime
@@ -236,7 +238,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
             log.info("Cleaned up {} log(s) filed before {}", result.rowcount, boundary)
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     log_cleanup_timer: GlobalTimer
     log_cleanup_timer_redis: RedisConnectionInfo

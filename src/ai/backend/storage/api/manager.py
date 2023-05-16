@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Iterator, List
+from typing import Awaitable, Callable, Iterator, List, cast
 from uuid import UUID
 
 import attr
@@ -21,11 +21,11 @@ from ai.backend.storage.exception import ExecutionError
 
 from ..abc import AbstractVolume
 from ..context import Context
-from ..exception import InvalidSubpathError, VFolderNotFoundError
+from ..exception import InvalidSubpathError, StorageProxyError, VFolderNotFoundError
 from ..types import VFolderCreationOptions
 from ..utils import check_params, log_manager_api_entry
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @web.middleware
@@ -33,13 +33,22 @@ async def token_auth_middleware(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> web.StreamResponse:
-    token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
-    if not token:
-        raise web.HTTPForbidden()
-    ctx: Context = request.app["ctx"]
-    if token != ctx.local_config["api"]["manager"]["secret"]:
-        raise web.HTTPForbidden()
+    skip_token_check = getattr(handler, "skip_token_check", False)
+    if not skip_token_check:
+        token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
+        if not token:
+            raise web.HTTPForbidden()
+        ctx: Context = request.app["ctx"]
+        if token != ctx.local_config["api"]["manager"]["secret"]:
+            raise web.HTTPForbidden()
     return await handler(request)
+
+
+def skip_token_check(
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
+    setattr(handler, "skip_token_check", True)
+    return handler
 
 
 async def get_status(request: web.Request) -> web.Response:
@@ -162,7 +171,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
             {
                 t.Key("src_volume"): t.String(),
                 t.Key("src_vfid"): tx.UUID(),
-                t.Key("dst_volume"): t.String(),
+                t.Key("dst_volume"): t.String() | t.Null,
                 t.Key("dst_vfid"): tx.UUID(),
                 t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
@@ -170,13 +179,13 @@ async def clone_vfolder(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "clone_vfolder", params)
         ctx: Context = request.app["ctx"]
+        if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
+            raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
         async with ctx.get_volume(params["src_volume"]) as src_volume:
-            async with ctx.get_volume(params["dst_volume"]) as dst_volume:
-                await src_volume.clone_vfolder(
-                    params["src_vfid"],
-                    dst_volume,
-                    params["dst_vfid"],
-                )
+            await src_volume.clone_vfolder(
+                params["src_vfid"],
+                params["dst_vfid"],
+            )
         return web.Response(status=204)
 
 
@@ -242,7 +251,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
             metric = await volume.get_performance_metric()
             return web.json_response(
                 {
-                    "metric": attr.asdict(metric),
+                    "metric": attr.asdict(cast(attr.AttrsInstance, metric)),
                 },
             )
 
@@ -365,6 +374,42 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                     {
                         "file_count": usage.file_count,
                         "used_bytes": usage.used_bytes,
+                    },
+                )
+        except ExecutionError:
+            return web.Response(
+                status=500,
+                reason="Storage server is busy. Please try again",
+            )
+
+
+@skip_token_check
+async def status(request: web.Request) -> web.Response:
+    return web.json_response(
+        {
+            "status": "ok",
+        },
+    )
+
+
+async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+                t.Key("vfid"): tx.UUID(),
+            },
+        ),
+    ) as params:
+        try:
+            await log_manager_api_entry(log, "get_vfolder_used_bytes", params)
+            ctx: Context = request.app["ctx"]
+            async with ctx.get_volume(params["volume"]) as volume:
+                usage = await volume.get_used_bytes(params["vfid"])
+                return web.json_response(
+                    {
+                        "used_bytes": usage,
                     },
                 )
         except ExecutionError:
@@ -642,6 +687,7 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/volume/quota", get_quota)
     app.router.add_route("PATCH", "/volume/quota", set_quota)
     app.router.add_route("GET", "/folder/usage", get_vfolder_usage)
+    app.router.add_route("GET", "/folder/used-bytes", get_vfolder_used_bytes)
     app.router.add_route("GET", "/folder/fs-usage", get_vfolder_fs_usage)
     app.router.add_route("POST", "/folder/file/mkdir", mkdir)
     app.router.add_route("POST", "/folder/file/list", list_files)
@@ -651,4 +697,5 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+    app.router.add_route("GET", "/status", status)
     return app
