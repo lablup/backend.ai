@@ -1,7 +1,7 @@
 """add a new session type INFERENCE
 
 Revision ID: b5be363ab05c
-Revises: cace152eefac
+Revises: b6b884fbae1f
 Create Date: 2023-02-15 15:24:29.112938
 
 Reference: https://www.postgresql.org/message-id/CANu8FiwwBxZZGX23=Na_7bc4DZ-yzd_poKhaoPmN3+SHG08MAg@mail.gmail.com
@@ -16,7 +16,7 @@ from ai.backend.common.types import SessionTypes
 
 # revision identifiers, used by Alembic.
 revision = "b5be363ab05c"
-down_revision = "cace152eefac"
+down_revision = "b6b884fbae1f"
 branch_labels = None
 depends_on = None
 
