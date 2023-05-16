@@ -52,6 +52,36 @@ local_config_iv = (
                     t.Key("aiomonitor-port", default=48300): t.Int[1:65535],
                 },
             ),
+            t.Key("filebrowser"): t.Dict(
+                {
+                    t.Key("image"): t.String,
+                    t.Key("service_ip"): t.IP,
+                    t.Key("service_port", default=None): t.Int,
+                    t.Key("port_range", default="4000-5000"): t.String,
+                    t.Key("settings_path", default=None): tx.Path(type="dir"),
+                    t.Key("mount_path", default=None): tx.Path(type="dir"),
+                    t.Key("db_path", default=None): tx.Path(
+                        type="file",
+                        allow_nonexisting=True,
+                        allow_devnull=True,
+                    ),
+                    t.Key(
+                        "filebrowser_key",
+                    ): t.String,
+                    t.Key("max_cpu", default=1): t.Int[1:_max_cpu_count],
+                    t.Key("max_mem", default="1g"): tx.BinarySize,
+                    t.Key("max_containers", default=32): t.Int[1:],
+                    t.Key("user_id", default=None): tx.UserID(
+                        default_uid=_file_perm.st_uid,
+                    ),
+                    t.Key("group_id", default=None): tx.GroupID(
+                        default_gid=_file_perm.st_gid,
+                    ),
+                    t.Key("activity_check_timeout", default=30): t.Int,
+                    t.Key("activity_check_freq", default=1): t.Int,
+                    t.Key("idle_timeout", default=300): t.Int,
+                },
+            ),
             t.Key("logging"): logging_config_iv,
             t.Key("api"): t.Dict(
                 {

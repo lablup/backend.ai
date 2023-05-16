@@ -270,6 +270,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Resource",
         "KeypairResourcePolicy",
         "VFolder",
+        "FileBrowser",
         "Dotfile",
         "ServerLog",
         "Permission",
@@ -303,6 +304,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
+        from .func.filebrowser import FileBrowser
         from .func.group import Group
         from .func.image import Image
         from .func.keypair import KeyPair
@@ -340,6 +342,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.ScalingGroup = ScalingGroup
         self.SessionTemplate = SessionTemplate
         self.VFolder = VFolder
+        self.FileBrowser = FileBrowser
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission

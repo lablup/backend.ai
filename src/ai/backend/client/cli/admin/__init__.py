@@ -13,6 +13,7 @@ from . import (  # noqa
     agent,
     domain,
     etcd,
+    filebrowser,
     group,
     image,
     keypair,
