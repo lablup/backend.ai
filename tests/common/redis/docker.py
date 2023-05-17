@@ -293,6 +293,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "-f",
                         os.fsencode(compose_cfg),
                         "down",
+                        "-v",
                     ],
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
