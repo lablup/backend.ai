@@ -116,32 +116,30 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
         cfg_dir = Path(__file__).parent
         compose_cfg = cfg_dir / "redis-cluster.yml"
+        assert compose_cfg.exists()
         project_name = f"{self.test_ns}_{self.test_case_ns}"
         compose_cmd = await self.probe_docker_compose()
 
-        snap_compose_dir: Optional[Path] = None
+        compose_cfg_dir: Optional[Path] = None
+        compose_cfg_files = [
+            "redis-cluster.yml",
+            "redis-sentinel.Dockerfile",
+            "sentinel.conf",
+        ]
+        compose_cfg_dir = (
+            Path.home() / ".cache" / "bai" / "testing" / f"bai-redis-test-{get_parallel_slot()}"
+        )
 
-        if (
-            await is_snap_docker()
-        ):  # FIXME: Remove this after we find out how to change pytest rootdir
-            files = [
-                "redis-cluster.yml",
-                "redis-sentinel.Dockerfile",
-                "sentinel.conf",
-            ]
-            snap_compose_dir = Path.home() / "tmp" / f"bai-redis-test-{get_parallel_slot()}"
+        def _copy_files():
+            nonlocal cfg_dir
+            if compose_cfg_dir.exists():
+                shutil.rmtree(compose_cfg_dir)
+            compose_cfg_dir.mkdir(parents=True)
+            for file in compose_cfg_files:
+                shutil.copy(cfg_dir / file, compose_cfg_dir)
 
-            def _copy_files():
-                nonlocal cfg_dir
-                if snap_compose_dir.exists():
-                    shutil.rmtree(snap_compose_dir)
-                snap_compose_dir.mkdir(parents=True)
-
-                for file in files:
-                    shutil.copy(cfg_dir / file, snap_compose_dir)
-
-            await asyncio.get_running_loop().run_in_executor(None, _copy_files)
-            compose_cfg = snap_compose_dir / "redis-cluster.yml"
+        await asyncio.get_running_loop().run_in_executor(None, _copy_files)
+        compose_cfg = compose_cfg_dir / "redis-cluster.yml"
 
         base_port = 9200 + get_parallel_slot() * 8
         ports = {
@@ -155,24 +153,24 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         os.environ.update({k: str(v) for k, v in ports.items()})
         os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
         async with async_timeout.timeout(30.0):
+            cmdargs = [
+                *compose_cmd,
+                "-p",
+                project_name,
+                "-f",
+                str(compose_cfg),
+                "up",
+                "-d",
+                "--build",
+            ]
             p = await simple_run_cmd(
-                [
-                    *compose_cmd,
-                    "-p",
-                    project_name,
-                    "-f",
-                    str(compose_cfg),
-                    "up",
-                    "-d",
-                    "--build",
-                ],
+                cmdargs,
                 env=os.environ,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
             assert p.returncode == 0, "Compose cluster creation has failed."
 
-        await asyncio.sleep(200)
         try:
             p = await simple_run_cmd(
                 [
