@@ -75,7 +75,7 @@ def wait_health_check(container_id):
 
 
 @pytest.fixture(scope="session", autouse=False)
-def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
+def etcd_container(test_ns) -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     etcd_allocated_port = 9600 + get_parallel_slot() * 8 + 0
     proc = subprocess.run(
@@ -83,6 +83,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
             "docker",
             "run",
             "-d",
+            "--name",
+            f"{test_ns}--etcd-slot-{get_parallel_slot()}",
             "-p",
             f"0.0.0.0:{etcd_allocated_port}:2379",
             "-p",
@@ -119,7 +121,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 
 
 @pytest.fixture(scope="session", autouse=False)
-def redis_container() -> Iterator[tuple[str, HostPortPair]]:
+def redis_container(test_ns) -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     redis_allocated_port = 9600 + get_parallel_slot() * 8 + 1
     proc = subprocess.run(
@@ -127,6 +129,8 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             "docker",
             "run",
             "-d",
+            "--name",
+            f"{test_ns}--redis-slot-{get_parallel_slot()}",
             "-p",
             f"0.0.0.0:{redis_allocated_port}:6379",
             # IMPORTANT: We have intentionally omitted the healthcheck here
@@ -160,7 +164,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 
 
 @pytest.fixture(scope="session", autouse=False)
-def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
+def postgres_container(test_ns) -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     postgres_allocated_port = 9600 + get_parallel_slot() * 8 + 2
     proc = subprocess.run(
@@ -168,6 +172,8 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
             "docker",
             "run",
             "-d",
+            "--name",
+            f"{test_ns}--postgres-slot-{get_parallel_slot()}",
             "-p",
             f"0.0.0.0:{postgres_allocated_port}:5432",
             "-e",
