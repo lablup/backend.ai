@@ -57,73 +57,67 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    build:
-      context: .
-      dockerfile: redis-sentinel.Dockerfile
-      cache_from:
-      - redis:7-alpine
-    image: redis-sentinel:testing
+    image: redis:7-alpine
     hostname: sentinel01
     networks:
     - testnet
-    environment:
-    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    - REDIS_MASTER_HOST=node01
-    - REDIS_MASTER_PORT=${REDIS_MASTER_PORT}
-    - REDIS_SENTINEL_SELF_HOST=sentinel01
-    - REDIS_SENTINEL_SELF_PORT=${REDIS_SENTINEL1_PORT}
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}/sentinel01.conf
+      target: /etc/redis-sentinel.conf
     ports:
     - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
     depends_on:
     - backendai-half-redis-node01
     - backendai-half-redis-node02
     - backendai-half-redis-node03
+    command: >
+      redis-server
+      /etc/redis-sentinel.conf
+      --sentinel
+      --port ${REDIS_SENTINEL1_PORT}
 
   backendai-half-redis-sentinel02:
-    build:
-      context: .
-      dockerfile: redis-sentinel.Dockerfile
-      cache_from:
-      - redis:7-alpine
-    image: redis-sentinel:testing
+    image: redis:7-alpine
     hostname: sentinel02
     networks:
     - testnet
-    environment:
-    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    - REDIS_MASTER_HOST=node01
-    - REDIS_MASTER_PORT=${REDIS_MASTER_PORT}
-    - REDIS_SENTINEL_SELF_HOST=sentinel02
-    - REDIS_SENTINEL_SELF_PORT=${REDIS_SENTINEL2_PORT}
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}/sentinel02.conf
+      target: /etc/redis-sentinel.conf
     ports:
     - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
     depends_on:
     - backendai-half-redis-node01
     - backendai-half-redis-node02
     - backendai-half-redis-node03
+    command: >
+      redis-server
+      /etc/redis-sentinel.conf
+      --sentinel
+      --port ${REDIS_SENTINEL2_PORT}
 
   backendai-half-redis-sentinel03:
-    build:
-      context: .
-      dockerfile: redis-sentinel.Dockerfile
-      cache_from:
-      - redis:7-alpine
-    image: redis-sentinel:testing
+    image: redis:7-alpine
     hostname: sentinel03
     networks:
     - testnet
-    environment:
-    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    - REDIS_MASTER_HOST=node01
-    - REDIS_MASTER_PORT=${REDIS_MASTER_PORT}
-    - REDIS_SENTINEL_SELF_HOST=sentinel03
-    - REDIS_SENTINEL_SELF_PORT=${REDIS_SENTINEL3_PORT}
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}/sentinel03.conf
+      target: /etc/redis-sentinel.conf
     ports:
     - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
     depends_on:
     - backendai-half-redis-node01
     - backendai-half-redis-node02
     - backendai-half-redis-node03
+    command: >
+      redis-server
+      /etc/redis-sentinel.conf
+      --sentinel
+      --port ${REDIS_SENTINEL3_PORT}
 
 networks:
   testnet:

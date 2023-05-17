@@ -5,7 +5,7 @@ import os
 import shutil
 import signal
 from pathlib import Path
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, Tuple
 
 import aiohttp
 import async_timeout
@@ -114,33 +114,19 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
     @contextlib.asynccontextmanager
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
-        cfg_dir = Path(__file__).parent
-        compose_cfg = cfg_dir / "redis-cluster.yml"
-        assert compose_cfg.exists()
+        template_cfg_dir = Path(__file__).parent
+        template_compose_file = template_cfg_dir / "redis-cluster.yml"
+        assert template_compose_file.exists()
         project_name = f"{self.test_ns}_{self.test_case_ns}"
         compose_cmd = await self.probe_docker_compose()
 
-        compose_cfg_dir: Optional[Path] = None
-        compose_cfg_files = [
+        template_cfg_files = [
             "redis-cluster.yml",
-            "redis-sentinel.Dockerfile",
             "sentinel.conf",
         ]
         compose_cfg_dir = (
             Path.home() / ".cache" / "bai" / "testing" / f"bai-redis-test-{get_parallel_slot()}"
         )
-
-        def _copy_files():
-            nonlocal cfg_dir
-            if compose_cfg_dir.exists():
-                shutil.rmtree(compose_cfg_dir)
-            compose_cfg_dir.mkdir(parents=True)
-            for file in compose_cfg_files:
-                shutil.copy(cfg_dir / file, compose_cfg_dir)
-
-        await asyncio.get_running_loop().run_in_executor(None, _copy_files)
-        compose_cfg = compose_cfg_dir / "redis-cluster.yml"
-
         base_port = 9200 + get_parallel_slot() * 8
         ports = {
             "REDIS_MASTER_PORT": base_port,
@@ -151,21 +137,46 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             "REDIS_SENTINEL3_PORT": base_port + 5,
         }
         os.environ.update({k: str(v) for k, v in ports.items()})
-        os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
+        os.environ["COMPOSE_PATH"] = str(compose_cfg_dir)
+
+        def _populate_configs():
+            nonlocal template_cfg_dir
+            if compose_cfg_dir.exists():
+                shutil.rmtree(compose_cfg_dir)
+            compose_cfg_dir.mkdir(parents=True)
+            for file in template_cfg_files:
+                shutil.copy(template_cfg_dir / file, compose_cfg_dir)
+            compose_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
+            compose_tpl = compose_tpl.replace("REDIS_PASSWORD", "develove")
+            compose_tpl = compose_tpl.replace("REDIS_MASTER_HOST", "node01")
+            compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(base_port))
+            sentinel01_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
+            sentinel01_cfg = sentinel01_cfg.replace("REDIS_SENTINEL_SELF_PORT", str(base_port + 3))
+            sentinel02_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
+            sentinel02_cfg = sentinel02_cfg.replace("REDIS_SENTINEL_SELF_PORT", str(base_port + 4))
+            sentinel03_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
+            sentinel03_cfg = sentinel03_cfg.replace("REDIS_SENTINEL_SELF_PORT", str(base_port + 5))
+            (compose_cfg_dir / "sentinel01.conf").write_text(sentinel01_cfg)
+            (compose_cfg_dir / "sentinel02.conf").write_text(sentinel02_cfg)
+            (compose_cfg_dir / "sentinel03.conf").write_text(sentinel03_cfg)
+
+        await asyncio.get_running_loop().run_in_executor(None, _populate_configs)
+        compose_file = compose_cfg_dir / "redis-cluster.yml"
+
         async with async_timeout.timeout(30.0):
             cmdargs = [
                 *compose_cmd,
                 "-p",
                 project_name,
                 "-f",
-                str(compose_cfg),
+                str(compose_file),
                 "up",
                 "-d",
-                "--build",
             ]
             p = await simple_run_cmd(
                 cmdargs,
                 env=os.environ,
+                cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -178,11 +189,12 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "-p",
                     project_name,
                     "-f",
-                    str(compose_cfg),
+                    str(compose_file),
                     "ps",
                     "--format",
                     "json",
                 ],
+                cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -210,6 +222,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "inspect",
                     *cids,
                 ],
+                cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -289,10 +302,11 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "-p",
                         project_name,
                         "-f",
-                        os.fsencode(compose_cfg),
+                        str(compose_file),
                         "down",
                         "-v",
                     ],
+                    cwd=compose_cfg_dir,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
