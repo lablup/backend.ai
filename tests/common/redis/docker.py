@@ -149,13 +149,19 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             compose_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
             compose_tpl = compose_tpl.replace("REDIS_PASSWORD", "develove")
             compose_tpl = compose_tpl.replace("REDIS_MASTER_HOST", "node01")
-            compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(base_port))
+            compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(ports["REDIS_MASTER_PORT"]))
             sentinel01_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
-            sentinel01_cfg = sentinel01_cfg.replace("REDIS_SENTINEL_SELF_PORT", str(base_port + 3))
+            sentinel01_cfg = sentinel01_cfg.replace(
+                "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL1_PORT"])
+            )
             sentinel02_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
-            sentinel02_cfg = sentinel02_cfg.replace("REDIS_SENTINEL_SELF_PORT", str(base_port + 4))
+            sentinel02_cfg = sentinel02_cfg.replace(
+                "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL2_PORT"])
+            )
             sentinel03_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
-            sentinel03_cfg = sentinel03_cfg.replace("REDIS_SENTINEL_SELF_PORT", str(base_port + 5))
+            sentinel03_cfg = sentinel03_cfg.replace(
+                "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL3_PORT"])
+            )
             (compose_cfg_dir / "sentinel01.conf").write_text(sentinel01_cfg)
             (compose_cfg_dir / "sentinel02.conf").write_text(sentinel02_cfg)
             (compose_cfg_dir / "sentinel03.conf").write_text(sentinel03_cfg)

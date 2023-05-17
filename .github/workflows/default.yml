@@ -147,8 +147,13 @@ jobs:
         gha-cache-key: pants-cache1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
+
     - name: Test
       run: |
+        # configure redis sentinel cluster hostnames for testing
+        sudo echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        sudo echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        sudo echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
