@@ -264,6 +264,32 @@ class StructuredJSONObjectColumn(TypeDecorator):
         return StructuredJSONObjectColumn(self._schema)
 
 
+class StructuredJSONObjectNullableColumn(TypeDecorator):
+    """
+    A column type to convert JSON values back and forth using JSONSerializableMixin, which is nullable.
+    """
+
+    impl = JSONB
+    cache_ok = True
+
+    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def process_bind_param(self, value, dialect) -> Optional[dict[str, Any]]:
+        if value is not None:
+            return self._schema.to_json(value)
+        return None
+
+    def process_result_value(self, raw_value, dialect) -> Optional[JSONSerializableMixin]:
+        if raw_value is not None:
+            return self._schema.from_json(raw_value)
+        return None
+
+    def copy(self):
+        return StructuredJSONObjectNullableColumn(self._schema)
+
+
 class StructuredJSONObjectListColumn(TypeDecorator):
     """
     A column type to convert JSON values back and forth using JSONSerializableMixin,

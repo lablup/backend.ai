@@ -1755,9 +1755,9 @@ class AbstractAgent(
                 for mount in resource_spec.mounts:
                     if mount.app_config is None:
                         continue
-                    if (
-                        cntr_port := mount.app_config["metadata"].get("container_port")
-                    ) is None or (hport := mount.app_config["metadata"].get("host_port")) is None:
+                    if (cntr_port := mount.app_config.metadata.get("container_port")) is None or (
+                        hport := mount.app_config.metadata.get("host_port")
+                    ) is None:
                         log.warning(
                             f"Invalid container_port {cntr_port}, or host_port {hport} in metadata"
                             " of mount.app_config. Skipping."
@@ -1765,7 +1765,7 @@ class AbstractAgent(
                         continue
                     service_ports.append(
                         {
-                            "name": mount.app_config["service_name"],
+                            "name": mount.app_config.service_name,
                             "protocol": ServicePortProtocols.PREOPEN,
                             "container_ports": (int(cntr_port),),
                             "host_ports": (int(hport),),

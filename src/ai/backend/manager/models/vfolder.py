@@ -14,7 +14,6 @@ import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
@@ -37,6 +36,7 @@ from .base import (
     IDColumn,
     Item,
     PaginatedList,
+    StructuredJSONObjectNullableColumn,
     batch_multiresult,
     metadata,
 )
@@ -189,7 +189,7 @@ vfolders = sa.Table(
         default=VFolderUsageMode.GENERAL,
         nullable=False,
     ),
-    sa.Column("app_config", pgsql.JSONB(), nullable=True),
+    sa.Column("app_config", StructuredJSONObjectNullableColumn(MountedAppConfig), nullable=True),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
     sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
@@ -702,15 +702,7 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
                     mount_perm=vfolder["permission"],
-                    app_config=(
-                        MountedAppConfig(
-                            service_name=vfolder["app_config"]["service_name"],
-                            metadata=vfolder["app_config"]["metadata"],
-                            service_def=vfolder["app_config"]["service_def"],
-                        )
-                        if vfolder["app_config"] is not None
-                        else None
-                    ),
+                    app_config=vfolder["app_config"],
                 )
             )
         else:
@@ -730,15 +722,7 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
-                    app_config=(
-                        MountedAppConfig(
-                            service_name=vfolder["app_config"]["service_name"],
-                            metadata=vfolder["app_config"]["metadata"],
-                            service_def=vfolder["app_config"]["service_def"],
-                        )
-                        if vfolder["app_config"] is not None
-                        else None
-                    ),
+                    app_config=vfolder["app_config"],
                 )
             )
 
