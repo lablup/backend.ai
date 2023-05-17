@@ -591,7 +591,6 @@ class SessionRow(Base):
     vfolder_mounts = sa.Column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
-    resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
     use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
@@ -696,6 +695,10 @@ class SessionRow(Base):
     @property
     def status_changed(self) -> datetime:
         return datetime.fromisoformat(self.status_history[self.status.name])
+
+    @property
+    def resource_opts(self) -> dict[str, Any]:
+        return {kern.cluster_hostname: kern.resource_opts for kern in self.kernels}
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
@@ -1252,7 +1255,6 @@ class ComputeSession(graphene.ObjectType):
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
-            "resource_opts": row.resource_opts,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
@@ -1333,6 +1335,15 @@ class ComputeSession(graphene.ObjectType):
         commit_status = await graph_ctx.registry.get_commit_status(session)
         return commit_status["status"]
 
+    async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return {}
+        self.containers = containers
+        return {cntr.cluster_hostname: cntr.resource_opts for cntr in containers}
+
     async def resolve_abusing_reports(
         self, info: graphene.ResolveInfo
     ) -> Iterable[Optional[Mapping[str, Any]]]:
@@ -1341,6 +1352,7 @@ class ComputeSession(graphene.ObjectType):
             containers = await self.resolve_containers(info)
         if containers is None:
             return []
+        self.containers = containers
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
