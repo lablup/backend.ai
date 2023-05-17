@@ -40,9 +40,7 @@ disruptions: Final = {
 async def simple_run_cmd(
     cmdargs: Sequence[Union[str, bytes]], **kwargs
 ) -> asyncio.subprocess.Process:
-    p = await asyncio.create_subprocess_exec(*cmdargs, **kwargs)
-    await p.wait()
-    return p
+    return await asyncio.create_subprocess_exec(*cmdargs, **kwargs)
 
 
 async def wait_redis_ready(host: str, port: int, password: Optional[str] = None) -> None:

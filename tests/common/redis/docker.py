@@ -34,46 +34,51 @@ class DockerRedisNode(AbstractRedisNode):
     async def pause(self) -> None:
         assert self.container_id is not None
         print(f"Docker container {self.container_id[:12]} is being paused...")
-        await simple_run_cmd(
+        p = await simple_run_cmd(
             ["docker", "pause", self.container_id],
             # stdout=asyncio.subprocess.DEVNULL,
             # stderr=asyncio.subprocess.DEVNULL,
         )
+        await p.wait()
         print(f"Docker container {self.container_id[:12]} is paused")
 
     async def unpause(self) -> None:
         assert self.container_id is not None
-        await simple_run_cmd(
+        p = await simple_run_cmd(
             ["docker", "unpause", self.container_id],
             # stdout=asyncio.subprocess.DEVNULL,
             # stderr=asyncio.subprocess.DEVNULL,
         )
+        await p.wait()
         print(f"Docker container {self.container_id[:12]} is unpaused")
 
     async def stop(self, force_kill: bool = False) -> None:
         assert self.container_id is not None
         if force_kill:
-            await simple_run_cmd(
+            p = await simple_run_cmd(
                 ["docker", "kill", self.container_id],
                 # stdout=asyncio.subprocess.DEVNULL,
                 # stderr=asyncio.subprocess.DEVNULL,
             )
+            await p.wait()
             print(f"Docker container {self.container_id[:12]} is killed")
         else:
-            await simple_run_cmd(
+            p = await simple_run_cmd(
                 ["docker", "stop", self.container_id],
                 # stdout=asyncio.subprocess.DEVNULL,
                 # stderr=asyncio.subprocess.DEVNULL,
             )
+            await p.wait()
             print(f"Docker container {self.container_id[:12]} is terminated")
 
     async def start(self) -> None:
         assert self.container_id is not None
-        await simple_run_cmd(
+        p = await simple_run_cmd(
             ["docker", "start", self.container_id],
             # stdout=asyncio.subprocess.DEVNULL,
             # stderr=asyncio.subprocess.DEVNULL,
         )
+        await p.wait()
         print(f"Docker container {self.container_id[:12]} started")
 
 
@@ -187,7 +192,10 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 # stdout=asyncio.subprocess.DEVNULL,
                 # stderr=asyncio.subprocess.DEVNULL,
             )
-            assert p.returncode == 0, "Compose cluster creation has failed."
+            try:
+                assert p.returncode == 0, "Compose cluster creation has failed."
+            finally:
+                await p.wait()
 
         await asyncio.sleep(1.0)
         try:
@@ -207,8 +215,8 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-            assert p.stdout is not None
             try:
+                assert p.stdout is not None
                 ps_output = json.loads(await p.stdout.read())
                 pprint(f"{ps_output=}")
             except json.JSONDecodeError:
@@ -237,16 +245,16 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-
-            assert p.stdout is not None
             try:
+                assert p.stdout is not None
                 inspect_output = json.loads(await p.stdout.read())
             except json.JSONDecodeError:
                 pytest.fail(
                     'Cannot parse "docker inspect ..." output. '
                     "You may need to upgrade to docker-compose v2.0.0.rc.3 or later"
                 )
-            await p.wait()
+            finally:
+                await p.wait()
 
             if not inspect_output:
                 pytest.fail(
@@ -258,8 +266,10 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     container["Id"]
                 )
                 print(f"--- logs of {container['Id']} ---")
-                p = await simple_run_cmd(["docker", "logs", container["Id"]])
-                await p.wait()
+                try:
+                    p = await simple_run_cmd(["docker", "logs", container["Id"]])
+                finally:
+                    await p.wait()
                 print("--- end of logs ---")
             print(f"{cids=}")
             print(f"{cid_mapping=}")
@@ -313,7 +323,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         finally:
             await asyncio.sleep(0.2)
             async with async_timeout.timeout(30.0):
-                await simple_run_cmd(
+                p = await simple_run_cmd(
                     [
                         *compose_cmd,
                         "-p",
@@ -327,6 +337,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
+                await p.wait()
             await asyncio.sleep(0.2)
 
 
