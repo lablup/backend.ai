@@ -183,8 +183,8 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cmdargs,
                 env=os.environ,
                 cwd=compose_cfg_dir,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                # stdout=asyncio.subprocess.DEVNULL,
+                # stderr=asyncio.subprocess.DEVNULL,
             )
             assert p.returncode == 0, "Compose cluster creation has failed."
 
@@ -208,12 +208,14 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             assert p.stdout is not None
             try:
                 ps_output = json.loads(await p.stdout.read())
+                print(f"{ps_output=}")
             except json.JSONDecodeError:
                 pytest.fail(
                     'Cannot parse "docker compose ... ps --format json" output. '
                     "You may need to upgrade to docker-compose v2.0.0.rc.3 or later"
                 )
-            await p.wait()
+            finally:
+                await p.wait()
 
             if not ps_output:
                 pytest.fail(
@@ -253,7 +255,8 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
                     container["Id"]
                 )
-            raise RuntimeError(f"Testing cid_mapping in GHA:\n{cid_mapping=}")
+            print(f"{cids=}")
+            print(f"{cid_mapping=}")
 
             yield RedisClusterInfo(
                 node_addrs=[
