@@ -137,7 +137,15 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     )
     container_id = proc.stdout.decode().strip()
     log.info("spawning redis container on port %d", redis_allocated_port)
-    time.sleep(0.3)
+    while True:
+        try:
+            with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+                s.connect(("127.0.0.1", redis_allocated_port))
+                break
+        except ConnectionRefusedError:
+            time.sleep(0.1)
+            continue
+    time.sleep(0.1)
     yield container_id, HostPortPair("127.0.0.1", redis_allocated_port)
     subprocess.run(
         [
