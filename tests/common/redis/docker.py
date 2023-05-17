@@ -5,6 +5,7 @@ import os
 import shutil
 import signal
 from pathlib import Path
+from pprint import pprint
 from typing import AsyncIterator, Tuple
 
 import aiohttp
@@ -198,6 +199,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "-f",
                     str(compose_file),
                     "ps",
+                    "-a",
                     "--format",
                     "json",
                 ],
@@ -208,7 +210,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             assert p.stdout is not None
             try:
                 ps_output = json.loads(await p.stdout.read())
-                print(f"{ps_output=}")
+                pprint(f"{ps_output=}")
             except json.JSONDecodeError:
                 pytest.fail(
                     'Cannot parse "docker compose ... ps --format json" output. '
@@ -255,6 +257,10 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
                     container["Id"]
                 )
+                print(f"--- logs of {container['Id']} ---")
+                p = await simple_run_cmd(["docker", "logs", container["Id"]])
+                await p.wait()
+                print("--- end of logs ---")
             print(f"{cids=}")
             print(f"{cid_mapping=}")
 
