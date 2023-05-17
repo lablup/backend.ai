@@ -50,6 +50,10 @@ class ServiceDefinition:
     default_arguments: Mapping[str, Union[None, str, List[str]]] = attrs.Factory(dict)
 
 
+def get_service_def_files(path: Path) -> list[Path]:
+    return list(path.glob("*.json"))
+
+
 class ServiceParser:
     variables: MutableMapping[str, str]
     services: MutableMapping[str, ServiceDefinition]
@@ -59,7 +63,7 @@ class ServiceParser:
         self.services = {}
 
     async def parse(self, path: Path) -> None:
-        for service_def_file in path.glob("*.json"):
+        for service_def_file in get_service_def_files(path):
             log.debug(f"loading service-definition from {service_def_file}")
             try:
                 with open(service_def_file.absolute(), "rb") as fr:

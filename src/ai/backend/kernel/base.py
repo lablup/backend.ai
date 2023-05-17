@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import sys
 import time
@@ -34,7 +35,7 @@ from jupyter_client import AsyncKernelClient, AsyncKernelManager
 from jupyter_client.kernelspec import KernelSpecManager
 
 from .compat import current_loop
-from .exception import UnsupportedBaseDistroError
+from .exception import InvalidServiceDefinition, UnsupportedBaseDistroError
 from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
@@ -43,7 +44,7 @@ from .intrinsic import (
 )
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
-from .service import ServiceParser
+from .service import ServiceParser, get_service_def_files
 from .utils import wait_local_port_open
 
 log = BraceStyleAdapter(logging.getLogger())
@@ -654,13 +655,31 @@ class BaseRunner(metaclass=ABCMeta):
             }
         return result
 
-    async def _start_mounted_service(
-        self, service_info: Mapping[str, Any], user_requested: bool = True
-    ) -> None:
-        mount_path: str = service_info["mount_path"]
-        opts: Mapping[str, Any] = service_info["options"]
+    async def _init_service(
+        self,
+        service_name: str,
+        service_info: Mapping[str, Any],
+    ) -> ServiceParser:
+        mount_info: dict[str, Any] = service_info["mount_info"]
+        mount_path: str = mount_info["kernel_path"]
+        app_config: dict[str, Any] = mount_info["app_config"]
+        copy_to: Optional[Path] = (
+            Path(app_config["copy_to"]) if app_config["copy_to"] is not None else None
+        )
+
+        opts: dict[str, Any] = service_info["options"]
         distro = opts["distro"]
         arch = opts["arch"]
+
+        mounted_def_folder = Path(mount_path) / "service-defs"
+
+        service_def_file_paths = get_service_def_files(mounted_def_folder)
+
+        if not mounted_def_folder.is_dir():
+            raise InvalidServiceDefinition(
+                f"Service definition directory not found. (name: {service_info['name']},"
+                f" mount_path: {mount_path})"
+            )
 
         def find_artifacts(pattern: str) -> dict[str, str]:
             artifacts = {}
@@ -670,22 +689,55 @@ class BaseRunner(metaclass=ABCMeta):
                     artifacts[m.group(1)] = p.name
             return artifacts
 
-        def find_versioned_binary_path(candidate_glob: str) -> Path:
+        def find_versioned_app_path(candidate_glob: str) -> Path:
             candidates = find_artifacts(candidate_glob)
             _, candidate = match_distro_data(candidates, distro)
             return Path(mount_path, candidate)
+
+        mounted_service_path = find_versioned_app_path(f"{service_name}*{arch}*")
+        service_path = mounted_service_path
+        service_def_folder = mounted_def_folder
+
+        if copy_to is not None:
+            service_def_folder = copy_to / "service-defs"
+            service_path = copy_to / mounted_service_path.name
+
+            def _copy() -> None:
+                assert copy_to is not None
+                copy_to.mkdir(parents=True, exist_ok=True)
+                service_def_folder.mkdir(parents=True, exist_ok=True)
+                shutil.copy(mounted_service_path, service_path)
+                for fpath in service_def_file_paths:
+                    shutil.copy(fpath, service_def_folder / fpath.name)
+
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, _copy)
+
+        service_parser = ServiceParser(
+            {
+                "runtime_path": str(self.runtime_path),
+                "service_path": str(service_path),
+                "port": service_info["port"],
+                "password": opts.get("password", "password"),
+            }
+        )
+        await service_parser.parse(service_def_folder)
+        log.debug("Loaded new-style service definitions.")
+        return service_parser
+
+    async def _start_mounted_service(
+        self, service_info: Mapping[str, Any], user_requested: bool = True
+    ) -> None:
+        mount_info: dict[str, Any] = service_info["mount_info"]
+        mount_path: str = mount_info["kernel_path"]
 
         async with self._service_lock:
             try:
                 service_name = service_info["name"]
                 if service_name not in self.mounted_service_parsers:
-                    service_def_folder = Path(mount_path) / "service-defs"
-                    if not service_def_folder.is_dir():
-                        log.warning(
-                            "Service definition directory not found. (name: {0}, mount_path: {1})",
-                            service_info["name"],
-                            mount_path,
-                        )
+                    try:
+                        service_parser = await self._init_service(service_name, service_info)
+                    except InvalidServiceDefinition:
                         result = {
                             "status": "failed",
                             "error": (
@@ -694,20 +746,6 @@ class BaseRunner(metaclass=ABCMeta):
                             ),
                         }
                         return
-                    path = find_versioned_binary_path(f"{service_name}*{arch}*")
-                    service_parser = ServiceParser(
-                        {
-                            "runtime_path": str(self.runtime_path),
-                            "distro": distro,
-                            "arch": arch,
-                            "mount_path": mount_path,
-                            "binary_path": str(path),
-                            "port": service_info["port"],
-                            "password": opts.get("password", "password"),
-                        }
-                    )
-                    await service_parser.parse(service_def_folder)
-                    log.debug("Loaded new-style service definitions.")
                     self.mounted_service_parsers[service_name] = service_parser
                 else:
                     service_parser = self.mounted_service_parsers[service_name]

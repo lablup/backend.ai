@@ -2023,10 +2023,10 @@ class AgentRegistry:
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         vfolder_mounts: list[VFolderMount] = session.vfolder_mounts
-        mount_path: Optional[str] = None
+        mount_info: Optional[dict[str, Any]] = None
         for mount in vfolder_mounts:
             if mount.app_config is not None and mount.app_config.service_name == service:
-                mount_path = str(mount.kernel_path)
+                mount_info = mount.to_json()
                 break
         async with handle_session_exception(self.db, "execute", session.id):
             async with RPCContext(
@@ -2037,7 +2037,10 @@ class AgentRegistry:
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
                 return await rpc.call.start_service(
-                    str(session.main_kernel.id), service, opts, mount_path
+                    str(session.main_kernel.id),
+                    service,
+                    opts,
+                    mount_info,
                 )
 
     async def shutdown_service(

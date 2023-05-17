@@ -2165,10 +2165,10 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].interrupt_kernel()
 
     async def start_service(
-        self, kernel_id: KernelId, service: str, opts: dict, mount_path: Optional[str]
+        self, kernel_id: KernelId, service: str, opts: dict, mount_info: Optional[Mapping[str, Any]]
     ):
         return await self.kernel_registry[kernel_id].start_service(
-            service, opts, self.local_config, mount_path
+            service, opts, self.local_config, mount_info
         )
 
     async def shutdown_service(self, kernel_id: KernelId, service: str):

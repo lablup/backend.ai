@@ -16,8 +16,8 @@
         "action": "run_command",
         "args": {
           "command": [
-            "tar -zxf {mount_path}/code-server-{distro}-{arch}.tar.gz --directory /home/work/",
-            "mv /home/work/code-server-{distro}-{arch} /home/work/.local/lib/code-server",
+            "tar -zxf {service_path} --directory /home/work/",
+            "find /home/work/ -name \"code-server*\" -maxdepth 1 -type d -exec mv '{}' /home/work/.local/lib/code-server",
             "ln -s /home/work/.local/lib/code-server/bin/code-server /home/work/.local/bin/code-server",
             "PATH=\"/home/work/.local/bin:$PATH\""
           ]
