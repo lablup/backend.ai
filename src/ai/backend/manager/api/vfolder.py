@@ -318,7 +318,7 @@ def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
             ),
             t.Key("quota", default=None): tx.BinarySize | t.Null,
             t.Key("cloneable", default=False): t.Bool,
-            t.Key("app_config", default=None): MountedAppConfig.as_trafaret() | t.Null,
+            t.Key("app_config", default=None): tx.ToJSONSerializable(MountedAppConfig) | t.Null,
         }
     ),
 )
@@ -482,7 +482,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
-            "app_config": MountedAppConfig.from_json(params["app_config"]),
+            "app_config": params["app_config"],
         }
         resp = {
             "id": folder_id.hex,
@@ -1161,7 +1161,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         {
             t.Key("cloneable", default=None): t.Bool | t.Null,
             t.Key("permission", default=None): tx.Enum(VFolderPermission) | t.Null,
-            t.Key("app_config", default=None): MountedAppConfig.as_trafaret() | t.Null,
+            t.Key("app_config", default=None): tx.ToJSONSerializable(MountedAppConfig) | t.Null,
         }
     )
 )
@@ -1198,10 +1198,9 @@ async def update_vfolder_options(
         if row["usage_mode"] != VFolderUsageMode.APP:
             raise InvalidAPIParameters(
                 f"Only APP mode vfolder can be set app_config, not {row['usage_mode']} mode"
-            )
-        app_config = MountedAppConfig.from_json(params["app_config"])
-        if app_config != row["app_config"]:
-            updated_fields["app_config"] = app_config
+            )["app_config"]
+        if params["app_config"] != row["app_config"]:
+            updated_fields["app_config"] = params["app_config"]
     if not row["is_owner"]:
         raise InvalidAPIParameters(
             "Cannot change the options of a vfolder that is not owned by myself."

@@ -773,29 +773,19 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-t_app_config = t.Dict(
-    {
-        t.Key("service_name"): t.String,
-        t.Key("metadata", default={}): t.Dict().allow_extra("*"),
-        t.Key("service_def", default={}): t.Dict().allow_extra("*"),
-        t.Key("copy_to_kernel", default=True): t.Bool,
-    }
-).allow_extra("*")
-
-
 @attrs.define(slots=True)
 class MountedAppConfig(JSONSerializableMixin):
     service_name: str
     service_def: Mapping[str, Any]
     metadata: Mapping[str, str]
-    copy_to_kernel: bool = True
+    copy_to: Optional[PurePosixPath] = None
 
     def to_json(self) -> dict[str, Any]:
         return {
             "service_name": self.service_name,
             "service_def": self.service_def,
             "metadata": self.metadata,
-            "copy_to_kernel": self.copy_to_kernel,
+            "copy_to": str(self.copy_to) if self.copy_to is not None else None,
         }
 
     @classmethod
@@ -804,7 +794,16 @@ class MountedAppConfig(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
-        return t_app_config
+        from . import validators as tx
+
+        return t.Dict(
+            {
+                t.Key("service_name"): t.String,
+                t.Key("metadata", default={}): t.Dict().allow_extra("*"),
+                t.Key("service_def", default={}): t.Dict().allow_extra("*"),
+                t.Key("copy_to", default=None): tx.Path(type="dir") | t.Null,
+            }
+        ).allow_extra("*")
 
 
 @attrs.define(slots=True)
@@ -830,10 +829,11 @@ class VFolderMount(JSONSerializableMixin):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VFolderMount:
-        check_result = cls.as_trafaret().check(obj)
-        if (app_config := obj.get("app_config")) is not None:
-            check_result = {**check_result, "app_config": MountedAppConfig.from_json(app_config)}
-        return cls(**check_result)
+        # check_result = cls.as_trafaret().check(obj)
+        # if (app_config := obj.get("app_config")) is not None:
+        #     check_result = {**check_result, "app_config": MountedAppConfig.from_json(app_config)}
+        # return cls(**check_result)
+        return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
@@ -847,7 +847,7 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
-                t.Key("app_config", default=None): MountedAppConfig.as_trafaret() | t.Null,
+                t.Key("app_config", default=None): tx.ToJSONSerializable(MountedAppConfig) | t.Null,
             }
         )
 
