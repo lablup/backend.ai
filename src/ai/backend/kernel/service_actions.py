@@ -41,6 +41,8 @@ async def run_command(
     variables: Mapping[str, Any],
     command: Iterable[str],
 ) -> Optional[MutableMapping[str, str]]:
+    # cmds = [str(p).format_map(variables) for p in command]
+    # raise Exception(f"{cmds = }, {variables = }")
     proc = await create_subprocess_exec(
         *(str(piece).format_map(variables) for piece in command),
         stdout=subprocess.PIPE,

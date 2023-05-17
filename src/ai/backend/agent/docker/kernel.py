@@ -16,6 +16,7 @@ import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
+from cachetools import LRUCache, cached
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
@@ -25,7 +26,7 @@ from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, S
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel
+from ..kernel import AbstractCodeRunner, AbstractKernel, match_distro_data
 from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
@@ -44,6 +45,7 @@ class DockerKernel(AbstractKernel):
         image: ImageRef,
         version: int,
         *,
+        image_labels: Mapping[str, Any],
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -56,6 +58,7 @@ class DockerKernel(AbstractKernel):
             agent_id,
             image,
             version,
+            image_labels=image_labels,
             agent_config=agent_config,
             resource_spec=resource_spec,
             service_ports=service_ports,
@@ -107,8 +110,28 @@ class DockerKernel(AbstractKernel):
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
+    @cached(
+        cache=LRUCache(maxsize=32),  # type: ignore
+        key=lambda self, local_config: (
+            self.image,
+            self.image_labels.get("ai.backend.base-distro", "ubuntu16.04"),
+        ),
+    )
+    def get_krunner_info(self, local_config: Mapping[str, Any]) -> Tuple[str, str, str]:
+        distro = self.image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        matched_distro, _ = match_distro_data(local_config["container"]["krunner-volumes"], distro)
+        matched_libc_style = "glibc"
+        if distro.startswith("alpine"):
+            matched_libc_style = "musl"
+        arch = get_arch_name()
+        return arch, matched_distro, matched_libc_style
+
     async def start_service(
-        self, service: str, opts: Mapping[str, Any], mount_path: Optional[Path] = None
+        self,
+        service: str,
+        opts: Mapping[str, Any],
+        local_config: Mapping[str, Any],
+        mount_path: Optional[str] = None,
     ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
@@ -121,6 +144,12 @@ class DockerKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
+        arch, distro, libc_style = self.get_krunner_info(local_config)
+        opts = {
+            "arch": arch,
+            "distro": distro,
+            **opts,
+        }
         if mount_path is None:
             result = await self.runner.feed_start_service(
                 {

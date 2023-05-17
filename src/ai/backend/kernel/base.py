@@ -5,6 +5,7 @@ import concurrent.futures
 import json
 import logging
 import os
+import re
 import signal
 import sys
 import time
@@ -33,6 +34,7 @@ from jupyter_client import AsyncKernelClient, AsyncKernelManager
 from jupyter_client.kernelspec import KernelSpecManager
 
 from .compat import current_loop
+from .exception import UnsupportedBaseDistroError
 from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
@@ -132,6 +134,7 @@ class BaseRunner(metaclass=ABCMeta):
     service_parser: Optional[ServiceParser]
     mounted_service_parsers: dict[str, ServiceParser]
     runtime_path: Path
+    _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
 
     services_running: Dict[str, asyncio.subprocess.Process]
 
@@ -654,11 +657,27 @@ class BaseRunner(metaclass=ABCMeta):
     async def _start_mounted_service(
         self, service_info: Mapping[str, Any], user_requested: bool = True
     ) -> None:
+        mount_path: str = service_info["mount_path"]
+        opts: Mapping[str, Any] = service_info["options"]
+        distro = opts["distro"]
+        arch = opts["arch"]
+
+        def find_artifacts(pattern: str) -> dict[str, str]:
+            artifacts = {}
+            for p in Path(mount_path).glob(pattern):
+                m = self._rx_distro.search(p.name)
+                if m is not None:
+                    artifacts[m.group(1)] = p.name
+            return artifacts
+
+        def find_versioned_binary_path(candidate_glob: str) -> Path:
+            candidates = find_artifacts(candidate_glob)
+            _, candidate = match_distro_data(candidates, distro)
+            return Path(mount_path, candidate)
+
         async with self._service_lock:
             try:
                 service_name = service_info["name"]
-                mount_path = service_info["mount_path"]
-                opts = service_info["options"]
                 if service_name not in self.mounted_service_parsers:
                     service_def_folder = Path(mount_path) / "service-defs"
                     if not service_def_folder.is_dir():
@@ -669,13 +688,20 @@ class BaseRunner(metaclass=ABCMeta):
                         )
                         result = {
                             "status": "failed",
-                            "error": "service definition not found",
+                            "error": (
+                                f"service definition not found, (name: {service_info['name']},"
+                                f" mount_path: {mount_path})"
+                            ),
                         }
                         return
+                    path = find_versioned_binary_path(f"{service_name}*{arch}*")
                     service_parser = ServiceParser(
                         {
                             "runtime_path": str(self.runtime_path),
+                            "distro": distro,
+                            "arch": arch,
                             "mount_path": mount_path,
+                            "binary_path": str(path),
                             "port": service_info["port"],
                             "password": opts.get("password", "password"),
                         }
@@ -1029,3 +1055,56 @@ class BaseRunner(metaclass=ABCMeta):
         user_input_server.close()
         await user_input_server.wait_closed()
         await self.shutdown()
+
+
+def match_distro_data(data: Mapping[str, str], distro: str) -> tuple[str, str]:
+    """
+    Find the latest or exactly matching entry from krunner_volumes mapping using the given distro
+    string expression.
+
+    It assumes that the keys of krunner_volumes mapping is a string concatenated with a distro
+    prefix (e.g., "centos", "ubuntu") and a distro version composed of multiple integer components
+    joined by single dots (e.g., "1.2.3", "18.04").
+    """
+    rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
+
+    def _extract_version(key: str) -> tuple[int, ...]:
+        m = rx_ver_suffix.search(key)
+        if m is not None:
+            return tuple(map(int, m.group(1).split(".")))
+        return (0,)
+
+    m = rx_ver_suffix.search(distro)
+    if m is None:
+        # Assume latest
+        distro_prefix = distro
+        distro_ver = None
+    else:
+        distro_prefix = distro[: -len(m.group(1))]
+        distro_ver = tuple(map(int, m.group(1).split(".")))
+
+    # Check if there are static-build krunners first.
+    if distro_prefix == "alpine":
+        libc_flavor = "musl"
+    else:
+        libc_flavor = "gnu"
+    distro_key = f"static-{libc_flavor}"
+    if volume := data.get(distro_key):
+        return distro_key, volume
+
+    # Search through the per-distro versions
+    match_list: list[tuple[str, str, tuple[int, ...]]] = [
+        (distro_key, value, _extract_version(distro_key))
+        for distro_key, value in data.items()
+        if distro_key.startswith(distro_prefix)
+    ]
+
+    match_list = sorted(match_list, key=lambda x: x[2], reverse=True)
+    if match_list:
+        if distro_ver is None:
+            return match_list[0][:-1]  # return latest
+        for distro_key, value, matched_distro_ver in match_list:
+            if distro_ver >= matched_distro_ver:
+                return (distro_key, value)
+        return match_list[-1][:-1]  # fallback to the latest of its kind
+    raise UnsupportedBaseDistroError(f"distro({distro}) is not supported.")

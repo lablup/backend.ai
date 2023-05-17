@@ -1,14 +1,25 @@
 {
     "prestart": [
       {
+        "action": "mkdir",
+        "args": {
+          "path": "/home/work/.local/lib"
+        }
+      },
+      {
+        "action": "mkdir",
+        "args": {
+          "path": "/home/work/.local/bin"
+        }
+      },
+      {
         "action": "run_command",
         "args": {
           "command": [
-            "mkdir -p ~/.local/lib ~/.local/bin",
-            "tar -zxvf {mount_path}/code-server.tar.gz",
-            "mv {mount_path}/code-server ~/.local/lib/code-server",
-            "ln -s ~/.local/lib/code-server/bin/code-server ~/.local/bin/code-server",
-            "PATH=\"~/.local/bin:$PATH\""
+            "tar -zxf {mount_path}/code-server-{distro}-{arch}.tar.gz --directory /home/work/",
+            "mv /home/work/code-server-{distro}-{arch} /home/work/.local/lib/code-server",
+            "ln -s /home/work/.local/lib/code-server/bin/code-server /home/work/.local/bin/code-server",
+            "PATH=\"/home/work/.local/bin:$PATH\""
           ]
         },
         "ref": "pre_start_result"
@@ -16,7 +27,7 @@
       {
         "action": "write_file",
         "args": {
-          "filename": "~/.config/code-server/config.yaml",
+          "filename": "/home/work/.config/code-server/config.yaml",
           "body": [
             "bind-addr: 127.0.0.1:{port}\n",
             "auth: password",
@@ -27,6 +38,6 @@
         "ref": "write_conf_file"
       }
     ],
-    "command": ["~/.local/bin/code-server"],
+    "command": ["/home/work/.local/bin/code-server"],
     "url_template": ""
 }

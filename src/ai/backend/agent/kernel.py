@@ -159,6 +159,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     agent_id: AgentId
     container_id: Optional[str]
     image: ImageRef
+    image_labels: Mapping[str, str]
     resource_spec: KernelResourceSpec
     service_ports: List[ServicePort]
     data: Dict[Any, Any]
@@ -181,6 +182,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         image: ImageRef,
         version: int,
         *,
+        image_labels: Mapping[str, str],
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -193,6 +195,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.agent_id = agent_id
         self.image = image
         self.version = version
+        self.image_labels = image_labels
         self.resource_spec = resource_spec
         self.service_ports = service_ports
         self.data = data
@@ -277,7 +280,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def start_service(self, service, opts, mount_path=None):
+    async def start_service(
+        self,
+        service: str,
+        opts: Mapping[str, Any],
+        local_config: Mapping[str, Any],
+        mount_path: Optional[str] = None,
+    ):
         raise NotImplementedError
 
     @abstractmethod

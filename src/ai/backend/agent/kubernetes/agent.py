@@ -574,6 +574,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             self.agent_id,
             self.image_ref,
             self.kspec_version,
+            image_labels=self.kernel_config["image"]["labels"],
             agent_config=self.local_config,
             service_ports=service_ports,
             resource_spec=resource_spec,

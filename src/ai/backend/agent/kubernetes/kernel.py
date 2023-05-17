@@ -40,6 +40,7 @@ class KubernetesKernel(AbstractKernel):
         image: ImageRef,
         version: int,
         *,
+        image_labels: Mapping[str, Any],
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -52,6 +53,7 @@ class KubernetesKernel(AbstractKernel):
             agent_id,
             image,
             version,
+            image_labels=image_labels,
             agent_config=agent_config,
             resource_spec=resource_spec,
             service_ports=service_ports,
@@ -175,7 +177,11 @@ class KubernetesKernel(AbstractKernel):
         return {"status": "finished"}
 
     async def start_service(
-        self, service: str, opts: Mapping[str, Any], mount_path: Optional[Path] = None
+        self,
+        service: str,
+        opts: Mapping[str, Any],
+        local_config: Mapping[str, Any],
+        mount_path: Optional[str] = None,
     ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
