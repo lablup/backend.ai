@@ -253,6 +253,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
                     container["Id"]
                 )
+            raise RuntimeError(f"Testing cid_mapping in GHA:\n{cid_mapping=}")
 
             yield RedisClusterInfo(
                 node_addrs=[
