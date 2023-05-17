@@ -188,6 +188,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             )
             assert p.returncode == 0, "Compose cluster creation has failed."
 
+        await asyncio.sleep(1.0)
         try:
             p = await simple_run_cmd(
                 [
