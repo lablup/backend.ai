@@ -10,7 +10,6 @@ import json
 import logging
 import re
 import secrets
-import time
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -38,7 +37,6 @@ import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
-import yarl
 from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
@@ -966,49 +964,6 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
         log.exception("COMMIT_SESSION: exception")
         raise
     return web.json_response(resp, status=201)
-
-
-async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
-    log_func = log.info
-    log_msg: str = ""
-    log_fmt: str = ""
-    log_arg: Any = None
-    begin = time.monotonic()
-    try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30.0),
-        ) as session:
-            try:
-                async with session.post(url, json=data) as response:
-                    if response.content_length is not None and response.content_length > 0:
-                        log_func = log.warning
-                        log_msg = "warning"
-                        log_fmt = (
-                            "{3[0]} {3[1]} - the callback response body was not empty! "
-                            "(len: {3[2]:,} bytes)"
-                        )
-                        log_arg = (response.status, response.reason, response.content_length)
-                    else:
-                        log_msg = "result"
-                        log_fmt = "{3[0]} {3[1]}"
-                        log_arg = (response.status, response.reason)
-            except aiohttp.ClientError as e:
-                log_func = log.warning
-                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
-    except asyncio.CancelledError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    finally:
-        log_func(
-            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
-            data["event"],
-            data["session_id"],
-            url,
-            log_arg,
-        )
 
 
 @catch_unexpected(log)

@@ -83,7 +83,7 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext, HookResults
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AccessKey,
@@ -95,7 +95,6 @@ from ai.backend.common.types import (
     ClusterSSHPortMapping,
     CommitStatus,
     DeviceId,
-    EtcdRedisConfig,
     HardwareMetadata,
     ImageAlias,
     KernelEnqueueingConfig,
@@ -132,7 +131,6 @@ from .defs import (
     DEFAULT_ROLE,
     INTRINSIC_SLOTS,
     REDIS_STREAM_DB,
-    PluginDatabaseID,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
@@ -291,6 +289,7 @@ class AgentRegistry:
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
+    webhook_ptask_group: aiotools.PersistentTaskGroup
 
     def __init__(
         self,
@@ -329,6 +328,7 @@ class AgentRegistry:
         self.session_creation_tracker = {}
         self.pending_waits = set()
         self.database_ptask_group = aiotools.PersistentTaskGroup()
+        self.webhook_ptask_group = aiotools.PersistentTaskGroup()
 
         # passive events
         evd = self.event_dispatcher
@@ -401,6 +401,7 @@ class AgentRegistry:
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
         await self.database_ptask_group.shutdown()
+        await self.webhook_ptask_group.shutdown()
 
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
@@ -3463,29 +3464,19 @@ async def invoke_session_callback(
     except Exception:
         log.exception("error while updating route status:")
 
-    url = session.callback_url
-    if url is None:
+    if (callback_url := session.callback_url) is None:
         return
-    if (addr := context.local_config.get("pipeline", {}).get("event-queue")) is None:
-        return
-    etcd_redis_config: EtcdRedisConfig = {
-        "addr": addr,
-        "sentinel": None,
-        "service_name": None,
-        "password": None,
+
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
     }
-    stream_key = "events"
-    token = url.query.get("token")
 
-    async def _dispatch() -> None:
-        hook_result = await context.hook_plugin_ctx.dispatch(
-            "PUBLISH_EVENT",
-            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
-        )
-        if hook_result.status != HookResults.PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
-    await execute_with_retry(_dispatch)
+    context.webhook_ptask_group.create_task(
+        _make_session_callback(data, callback_url),
+    )
 
 
 async def handle_batch_result(
@@ -3662,3 +3653,46 @@ async def handle_kernel_log(
     finally:
         log_buffer.close()
         await redis_conn.close()
+
+
+async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
+    log_func = log.info
+    log_msg: str = ""
+    log_fmt: str = ""
+    log_arg: Any = None
+    begin = time.monotonic()
+    try:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30.0),
+        ) as session:
+            try:
+                async with session.post(url, json=data) as response:
+                    if response.content_length is not None and response.content_length > 0:
+                        log_func = log.warning
+                        log_msg = "warning"
+                        log_fmt = (
+                            "{3[0]} {3[1]} - the callback response body was not empty! "
+                            "(len: {3[2]:,} bytes)"
+                        )
+                        log_arg = (response.status, response.reason, response.content_length)
+                    else:
+                        log_msg = "result"
+                        log_fmt = "{3[0]} {3[1]}"
+                        log_arg = (response.status, response.reason)
+            except aiohttp.ClientError as e:
+                log_func = log.warning
+                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
+    except asyncio.CancelledError:
+        log_func = log.warning
+        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
+    except asyncio.TimeoutError:
+        log_func = log.warning
+        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
+    finally:
+        log_func(
+            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
+            data["event"],
+            data["session_id"],
+            url,
+            log_arg,
+        )
