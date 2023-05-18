@@ -173,6 +173,24 @@ class AuthorizationFailed(BackendError, web.HTTPUnauthorized):
     error_title = "Credential/signature mismatch."
 
 
+class PasswordExpired(BackendError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/password-expired"
+    error_title = "Should update password."
+
+    def __init__(
+        self, jwt_token: str, extra_msg: str = None, extra_data: Dict[str, Any] = None, **kwargs
+    ):
+        if extra_data is None:
+            _data = {}
+        else:
+            _data = extra_data
+        _data = {
+            **_data,
+            "token": jwt_token,
+        }
+        super().__init__(extra_msg, _data, **kwargs)
+
+
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
@@ -114,6 +115,11 @@ users = sa.Table(
     sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
     sa.Column("password", PasswordColumn()),
     sa.Column("need_password_change", sa.Boolean),
+    sa.Column(
+        "password_changed_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+    ),
     sa.Column("full_name", sa.String(length=64)),
     sa.Column("description", sa.String(length=500)),
     sa.Column("status", EnumValueType(UserStatus), default=UserStatus.ACTIVE, nullable=False),
@@ -636,6 +642,9 @@ class ModifyUser(graphene.Mutation):
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
             data["status"] = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
+
+        if data.get("password") is not None:
+            data["password_changed_at"] = datetime.utcnow()
 
         user_update_data: Dict[str, Any]
         prev_domain_name: str
