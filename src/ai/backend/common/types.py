@@ -778,14 +778,14 @@ class MountedAppConfig(JSONSerializableMixin):
     service_name: str
     service_def: Mapping[str, Any]
     metadata: Mapping[str, str]
-    copy_to: Optional[PurePosixPath] = None
+    copy_dir: Optional[PurePosixPath] = None
 
     def to_json(self) -> dict[str, Any]:
         return {
             "service_name": self.service_name,
             "service_def": self.service_def,
             "metadata": self.metadata,
-            "copy_to": str(self.copy_to) if self.copy_to is not None else None,
+            "copy_dir": str(self.copy_dir) if self.copy_dir is not None else None,
         }
 
     @classmethod
@@ -801,7 +801,7 @@ class MountedAppConfig(JSONSerializableMixin):
                 t.Key("service_name"): t.String,
                 t.Key("metadata", default={}): t.Dict().allow_extra("*"),
                 t.Key("service_def", default={}): t.Dict().allow_extra("*"),
-                t.Key("copy_to", default=None): tx.Path(type="dir") | t.Null,
+                t.Key("copy_dir", default=None): tx.Path(type="dir") | t.Null,
             }
         ).allow_extra("*")
 

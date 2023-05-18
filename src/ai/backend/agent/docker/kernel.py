@@ -26,7 +26,7 @@ from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, S
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..kernel import AbstractCodeRunner, AbstractKernel, match_distro_data
+from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
@@ -119,12 +119,11 @@ class DockerKernel(AbstractKernel):
     )
     def get_krunner_info(self, local_config: Mapping[str, Any]) -> Tuple[str, str, str]:
         distro = self.image_labels.get("ai.backend.base-distro", "ubuntu16.04")
-        matched_distro, _ = match_distro_data(local_config["container"]["krunner-volumes"], distro)
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
             matched_libc_style = "musl"
         arch = get_arch_name()
-        return arch, matched_distro, matched_libc_style
+        return arch, distro, matched_libc_style
 
     async def start_service(
         self,

@@ -16,9 +16,8 @@
         "action": "run_command",
         "args": {
           "command": [
-            "tar -zxf {service_path} --directory /home/work/",
-            "find /home/work/ -name \"code-server*\" -maxdepth 1 -type d -exec mv '{}' /home/work/.local/lib/code-server",
-            "ln -s /home/work/.local/lib/code-server/bin/code-server /home/work/.local/bin/code-server",
+            "ln -s {service_path} /home/work/.local/lib/code-server",
+            "ln -s {service_path}/bin/code-server /home/work/.local/bin/code-server",
             "PATH=\"/home/work/.local/bin:$PATH\""
           ]
         },
@@ -30,9 +29,9 @@
           "filename": "/home/work/.config/code-server/config.yaml",
           "body": [
             "bind-addr: 127.0.0.1:{port}\n",
-            "auth: password",
-            "password: {password}",
-            "cert: false"
+            "auth: password\n",
+            "password: {password}\n",
+            "cert: false\n"
           ]
         },
         "ref": "write_conf_file"

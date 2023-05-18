@@ -135,7 +135,6 @@ class BaseRunner(metaclass=ABCMeta):
     service_parser: Optional[ServiceParser]
     mounted_service_parsers: dict[str, ServiceParser]
     runtime_path: Path
-    _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
 
     services_running: Dict[str, asyncio.subprocess.Process]
 
@@ -663,8 +662,8 @@ class BaseRunner(metaclass=ABCMeta):
         mount_info: dict[str, Any] = service_info["mount_info"]
         mount_path: str = mount_info["kernel_path"]
         app_config: dict[str, Any] = mount_info["app_config"]
-        copy_to: Optional[Path] = (
-            Path(app_config["copy_to"]) if app_config["copy_to"] is not None else None
+        copy_dir: Optional[Path] = (
+            Path(app_config["copy_dir"]) if app_config["copy_dir"] is not None else None
         )
 
         opts: dict[str, Any] = service_info["options"]
@@ -683,30 +682,41 @@ class BaseRunner(metaclass=ABCMeta):
 
         def find_artifacts(pattern: str) -> dict[str, str]:
             artifacts = {}
+            # search distro and version
+            # ex - dropbear<-ubuntu.22.04.>aarch64.bin
+            _rx_distro = re.compile(r"\-([a-z]+\d+\.\d+)\.")
             for p in Path(mount_path).glob(pattern):
-                m = self._rx_distro.search(p.name)
+                m = _rx_distro.search(p.name)
                 if m is not None:
                     artifacts[m.group(1)] = p.name
             return artifacts
 
         def find_versioned_app_path(candidate_glob: str) -> Path:
             candidates = find_artifacts(candidate_glob)
-            _, candidate = match_distro_data(candidates, distro)
+            # _, candidate = match_distro_data(candidates, distro)
+            for _, cand in candidates.items():
+                candidate = cand
+                break
+            else:
+                raise UnsupportedBaseDistroError(f"distro({distro}) is not supported.")
             return Path(mount_path, candidate)
 
         mounted_service_path = find_versioned_app_path(f"{service_name}*{arch}*")
         service_path = mounted_service_path
         service_def_folder = mounted_def_folder
 
-        if copy_to is not None:
-            service_def_folder = copy_to / "service-defs"
-            service_path = copy_to / mounted_service_path.name
+        if copy_dir is not None:
+            service_def_folder = copy_dir / "service-defs"
+            service_path = copy_dir / mounted_service_path.name
 
             def _copy() -> None:
-                assert copy_to is not None
-                copy_to.mkdir(parents=True, exist_ok=True)
+                assert copy_dir is not None
+                copy_dir.mkdir(parents=True, exist_ok=True)
                 service_def_folder.mkdir(parents=True, exist_ok=True)
-                shutil.copy(mounted_service_path, service_path)
+                if mounted_service_path.is_file():
+                    shutil.copy(mounted_service_path, service_path)
+                else:
+                    shutil.copytree(mounted_service_path, service_path)
                 for fpath in service_def_file_paths:
                     shutil.copy(fpath, service_def_folder / fpath.name)
 
