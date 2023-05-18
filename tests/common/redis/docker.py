@@ -145,34 +145,31 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         os.environ.update({k: str(v) for k, v in ports.items()})
         os.environ["COMPOSE_PATH"] = str(compose_cfg_dir)
 
-        def _populate_configs():
-            nonlocal template_cfg_dir
-            if compose_cfg_dir.exists():
-                shutil.rmtree(compose_cfg_dir)
-            compose_cfg_dir.mkdir(parents=True)
-            for file in template_cfg_files:
-                shutil.copy(template_cfg_dir / file, compose_cfg_dir)
-            compose_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
-            compose_tpl = compose_tpl.replace("REDIS_PASSWORD", "develove")
-            compose_tpl = compose_tpl.replace("REDIS_MASTER_HOST", "node01")
-            compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(ports["REDIS_MASTER_PORT"]))
-            sentinel01_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
-            sentinel01_cfg = sentinel01_cfg.replace(
-                "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL1_PORT"])
-            )
-            sentinel02_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
-            sentinel02_cfg = sentinel02_cfg.replace(
-                "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL2_PORT"])
-            )
-            sentinel03_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
-            sentinel03_cfg = sentinel03_cfg.replace(
-                "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL3_PORT"])
-            )
-            (compose_cfg_dir / "sentinel01.conf").write_text(sentinel01_cfg)
-            (compose_cfg_dir / "sentinel02.conf").write_text(sentinel02_cfg)
-            (compose_cfg_dir / "sentinel03.conf").write_text(sentinel03_cfg)
+        if compose_cfg_dir.exists():
+            shutil.rmtree(compose_cfg_dir)
+        compose_cfg_dir.mkdir(parents=True)
+        for file in template_cfg_files:
+            shutil.copy(template_cfg_dir / file, compose_cfg_dir)
+        compose_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
+        compose_tpl = compose_tpl.replace("REDIS_PASSWORD", "develove")
+        compose_tpl = compose_tpl.replace("REDIS_MASTER_HOST", "node01")
+        compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(ports["REDIS_MASTER_PORT"]))
+        sentinel01_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
+        sentinel01_cfg = sentinel01_cfg.replace(
+            "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL1_PORT"])
+        )
+        sentinel02_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
+        sentinel02_cfg = sentinel02_cfg.replace(
+            "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL2_PORT"])
+        )
+        sentinel03_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
+        sentinel03_cfg = sentinel03_cfg.replace(
+            "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL3_PORT"])
+        )
+        (compose_cfg_dir / "sentinel01.conf").write_text(sentinel01_cfg)
+        (compose_cfg_dir / "sentinel02.conf").write_text(sentinel02_cfg)
+        (compose_cfg_dir / "sentinel03.conf").write_text(sentinel03_cfg)
 
-        await asyncio.get_running_loop().run_in_executor(None, _populate_configs)
         compose_file = compose_cfg_dir / "redis-cluster.yml"
 
         async with async_timeout.timeout(30.0):

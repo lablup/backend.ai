@@ -63,8 +63,8 @@ services:
     - testnet
     volumes:
     - type: bind
-      source: ${COMPOSE_PATH}/sentinel01.conf
-      target: /etc/redis-sentinel.conf
+      source: ${COMPOSE_PATH}
+      target: /config
     ports:
     - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
     depends_on:
@@ -73,7 +73,7 @@ services:
     - backendai-half-redis-node03
     command: >
       redis-server
-      /etc/redis-sentinel.conf
+      /config/redis-sentinel.conf
       --sentinel
       --port ${REDIS_SENTINEL1_PORT}
 
@@ -84,8 +84,8 @@ services:
     - testnet
     volumes:
     - type: bind
-      source: ${COMPOSE_PATH}/sentinel02.conf
-      target: /etc/redis-sentinel.conf
+      source: ${COMPOSE_PATH}
+      target: /config
     ports:
     - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
     depends_on:
@@ -94,7 +94,7 @@ services:
     - backendai-half-redis-node03
     command: >
       redis-server
-      /etc/redis-sentinel.conf
+      /config/redis-sentinel.conf
       --sentinel
       --port ${REDIS_SENTINEL2_PORT}
 
@@ -105,8 +105,8 @@ services:
     - testnet
     volumes:
     - type: bind
-      source: ${COMPOSE_PATH}/sentinel03.conf
-      target: /etc/redis-sentinel.conf
+      source: ${COMPOSE_PATH}
+      target: /config
     ports:
     - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
     depends_on:
@@ -115,7 +115,7 @@ services:
     - backendai-half-redis-node03
     command: >
       redis-server
-      /etc/redis-sentinel.conf
+      /config/redis-sentinel.conf
       --sentinel
       --port ${REDIS_SENTINEL3_PORT}
 
