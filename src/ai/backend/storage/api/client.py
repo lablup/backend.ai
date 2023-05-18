@@ -420,4 +420,5 @@ async def init_client_app(ctx: Context) -> web.Application:
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
+
     return app
