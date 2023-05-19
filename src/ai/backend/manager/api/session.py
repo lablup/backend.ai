@@ -2086,6 +2086,7 @@ async def get_info(request: web.Request) -> web.Response:
             sess.main_kernel.occupied_shares
         )  # legacy, only caculate main kernel's occupying resource
         resp["environ"] = str(sess.environ)
+        resp["resourceOpts"] = str(sess.resource_opts)
 
         # Lifecycle
         resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
