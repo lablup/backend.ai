@@ -73,7 +73,7 @@ services:
     - backendai-half-redis-node03
     command: >
       redis-server
-      /config/redis-sentinel.conf
+      /config/redis-sentinel01.conf
       --sentinel
       --port ${REDIS_SENTINEL1_PORT}
 
@@ -94,7 +94,7 @@ services:
     - backendai-half-redis-node03
     command: >
       redis-server
-      /config/redis-sentinel.conf
+      /config/redis-sentinel02.conf
       --sentinel
       --port ${REDIS_SENTINEL2_PORT}
 
@@ -115,7 +115,7 @@ services:
     - backendai-half-redis-node03
     command: >
       redis-server
-      /config/redis-sentinel.conf
+      /config/redis-sentinel03.conf
       --sentinel
       --port ${REDIS_SENTINEL3_PORT}
 
