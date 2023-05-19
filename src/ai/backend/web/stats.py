@@ -73,5 +73,5 @@ async def view_stats(request: web.Request) -> web.Response:
                 "active_proxy_websocket_handlers": len(stats.active_proxy_websocket_handlers),
             }
             return web.json_response(data)
-        case _:
-            raise web.HTTPBadRequest(text=f"Invalid format: {_}")
+        case _ as invalid_format:
+            raise web.HTTPBadRequest(text=f"Invalid format: {invalid_format}")
