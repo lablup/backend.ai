@@ -36,6 +36,7 @@ from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
+from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
@@ -70,6 +71,8 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     static_path = request.app["config"]["service"]["static_path"]
     file_path = (static_path / request_path).resolve()
@@ -99,6 +102,8 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def config_ini_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
@@ -115,6 +120,8 @@ async def config_ini_handler(request: web.Request) -> web.Response:
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
@@ -131,6 +138,8 @@ async def config_toml_handler(request: web.Request) -> web.Response:
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_webui_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     config = request.app["config"]
     static_path = config["service"]["static_path"]
@@ -156,6 +165,8 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
 
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
+    stats: WebStats = request.app["stats"]
+    stats.active_login_check_handlers.add(asyncio.current_task())  # type: ignore
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -176,6 +187,8 @@ async def login_check_handler(request: web.Request) -> web.Response:
 
 async def login_handler(request: web.Request) -> web.Response:
     config = request.app["config"]
+    stats: WebStats = request.app["stats"]
+    stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
         return web.HTTPBadRequest(
@@ -357,12 +370,16 @@ async def login_handler(request: web.Request) -> web.Response:
 
 
 async def logout_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     session.invalidate()
     return web.Response(status=201)
 
 
-async def webserver_healthcheck(_: web.Request) -> web.Response:
+async def webserver_healthcheck(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
     result = {
         "version": __version__,
         "details": "Success",
@@ -372,6 +389,8 @@ async def webserver_healthcheck(_: web.Request) -> web.Response:
 
 async def token_login_handler(request: web.Request) -> web.Response:
     config = request.app["config"]
+    stats: WebStats = request.app["stats"]
+    stats.active_token_login_handlers.add(asyncio.current_task())  # type: ignore
 
     # Check browser session exists.
     session = await get_session(request)
@@ -476,7 +495,7 @@ async def server_main(
     args: Tuple[Any, ...],
 ) -> AsyncIterator[None]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload])
+    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
     app["config"] = config
     j2env = jinja2.Environment(
         extensions=[
@@ -520,6 +539,8 @@ async def server_main(
     }
     cors = aiohttp_cors.setup(app, defaults=cors_options)
 
+    app["stats"] = WebStats()
+
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
@@ -532,6 +553,7 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/server/token-login", token_login_handler))
     cors.add(app.router.add_route("POST", "/server/login-check", login_check_handler))
     cors.add(app.router.add_route("POST", "/server/logout", logout_handler))
+    cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
