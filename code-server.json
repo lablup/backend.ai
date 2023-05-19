@@ -1,42 +1,28 @@
 {
-    "prestart": [
-      {
-        "action": "mkdir",
-        "args": {
-          "path": "/home/work/.local/lib"
-        }
-      },
-      {
-        "action": "mkdir",
-        "args": {
-          "path": "/home/work/.local/bin"
-        }
-      },
-      {
-        "action": "run_command",
-        "args": {
-          "command": [
-            "ln -s {service_path} /home/work/.local/lib/code-server",
-            "ln -s {service_path}/bin/code-server /home/work/.local/bin/code-server",
-            "PATH=\"/home/work/.local/bin:$PATH\""
-          ]
-        },
-        "ref": "pre_start_result"
-      },
-      {
-        "action": "write_file",
-        "args": {
-          "filename": "/home/work/.config/code-server/config.yaml",
-          "body": [
-            "bind-addr: 127.0.0.1:{port}\n",
-            "auth: password\n",
-            "password: {password}\n",
-            "cert: false\n"
-          ]
-        },
-        "ref": "write_conf_file"
+  "prestart": [
+    {
+      "action": "mkdir",
+      "args": {
+        "path": "/home/work/.config/code-server"
       }
-    ],
-    "command": ["/home/work/.local/bin/code-server"],
-    "url_template": ""
+    },
+    {
+      "action": "write_file",
+      "args": {
+        "filename": "/home/work/.config/code-server/config.yaml",
+        "body": [
+          "bind-addr: 0.0.0.0:{port}",
+          "auth: none",
+          "cert: false"
+        ]
+      },
+      "ref": "write_conf_file"
+    }
+  ],
+  "command": [
+    "{service_path}/bin/code-server",
+    "--config",
+    "/home/work/.config/code-server/config.yaml"
+  ],
+  "url_template": ""
 }

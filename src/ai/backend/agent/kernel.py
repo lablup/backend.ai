@@ -610,7 +610,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             ]
         )
         try:
-            with timeout(10):
+            with timeout(20):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
             return json.loads(result)
