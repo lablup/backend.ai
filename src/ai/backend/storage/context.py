@@ -9,7 +9,7 @@ from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
 from .cephfs import CephFSVolume
-from .dellemc import DellEMCVolume
+from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
 from .netapp import NetAppVolume
@@ -23,9 +23,11 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "vfs": BaseVolume,
     "xfs": XfsVolume,
     "netapp": NetAppVolume,
-    "dell": DellEMCVolume,
+    # NOTE: Dell EMC has two different storage: PowerStore and PowerScale (OneFS).
+    #       We support the latter only for now.
+    "dellemc-onefs": DellEMCOneFSVolume,
     "weka": WekaVolume,
-    "spectrumscale": GPFSVolume,
+    "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
     "cephfs": CephFSVolume,
 }
 
