@@ -582,7 +582,7 @@ class SchedulerDispatcher(aobject):
                         extra_msg=(
                             "Could not find a contiguous resource region in any agent "
                             "big enough to host the session "
-                            f"({sess_ctx.id})"
+                            f"(id: {sess_ctx.id}, resource group: {sess_ctx.scaling_group_name})"
                         ),
                     )
                 assert cand_agent is not None
@@ -782,9 +782,9 @@ class SchedulerDispatcher(aobject):
                         if agent is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    "Could not find a contiguous resource region in any agent "
-                                    "big enough to host a kernel in the session "
-                                    f"({sess_ctx.id})"
+                                    "Could not find a contiguous resource region in any agent big"
+                                    f" enough to host a kernel in the session (id: {sess_ctx.id},"
+                                    f" resource group: {sess_ctx.scaling_group_name})"
                                 ),
                             )
                     assert agent is not None
