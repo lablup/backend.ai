@@ -1,8 +1,8 @@
-"""add_vfolder_usage_mode_type
+"""service_app_vfolder
 
-Revision ID: 5e22558221ce
-Revises: fdc9d6ac49b4
-Create Date: 2023-05-08 13:17:07.675013
+Revision ID: fdd7c60f3d34
+Revises: d6a02307a057
+Create Date: 2023-05-19 17:10:58.268838
 
 """
 import textwrap
@@ -16,8 +16,8 @@ from ai.backend.manager.models.base import GUID, convention
 from ai.backend.manager.models.vfolder import VFolderUsageMode
 
 # revision identifiers, used by Alembic.
-revision = "5e22558221ce"
-down_revision = "fdc9d6ac49b4"
+revision = "fdd7c60f3d34"
+down_revision = "d6a02307a057"
 branch_labels = None
 depends_on = None
 
