@@ -404,8 +404,6 @@ shared_config_iv = t.Dict(
             t.Dict(
                 {
                     t.Key("max_password_age", default=None): t.Null | tx.TimeDuration(),
-                    t.Key("shared_secret"): t.String,
-                    t.Key("exp"): tx.TimeDuration(),
                 }
             ).allow_extra("*")
             | t.Null

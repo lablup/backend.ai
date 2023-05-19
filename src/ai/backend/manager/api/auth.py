@@ -6,10 +6,8 @@ import secrets
 from collections import ChainMap
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple, cast
-from uuid import UUID
 
 import aiohttp_cors
-import jwt
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -395,20 +393,6 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
 
-class JWTAuth:
-    @staticmethod
-    def encode_token(auth_config: Mapping[str, Any], user_id: UUID) -> str:
-        return jwt.encode(
-            {"user_id": str(user_id), "exp": datetime.utcnow() + auth_config["exp"]},
-            auth_config["shared_secret"],
-            algorithm="HS256",
-        )
-
-    @staticmethod
-    def decode_token(auth_config: Mapping[str, Any], token: str) -> dict[str, Any]:
-        return jwt.decode(token, auth_config["shared_secret"], algorithms=["HS256"])
-
-
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
@@ -523,11 +507,22 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             max_password_age := auth_config["max_password_age"]
         ) is not None:
             password_changed_at: datetime = row.users_password_changed_at
-            async with root_ctx.db.begin_readonly() as dbconn:
-                current_dt: datetime = await dbconn.scalar(sa.select(sa.func.now()))
-            if password_changed_at + max_password_age > current_dt:
-                # Force user to update password
-                raise PasswordExpired(jwt_token=JWTAuth.encode_token(auth_config, row.users_uuid))
+
+            async def _force_password_update() -> None:
+                assert row is not None
+                async with root_ctx.db.begin() as db_conn:
+                    current_dt: datetime = await db_conn.scalar(sa.select(sa.func.now()))
+                    if password_changed_at + max_password_age > current_dt:
+                        # Force user to update password
+                        query = (
+                            sa.update(users)
+                            .where(users.c.uuid == row.users_uuid)
+                            .values(need_password_change=True)
+                        )
+                        await db_conn.execute(query)
+                        raise PasswordExpired("Should change password")
+
+            await execute_with_retry(_force_password_update)
 
         auth_result = {
             "is_authorized": True,
@@ -988,27 +983,35 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("token"): t.String,
+            t.Key("domain"): t.String,
+            t.Key("email"): t.String,
+            t.Key("old_password"): t.String,
             t.Key("new_password"): t.String,
             t.Key("new_password2"): t.String,
         }
     )
 )
-async def update_password_by_token(request: web.Request, params: Any) -> web.Response:
+async def update_password_no_auth(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    log_fmt = "AUTH.UDPATE_PASSWORD_BY_TOKEN()"
-    log.info(log_fmt)
+    log_fmt = "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)"
+    log_args = (params["domain"], params["email"])
+    log.info(log_fmt, *log_args)
 
-    token = params["token"]
-    try:
-        decoded = JWTAuth.decode_token(root_ctx.shared_config["auth"], token)
-    except jwt.ExpiredSignatureError:
-        return web.json_response({"error_msg": "signature has expired"}, status=400)
+    if (auth_config := root_ctx.shared_config["auth"]) is None or auth_config[
+        "max_password_age"
+    ] is None:
+        raise GenericBadRequest("Unsupported function.")
 
-    user_id = UUID(decoded["user_id"])
+    checked_user = await check_credential(
+        root_ctx.db, params["domain"], params["email"], params["old_password"]
+    )
+    if checked_user is None:
+        raise AuthorizationFailed("User credential mismatch.")
+    if not checked_user["need_password_change"]:
+        raise AuthorizationFailed("No need to change password.")
 
     if params["new_password"] != params["new_password2"]:
-        log.info(log_fmt + ": new password mismtach")
+        log.info(log_fmt + ": new password mismtach", *log_args)
         return web.json_response({"error_msg": "new password mismatch"}, status=400)
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
@@ -1024,15 +1027,18 @@ async def update_password_by_token(request: web.Request, params: Any) -> web.Res
         hook_result.reason = hook_result.reason or "invalid password format"
         raise RejectedByHook.from_hook_result(hook_result)
 
-    async with root_ctx.db.begin() as conn:
-        # Update user password.
-        data = {
-            "password": params["new_password"],
-            "need_password_change": False,
-            "password_changed_at": datetime.utcnow(),
-        }
-        query = users.update().values(data).where(users.c.uuid == user_id)
-        await conn.execute(query)
+    async def _update() -> None:
+        async with root_ctx.db.begin() as conn:
+            # Update user password.
+            data = {
+                "password": params["new_password"],
+                "need_password_change": False,
+                "password_changed_at": datetime.utcnow(),
+            }
+            query = users.update().values(data).where(users.c.uuid == checked_user["uuid"])
+            await conn.execute(query)
+
+    await execute_with_retry(_update)
     return web.json_response({}, status=200)
 
 
@@ -1115,7 +1121,7 @@ def create_app(
     cors.add(app.router.add_route("GET", "/role", get_role))
     cors.add(app.router.add_route("POST", "/signup", signup))
     cors.add(app.router.add_route("POST", "/signout", signout))
-    cors.add(app.router.add_route("POST", "/update-password-token", update_password_by_token))
+    cors.add(app.router.add_route("POST", "/update-password-no-auth", update_password_no_auth))
     cors.add(app.router.add_route("POST", "/update-password", update_password))
     cors.add(app.router.add_route("POST", "/update-full-name", update_full_name))
     cors.add(app.router.add_route("GET", "/ssh-keypair", get_ssh_keypair))
