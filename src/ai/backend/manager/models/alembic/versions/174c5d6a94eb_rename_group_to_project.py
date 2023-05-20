@@ -1,8 +1,8 @@
 """rename_group_to_project
 
-Revision ID: 57e4e9d12256
-Revises: 10c58e701d87
-Create Date: 2023-03-05 13:59:57.049061
+Revision ID: 174c5d6a94eb
+Revises: d6a02307a057
+Create Date: 2023-05-20 12:24:39.499961
 
 """
 import enum
@@ -16,8 +16,8 @@ from ai.backend.manager.models.base import convention
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, vfolders
 
 # revision identifiers, used by Alembic.
-revision = "57e4e9d12256"
-down_revision = "10c58e701d87"
+revision = "174c5d6a94eb"
+down_revision = "d6a02307a057"
 branch_labels = None
 depends_on = None
 
