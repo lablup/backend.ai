@@ -58,6 +58,8 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
+from .datastore.config import load as datastore_cfg_load
+from .datastore.server import DataStoreRPCServer
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .types import DistributedLockFactory
@@ -284,6 +286,15 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         tz = root_ctx.shared_config["system"]["timezone"]
         log.info("Configured timezone: {}", tz.tzname(datetime.now()))
     yield
+
+
+@actxmgr
+async def datastore_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    cfg = root_ctx.datastore_config
+    datastore = await DataStoreRPCServer.new(root_ctx.shared_config.etcd, cfg)
+    root_ctx.datastore = datastore
+    yield
+    await root_ctx.datastore.__aexit__()
 
 
 @actxmgr
@@ -686,6 +697,7 @@ async def server_main(
     ]
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
+    root_ctx.datastore_config = datastore_cfg_load(_args[2])
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
@@ -783,6 +795,15 @@ async def server_main_logwrapper(
     help="The config file path. (default: ./manager.toml and /etc/backend.ai/manager.toml)",
 )
 @click.option(
+    "--datastore-config",
+    type=Path,
+    default=None,
+    help=(
+        "The config file path of datastore. (default: ./datastore.toml and"
+        " /etc/backend.ai/datastore.toml)"
+    ),
+)
+@click.option(
     "--debug",
     is_flag=True,
     help="This option will soon change to --log-level TEXT option.",
@@ -795,7 +816,11 @@ async def server_main_logwrapper(
 )
 @click.pass_context
 def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+    ctx: click.Context,
+    config_path: Path,
+    datastore_config: Path | None,
+    log_level: LogSeverity,
+    debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.
@@ -830,7 +855,7 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=cfg["manager"]["num-proc"],
-                        args=(cfg, log_endpoint),
+                        args=(cfg, log_endpoint, datastore_config),
                         wait_timeout=5.0,
                     )
                 finally:

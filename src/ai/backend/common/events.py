@@ -370,6 +370,10 @@ class SessionStartedEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_started"
 
 
+class SessionRestartingEvent(SessionCreationEventArgs, AbstractEvent):
+    name = "session_restarting"
+
+
 @attrs.define(slots=True, frozen=True)
 class SessionTerminationEventArgs:
     session_id: SessionId = attrs.field()

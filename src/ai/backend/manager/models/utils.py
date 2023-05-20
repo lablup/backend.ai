@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -175,6 +176,7 @@ async def connect_database(
     db = create_async_engine(
         url,
         connect_args=pgsql_connect_opts,
+        poolclass=NullPool,
         pool_size=local_config["db"]["pool-size"],
         max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
