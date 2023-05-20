@@ -82,20 +82,17 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import HookResults
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    EtcdRedisConfig,
     KernelEnqueueingConfig,
     KernelId,
     SessionTypes,
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
-from ai.backend.manager.defs import PluginDatabaseID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -140,7 +137,6 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    RejectedByHook,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1503,14 +1499,11 @@ async def handle_kernel_creation_lifecycle(
     generated when initiating the create_kernels() agent RPC call.
     """
     root_ctx: RootContext = app["_root.context"]
-    # ck_id = (event.creation_id, event.kernel_id)
-    ck_id = event.kernel_id
-    if ck_id in root_ctx.registry.kernel_creation_tracker:
-        log.debug(
-            "handle_kernel_creation_lifecycle: ev:{} k:{}",
-            event.name,
-            event.kernel_id,
-        )
+    log.debug(
+        "handle_kernel_creation_lifecycle: ev:{} k:{}",
+        event.name,
+        event.kernel_id,
+    )
     if isinstance(event, KernelPreparingEvent):
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
         pass
@@ -1523,17 +1516,12 @@ async def handle_kernel_creation_lifecycle(
             root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
-        await root_ctx.registry.finalize_running(event.creation_info)
-        # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            tracker.set_result(None)
+        session_id = event.session_id
+        await root_ctx.registry.finalize_running(event.kernel_id, session_id, event.creation_info)
         if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
-            session_id = event.creation_info.get("session_id")
-            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(str(session_id)))
     elif isinstance(event, KernelCancelledEvent):
-        if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
-            log.warning(f"Kernel cancelled, {event.reason = }")
-            tracker.cancel()
+        log.warning(f"Kernel cancelled, {event.reason = }")
 
 
 async def handle_kernel_termination_lifecycle(
@@ -1549,7 +1537,8 @@ async def handle_kernel_termination_lifecycle(
         await root_ctx.registry.mark_kernel_terminated(
             event.kernel_id, event.reason, event.exit_code
         )
-        await root_ctx.registry.check_session_terminated(event.kernel_id, event.reason)
+        session_id = event.session_id
+        await root_ctx.registry.check_session_terminated(session_id, event.reason)
 
 
 async def handle_session_creation_lifecycle(
@@ -1661,7 +1650,9 @@ async def invoke_session_callback(
     | SessionFailureEvent,
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
+    app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
+
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -1670,29 +1661,20 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
-    url = session.callback_url
-    if url is None:
+
+    if (callback_url := session.callback_url) is None:
         return
-    if (addr := root_ctx.local_config.get("pipeline", {}).get("event-queue")) is None:
-        return
-    etcd_redis_config: EtcdRedisConfig = {
-        "addr": addr,
-        "sentinel": None,
-        "service_name": None,
-        "password": None,
+
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
     }
-    stream_key = "events"
-    token = url.query.get("token")
 
-    async def _dispatch() -> None:
-        hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-            "PUBLISH_EVENT",
-            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
-        )
-        if hook_result.status != HookResults.PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
-    await execute_with_retry(_dispatch)
+    app_ctx.webhook_ptask_group.create_task(
+        _make_session_callback(data, callback_url),
+    )
 
 
 async def handle_batch_result(
@@ -2114,6 +2096,7 @@ async def get_info(request: web.Request) -> web.Response:
             sess.main_kernel.occupied_shares
         )  # legacy, only caculate main kernel's occupying resource
         resp["environ"] = str(sess.environ)
+        resp["resourceOpts"] = str(sess.resource_opts)
 
         # Lifecycle
         resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
@@ -2700,19 +2683,17 @@ async def init(app: web.Application) -> None:
 
     # passive events
     evd = root_ctx.event_dispatcher
-    evd.subscribe(
+    evd.consume(
         KernelPreparingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kprep"
     )
-    evd.subscribe(
-        KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull"
-    )
-    evd.subscribe(
+    evd.consume(KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull")
+    evd.consume(
         KernelCreatingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kcreat"
     )
-    evd.subscribe(
+    evd.consume(
         KernelStartedEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
     )
-    evd.subscribe(
+    evd.consume(
         KernelCancelledEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
     )
     evd.subscribe(

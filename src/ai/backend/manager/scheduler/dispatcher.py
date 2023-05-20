@@ -274,9 +274,27 @@ class SchedulerDispatcher(aobject):
 
         if cancelled_sessions:
             now = datetime.now(tzutc())
+            session_ids = [item.id for item in cancelled_sessions]
 
             async def _apply_cancellation():
                 async with self.db.begin_session() as db_sess:
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .values(
+                            status=KernelStatus.CANCELLED,
+                            status_info="pending-timeout",
+                            terminated_at=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.CANCELLED.name: now.isoformat(),
+                                },
+                            ),
+                        )
+                        .where(KernelRow.session_id.in_(session_ids))
+                    )
+                    await db_sess.execute(kernel_query)
                     query = (
                         sa.update(SessionRow)
                         .values(
@@ -291,7 +309,7 @@ class SchedulerDispatcher(aobject):
                                 },
                             ),
                         )
-                        .where(SessionRow.id.in_([item.id for item in cancelled_sessions]))
+                        .where(SessionRow.id.in_(session_ids))
                     )
                     await db_sess.execute(query)
 
@@ -564,7 +582,7 @@ class SchedulerDispatcher(aobject):
                         extra_msg=(
                             "Could not find a contiguous resource region in any agent "
                             "big enough to host the session "
-                            f"({sess_ctx.id})"
+                            f"(id: {sess_ctx.id}, resource group: {sess_ctx.scaling_group_name})"
                         ),
                     )
                 assert cand_agent is not None
@@ -764,9 +782,9 @@ class SchedulerDispatcher(aobject):
                         if agent is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    "Could not find a contiguous resource region in any agent "
-                                    "big enough to host a kernel in the session "
-                                    f"({sess_ctx.id})"
+                                    "Could not find a contiguous resource region in any agent big"
+                                    f" enough to host a kernel in the session (id: {sess_ctx.id},"
+                                    f" resource group: {sess_ctx.scaling_group_name})"
                                 ),
                             )
                     assert agent is not None

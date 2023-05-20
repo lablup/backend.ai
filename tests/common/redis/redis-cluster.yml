@@ -16,10 +16,9 @@ services:
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
     network_mode: host
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 2s
-      start_period: 1s
+    # IMPORTANT: We have INTENTIONALLY OMITTED the healthchecks
+    # because it interferes with pause/unpause of container to simulate
+    # network partitioning.
 
   backendai-half-redis-node02:
     image: redis:6-alpine
@@ -35,10 +34,6 @@ services:
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
     network_mode: host
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 2s
-      start_period: 1s
 
   backendai-half-redis-node03:
     image: redis:6-alpine
@@ -54,10 +49,6 @@ services:
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
     network_mode: host
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 2s
-      start_period: 1s
 
   backendai-half-redis-sentinel01:
     build:
@@ -75,10 +66,6 @@ services:
       - backendai-half-redis-node02
       - backendai-half-redis-node03
     network_mode: host
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 2s
-      start_period: 1s
 
   backendai-half-redis-sentinel02:
     build:
@@ -96,10 +83,6 @@ services:
       - backendai-half-redis-node02
       - backendai-half-redis-node03
     network_mode: host
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 2s
-      start_period: 1s
 
   backendai-half-redis-sentinel03:
     build:
@@ -117,7 +100,3 @@ services:
       - backendai-half-redis-node02
       - backendai-half-redis-node03
     network_mode: host
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 2s
-      start_period: 1s
