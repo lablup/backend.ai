@@ -1,0 +1,5 @@
+[db-pooler]
+addr = { host = "localhost", port = 8101 }
+name = "backend"
+user = "postgres"
+password = "develove"

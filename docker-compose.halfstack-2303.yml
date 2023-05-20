@@ -21,6 +21,21 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-pgbouncer:
+    image: bitnami/pgbouncer:1.19.0
+    networks:
+      - half
+    ports:
+      - "8101:6432"
+    environment:
+      - POSTGRESQL_PASSWORD=develove
+      - POSTGRESQL_DATABASE=backend
+      - POSTGRESQL_PORT=8100
+      - PGBOUNCER_AUTH_TYPE=any
+      - PGBOUNCER_CLIENT_TLS_SSLMODE=disable
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/pgbouncer-data:/bitnami/pgbouncer:rw"
+
   backendai-half-redis:
     image: redis:7.0.5-alpine
     restart: unless-stopped

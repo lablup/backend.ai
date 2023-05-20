@@ -252,6 +252,10 @@ EDITABLE_WEBUI=0
 # AGENT_WATCHER_PORT="6009"
 
 POSTGRES_PORT="8101"
+PGBOUNCER_PORT="8102"
+DB_NAME="backend"
+DB_USER="postgres"
+DB_PASSWORD="develove"
 REDIS_PORT="8111"
 ETCD_PORT="8121"
 MANAGER_PORT="8091"
@@ -280,6 +284,8 @@ while [ $# -gt 0 ]; do
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
+    --pgbouncer-port)       PGBOUNCER_PORT=$2; shift ;;
+    --pgbouncer-port=*)     PGBOUNCER_PORT="${1#*=}" ;;
     --redis-port)          REDIS_PORT=$2; shift ;;
     --redis-port=*)        REDIS_PORT="${1#*=}" ;;
     --etcd-port)           ETCD_PORT=$2; shift ;;
@@ -686,9 +692,17 @@ setup_environment() {
   fi
   cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRES_PASSWORD=develove/POSTGRES_PASSWORD=${DB_PASSWORD}/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRES_DB=backend/POSTGRES_DB=${DB_NAME}/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/8101:6432/${PGBOUNCER_PORT}:6432/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRESQL_PASSWORD=develove/POSTGRESQL_PASSWORD=${DB_PASSWORD}/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRESQL_DATABASE=backend/POSTGRESQL_DATABASE=${DB_NAME}/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRESQL_PORT=8100/POSTGRESQL_PORT=${POSTGRES_PORT}/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/pgbouncer-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/config"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
@@ -730,6 +744,10 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure datastore
+  cp configs/datastore/halfstack.toml ./datastore.toml
+  sed_inplace "s/port = 8101/port = ${PGBOUNCER_PORT}/" ./datastore.toml
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml
