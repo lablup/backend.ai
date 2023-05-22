@@ -35,7 +35,6 @@ from ai.backend.common.types import (
     DeviceModelInfo,
     DeviceName,
     HardwareMetadata,
-    MountedAppConfig,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -448,7 +447,7 @@ class Mount:
     target: Path
     permission: MountPermission = MountPermission.READ_ONLY
     opts: Optional[Mapping[str, Any]] = None
-    app_config: Optional[MountedAppConfig] = None
+    app_config: Optional[dict] = None
 
     def __str__(self):
         return f"{self.source}:{self.target}:{self.permission.value}"

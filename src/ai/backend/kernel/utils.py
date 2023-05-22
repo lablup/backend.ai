@@ -41,7 +41,7 @@ async def safe_close_task(task):
 async def wait_local_port_open(port):
     while True:
         try:
-            with timeout(20.0):
+            with timeout(40.0):
                 reader, writer = await asyncio.open_connection("127.0.0.1", port)
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)

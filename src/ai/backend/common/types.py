@@ -829,10 +829,6 @@ class VFolderMount(JSONSerializableMixin):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VFolderMount:
-        # check_result = cls.as_trafaret().check(obj)
-        # if (app_config := obj.get("app_config")) is not None:
-        #     check_result = {**check_result, "app_config": MountedAppConfig.from_json(app_config)}
-        # return cls(**check_result)
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
