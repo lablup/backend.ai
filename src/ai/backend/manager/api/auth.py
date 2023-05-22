@@ -418,7 +418,9 @@ async def check_password_age(
                         .values(need_password_change=True)
                     )
                     await db_conn.execute(query)
-                    raise PasswordExpired("Should change password")
+                    raise PasswordExpired(
+                        extra_msg=f"Password expired on {password_changed_at + max_password_age}."
+                    )
 
         await execute_with_retry(_force_password_update)
 
@@ -997,9 +999,8 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         {
             t.Key("domain"): t.String,
             t.Key("email"): t.String,
-            t.Key("old_password"): t.String,
+            t.Key("current_password"): t.String,
             t.Key("new_password"): t.String,
-            t.Key("new_password2"): t.String,
         }
     )
 )
@@ -1015,16 +1016,12 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         raise GenericBadRequest("Unsupported function.")
 
     checked_user = await check_credential(
-        root_ctx.db, params["domain"], params["email"], params["old_password"]
+        root_ctx.db, params["domain"], params["email"], params["current_password"]
     )
     if checked_user is None:
         raise AuthorizationFailed("User credential mismatch.")
     if not checked_user["need_password_change"]:
         raise AuthorizationFailed("No need to change password.")
-
-    if params["new_password"] != params["new_password2"]:
-        log.info(log_fmt + ": new password mismtach", *log_args)
-        return web.json_response({"error_msg": "new password mismatch"}, status=400)
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
     # The hook handlers should accept the request and whole ``params` dict.

@@ -175,7 +175,7 @@ class AuthorizationFailed(BackendError, web.HTTPUnauthorized):
 
 class PasswordExpired(BackendError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
-    error_title = "Should update password."
+    error_title = "Password has expired."
 
 
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
