@@ -22,7 +22,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
-from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
+from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
 from ..types import UserScope
 from .base import (
     GUID,
@@ -209,8 +209,10 @@ vfolders = sa.Table(
         nullable=False,
     ),
     sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
+        (
+            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+            "(ownership_type = 'group' AND \"group\" IS NOT NULL)"
+        ),
         name="ownership_type_match_with_user_or_group",
     ),
     sa.CheckConstraint(
@@ -586,8 +588,7 @@ async def prepare_vfolder_mounts(
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
-                f"The subpath '{subpath}' should designate "
-                f"a subdirectory of the vfolder '{name}'.",
+                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
             )
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
@@ -665,6 +666,8 @@ async def prepare_vfolder_mounts(
             )
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
+        if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
+            requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(

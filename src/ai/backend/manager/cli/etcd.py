@@ -143,9 +143,11 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
     "--scope",
     type=EnumChoice(ConfigScopes),
     default=ConfigScopes.GLOBAL,
-    help="The configuration scope to get/put the subtree. "
-    "To move between different scopes, use the global scope "
-    "and specify the per-scope prefixes manually.",
+    help=(
+        "The configuration scope to get/put the subtree. "
+        "To move between different scopes, use the global scope "
+        "and specify the per-scope prefixes manually."
+    ),
 )
 @click.pass_obj
 def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
@@ -171,7 +173,7 @@ def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
 @click.option(
     "--prefix",
     is_flag=True,
-    help="Get all key-value pairs prefixed with the given key " "as a JSON form.",
+    help="Get all key-value pairs prefixed with the given key as a JSON form.",
 )
 @click.option(
     "-s",
@@ -350,3 +352,62 @@ def unquote(cli_ctx: CLIContext, value) -> None:
     Unquote the given string used as a URL piece in etcd keys.
     """
     print(etcd_unquote(value))
+
+
+@cli.command()
+@click.argument("proxy")
+@click.argument("scaling_groups")
+@click.option(
+    "-s",
+    "--scope",
+    type=EnumChoice(ConfigScopes),
+    default=ConfigScopes.GLOBAL,
+    help="The configuration scope to put the value.",
+)
+@click.pass_obj
+def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, scope) -> None:
+    """
+    Updates storage proxy node config's SFTP desginated scaling groups.
+    To enter multiple scaling groups concatenate names with comma(,).
+    """
+
+    async def _impl():
+        async with etcd_ctx(cli_ctx) as etcd:
+            data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
+            if len(data) == 0:
+                log.error("proxy {} does not exist", proxy)
+                sys.exit(ExitCode.FAILURE)
+            await etcd.put(
+                f"volumes/proxies/{proxy}/sftp_scaling_groups",
+                ",".join([x.strip() for x in scaling_groups.split(",")]),
+            )
+
+    with cli_ctx.logger:
+        asyncio.run(_impl())
+
+
+@cli.command()
+@click.argument("proxy")
+@click.option(
+    "-s",
+    "--scope",
+    type=EnumChoice(ConfigScopes),
+    default=ConfigScopes.GLOBAL,
+    help="The configuration scope to put the value.",
+)
+@click.pass_obj
+def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scope) -> None:
+    """
+    Removes storage proxy node config's SFTP desginated scaling groups.
+    """
+
+    async def _impl():
+        async with etcd_ctx(cli_ctx) as etcd:
+            data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
+            if len(data) == 0:
+                log.error("proxy {} does not exist", proxy)
+                sys.exit(ExitCode.FAILURE)
+            await etcd.delete(f"volumes/proxies/{proxy}/sftp_scaling_groups")
+
+    with cli_ctx.logger:
+        asyncio.run(_impl())

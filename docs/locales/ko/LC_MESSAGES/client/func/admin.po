@@ -9,72 +9,71 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-13 16:57+0900\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.3\n"
+"Generated-By: Babel 2.12.1\n"
 
 # 8ec5acb8a5894dc4a4b2f89cdd1b1b39
-#: ../../client/func/admin.rst:2 fb3a7c91d9f44ae495c3fdee25f73606
+#: ../../client/func/admin.rst:2 4499c6e7a72043caad15271861e51d8b
 msgid "Admin Functions"
 msgstr "관리자용 함수"
 
-#: a705387be3274e0c84e07e7a1fdaeb5a ai.backend.client.func.admin.Admin:1 of
-msgid "Provides the function interface for making admin GrapQL queries."
+#: 17b4d4285bc041c9a9b1ea31ac0f3917 ai.backend.client.func.admin.Admin:1 of
+msgid "Provides the function interface for making admin GraphQL queries."
 msgstr ""
 
-#: ai.backend.client.func.admin.Admin:5 cb1a7702200e43eeada25730e511f8bd of
+#: 8d06f872898843cdaf80b57f13afdb47 ai.backend.client.func.admin.Admin:5 of
 msgid ""
 "Depending on the privilege of your API access key, you may or may not "
 "have access to querying/mutating server-side resources of other users."
 msgstr ""
 
-#: 6fe694bcc8824eeead10e7a88b76e30c ai.backend.client.func.admin.Admin.query:1
+#: 8638a7541b96449b8050a6eaef8408ce ai.backend.client.func.admin.Admin.query:1
 #: of
 msgid "Sends the GraphQL query and returns the response."
 msgstr ""
 
-#: 0f2f3282f53a400e833dcc945fafd90e ai.backend.client.func.admin.Admin.query of
+#: 81029a36880a4340b99f1b1e59ae8f62 ai.backend.client.func.admin.Admin.query of
 msgid "Parameters"
 msgstr ""
 
-#: 9f578547c041482ba0f046d83992f1a0 ai.backend.client.func.admin.Admin.query:4
+#: 4bd94c9f9b764454a0ebc98d03f829c0 ai.backend.client.func.admin.Admin.query:4
 #: of
 msgid "The GraphQL query string."
 msgstr ""
 
-#: ai.backend.client.func.admin.Admin.query:6 db7a8734b0974ef4a6244c889326cead
+#: 35302cbe5bf347cc8b2768971bc7fc19 ai.backend.client.func.admin.Admin.query:6
 #: of
 msgid ""
 "An optional key-value dictionary to fill the interpolated template "
 "variables in the query."
 msgstr ""
 
-#: 1db45ca429dd4df3a63cb33a193a05df ai.backend.client.func.admin.Admin.query of
+#: 927d98560fd0433a8f697fd57b8f7579 ai.backend.client.func.admin.Admin.query of
 msgid "Return type"
 msgstr ""
 
-#: ai.backend.client.func.admin.Admin.query:10 f88e9a539b1f498ba5fb330eb0138dd8
+#: 5789829f430c4e35a12b294dacfd5a60 ai.backend.client.func.admin.Admin.query:10
 #: of
 msgid ":py:data:`~typing.Any`"
 msgstr ""
 
-#: ai.backend.client.func.admin.Admin.query dcd6363e8ae04a0395ce21d312241331 of
+#: ai.backend.client.func.admin.Admin.query ba25a580752d467fb3f621fadd08132c of
 msgid "Returns"
 msgstr ""
 
-#: 9b05b96e59a04d2094dcbd373c626548 ai.backend.client.func.admin.Admin.query:11
+#: a0dfb14734ee4166a722abe21473bd91 ai.backend.client.func.admin.Admin.query:11
 #: of
 msgid "The object parsed from the response JSON string."
 msgstr ""
 
-# a1dcc49b0ed142d49ca971734031a61a
 #~ msgid "Provides the function interface for making admin GrapQL queries."
-#~ msgstr "관리자 GraphQL 쿼리를 날리고 받아오는 함수형 인터페이스를 제공합니다."
+#~ msgstr ""
 
 # 13a50fe212e046069fbddba698558897
 #~ msgid ""

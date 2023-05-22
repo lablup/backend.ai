@@ -167,9 +167,7 @@ class CUDAPlugin(AbstractComputePlugin):
             if dev_id in self.device_mask:
                 continue
             raw_info = libcudart.get_device_props(int(dev_id))
-            sysfs_node_path = (
-                "/sys/bus/pci/devices/" f"{raw_info['pciBusID_str'].lower()}/numa_node"
-            )
+            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
             node: Optional[int]
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
@@ -280,9 +278,7 @@ class CUDAPlugin(AbstractComputePlugin):
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
             device_slots={
-                dev.device_id: (
-                    DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1))
-                )
+                dev.device_id: DeviceSlotInfo(SlotTypes.COUNT, SlotName("cuda.device"), Decimal(1))
                 for dev in devices
             },
         )
@@ -486,6 +482,6 @@ class CUDAPlugin(AbstractComputePlugin):
             "human_readable_name": "GPU",
             "description": "CUDA-capable GPU",
             "display_unit": "GPU",
-            "number_format": "#,###",
+            "number_format": {"binary": False, "round_length": 0},
             "display_icon": "gpu1",
         }

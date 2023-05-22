@@ -30,6 +30,7 @@ from typing import (
     Tuple,
     Union,
 )
+from uuid import UUID
 
 import aiohttp
 import aiotools
@@ -47,6 +48,7 @@ from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
@@ -62,6 +64,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     Sentinel,
     ServicePort,
+    SessionId,
     SlotName,
     current_resource_slots,
 )
@@ -146,6 +149,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -156,7 +161,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
 
@@ -511,8 +524,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         "Target": str(mount.target),
                         "Source": str(mount.source),
                         "Type": mount.type.value,
-                        "ReadOnly": fix_unsupported_perm(mount.permission)
-                        == MountPermission.READ_ONLY,
+                        "ReadOnly": (
+                            fix_unsupported_perm(mount.permission) == MountPermission.READ_ONLY
+                        ),
                         f"{mount.type.value.capitalize()}Options": mount.opts if mount.opts else {},
                     }
                     for mount in mounts
@@ -660,6 +674,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         kernel_obj = DockerKernel(
             self.kernel_id,
+            self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -724,9 +740,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
-                "ai.backend.internal.block-service-ports": "1"
-                if self.internal_data.get("block_service_ports", False)
-                else "0",
+                "ai.backend.session-id": str(self.session_id),
+                "ai.backend.owner": str(self.agent_id),
+                "ai.backend.internal.block-service-ports": (
+                    "1" if self.internal_data.get("block_service_ports", False) else "0"
+                ),
             },
             "HostConfig": {
                 "Init": True,
@@ -1084,16 +1102,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None or kernel_id not in self.kernel_registry:
+                        if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
-                            await container.show()
-                            result.append(
-                                (
-                                    kernel_id,
-                                    container_from_docker_container(container),
-                                ),
+                            owner_id = AgentId(
+                                container["Config"]["Labels"].get("ai.backend.owner", "")
                             )
+                            if self.id == owner_id:
+                                await container.show()
+                                result.append(
+                                    (
+                                        kernel_id,
+                                        container_from_docker_container(container),
+                                    ),
+                                )
                     except asyncio.CancelledError:
                         pass
                     except Exception:
@@ -1249,6 +1271,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1256,6 +1279,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     ) -> DockerKernelCreationContext:
         return DockerKernelCreationContext(
             kernel_id,
+            session_id,
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
@@ -1316,7 +1341,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif e.status == 404:
                 # missing
                 log.warning(
-                    "destroy_kernel(k:{0}) kernel missing, " "forgetting this kernel", kernel_id
+                    "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
                 await self.rescan_resource_usage()
             else:
@@ -1441,8 +1466,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @preserve_termination_log
     async def monitor_docker_events(self):
         async def handle_action_start(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+            session_id = SessionId(UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"]))
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.START,
                 KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
@@ -1458,8 +1485,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 exit_code = evdata["Actor"]["Attributes"]["exitCode"]
             except KeyError:
                 exit_code = 255
+            session_id = SessionId(UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"]))
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.CLEAN,
                 reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
@@ -1477,8 +1506,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             if evdata is None:
                                 # Break out to the outermost loop when the connection is closed
                                 log.info(
-                                    "monitor_docker_events(): "
-                                    "restarting aiodocker event subscriber",
+                                    (
+                                        "monitor_docker_events(): "
+                                        "restarting aiodocker event subscriber"
+                                    ),
                                 )
                                 break
                             if evdata["Type"] != "container":
