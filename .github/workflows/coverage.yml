@@ -48,10 +48,10 @@ jobs:
     - name: Run the full test suite
       run: |
         # configure redis sentinel cluster hostnames for testing
-        sudo echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
-        sudo echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
-        sudo echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
-        pants test --use-coverage tests:: -- -m 'not integration'
+        echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+        pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
     - name: Upload pants log

@@ -162,7 +162,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -s -v
+        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:

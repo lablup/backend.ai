@@ -14,7 +14,6 @@ from typing import (
     Union,
 )
 
-import async_timeout
 from redis.asyncio import Redis
 from redis.exceptions import AuthenticationError as RedisAuthenticationError
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -101,9 +100,6 @@ _TReturn = TypeVar("_TReturn")
 _PInner = ParamSpec("_PInner")
 
 
-# FIXME: mypy 0.910 does not support PEP-612 (ParamSpec) yet...
-
-
 def with_timeout(
     t: float,
 ) -> Callable[  # type: ignore
@@ -115,7 +111,7 @@ def with_timeout(
     ) -> Callable[_PInner, Awaitable[_TReturn]]:  # type: ignore
         @functools.wraps(corofunc)
         async def run(*args: _PInner.args, **kwargs: _PInner.kwargs) -> _TReturn:  # type: ignore
-            async with async_timeout.timeout(t):
+            async with asyncio.timeout(t):
                 return await corofunc(*args, **kwargs)
 
         return run
