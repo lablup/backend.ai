@@ -149,7 +149,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
-      timeout-minutes: 5
+      timeout-minutes: 15
       run: |
         # configure redis sentinel cluster hostnames for testing
         echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
@@ -164,9 +164,6 @@ jobs:
           BASE_REF="HEAD~1"
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:

@@ -4,6 +4,7 @@ import contextlib
 import fcntl
 import json
 import logging
+import os
 import socket
 import subprocess
 import time
@@ -83,6 +84,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
             "docker",
             "run",
             "-d",
+            "-u",
+            f"{os.getuid()}:{os.getgid()}",
             "--name",
             f"test--etcd-slot-{get_parallel_slot()}",
             "-p",
@@ -129,6 +132,8 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             "docker",
             "run",
             "-d",
+            "-u",
+            f"{os.getuid()}:{os.getgid()}",
             "--name",
             f"test--redis-slot-{get_parallel_slot()}",
             "-p",
@@ -172,6 +177,8 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
             "docker",
             "run",
             "-d",
+            "-u",
+            f"{os.getuid()}:{os.getgid()}",
             "--name",
             f"test--postgres-slot-{get_parallel_slot()}",
             "-p",
