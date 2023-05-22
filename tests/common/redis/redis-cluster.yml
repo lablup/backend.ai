@@ -6,6 +6,7 @@ services:
   backendai-half-redis-node01:
     image: redis:7-alpine
     hostname: node01
+    user: ${DOCKER_USER}
     networks:
     - testnet
     ports:
@@ -25,6 +26,7 @@ services:
   backendai-half-redis-node02:
     image: redis:7-alpine
     hostname: node02
+    user: ${DOCKER_USER}
     networks:
     - testnet
     ports:
@@ -42,6 +44,7 @@ services:
   backendai-half-redis-node03:
     image: redis:7-alpine
     hostname: node03
+    user: ${DOCKER_USER}
     networks:
     - testnet
     ports:
@@ -59,6 +62,7 @@ services:
   backendai-half-redis-sentinel01:
     image: redis:7-alpine
     hostname: sentinel01
+    user: ${DOCKER_USER}
     networks:
     - testnet
     volumes:
@@ -80,6 +84,7 @@ services:
   backendai-half-redis-sentinel02:
     image: redis:7-alpine
     hostname: sentinel02
+    user: ${DOCKER_USER}
     networks:
     - testnet
     volumes:
@@ -101,6 +106,7 @@ services:
   backendai-half-redis-sentinel03:
     image: redis:7-alpine
     hostname: sentinel03
+    user: ${DOCKER_USER}
     networks:
     - testnet
     volumes:

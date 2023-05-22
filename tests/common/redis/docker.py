@@ -144,6 +144,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         }
         os.environ.update({k: str(v) for k, v in ports.items()})
         os.environ["COMPOSE_PATH"] = str(compose_cfg_dir)
+        os.environ["DOCKER_USER"] = f"{os.getuid()}:{os.getgid()}"
 
         if compose_cfg_dir.exists():
             shutil.rmtree(compose_cfg_dir)
