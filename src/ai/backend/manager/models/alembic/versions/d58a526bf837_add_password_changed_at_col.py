@@ -1,16 +1,16 @@
 """add_password_changed_at_col
 
-Revision ID: 673c9c64d140
-Revises: fdc9d6ac49b4
-Create Date: 2023-05-18 17:42:29.270969
+Revision ID: d58a526bf837
+Revises: d6a02307a057
+Create Date: 2023-05-22 15:04:20.452390
 
 """
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "673c9c64d140"
-down_revision = "fdc9d6ac49b4"
+revision = "d58a526bf837"
+down_revision = "d6a02307a057"
 branch_labels = None
 depends_on = None
 
