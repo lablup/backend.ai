@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import hashlib
 import hmac
@@ -44,6 +46,9 @@ from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine.row import Row
+
+    from ..models.utils import ExtendedAsyncSAEngine
     from .context import RootContext
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -393,6 +398,31 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
 
+async def check_password_age(
+    db: ExtendedAsyncSAEngine, user: Row, auth_config: Mapping[str, Any] | None
+) -> None:
+    if (
+        auth_config is not None
+        and (max_password_age := auth_config["max_password_age"]) is not None
+    ):
+        password_changed_at: datetime = user.users_password_changed_at
+
+        async def _force_password_update() -> None:
+            async with db.begin() as db_conn:
+                current_dt: datetime = await db_conn.scalar(sa.select(sa.func.now()))
+                if password_changed_at + max_password_age < current_dt:
+                    # Force user to update password
+                    query = (
+                        sa.update(users)
+                        .where(users.c.uuid == user.users_uuid)
+                        .values(need_password_change=True)
+                    )
+                    await db_conn.execute(query)
+                    raise PasswordExpired("Should change password")
+
+        await execute_with_retry(_force_password_update)
+
+
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
@@ -503,26 +533,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             pass
 
     if row is not None:
-        if (auth_config := root_ctx.shared_config["auth"]) is not None and (
-            max_password_age := auth_config["max_password_age"]
-        ) is not None:
-            password_changed_at: datetime = row.users_password_changed_at
-
-            async def _force_password_update() -> None:
-                assert row is not None
-                async with root_ctx.db.begin() as db_conn:
-                    current_dt: datetime = await db_conn.scalar(sa.select(sa.func.now()))
-                    if password_changed_at + max_password_age > current_dt:
-                        # Force user to update password
-                        query = (
-                            sa.update(users)
-                            .where(users.c.uuid == row.users_uuid)
-                            .values(need_password_change=True)
-                        )
-                        await db_conn.execute(query)
-                        raise PasswordExpired("Should change password")
-
-            await execute_with_retry(_force_password_update)
+        await check_password_age(root_ctx.db, row, root_ctx.shared_config["auth"])
 
         auth_result = {
             "is_authorized": True,
@@ -706,6 +717,7 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         keypair = result.first()
     if keypair is None:
         raise AuthorizationFailed("No API keypairs found.")
+    await check_password_age(root_ctx.db, user, root_ctx.shared_config["auth"])
     # [Hooking point for POST_AUTHORIZE]
     # The hook handlers should accept a tuple of the request, user, and keypair objects.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
