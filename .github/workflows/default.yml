@@ -167,6 +167,7 @@ jobs:
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Setup tmate session
+      if: ${{ failure() }}
       uses: mxschmitt/action-tmate@v3
     - name: Upload pants log
       uses: actions/upload-artifact@v3
