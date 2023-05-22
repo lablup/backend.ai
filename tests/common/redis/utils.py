@@ -44,11 +44,10 @@ async def simple_run_cmd(
 
 async def wait_redis_ready(host: str, port: int, password: Optional[str] = None) -> None:
     r = Redis.from_url(f"redis://{host}:{port}", password=password, socket_timeout=0.2)
+    print("CheckReady.PING...", port, file=sys.stderr)
     while True:
         try:
-            print("CheckReady.PING", port, file=sys.stderr)
             await r.ping()
-            print("CheckReady.PONG", port, file=sys.stderr)
         except RedisAuthenticationError:
             raise
         except (
@@ -56,11 +55,11 @@ async def wait_redis_ready(host: str, port: int, password: Optional[str] = None)
             ConnectionError,
             RedisConnectionError,
         ):
-            print("connectionError, retrying")
             await asyncio.sleep(0.1)
         except RedisTimeoutError:
             pass
         else:
+            print("CheckReady.PONG", port, file=sys.stderr)
             break
 
 

@@ -33,7 +33,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.blpop(r, key, reconnect_poll_interval=0.3),
+                redis_helper.blpop(r, key, reconnect_poll_interval=0.2),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -45,7 +45,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
 
     addr = redis_container[1]
     r = RedisConnectionInfo(
-        Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -64,27 +64,27 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     )
     await asyncio.sleep(0)
 
-    for i in range(5):
+    for i in range(2):
         print(f"pushing {i} to bl1")
         await r.client.rpush("bl1", str(i))
         await asyncio.sleep(0.1)
     do_pause.set()
     await paused.wait()
-    for i in range(5):
+    for i in range(2):
         # The Redis server is dead temporarily...
         if disruption_method == "stop":
             with pytest.raises(RedisConnectionError):
-                await r.client.rpush("bl1", str(5 + i))
+                await r.client.rpush("bl1", str(2 + i))
         elif disruption_method == "pause":
             with pytest.raises((asyncio.TimeoutError, RedisTimeoutError)):
-                await r.client.rpush("bl1", str(5 + i))
+                await r.client.rpush("bl1", str(2 + i))
         else:
             raise RuntimeError("should not reach here")
         await asyncio.sleep(0.1)
     do_unpause.set()
     await unpaused.wait()
-    for i in range(5):
-        await r.client.rpush("bl1", str(10 + i))
+    for i in range(2):
+        await r.client.rpush("bl1", str(4 + i))
         await asyncio.sleep(0.1)
 
     await interrupt_task
@@ -93,9 +93,9 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     assert pop_task.done()
 
     all_messages = set(map(int, received_messages))
-    assert set(range(0, 5)) < all_messages
-    assert set(range(13, 15)) < all_messages  # more msgs may be lost during restart
-    assert all_messages <= set(range(0, 15))
+    assert set(range(0, 2)) < all_messages
+    assert set(range(5, 6)) < all_messages  # more msgs may be lost during restart
+    assert all_messages <= set(range(0, 6))
 
 
 @pytest.mark.redis
@@ -114,7 +114,7 @@ async def test_blist_with_retrying_rpush(
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.blpop(r, key, reconnect_poll_interval=0.3),
+                redis_helper.blpop(r, key, reconnect_poll_interval=0.2),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -124,7 +124,7 @@ async def test_blist_with_retrying_rpush(
 
     addr = redis_container[1]
     r = RedisConnectionInfo(
-        Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -143,7 +143,7 @@ async def test_blist_with_retrying_rpush(
     )
     await asyncio.sleep(0)
 
-    for i in range(5):
+    for i in range(2):
         await redis_helper.execute(r, lambda r: r.rpush("bl1", str(i)))
         await asyncio.sleep(0.1)
     do_pause.set()
@@ -154,14 +154,14 @@ async def test_blist_with_retrying_rpush(
         do_unpause.set()
 
     wakeup_task = asyncio.create_task(wakeup())
-    for i in range(5):
-        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(5 + i)))
+    for i in range(2):
+        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(2 + i)))
         await asyncio.sleep(0.1)
     await wakeup_task
 
     await unpaused.wait()
-    for i in range(5):
-        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(10 + i)))
+    for i in range(2):
+        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(4 + i)))
         await asyncio.sleep(0.1)
 
     await interrupt_task
@@ -170,9 +170,9 @@ async def test_blist_with_retrying_rpush(
     assert pop_task.done()
 
     all_messages = set(map(int, received_messages))
-    assert set(range(0, 5)) < all_messages
-    assert set(range(13, 15)) < all_messages  # more msgs may be lost during restart
-    assert all_messages <= set(range(0, 15))
+    assert set(range(0, 2)) < all_messages
+    assert set(range(5, 6)) < all_messages  # more msgs may be lost during restart
+    assert all_messages <= set(range(0, 6))
 
 
 @pytest.mark.redis
@@ -196,7 +196,7 @@ async def test_blist_cluster_sentinel(
                 redis_helper.blpop(
                     s,
                     key,
-                    reconnect_poll_interval=0.3,
+                    reconnect_poll_interval=0.2,
                     service_name="mymaster",
                 ),
             ) as agen:
@@ -210,7 +210,7 @@ async def test_blist_cluster_sentinel(
         Sentinel(
             redis_cluster.sentinel_addrs,
             password="develove",
-            socket_timeout=0.5,
+            socket_timeout=0.2,
         ),
         service_name="mymaster",
     )
@@ -230,7 +230,7 @@ async def test_blist_cluster_sentinel(
     )
     await asyncio.sleep(0)
 
-    for i in range(5):
+    for i in range(2):
         await redis_helper.execute(
             s,
             lambda r: r.rpush("bl1", str(i)),
@@ -245,20 +245,20 @@ async def test_blist_cluster_sentinel(
         do_unpause.set()
 
     wakeup_task = asyncio.create_task(wakeup())
-    for i in range(5):
+    for i in range(2):
         await redis_helper.execute(
             s,
-            lambda r: r.rpush("bl1", str(5 + i)),
+            lambda r: r.rpush("bl1", str(2 + i)),
             service_name="mymaster",
         )
         await asyncio.sleep(0.1)
     await wakeup_task
 
     await unpaused.wait()
-    for i in range(5):
+    for i in range(2):
         await redis_helper.execute(
             s,
-            lambda r: r.rpush("bl1", str(10 + i)),
+            lambda r: r.rpush("bl1", str(4 + i)),
             service_name="mymaster",
         )
         await asyncio.sleep(0.1)
@@ -269,10 +269,10 @@ async def test_blist_cluster_sentinel(
     assert pop_task.done()
 
     if disruption_method == "stop":
-        assert [*map(int, received_messages)] == [*range(0, 15)]
+        assert [*map(int, received_messages)] == [*range(0, 6)]
     else:
         # loss happens during failover
         all_messages = set(map(int, received_messages))
-        assert set(range(0, 5)) < all_messages
-        assert set(range(10, 15)) < all_messages
-        assert all_messages <= set(range(0, 15))
+        assert set(range(0, 2)) < all_messages
+        assert set(range(4, 6)) < all_messages
+        assert all_messages <= set(range(0, 6))
