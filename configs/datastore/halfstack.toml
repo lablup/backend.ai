@@ -1,5 +1,20 @@
 [db-pooler]
-addr = { host = "localhost", port = 8101 }
+addr = { host = "localhost", port = 8200 }
 name = "backend"
 user = "postgres"
 password = "develove"
+
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 8120 }
+user = ""
+password = ""
+
+[datastore]
+rpc-listen-addr = { host = "127.0.0.1", port = 8190 }
+# id = "i-something-special"
+pid-file = "./datastore.pid"
+event-loop = "uvloop"
+
+[debug]
+enabled = true

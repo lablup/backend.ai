@@ -21,20 +21,19 @@ services:
       timeout: 3s
       retries: 10
 
-  backendai-half-pgbouncer:
+  backendai-half-db-pooler:
     image: bitnami/pgbouncer:1.19.0
+    depends_on:
+      - backendai-half-db
+    restart: unless-stopped
     networks:
       - half
     ports:
-      - "8101:6432"
-    environment:
-      - POSTGRESQL_PASSWORD=develove
-      - POSTGRESQL_DATABASE=backend
-      - POSTGRESQL_PORT=8100
-      - PGBOUNCER_AUTH_TYPE=any
-      - PGBOUNCER_CLIENT_TLS_SSLMODE=disable
+      - "8200:6432"
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/pgbouncer-data:/bitnami/pgbouncer:rw"
+    command: >
+      pgbouncer /bitnami/pgbouncer/conf/pgbouncer.ini
 
   backendai-half-redis:
     image: redis:7.0.5-alpine

@@ -2,20 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import functools
-from typing import Callable,Coroutine,Any, ClassVar, Mapping, cast
 import logging
+from typing import Any, Callable, ClassVar, Coroutine, Mapping, cast
 
-from callosum.rpc import Peer, RPCMessage
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
+from callosum.rpc import Peer, RPCMessage
 
-from ai.backend.common import config, identity, msgpack
+from ai.backend.common import config, msgpack
 from ai.backend.common.bgtask import BackgroundTaskManager
-from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.events import EventProducer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import aobject, EtcdRedisConfig
-
+from ai.backend.common.events import EventProducer
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import EtcdRedisConfig, aobject
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -53,7 +52,8 @@ class RPCFunctionRegistry:
 
         self.functions.add(meth.__name__)
         return _inner
-    
+
+
 class DataStoreRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
 

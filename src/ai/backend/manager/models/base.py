@@ -95,9 +95,6 @@ pgsql_connect_opts = {
         # 'deadlock_timeout': '10000',  # FIXME: AWS RDS forbids settings this via connection arguments
         "lock_timeout": "60000",  # 60 secs
         "idle_in_transaction_session_timeout": "60000",  # 60 secs
-        "prepared_statement_name_func": (
-            lambda: f"__asyncpg_{uuid.uuid4()}__"
-        ),  # https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#prepared-statement-name
     },
 }
 
