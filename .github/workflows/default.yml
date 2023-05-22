@@ -118,8 +118,6 @@ jobs:
     # runs-on: ubuntu-latest-8-cores
     runs-on: ubuntu-latest  # use this until we fix the redis cluster test cases
     steps:
-    - name: Collect Workflow Telemetry
-      uses: runforesight/workflow-telemetry-action@v1
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
@@ -151,7 +149,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
-      timeout-minutes: 2
+      timeout-minutes: 5
       run: |
         # configure redis sentinel cluster hostnames for testing
         echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
