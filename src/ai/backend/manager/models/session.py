@@ -693,8 +693,11 @@ class SessionRow(Base):
         return kerns[0]
 
     @property
-    def status_changed(self) -> datetime:
-        return datetime.fromisoformat(self.status_history[self.status.name])
+    def status_changed(self) -> Optional[datetime]:
+        try:
+            return datetime.fromisoformat(self.status_history[self.status.name])
+        except KeyError:
+            return None
 
     @property
     def resource_opts(self) -> dict[str, Any]:
@@ -1139,7 +1142,6 @@ DEFAULT_SESSION_ORDERING = [
         sa.func.greatest(
             SessionRow.created_at,
             SessionRow.terminated_at,
-            # SessionRow.status_changed,
         )
     ),
 ]
@@ -1373,7 +1375,6 @@ class ComputeSession(graphene.ObjectType):
         "cluster_size": ("sessions_cluster_size", None),
         "status": ("sessions_status", lambda s: SessionStatus[s]),
         "status_info": ("sessions_status_info", None),
-        # "status_changed": ("status_changed", dtparse),
         "result": ("sessions_result", lambda s: SessionResult[s]),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
