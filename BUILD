@@ -16,7 +16,7 @@ python_requirements(
         "zipstream-new": ["zipstream"],
     },
     type_stubs_module_mapping={
-        "types-aiofiles": ["aiofiles"],
+        "types-aiofiles": ["aiofiles", "aiofiles.os"],
         "types-click": ["click"],
         "types-cachetools": ["cachetools"],
         "types-Jinja2": ["Jinja2"],
