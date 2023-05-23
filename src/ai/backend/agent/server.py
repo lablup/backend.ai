@@ -22,6 +22,7 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
+    Iterable,
     Literal,
     Mapping,
     Optional,
@@ -47,7 +48,11 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventProducer,
+    KernelLifecycleEventReason,
+    KernelTerminatedEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -345,6 +350,37 @@ class AgentRPCServer(aobject):
     @collect_error
     async def ping_kernel(self, kernel_id: str):
         log.debug("rpc::ping_kernel({0})", kernel_id)
+
+    @rpc_function
+    @collect_error
+    async def sync_kernel_registry(
+        self,
+        raw_kernel_session_ids: Iterable[tuple[str, str]],
+    ) -> None:
+        kernel_session_ids = [
+            (KernelId(UUID(raw_kid)), SessionId(UUID(raw_sid)))
+            for raw_kid, raw_sid in raw_kernel_session_ids
+        ]
+        for kid, sid in kernel_session_ids:
+            if kid not in self.agent.kernel_registry:
+                # produce KernelTerminatedEvent
+                await self.agent.produce_event(
+                    KernelTerminatedEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    )
+                )
+        for kid, kernel in self.agent.kernel_registry.items():
+            if kid not in {kern_id for kern_id, sess_id in kernel_session_ids}:
+                # destroy kernel
+                await self.agent.inject_container_lifecycle_event(
+                    kid,
+                    kernel.session_id,
+                    LifecycleEvent.DESTROY,
+                    KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                    suppress_events=True,
+                )
 
     @rpc_function
     @collect_error

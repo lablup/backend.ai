@@ -1432,6 +1432,31 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
 @check_api_params(
     t.Dict(
         {
+            t.Key("agent"): t.String,
+        }
+    ),
+)
+async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    log.info(
+        "SYNC_AGENT_REGISTRY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    try:
+        await root_ctx.registry.sync_agent_kernel_registry(params["agent"])
+    except BackendError:
+        log.exception("SYNC_AGENT_REGISTRY: exception")
+        raise
+    return web.json_response({}, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
             t.Key("login_session_token", default=None): t.Null | t.String,
             # if `dst` is None, it will be agent's default destination.
             tx.AliasedKey(["filename", "fname"], default=None): t.Null | t.String,
@@ -2807,4 +2832,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
+    cors.add(
+        app.router.add_route("GET", "/{session_name}/sync-agent-registry", sync_agent_registry)
+    )
     return app, []

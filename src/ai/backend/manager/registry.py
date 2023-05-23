@@ -2397,6 +2397,41 @@ class AgentRegistry:
         if per_kernel_updates:
             await execute_with_retry(_update)
 
+    async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
+        """
+        Fetch agent data and status of related kernel data from DB.
+        If agent's kernel_registry has unknown kernel data,
+        """
+
+        async with self.db.begin_readonly() as db_conn:
+            query = (
+                sa.select([kernels.c.id, kernels.c.session_id, kernels.c.agent_addr])
+                .select_from(kernels)
+                .where(
+                    (kernels.c.agent == agent_id)
+                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                )
+            )
+            result = await db_conn.execute(query)
+            kernel_list = result.fetchall()
+
+        keyfunc = lambda item: item.agent_addr or ""
+        for agent_addr, group_iterator in itertools.groupby(
+            sorted(kernel_list, key=keyfunc),
+            key=keyfunc,
+        ):
+            grouped_kernels = [*group_iterator]
+            aid = grouped_kernels[0].agent
+            async with RPCContext(
+                aid,
+                agent_addr,
+                invoke_timeout=None,
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                return await rpc.call.sync_kernel_registry(
+                    [(str(kernel.id), str(kernel.session_id)) for kernel in group_iterator]
+                )
+
     async def mark_kernel_terminated(
         self,
         kernel_id: KernelId,
