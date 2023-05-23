@@ -1048,7 +1048,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
             await conn.execute(query)
 
     await execute_with_retry(_update)
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=201)
 
 
 @auth_required
