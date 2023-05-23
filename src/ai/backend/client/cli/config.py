@@ -207,11 +207,6 @@ def update_password_no_auth(domain, email, current_password, new_password):
     """
     Update user's password. This is used to update `EXPIRED` password only.
     """
-    config = get_config()
-    if config.endpoint_type != "session":
-        print_warn('To update password, your endpoint type must be "session".')
-        raise click.Abort()
-
     with Session() as session:
         try:
             session.Auth.update_password_no_auth(domain, email, current_password, new_password)

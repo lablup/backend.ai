@@ -84,5 +84,5 @@ class Auth(BaseFunction):
                 "new_password": new_password,
             }
         )
-        async with rqst.fetch() as resp:
+        async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()
