@@ -407,22 +407,13 @@ async def check_password_age(
     ):
         password_changed_at: datetime = user.users_password_changed_at
 
-        async def _force_password_update() -> None:
-            async with db.begin() as db_conn:
-                current_dt: datetime = await db_conn.scalar(sa.select(sa.func.now()))
-                if password_changed_at + max_password_age < current_dt:
-                    # Force user to update password
-                    query = (
-                        sa.update(users)
-                        .where(users.c.uuid == user.users_uuid)
-                        .values(need_password_change=True)
-                    )
-                    await db_conn.execute(query)
-                    raise PasswordExpired(
-                        extra_msg=f"Password expired on {password_changed_at + max_password_age}."
-                    )
-
-        await execute_with_retry(_force_password_update)
+        async with db.begin_readonly() as db_conn:
+            current_dt: datetime = await db_conn.scalar(sa.select(sa.func.now()))
+            if password_changed_at + max_password_age < current_dt:
+                # Force user to update password
+                raise PasswordExpired(
+                    extra_msg=f"Password expired on {password_changed_at + max_password_age}."
+                )
 
 
 @web.middleware
@@ -1020,8 +1011,6 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
     )
     if checked_user is None:
         raise AuthorizationFailed("User credential mismatch.")
-    if not checked_user["need_password_change"]:
-        raise AuthorizationFailed("No need to change password.")
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
     # The hook handlers should accept the request and whole ``params` dict.
@@ -1042,7 +1031,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
             data = {
                 "password": params["new_password"],
                 "need_password_change": False,
-                "password_changed_at": datetime.utcnow(),
+                "password_changed_at": sa.func.now(),
             }
             query = users.update().values(data).where(users.c.uuid == checked_user["uuid"])
             await conn.execute(query)
