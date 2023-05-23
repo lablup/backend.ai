@@ -526,8 +526,6 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             pass
 
     if row is not None:
-        await check_password_age(root_ctx.db, row, root_ctx.shared_config["auth"])
-
         auth_result = {
             "is_authorized": True,
             "keypair": {
