@@ -86,3 +86,24 @@ class Auth(BaseFunction):
         )
         async with rqst.fetch(anonymous=True) as resp:
             return await resp.json()
+
+    @api_function
+    @classmethod
+    async def update_password_no_auth_webserver(
+        cls, domain: str, email: str, current_password: str, new_password: str
+    ) -> dict:
+        """
+        Update user's password. This is used to update `EXPIRED` password only.
+        """
+
+        rqst = Request("POST", "/server/update-password-no-auth")
+        rqst.set_json(
+            {
+                "domain": domain,
+                "email": email,
+                "current_password": current_password,
+                "new_password": new_password,
+            }
+        )
+        async with rqst.fetch(anonymous=True) as resp:
+            return await resp.json()

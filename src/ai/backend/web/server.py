@@ -163,6 +163,89 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     return apply_cache_headers(web.FileResponse(static_path / "index.html"), "index.html")
 
 
+async def update_password_no_auth(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    client_ip = get_client_ip(request)
+    try:
+        text = await request.text()
+        creds = json.loads(text)
+    except json.JSONDecodeError as e:
+        log.error("Login: JSON decoding error: {}", e)
+        creds = {}
+
+    def _check_params(param_names: list[str]) -> web.Response | None:
+        for param in param_names:
+            if creds.get(param) is None:
+                return web.HTTPBadRequest(
+                    text=json.dumps(
+                        {
+                            "type": "https://api.backend.ai/probs/invalid-api-params",
+                            "title": f"You must provide the {param} field.",
+                        }
+                    ),
+                    content_type="application/problem+json",
+                )
+        return None
+
+    if (
+        fail_resp := _check_params(["domain", "email", "current_password", "new_password"])
+    ) is not None:
+        return fail_resp
+
+    result: MutableMapping[str, Any] = {
+        "data": None,
+    }
+
+    try:
+        anon_api_config = APIConfig(
+            domain=creds["domain"],
+            endpoint=config["api"]["endpoint"][0],
+            access_key="",
+            secret_key="",  # anonymous session
+            user_agent=user_agent,
+            skip_sslcert_validation=not config["api"]["ssl_verify"],
+        )
+        assert anon_api_config.is_anonymous
+        async with APISession(config=anon_api_config) as api_session:
+            fill_forwarding_hdrs_to_api_session(request, api_session)
+            await api_session.Auth.update_password_no_auth(
+                creds["domain"],
+                creds["email"],
+                creds["current_password"],
+                creds["new_password"],
+            )
+            log.info(
+                "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+                creds["email"],
+                client_ip,
+            )
+    except BackendClientError as e:
+        # This is error, not failed login, so we should not update login history.
+        return web.HTTPBadGateway(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/bad-gateway",
+                    "title": "The proxy target server is inaccessible.",
+                    "details": str(e),
+                }
+            ),
+            content_type="application/problem+json",
+        )
+    except BackendAPIError as e:
+        log.info(
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+            creds["username"],
+            client_ip,
+            e,
+        )
+        result["data"] = {
+            "type": e.data.get("type"),
+            "title": e.data.get("title"),
+            "details": e.data.get("msg"),
+        }
+    return web.json_response(result)
+
+
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
     stats: WebStats = request.app["stats"]
@@ -553,6 +636,9 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/server/token-login", token_login_handler))
     cors.add(app.router.add_route("POST", "/server/login-check", login_check_handler))
     cors.add(app.router.add_route("POST", "/server/logout", logout_handler))
+    cors.add(
+        app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
+    )
     cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))

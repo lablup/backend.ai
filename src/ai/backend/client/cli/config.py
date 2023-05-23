@@ -209,7 +209,12 @@ def update_password_no_auth(domain, email, current_password, new_password):
     """
     with Session() as session:
         try:
-            session.Auth.update_password_no_auth(domain, email, current_password, new_password)
+            if config.endpoint_type == "session":
+                session.Auth.update_password_no_auth_webserver(
+                    domain, email, current_password, new_password
+                )
+            else:
+                session.Auth.update_password_no_auth(domain, email, current_password, new_password)
             print_done("Password updated.")
         except Exception as e:
             print_error(e)
