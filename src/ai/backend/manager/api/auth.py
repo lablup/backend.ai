@@ -976,7 +976,7 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         data = {
             "password": params["new_password"],
             "need_password_change": False,
-            "password_changed_at": datetime.utcnow(),
+            "password_changed_at": sa.func.now(),
         }
         query = users.update().values(data).where(users.c.email == email)
         await conn.execute(query)
