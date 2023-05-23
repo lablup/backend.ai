@@ -1445,11 +1445,11 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
         "SYNC_AGENT_REGISTRY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        await root_ctx.registry.sync_agent_kernel_registry(params["agent"])
+        await root_ctx.registry.sync_agent_kernel_registry(AgentId(params["agent"]))
     except BackendError:
         log.exception("SYNC_AGENT_REGISTRY: exception")
         raise
-    return web.json_response({}, status=200)
+    return web.json_response({}, status=201)
 
 
 @server_status_required(ALL_ALLOWED)

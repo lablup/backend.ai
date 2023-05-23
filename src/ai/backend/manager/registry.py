@@ -2429,7 +2429,7 @@ class AgentRegistry:
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
                 return await rpc.call.sync_kernel_registry(
-                    [(str(kernel.id), str(kernel.session_id)) for kernel in group_iterator]
+                    [(str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels]
                 )
 
     async def mark_kernel_terminated(

@@ -371,8 +371,10 @@ class AgentRPCServer(aobject):
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
                     )
                 )
+
+        kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
         for kid, kernel in self.agent.kernel_registry.items():
-            if kid not in {kern_id for kern_id, sess_id in kernel_session_ids}:
+            if kid not in kernel_ids:
                 # destroy kernel
                 await self.agent.inject_container_lifecycle_event(
                     kid,
