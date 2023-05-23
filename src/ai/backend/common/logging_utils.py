@@ -1,10 +1,11 @@
 import logging
+from typing import Any, LiteralString
 
 
 class BraceMessage:
     __slots__ = ("fmt", "args")
 
-    def __init__(self, fmt, args):
+    def __init__(self, fmt: LiteralString, args: tuple[Any, ...]):
         self.fmt = fmt
         self.args = args
 

@@ -1,0 +1,119 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/install-storage-proxy.rst:2
+#: f7f9e350488445cfab54a18301f8b009
+msgid "Install Backend.AI Storage Proxy"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:4
+#: 43468436f0ea49d2926f2ef960cd3ef0
+msgid ""
+"Refer to :ref:`prepare_python_and_venv` to setup Python and virtual "
+"environment for the service."
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:7
+#: 7c345fdb02d64b36997787cc3de977a4
+msgid ""
+"Install the latest version of Backend.AI Storage Proxy for the current "
+"Python version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:16
+#: ee3248936fb2414cbd9d07da656b3ea1
+msgid "If you want to install a specific version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:24
+#: de6df27ee11847abb86923af79dc1af1
+msgid "Local configuration"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:26
+#: bb424ddb32094d2dad76e3db8d25b7e3
+msgid ""
+"Backend.AI Storage Proxy uses a TOML file (``storage-proxy.toml``) to "
+"configure local service. Refer to the `storage-proxy.toml sample file "
+"<https://github.com/lablup/backend.ai/blob/main/configs/storage-"
+"proxy/sample.toml>`_ for a detailed description of each section and item."
+" A configuration example would be:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:115
+#: 07e3e8df81de4607a1dd4f39a8ed5f52
+msgid ""
+"Save the contents to ``${HOME}/.config/backend.ai/storage-proxy.toml``. "
+"Backend.AI will automatically recognize the location. Adjust each field "
+"to conform to your system."
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:121
+#: 470f09c3910d481a8c9f27e9c8ecdb01
+msgid "Run Backend.AI Storage Proxy service"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:123
+#: 22042f3bb7734f7d86c4817cc261ece2
+msgid "You can run the service:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:130
+#: 5690a5c57501489abd9023c063dd788d
+msgid "Press ``Ctrl-C`` to stop both services."
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:134
+#: 515f65b86e094b1c8558365db178a2c6
+msgid "Register systemd service"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:136
+#: 3db8533e329546bc9c24a45c0e3f871e
+msgid ""
+"The service can be registered as a systemd daemon. It is recommended to "
+"automatically run the service after rebooting the host machine, although "
+"this is entirely optional."
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:140
+#: 94061de2756a4c7dbd8126dc1033552a
+msgid "First, create a runner script at ``${HOME}/bin/run-storage-proxy.sh``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:165
+#: d7e2ba2baf7c455eb6645b7014684dbe
+msgid "Make the scripts executable:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:171
+#: ac80563c618c403ca255689ca88a4706
+msgid ""
+"Then, create a systemd service file at ``/etc/systemd/system/backendai-"
+"storage-proxy.service``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-storage-proxy.rst:200
+#: 0622218759154ef7ad6c02ba96514664
+msgid "Finally, enable and start the service:"
+msgstr ""
+

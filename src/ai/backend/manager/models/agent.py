@@ -83,6 +83,7 @@ agents = sa.Table(
     sa.Column("available_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("addr", sa.String(length=128), nullable=False),
+    sa.Column("public_host", sa.String(length=256), nullable=True),
     sa.Column("first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("version", sa.String(length=64), nullable=False),
@@ -271,14 +272,18 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         scaling_group: str = None,
-        raw_status: str = None,
+        raw_status: Optional[str | AgentStatus] = None,
         filter: str = None,
     ) -> int:
+        if isinstance(raw_status, str):
+            status_list = [AgentStatus[s] for s in raw_status.split(",")]
+        elif isinstance(raw_status, AgentStatus):
+            status_list = [raw_status]
         query = sa.select([sa.func.count()]).select_from(agents)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
-            query = query.where(agents.c.status == AgentStatus[raw_status])
+            query = query.where(agents.c.status.in_(status_list))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -298,11 +303,15 @@ class Agent(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[Agent]:
+        if isinstance(raw_status, str):
+            status_list = [AgentStatus[s] for s in raw_status.split(",")]
+        elif isinstance(raw_status, AgentStatus):
+            status_list = [raw_status]
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         if scaling_group is not None:
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
-            query = query.where(agents.c.status == AgentStatus[raw_status])
+            query = query.where(agents.c.status.in_(status_list))
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
