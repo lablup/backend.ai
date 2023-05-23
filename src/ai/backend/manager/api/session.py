@@ -2808,6 +2808,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-from-template", create_from_template))
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
+    cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
@@ -2832,7 +2833,4 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
-    cors.add(
-        app.router.add_route("POST", "/{session_name}/sync-agent-registry", sync_agent_registry)
-    )
     return app, []
