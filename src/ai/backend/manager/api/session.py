@@ -2833,6 +2833,6 @@ def create_app(
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
     cors.add(
-        app.router.add_route("GET", "/{session_name}/sync-agent-registry", sync_agent_registry)
+        app.router.add_route("POST", "/{session_name}/sync-agent-registry", sync_agent_registry)
     )
     return app, []
