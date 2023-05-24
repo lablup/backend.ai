@@ -1370,11 +1370,11 @@ class AgentRegistry:
         concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
             set
         )  # key: access_key, value: set of session_id
-        occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-            lambda: ResourceSlot({"cpu": 0, "mem": 0})
-        )
 
         async def _recalc() -> None:
+            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
+                lambda: ResourceSlot({"cpu": 0, "mem": 0})
+            )
             async with self.db.begin() as conn:
                 # Query running containers and calculate concurrency_used per AK and
                 # occupied_slots per agent.
