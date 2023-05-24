@@ -1142,6 +1142,13 @@ def _verify_password(guess, hashed):
     return bcrypt.verify(guess, hashed)
 
 
+def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
+    """
+    Compare a raw string password value to hased password.
+    """
+    return _verify_password(raw_password, hashed_password)
+
+
 async def check_credential(
     db: SAEngine,
     domain: str,

@@ -29,7 +29,13 @@ from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
 from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
-from ..models.user import INACTIVE_USER_STATUSES, UserRole, UserStatus, check_credential
+from ..models.user import (
+    INACTIVE_USER_STATUSES,
+    UserRole,
+    UserStatus,
+    check_credential,
+    compare_to_hashed_password,
+)
 from ..models.utils import execute_with_retry
 from .exceptions import (
     AuthorizationFailed,
@@ -994,6 +1000,12 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def update_password_no_auth(request: web.Request, params: Any) -> web.Response:
+    """
+    Update user's password without any authorization
+    to allows users to update passwords that have expired
+    because it's been too long since a user changed the password.
+    """
+
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)"
     log_args = (params["domain"], params["username"])
@@ -1009,6 +1021,9 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
     )
     if checked_user is None:
         raise AuthorizationFailed("User credential mismatch.")
+    new_password = params["new_password"]
+    if compare_to_hashed_password(new_password, checked_user["password"]):
+        raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
     # The hook handlers should accept the request and whole ``params` dict.
@@ -1027,7 +1042,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         async with root_ctx.db.begin() as conn:
             # Update user password.
             data = {
-                "password": params["new_password"],
+                "password": new_password,
                 "need_password_change": False,
                 "password_changed_at": sa.func.now(),
             }
