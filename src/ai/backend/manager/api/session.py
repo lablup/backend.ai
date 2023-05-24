@@ -1438,12 +1438,9 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
 )
 async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
-    log.info(
-        "SYNC_AGENT_REGISTRY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
-    )
+    log.info("SYNC_AGENT_REGISTRY (ak:{}/{})", requester_access_key, owner_access_key)
     try:
         await root_ctx.registry.sync_agent_kernel_registry(AgentId(params["agent"]))
     except BackendError:
