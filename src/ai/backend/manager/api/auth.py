@@ -1041,7 +1041,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
             return result.scalar()
 
     changed_at = await execute_with_retry(_update)
-    return web.json_response({"password_changed_at": changed_at.strftime("%Y-%m-%d")}, status=201)
+    return web.json_response({"password_changed_at": changed_at.isoformat()}, status=201)
 
 
 @auth_required
