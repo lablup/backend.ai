@@ -743,6 +743,9 @@ class BaseRunner(metaclass=ABCMeta):
         async with self._service_lock:
             try:
                 service_name = service_info["name"]
+                if service_name in self.services_running:
+                    result = {"status": "running"}
+                    return
                 if service_name not in self.mounted_service_parsers:
                     try:
                         service_parser = await self._init_service(service_name, service_info)
