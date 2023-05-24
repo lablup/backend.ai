@@ -987,7 +987,7 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("domain"): t.String,
-            t.Key("email"): t.String,
+            t.Key("username"): t.String,
             t.Key("current_password"): t.String,
             t.Key("new_password"): t.String,
         }
@@ -996,7 +996,7 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
 async def update_password_no_auth(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)"
-    log_args = (params["domain"], params["email"])
+    log_args = (params["domain"], params["username"])
     log.info(log_fmt, *log_args)
 
     if (auth_config := root_ctx.shared_config["auth"]) is None or auth_config[
@@ -1005,7 +1005,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         raise GenericBadRequest("Unsupported function.")
 
     checked_user = await check_credential(
-        root_ctx.db, params["domain"], params["email"], params["current_password"]
+        root_ctx.db, params["domain"], params["username"], params["current_password"]
     )
     if checked_user is None:
         raise AuthorizationFailed("User credential mismatch.")

@@ -187,9 +187,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
                 )
         return None
 
-    if (
-        fail_resp := _check_params(["domain", "email", "current_password", "new_password"])
-    ) is not None:
+    if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
         return fail_resp
 
     result: MutableMapping[str, Any] = {
@@ -198,7 +196,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
 
     try:
         anon_api_config = APIConfig(
-            domain=creds["domain"],
+            domain=config["api"]["domain"],
             endpoint=config["api"]["endpoint"][0],
             access_key="",
             secret_key="",  # anonymous session
@@ -209,14 +207,14 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             await api_session.Auth.update_password_no_auth(
-                creds["domain"],
-                creds["email"],
+                config["api"]["domain"],
+                creds["username"],
                 creds["current_password"],
                 creds["new_password"],
             )
             log.info(
                 "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
-                creds["email"],
+                creds["username"],
                 client_ip,
             )
     except BackendClientError as e:
