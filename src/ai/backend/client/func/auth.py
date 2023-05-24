@@ -73,6 +73,7 @@ class Auth(BaseFunction):
     ) -> dict:
         """
         Update user's password. This is used to update `EXPIRED` password only.
+        This function fetch a request to manager.
         """
 
         rqst = Request("POST", "/auth/update-password-no-auth")
@@ -89,11 +90,12 @@ class Auth(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_password_no_auth_webserver(
+    async def update_password_no_auth_in_session(
         cls, user_id: str, current_password: str, new_password: str
     ) -> dict:
         """
         Update user's password. This is used to update `EXPIRED` password only.
+        This function fetch a girequest to webserver.
         """
 
         rqst = Request("POST", "/server/update-password-no-auth")

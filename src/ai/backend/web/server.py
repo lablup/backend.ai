@@ -190,7 +190,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
     if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
         return fail_resp
 
-    result: MutableMapping[str, Any] = {
+    result: dict[str, Any] = {
         "data": None,
         "password_changed_at": None,
     }

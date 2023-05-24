@@ -209,8 +209,9 @@ def update_password_no_auth(domain, user_id, current_password, new_password):
     """
     with Session() as session:
         try:
+            config = get_config()
             if config.endpoint_type == "session":
-                session.Auth.update_password_no_auth_webserver(
+                session.Auth.update_password_no_auth_in_session(
                     user_id, current_password, new_password
                 )
             else:
