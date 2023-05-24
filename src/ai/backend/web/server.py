@@ -207,7 +207,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            changed_at = await api_session.Auth.update_password_no_auth(
+            result = await api_session.Auth.update_password_no_auth(
                 config["api"]["domain"],
                 creds["username"],
                 creds["current_password"],
@@ -218,7 +218,6 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
                 creds["username"],
                 client_ip,
             )
-            result["password_changed_at"] = changed_at["password_changed_at"]
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
