@@ -1023,7 +1023,7 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         hook_result.reason = hook_result.reason or "invalid password format"
         raise RejectedByHook.from_hook_result(hook_result)
 
-    async def _update() -> None:
+    async def _update() -> datetime:
         async with root_ctx.db.begin() as conn:
             # Update user password.
             data = {
@@ -1031,11 +1031,19 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
                 "need_password_change": False,
                 "password_changed_at": sa.func.now(),
             }
-            query = users.update().values(data).where(users.c.uuid == checked_user["uuid"])
-            await conn.execute(query)
+            query = (
+                sa.update(users)
+                .values(data)
+                .where(users.c.uuid == checked_user["uuid"])
+                .returning(users.c.password_changed_at)
+            )
+            result = await conn.execute(query)
+            return result.scalar()
 
-    await execute_with_retry(_update)
-    return web.json_response({}, status=201)
+    changed_at = await execute_with_retry(_update)
+    return web.json_response(
+        {"password_changed_at": changed_at.strftime("%Y-%m-%dT%HH%MM")}, status=201
+    )
 
 
 @auth_required
