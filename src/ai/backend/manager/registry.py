@@ -2621,9 +2621,10 @@ class AgentRegistry:
         kernel_id: KernelId,
     ) -> AbuseReport:
         hash_name = "abuse_report"
-        abusing_report: Mapping[str, str] = await redis_helper.execute(
+        abusing_report: dict[str, str] = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.hgetall(hash_name),
+            encoding="utf-8",
         )
         if abusing_report is None:
             return {"kernel": kernel_id, "abuse_report": AbuseReportValue.NONE.value}
