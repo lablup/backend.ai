@@ -60,7 +60,10 @@
       "PasswordChangePlace": "상단바의 사람 아이콘을 클릭하고 \"사용자 정보 변경\" 메뉴로 이동하세요.",
       "SetupTotp": "이중 인증 활성화",
       "TotpActivated": "이중 인증 사용",
-      "AIAccelerator": "AI 가속기"
+      "AIAccelerator": "AI 가속기",
+      "YouMushChangeYourPassword": "보안을 위해 비밀번호를 주기적으로 변경하는 것이 좋습니다. 비밀번호를 변경한 지 일정 시간이 지났으므로, 서비스를 계속 이용하려면 비밀번호를 변경해야 합니다.",
+      "CurrentPassword": "현재 비밀번호",
+      "NewPasswordCannotBeSame": "기존 비밀번호와 다른 새 비밀번호를 입력해주세요."
     },
     "LOGINREQUIRED": "로그인이 필요합니다",
     "YouAreOffline": "오프라인 상태가 되었습니다",
@@ -331,6 +334,10 @@
     "DescCommitSession": "다음 세션에 대응하는 컨테이너를 커밋하려고 합니다: ",
     "EnvironmentInfo": "환경 정보",
     "DownloadingSessionLogs": "세션 로그를 다운받습니다.",
+    "VSCodeRemoteConnection": "VSCode 원격 연결",
+    "VSCodeRemotePasswordTitle": "Visual Studio Code 원격 연결 SSH 패스워드",
+    "VSCodeRemoteDescription": "로컬 Visual Studio Code 앱을 띄운후 아래 비밀번호를 입력하여 연산 세션에 (SSH를 통해) 원격 연결하고 작업할 수 있습니다. 버튼을 클릭하기 전에 비밀번호를 복사하세요. (주의: Visual Studio Code 앱이 여러분의 로컬 머신에 설치되어 있어야 합니다.)",
+    "VSCodeRemoteNoticeSSHConfig": "$HOME/.ssh/config 파일을 생성 또는 수정하여 아래 내용을 추가하면 Visual Studio Code에서 연산 세션으로의 원격 연결을 좀더 편리하게 할 수 있습니다.",
     "ElapsedTime": "경과 시간",
     "Timeout": "타임아웃",
     "SessionLifetime": "세션 수명",
@@ -347,7 +354,7 @@
     "Utilization": "사용률",
     "Threshold": "수거 기준값",
     "IdleChecks": "유휴 상태 검사",
-    "IdleChecksDesc": "연산 세션을 자동 삭제하는 세 가지 기준을 제공합니다.",
+    "IdleChecksDesc": "연산 세션을 자동 삭제하는 기준을 제공합니다.",
     "MaxSessionLifetime": "최대 세션 수명 시간",
     "MaxSessionLifetimeDesc": "세션 생성 후 이 시간이 지나면 세션을 강제 종료합니다. 세션이 무한으로 실행되는 것을 막을 수 있습니다.",
     "NetworkIdleTimeout": "네트워크 트래픽 기반 유휴 시간",
@@ -358,7 +365,9 @@
     "GracePeriodDesc": "자원 사용량 기반 체커를 이 시간 동안 작동하지 않게 합니다. 이 시간이 지나기 전에는 사용량이 적더라도 연산 세션이 삭제되지 않습니다.",
     "UtilizationThreshold": "자원 사용량 기준",
     "UtilizationThresholdDesc": "연산 세션의 자원 사용량 기준입니다. 연산 세션의 자원 사용량이 일정 시간 동안 설정된 기준값을 넘지 못하면, 그 세션은 자동으로 삭제됩니다. 예를 들어, CUDA 사용률 기준을 1%로 설정했다면, 일정 시간 동안 1% 미만의 CUDA GPU 사용률을 보이는 연산 세션이 삭제됩니다. 값이 설정되지 않는 자원은 자동 삭제 기준에서 제외됩니다.",
-    "ExpiresAfter": "남은 시간"
+    "ExpiresAfter": "남은 시간",
+    "ConnectionExample": "접속 예제",
+    "System": "업로드 세션"
   },
   "button": {
     "Cancel": "취소",
@@ -504,7 +513,8 @@
       "PleaseSelectOption": "옵션 선택은 필수 입니다.",
       "LetterNumber-_dot": "문자, 숫자 및 -_. 만 허용됩니다.",
       "NameAlreadyExists": "그 이름은 이미 사용중입니다.",
-      "ValidationFailed": "인증에 실패하였습니다."
+      "ValidationFailed": "인증에 실패하였습니다.",
+      "PleaseSelectOptions": "하나 이상의 옵션을 선택해주세요."
     },
     "ProjectAndGroup": "프로젝트 및 그룹",
     "ModifyKeypairResourcePolicy": "키페어 자원 정책 수정",
@@ -610,11 +620,12 @@
       "FolderUsing": "사용량",
       "FolderQuota": "가용량",
       "MaxFolderQuota": "최대 할당 가능 용량",
-      "Serve": "__NOT_TRANSLATED__"
+      "Serve": "서비스"
     },
     "explorer": {
-      "Delete": "삭제...",
-      "UploadFiles": "파일 업로드...",
+      "Delete": "삭제",
+      "UploadFiles": "파일 업로드",
+      "UploadFolder": "폴더 업로드",
       "NewFolder": "새 폴더",
       "StopUploading": "업로드 취소",
       "RenameAFile": "파일 이름 변경",
@@ -644,6 +655,7 @@
       "WritePermissionRequiredInUploadFiles": "파일을 업로드하기 위해서는 쓰기(write) 권한이 필요합니다.",
       "ReadonlyFolder": "읽기 전용 폴더",
       "FileAlreadyExists": "다음 파일은 이미 존재합니다.",
+      "FolderAlreadyExists": "다음 폴더는 이미 존재합니다.",
       "DoYouWantToOverwrite": "덮어쓰시겠습니까?",
       "FileExtensionChanged": "파일 확장자를 변경하시겠습니까?",
       "KeepFileExtension": " 유지",
@@ -655,7 +667,17 @@
       "NotEnoughResourceForFileBrowserSession": "파일브라우저용 세션 생성을 위한 충분한 자원(cpu: 1 Core, mem: 0.5GB)이 없습니다. 자원 확인 후 다시 시도하십시오.",
       "NoImagesSupportingFileBrowser": "파일브라우저를 지원하는 이미지가 없습니다. 폴더를 업로드하려면 파일브라우저 지원 이미지가 필요합니다.",
       "ClickFilebrowserButton": "폴더를 업로드하려면 파일브라우저 실행 버튼을 클릭해주세요.",
-      "ReadOnlyFolderOnFileBrowser": "파일브라우저에서 읽기 전용 폴더를 열게 되면, 파일 또는 폴더 다운로드만 허용됩니다."
+      "ReadOnlyFolderOnFileBrowser": "파일브라우저에서 읽기 전용 폴더를 열게 되면, 파일 또는 폴더 다운로드만 허용됩니다.",
+      "ExecuteSSH/SFTP": "SSH / SFTP 실행",
+      "NoImagesSupportingSystemSession": "SSH / SFTP를 지원하는 이미지가 없습니다. SSH / SFTP를 이용하려면 시스템 이미지가 필요합니다.",
+      "SftpScalingGroupsDoNotExist": "Sftp 자원 그룹이 없습니다.",
+      "ExecutingSSH/SFTPSession": "SSH / SFTP 세션을 실행합니다...",
+      "RunSSH/SFTPserver": "SFTP 서버 사용",
+      "SFTPSessionNotAvailable": "현재 SFTP 세션 사용이 불가능합니다.",
+      "StartingSSH/SFTPSession": "SFTP 서버 시작",
+      "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
+      "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
+      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요."
     },
     "invitation": {
       "EnterEmail": "이메일을 입력하세요",
@@ -665,7 +687,8 @@
       "InvitationError": "초대가 실패했습니다. 이미 초대된 사용자일 수 있습니다.",
       "Shared": "그룹 폴더를 공유했습니다",
       "NoOneWasShared": "그룹 폴더 공유에 실패했습니다",
-      "SharingError": "공유에 실패했습니다. 이미 공유받은 사용자거나 프로젝트 소속 사용자가 아닐 수 있습니다."
+      "SharingError": "공유에 실패했습니다. 이미 공유받은 사용자거나 프로젝트 소속 사용자가 아닐 수 있습니다.",
+      "FolderSharingNotAvailableToUser": "다음 사용자는 폴더 공유가 불가능한 상태입니다: "
     },
     "permission": {
       "NoChanges": "변경 사항이 없습니다",
@@ -818,6 +841,8 @@
     "Edit_ShellScriptTitle_2": " 셀 스크립트 수정하기",
     "AutoLogout": "자동 로그아웃",
     "DescAutoLogout": "세션 내 앱을 실행하기 위해 생성된 페이지를 제외한 모든 Backend.AI 웹 UI 페이지가 닫힐 경우 자동으로 로그아웃됩니다.",
+    "NoExistingVSCodePassword": "복사할 VS Code 패스워드가 없습니다.",
+    "VSCodePasswordClipboardCopy": "VS Code 패스워드가 클립보드에 복사되었습니다.",
     "SSHKeypairEnterManuallyFinished": "SSH 키페어 등록이 성공적으로 완료되었습니다."
   },
   "webTerminalUsageGuide": {
@@ -935,7 +960,8 @@
     "ResourceGroupDetail": "자원 그룹 세부 정보",
     "RetriesToSkip": "회",
     "NoGroupToDisplay": "그룹이 없습니다.",
-    "AllowedSessionTypes": "허용된 세션 타입"
+    "AllowedSessionTypes": "허용된 세션 타입",
+    "Domain": "도메인"
   },
   "maintenance": {
     "General": "일반",
@@ -998,10 +1024,18 @@
     }
   },
   "statistics": {
-    "Usage": "사용량",
+    "UsageHistory": "사용 기록",
     "SelectPeriod": "기간을 선택하세요",
     "1Day": "1일",
-    "1Week": "1주"
+    "1Week": "1주",
+    "UsageHistoryDesc": "사용 기록 탭에서는 연산 세션 사용과 관련된 간단한 통계를 그래프로 확인할 수 있습니다. 좌측 상단의 기간 선택 메뉴에서 이용 기간을 선택하여 하루 또는 일주일 동안의 사용 기록 통계를 확인할 수 있습니다. 표시되는 항목은 다음과 같습니다.",
+    "SessionsDesc": "생성된 연산 세션의 수입니다.",
+    "CPUDesc": "연산 세션이 생성되면서 할당한 CPU 코어의 수입니다.",
+    "MemoryDesc": "연산 세션이 생성되면서 할당한 메모리의 양입니다.",
+    "GPUDesc": "연산 세션이 생성되면서 할당한 GPU 단위의 수입니다. Fractional GPU 기능이 작동하고 있을 경우, 물리 GPU 와 일치하지 않을 수 있습니다.",
+    "IOReadDesc": "연산 세션에서 읽어들인(read) 데이터의 크기입니다. 단, 데이터 폴더 등 외부에서 마운트 된 장치에서 읽어들인 데이터 양은 포함되지 않습니다.",
+    "IOWriteDesc": "연산 세션에서 기록한(write) 데이터의 크기입니다. 단, 데이터 폴더 등 외부에서 마운트 된 장치에서 생성한 데이터의 양은 포함되지 않습니다.",
+    "UsageHistoryNote": "여기에 나타나는 통계는 종료된 연산 세션을 기준으로 합니다. 또한, 가입 일주일 미만의 사용자에게는 주간 사용 기록 조회 메뉴가 출력되지 않을 수 있습니다."
   },
   "language": {
     "Browser": "브라우저 기본",
@@ -1163,7 +1197,8 @@
     "TooManyAttempt": "너무 많은 로그인 시도가 있었습니다. 잠시동안 로그인 시도가 차단되었습니다.",
     "SingleSignOn": {
       "LoginWithSAML": "SAML 로그인"
-    }
+    },
+    "EndpointStartWith": "http:// 혹은 https:// 로 시작해야 합니다."
   },
   "signup": {
     "SignupBETA": "가입 (베타 초대 대상)",
@@ -1306,7 +1341,9 @@
     "LoginSucceededManagerNotResponding": "로그인은 성공하였으나 매니저 서버가 응답하지 않습니다.",
     "UserNameAlreadyExist": "이미 사용하고 있는 사용자명입니다.",
     "ResourcePolicyStillReferenced": "이 자원 정책을 사용하고 있는 자격 증명이 있습니다.",
-    "InvalidSignupToken": "잘못된 가입 토큰입니다"
+    "InvalidSignupToken": "잘못된 가입 토큰입니다",
+    "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
+    "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다."
   },
   "maxLength": {
     "20chars": "(최대 길이 20자)",
@@ -1333,6 +1370,7 @@
     "ValueRequired": "값이 필요합니다.",
     "InputTooShort": "입력값이 너무 짧습니다."
   },
+  "OpenVSCodeRemote": "로컬 Visual Studio Code 열기",
   "totp": {
     "OTP": "이중 인증",
     "TotpRemoved": "이중 인증이 비활성화 되었습니다.",
