@@ -1354,6 +1354,8 @@ class AbstractAgent(
                             kern_id,
                             body.get("reason"),
                         )
+        except Exception:
+            log.exception("error while paring abuse reports:")
         finally:
             for kid, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
