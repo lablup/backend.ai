@@ -1118,6 +1118,10 @@ class PurgeUser(graphene.Mutation):
                 redis_conn,
                 lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
             )
+            await redis_helper.execute(
+                redis_conn,
+                lambda r: r.delete(f"keypair.sftp_concurrency_used.{access_key}"),
+            )
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
         )
