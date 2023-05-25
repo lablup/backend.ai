@@ -1,6 +1,9 @@
 name: assign-pr-number
 on:
-  [workflow_call]
+  workflow_call:
+    secrets:
+      WORKFLOW_PAT:
+        required: true
 permissions:
   contents: write
 
