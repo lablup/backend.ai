@@ -64,6 +64,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReport,
     AccessKey,
     AgentId,
     BinarySize,
@@ -2189,6 +2190,7 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
+        auto_terminate_abusing_kernel = agent_info["auto_terminate_abusing_kernel"]
         async with self.heartbeat_lock:
             instance_rejoin = False
 
@@ -2213,6 +2215,7 @@ class AgentRegistry:
                                 agents.c.version,
                                 agents.c.compute_plugins,
                                 agents.c.architecture,
+                                agents.c.auto_terminate_abusing_kernel,
                             ]
                         )
                         .select_from(agents)
@@ -2241,6 +2244,7 @@ class AgentRegistry:
                                 "version": agent_info["version"],
                                 "compute_plugins": agent_info["compute_plugins"],
                                 "architecture": agent_info.get("architecture", "x86_64"),
+                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                             }
                         )
                         result = await conn.execute(insert_query)
@@ -2261,6 +2265,8 @@ class AgentRegistry:
                             updates["compute_plugins"] = agent_info["compute_plugins"]
                         if row["architecture"] != agent_info["architecture"]:
                             updates["architecture"] = agent_info["architecture"]
+                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
+                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
                         # occupied_slots are updated when kernels starts/terminates
                         if updates:
                             await self.shared_config.update_resource_slots(slot_key_and_units)
@@ -2285,6 +2291,7 @@ class AgentRegistry:
                                     "version": agent_info["version"],
                                     "compute_plugins": agent_info["compute_plugins"],
                                     "architecture": agent_info["architecture"],
+                                    "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                                 }
                             )
                             .where(agents.c.id == agent_id)
@@ -2611,15 +2618,20 @@ class AgentRegistry:
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
-        agent_id: AgentId,
-        agent_addr: str,
-    ) -> Optional[Mapping[str, str]]:
-        async with RPCContext(
-            agent_id,
-            agent_addr,
-            invoke_timeout=None,
-        ) as rpc:
-            return await rpc.call.get_abusing_report(str(kernel_id))
+    ) -> Optional[AbuseReport]:
+        hash_name = "abuse_report"
+        abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.hgetall(hash_name),
+            encoding="utf-8",
+        )
+        kern_id = str(kernel_id)
+        if abusing_report is None or (result := abusing_report.get(kern_id)) is None:
+            return None
+        return {
+            "kernel": kern_id,
+            "abuse_report": result,
+        }
 
 
 async def check_scaling_group(
