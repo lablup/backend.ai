@@ -1,7 +1,7 @@
 """add_auto_terminate_col
 
 Revision ID: 857bdec5abda
-Revises: d6a02307a057
+Revises: 210c4d9be768
 Create Date: 2023-05-23 12:18:02.046409
 
 """
