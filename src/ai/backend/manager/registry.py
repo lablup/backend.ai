@@ -65,7 +65,6 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginConte
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AbuseReport,
-    AbuseReportValue,
     AccessKey,
     AgentId,
     BinarySize,
@@ -2628,10 +2627,10 @@ class AgentRegistry:
         )
         kern_id = str(kernel_id)
         if abusing_report is None:
-            return {"kernel": kern_id, "abuse_report": AbuseReportValue.NONE.value}
+            return {"kernel": kern_id, "abuse_report": None}
         return {
             "kernel": kern_id,
-            "abuse_report": abusing_report.get(kern_id, AbuseReportValue.NONE.value),
+            "abuse_report": abusing_report.get(kern_id),
         }
 
 

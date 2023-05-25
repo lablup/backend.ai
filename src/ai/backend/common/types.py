@@ -293,14 +293,13 @@ class CommitStatus(str, enum.Enum):
 
 
 class AbuseReportValue(str, enum.Enum):
-    NONE = "none"
     DETECTED = "detected"
     CLEANING = "cleaning"
 
 
 class AbuseReport(TypedDict):
     kernel: str
-    abuse_report: str
+    abuse_report: Optional[str]
 
 
 class MovingStatValue(TypedDict):
