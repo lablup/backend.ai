@@ -65,6 +65,7 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginConte
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AbuseReport,
+    AbuseReportValue,
     AccessKey,
     AgentId,
     BinarySize,
@@ -2618,18 +2619,17 @@ class AgentRegistry:
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
-    ) -> Optional[Mapping[str, str]]:
+    ) -> AbuseReport:
         hash_name = "abuse_report"
         abusing_report: Mapping[str, str] = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.hgetall(hash_name),
         )
-        kern_id = str(kernel_id)
         if abusing_report is None:
-            return {"kernel": kern_id, "abuse_report": AbuseReport.NONE.value}
+            return {"kernel": kernel_id, "abuse_report": AbuseReportValue.NONE.value}
         return {
-            "kernel": kern_id,
-            "abuse_report": abusing_report.get(kern_id, AbuseReport.NONE.value),
+            "kernel": kernel_id,
+            "abuse_report": abusing_report.get(str(kernel_id), AbuseReportValue.NONE.value),
         }
 
 

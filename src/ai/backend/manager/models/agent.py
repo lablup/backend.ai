@@ -232,7 +232,7 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
-    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {
             "agent": {
                 "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,

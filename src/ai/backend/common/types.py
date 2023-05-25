@@ -292,10 +292,15 @@ class CommitStatus(str, enum.Enum):
     ONGOING = "ongoing"
 
 
-class AbuseReport(str, enum.Enum):
+class AbuseReportValue(str, enum.Enum):
     NONE = "none"
     DETECTED = "detected"
     CLEANING = "cleaning"
+
+
+class AbuseReport(TypedDict):
+    kernel: KernelId
+    abuse_report: str
 
 
 class MovingStatValue(TypedDict):
