@@ -299,7 +299,7 @@ class AbuseReportValue(str, enum.Enum):
 
 
 class AbuseReport(TypedDict):
-    kernel: KernelId
+    kernel: str
     abuse_report: str
 
 

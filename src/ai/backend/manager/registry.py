@@ -2621,16 +2621,17 @@ class AgentRegistry:
         kernel_id: KernelId,
     ) -> AbuseReport:
         hash_name = "abuse_report"
-        abusing_report: dict[str, str] = await redis_helper.execute(
+        abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.hgetall(hash_name),
             encoding="utf-8",
         )
+        kern_id = str(kernel_id)
         if abusing_report is None:
-            return {"kernel": kernel_id, "abuse_report": AbuseReportValue.NONE.value}
+            return {"kernel": kern_id, "abuse_report": AbuseReportValue.NONE.value}
         return {
-            "kernel": kernel_id,
-            "abuse_report": abusing_report.get(str(kernel_id), AbuseReportValue.NONE.value),
+            "kernel": kern_id,
+            "abuse_report": abusing_report.get(kern_id, AbuseReportValue.NONE.value),
         }
 
 
