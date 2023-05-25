@@ -84,7 +84,6 @@ async def check_concurrency(
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
         redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
-    log.debug("updating {}", redis_key)
     ok, concurrency_used = await redis_helper.execute_script(
         sched_ctx.registry.redis_stat,
         "check_keypair_concurrency_used",
