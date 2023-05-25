@@ -1402,7 +1402,7 @@ class AgentRegistry:
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in await conn.stream(query):
-                    if kernels.c.role in PRIVATE_KERNEL_ROLES:
+                    if row.role in PRIVATE_KERNEL_ROLES:
                         sftp_concurrency_used_per_key[row.access_key].add(row.session_id)
                     else:
                         concurrency_used_per_key[row.access_key].add(row.session_id)
@@ -1682,7 +1682,7 @@ class AgentRegistry:
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
-                                if kernel.role in PRIVATE_KERNEL_ROLES:
+                                if kernel.is_private:
                                     kp_key = "keypair.sftp_concurrency_used"
                                 else:
                                     kp_key = "keypair.concurrency_used"
@@ -1727,7 +1727,7 @@ class AgentRegistry:
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
-                                if kernel.role in PRIVATE_KERNEL_ROLES:
+                                if kernel.is_private:
                                     kp_key = "keypair.sftp_concurrency_used"
                                 else:
                                     kp_key = "keypair.concurrency_used"

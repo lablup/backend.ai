@@ -560,6 +560,10 @@ class KernelRow(Base):
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
 
+    @property
+    def is_private(self) -> bool:
+        return self.role in PRIVATE_KERNEL_ROLES
+
     @staticmethod
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False

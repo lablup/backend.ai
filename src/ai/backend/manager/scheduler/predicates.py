@@ -69,7 +69,7 @@ async def check_concurrency(
         resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
             KeyPairRow.access_key == sess_ctx.access_key
         )
-        if sess_ctx.is_private_session:
+        if sess_ctx.is_private:
             concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
         else:
             concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sessions
@@ -80,7 +80,7 @@ async def check_concurrency(
         return result.scalar()
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
-    if sess_ctx.is_private_session:
+    if sess_ctx.is_private:
         redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
     else:
         redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"

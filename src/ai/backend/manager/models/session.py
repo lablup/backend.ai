@@ -69,7 +69,7 @@ from .base import (
     batch_result_in_session,
 )
 from .group import GroupRow
-from .kernel import PRIVATE_KERNEL_ROLES, ComputeContainer, KernelRow, KernelStatus
+from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRow
@@ -704,8 +704,8 @@ class SessionRow(Base):
         return {kern.cluster_hostname: kern.resource_opts for kern in self.kernels}
 
     @property
-    def is_private_session(self) -> bool:
-        return any([kernel.role in PRIVATE_KERNEL_ROLES for kernel in self.kernels])
+    def is_private(self) -> bool:
+        return any([kernel.is_private for kernel in self.kernels])
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
