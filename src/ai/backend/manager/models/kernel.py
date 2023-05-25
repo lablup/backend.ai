@@ -863,7 +863,7 @@ class ComputeContainer(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         if access_key is None:
             return None
-        return await graph_ctx.registry.get_abusing_report(self.id, self.agent, self.agent_addr)
+        return await graph_ctx.registry.get_abusing_report(self.id)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),

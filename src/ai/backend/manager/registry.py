@@ -2618,8 +2618,6 @@ class AgentRegistry:
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
-        agent_id: AgentId,
-        agent_addr: str,
     ) -> Optional[Mapping[str, str]]:
         hash_name = "abuse_report"
         abusing_report: Mapping[str, str] = await redis_helper.execute(
