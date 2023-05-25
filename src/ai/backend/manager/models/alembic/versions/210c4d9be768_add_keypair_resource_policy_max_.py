@@ -18,7 +18,7 @@ depends_on = None
 def upgrade():
     op.add_column(
         "keypair_resource_policies",
-        sa.Column("max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default="1"),
     )
 
 
