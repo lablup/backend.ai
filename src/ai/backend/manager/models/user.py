@@ -114,6 +114,11 @@ users = sa.Table(
     sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
     sa.Column("password", PasswordColumn()),
     sa.Column("need_password_change", sa.Boolean),
+    sa.Column(
+        "password_changed_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+    ),
     sa.Column("full_name", sa.String(length=64)),
     sa.Column("description", sa.String(length=500)),
     sa.Column("status", EnumValueType(UserStatus), default=UserStatus.ACTIVE, nullable=False),
@@ -637,6 +642,9 @@ class ModifyUser(graphene.Mutation):
         if data.get("status") is None and props.is_active is not None:
             data["status"] = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
 
+        if data.get("password") is not None:
+            data["password_changed_at"] = sa.func.now()
+
         user_update_data: Dict[str, Any]
         prev_domain_name: str
         prev_role: UserRole
@@ -1136,6 +1144,13 @@ def _hash_password(password):
 
 def _verify_password(guess, hashed):
     return bcrypt.verify(guess, hashed)
+
+
+def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
+    """
+    Compare a raw string password value to hased password.
+    """
+    return _verify_password(raw_password, hashed_password)
 
 
 async def check_credential(
