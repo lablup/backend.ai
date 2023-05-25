@@ -16,6 +16,30 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.3 (2023-05-25)
+
+### Features
+* Add support for DellEMC storage backend. ([#682](https://github.com/lablup/backend.ai/issues/682))
+* Enable vfolder upload function to allow you to upload folders by making parent directory of a target path. ([#1233](https://github.com/lablup/backend.ai/issues/1233))
+* Add recurvice option to vfolder upload function. ([#1235](https://github.com/lablup/backend.ai/issues/1235))
+* Include `scaling_group_name` when fail to assign session to agent. ([#1259](https://github.com/lablup/backend.ai/issues/1259))
+* Add `agent_id` label to containers as `ai.backend.owner`. ([#1266](https://github.com/lablup/backend.ai/issues/1266))
+* Add a manager-side status check API to the storage proxy for internal monitoring ([#1268](https://github.com/lablup/backend.ai/issues/1268))
+* Resolve `resource_opts` of session from sibling kernels. ([#1282](https://github.com/lablup/backend.ai/issues/1282))
+* Implement feature to force password updates periodically based on manager settings. ([#1284](https://github.com/lablup/backend.ai/issues/1284))
+* Add a detailed request handler statistics to the web server ([#1285](https://github.com/lablup/backend.ai/issues/1285))
+* Intoduce separate concurrency limit for SFTP upload sessions ([#1299](https://github.com/lablup/backend.ai/issues/1299))
+
+### Fixes
+* Rewrite the alembic history to resolve errors in migrating from 22.09. ([#1175](https://github.com/lablup/backend.ai/issues/1175))
+* Restore session callback function and remove a plugin for it ([#1212](https://github.com/lablup/backend.ai/issues/1212))
+* Update the priority of session allocation for the pipeline service. ([#1275](https://github.com/lablup/backend.ai/issues/1275))
+* Fix a potential hang-up and leak issue due to missing async-context managers around Redis pipelines ([#1281](https://github.com/lablup/backend.ai/issues/1281))
+* Handle error of Session `status_changed` if any status is not registered in `status_history`. ([#1288](https://github.com/lablup/backend.ai/issues/1288))
+* Fix doubling of agent's occupied resources when the transaction in `recalculate_usage()` is retried due to database contention ([#1295](https://github.com/lablup/backend.ai/issues/1295))
+* Remove vscode app from intrinsic service which blocks using image's own vscode service definition. ([#1298](https://github.com/lablup/backend.ai/issues/1298))
+
+
 ## 23.03.2 (2023-05-05)
 
 ### Fixes
