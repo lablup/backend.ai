@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "857bdec5abda"
-down_revision = "d6a02307a057"
+down_revision = "210c4d9be768"
 branch_labels = None
 depends_on = None
 
@@ -22,7 +22,7 @@ def upgrade():
         sa.Column(
             "auto_terminate_abusing_kernel",
             sa.Boolean(),
-            server_default=sa.text("true"),
+            server_default=sa.text("false"),
             nullable=False,
         ),
     )

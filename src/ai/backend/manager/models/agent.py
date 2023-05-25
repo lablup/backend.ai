@@ -13,7 +13,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.expression import true
+from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
@@ -93,7 +93,7 @@ agents = sa.Table(
         "auto_terminate_abusing_kernel",
         sa.Boolean(),
         nullable=False,
-        server_default=true(),
+        server_default=false(),
         default=False,
     ),
 )
