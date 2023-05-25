@@ -2618,7 +2618,7 @@ class AgentRegistry:
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
-    ) -> AbuseReport:
+    ) -> Optional[AbuseReport]:
         hash_name = "abuse_report"
         abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
             self.redis_stat,
@@ -2626,11 +2626,11 @@ class AgentRegistry:
             encoding="utf-8",
         )
         kern_id = str(kernel_id)
-        if abusing_report is None:
-            return {"kernel": kern_id, "abuse_report": None}
+        if abusing_report is None or (result := abusing_report.get(kern_id)) is None:
+            return None
         return {
             "kernel": kern_id,
-            "abuse_report": abusing_report.get(kern_id),
+            "abuse_report": result,
         }
 
 
