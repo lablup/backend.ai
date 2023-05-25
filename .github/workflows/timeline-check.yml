@@ -9,6 +9,8 @@ jobs:
   pr-number-assign:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null }}
     uses: ./.github/workflows/pr-number-assign.yml
+    secrets:
+      WORKFLOW_PAT: ${{ secrets.WORKFLOW_PAT }}
 
   towncrier:
     needs: [pr-number-assign]
