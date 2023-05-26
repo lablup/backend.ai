@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -52,7 +52,7 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -71,7 +71,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -100,7 +100,7 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -119,7 +119,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -158,7 +158,7 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
