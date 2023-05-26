@@ -83,7 +83,7 @@ class FileLock(AbstractDistributedLock):
         assert not self._locked
         if not self._path.exists():
             self._path.touch()
-        self._file = open(self._path, "rb")
+        self._file = open(self._path, "wb")
         stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
         try:
             async for attempt in AsyncRetrying(
