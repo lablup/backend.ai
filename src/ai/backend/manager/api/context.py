@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING
 
 import attrs
 
@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from ai.backend.common.types import RedisConnectionInfo
 
     from ..config import LocalConfig, SharedConfig
-    from ..datastore.server import DataStoreRPCServer
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
@@ -52,6 +51,3 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
-
-    datastore_config: Mapping[str, Any]
-    datastore: DataStoreRPCServer

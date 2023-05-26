@@ -96,7 +96,6 @@ ENV/
 
 # Local configurations
 /manager.toml
-# /datastore.toml
 /agent.toml
 /storage-proxy.toml
 /webserver.conf

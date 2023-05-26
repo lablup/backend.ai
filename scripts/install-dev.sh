@@ -745,12 +745,12 @@ configure_backendai() {
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
-  # configure datastore
-  cp configs/datastore/halfstack.toml ./datastore.toml
-  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./datastore.toml
-  sed_inplace "s/port = 8200/port = ${PGBOUNCER_PORT}/" ./datastore.toml
-  sed_inplace "s/port = 8190/port = ${DATASTORE_RPC_PORT}/" ./datastore.toml
-  cp configs/datastore/halfstack.pgbouncer.ini "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/conf/pgbouncer.ini"
+  # configure db-pooler
+  cp configs/db-pooler/halfstack.toml ./db-pooler.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./db-pooler.toml
+  sed_inplace "s/port = 8200/port = ${PGBOUNCER_PORT}/" ./db-pooler.toml
+  sed_inplace "s/port = 8190/port = ${DATASTORE_RPC_PORT}/" ./db-pooler.toml
+  cp configs/db-pooler/halfstack.pgbouncer.ini "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/conf/pgbouncer.ini"
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml
