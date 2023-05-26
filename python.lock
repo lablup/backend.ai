@@ -88,7 +88,6 @@
 //     "types-aiofiles",
 //     "types-cachetools",
 //     "types-click",
-//     "types-pkg_resources",
 //     "types-python-dateutil",
 //     "types-redis",
 //     "types-setuptools",
@@ -3947,24 +3946,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0cb9972cee992249f93fff1a491bf2dc3ce674e5a1926e27d4f0866f7d9b6d9c",
-              "url": "https://files.pythonhosted.org/packages/e9/97/a24ffd614ac2962dabbd599afbed00adf6464604a53b96b5f48301518a5f/types_pkg_resources-0.1.3-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "834a9b8d3dbea343562fd99d5d3359a726f6bf9d3733bccd2b4f3096fbab9dae",
-              "url": "https://files.pythonhosted.org/packages/a4/5c/5e04590a4b9749a33a6b8b93784270a65f8ebdec55a0b7742bb30e2075bb/types-pkg_resources-0.1.3.tar.gz"
-            }
-          ],
-          "project_name": "types-pkg-resources",
-          "requires_dists": [],
-          "requires_python": null,
-          "version": "0.1.3"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "ad024b07a1f4bffbca44699543c71efd04733a6c22781fa9673a971e410a3086",
               "url": "https://files.pythonhosted.org/packages/88/71/c0d92ea9c7c21b941306f97a3fcd85a6b57ff57f84d9ba16083cb2286664/types_pyOpenSSL-23.1.0.3-py3-none-any.whl"
             },
@@ -4458,7 +4439,6 @@
     "types-aiofiles",
     "types-cachetools",
     "types-click",
-    "types-pkg_resources",
     "types-python-dateutil",
     "types-redis",
     "types-setuptools",

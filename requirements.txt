@@ -78,7 +78,6 @@ pytest>=7.3.1
 pytest-dependency>=0.5.1
 
 # type stubs
-types-pkg_resources
 types-six
 types-setuptools
 types-python-dateutil
