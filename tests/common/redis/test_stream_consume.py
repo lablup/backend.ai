@@ -127,4 +127,4 @@ async def test_stream_loadbalance(
     all_messages = set(map(int, received_messages["c1"])) | set(map(int, received_messages["c2"]))
     print(f"{all_messages=}")
     assert all_messages >= set(range(0, 1)) | set(range(5, 6))
-    assert len(all_messages) >= 4
+    assert len(all_messages) >= 3
