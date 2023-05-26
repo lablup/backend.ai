@@ -43,6 +43,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
+      timeout-minutes: 15
       shell: 'script -q -e -c "bash {0}"'
       run: |
         ./scripts/install-dev.sh
