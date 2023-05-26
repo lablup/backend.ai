@@ -36,6 +36,7 @@ from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
+from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
@@ -70,6 +71,8 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     static_path = request.app["config"]["service"]["static_path"]
     file_path = (static_path / request_path).resolve()
@@ -99,6 +102,8 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def config_ini_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
@@ -115,6 +120,8 @@ async def config_ini_handler(request: web.Request) -> web.Response:
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
@@ -131,6 +138,8 @@ async def config_toml_handler(request: web.Request) -> web.Response:
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_webui_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     config = request.app["config"]
     static_path = config["service"]["static_path"]
@@ -154,8 +163,92 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     return apply_cache_headers(web.FileResponse(static_path / "index.html"), "index.html")
 
 
+async def update_password_no_auth(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    client_ip = get_client_ip(request)
+    try:
+        text = await request.text()
+        creds = json.loads(text)
+    except json.JSONDecodeError as e:
+        log.error("Login: JSON decoding error: {}", e)
+        creds = {}
+
+    def _check_params(param_names: list[str]) -> web.Response | None:
+        for param in param_names:
+            if creds.get(param) is None:
+                return web.HTTPBadRequest(
+                    text=json.dumps(
+                        {
+                            "type": "https://api.backend.ai/probs/invalid-api-params",
+                            "title": f"You must provide the {param} field.",
+                        }
+                    ),
+                    content_type="application/problem+json",
+                )
+        return None
+
+    if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
+        return fail_resp
+
+    result: dict[str, Any] = {
+        "data": None,
+        "password_changed_at": None,
+    }
+
+    try:
+        anon_api_config = APIConfig(
+            domain=config["api"]["domain"],
+            endpoint=config["api"]["endpoint"][0],
+            access_key="",
+            secret_key="",  # anonymous session
+            user_agent=user_agent,
+            skip_sslcert_validation=not config["api"]["ssl_verify"],
+        )
+        assert anon_api_config.is_anonymous
+        async with APISession(config=anon_api_config) as api_session:
+            fill_forwarding_hdrs_to_api_session(request, api_session)
+            result = await api_session.Auth.update_password_no_auth(
+                config["api"]["domain"],
+                creds["username"],
+                creds["current_password"],
+                creds["new_password"],
+            )
+            log.info(
+                "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+                creds["username"],
+                client_ip,
+            )
+    except BackendClientError as e:
+        # This is error, not failed login, so we should not update login history.
+        return web.HTTPBadGateway(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/bad-gateway",
+                    "title": "The proxy target server is inaccessible.",
+                    "details": str(e),
+                }
+            ),
+            content_type="application/problem+json",
+        )
+    except BackendAPIError as e:
+        log.info(
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+            creds["username"],
+            client_ip,
+            e,
+        )
+        result["data"] = {
+            "type": e.data.get("type"),
+            "title": e.data.get("title"),
+            "details": e.data.get("msg"),
+        }
+    return web.json_response(result)
+
+
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
+    stats: WebStats = request.app["stats"]
+    stats.active_login_check_handlers.add(asyncio.current_task())  # type: ignore
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -176,6 +269,8 @@ async def login_check_handler(request: web.Request) -> web.Response:
 
 async def login_handler(request: web.Request) -> web.Response:
     config = request.app["config"]
+    stats: WebStats = request.app["stats"]
+    stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
         return web.HTTPBadRequest(
@@ -357,12 +452,16 @@ async def login_handler(request: web.Request) -> web.Response:
 
 
 async def logout_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     session.invalidate()
     return web.Response(status=201)
 
 
-async def webserver_healthcheck(_: web.Request) -> web.Response:
+async def webserver_healthcheck(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
     result = {
         "version": __version__,
         "details": "Success",
@@ -372,6 +471,8 @@ async def webserver_healthcheck(_: web.Request) -> web.Response:
 
 async def token_login_handler(request: web.Request) -> web.Response:
     config = request.app["config"]
+    stats: WebStats = request.app["stats"]
+    stats.active_token_login_handlers.add(asyncio.current_task())  # type: ignore
 
     # Check browser session exists.
     session = await get_session(request)
@@ -476,7 +577,7 @@ async def server_main(
     args: Tuple[Any, ...],
 ) -> AsyncIterator[None]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload])
+    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
     app["config"] = config
     j2env = jinja2.Environment(
         extensions=[
@@ -520,6 +621,8 @@ async def server_main(
     }
     cors = aiohttp_cors.setup(app, defaults=cors_options)
 
+    app["stats"] = WebStats()
+
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
@@ -532,6 +635,10 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/server/token-login", token_login_handler))
     cors.add(app.router.add_route("POST", "/server/login-check", login_check_handler))
     cors.add(app.router.add_route("POST", "/server/logout", logout_handler))
+    cors.add(
+        app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
+    )
+    cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))

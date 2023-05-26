@@ -1,5 +1,5 @@
 require:db-migration:
-- any: ['src/ai/backend/manager/alembic/versions/*.py']
+- any: ['src/ai/backend/manager/models/alembic/versions/*.py']
 
 area:docs:
 - any: ['docs/**/*']
