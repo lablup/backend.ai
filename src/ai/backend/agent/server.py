@@ -382,7 +382,6 @@ class AgentRPCServer(aobject):
                     KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                     suppress_events=True,
                 )
-        await self.agent.save_last_registry()
 
     @rpc_function
     @collect_error
