@@ -78,8 +78,10 @@ ENV/
 
 # IDE/vim
 .idea
-*.swp
-*.swo
+.swp
+.swo
+.*.swp
+.*.swo
 .vscode/
 /.vimrc
 /.nvimrc

@@ -408,6 +408,14 @@ shared_config_iv = t.Dict(
                 t.Key("token", default=_config_defaults["watcher"]["token"]): t.Null | t.String,
             }
         ).allow_extra("*"),
+        t.Key("auth", default=None): (
+            t.Dict(
+                {
+                    t.Key("max_password_age", default=None): t.Null | tx.TimeDuration(),
+                }
+            ).allow_extra("*")
+            | t.Null
+        ),
     }
 ).allow_extra("*")
 
