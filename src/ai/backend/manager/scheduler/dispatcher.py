@@ -32,7 +32,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, aobject
+from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, aobject
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -265,6 +265,45 @@ class SchedulerDispatcher(aobject):
         sched_ctx: SchedulingContext,
         sgroup_name: str,
     ) -> None:
+        async def _apply_cancellation(
+            db_sess: SASession, session_ids: list[SessionId], reason="pending-timeout"
+        ):
+            now = datetime.now(tzutc())
+            kernel_query = (
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.CANCELLED,
+                    status_info=reason,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {
+                            KernelStatus.CANCELLED.name: now.isoformat(),
+                        },
+                    ),
+                )
+                .where(KernelRow.session_id.in_(session_ids))
+            )
+            await db_sess.execute(kernel_query)
+            query = (
+                sa.update(SessionRow)
+                .values(
+                    status=SessionStatus.CANCELLED,
+                    status_info=reason,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            SessionStatus.CANCELLED.name: now.isoformat(),
+                        },
+                    ),
+                )
+                .where(SessionRow.id.in_(session_ids))
+            )
+            await db_sess.execute(query)
+
         async with self.db.begin_readonly_session() as db_sess:
             scheduler = await self._load_scheduler(db_sess, sgroup_name)
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
@@ -272,29 +311,13 @@ class SchedulerDispatcher(aobject):
             )
 
         if cancelled_sessions:
-            now = datetime.now(tzutc())
+            session_ids = [item.id for item in cancelled_sessions]
 
-            async def _apply_cancellation():
+            async def _update():
                 async with self.db.begin_session() as db_sess:
-                    query = (
-                        sa.update(SessionRow)
-                        .values(
-                            status=SessionStatus.CANCELLED,
-                            status_info="pending-timeout",
-                            terminated_at=now,
-                            status_history=sql_json_merge(
-                                SessionRow.status_history,
-                                (),
-                                {
-                                    SessionStatus.CANCELLED.name: now.isoformat(),
-                                },
-                            ),
-                        )
-                        .where(SessionRow.id.in_([item.id for item in cancelled_sessions]))
-                    )
-                    await db_sess.execute(query)
+                    await _apply_cancellation(db_sess, session_ids)
 
-            await execute_with_retry(_apply_cancellation)
+            await execute_with_retry(_update)
             for item in cancelled_sessions:
                 await self.event_producer.produce_event(
                     SessionCancelledEvent(
@@ -349,26 +372,29 @@ class SchedulerDispatcher(aobject):
             async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
                 check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
                 async with self.db.begin_session() as db_sess:
-                    predicates: Sequence[Tuple[str, Awaitable[PredicateResult]]] = [
+                    predicates: list[Tuple[str, Awaitable[PredicateResult]]] = [
                         (
                             "reserved_time",
                             check_reserved_batch_session(db_sess, sched_ctx, sess_ctx),
                         ),
-                        ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
                         ("dependencies", check_dependencies(db_sess, sched_ctx, sess_ctx)),
-                        (
-                            "keypair_resource_limit",
-                            check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
-                        ),
-                        (
-                            "user_group_resource_limit",
-                            check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
-                        ),
-                        (
-                            "domain_resource_limit",
-                            check_domain_resource_limit(db_sess, sched_ctx, sess_ctx),
-                        ),
+                        ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
                     ]
+                    if not sess_ctx.is_private:
+                        predicates += [
+                            (
+                                "keypair_resource_limit",
+                                check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "user_group_resource_limit",
+                                check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                            (
+                                "domain_resource_limit",
+                                check_domain_resource_limit(db_sess, sched_ctx, sess_ctx),
+                            ),
+                        ]
                     for predicate_name, check_coro in predicates:
                         try:
                             check_results.append((predicate_name, await check_coro))
@@ -416,7 +442,7 @@ class SchedulerDispatcher(aobject):
             if has_failure:
                 log.debug(log_fmt + "predicate-checks-failed (temporary)", *log_args)
 
-                async def _update() -> None:
+                async def _cancel_failed_system_session() -> None:
                     async with self.db.begin_session() as db_sess:
                         await _rollback_predicate_mutations(
                             db_sess,
@@ -436,14 +462,23 @@ class SchedulerDispatcher(aobject):
                             .where(SessionRow.id == sess_ctx.id)
                         )
                         await db_sess.execute(query)
+                        if sess_ctx.is_private:
+                            await _apply_cancellation(db_sess, [sess_ctx.id])
+                            await self.event_producer.produce_event(
+                                SessionCancelledEvent(
+                                    sess_ctx.id,
+                                    sess_ctx.creation_id,
+                                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                                )
+                            )
 
-                await execute_with_retry(_update)
+                await execute_with_retry(_cancel_failed_system_session)
                 # Predicate failures are *NOT* permanent errors.
                 # We need to retry the scheduling afterwards.
                 continue
             else:
 
-                async def _update() -> None:
+                async def _update_session_status_data() -> None:
                     async with self.db.begin_session() as db_sess:
                         kernel_query = (
                             sa.update(KernelRow)
@@ -470,7 +505,7 @@ class SchedulerDispatcher(aobject):
                         )
                         await db_sess.execute(session_query)
 
-                await execute_with_retry(_update)
+                await execute_with_retry(_update_session_status_data)
 
             async with self.db.begin_readonly_session() as db_sess:
                 schedulable_sess = await SessionRow.get_session_by_id(
@@ -528,8 +563,7 @@ class SchedulerDispatcher(aobject):
         requested_architectures = set(k.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architecture"
-                "on single node session",
+                "Cannot assign multiple kernels with different architectureon single node session",
             )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
@@ -539,7 +573,7 @@ class SchedulerDispatcher(aobject):
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        f"No agents found to be compatible with the image acrhitecture "
+                        "No agents found to be compatible with the image acrhitecture "
                         f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
                         f"arch: {requested_architecture})"
                     ),
@@ -559,9 +593,9 @@ class SchedulerDispatcher(aobject):
                 if cand_agent is None:
                     raise InstanceNotAvailable(
                         extra_msg=(
-                            f"Could not find a contiguous resource region in any agent "
-                            f"big enough to host the session "
-                            f"({sess_ctx.id})"
+                            "Could not find a contiguous resource region in any agent "
+                            "big enough to host the session "
+                            f"(id: {sess_ctx.id}, resource group: {sess_ctx.scaling_group_name})"
                         ),
                     )
                 assert cand_agent is not None
@@ -625,7 +659,7 @@ class SchedulerDispatcher(aobject):
                 log_fmt + "unexpected-error, during agent allocation",
                 *log_args,
             )
-            exc_data = convert_to_status_data(e)
+            exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
 
             async def _update_generic_failure() -> None:
                 async with self.db.begin_session() as kernel_db_sess:
@@ -749,7 +783,7 @@ class SchedulerDispatcher(aobject):
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    f"No agents found to be compatible with the image acrhitecture "
+                                    "No agents found to be compatible with the image acrhitecture "
                                     f"(image: {kernel.image_ref}, "
                                     f"arch: {kernel.architecture})"
                                 ),
@@ -761,9 +795,9 @@ class SchedulerDispatcher(aobject):
                         if agent is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    f"Could not find a contiguous resource region in any agent "
-                                    f"big enough to host a kernel in the session "
-                                    f"({sess_ctx.id})"
+                                    "Could not find a contiguous resource region in any agent big"
+                                    f" enough to host a kernel in the session (id: {sess_ctx.id},"
+                                    f" resource group: {sess_ctx.scaling_group_name})"
                                 ),
                             )
                     assert agent is not None
@@ -820,7 +854,7 @@ class SchedulerDispatcher(aobject):
                         log_fmt + "unexpected-error, during agent allocation",
                         *log_args,
                     )
-                    exc_data = convert_to_status_data(e)
+                    exc_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
 
                     async def _update_generic_failure() -> None:
                         async with self.db.begin_session() as kernel_db_sess:
@@ -1023,7 +1057,7 @@ class SchedulerDispatcher(aobject):
             await self.registry.start_session(sched_ctx, session)
         except Exception as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
-            log.warning(log_fmt + "failed-starting: {1!r}", *log_args, status_data)
+            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
             #       SCHEDULED and retry within some limit using status_data.
 

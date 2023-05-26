@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
-import json
 import logging
 import logging.config
 import os
@@ -119,7 +118,7 @@ async def get_extra_volumes(docker, lang):
             mount_list.append(vol)
         else:
             log.info(
-                "skipped attaching extra volume {0} " "to a kernel based on image {1}",
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
                 vol.name,
                 lang,
             )
@@ -408,6 +407,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
+        session_id: str,
         reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
@@ -416,6 +416,7 @@ class AgentRPCServer(aobject):
         log.info("rpc::destroy_kernel(k:{0})", kernel_id)
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
+            SessionId(UUID(session_id)),
             LifecycleEvent.DESTROY,
             reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
@@ -551,23 +552,6 @@ class AgentRPCServer(aobject):
             },
             "watcher": self.local_config["watcher"],
         }
-
-    @rpc_function
-    @collect_error
-    async def get_abusing_report(
-        self,
-        kernel_id,  # type: str
-    ) -> Mapping[str, str] | None:
-        if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
-            report_path = Path(abuse_path, f"report.{kernel_id}.json")
-            if report_path.is_file():
-
-                def _read_file():
-                    with open(report_path, "r") as file:
-                        return json.load(file)
-
-                return await self.loop.run_in_executor(None, _read_file)
-        return None
 
     @rpc_function
     @collect_error
@@ -791,7 +775,7 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. " "(default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
@@ -871,8 +855,10 @@ def main(
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            "ConfigurationError: "
-            "Cannot use link-local or unspecified IP address as the RPC listening host.",
+            (
+                "ConfigurationError: "
+                "Cannot use link-local or unspecified IP address as the RPC listening host."
+            ),
             file=sys.stderr,
         )
         raise click.Abort()
@@ -888,17 +874,18 @@ def main(
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
-                    "ConfigurationError: "
-                    "Storing container coredumps is only supported in Linux.",
+                    "ConfigurationError: Storing container coredumps is only supported in Linux.",
                     file=sys.stderr,
                 )
                 raise click.Abort()
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    "ConfigurationError: "
-                    "/proc/sys/kernel/core_pattern must be an absolute path "
-                    "to enable container coredumps.",
+                    (
+                        "ConfigurationError: "
+                        "/proc/sys/kernel/core_pattern must be an absolute path "
+                        "to enable container coredumps."
+                    ),
                     file=sys.stderr,
                 )
                 raise click.Abort()

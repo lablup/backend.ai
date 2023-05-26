@@ -36,7 +36,6 @@ from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
     prepare_ttyd_service,
-    prepare_vscode_service,
 )
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
@@ -286,7 +285,7 @@ class BaseRunner(metaclass=ABCMeta):
                 self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
                 await self.kernel_mgr.start_kernel()
                 if not await self.kernel_mgr.is_alive():
-                    log.error("jupyter query mode is disabled: " "failed to start jupyter kernel")
+                    log.error("jupyter query mode is disabled: failed to start jupyter kernel")
                 else:
                     self.kernel_client = self.kernel_mgr.client()  # type: ignore
                     assert self.kernel_client is not None
@@ -300,7 +299,7 @@ class BaseRunner(metaclass=ABCMeta):
                         self.kernel_mgr = None
                 break
         else:
-            log.debug("jupyter query mode is not available: " "no jupyter kernelspec found")
+            log.debug("jupyter query mode is not available: no jupyter kernelspec found")
             self.kernel_mgr = None
 
     async def _shutdown_jupyter_kernel(self):
@@ -444,7 +443,7 @@ class BaseRunner(metaclass=ABCMeta):
         `Runner` subclass should override this method.
         """
         if not hasattr(self, "kernel_mgr") or self.kernel_mgr is None:
-            log.error("query mode is disabled: " "failed to start jupyter kernel")
+            log.error("query mode is disabled: failed to start jupyter kernel")
             return 127
 
         assert self.kernel_client is not None
@@ -616,8 +615,6 @@ class BaseRunner(metaclass=ABCMeta):
                     cmdargs, env = await prepare_ttyd_service(service_info)
                 elif service_info["name"] == "sshd":
                     cmdargs, env = await prepare_sshd_service(service_info)
-                elif service_info["name"] == "vscode":
-                    cmdargs, env = await prepare_vscode_service(service_info)
                 elif self.service_parser is not None:
                     self.service_parser.variables["ports"] = service_info["ports"]
                     cmdargs, env = await self.service_parser.start_service(
@@ -726,8 +723,10 @@ class BaseRunner(metaclass=ABCMeta):
             kernel_id = os.environ["BACKENDAI_KERNEL_ID"]
             kernel_id_hex = uuid.UUID(kernel_id).hex
             log_path = Path(
-                "/home/work/.logs/task/"
-                f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log",
+                (
+                    "/home/work/.logs/task/"
+                    f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log"
+                ),
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)
         else:

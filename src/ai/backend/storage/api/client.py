@@ -136,7 +136,7 @@ async def download(request: web.Request) -> web.StreamResponse:
         hdrs.CONTENT_TYPE: "application/octet-stream",
         hdrs.CONTENT_DISPOSITION: " ".join(
             [
-                "attachment;" f'filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
                 f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
             ],
         ),
@@ -199,7 +199,7 @@ async def download_directory_as_archive(
             hdrs.CONTENT_TYPE: "application/zip",
             hdrs.CONTENT_DISPOSITION: " ".join(
                 [
-                    "attachment;" f'filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                    f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
                     f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
                 ],
             ),
@@ -259,7 +259,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         async with ctx.get_volume(token_data["volume"]) as volume:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path = vfpath / ".upload" / token_data["session"]
+            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
 
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,
@@ -275,9 +275,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 parent_dir = vfpath
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
-                if not parent_dir.exists():
-                    parent_dir.mkdir(parents=True, exist_ok=True)
-                target_path = parent_dir / token_data["relpath"]
+                target_path: Path = parent_dir / token_data["relpath"]
+                if not target_path.parent.exists():
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()
@@ -298,12 +298,12 @@ async def tus_options(request: web.Request) -> web.Response:
     ctx: Context = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers[
-        "Access-Control-Allow-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    headers[
-        "Access-Control-Expose-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers["Access-Control-Allow-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
+    headers["Access-Control-Expose-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
@@ -333,12 +333,12 @@ async def prepare_tus_session_headers(
         )
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers[
-        "Access-Control-Allow-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    headers[
-        "Access-Control-Expose-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers["Access-Control-Allow-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
+    headers["Access-Control-Expose-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
@@ -365,4 +365,5 @@ async def init_client_app(ctx: Context) -> web.Application:
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
+
     return app
