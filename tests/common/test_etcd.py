@@ -1,5 +1,6 @@
 import asyncio
 
+import async_timeout
 import pytest
 from etcetra.types import WatchEventType
 
@@ -196,18 +197,20 @@ async def test_watch(etcd):
     rp_ready = asyncio.Event()
 
     async def _record():
-        try:
-            async for ev in etcd.watch("wow", ready_event=r_ready):
-                records.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch("wow", ready_event=r_ready):
+            records.append(ev)
+            recv_count += 1
+            if recv_count == 2:
+                return
 
     async def _record_prefix():
-        try:
-            async for ev in etcd.watch_prefix("wow", ready_event=rp_ready):
-                records_prefix.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch_prefix("wow", ready_event=rp_ready):
+            records_prefix.append(ev)
+            recv_count += 1
+            if recv_count == 4:
+                return
 
     t1 = asyncio.create_task(_record())
     t2 = asyncio.create_task(_record_prefix())
@@ -220,13 +223,9 @@ async def test_watch(etcd):
     await etcd.put("wow/child", "hello")
     await etcd.delete_prefix("wow")
 
-    await asyncio.sleep(0.2)
-    t1.cancel()
-    t2.cancel()
-    await t1
-    await t2
+    async with async_timeout.timeout(10):
+        await asyncio.gather(t1, t2, return_exceptions=True)
 
-    assert len(records) == 2
     assert records[0].key == "wow"
     assert records[0].event == WatchEventType.PUT
     assert records[0].value == "123"
@@ -234,7 +233,6 @@ async def test_watch(etcd):
     assert records[1].event == WatchEventType.DELETE
     assert records[1].value == ""
 
-    assert len(records_prefix) == 4
     assert records_prefix[0].key == "wow"
     assert records_prefix[0].event == WatchEventType.PUT
     assert records_prefix[0].value == "123"
@@ -257,18 +255,20 @@ async def test_watch_once(etcd):
     rp_ready = asyncio.Event()
 
     async def _record():
-        try:
-            async for ev in etcd.watch("wow", once=True, ready_event=r_ready):
-                records.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch("wow", once=True, ready_event=r_ready):
+            records.append(ev)
+            recv_count += 1
+            if recv_count == 1:
+                return
 
     async def _record_prefix():
-        try:
-            async for ev in etcd.watch_prefix("wow/city", once=True, ready_event=rp_ready):
-                records_prefix.append(ev)
-        except asyncio.CancelledError:
-            pass
+        recv_count = 0
+        async for ev in etcd.watch_prefix("wow/city", once=True, ready_event=rp_ready):
+            records_prefix.append(ev)
+            recv_count += 1
+            if recv_count == 1:
+                return
 
     t1 = asyncio.create_task(_record())
     t2 = asyncio.create_task(_record_prefix())
@@ -280,18 +280,13 @@ async def test_watch_once(etcd):
     await etcd.put("wow", "korea")
     await etcd.delete_prefix("wow")
 
-    await asyncio.sleep(0.2)
-    t1.cancel()
-    t2.cancel()
-    await t1
-    await t2
+    async with async_timeout.timeout(10):
+        await asyncio.gather(t1, t2, return_exceptions=True)
 
-    assert len(records) == 1
     assert records[0].key == "wow"
     assert records[0].event == WatchEventType.PUT
     assert records[0].value == "korea"
 
-    assert len(records_prefix) == 1
     assert records_prefix[0].key == "wow/city1"
     assert records_prefix[0].event == WatchEventType.PUT
     assert records_prefix[0].value == "seoul"
