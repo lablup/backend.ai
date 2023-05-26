@@ -190,19 +190,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9f04650092b1f3423bd6834c850f20916d499e3b59ea5bab64d8de95b9e6b196",
-              "url": "https://files.pythonhosted.org/packages/3d/f2/9321bf478b2a1cf63839719455cc2a78a532d168a234e92629488287bc0a/types_aiofiles-23.1.0.1-py3-none-any.whl"
+              "hash": "9634f06c5fc331ec660d1e80faa031aa2e0aa388fbb6312f936c7076ac8a9fd3",
+              "url": "https://files.pythonhosted.org/packages/59/f8/db22544537e2ddc4ec6c6429aa59726a0e26d8cd47236fb1c3fea2e7fec0/types_aiofiles-23.1.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "be8030019f7be67f4b0f0c00acd28f4942b34cf719e1715f5d99d868c7b1a776",
-              "url": "https://files.pythonhosted.org/packages/f1/23/f77852509bd45121ffdb80c23a2cb1b71cb0916610e0a7f806123e46f177/types-aiofiles-23.1.0.1.tar.gz"
+              "hash": "ccd7b4db06c66cb7145802b1d9cf33bd6d8e88c7fe63a3ba5551671faac32648",
+              "url": "https://files.pythonhosted.org/packages/8f/e9/8259e6cbb9b80180f2034d3ae46c1ec0cd66d331ddb2d4e6c8280c36f3f5/types-aiofiles-23.1.0.3.tar.gz"
             }
           ],
           "project_name": "types-aiofiles",
           "requires_dists": [],
           "requires_python": null,
-          "version": "23.1.0.1"
+          "version": "23.1.0.3"
         },
         {
           "artifacts": [
@@ -300,13 +300,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b050641aeff6dfebf231ad719bdac12d53b8ee818d4afb67b886333484629957",
-              "url": "https://files.pythonhosted.org/packages/9b/a0/692ecdd305e1bf7f7955ff1e97f8586681aa1c134742343be5957775688f/types_pyOpenSSL-23.1.0.2-py3-none-any.whl"
+              "hash": "ad024b07a1f4bffbca44699543c71efd04733a6c22781fa9673a971e410a3086",
+              "url": "https://files.pythonhosted.org/packages/88/71/c0d92ea9c7c21b941306f97a3fcd85a6b57ff57f84d9ba16083cb2286664/types_pyOpenSSL-23.1.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "20b80971b86240e8432a1832bd8124cea49c3088c7bfc77dfd23be27ffe4a517",
-              "url": "https://files.pythonhosted.org/packages/9e/26/bd7b47d54526581e6682a275055e2109f406e9566dc5cc666fc6aa874523/types-pyOpenSSL-23.1.0.2.tar.gz"
+              "hash": "e7211088eff3e20d359888dedecb0994f7181d5cce0f26354dd47ca0484dc8a6",
+              "url": "https://files.pythonhosted.org/packages/a5/f0/7c331aa7a58d421b41aaf69ca72a1633a7f3e724a8e3646a0b10357af16f/types-pyOpenSSL-23.1.0.3.tar.gz"
             }
           ],
           "project_name": "types-pyopenssl",
@@ -314,55 +314,55 @@
             "cryptography>=35.0.0"
           ],
           "requires_python": null,
-          "version": "23.1.0.2"
+          "version": "23.1.0.3"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "fe5b545e678ec13e3ddc83a0eee1545c1b5e2fba4cfc39b276ab6f4e7604a923",
-              "url": "https://files.pythonhosted.org/packages/cc/fe/cb71c31f04df6b6a8b02cbec9516e8090c496bd5e6b48f17916a36b0bbc8/types_python_dateutil-2.8.19.12-py3-none-any.whl"
+              "hash": "0b0e7c68e7043b0354b26a1e0225cb1baea7abb1b324d02b50e2d08f1221043f",
+              "url": "https://files.pythonhosted.org/packages/ce/d5/b9b14423fb16cd40db0b5715424d02b9e1546a517ee45fc61219421fed6f/types_python_dateutil-2.8.19.13-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "355b2cb82b31e556fd18e7b074de7c350c680ab80608f0cc55ba6770d986d67d",
-              "url": "https://files.pythonhosted.org/packages/5a/a0/28a975078f292b9c21b3ea7922c31330b0f3629c8c0dc7aea15f40c9cc30/types-python-dateutil-2.8.19.12.tar.gz"
+              "hash": "09a0275f95ee31ce68196710ed2c3d1b9dc42e0b61cc43acc369a42cb939134f",
+              "url": "https://files.pythonhosted.org/packages/ec/d6/470dcb48effd56fa260d676115c7551c8395b6c075e5c602f8d5a2121ec3/types-python-dateutil-2.8.19.13.tar.gz"
             }
           ],
           "project_name": "types-python-dateutil",
           "requires_dists": [],
           "requires_python": null,
-          "version": "2.8.19.12"
+          "version": "2.8.19.13"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5aed5aa66bd2d2e158f75dda22b059570ede988559f030cf294871d3b647e3e8",
-              "url": "https://files.pythonhosted.org/packages/88/93/a98be346729157d9f085fd68e58fcbba823188829ac8488a9d7f12614e53/types_PyYAML-6.0.12.9-py3-none-any.whl"
+              "hash": "662fa444963eff9b68120d70cda1af5a5f2aa57900003c2006d7626450eaae5f",
+              "url": "https://files.pythonhosted.org/packages/0a/06/4c384009ff044ce9c439c69abe4498f7caf2155f69cc699073d4fce84a91/types_PyYAML-6.0.12.10-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c51b1bd6d99ddf0aa2884a7a328810ebf70a4262c292195d3f4f9a0005f9eeb6",
-              "url": "https://files.pythonhosted.org/packages/05/6f/f19081de5ba81864f89e354560a60637822f7d6d54d9a2a907785e9b5cc4/types-PyYAML-6.0.12.9.tar.gz"
+              "hash": "ebab3d0700b946553724ae6ca636ea932c1b0868701d4af121630e78d695fc97",
+              "url": "https://files.pythonhosted.org/packages/1e/1f/b94c24cd38507a94efb8bd95682a27fbcda543e5afbd11a018305f552a11/types-PyYAML-6.0.12.10.tar.gz"
             }
           ],
           "project_name": "types-pyyaml",
           "requires_dists": [],
           "requires_python": null,
-          "version": "6.0.12.9"
+          "version": "6.0.12.10"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2db530f54facec3149147bfe61d5ac24f5fe4e871823d95a601cd2c1d775d8a0",
-              "url": "https://files.pythonhosted.org/packages/ef/40/5966f6cedce745b546ffa6df5baa3a00c2b1cf3ea4c3c8e80130e9b46e9e/types_redis-4.5.4.1-py3-none-any.whl"
+              "hash": "bf8692252038dbe03b007ca4fde87d3ae8e10610854a6858e3bf5d01721a7c4b",
+              "url": "https://files.pythonhosted.org/packages/6b/5d/f3c257c289d47ba9b988712e35308062f8fbbe2af45121c52c53f806ff00/types_redis-4.5.5.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bf04192f415b2b42ecefd70bb4b91eb0352e48f2716a213e038e35c096a639c2",
-              "url": "https://files.pythonhosted.org/packages/a1/92/ea644c8b0f5896dac62d4f8aff0ce23fab0270d34e2957497c0890a70569/types-redis-4.5.4.1.tar.gz"
+              "hash": "2fe82f374d9dddf007deaf23d81fddcfd9523d9522bf11523c5c43bc5b27099e",
+              "url": "https://files.pythonhosted.org/packages/ef/77/25f255db176b5a49028be5b3577506002f831d5d2a45c5cd9ced5beb116a/types-redis-4.5.5.2.tar.gz"
             }
           ],
           "project_name": "types-redis",
@@ -371,25 +371,25 @@
             "types-pyOpenSSL"
           ],
           "requires_python": null,
-          "version": "4.5.4.1"
+          "version": "4.5.5.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "02ee794d41c282ecfc99e09d8115ca4c3c4395a9747d1a35fa4a6f243d7585e6",
-              "url": "https://files.pythonhosted.org/packages/7e/17/0655b6cae64af0b5f3961cd9617eb5c4ba8feb29e983d7793e3063875a65/types_setuptools-67.7.0.0-py3-none-any.whl"
+              "hash": "6df73340d96b238a4188b7b7668814b37e8018168aef1eef94a3b1872e3f60ff",
+              "url": "https://files.pythonhosted.org/packages/b0/17/3b4d69a9339b8aeac751a3f62a0875b345518f69db8d5b3f6272f7c10ff1/types_setuptools-67.8.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f59b03c786510176c7601578d84d5e6c58e985de331f08036b2fe008408a63c1",
-              "url": "https://files.pythonhosted.org/packages/b8/7f/8d4b6a2ac7f7792cab397a4a7441c1913a4f065a78595214a37075c15c3f/types-setuptools-67.7.0.0.tar.gz"
+              "hash": "95c9ed61871d6c0e258433373a4e1753c0a7c3627a46f4d4058c7b5a08ab844f",
+              "url": "https://files.pythonhosted.org/packages/9f/b1/01280c629276c7fec2580ba90b48955397a178d899936567a9ab98ba5afe/types-setuptools-67.8.0.0.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "67.7.0.0"
+          "version": "67.8.0.0"
         },
         {
           "artifacts": [
@@ -432,7 +432,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.122",
+  "pex_version": "2.1.134",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
