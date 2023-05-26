@@ -486,6 +486,12 @@ class MemoryPlugin(AbstractComputePlugin):
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             try:
                 mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                for line in (mem_path / "memory.stat").read_text().splitlines():
+                    key, value = line.split(" ")
+                    if key == "total_inactive_file":
+                        mem_cur_bytes -= int(value)
+                        break
+
                 io_stats = (io_path / "blkio.throttle.io_service_bytes").read_text()
                 # example data:
                 #   8:0 Read 13918208
