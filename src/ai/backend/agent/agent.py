@@ -91,6 +91,7 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReportValue,
     AcceleratorMetadata,
     AgentId,
     AutoPullBehavior,
@@ -799,6 +800,9 @@ class AbstractAgent(
                 ),
                 "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
+                "auto_terminate_abusing_kernel": self.local_config["agent"][
+                    "force-terminate-abusing-containers"
+                ],
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
@@ -1305,6 +1309,7 @@ class AbstractAgent(
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):
+        # dest_path == abuse_report_path
         dest_path: Path = self.local_config["agent"]["abuse-report-path"]
         auto_terminate: bool = self.local_config["agent"].get(
             "force-terminate-abusing-containers", False
@@ -1317,18 +1322,21 @@ class AbstractAgent(
         def _rm(path: Path) -> None:
             os.remove(path)
 
-        terminated_kernels: MutableMapping[str, ContainerLifecycleEvent] = {}
+        terminated_kernels: dict[str, ContainerLifecycleEvent] = {}
+        abuse_report: dict[str, str] = {}
         try:
             async with FileLock(path=dest_path / "report.lock"):
                 for reported_kernel in dest_path.glob("report.*.json"):
                     raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
-                    body: MutableMapping[str, str] = json.loads(raw_body)
+                    body: dict[str, str] = json.loads(raw_body)
+                    kern_id = body["ID"]
                     if auto_terminate:
                         log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
                         kernel_id = KernelId(UUID(body["ID"]))
                         kernel_obj = self.kernel_registry.get(kernel_id)
                         if kernel_obj is None:
                             continue
+                        abuse_report[kern_id] = AbuseReportValue.CLEANING.value
                         session_id = kernel_obj.session_id
                         terminated_kernels[body["ID"]] = ContainerLifecycleEvent(
                             kernel_id,
@@ -1340,14 +1348,47 @@ class AbstractAgent(
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
+                        abuse_report[kern_id] = AbuseReportValue.DETECTED.value
                         log.debug(
                             "abusing container detected, skipping auto-termination: {} ({})",
-                            body["ID"],
+                            kern_id,
                             body.get("reason"),
                         )
+        except Exception:
+            log.exception("error while paring abuse reports:")
         finally:
             for kid, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
+
+            hash_name = "abuse_report"
+            abuse_report_script = textwrap.dedent("""
+                local key = KEYS[1]
+                local new_report = cjson.decode(ARGV[1])
+
+                -- Delete dangling reports
+                local all_report = redis.call('HKEYS', key)
+                if all_report ~= nil and next(all_report) ~= nil then
+                    for _, v in ipairs(all_report) do
+                        if next(all_report) == nil or not new_report[v] then
+                            redis.call('HDEL', key, v)
+                        end
+                    end
+                end
+
+                -- Update new reports
+                if next(new_report) ~= nil then
+                    for kern_id, report_val in pairs(new_report) do
+                        redis.call('HSET', key, kern_id, report_val)
+                    end
+                end
+            """)
+            await redis_helper.execute_script(
+                self.redis_stat_pool,
+                "report_abusing_kernels",
+                abuse_report_script,
+                [hash_name],
+                [json.dumps(abuse_report)],
+            )
 
     @abstractmethod
     async def scan_images(self) -> Mapping[str, str]:
