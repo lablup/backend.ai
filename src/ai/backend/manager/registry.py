@@ -1621,14 +1621,14 @@ class AgentRegistry:
                                 main_stat = {"status": "cancelled"}
                                 await SessionRow.set_session_status(
                                     self.db,
-                                    kernel.session_id,
+                                    session_id,
                                     SessionStatus.CANCELLED,
                                     reason=reason,
                                     status_changed_at=now,
                                 )
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
-                                        kernel.session_id,
+                                        session_id,
                                         kernel.session_creation_id,
                                         reason,
                                     ),
