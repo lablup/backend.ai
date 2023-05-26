@@ -24,7 +24,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        gha-cache-key: pants-cache1-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache-main-1-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - uses: CycloneDX/gh-python-generate-sbom@v1.0.1
