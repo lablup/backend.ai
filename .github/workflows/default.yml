@@ -34,7 +34,7 @@ jobs:
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        gha-cache-key: pants-cache1-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache-main-1-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
@@ -56,7 +56,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        pants lint --changed-since=$BASE_REF --changed-dependees=transitive
+        pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -86,7 +86,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        gha-cache-key: pants-cache1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache-main-1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
@@ -104,7 +104,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        pants check --changed-since=$BASE_REF --changed-dependees=transitive
+        pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -144,7 +144,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        gha-cache-key: pants-cache1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache-main-1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -206,7 +206,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
-        gha-cache-key: pants-cache1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Install local dependencies for packaging
