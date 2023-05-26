@@ -246,7 +246,8 @@
       "ImageDoesNotProvideModelPath": "__NOT_TRANSLATED__",
       "ModelStorageToMount": "__NOT_TRANSLATED__",
       "AIAccelerator": "__NOT_TRANSLATED__",
-      "DescAIAccelerator": "__NOT_TRANSLATED__"
+      "DescAIAccelerator": "__NOT_TRANSLATED__",
+      "SessionAlreadyExists": "__NOT_TRANSLATED__"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -331,6 +332,10 @@
     "Message": "Pesan",
     "EnvironmentInfo": "__NOT_TRANSLATED__",
     "DownloadingSessionLogs": "__NOT_TRANSLATED__",
+    "VSCodeRemoteConnection": "__NOT_TRANSLATED__",
+    "VSCodeRemoteDescription": "__NOT_TRANSLATED__",
+    "VSCodeRemotePasswordTitle": "__NOT_TRANSLATED__",
+    "VSCodeRemoteNoticeSSHConfig": "__NOT_TRANSLATED__",
     "ElapsedTime": "__NOT_TRANSLATED__",
     "Timeout": "__NOT_TRANSLATED__",
     "SessionLifetime": "__NOT_TRANSLATED__",
@@ -359,7 +364,9 @@
     "GracePeriodDesc": "__NOT_TRANSLATED__",
     "UtilizationThreshold": "__NOT_TRANSLATED__",
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
-    "ExpiresAfter": "__NOT_TRANSLATED__"
+    "ExpiresAfter": "__NOT_TRANSLATED__",
+    "ConnectionExample": "__NOT_TRANSLATED__",
+    "System": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -498,7 +505,8 @@
       "PleaseSelectOption": "Mohon pilih satu pilihan",
       "LetterNumber-_dot": "Huruf, angka, dan -_. diizinkan",
       "NameAlreadyExists": "Nama Kebijakan Sudah Ada!",
-      "ValidationFailed": "Validasi gagal"
+      "ValidationFailed": "Validasi gagal",
+      "PleaseSelectOptions": "Mohon pilih satu pilihan"
     },
     "ProjectAndGroup": "Proyek & Grup",
     "ModifyKeypairResourcePolicy": "Ubah kebijakan sumber daya pasangan kunci",
@@ -647,7 +655,19 @@
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber daya yang cukup (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk filebrowser. Mohon periksa sumber daya yang tersedia.",
       "NoImagesSupportingFileBrowser": "Belum ada image yang mendukung file browser. Setidaknya satu atau lebih image yang mendukung file browser diperlukan untuk mengunggah folder.",
       "ClickFilebrowserButton": "Untuk mengunggah Folder, Silakan klik tombol Jalankan file browser.",
-      "ReadOnlyFolderOnFileBrowser": "__NOT_TRANSLATED__"
+      "ReadOnlyFolderOnFileBrowser": "__NOT_TRANSLATED__",
+      "ExecuteSSH/SFTP": "__NOT_TRANSLATED__",
+      "NoImagesSupportingSystemSession": "__NOT_TRANSLATED__",
+      "SftpScalingGroupsDoNotExist": "__NOT_TRANSLATED__",
+      "ExecutingSSH/SFTPSession": "__NOT_TRANSLATED__",
+      "RunSSH/SFTPserver": "__NOT_TRANSLATED__",
+      "SFTPSessionNotAvailable": "__NOT_TRANSLATED__",
+      "StartingSSH/SFTPSession": "__NOT_TRANSLATED__",
+      "UploadFolder": "__NOT_TRANSLATED__",
+      "EmptyFilesAndFoldersAreNotUploaded": "__NOT_TRANSLATED__",
+      "FolderAlreadyExists": "__NOT_TRANSLATED__",
+      "NumberOfSFTPSessionsExceededTitle": "__NOT_TRANSLATED__",
+      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__"
     },
     "invitation": {
       "EnterEmail": "Masukkan alamat email",
@@ -657,7 +677,8 @@
       "InvitationError": "Undangan gagal. Pengguna mungkin sudah diundang.",
       "Shared": "Folder grup berhasil dibagikan",
       "NoOneWasShared": "Gagal membagikan folder grup",
-      "SharingError": "Gagal berbagi. Pengguna mungkin sudah dibagikan atau tidak ada dalamm proyek yang sesuai."
+      "SharingError": "Gagal berbagi. Pengguna mungkin sudah dibagikan atau tidak ada dalamm proyek yang sesuai.",
+      "FolderSharingNotAvailableToUser": "__NOT_TRANSLATED__"
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dilakukan",
@@ -818,6 +839,8 @@
     "AutoLogout": "Keluar Otomatis",
     "DescAutoLogout": "Keluar secara otomatis jika semua halaman yang masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Jupyter notebook, terminal web, dll.)",
     "BootstrapScriptDescription": "__NOT_TRANSLATED__",
+    "NoExistingVSCodePassword": "__NOT_TRANSLATED__",
+    "VSCodePasswordClipboardCopy": "__NOT_TRANSLATED__",
     "SSHKeypairEnterManually": "__NOT_TRANSLATED__",
     "SSHKeypairEnterManuallyFinished": "__NOT_TRANSLATED__"
   },
@@ -935,7 +958,8 @@
     "ResourceGroupDetail": "Detail Grup Sumber Daya",
     "RetriesToSkip": "__NOT_TRANSLATED__",
     "NoGroupToDisplay": "__NOT_TRANSLATED__",
-    "AllowedSessionTypes": "__NOT_TRANSLATED__"
+    "AllowedSessionTypes": "__NOT_TRANSLATED__",
+    "Domain": "Domain"
   },
   "maintenance": {
     "General": "Umum",
@@ -998,10 +1022,18 @@
     }
   },
   "statistics": {
-    "Usage": "Pemakaian",
+    "UsageHistory": "Riwayat Penggunaan",
     "SelectPeriod": "Pilih Periode",
     "1Day": "1 Hari",
-    "1Week": "1 Minggu"
+    "1Week": "1 Minggu",
+    "UsageHistoryDesc": "__NOT_TRANSLATED__",
+    "SessionsDesc": "__NOT_TRANSLATED__",
+    "CPUDesc": "__NOT_TRANSLATED__",
+    "MemoryDesc": "__NOT_TRANSLATED__",
+    "GPUDesc": "__NOT_TRANSLATED__",
+    "IOReadDesc": "__NOT_TRANSLATED__",
+    "IOWriteDesc": "__NOT_TRANSLATED__",
+    "UsageHistoryNote": "__NOT_TRANSLATED__"
   },
   "language": {
     "Browser": "Peramban web",
@@ -1164,7 +1196,8 @@
       "LoginWithSAML": "__NOT_TRANSLATED__"
     },
     "EndpointInfo": "__NOT_TRANSLATED__",
-    "DescEndpoint": "__NOT_TRANSLATED__"
+    "DescEndpoint": "__NOT_TRANSLATED__",
+    "EndpointStartWith": "__NOT_TRANSLATED__"
   },
   "signup": {
     "SignupBETA": "Pendaftaran (khusus undangan Beta)",
@@ -1333,6 +1366,7 @@
     "ValueRequired": "NilaiDiperlukan",
     "InputTooShort": "MasukanTerlaluPendek"
   },
+  "OpenVSCodeRemote": "__NOT_TRANSLATED__",
   "totp": {
     "OTP": "__NOT_TRANSLATED__",
     "TotpRemoved": "__NOT_TRANSLATED__",

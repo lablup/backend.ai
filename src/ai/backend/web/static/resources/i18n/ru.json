@@ -246,7 +246,8 @@
       "ImageDoesNotProvideModelPath": "__NOT_TRANSLATED__",
       "ModelStorageToMount": "__NOT_TRANSLATED__",
       "AIAccelerator": "__NOT_TRANSLATED__",
-      "DescAIAccelerator": "__NOT_TRANSLATED__"
+      "DescAIAccelerator": "__NOT_TRANSLATED__",
+      "SessionAlreadyExists": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -331,6 +332,10 @@
     "Message": "сообщение",
     "EnvironmentInfo": "__NOT_TRANSLATED__",
     "DownloadingSessionLogs": "__NOT_TRANSLATED__",
+    "VSCodeRemoteConnection": "__NOT_TRANSLATED__",
+    "VSCodeRemoteDescription": "__NOT_TRANSLATED__",
+    "VSCodeRemotePasswordTitle": "__NOT_TRANSLATED__",
+    "VSCodeRemoteNoticeSSHConfig": "__NOT_TRANSLATED__",
     "ElapsedTime": "__NOT_TRANSLATED__",
     "Timeout": "__NOT_TRANSLATED__",
     "SessionLifetime": "__NOT_TRANSLATED__",
@@ -359,7 +364,9 @@
     "GracePeriodDesc": "__NOT_TRANSLATED__",
     "UtilizationThreshold": "__NOT_TRANSLATED__",
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
-    "ExpiresAfter": "__NOT_TRANSLATED__"
+    "ExpiresAfter": "__NOT_TRANSLATED__",
+    "ConnectionExample": "__NOT_TRANSLATED__",
+    "System": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Отмена",
@@ -498,7 +505,8 @@
       "PleaseSelectOption": "Пожалуйста, выберите один вариант",
       "LetterNumber-_dot": "Допускает буквы, цифры и -_.",
       "NameAlreadyExists": "Название политики уже существует!",
-      "ValidationFailed": "Проверка не удалась"
+      "ValidationFailed": "Проверка не удалась",
+      "PleaseSelectOptions": "Пожалуйста, выберите варианты"
     },
     "ProjectAndGroup": "Проекты и группы",
     "ModifyKeypairResourcePolicy": "Изменить политику ресурсов пары ключей",
@@ -647,7 +655,19 @@
       "NotEnoughResourceForFileBrowserSession": "Недостаточно ресурсов (cpu: 1 Core, mem: 0,5GB) для создания сеанса для просмотра файлов. пожалуйста, проверьте доступные ресурсы.",
       "NoImagesSupportingFileBrowser": "Пока нет изображений, поддерживающих просмотрщик файлов. Для загрузки папок требуется по крайней мере одно или несколько изображений, поддерживающих просмотрщик файлов.",
       "ClickFilebrowserButton": "Чтобы загрузить папку (и), нажмите кнопку «Выполнить просмотрщик файлов».",
-      "ReadOnlyFolderOnFileBrowser": "__NOT_TRANSLATED__"
+      "ReadOnlyFolderOnFileBrowser": "__NOT_TRANSLATED__",
+      "ExecuteSSH/SFTP": "__NOT_TRANSLATED__",
+      "NoImagesSupportingSystemSession": "__NOT_TRANSLATED__",
+      "SftpScalingGroupsDoNotExist": "__NOT_TRANSLATED__",
+      "ExecutingSSH/SFTPSession": "__NOT_TRANSLATED__",
+      "RunSSH/SFTPserver": "__NOT_TRANSLATED__",
+      "SFTPSessionNotAvailable": "__NOT_TRANSLATED__",
+      "StartingSSH/SFTPSession": "__NOT_TRANSLATED__",
+      "UploadFolder": "__NOT_TRANSLATED__",
+      "EmptyFilesAndFoldersAreNotUploaded": "__NOT_TRANSLATED__",
+      "FolderAlreadyExists": "__NOT_TRANSLATED__",
+      "NumberOfSFTPSessionsExceededTitle": "__NOT_TRANSLATED__",
+      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__"
     },
     "invitation": {
       "EnterEmail": "Введите адрес электронной почты",
@@ -657,7 +677,8 @@
       "InvitationError": "Приглашение не прошло. Пользователь уже может быть приглашен.",
       "Shared": "Успешно предоставлен доступ к групповой папке",
       "NoOneWasShared": "Не удалось предоставить общий доступ к папке группы",
-      "SharingError": "Не удалось отправить. Возможно, пользователь уже находится в совместном доступе или не принадлежит соответствующему проекту."
+      "SharingError": "Не удалось отправить. Возможно, пользователь уже находится в совместном доступе или не принадлежит соответствующему проекту.",
+      "FolderSharingNotAvailableToUser": "__NOT_TRANSLATED__"
     },
     "permission": {
       "NoChanges": "Никаких изменений не внесено",
@@ -818,6 +839,8 @@
     "AutoLogout": "Автоматический выход",
     "DescAutoLogout": "Автоматический выход из системы, если все зарегистрированные страницы закрыты, кроме страниц, созданных в сеансе для приложений (например, блокнот jupyter, веб-терминал и т. Д.)",
     "BootstrapScriptDescription": "__NOT_TRANSLATED__",
+    "NoExistingVSCodePassword": "__NOT_TRANSLATED__",
+    "VSCodePasswordClipboardCopy": "__NOT_TRANSLATED__",
     "SSHKeypairEnterManually": "__NOT_TRANSLATED__",
     "SSHKeypairEnterManuallyFinished": "__NOT_TRANSLATED__"
   },
@@ -935,7 +958,8 @@
     "ResourceGroupDetail": "Сведения о группе ресурсов",
     "RetriesToSkip": "__NOT_TRANSLATED__",
     "NoGroupToDisplay": "__NOT_TRANSLATED__",
-    "AllowedSessionTypes": "__NOT_TRANSLATED__"
+    "AllowedSessionTypes": "__NOT_TRANSLATED__",
+    "Domain": "Домен"
   },
   "maintenance": {
     "General": "Общий",
@@ -998,10 +1022,18 @@
     }
   },
   "statistics": {
-    "Usage": "Применение",
+    "UsageHistory": "История использования",
     "SelectPeriod": "Выберите период",
     "1Day": "1 день",
-    "1Week": "1 неделя"
+    "1Week": "1 неделя",
+    "UsageHistoryDesc": "__NOT_TRANSLATED__",
+    "SessionsDesc": "__NOT_TRANSLATED__",
+    "CPUDesc": "__NOT_TRANSLATED__",
+    "MemoryDesc": "__NOT_TRANSLATED__",
+    "GPUDesc": "__NOT_TRANSLATED__",
+    "IOReadDesc": "__NOT_TRANSLATED__",
+    "IOWriteDesc": "__NOT_TRANSLATED__",
+    "UsageHistoryNote": "__NOT_TRANSLATED__"
   },
   "language": {
     "Browser": "Браузер",
@@ -1164,7 +1196,8 @@
       "LoginWithSAML": "__NOT_TRANSLATED__"
     },
     "EndpointInfo": "__NOT_TRANSLATED__",
-    "DescEndpoint": "__NOT_TRANSLATED__"
+    "DescEndpoint": "__NOT_TRANSLATED__",
+    "EndpointStartWith": "__NOT_TRANSLATED__"
   },
   "signup": {
     "SignupBETA": "Регистрация (только приглашение в бета-версию)",
@@ -1333,6 +1366,7 @@
     "ValueRequired": "НужноЗначение",
     "InputTooShort": "ВводОченьКороток"
   },
+  "OpenVSCodeRemote": "__NOT_TRANSLATED__",
   "totp": {
     "OTP": "__NOT_TRANSLATED__",
     "TotpRemoved": "__NOT_TRANSLATED__",

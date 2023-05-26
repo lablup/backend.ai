@@ -693,12 +693,19 @@ class SessionRow(Base):
         return kerns[0]
 
     @property
-    def status_changed(self) -> datetime:
-        return datetime.fromisoformat(self.status_history[self.status.name])
+    def status_changed(self) -> Optional[datetime]:
+        try:
+            return datetime.fromisoformat(self.status_history[self.status.name])
+        except KeyError:
+            return None
 
     @property
     def resource_opts(self) -> dict[str, Any]:
         return {kern.cluster_hostname: kern.resource_opts for kern in self.kernels}
+
+    @property
+    def is_private(self) -> bool:
+        return any([kernel.is_private for kernel in self.kernels])
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
@@ -1139,7 +1146,6 @@ DEFAULT_SESSION_ORDERING = [
         sa.func.greatest(
             SessionRow.created_at,
             SessionRow.terminated_at,
-            # SessionRow.status_changed,
         )
     ),
 ]
@@ -1155,6 +1161,7 @@ class ComputeSession(graphene.ObjectType):
     tag = graphene.String()
     name = graphene.String()
     type = graphene.String()
+    main_kernel_role = graphene.String()
 
     # image
     image = graphene.String()  # image for the main container
@@ -1225,6 +1232,7 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
+            "main_kernel_role": row.main_kernel.role.name,
             # image
             # "image": row.image_id,
             "image": row.main_kernel.image,
@@ -1373,7 +1381,6 @@ class ComputeSession(graphene.ObjectType):
         "cluster_size": ("sessions_cluster_size", None),
         "status": ("sessions_status", lambda s: SessionStatus[s]),
         "status_info": ("sessions_status_info", None),
-        # "status_changed": ("status_changed", dtparse),
         "result": ("sessions_result", lambda s: SessionResult[s]),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
