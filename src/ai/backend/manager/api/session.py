@@ -913,15 +913,11 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
                 session_name, owner_access_key, db_session=db_sess
             )
         kernel = session.main_kernel
-        report = await root_ctx.registry.get_abusing_report(
-            kernel.id, kernel.agent, kernel.agent_addr
-        )
+        report = await root_ctx.registry.get_abusing_report(kernel.id)
     except BackendError:
         log.exception("GET_ABUSING_REPORT: exception")
         raise
-    if report is None:
-        report = {}
-    return web.json_response(report, status=200)
+    return web.json_response(report or {}, status=200)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1262,6 +1258,7 @@ async def get_info(request: web.Request) -> web.Response:
             sess.main_kernel.occupied_shares
         )  # legacy, only caculate main kernel's occupying resource
         resp["environ"] = str(sess.environ)
+        resp["resourceOpts"] = str(sess.resource_opts)
 
         # Lifecycle
         resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "

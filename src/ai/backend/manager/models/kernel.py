@@ -560,6 +560,10 @@ class KernelRow(Base):
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
 
+    @property
+    def is_private(self) -> bool:
+        return self.role in PRIVATE_KERNEL_ROLES
+
     @staticmethod
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
@@ -862,7 +866,7 @@ class ComputeContainer(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         if access_key is None:
             return None
-        return await graph_ctx.registry.get_abusing_report(self.id, self.agent, self.agent_addr)
+        return await graph_ctx.registry.get_abusing_report(self.id)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),
@@ -1445,12 +1449,30 @@ async def recalc_concurrency_used(
             ),
         )
         concurrency_used = result.scalar()
+        result = await db_sess.execute(
+            sa.select(sa.func.count())
+            .select_from(KernelRow)
+            .where(
+                (KernelRow.access_key == access_key)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+            ),
+        )
+        sftp_concurrency_used = result.scalar()
         assert isinstance(concurrency_used, int)
+        assert isinstance(sftp_concurrency_used, int)
 
     await redis_helper.execute(
         redis_stat,
         lambda r: r.set(
             f"keypair.concurrency_used.{access_key}",
             concurrency_used,
+        ),
+    )
+    await redis_helper.execute(
+        redis_stat,
+        lambda r: r.set(
+            f"keypair.sftp_concurrency_used.{access_key}",
+            sftp_concurrency_used,
         ),
     )

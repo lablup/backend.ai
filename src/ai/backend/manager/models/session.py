@@ -594,7 +594,6 @@ class SessionRow(Base):
     vfolder_mounts = sa.Column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
-    resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
     use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
@@ -699,8 +698,19 @@ class SessionRow(Base):
         return kerns[0]
 
     @property
-    def status_changed(self) -> datetime:
-        return datetime.fromisoformat(self.status_history[self.status.name])
+    def status_changed(self) -> Optional[datetime]:
+        try:
+            return datetime.fromisoformat(self.status_history[self.status.name])
+        except KeyError:
+            return None
+
+    @property
+    def resource_opts(self) -> dict[str, Any]:
+        return {kern.cluster_hostname: kern.resource_opts for kern in self.kernels}
+
+    @property
+    def is_private(self) -> bool:
+        return any([kernel.is_private for kernel in self.kernels])
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
@@ -1182,7 +1192,6 @@ DEFAULT_SESSION_ORDERING = [
         sa.func.greatest(
             SessionRow.created_at,
             SessionRow.terminated_at,
-            # SessionRow.status_changed,
         )
     ),
 ]
@@ -1198,6 +1207,7 @@ class ComputeSession(graphene.ObjectType):
     tag = graphene.String()
     name = graphene.String()
     type = graphene.String()
+    main_kernel_role = graphene.String()
 
     # image
     image = graphene.String()  # image for the main container
@@ -1268,6 +1278,7 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
+            "main_kernel_role": row.main_kernel.role.name,
             # image
             # "image": row.image_id,
             "image": row.main_kernel.image,
@@ -1298,7 +1309,6 @@ class ComputeSession(graphene.ObjectType):
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
-            "resource_opts": row.resource_opts,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
@@ -1379,6 +1389,15 @@ class ComputeSession(graphene.ObjectType):
         commit_status = await graph_ctx.registry.get_commit_status(session)
         return commit_status["status"]
 
+    async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return {}
+        self.containers = containers
+        return {cntr.cluster_hostname: cntr.resource_opts for cntr in containers}
+
     async def resolve_abusing_reports(
         self, info: graphene.ResolveInfo
     ) -> Iterable[Optional[Mapping[str, Any]]]:
@@ -1387,6 +1406,7 @@ class ComputeSession(graphene.ObjectType):
             containers = await self.resolve_containers(info)
         if containers is None:
             return []
+        self.containers = containers
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
@@ -1407,7 +1427,6 @@ class ComputeSession(graphene.ObjectType):
         "cluster_size": ("sessions_cluster_size", None),
         "status": ("sessions_status", lambda s: SessionStatus[s]),
         "status_info": ("sessions_status_info", None),
-        # "status_changed": ("status_changed", dtparse),
         "result": ("sessions_result", lambda s: SessionResult[s]),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),

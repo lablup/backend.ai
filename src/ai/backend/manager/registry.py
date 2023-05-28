@@ -86,6 +86,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReport,
     AccessKey,
     AgentId,
     BinarySize,
@@ -1964,11 +1965,14 @@ class AgentRegistry:
         concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
             set
         )  # key: access_key, value: set of session_id
-        occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-            lambda: ResourceSlot({"cpu": 0, "mem": 0})
-        )
+        sftp_concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
+            set
+        )  # key: access_key, value: set of session_id
 
         async def _recalc() -> None:
+            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
+                lambda: ResourceSlot({"cpu": 0, "mem": 0})
+            )
             async with self.db.begin() as conn:
                 # Query running containers and calculate concurrency_used per AK and
                 # occupied_slots per agent.
@@ -1986,18 +1990,17 @@ class AgentRegistry:
                             kernels.c.session_id,
                             kernels.c.agent,
                             kernels.c.occupied_slots,
+                            kernels.c.role,
                         ]
                     )
-                    .where(
-                        (
-                            kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)
-                            & kernels.c.role.not_in(PRIVATE_KERNEL_ROLES)
-                        )
-                    )
+                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in await conn.stream(query):
-                    concurrency_used_per_key[row.access_key].add(row.session_id)
+                    if row.role in PRIVATE_KERNEL_ROLES:
+                        sftp_concurrency_used_per_key[row.access_key].add(row.session_id)
+                    else:
+                        concurrency_used_per_key[row.access_key].add(row.session_id)
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
@@ -2026,11 +2029,15 @@ class AgentRegistry:
 
         # Update keypair resource usage for keypairs with running containers.
         kp_key = "keypair.concurrency_used"
+        sftp_kp_key = "keypair.sftp_concurrency_used"
 
         async def _update(r: Redis):
             updates = {
                 f"{kp_key}.{ak}": len(session_ids)
                 for ak, session_ids in concurrency_used_per_key.items()
+            } | {
+                f"{sftp_kp_key}.{ak}": len(session_ids)
+                for ak, session_ids in sftp_concurrency_used_per_key.items()
             }
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
@@ -2042,6 +2049,11 @@ class AgentRegistry:
                 session_concurrency = concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
                 updates[f"{kp_key}.{ak}"] = usage
+            keys = await r.keys(f"{sftp_kp_key}.*")
+            for ak in keys:
+                session_concurrency = sftp_concurrency_used_per_key.get(ak)
+                usage = len(session_concurrency) if session_concurrency is not None else 0
+                updates[f"{sftp_kp_key}.{ak}"] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2203,14 +2215,14 @@ class AgentRegistry:
                                 main_stat = {"status": "cancelled"}
                                 await SessionRow.set_session_status(
                                     self.db,
-                                    kernel.session_id,
+                                    session_id,
                                     SessionStatus.CANCELLED,
                                     reason=reason,
                                     status_changed_at=now,
                                 )
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
-                                        kernel.session_id,
+                                        session_id,
                                         kernel.session_creation_id,
                                         reason,
                                     ),
@@ -2262,16 +2274,17 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if (
-                                kernel.cluster_role == DEFAULT_ROLE
-                                and kernel.role not in PRIVATE_KERNEL_ROLES
-                            ):
+                            if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
+                                if kernel.is_private:
+                                    kp_key = "keypair.sftp_concurrency_used"
+                                else:
+                                    kp_key = "keypair.concurrency_used"
                                 await redis_helper.execute(
                                     self.redis_stat,
                                     lambda r: r.incrby(
-                                        f"keypair.concurrency_used.{kernel.access_key}",
+                                        f"{kp_key}.{kernel.access_key}",
                                         -1,
                                     ),
                                 )
@@ -2306,16 +2319,17 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if (
-                                kernel.cluster_role == DEFAULT_ROLE
-                                and kernel.role not in PRIVATE_KERNEL_ROLES
-                            ):
+                            if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
+                                if kernel.is_private:
+                                    kp_key = "keypair.sftp_concurrency_used"
+                                else:
+                                    kp_key = "keypair.concurrency_used"
                                 await redis_helper.execute(
                                     self.redis_stat,
                                     lambda r: r.incrby(
-                                        f"keypair.concurrency_used.{kernel.access_key}",
+                                        f"{kp_key}.{kernel.access_key}",
                                         -1,
                                     ),
                                 )
@@ -2770,6 +2784,7 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
+        auto_terminate_abusing_kernel = agent_info["auto_terminate_abusing_kernel"]
         async with self.heartbeat_lock:
             instance_rejoin = False
 
@@ -2794,6 +2809,7 @@ class AgentRegistry:
                                 agents.c.version,
                                 agents.c.compute_plugins,
                                 agents.c.architecture,
+                                agents.c.auto_terminate_abusing_kernel,
                             ]
                         )
                         .select_from(agents)
@@ -2822,6 +2838,7 @@ class AgentRegistry:
                                 "version": agent_info["version"],
                                 "compute_plugins": agent_info["compute_plugins"],
                                 "architecture": agent_info.get("architecture", "x86_64"),
+                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                             }
                         )
                         result = await conn.execute(insert_query)
@@ -2842,6 +2859,8 @@ class AgentRegistry:
                             updates["compute_plugins"] = agent_info["compute_plugins"]
                         if row["architecture"] != agent_info["architecture"]:
                             updates["architecture"] = agent_info["architecture"]
+                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
+                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
                         # occupied_slots are updated when kernels starts/terminates
                         if updates:
                             await self.shared_config.update_resource_slots(slot_key_and_units)
@@ -2866,6 +2885,7 @@ class AgentRegistry:
                                     "version": agent_info["version"],
                                     "compute_plugins": agent_info["compute_plugins"],
                                     "architecture": agent_info["architecture"],
+                                    "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
                                 }
                             )
                             .where(agents.c.id == agent_id)
@@ -3192,15 +3212,20 @@ class AgentRegistry:
     async def get_abusing_report(
         self,
         kernel_id: KernelId,
-        agent_id: AgentId,
-        agent_addr: str,
-    ) -> Optional[Mapping[str, str]]:
-        async with RPCContext(
-            agent_id,
-            agent_addr,
-            invoke_timeout=None,
-        ) as rpc:
-            return await rpc.call.get_abusing_report(str(kernel_id))
+    ) -> Optional[AbuseReport]:
+        hash_name = "abuse_report"
+        abusing_report: Optional[dict[str, str]] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.hgetall(hash_name),
+            encoding="utf-8",
+        )
+        kern_id = str(kernel_id)
+        if abusing_report is None or (result := abusing_report.get(kern_id)) is None:
+            return None
+        return {
+            "kernel": kern_id,
+            "abuse_report": result,
+        }
 
     async def update_appproxy_endpoint_routes(
         self, db_sess: AsyncSession, endpoint: EndpointRow

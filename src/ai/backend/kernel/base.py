@@ -36,7 +36,6 @@ from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
     prepare_ttyd_service,
-    prepare_vscode_service,
 )
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
@@ -616,8 +615,6 @@ class BaseRunner(metaclass=ABCMeta):
                     cmdargs, env = await prepare_ttyd_service(service_info)
                 elif service_info["name"] == "sshd":
                     cmdargs, env = await prepare_sshd_service(service_info)
-                elif service_info["name"] == "vscode":
-                    cmdargs, env = await prepare_vscode_service(service_info)
                 elif self.service_parser is not None:
                     self.service_parser.variables["ports"] = service_info["ports"]
                     cmdargs, env = await self.service_parser.start_service(
