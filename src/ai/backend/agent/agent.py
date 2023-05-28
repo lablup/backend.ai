@@ -1808,6 +1808,8 @@ class AbstractAgent(
                         yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
                     )
                     assert model_definition is not None
+                    environ["BACKEND_MODEL_NAME"] = model_definition["name"]
+                    environ["BACKEND_MODEL_PATH"] = model_definition["model_path"]
                     for model in model_definition["models"]:
                         if service := model.get("service"):
                             service_ports.append(
