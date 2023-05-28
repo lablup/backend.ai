@@ -586,7 +586,7 @@ async def prepare_vfolder_mounts(
 
     for vfid, name in result.fetchall():
         requested_mounts.append(name)
-        if path := requested_mount_map.get(vfid):
+        if path := requested_mount_reference_map.get(vfid):
             requested_mount_map[name] = path
 
     requested_vfolder_names: dict[str, str] = {}

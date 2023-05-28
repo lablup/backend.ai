@@ -1770,16 +1770,16 @@ class AbstractAgent(
                 }
             )
 
-            model_service_bootstrap_script: list[str] = []
+            model_definition: Optional[Mapping[str, Any]] = None
             # Read model config
             model_folders = [
                 folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.MODEL
             ]
             if len(model_folders) > 0:
                 model_folder = model_folders[0]
-                model_definition_path = Path(model_folder.host_path / "model-defintion.yml")
+                model_definition_path = Path(model_folder.host_path / "model-definition.yml")
                 try:
-                    model_defintion_yaml = await asyncio.get_running_loop().run_in_executor(
+                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
                         None, model_definition_path.read_text
                     )
                 except FileNotFoundError:
@@ -1793,53 +1793,26 @@ class AbstractAgent(
                     )
                 try:
                     model_definition = model_definition_iv.check(
-                        yaml.load(model_defintion_yaml, Loader=yaml.FullLoader)
+                        yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
                     )
+                    assert model_definition is not None
+                    for model in model_definition["models"]:
+                        if service := model.get("service"):
+                            service_ports.append(
+                                {
+                                    "name": f"{model['name']}-{service['port']}",
+                                    "protocol": ServicePortProtocols.PREOPEN,
+                                    "container_ports": (service["port"],),
+                                    "host_ports": (None,),
+                                    "is_inference": True,
+                                }
+                            )
                 except DataError:
                     raise AgentError(
-                        "Failed to read model defintion from vFolder {} (ID {})",
+                        "Failed to read model definition from vFolder {} (ID {})",
                         model_folder.name,
                         model_folder.vfid,
                     )
-                for model in model_definition["models"]:
-                    if service := model.get("service"):
-                        service_ports.append(
-                            {
-                                "name": str(service["port"]),
-                                "protocol": ServicePortProtocols.PREOPEN,
-                                "container_ports": (service["port"],),
-                                "host_ports": (None,),
-                                "is_inference": True,
-                            }
-                        )
-                        model_service_bootstrap_script += f"{service['command']} &"
-                        if health_check := model.get("health_check"):
-                            model_service_bootstrap_script += textwrap.dedent(f"""
-                                server_pid=$!
-                                exit_code=1
-                                for i in {{1..{health_check['max_retries']}}}
-                                do
-                                pid_list=$(ps -o "pid=" -p $server_pid | wc -l)
-                                if [ $pid_list -eq 0 ]; then
-                                    echo "Inference server process killed unexpectedly"
-                                    break
-                                fi
-                                curl http://localhost:{service['port']}{health_check['path']} 2>/dev/null
-                                if [ $? -eq 0 ]; then
-                                    echo "Inference server loaded"
-                                    exit_code=0
-                                    break
-                                fi
-                                sleep 5
-                                done
-
-                                if [ $exit_code -ne 0 ]; then
-                                echo "Timed out while waiting for inference server to load"
-                                exit $exit_code
-                                fi
-                            """)
-            if len(model_service_bootstrap_script) > 0:
-                ctx.update_user_bootstrap_script("\n".join(model_service_bootstrap_script))
 
             if ctx.kernel_config["cluster_role"] in ("main", "master"):
                 for sport in parse_service_ports(
@@ -2018,6 +1991,11 @@ class AbstractAgent(
                 "agent_addr": kernel_config["agent_addr"],
                 "attached_devices": attached_devices,
             }
+
+            if model_definition:
+                for model in model_definition["models"]:
+                    log.debug("starting model service of model {}", model)
+                    await kernel_obj.start_model_service(model)
 
             # Finally we are done.
             await self.produce_event(

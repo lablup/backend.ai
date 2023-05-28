@@ -835,7 +835,9 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
-                t.Key("usage_mode"): tx.Enum(VFolderUsageMode),
+                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
+                    VFolderUsageMode
+                ),
             }
         )
 

@@ -424,6 +424,7 @@ def downscale_route(ctx: CLIContext, service_id: str, route_id: str):
     """
     Destroy route and its associated session and
     decrement desired session count of endpoint
+
     \b
     SERVICE_ID: The endpoint ID
     ROUTE_ID: Route ID to destroy

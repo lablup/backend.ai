@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import time
+import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
 from functools import partial
@@ -594,19 +595,68 @@ class BaseRunner(metaclass=ABCMeta):
         """Start an application service daemon."""
         return None, {}
 
-    async def _start_service(self, service_info, user_requested: bool = True):
+    async def start_model_service(self, model_info):
+        assert self.service_parser is not None
+        model_service_info = model_info.get("service")
+        result = {}
+        try:
+            if model_service_info is None:
+                result = {"status": "failed", "error": "service info not provided"}
+                return
+            service_name = f"{model_info['name']}-{model_service_info['port']}"
+            self.service_parser.add_model_service(service_name, model_service_info)
+            service_info = {
+                "name": service_name,
+                "port": model_service_info["port"],
+                "ports": [model_service_info["port"]],
+                "protocol": "http",
+                "options": {},
+            }
+            result = await self._start_service(service_info)
+            if (result["status"] == "running" or result["status"] == "started") and (
+                health_check_info := model_service_info.get("health_check")
+            ):
+                health_check_endpoint = (
+                    f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
+                )
+                is_healthy = False
+                for _ in range(health_check_info["max_retries"]):
+                    async with timeout(health_check_info["max_wait_time"]):
+                        resp = await asyncio.get_running_loop().run_in_executor(
+                            None, urllib.request.urlopen, health_check_endpoint
+                        )
+                        if resp.status == health_check_info["expected_status_code"]:
+                            is_healthy = True
+                            break
+                if not is_healthy:
+                    result = {"status": "failed", "error": "service unhealthy"}
+        finally:
+            await self.outsock.send_multipart(
+                [
+                    b"service-result",
+                    json.dumps(result).encode("utf8"),
+                ]
+            )
+
+    async def _start_service_and_feed_result(self, service_info):
+        result = await self._start_service(service_info)
+        await self.outsock.send_multipart(
+            [
+                b"service-result",
+                json.dumps(result).encode("utf8"),
+            ]
+        )
+
+    async def _start_service(self, service_info):
         async with self._service_lock:
             try:
                 if service_info["protocol"] == "preopen":
                     # skip subprocess spawning as we assume the user runs it manually.
-                    result = {"status": "started"}
-                    return
+                    return {"status": "started"}
                 if service_info["name"] in self.services_running:
-                    result = {"status": "running"}
-                    return
+                    return {"status": "running"}
                 if service_info["protocol"] == "pty":
-                    result = {"status": "failed", "error": "not implemented yet"}
-                    return
+                    return {"status": "failed", "error": "not implemented yet"}
                 cwd = Path.cwd()
                 cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
                 env: Mapping[str, str]
@@ -634,11 +684,10 @@ class BaseRunner(metaclass=ABCMeta):
                 if cmdargs is None:
                     # still not found?
                     log.warning("The service {0} is not supported.", service_info["name"])
-                    result = {
+                    return {
                         "status": "failed",
                         "error": "unsupported service",
                     }
-                    return
                 log.debug("cmdargs: {0}", cmdargs)
                 log.debug("env: {0}", env)
                 service_env = {**self.child_env, **env}
@@ -663,11 +712,11 @@ class BaseRunner(metaclass=ABCMeta):
                         proc.pid,
                         service_info["port"],
                     )
-                    result = {"status": "started"}
+                    return {"status": "started"}
                 except asyncio.CancelledError:
                     # This may happen if the service process gets started but it fails to
                     # open the port and then terminates (with an error).
-                    result = {
+                    return {
                         "status": "failed",
                         "error": f"the process did not start properly: {cmdargs[0]}",
                     }
@@ -676,34 +725,26 @@ class BaseRunner(metaclass=ABCMeta):
                     if service_info["name"] in self.services_running:
                         await terminate_and_wait(proc, timeout=10.0)
                         self.services_running.pop(service_info["name"], None)
-                    result = {
+                    return {
                         "status": "failed",
                         "error": f"opening the service port timed out: {service_info['name']}",
                     }
                 except PermissionError:
-                    result = {
+                    return {
                         "status": "failed",
                         "error": f"the target file is not executable: {cmdargs[0]}",
                     }
                 except FileNotFoundError:
-                    result = {
+                    return {
                         "status": "failed",
                         "error": f"the executable file is not found: {cmdargs[0]}",
                     }
             except Exception as e:
                 log.exception("start_service: unexpected error")
-                result = {
+                return {
                     "status": "failed",
                     "error": repr(e),
                 }
-            finally:
-                if user_requested:
-                    await self.outsock.send_multipart(
-                        [
-                            b"service-result",
-                            json.dumps(result).encode("utf8"),
-                        ]
-                    )
 
     async def _wait_service_proc(
         self,
@@ -869,7 +910,6 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
-                user_requested=False,
             )
         )
         intrinsic_spawn_coros.append(
@@ -879,7 +919,6 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
-                user_requested=False,
             )
         )
         results = await asyncio.gather(*intrinsic_spawn_coros, return_exceptions=True)
@@ -917,9 +956,12 @@ class BaseRunner(metaclass=ABCMeta):
                     await self._interrupt()
                 elif op_type == "status":
                     await self._send_status()
+                elif op_type == "start-model-service":  # activate a service port
+                    data = json.loads(text)
+                    asyncio.create_task(self.start_model_service(data))
                 elif op_type == "start-service":  # activate a service port
                     data = json.loads(text)
-                    asyncio.create_task(self._start_service(data))
+                    asyncio.create_task(self._start_service_and_feed_result(data))
                 elif op_type == "shutdown-service":  # shutdown the service by its name
                     data = json.loads(text)
                     await self._shutdown_service(data)

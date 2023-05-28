@@ -280,6 +280,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def start_model_service(self, model_service):
+        raise NotImplementedError
+
+    @abstractmethod
     async def shutdown_service(self, service):
         raise NotImplementedError
 
@@ -587,6 +591,31 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return json.loads(result)
         except asyncio.CancelledError:
             return []
+
+    async def feed_start_model_service(self, model_service_info):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        await self.input_sock.send_multipart(
+            [
+                b"start-model-service",
+                json.dumps(model_service_info).encode("utf8"),
+            ]
+        )
+        if health_check_info := model_service_info.get("health_check"):
+            timeout_seconds = (
+                health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
+            )
+        else:
+            timeout_seconds = 10
+        try:
+            with timeout(timeout_seconds):
+                result = await self.service_queue.get()
+            self.service_queue.task_done()
+            return json.loads(result)
+        except asyncio.CancelledError:
+            return {"status": "failed", "error": "cancelled"}
+        except asyncio.TimeoutError:
+            return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
         if self.input_sock.closed:
