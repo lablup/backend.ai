@@ -50,6 +50,7 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
+import yaml
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -62,6 +63,7 @@ from tenacity import (
     stop_after_delay,
     wait_fixed,
 )
+from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
@@ -114,6 +116,7 @@ from ai.backend.common.types import (
     SessionId,
     SlotName,
     VFolderMount,
+    VFolderUsageMode,
     aobject,
 )
 from ai.backend.common.utils import cancel_tasks, current_loop
@@ -121,6 +124,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
+from .config import model_definition_iv
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -221,6 +225,12 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     @abstractmethod
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
+
+    def update_user_bootstrap_script(self, script: str) -> None:
+        """
+        Replace user-defined bootstrap script to an arbitrary one created by agent.
+        """
+        self.kernel_config["bootstrap_script"] = script
 
     @abstractmethod
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
@@ -1713,8 +1723,8 @@ class AbstractAgent(
             await ctx.prepare_ssh(cluster_info)
 
             # Mount vfolders and krunner stuffs.
+            vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
             if not restarting:
-                vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
                 await ctx.mount_vfolders(vfolder_mounts, resource_spec)
                 await ctx.mount_krunner(resource_spec, environ)
 
@@ -1759,6 +1769,77 @@ class AbstractAgent(
                     "is_inference": False,
                 }
             )
+
+            model_service_bootstrap_script = []
+            # Read model config
+            model_folders = [
+                folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.MODEL
+            ]
+            if len(model_folders) > 0:
+                model_folder = model_folders[0]
+                model_definition_path = Path(model_folder.host_path / "model-defintion.yml")
+                try:
+                    model_defintion_yaml = await asyncio.get_running_loop().run_in_executor(
+                        None, model_definition_path.read_text
+                    )
+                except FileNotFoundError:
+                    raise AgentError(
+                        (
+                            "Model definition file (model-definition.yml) does not exist on vFolder"
+                            " {} (ID {})"
+                        ),
+                        model_folder.name,
+                        model_folder.vfid,
+                    )
+                try:
+                    model_definition = model_definition_iv.check(
+                        yaml.load(model_defintion_yaml, loader=yaml.FullLoader)
+                    )
+                except DataError:
+                    raise AgentError(
+                        "Failed to read model defintion from vFolder {} (ID {})",
+                        model_folder.name,
+                        model_folder.vfid,
+                    )
+                for model in model_definition["models"]:
+                    if service := model.get("service"):
+                        service_ports.append(
+                            {
+                                "name": str(service["port"]),
+                                "protocol": ServicePortProtocols.PREOPEN,
+                                "container_ports": (service["port"],),
+                                "host_ports": (None,),
+                                "is_inference": True,
+                            }
+                        )
+                        model_service_bootstrap_script += f"{service['command']} &"
+                        if health_check := model.get("health_check"):
+                            model_service_bootstrap_script += textwrap.dedent(f"""
+                                server_pid=$!
+                                exit_code=1
+                                for i in {{1..{health_check['max_retries']}}}
+                                do
+                                pid_list=$(ps -o "pid=" -p $server_pid | wc -l)
+                                if [ $pid_list -eq 0 ]; then
+                                    echo "Inference server process killed unexpectedly"
+                                    break
+                                fi
+                                curl http://localhost:{service['port']}{health_check['path']} 2>/dev/null
+                                if [ $? -eq 0 ]; then
+                                    echo "Inference server loaded"
+                                    exit_code=0
+                                    break
+                                fi
+                                sleep 5
+                                done
+
+                                if [ $exit_code -ne 0 ]; then
+                                echo "Timed out while waiting for inference server to load"
+                                exit $exit_code
+                                fi
+                            """)
+            if len(model_service_bootstrap_script) > 0:
+                ctx.update_user_bootstrap_script("\n".join(model_service_bootstrap_script))
 
             if ctx.kernel_config["cluster_role"] in ("main", "master"):
                 for sport in parse_service_ports(

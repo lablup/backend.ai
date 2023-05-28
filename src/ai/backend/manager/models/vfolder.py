@@ -19,7 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import (
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderMount,
+    VFolderUsageMode,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
@@ -49,7 +54,6 @@ __all__: Sequence[str] = (
     "vfolder_invitations",
     "vfolder_permissions",
     "VirtualFolder",
-    "VFolderUsageMode",
     "VFolderOwnershipType",
     "VFolderInvitationState",
     "VFolderPermission",
@@ -71,20 +75,6 @@ __all__: Sequence[str] = (
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-
-class VFolderUsageMode(str, enum.Enum):
-    """
-    Usage mode of virtual folder.
-
-    GENERAL: normal virtual folder
-    MODEL: virtual folder which provides shared models
-    DATA: virtual folder which provides shared data
-    """
-
-    GENERAL = "general"
-    MODEL = "model"
-    DATA = "data"
 
 
 class VFolderOwnershipType(str, enum.Enum):
@@ -712,6 +702,7 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
                     mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
         else:
@@ -731,6 +722,7 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
 

@@ -165,3 +165,28 @@ container_etcd_config_iv = t.Dict(
         t.Key("kernel-gid", optional=True): t.ToInt,
     }
 ).allow_extra("*")
+
+model_definition_iv = t.Dict(
+    {
+        t.Key("models"): t.List(
+            t.Dict(
+                {
+                    t.Key("name"): t.String,
+                    t.Key("model-path"): t.String,
+                    t.Key("service", default=None): t.Null | t.Dict(
+                        {
+                            t.Key("command"): t.String,
+                            t.Key("port"): t.ToInt[1:],
+                            t.Key("health_check", default=None): t.Null | t.Dict(
+                                {
+                                    t.Key("path"): t.String,
+                                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
+                                }
+                            ),
+                        }
+                    ),
+                }
+            )
+        )
+    }
+)

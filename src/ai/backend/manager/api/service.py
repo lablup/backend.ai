@@ -19,7 +19,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes
+from ai.backend.common.types import ClusterMode, SessionTypes, VFolderUsageMode
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_IMAGE_ARCH
@@ -27,7 +27,6 @@ from ..models import (
     ImageRow,
     KernelRole,
     UserRow,
-    VFolderUsageMode,
     query_accessible_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
