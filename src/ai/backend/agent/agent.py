@@ -1770,7 +1770,7 @@ class AbstractAgent(
                 }
             )
 
-            model_service_bootstrap_script: list[Mapping[str, Any]] = []
+            model_service_bootstrap_script: list[str] = []
             # Read model config
             model_folders = [
                 folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.MODEL
