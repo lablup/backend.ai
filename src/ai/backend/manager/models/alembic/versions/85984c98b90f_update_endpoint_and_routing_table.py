@@ -1,7 +1,7 @@
 """update endpoint and routing table
 
 Revision ID: 85984c98b90f
-Revises: fdc9d6ac49b4
+Revises: 857bdec5abda
 Create Date: 2023-05-11 12:40:09.197522
 
 """
@@ -15,7 +15,7 @@ from ai.backend.manager.models.routing import RouteStatus
 
 # revision identifiers, used by Alembic.
 revision = "85984c98b90f"
-down_revision = "fdc9d6ac49b4"
+down_revision = "857bdec5abda"
 branch_labels = None
 depends_on = None
 
