@@ -114,6 +114,7 @@ from ai.backend.common.types import (
     ServicePort,
     ServicePortProtocols,
     SessionId,
+    SessionTypes,
     SlotName,
     VFolderMount,
     VFolderUsageMode,
@@ -1775,7 +1776,7 @@ class AbstractAgent(
             model_folders = [
                 folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.MODEL
             ]
-            if len(model_folders) > 0:
+            if len(model_folders) > 0 and kernel_config["session_type"] == SessionTypes.INFERENCE:
                 model_folder = model_folders[0]
                 model_definition_path = Path(model_folder.host_path / "model-definition.yml")
                 if not model_definition_path.is_file():
