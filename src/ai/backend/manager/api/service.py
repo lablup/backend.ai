@@ -25,7 +25,6 @@ from ai.backend.manager.registry import check_scaling_group
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
     ImageRow,
-    KernelRole,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
@@ -257,8 +256,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 params["image"],
             ],
         )
-    if image_row.labels.get("ai.backend.role") != KernelRole.INFERENCE.name:
-        raise InvalidAPIParameters("Cannot create service with non-inference image")
 
     params["config"]["mount_map"] = {
         params["config"]["model_id"]: params["config"]["model_mount_destination"]
