@@ -1778,6 +1778,17 @@ class AbstractAgent(
             if len(model_folders) > 0:
                 model_folder = model_folders[0]
                 model_definition_path = Path(model_folder.host_path / "model-definition.yml")
+                if not model_definition_path.is_file():
+                    model_definition_path = Path(model_folder.host_path / "model-definition.yaml")
+                    if not model_definition_path.is_file():
+                        raise AgentError(
+                            (
+                                "Model definition file (model-definition.yml or"
+                                " model-definition.yaml) does not exist on vFolder {} (ID {})"
+                            ),
+                            model_folder.name,
+                            model_folder.vfid,
+                        )
                 try:
                     model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
                         None, model_definition_path.read_text

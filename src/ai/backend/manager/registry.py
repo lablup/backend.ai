@@ -692,7 +692,7 @@ class AgentRegistry:
             raise
         finally:
             self.pending_waits.discard(current_task)
-            if not enqueue_only:
+            if not enqueue_only and session_creation_id in self.session_creation_tracker:
                 del self.session_creation_tracker[session_creation_id]
 
     async def create_cluster(
