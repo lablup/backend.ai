@@ -1090,6 +1090,14 @@ class SchedulerDispatcher(aobject):
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
+        endpoints_to_flush = [
+            endpoint.id
+            for endpoint in endpoints
+            if endpoint.desired_session_count < 0 and len(endpoint.routings) == 0
+        ]
+        async with self.db.begin_session() as session:
+            query = sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoints_to_flush))
+            await session.execute(query)
         for endpoint in endpoints:
             desired_session_count = endpoint.desired_session_count
             if desired_session_count < 0:
