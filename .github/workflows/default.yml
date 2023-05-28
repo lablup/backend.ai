@@ -348,19 +348,17 @@ jobs:
           echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
           echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: ./backend.ai-client.Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: lablup/backend.ai-client:${{ github.ref_name }}
+          tags: |
+            lablup/backend.ai-client:${{ github.ref_name }}
+            lablup/backend.ai-client:latest
           build-args: |
             PYTHON_VERSION=${{ env.PROJECT_PYTHON_VERSION }}
             PKGVER=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Push to the Docker Hub
-        run: |
-          docker tag lablup/backend.ai-client:${{ github.ref_name }} lablup/backend.ai-client:latest
-          docker push lablup/backend.ai-client:latest
