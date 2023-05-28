@@ -1793,7 +1793,7 @@ class AbstractAgent(
                     )
                 try:
                     model_definition = model_definition_iv.check(
-                        yaml.load(model_defintion_yaml, loader=yaml.FullLoader)
+                        yaml.load(model_defintion_yaml, Loader=yaml.FullLoader)
                     )
                 except DataError:
                     raise AgentError(
