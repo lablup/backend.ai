@@ -31,10 +31,14 @@ from aiodocker.docker import DockerContainer
 from typing_extensions import Final
 
 from ai.backend.common import identity
-from ai.backend.common.cgroup import get_cgroup_of_pid, get_container_id_of_cgroup
+from ai.backend.common.cgroup import (
+    get_cgroup_of_pid,
+    get_container_id_of_cgroup,
+    get_container_pids,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
+from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -353,8 +357,7 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
                 await docker.close()
 
     try:
-        tasks_path = Path(f"/sys/fs/cgroup/pids/docker/{container_id}/tasks")
-        cgtasks = [*map(int, tasks_path.read_text().splitlines())]
+        cgtasks = await get_container_pids(ContainerId(container_id))
         for pid in cgtasks:
             proc_path = Path(f"/proc/{pid}/status")
             proc_status = {
