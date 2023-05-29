@@ -16,6 +16,34 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.22 (2023-05-29)
+
+### Features
+* Report commit status through redis rather direct RPC call. ([#1015](https://github.com/lablup/backend.ai/issues/1015))
+* Enable vfolder upload function to allow you to upload folders by making parent directory of a target path. ([#1233](https://github.com/lablup/backend.ai/issues/1233))
+* Add recurvice option to vfolder upload function. ([#1235](https://github.com/lablup/backend.ai/issues/1235))
+* Add `is_public` field to scaling_group table. ([#1236](https://github.com/lablup/backend.ai/issues/1236))
+* Add agent `public-host` config option and impl manager API to fetch direct access info of `SYSTEM` kernel. ([#1238](https://github.com/lablup/backend.ai/issues/1238))
+* Make image scanner handle OCI image metadata formats ([#1241](https://github.com/lablup/backend.ai/issues/1241))
+* Do not count stakes of `SYSTEM` role kernels when calculating resource occupancy ([#1243](https://github.com/lablup/backend.ai/issues/1243))
+* Update `/folder/_/list-hosts` API to expose client scaling groups designated only for SSH connection apps ([#1246](https://github.com/lablup/backend.ai/issues/1246))
+* Implement feature to force password updates periodically based on manager settings. ([#1284](https://github.com/lablup/backend.ai/issues/1284))
+* Add a detailed request handler statistics to the web server ([#1285](https://github.com/lablup/backend.ai/issues/1285))
+* Enable hard-sync manager DB and agent's kernel_registry. ([#1292](https://github.com/lablup/backend.ai/issues/1292))
+
+### Fixes
+* Fix relative path computation in the NetApp storage backend and disable cross-volume vfolder cloning until we have explicit export/import abstractions for the storage backends ([#1208](https://github.com/lablup/backend.ai/issues/1208))
+* Optimize monthly stat API by reducing the number of iteration and fetch to Redis. ([#1214](https://github.com/lablup/backend.ai/issues/1214))
+* Remove `DoSyncKernelStatsEvent` events since it is deprecated and adjust the interval of agent heart-beat event through configuration. ([#1223](https://github.com/lablup/backend.ai/issues/1223))
+* Upgrade aiotools to 1.6.1 for potential memory leak fix when there are unhandled exceptions inside persistent task groups ([#1256](https://github.com/lablup/backend.ai/issues/1256))
+* Fix a potential hang-up and leak issue due to missing async-context managers around Redis pipelines ([#1281](https://github.com/lablup/backend.ai/issues/1281))
+* Fix MemoryPlugin memory wrong calculation bug ([#1291](https://github.com/lablup/backend.ai/issues/1291))
+* Fix doubling of agent's occupied resources when the transaction in `recalculate_usage()` is retried due to database contention ([#1295](https://github.com/lablup/backend.ai/issues/1295))
+
+### Miscellaneous
+* Replace `./pants` with the scie-pants project so that developers could use a much faster version of `pants` binary bootstrapper that auto-installs the required Python interpreter using a static build ([#1237](https://github.com/lablup/backend.ai/issues/1237))
+
+
 ## 22.09.21 (2023-04-03)
 
 ### Features
