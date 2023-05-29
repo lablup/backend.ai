@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.4 (2023-05-29)
+
+### Features
+* Enable hard-sync manager DB and agent's kernel_registry. ([#1292](https://github.com/lablup/backend.ai/issues/1292))
+* Add a new route to the `WebServer` to support websocket proxy for the pipeline service. ([#1294](https://github.com/lablup/backend.ai/issues/1294))
+
+### Fixes
+* Fix MemoryPlugin memory wrong calculation bug ([#1291](https://github.com/lablup/backend.ai/issues/1291))
+* Use `session_id` to update status of destroyed session rather `kernel.session_id`. ([#1304](https://github.com/lablup/backend.ai/issues/1304))
+
+
 ## 23.03.3 (2023-05-26)
 
 ### Features
