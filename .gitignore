@@ -78,8 +78,10 @@ ENV/
 
 # IDE/vim
 .idea
-*.swp
-*.swo
+.swp
+.swo
+.*.swp
+.*.swo
 .vscode/
 /.vimrc
 /.nvimrc
@@ -125,3 +127,5 @@ ENV/
 
 # macOS specific
 .DS_Store
+
+.python-runtime

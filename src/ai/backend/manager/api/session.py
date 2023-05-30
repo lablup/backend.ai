@@ -82,20 +82,17 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import HookResults
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    EtcdRedisConfig,
     KernelEnqueueingConfig,
     KernelId,
     SessionTypes,
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
-from ai.backend.manager.defs import PluginDatabaseID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -140,7 +137,6 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
-    RejectedByHook,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1420,15 +1416,36 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
                 session_name, owner_access_key, db_session=db_sess
             )
         kernel = session.main_kernel
-        report = await root_ctx.registry.get_abusing_report(
-            kernel.id, kernel.agent, kernel.agent_addr
-        )
+        report = await root_ctx.registry.get_abusing_report(kernel.id)
     except BackendError:
         log.exception("GET_ABUSING_REPORT: exception")
         raise
-    if report is None:
-        report = {}
-    return web.json_response(report, status=200)
+    return web.json_response(report or {}, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("agent"): t.String,
+        }
+    ),
+)
+async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    agent_id = AgentId(params["agent"])
+    log.info(
+        "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
+    )
+    try:
+        await root_ctx.registry.sync_agent_kernel_registry(agent_id)
+    except BackendError:
+        log.exception("SYNC_AGENT_REGISTRY: exception")
+        raise
+    return web.json_response({}, status=200)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1645,7 +1662,9 @@ async def invoke_session_callback(
     | SessionFailureEvent,
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
+    app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
+
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with root_ctx.db.begin_readonly_session() as db_sess:
@@ -1654,29 +1673,20 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
-    url = session.callback_url
-    if url is None:
+
+    if (callback_url := session.callback_url) is None:
         return
-    if (addr := root_ctx.local_config.get("pipeline", {}).get("event-queue")) is None:
-        return
-    etcd_redis_config: EtcdRedisConfig = {
-        "addr": addr,
-        "sentinel": None,
-        "service_name": None,
-        "password": None,
+
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
     }
-    stream_key = "events"
-    token = url.query.get("token")
 
-    async def _dispatch() -> None:
-        hook_result = await root_ctx.hook_plugin_ctx.dispatch(
-            "PUBLISH_EVENT",
-            (event, etcd_redis_config, PluginDatabaseID.SESSION_EVENT, stream_key, token),
-        )
-        if hook_result.status != HookResults.PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
-    await execute_with_retry(_dispatch)
+    app_ctx.webhook_ptask_group.create_task(
+        _make_session_callback(data, callback_url),
+    )
 
 
 async def handle_batch_result(
@@ -2097,6 +2107,7 @@ async def get_info(request: web.Request) -> web.Response:
             sess.main_kernel.occupied_shares
         )  # legacy, only caculate main kernel's occupying resource
         resp["environ"] = str(sess.environ)
+        resp["resourceOpts"] = str(sess.resource_opts)
 
         # Lifecycle
         resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
@@ -2793,6 +2804,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-from-template", create_from_template))
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
+    cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))

@@ -164,20 +164,3 @@ async def prepare_ttyd_service(service_info):
     if shell != "ash":  # Currently Alpine-based containers are not supported.
         cmdargs += ["-c", "/opt/kernel/tmux -2 attach"]
     return cmdargs, {}
-
-
-async def prepare_vscode_service(service_info):
-    # NOTE: This will be replaced as intrinsic binary: /opt/kernel/vscode/...
-    extension_dir = Path("/home/work/.vscode-exts")
-    extension_dir.mkdir(parents=True, exist_ok=True)
-    return [
-        "/usr/local/bin/code-server",
-        "--auth",
-        "none",
-        "--bind-addr",
-        "0.0.0.0",
-        "--port",
-        str(service_info["port"]),
-        "--extensions-dir",
-        str(extension_dir),
-    ], {"PWD": "/home/work"}
