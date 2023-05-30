@@ -1629,7 +1629,7 @@ class AgentRegistry:
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
                                         session_id,
-                                        kernel.session_creation_id,
+                                        target_session.creation_id,
                                         reason,
                                     ),
                                 )
