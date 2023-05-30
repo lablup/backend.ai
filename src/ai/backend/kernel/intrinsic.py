@@ -148,19 +148,14 @@ async def prepare_sshd_service(service_info):
 
 async def prepare_ttyd_service(service_info):
     shell = "sh"
-    if Path("/bin/zsh"):
+    if Path("/bin/zsh").exists():
         shell = "zsh"
-        zshrc_path = Path("~/.zshrc").expanduser()
-        with zshrc_path.open("w") as f:
-            f.write("export PATH=$PATH:/opt/backend.ai/bin\n")
-            f.write("export TERM=xterm-256color\n")
-            f.write("autoload -Uz compinit && compinit\n")
-    elif Path("/bin/bash"):
+    elif Path("/bin/bash").exists():
         shell = "bash"
-    elif Path("/bin/ash"):
+    elif Path("/bin/ash").exists():
         shell = "ash"
 
     cmdargs = ["/opt/backend.ai/bin/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
     if shell != "ash":  # Currently Alpine-based containers are not supported.
-        cmdargs += ["-c", "/opt/kernel/tmux -2 attach"]
+        cmdargs += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
     return cmdargs, {}
