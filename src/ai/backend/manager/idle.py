@@ -255,7 +255,9 @@ class IdleCheckerHost:
                 )
                 .select_from(j)
                 .where(
-                    (kernels.c.status.in_(LIVE_STATUS)) & (kernels.c.cluster_role == DEFAULT_ROLE),
+                    (kernels.c.status.in_(LIVE_STATUS))
+                    & (kernels.c.cluster_role == DEFAULT_ROLE)
+                    & (kernels.c.session_type != SessionTypes.INFERENCE),
                 )
             )
             result = await conn.execute(query)

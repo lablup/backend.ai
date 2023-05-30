@@ -172,7 +172,7 @@ model_definition_iv = t.Dict(
             t.Dict(
                 {
                     t.Key("name"): t.String,
-                    t.Key("model-path"): t.String,
+                    t.Key("model_path"): t.String,
                     t.Key("service", default=None): t.Null | t.Dict(
                         {
                             # ai.backend.kernel.service.ServiceParser.start_service()

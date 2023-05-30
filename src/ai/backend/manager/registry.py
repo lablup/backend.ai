@@ -3231,8 +3231,6 @@ class AgentRegistry:
         self, db_sess: AsyncSession, endpoint: EndpointRow
     ) -> None:
         active_routes = [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-        if len(active_routes) == 0:
-            return await self.delete_appproxy_endpoint(db_sess, endpoint)
 
         target_sessions = await SessionRow.list_sessions_with_main_kernels(
             [r.session for r in active_routes],
@@ -3455,7 +3453,6 @@ async def invoke_session_callback(
 
             async def _update() -> None:
                 async with context.db.begin_session() as db_sess:
-                    log.debug("Session ID: {}", session.id)
                     route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                     endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
@@ -3468,6 +3465,15 @@ async def invoke_session_callback(
                             and endpoint.desired_session_count < 0  # we just removed last one
                         ):
                             await db_sess.delete(endpoint)
+                            try:
+                                await context.delete_appproxy_endpoint(db_sess, endpoint)
+                            except aiohttp.ClientError as e:
+                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                        else:
+                            try:
+                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
+                            except aiohttp.ClientError as e:
+                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
@@ -3483,7 +3489,10 @@ async def invoke_session_callback(
                                 .values({"status": new_route_status})
                             )
                             await db_sess.execute(query)
-                            await context.update_appproxy_endpoint_routes(db_sess, endpoint)
+                            try:
+                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
+                            except aiohttp.ClientError as e:
+                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
 
             await execute_with_retry(_update)
     except Exception:

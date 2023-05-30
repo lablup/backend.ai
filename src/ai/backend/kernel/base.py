@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import time
+import urllib.error
 import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
@@ -612,7 +613,7 @@ class BaseRunner(metaclass=ABCMeta):
                 "protocol": "http",
                 "options": {},
             }
-            result = await self._start_service(service_info)
+            result = await self._start_service(service_info, do_not_wait=True)
             if (result["status"] == "running" or result["status"] == "started") and (
                 health_check_info := model_service_info.get("health_check")
             ):
@@ -622,12 +623,15 @@ class BaseRunner(metaclass=ABCMeta):
                 is_healthy = False
                 for _ in range(health_check_info["max_retries"]):
                     async with timeout(health_check_info["max_wait_time"]):
-                        resp = await asyncio.get_running_loop().run_in_executor(
-                            None, urllib.request.urlopen, health_check_endpoint
-                        )
-                        if resp.status == health_check_info["expected_status_code"]:
-                            is_healthy = True
-                            break
+                        try:
+                            resp = await asyncio.get_running_loop().run_in_executor(
+                                None, urllib.request.urlopen, health_check_endpoint
+                            )
+                            if resp.status == health_check_info["expected_status_code"]:
+                                is_healthy = True
+                                break
+                        except urllib.error.URLError:
+                            pass
                 if not is_healthy:
                     result = {"status": "failed", "error": "service unhealthy"}
         finally:
@@ -647,7 +651,7 @@ class BaseRunner(metaclass=ABCMeta):
             ]
         )
 
-    async def _start_service(self, service_info):
+    async def _start_service(self, service_info, do_not_wait=False):
         async with self._service_lock:
             try:
                 if service_info["protocol"] == "preopen":
@@ -704,8 +708,9 @@ class BaseRunner(metaclass=ABCMeta):
                     )
                     self.services_running[service_info["name"]] = proc
                     asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-                    with timeout(5.0):
-                        await wait_local_port_open(service_info["port"])
+                    if not do_not_wait:
+                        with timeout(5.0):
+                            await wait_local_port_open(service_info["port"])
                     log.info(
                         "Service {} has started (pid: {}, port: {})",
                         service_info["name"],

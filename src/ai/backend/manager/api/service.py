@@ -451,7 +451,10 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
         )
         await db_sess.execute(query)
         endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
-        await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+        try:
+            await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+        except aiohttp.ClientError as e:
+            log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
         return web.json_response({"success": True})
 
 

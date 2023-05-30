@@ -1714,278 +1714,299 @@ class AbstractAgent(
                                 dict(computer_set.alloc_map.allocations),
                             )
                             raise
+            try:
+                # Prepare scratch spaces and dotfiles inside it.
+                if not restarting:
+                    await ctx.prepare_scratch()
 
-            # Prepare scratch spaces and dotfiles inside it.
-            if not restarting:
-                await ctx.prepare_scratch()
+                # Prepare networking.
+                await ctx.apply_network(cluster_info)
+                await ctx.prepare_ssh(cluster_info)
 
-            # Prepare networking.
-            await ctx.apply_network(cluster_info)
-            await ctx.prepare_ssh(cluster_info)
+                # Mount vfolders and krunner stuffs.
+                vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
+                if not restarting:
+                    await ctx.mount_vfolders(vfolder_mounts, resource_spec)
+                    await ctx.mount_krunner(resource_spec, environ)
 
-            # Mount vfolders and krunner stuffs.
-            vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
-            if not restarting:
-                await ctx.mount_vfolders(vfolder_mounts, resource_spec)
-                await ctx.mount_krunner(resource_spec, environ)
+                # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
+                label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")
+                envs_corecount = label_envs_corecount.split(",") if label_envs_corecount else []
+                cpu_core_count = len(resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")])
+                environ.update({k: str(cpu_core_count) for k in envs_corecount if k not in environ})
 
-            # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
-            label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")
-            envs_corecount = label_envs_corecount.split(",") if label_envs_corecount else []
-            cpu_core_count = len(resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")])
-            environ.update({k: str(cpu_core_count) for k in envs_corecount if k not in environ})
+                # Realize mounts.
+                await ctx.process_mounts(resource_spec.mounts)
 
-            # Realize mounts.
-            await ctx.process_mounts(resource_spec.mounts)
+                # Get attached devices information (including model_name).
+                attached_devices = {}
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    computer_set = self.computers[dev_name]
+                    devices = await computer_set.instance.get_attached_devices(device_alloc)
+                    attached_devices[dev_name] = devices
 
-            # Get attached devices information (including model_name).
-            attached_devices = {}
-            for dev_name, device_alloc in resource_spec.allocations.items():
-                computer_set = self.computers[dev_name]
-                devices = await computer_set.instance.get_attached_devices(device_alloc)
-                attached_devices[dev_name] = devices
+                exposed_ports = [2000, 2001]
+                service_ports: List[ServicePort] = []
+                port_map: Dict[str, ServicePort] = {}
+                preopen_ports = ctx.kernel_config.get("preopen_ports")
+                if preopen_ports is None:
+                    preopen_ports = []
 
-            exposed_ports = [2000, 2001]
-            service_ports: List[ServicePort] = []
-            port_map: Dict[str, ServicePort] = {}
-            preopen_ports = ctx.kernel_config.get("preopen_ports")
-            if preopen_ports is None:
-                preopen_ports = []
+                service_ports.append(
+                    {
+                        "name": "sshd",
+                        "protocol": ServicePortProtocols.TCP,
+                        "container_ports": (2200,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    }
+                )
+                service_ports.append(
+                    {
+                        "name": "ttyd",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7681,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    }
+                )
 
-            service_ports.append(
-                {
-                    "name": "sshd",
-                    "protocol": ServicePortProtocols.TCP,
-                    "container_ports": (2200,),
-                    "host_ports": (None,),
-                    "is_inference": False,
-                }
-            )
-            service_ports.append(
-                {
-                    "name": "ttyd",
-                    "protocol": ServicePortProtocols.HTTP,
-                    "container_ports": (7681,),
-                    "host_ports": (None,),
-                    "is_inference": False,
-                }
-            )
-
-            model_definition: Optional[Mapping[str, Any]] = None
-            # Read model config
-            model_folders = [
-                folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.MODEL
-            ]
-            if len(model_folders) > 0 and kernel_config["session_type"] == SessionTypes.INFERENCE:
-                model_folder = model_folders[0]
-                model_definition_path = Path(model_folder.host_path / "model-definition.yml")
-                if not model_definition_path.is_file():
-                    model_definition_path = Path(model_folder.host_path / "model-definition.yaml")
+                model_definition: Optional[Mapping[str, Any]] = None
+                # Read model config
+                model_folders = [
+                    folder
+                    for folder in vfolder_mounts
+                    if folder.usage_mode == VFolderUsageMode.MODEL
+                ]
+                if (
+                    len(model_folders) > 0
+                    and kernel_config["session_type"] == SessionTypes.INFERENCE
+                ):
+                    model_folder = model_folders[0]
+                    model_definition_path = Path(model_folder.host_path / "model-definition.yml")
                     if not model_definition_path.is_file():
+                        model_definition_path = Path(
+                            model_folder.host_path / "model-definition.yaml"
+                        )
+                        if not model_definition_path.is_file():
+                            raise AgentError(
+                                (
+                                    "Model definition file (model-definition.yml or"
+                                    " model-definition.yaml) does not exist on vFolder {} (ID {})"
+                                ),
+                                model_folder.name,
+                                model_folder.vfid,
+                            )
+                    try:
+                        model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
+                            None, model_definition_path.read_text
+                        )
+                    except FileNotFoundError:
                         raise AgentError(
                             (
-                                "Model definition file (model-definition.yml or"
-                                " model-definition.yaml) does not exist on vFolder {} (ID {})"
+                                "Model definition file (model-definition.yml) does not exist on"
+                                " vFolder {} (ID {})"
                             ),
                             model_folder.name,
                             model_folder.vfid,
                         )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError:
-                    raise AgentError(
-                        (
-                            "Model definition file (model-definition.yml) does not exist on vFolder"
-                            " {} (ID {})"
-                        ),
-                        model_folder.name,
-                        model_folder.vfid,
-                    )
-                try:
-                    model_definition = model_definition_iv.check(
-                        yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-                    )
-                    assert model_definition is not None
-                    environ["BACKEND_MODEL_NAME"] = model_definition["name"]
-                    environ["BACKEND_MODEL_PATH"] = model_definition["model_path"]
-                    for model in model_definition["models"]:
-                        if service := model.get("service"):
-                            service_ports.append(
-                                {
-                                    "name": f"{model['name']}-{service['port']}",
-                                    "protocol": ServicePortProtocols.PREOPEN,
-                                    "container_ports": (service["port"],),
-                                    "host_ports": (None,),
-                                    "is_inference": True,
-                                }
-                            )
-                except DataError:
-                    raise AgentError(
-                        "Failed to read model definition from vFolder {} (ID {})",
-                        model_folder.name,
-                        model_folder.vfid,
-                    )
+                    try:
+                        model_definition = model_definition_iv.check(
+                            yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+                        )
+                        assert model_definition is not None
+                        for model in model_definition["models"]:
+                            environ["BACKEND_MODEL_NAME"] = model["name"]
+                            environ["BACKEND_MODEL_PATH"] = model["model_path"]
+                            if service := model.get("service"):
+                                service_ports.append(
+                                    {
+                                        "name": f"{model['name']}-{service['port']}",
+                                        "protocol": ServicePortProtocols.PREOPEN,
+                                        "container_ports": (service["port"],),
+                                        "host_ports": (None,),
+                                        "is_inference": True,
+                                    }
+                                )
+                    except DataError:
+                        raise AgentError(
+                            "Failed to read model definition from vFolder {} (ID {})",
+                            model_folder.name,
+                            model_folder.vfid,
+                        )
 
-            if ctx.kernel_config["cluster_role"] in ("main", "master"):
-                for sport in parse_service_ports(
-                    image_labels.get("ai.backend.service-ports", ""),
-                    image_labels.get("ai.backend.endpoint-ports", ""),
-                ):
-                    port_map[sport["name"]] = sport
-                for port_no in preopen_ports:
-                    preopen_sport: ServicePort = {
-                        "name": str(port_no),
-                        "protocol": ServicePortProtocols.PREOPEN,
-                        "container_ports": (port_no,),
-                        "host_ports": (None,),
-                        "is_inference": False,
-                    }
-                    service_ports.append(preopen_sport)
-                    for cport in preopen_sport["container_ports"]:
-                        exposed_ports.append(cport)
-                for sport in port_map.values():
-                    service_ports.append(sport)
-                    for cport in sport["container_ports"]:
-                        exposed_ports.append(cport)
-                for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
-                    service_ports.append(
-                        {
-                            "name": f"hostport{index+1}",
-                            "protocol": ServicePortProtocols.INTERNAL,
-                            "container_ports": (port,),
-                            "host_ports": (port,),
+                if ctx.kernel_config["cluster_role"] in ("main", "master"):
+                    for sport in parse_service_ports(
+                        image_labels.get("ai.backend.service-ports", ""),
+                        image_labels.get("ai.backend.endpoint-ports", ""),
+                    ):
+                        port_map[sport["name"]] = sport
+                    for port_no in preopen_ports:
+                        preopen_sport: ServicePort = {
+                            "name": str(port_no),
+                            "protocol": ServicePortProtocols.PREOPEN,
+                            "container_ports": (port_no,),
+                            "host_ports": (None,),
                             "is_inference": False,
                         }
-                    )
-                    exposed_ports.append(port)
-                log.debug("exposed ports: {!r}", exposed_ports)
+                        service_ports.append(preopen_sport)
+                        for cport in preopen_sport["container_ports"]:
+                            exposed_ports.append(cport)
+                    for sport in port_map.values():
+                        service_ports.append(sport)
+                        for cport in sport["container_ports"]:
+                            exposed_ports.append(cport)
+                    for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
+                        service_ports.append(
+                            {
+                                "name": f"hostport{index+1}",
+                                "protocol": ServicePortProtocols.INTERNAL,
+                                "container_ports": (port,),
+                                "host_ports": (port,),
+                                "is_inference": False,
+                            }
+                        )
+                        exposed_ports.append(port)
+                    log.debug("exposed ports: {!r}", exposed_ports)
 
-            runtime_type = image_labels.get("ai.backend.runtime-type", "python")
-            runtime_path = image_labels.get("ai.backend.runtime-path", None)
-            cmdargs: list[str] = []
-            krunner_opts: list[str] = []
-            if self.local_config["container"]["sandbox-type"] == "jail":
+                runtime_type = image_labels.get("ai.backend.runtime-type", "python")
+                runtime_path = image_labels.get("ai.backend.runtime-path", None)
+                cmdargs: list[str] = []
+                krunner_opts: list[str] = []
+                if self.local_config["container"]["sandbox-type"] == "jail":
+                    cmdargs += [
+                        "/opt/kernel/jail",
+                        # "--policy",
+                        # "/etc/backend.ai/jail/policy.yml",
+                        # TODO: Update default Jail policy in images
+                    ]
+                    if self.local_config["container"]["jail-args"]:
+                        cmdargs += map(
+                            lambda s: s.strip(), self.local_config["container"]["jail-args"]
+                        )
+                    cmdargs += ["--"]
+                if self.local_config["debug"]["kernel-runner"]:
+                    krunner_opts.append("--debug")
                 cmdargs += [
-                    "/opt/kernel/jail",
-                    # "--policy",
-                    # "/etc/backend.ai/jail/policy.yml",
-                    # TODO: Update default Jail policy in images
+                    "/opt/backend.ai/bin/python",
+                    "-m",
+                    "ai.backend.kernel",
+                    *krunner_opts,
+                    runtime_type,
                 ]
-                if self.local_config["container"]["jail-args"]:
-                    cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
-                cmdargs += ["--"]
-            if self.local_config["debug"]["kernel-runner"]:
-                krunner_opts.append("--debug")
-            cmdargs += [
-                "/opt/backend.ai/bin/python",
-                "-m",
-                "ai.backend.kernel",
-                *krunner_opts,
-                runtime_type,
-            ]
-            if runtime_path is not None:
-                cmdargs.append(runtime_path)
+                if runtime_path is not None:
+                    cmdargs.append(runtime_path)
 
-            # Store information required for restarts.
-            # NOTE: kconfig may be updated after restarts.
-            resource_spec.freeze()
-            await self.restart_kernel__store_config(
-                kernel_id,
-                "kconfig.dat",
-                pickle.dumps(ctx.kernel_config),
-            )
-            if not restarting:
+                # Store information required for restarts.
+                # NOTE: kconfig may be updated after restarts.
+                resource_spec.freeze()
                 await self.restart_kernel__store_config(
                     kernel_id,
-                    "cluster.json",
-                    json.dumps(cluster_info).encode("utf8"),
+                    "kconfig.dat",
+                    pickle.dumps(ctx.kernel_config),
                 )
+                if not restarting:
+                    await self.restart_kernel__store_config(
+                        kernel_id,
+                        "cluster.json",
+                        json.dumps(cluster_info).encode("utf8"),
+                    )
 
-            if self.local_config["debug"]["log-kernel-config"]:
-                log.info(
-                    "kernel starting with resource spec: \n{0}", pretty(attrs.asdict(resource_spec))
-                )
-            kernel_obj: KernelObjectType = await ctx.spawn(
-                resource_spec,
-                environ,
-                service_ports,
-            )
-            async with self.registry_lock:
-                self.kernel_registry[ctx.kernel_id] = kernel_obj
-            try:
-                container_data = await ctx.start_container(
-                    kernel_obj,
-                    cmdargs,
-                    resource_opts,
-                    preopen_ports,
-                )
-            except ContainerCreationError as e:
-                log.warning(
-                    "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
-                    ctx.kernel_id,
-                )
-                cid = e.container_id
-                async with self.registry_lock:
-                    self.kernel_registry[ctx.kernel_id]["container_id"] = cid
-                await self.inject_container_lifecycle_event(
-                    kernel_id,
-                    session_id,
-                    LifecycleEvent.DESTROY,
-                    KernelLifecycleEventReason.UNKNOWN,
-                    container_id=ContainerId(cid),
-                )
-                raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
-            except Exception:
-                log.warning(
-                    "Kernel failed to create container (k:{}). Kernel is going to be unregistered.",
-                    kernel_id,
-                )
-                async with self.registry_lock:
-                    del self.kernel_registry[kernel_id]
-                raise
-            async with self.registry_lock:
-                self.kernel_registry[ctx.kernel_id].data.update(container_data)
-            await kernel_obj.init()
-
-            current_task = asyncio.current_task()
-            assert current_task is not None
-            self._pending_creation_tasks[kernel_id].add(current_task)
-            try:
-                async for attempt in AsyncRetrying(
-                    wait=wait_fixed(0.3),
-                    stop=(stop_after_attempt(10) | stop_after_delay(60)),
-                    retry=retry_if_exception_type(zmq.error.ZMQError),
-                ):
-                    with attempt:
-                        # Wait until bootstrap script is executed.
-                        # - Main kernel runner is executed after bootstrap script, and
-                        #   check_status is accessible only after kernel runner is loaded.
-                        await kernel_obj.check_status()
-                        # Update the service-ports metadata from the image labels
-                        # with the extended template metadata from the agent and krunner.
-                        live_services = await kernel_obj.get_service_apps()
-                        if live_services["status"] != "failed":
-                            for live_service in live_services["data"]:
-                                for service_port in service_ports:
-                                    if live_service["name"] == service_port["name"]:
-                                        service_port.update(live_service)
-                                        break
                 if self.local_config["debug"]["log-kernel-config"]:
-                    log.debug("service ports:\n{!r}", pretty(service_ports))
-            except asyncio.CancelledError:
-                log.warning("cancelled waiting of container startup (k:{})", kernel_id)
-                raise
-            except Exception:
-                log.exception("unexpected error while waiting container startup (k:{})", kernel_id)
-                raise RuntimeError(
-                    "cancelled waiting of container startup due to initialization failure",
+                    log.info(
+                        "kernel starting with resource spec: \n{0}",
+                        pretty(attrs.asdict(resource_spec)),
+                    )
+                kernel_obj: KernelObjectType = await ctx.spawn(
+                    resource_spec,
+                    environ,
+                    service_ports,
                 )
-            finally:
-                self._pending_creation_tasks[kernel_id].remove(current_task)
-                if not self._pending_creation_tasks[kernel_id]:
-                    del self._pending_creation_tasks[kernel_id]
+                async with self.registry_lock:
+                    self.kernel_registry[ctx.kernel_id] = kernel_obj
+                try:
+                    container_data = await ctx.start_container(
+                        kernel_obj,
+                        cmdargs,
+                        resource_opts,
+                        preopen_ports,
+                    )
+                except ContainerCreationError as e:
+                    log.warning(
+                        (
+                            "Kernel failed to create container (k:{}). Kernel is going to be"
+                            " destroyed."
+                        ),
+                        ctx.kernel_id,
+                    )
+                    cid = e.container_id
+                    async with self.registry_lock:
+                        self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.UNKNOWN,
+                        container_id=ContainerId(cid),
+                    )
+                    raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
+                except Exception:
+                    log.warning(
+                        (
+                            "Kernel failed to create container (k:{}). Kernel is going to be"
+                            " unregistered."
+                        ),
+                        kernel_id,
+                    )
+                    async with self.registry_lock:
+                        del self.kernel_registry[kernel_id]
+                    raise
+                async with self.registry_lock:
+                    self.kernel_registry[ctx.kernel_id].data.update(container_data)
+                await kernel_obj.init()
+
+                current_task = asyncio.current_task()
+                assert current_task is not None
+                self._pending_creation_tasks[kernel_id].add(current_task)
+                try:
+                    async for attempt in AsyncRetrying(
+                        wait=wait_fixed(0.3),
+                        stop=(stop_after_attempt(10) | stop_after_delay(60)),
+                        retry=retry_if_exception_type(zmq.error.ZMQError),
+                    ):
+                        with attempt:
+                            # Wait until bootstrap script is executed.
+                            # - Main kernel runner is executed after bootstrap script, and
+                            #   check_status is accessible only after kernel runner is loaded.
+                            await kernel_obj.check_status()
+                            # Update the service-ports metadata from the image labels
+                            # with the extended template metadata from the agent and krunner.
+                            live_services = await kernel_obj.get_service_apps()
+                            if live_services["status"] != "failed":
+                                for live_service in live_services["data"]:
+                                    for service_port in service_ports:
+                                        if live_service["name"] == service_port["name"]:
+                                            service_port.update(live_service)
+                                            break
+                    if self.local_config["debug"]["log-kernel-config"]:
+                        log.debug("service ports:\n{!r}", pretty(service_ports))
+                except asyncio.CancelledError:
+                    log.warning("cancelled waiting of container startup (k:{})", kernel_id)
+                    raise
+                except Exception:
+                    log.exception(
+                        "unexpected error while waiting container startup (k:{})", kernel_id
+                    )
+                    raise RuntimeError(
+                        "cancelled waiting of container startup due to initialization failure",
+                    )
+                finally:
+                    self._pending_creation_tasks[kernel_id].remove(current_task)
+                    if not self._pending_creation_tasks[kernel_id]:
+                        del self._pending_creation_tasks[kernel_id]
+            except Exception as e:
+                await self.rescan_resource_usage()
+                raise e
 
             public_service_ports: List[ServicePort] = [
                 port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
