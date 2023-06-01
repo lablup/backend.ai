@@ -114,7 +114,7 @@ def info(ctx: CLIContext, service_name_or_id: str):
 @service.command()
 @pass_ctx_obj
 @click.argument("image", metavar="IMAGE", type=str)
-@click.argument("model_id_or_name", metavar="MODEL_ID", type=str)
+@click.argument("model_name_or_id", metavar="MODEL_NAME_OR_ID", type=str)
 @click.argument("initial_session_count", metavar="COUNT", type=int)
 @click.option("-t", "--name", metavar="NAME", type=str, default=None)
 @click.option("--model-version", metavar="VERSION", type=str, default=None)
@@ -228,7 +228,7 @@ def info(ctx: CLIContext, service_name_or_id: str):
 def create(
     ctx: CLIContext,
     image: str,
-    model_id_or_name: str,
+    model_name_or_id: str,
     initial_session_count: int,
     *,
     name: Optional[str],
@@ -287,7 +287,7 @@ def create(
         try:
             result = session.Service.create(
                 image,
-                model_id_or_name,
+                model_name_or_id,
                 initial_session_count,
                 **body,
             )
