@@ -634,7 +634,7 @@ class BaseRunner(metaclass=ABCMeta):
                             except urllib.error.URLError:
                                 pass
                             # falling to here means that health check has failed, so just wait until
-                            # timeout() is fired to fill out the gap between max_wait_time and actual time elapsed
+                            # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
                             await asyncio.sleep(health_check_info["max_wait_time"])
                     except asyncio.TimeoutError:
                         pass
