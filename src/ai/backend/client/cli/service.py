@@ -18,6 +18,7 @@ from .types import CLIContext
 
 _default_detail_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
+    service_fields["name"],
     service_fields["image"],
     service_fields["desired_session_count"],
     service_fields["routings"],
@@ -33,6 +34,15 @@ _default_routing_fields: Sequence[FieldSpec] = (
     routing_fields["session"],
     routing_fields["endpoint"],
 )
+
+
+def get_service_id(session: Session, name_or_id: str):
+    try:
+        session.Service(name_or_id).info()
+        return name_or_id
+    except Exception:
+        services = session.Service.list(name=name_or_id)
+        return services[0]["id"]
 
 
 @main.group()
@@ -71,8 +81,8 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
-def info(ctx: CLIContext, service_id: str):
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
+def info(ctx: CLIContext, service_name_or_id: str):
     """
     Display the detail of a service endpoint with its backing inference session.
 
@@ -81,6 +91,7 @@ def info(ctx: CLIContext, service_id: str):
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             result = session.Service.detail(service_id, fields=_default_detail_fields)
             routes = result["routings"]
             ctx.output.print_item(
@@ -103,7 +114,7 @@ def info(ctx: CLIContext, service_id: str):
 @service.command()
 @pass_ctx_obj
 @click.argument("image", metavar="IMAGE", type=str)
-@click.argument("model_id", metavar="MODEL_ID", type=str)
+@click.argument("model_id_or_name", metavar="MODEL_ID", type=str)
 @click.argument("initial_session_count", metavar="COUNT", type=int)
 @click.option("-t", "--name", metavar="NAME", type=str, default=None)
 @click.option("--model-version", metavar="VERSION", type=str, default=None)
@@ -217,7 +228,7 @@ def info(ctx: CLIContext, service_id: str):
 def create(
     ctx: CLIContext,
     image: str,
-    model_id: str,
+    model_id_or_name: str,
     initial_session_count: int,
     *,
     name: Optional[str],
@@ -276,7 +287,7 @@ def create(
         try:
             result = session.Service.create(
                 image,
-                model_id,
+                model_id_or_name,
                 initial_session_count,
                 **body,
             )
@@ -291,8 +302,8 @@ def create(
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
-def rm(ctx: CLIContext, service_id):
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
+def rm(ctx: CLIContext, service_name_or_id):
     """
     Remove the service endpoint.
 
@@ -300,6 +311,7 @@ def rm(ctx: CLIContext, service_id):
     SERVICE_ID: The endpoint ID"""
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             session.Service(service_id).delete()
             print_done("Removed.")
         except Exception as e:
@@ -309,8 +321,8 @@ def rm(ctx: CLIContext, service_id):
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
-def sync(ctx: CLIContext, service_id: str):
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
+def sync(ctx: CLIContext, service_name_or_id: str):
     """
     Sync route status with AppProxy.
 
@@ -319,6 +331,7 @@ def sync(ctx: CLIContext, service_id: str):
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             session.Service(service_id).sync()
             print_done("Done.")
         except Exception as e:
@@ -328,9 +341,9 @@ def sync(ctx: CLIContext, service_id: str):
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("target_count", metavar="COUNT", type=int)
-def scale(ctx: CLIContext, service_id: str, target_count: int):
+def scale(ctx: CLIContext, service_name_or_id: str, target_count: int):
     """
     Start or resume the service endpoint to handle the incoming traffic.
 
@@ -340,6 +353,7 @@ def scale(ctx: CLIContext, service_id: str, target_count: int):
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             session.Service(service_id).scale(target_count)
             print_done("Triggered scaling.")
         except Exception as e:
@@ -349,10 +363,10 @@ def scale(ctx: CLIContext, service_id: str, target_count: int):
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("duration", metavar="DURATION", type=str)
 @click.option("-q", "--quiet", is_flag=True)
-def generate_token(ctx: CLIContext, service_id: str, duration: str, quiet: bool):
+def generate_token(ctx: CLIContext, service_name_or_id: str, duration: str, quiet: bool):
     """
     Generate an API token to communicate with inference endpoint.
 
@@ -363,6 +377,7 @@ def generate_token(ctx: CLIContext, service_id: str, duration: str, quiet: bool)
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             resp = session.Service(service_id).generate_api_token(duration)
             if quiet:
                 print(resp["token"])
@@ -375,8 +390,8 @@ def generate_token(ctx: CLIContext, service_id: str, duration: str, quiet: bool)
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
-def get_endpoint(ctx: CLIContext, service_id: str):
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
+def get_endpoint(ctx: CLIContext, service_name_or_id: str):
     """
     Returns API Endpoint URL of the service.
 
@@ -385,6 +400,7 @@ def get_endpoint(ctx: CLIContext, service_id: str):
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             result = session.Service.detail(service_id, fields=_default_detail_fields)
             print(result["url"])
         except Exception as e:
@@ -394,10 +410,10 @@ def get_endpoint(ctx: CLIContext, service_id: str):
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("route_id", metavar="ROUTE_ID", type=str)
 @click.argument("ratio", metavar="RATIO", type=float)
-def update_traffic_ratio(ctx: CLIContext, service_id: str, route_id: str, ratio: float):
+def update_traffic_ratio(ctx: CLIContext, service_name_or_id: str, route_id: str, ratio: float):
     """
     Update traffic ratio of single route.
 
@@ -408,6 +424,7 @@ def update_traffic_ratio(ctx: CLIContext, service_id: str, route_id: str, ratio:
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             session.Service(service_id).update_traffic_ratio(UUID(route_id), ratio)
             print_done("Done.")
         except Exception as e:
@@ -417,10 +434,10 @@ def update_traffic_ratio(ctx: CLIContext, service_id: str, route_id: str, ratio:
 
 @service.command()
 @pass_ctx_obj
-@click.argument("service_id", metavar="SERVICE_ID", type=str)
+@click.argument("service_name_or_id", metavar="SERVICE_NAME_OR_ID", type=str)
 @click.argument("route_id", metavar="ROUTE_ID", type=str)
 @click.argument("ratio", metavar="RATIO", type=float)
-def downscale_route(ctx: CLIContext, service_id: str, route_id: str):
+def downscale_route(ctx: CLIContext, service_name_or_id: str, route_id: str):
     """
     Destroy route and its associated session and
     decrement desired session count of endpoint
@@ -431,6 +448,7 @@ def downscale_route(ctx: CLIContext, service_id: str, route_id: str):
     """
     with Session() as session:
         try:
+            service_id = get_service_id(session, service_name_or_id)
             session.Service(service_id).downscale_single_route(UUID(route_id))
             print_done("Done.")
         except Exception as e:

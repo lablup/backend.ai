@@ -17,6 +17,7 @@ __all__ = ("Service",)
 
 _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
+    service_fields["name"],
     service_fields["image"],
     service_fields["desired_session_count"],
     service_fields["routings"],
@@ -30,9 +31,12 @@ class Service(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls):
+    async def list(cls, name: Optional[str] = None):
         """ """
-        rqst = Request("GET", "/services")
+        params = {}
+        if name:
+            params["name"] = name
+        rqst = Request("GET", "/services", params=params)
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -81,7 +85,7 @@ class Service(BaseFunction):
     async def create(
         cls,
         image: str,
-        model_id: str,
+        model_id_or_name: str,
         initial_session_count: int,
         *,
         service_name: Optional[str] = None,
@@ -154,7 +158,7 @@ class Service(BaseFunction):
                 "owner_access_key": owner_access_key,
                 "open_to_public": expose_to_public,
                 "config": {
-                    "model_id": model_id,
+                    "model": model_id_or_name,
                     "model_version": model_version,
                     "model_mount_destination": model_mount_destination,
                     "environ": envs,

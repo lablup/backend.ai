@@ -79,17 +79,25 @@ async def is_user_allowed_to_access_resource(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def list_serve(request: web.Request) -> web.Response:
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("name", default=None): t.Null | t.String,
+        }
+    )
+)
+async def list_serve(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
+    query_conds = EndpointRow.session_owner == request["user"]["uuid"]
+    if params["name"]:
+        query_conds &= EndpointRow.name == params["name"]
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
         query = (
-            sa.select(EndpointRow)
-            .where(EndpointRow.session_owner == request["user"]["uuid"])
-            .options(selectinload(EndpointRow.routings))
+            sa.select(EndpointRow).where(query_conds).options(selectinload(EndpointRow.routings))
         )
         result = await db_sess.execute(query)
         rows = result.scalars().all()
@@ -177,7 +185,7 @@ async def get_info(request: web.Request) -> web.Response:
             t.Key("open_to_public", default=False): t.Bool,
             t.Key("config"): t.Dict(
                 {
-                    tx.AliasedKey(["model_id", "modelId"]): tx.UUID,
+                    t.Key("model"): t.String,
                     tx.AliasedKey(["model_version", "modelVersion"], default=None): (
                         t.Null | t.String
                     ),
@@ -232,12 +240,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
         params["config"]["scaling_group"] = checked_scaling_group
 
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-        extra_vf_conds = (vfolders.c.id == params["config"]["model_id"]) & (
-            vfolders.c.usage_mode == VFolderUsageMode.MODEL
-        )
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
-            await query_accessible_vfolders(
+            extra_vf_conds = (vfolders.c.id == uuid.UUID(params["config"]["model"])) & (
+                vfolders.c.usage_mode == VFolderUsageMode.MODEL
+            )
+            matched_vfolders = await query_accessible_vfolders(
                 conn,
                 owner_uuid,
                 user_role=request["user"]["role"],
@@ -245,8 +253,27 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_vf_conds,
             )
-        except VFolderNotFound:
-            raise VFolderNotFound("Cannot find model folder")
+        except Exception as e:
+            # just catching ValueError | VFolderNotFound will raise
+            # TypeError: catching classes that do not inherit from BaseException is not allowed
+            if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
+                try:
+                    extra_vf_conds = (vfolders.c.name == params["config"]["model"]) & (
+                        vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                    )
+                    matched_vfolders = await query_accessible_vfolders(
+                        conn,
+                        owner_uuid,
+                        user_role=request["user"]["role"],
+                        domain_name=params["domain"],
+                        allowed_vfolder_types=allowed_vfolder_types,
+                        extra_vf_conds=extra_vf_conds,
+                    )
+                except VFolderNotFound as e:
+                    raise VFolderNotFound("Cannot find model folder") from e
+            else:
+                raise
+        model_id = matched_vfolders[0]["id"]
 
     async with root_ctx.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
@@ -257,9 +284,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             ],
         )
 
-    params["config"]["mount_map"] = {
-        params["config"]["model_id"]: params["config"]["model_mount_destination"]
-    }
+    params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
 
     # check if session is valid to be created
     await root_ctx.registry.create_session(
@@ -297,7 +322,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             owner_uuid,
             params["desired_session_count"],
             image_row,
-            params["config"]["model_id"],
+            model_id,
             params["domain"],
             project_id,
             checked_scaling_group,
