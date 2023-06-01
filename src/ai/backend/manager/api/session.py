@@ -55,6 +55,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     SessionTypes,
 )
