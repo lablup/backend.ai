@@ -371,6 +371,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
+    model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     output_queue: Optional[asyncio.Queue[ResultRecord]]
@@ -407,6 +408,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -437,6 +439,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["output_sock"]
         del props["completion_queue"]
         del props["service_queue"]
+        del props["model_service_queue"]
         del props["service_apps_info_queue"]
         del props["status_queue"]
         del props["output_queue"]
@@ -457,6 +460,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -592,25 +596,25 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             return []
 
-    async def feed_start_model_service(self, model_service_info):
+    async def feed_start_model_service(self, model_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
         await self.input_sock.send_multipart(
             [
                 b"start-model-service",
-                json.dumps(model_service_info).encode("utf8"),
+                json.dumps(model_info).encode("utf8"),
             ]
         )
-        if health_check_info := model_service_info.get("health_check"):
+        if health_check_info := model_info.get("service", {}).get("health_check"):
             timeout_seconds = (
                 health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
             )
         else:
             timeout_seconds = 10
         try:
-            with timeout(timeout_seconds):
-                result = await self.service_queue.get()
-            self.service_queue.task_done()
+            async with timeout(timeout_seconds):
+                result = await self.model_service_queue.get()
+            self.model_service_queue.task_done()
             return json.loads(result)
         except asyncio.CancelledError:
             return {"status": "failed", "error": "cancelled"}
@@ -903,6 +907,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         await self.completion_queue.put(msg_data)
                     elif msg_type == b"service-result":
                         await self.service_queue.put(msg_data)
+                    elif msg_type == b"model-service-result":
+                        await self.model_service_queue.put(msg_data)
                     elif msg_type == b"apps-result":
                         await self.service_apps_info_queue.put(msg_data)
                     elif msg_type == b"stdout":

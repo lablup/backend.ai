@@ -600,6 +600,7 @@ class BaseRunner(metaclass=ABCMeta):
         assert self.service_parser is not None
         model_service_info = model_info.get("service")
         result = {}
+        is_healthy = False
         try:
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
@@ -615,29 +616,34 @@ class BaseRunner(metaclass=ABCMeta):
             }
             result = await self._start_service(service_info, do_not_wait=True)
             if (result["status"] == "running" or result["status"] == "started") and (
-                health_check_info := model_service_info.get("health_check")
+                (health_check_info := model_service_info.get("health_check")) is not None
             ):
                 health_check_endpoint = (
                     f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
                 )
-                is_healthy = False
                 for _ in range(health_check_info["max_retries"]):
-                    async with timeout(health_check_info["max_wait_time"]):
-                        try:
-                            resp = await asyncio.get_running_loop().run_in_executor(
-                                None, urllib.request.urlopen, health_check_endpoint
-                            )
-                            if resp.status == health_check_info["expected_status_code"]:
-                                is_healthy = True
-                                break
-                        except urllib.error.URLError:
-                            pass
-                if not is_healthy:
-                    result = {"status": "failed", "error": "service unhealthy"}
+                    try:
+                        async with timeout(health_check_info["max_wait_time"]):
+                            try:
+                                resp = await asyncio.get_running_loop().run_in_executor(
+                                    None, urllib.request.urlopen, health_check_endpoint
+                                )
+                                if resp.status == health_check_info["expected_status_code"]:
+                                    is_healthy = True
+                                    break
+                            except urllib.error.URLError:
+                                pass
+                            # falling to here means that health check has failed, so just wait until
+                            # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
+                            await asyncio.sleep(health_check_info["max_wait_time"])
+                    except asyncio.TimeoutError:
+                        pass
         finally:
+            if not is_healthy:
+                result = {"status": "failed", "error": "service unhealthy"}
             await self.outsock.send_multipart(
                 [
-                    b"service-result",
+                    b"model-service-result",
                     json.dumps(result).encode("utf8"),
                 ]
             )
