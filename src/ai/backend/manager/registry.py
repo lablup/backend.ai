@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
 import itertools
 import logging
 import re
+import secrets
 import time
 import typing
 import uuid
@@ -14,6 +16,7 @@ from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from datetime import datetime
 from decimal import Decimal
+from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,10 +33,13 @@ from typing import (
     Union,
     cast,
 )
+from urllib.parse import urlparse
 
 import aiodocker
+import aiohttp
 import aiotools
 import sqlalchemy as sa
+import yarl
 import zmq
 from async_timeout import timeout as _timeout
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
@@ -41,25 +47,41 @@ from callosum.rpc import Peer, RPCUserError
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncSession
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
+    AgentHeartbeatEvent,
     AgentStartedEvent,
+    AgentTerminatedEvent,
+    DoSyncKernelLogsEvent,
+    DoTerminateSessionEvent,
     KernelCancelledEvent,
+    KernelCreatingEvent,
     KernelLifecycleEventReason,
+    KernelPreparingEvent,
+    KernelPullingEvent,
+    KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
+    SessionFailureEvent,
+    SessionPreparingEvent,
+    SessionScheduledEvent,
     SessionStartedEvent,
+    SessionSuccessEvent,
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
+from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -75,6 +97,7 @@ from ai.backend.common.types import (
     CommitStatus,
     DeviceId,
     HardwareMetadata,
+    ImageAlias,
     KernelEnqueueingConfig,
     KernelId,
     RedisConnectionInfo,
@@ -86,20 +109,30 @@ from ai.backend.common.types import (
     SlotTypes,
     check_typed_dict,
 )
+from ai.backend.common.utils import str_to_timedelta
+from ai.backend.manager.models.routing import RouteStatus
 
 from .api.exceptions import (
     AgentError,
     BackendError,
     GenericForbidden,
+    ImageNotFound,
     InstanceNotFound,
     InvalidAPIParameters,
     QuotaExceeded,
     RejectedByHook,
     ScalingGroupNotFound,
+    SessionAlreadyExists,
     SessionNotFound,
+    TooManySessionsMatched,
 )
-from .config import SharedConfig
-from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
+from .config import LocalConfig, SharedConfig
+from .defs import (
+    DEFAULT_IMAGE_ARCH,
+    DEFAULT_ROLE,
+    INTRINSIC_SLOTS,
+    REDIS_STREAM_DB,
+)
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -107,25 +140,30 @@ from .models import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentRow,
     AgentStatus,
+    EndpointRow,
     ImageRow,
     KernelRole,
     KernelRow,
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    RoutingRow,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
     UserRow,
     agents,
+    domains,
     handle_session_exception,
     kernels,
     prepare_dotfiles,
     prepare_vfolder_mounts,
     query_allowed_sgroups,
+    query_bootstrap_script,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
     scaling_groups,
+    verify_vfolder_name,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -248,8 +286,15 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
+    local_config: LocalConfig
+    session_creation_tracker: dict[str, asyncio.Event]
+    pending_waits: set[asyncio.Task[None]]
+    database_ptask_group: aiotools.PersistentTaskGroup
+    webhook_ptask_group: aiotools.PersistentTaskGroup
+
     def __init__(
         self,
+        local_config: LocalConfig,
         shared_config: SharedConfig,
         db: ExtendedAsyncSAEngine,
         redis_stat: RedisConnectionInfo,
@@ -262,6 +307,7 @@ class AgentRegistry:
         *,
         debug: bool = False,
     ) -> None:
+        self.local_config = local_config
         self.shared_config = shared_config
         self.docker = aiodocker.Docker()
         self.db = db
@@ -280,9 +326,83 @@ class AgentRegistry:
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
+        self.session_creation_tracker = {}
+        self.pending_waits = set()
+        self.database_ptask_group = aiotools.PersistentTaskGroup()
+        self.webhook_ptask_group = aiotools.PersistentTaskGroup()
+
+        # passive events
+        evd = self.event_dispatcher
+        evd.consume(
+            KernelPreparingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kprep"
+        )
+        evd.consume(
+            KernelPullingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kpull"
+        )
+        evd.consume(
+            KernelCreatingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kcreat"
+        )
+        evd.consume(
+            KernelStartedEvent, self, handle_kernel_creation_lifecycle, name="api.session.kstart"
+        )
+        evd.consume(
+            KernelCancelledEvent, self, handle_kernel_creation_lifecycle, name="api.session.kstart"
+        )
+        evd.subscribe(
+            SessionStartedEvent,
+            self,
+            handle_session_creation_lifecycle,
+            name="api.session.sstart",
+        )
+        evd.subscribe(
+            SessionCancelledEvent,
+            self,
+            handle_session_creation_lifecycle,
+            name="api.session.scancel",
+        )
+        evd.consume(
+            KernelTerminatingEvent,
+            self,
+            handle_kernel_termination_lifecycle,
+            name="api.session.kterming",
+        )
+        evd.consume(
+            KernelTerminatedEvent,
+            self,
+            handle_kernel_termination_lifecycle,
+            name="api.session.kterm",
+        )
+        evd.consume(
+            SessionTerminatingEvent,
+            self,
+            handle_session_termination_lifecycle,
+            name="api.session.sterming",
+        ),
+        evd.consume(
+            SessionTerminatedEvent,
+            self,
+            handle_session_termination_lifecycle,
+            name="api.session.sterm",
+        )
+        evd.consume(SessionEnqueuedEvent, self, invoke_session_callback)
+        evd.consume(SessionScheduledEvent, self, invoke_session_callback)
+        evd.consume(SessionPreparingEvent, self, invoke_session_callback)
+        evd.consume(SessionSuccessEvent, self, handle_batch_result)
+        evd.consume(SessionFailureEvent, self, handle_batch_result)
+        evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
+        evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
+        evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
+
+        # action-trigerring events
+        evd.consume(DoSyncKernelLogsEvent, self, handle_kernel_log, name="api.session.syncklog")
+        evd.consume(
+            DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
+        )
 
     async def shutdown(self) -> None:
-        pass
+        await cancel_tasks(self.pending_waits)
+        await self.database_ptask_group.shutdown()
+        await self.webhook_ptask_group.shutdown()
 
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
@@ -340,6 +460,461 @@ class AgentRegistry:
                 HardwareMetadata,  # type: ignore  # (python/mypy#9827)
             )
 
+    async def create_session(
+        self,
+        session_name: str,
+        image: str,
+        architecture: str,
+        user_scope: UserScope,
+        owner_access_key: AccessKey,
+        resource_policy: dict,
+        session_type: SessionTypes,
+        config: dict[str, Any],
+        cluster_mode: ClusterMode,
+        cluster_size: int,
+        dry_run=False,
+        reuse=False,
+        enqueue_only=False,
+        max_wait_seconds=0,
+        bootstrap_script: Optional[str] = None,
+        dependencies: Optional[List[uuid.UUID]] = None,
+        startup_command: Optional[str] = None,
+        starts_at_timestamp: Optional[str] = None,
+        tag: Optional[str] = None,
+        callback_url: Optional[yarl.URL] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+        traffic_ratio: Optional[float] = None,
+    ) -> Mapping[str, Any]:
+        log.debug("create_session():")
+        resp: MutableMapping[str, Any] = {}
+
+        current_task = asyncio.current_task()
+        assert current_task is not None
+
+        # Check work directory and reserved name directory.
+        mount_map = config.get("mount_map")
+
+        if mount_map is not None:
+            original_folders = mount_map.keys()
+            alias_folders = mount_map.values()
+            if len(alias_folders) != len(set(alias_folders)):
+                raise InvalidAPIParameters("Duplicate alias folder name exists.")
+
+            alias_name: str
+            for alias_name in alias_folders:
+                if alias_name is None:
+                    continue
+                if alias_name.startswith("/home/work/"):
+                    alias_name = alias_name.replace("/home/work/", "")
+                if alias_name == "":
+                    raise InvalidAPIParameters("Alias name cannot be empty.")
+                if not verify_vfolder_name(alias_name):
+                    raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
+                if alias_name in original_folders:
+                    raise InvalidAPIParameters(
+                        "Alias name cannot be set to an existing folder name: " + str(alias_name)
+                    )
+
+        # Resolve the image reference.
+        try:
+            async with self.db.begin_readonly_session() as session:
+                image_row = await ImageRow.resolve(
+                    session,
+                    [
+                        ImageRef(image, ["*"], architecture),
+                        ImageAlias(image),
+                    ],
+                )
+            requested_image_ref = image_row.image_ref
+            if not requested_image_ref.is_local:
+                async with self.db.begin_readonly() as conn:
+                    query = (
+                        sa.select([domains.c.allowed_docker_registries])
+                        .select_from(domains)
+                        .where(domains.c.name == user_scope.domain_name)
+                    )
+                    allowed_registries = await conn.scalar(query)
+                    if requested_image_ref.registry not in allowed_registries:
+                        raise AliasResolutionFailed
+        except AliasResolutionFailed:
+            raise ImageNotFound("unknown alias or disallowed registry")
+
+        # Check existing (access_key, session_name) instance
+        try:
+            # NOTE: We can reuse the session IDs of TERMINATED sessions only.
+            # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
+            async with self.db.begin_readonly_session() as db_sess:
+                sess = await SessionRow.get_session_with_main_kernel(
+                    session_name,
+                    owner_access_key,
+                    db_session=db_sess,
+                )
+            running_image_ref = ImageRef(
+                sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
+            )
+            if running_image_ref != requested_image_ref:
+                # The image must be same if get_or_create() called multiple times
+                # against an existing (non-terminated) session
+                raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
+            if not reuse:
+                # Respond as error since the client did not request to reuse,
+                # but provide the overlapping session ID for later use.
+                raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
+            # Respond as success with the reused session's information.
+            return {
+                "sessionId": str(sess.id),
+                "sessionName": str(sess.name),
+                "status": sess.status.name,
+                "service_ports": sess.main_kernel.service_ports,
+                "created": False,
+            }
+        except SessionNotFound:
+            # It's time to create a new session.
+            pass
+
+        if session_type == SessionTypes.BATCH and not startup_command:
+            raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
+        if session_type != SessionTypes.BATCH and starts_at_timestamp:
+            raise InvalidAPIParameters("Parameter starts_at should be used only for batch sessions")
+        starts_at: Union[datetime, None] = None
+        if starts_at_timestamp:
+            try:
+                starts_at = isoparse(starts_at_timestamp)
+            except ValueError:
+                _td = str_to_timedelta(starts_at_timestamp)
+                starts_at = datetime.now(tzutc()) + _td
+
+        if cluster_size > 1:
+            log.debug(" -> cluster_mode:{} (replicate)", cluster_mode)
+
+        if dependencies is None:
+            dependencies = []
+
+        session_creation_id = secrets.token_urlsafe(16)
+        start_event = asyncio.Event()
+        self.session_creation_tracker[session_creation_id] = start_event
+
+        async with self.db.begin_readonly() as conn:
+            # Use keypair bootstrap_script if it is not delivered as a parameter
+            if not bootstrap_script:
+                script, _ = await query_bootstrap_script(conn, owner_access_key)
+                bootstrap_script = script
+
+        public_sgroup_only = True
+        if _role_str := image_row.labels.get("ai.backend.role"):
+            public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
+        if dry_run:
+            return {}
+        try:
+            session_id = await asyncio.shield(
+                self.database_ptask_group.create_task(
+                    self.enqueue_session(
+                        session_creation_id,
+                        session_name,
+                        owner_access_key,
+                        {
+                            "creation_config": config,
+                            "kernel_configs": [
+                                {
+                                    "image_ref": requested_image_ref,
+                                    "cluster_role": DEFAULT_ROLE,
+                                    "cluster_idx": 1,
+                                    "local_rank": 0,
+                                    "cluster_hostname": f"{DEFAULT_ROLE}1",
+                                    "creation_config": config,
+                                    "bootstrap_script": bootstrap_script,
+                                    "startup_command": startup_command,
+                                }
+                            ],
+                        },
+                        config["scaling_group"],
+                        session_type,
+                        resource_policy,
+                        user_scope=user_scope,
+                        cluster_mode=cluster_mode,
+                        cluster_size=cluster_size,
+                        session_tag=tag,
+                        starts_at=starts_at,
+                        agent_list=config["agent_list"],
+                        dependency_sessions=[SessionId(d) for d in dependencies],
+                        callback_url=callback_url,
+                        public_sgroup_only=public_sgroup_only,
+                        endpoint_id=endpoint_id,
+                        traffic_ratio=traffic_ratio,
+                    )
+                ),
+            )
+            resp["sessionId"] = str(session_id)  # changed since API v5
+            resp["sessionName"] = str(session_name)
+            resp["status"] = "PENDING"
+            resp["servicePorts"] = []
+            resp["created"] = True
+
+            if not enqueue_only:
+                self.pending_waits.add(current_task)
+                max_wait = max_wait_seconds
+                try:
+                    if max_wait > 0:
+                        with _timeout(max_wait):
+                            await start_event.wait()
+                    else:
+                        await start_event.wait()
+                except asyncio.TimeoutError:
+                    resp["status"] = "TIMEOUT"
+                else:
+                    await asyncio.sleep(0.5)
+                    async with self.db.begin_readonly_session() as db_sess:
+                        query = sa.select(KernelRow.status, KernelRow.service_ports).where(
+                            (KernelRow.session_id == session_id)
+                            & (KernelRow.cluster_role == DEFAULT_ROLE)
+                        )
+                        result = await db_sess.execute(query)
+                        row = result.first()
+                    if row.status == KernelStatus.RUNNING:
+                        resp["status"] = "RUNNING"
+                        for item in row.service_ports:
+                            response_dict = {
+                                "name": item["name"],
+                                "protocol": item["protocol"],
+                                "ports": item["container_ports"],
+                            }
+                            if "url_template" in item.keys():
+                                response_dict["url_template"] = item["url_template"]
+                            if "allowed_arguments" in item.keys():
+                                response_dict["allowed_arguments"] = item["allowed_arguments"]
+                            if "allowed_envs" in item.keys():
+                                response_dict["allowed_envs"] = item["allowed_envs"]
+                            resp["servicePorts"].append(response_dict)
+                    else:
+                        resp["status"] = row.status.name
+            return resp
+        except asyncio.CancelledError:
+            raise
+        finally:
+            self.pending_waits.discard(current_task)
+            if not enqueue_only and session_creation_id in self.session_creation_tracker:
+                del self.session_creation_tracker[session_creation_id]
+
+    async def create_cluster(
+        self,
+        template: Any,
+        session_name: str,
+        user_scope: UserScope,
+        owner_access_key: AccessKey,
+        resource_policy: dict,
+        scaling_group: str,
+        sess_type: SessionTypes,
+        tag: str,
+        enqueue_only=False,
+        max_wait_seconds=0,
+    ) -> Mapping[str, Any]:
+        resp: MutableMapping[str, Any] = {}
+
+        current_task = asyncio.current_task()
+        assert current_task is not None
+
+        # Check existing (access_key, session) kernel instance
+        try:
+            # NOTE: We can reuse the session IDs of TERMINATED sessions only.
+            # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
+            async with self.db.begin_readonly_session() as db_sess:
+                await SessionRow.get_session(
+                    session_name,
+                    owner_access_key,
+                    db_session=db_sess,
+                )
+        except SessionNotFound:
+            pass
+        else:
+            raise TooManySessionsMatched
+
+        mounts = []
+        mount_map = {}
+        environ = {}
+
+        if _mounts := template["spec"].get("mounts"):  # noqa
+            mounts = list(_mounts.keys())
+            mount_map = {key: value for (key, value) in _mounts.items() if len(value) > 0}
+        if _environ := template["spec"].get("environ"):  # noqa
+            environ = _environ
+
+        kernel_configs: List[KernelEnqueueingConfig] = []
+        for node in template["spec"]["nodes"]:
+            # Resolve session template.
+            kernel_config = {
+                "image": template["spec"]["kernel"]["image"],
+                "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
+                "cluster_role": node["cluster_role"],
+                "creation_config": {
+                    "mount": mounts,
+                    "mount_map": mount_map,
+                    "environ": environ,
+                },
+            }
+
+            if template["spec"]["sess_type"] == "interactive":
+                kernel_config["sess_type"] = SessionTypes.INTERACTIVE
+            elif template["spec"]["sess_type"] == "batch":
+                kernel_config["sess_type"] = SessionTypes.BATCH
+            elif template["spec"]["sess_type"] == "inference":
+                kernel_config["sess_type"] = SessionTypes.INFERENCE
+
+            if tag := template["metadata"].get("tag", None):
+                kernel_config["tag"] = tag
+            if runtime_opt := template["spec"]["kernel"]["run"]:
+                if bootstrap := runtime_opt["bootstrap"]:
+                    kernel_config["bootstrap_script"] = bootstrap
+                if startup := runtime_opt["startup_command"]:
+                    kernel_config["startup_command"] = startup
+
+            if resources := template["spec"].get("resources"):
+                kernel_config["creation_config"]["resources"] = resources
+
+            if git := template["spec"]["kernel"]["git"]:
+                if _dest := git.get("dest_dir"):
+                    target = _dest
+                else:
+                    target = git["repository"].split("/")[-1]
+
+                cmd_builder = "git clone "
+                if credential := git.get("credential"):
+                    proto, url = git["repository"].split("://")
+                    cmd_builder += (
+                        f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
+                    )
+                else:
+                    cmd_builder += git["repository"]
+                if branch := git.get("branch"):
+                    cmd_builder += f" -b {branch}"
+                cmd_builder += f" {target}\n"
+
+                if commit := git.get("commit"):
+                    cmd_builder = "CWD=$(pwd)\n" + cmd_builder
+                    cmd_builder += f"cd {target}\n"
+                    cmd_builder += f"git checkout {commit}\n"
+                    cmd_builder += "cd $CWD\n"
+
+                bootstrap = base64.b64decode(kernel_config.get("bootstrap_script") or b"").decode()
+                bootstrap += "\n"
+                bootstrap += cmd_builder
+                kernel_config["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
+
+            # Resolve the image reference.
+            try:
+                async with self.db.begin_readonly_session() as session:
+                    image_row = await ImageRow.resolve(
+                        session,
+                        [
+                            ImageRef(kernel_config["image"], ["*"], kernel_config["architecture"]),
+                            kernel_config["image"],
+                        ],
+                    )
+                requested_image_ref = image_row.image_ref
+                async with self.db.begin_readonly() as conn:
+                    query = (
+                        sa.select([domains.c.allowed_docker_registries])
+                        .select_from(domains)
+                        .where(domains.c.name == user_scope.domain_name)
+                    )
+                    allowed_registries = await conn.scalar(query)
+                    if requested_image_ref.registry not in allowed_registries:
+                        raise AliasResolutionFailed
+                    kernel_config["image_ref"] = requested_image_ref
+            except AliasResolutionFailed:
+                raise ImageNotFound("unknown alias or disallowed registry")
+
+            for i in range(node["replicas"]):
+                kernel_config["cluster_idx"] = i + 1
+                kernel_configs.append(
+                    check_typed_dict(kernel_config, KernelEnqueueingConfig),  # type: ignore
+                )
+
+        session_creation_id = secrets.token_urlsafe(16)
+        start_event = asyncio.Event()
+        kernel_id: Optional[KernelId] = None
+        self.session_creation_tracker[session_creation_id] = start_event
+        current_task = asyncio.current_task()
+        assert current_task is not None
+
+        try:
+            session_id = await asyncio.shield(
+                self.database_ptask_group.create_task(
+                    self.enqueue_session(
+                        session_creation_id,
+                        session_name,
+                        owner_access_key,
+                        {
+                            "creation_config": {
+                                "mount_map": mount_map,
+                                "environ": environ,
+                            },
+                            "kernel_configs": kernel_configs,
+                        },
+                        scaling_group,
+                        sess_type,
+                        resource_policy,
+                        user_scope=user_scope,
+                        session_tag=tag,
+                    ),
+                )
+            )
+            kernel_id = cast(KernelId, session_id)  # the main kernel's ID is the session ID.
+            resp["kernelId"] = str(kernel_id)
+            resp["status"] = "PENDING"
+            resp["servicePorts"] = []
+            resp["created"] = True
+
+            if not enqueue_only:
+                self.pending_waits.add(current_task)
+                max_wait = max_wait_seconds
+                try:
+                    if max_wait > 0:
+                        with _timeout(max_wait):
+                            await start_event.wait()
+                    else:
+                        await start_event.wait()
+                except asyncio.TimeoutError:
+                    resp["status"] = "TIMEOUT"
+                else:
+                    await asyncio.sleep(0.5)
+                    async with self.db.begin_readonly() as conn:
+                        query = (
+                            sa.select(
+                                [
+                                    kernels.c.status,
+                                    kernels.c.service_ports,
+                                ]
+                            )
+                            .select_from(kernels)
+                            .where(kernels.c.id == kernel_id)
+                        )
+                        result = await conn.execute(query)
+                        row = result.first()
+                    if row["status"] == KernelStatus.RUNNING:
+                        resp["status"] = "RUNNING"
+                        for item in row["service_ports"]:
+                            response_dict = {
+                                "name": item["name"],
+                                "protocol": item["protocol"],
+                                "ports": item["container_ports"],
+                            }
+                            if "url_template" in item.keys():
+                                response_dict["url_template"] = item["url_template"]
+                            if "allowed_arguments" in item.keys():
+                                response_dict["allowed_arguments"] = item["allowed_arguments"]
+                            if "allowed_envs" in item.keys():
+                                response_dict["allowed_envs"] = item["allowed_envs"]
+                            resp["servicePorts"].append(response_dict)
+                    else:
+                        resp["status"] = row["status"].name
+            return resp
+        except asyncio.CancelledError:
+            raise
+        finally:
+            self.pending_waits.discard(current_task)
+            if session_creation_id in self.session_creation_tracker:
+                del self.session_creation_tracker[session_creation_id]
+
     async def enqueue_session(
         self,
         session_creation_id: str,
@@ -354,12 +929,14 @@ class AgentRegistry:
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
-        session_tag: str = None,
-        internal_data: dict = None,
-        starts_at: datetime = None,
-        agent_list: Sequence[str] = None,
-        dependency_sessions: Sequence[SessionId] = None,
-        callback_url: URL = None,
+        session_tag: Optional[str] = None,
+        internal_data: Optional[dict] = None,
+        starts_at: Optional[datetime] = None,
+        agent_list: Optional[Sequence[str]] = None,
+        dependency_sessions: Optional[Sequence[SessionId]] = None,
+        callback_url: Optional[URL] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+        traffic_ratio: Optional[float] = None,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
 
@@ -706,33 +1283,45 @@ class AgentRegistry:
                     db_sess.add(session)
                     db_sess.add_all(kernels)
 
-                    if not dependency_sessions:
-                        return
-
-                    matched_dependency_session_ids = []
-                    for dependency_id in dependency_sessions:
-                        try:
-                            match_info = await SessionRow.get_session(
-                                dependency_id,
-                                access_key,
-                                db_session=db_sess,
-                            )
-                        except SessionNotFound:
-                            raise InvalidAPIParameters(
-                                "Unknown session ID or name in the dependency list",
-                                extra_data={"session_ref": dependency_id},
-                            )
-                        else:
-                            matched_dependency_session_ids.append(match_info.id)
-
-                    dependency_rows = [
-                        SessionDependencyRow(session_id=session_id, depends_on=depend_id)
-                        for depend_id in matched_dependency_session_ids
-                    ]
-                    db_sess.add_all(dependency_rows)
-                    await db_sess.commit()
-
             await execute_with_retry(_enqueue)
+
+            async def _post_enqueue() -> None:
+                async with self.db.begin_session() as db_sess:
+                    if endpoint_id:
+                        routing_row = RoutingRow(
+                            endpoint_id,
+                            session_id,
+                            user_scope.user_uuid,
+                            user_scope.domain_name,
+                            user_scope.group_id,
+                            traffic_ratio=traffic_ratio or 1.0,
+                        )
+                        db_sess.add(routing_row)
+
+                    if dependency_sessions:
+                        matched_dependency_session_ids = []
+                        for dependency_id in dependency_sessions:
+                            try:
+                                match_info = await SessionRow.get_session(
+                                    dependency_id,
+                                    access_key,
+                                    db_session=db_sess,
+                                )
+                            except SessionNotFound:
+                                raise InvalidAPIParameters(
+                                    "Unknown session ID or name in the dependency list",
+                                    extra_data={"session_ref": dependency_id},
+                                )
+                            else:
+                                matched_dependency_session_ids.append(match_info.id)
+
+                        dependency_rows = [
+                            SessionDependencyRow(session_id=session_id, depends_on=depend_id)
+                            for depend_id in matched_dependency_session_ids
+                        ]
+                        db_sess.add_all(dependency_rows)
+
+            await execute_with_retry(_post_enqueue)
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "23503":
                 match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
@@ -1052,6 +1641,11 @@ class AgentRegistry:
 
             updated_session = await SessionRow.get_session_to_produce_event(self.db, session_id)
 
+            log.debug(
+                "Producing SessionStartedEvent({}, {})",
+                updated_session.id,
+                updated_session.creation_id,
+            )
             await self.event_producer.produce_event(
                 SessionStartedEvent(updated_session.id, updated_session.creation_id),
             )
@@ -2666,6 +3260,356 @@ class AgentRegistry:
             "abuse_report": result,
         }
 
+    async def update_appproxy_endpoint_routes(
+        self, db_sess: AsyncSession, endpoint: EndpointRow
+    ) -> None:
+        active_routes = [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+
+        target_sessions = await SessionRow.list_sessions_with_main_kernels(
+            [r.session for r in active_routes],
+            db_session=db_sess,
+        )
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == endpoint.resource_group))
+        )
+
+        result = await db_sess.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        wsproxy_api_token = sgroup["wsproxy_api_token"]
+
+        session_id_to_route_map = {r.session: r for r in active_routes}
+        inference_apps: defaultdict[str, list[dict[str, str]]] = defaultdict(list)
+        for target_session in target_sessions:
+            if target_session.main_kernel.kernel_host is None:
+                kernel_host = urlparse(target_session.main_kernel.agent_addr).hostname
+            else:
+                kernel_host = target_session.main_kernel.kernel_host
+            assert kernel_host is not None
+            for port_info in target_session.main_kernel.service_ports:
+                if not port_info["is_inference"]:
+                    continue
+                inference_apps[port_info["name"]].append(
+                    {
+                        "session_id": str(target_session.id),
+                        "kernel_host": kernel_host,
+                        "kernel_port": port_info["host_ports"][0],
+                        "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
+                    }
+                )
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
+                json={
+                    "service_name": endpoint.name,
+                    "apps": inference_apps,
+                    "open_to_public": endpoint.open_to_public,
+                },  # TODO: support for multiple inference apps
+                headers={
+                    "X-BackendAI-Token": wsproxy_api_token,
+                },
+            ) as resp:
+                endpoint_json = await resp.json()
+                log.debug("resp: {}", endpoint_json)
+                async with self.db.begin_session() as db_sess:
+                    query = (
+                        sa.update(EndpointRow)
+                        .values({"url": endpoint_json["endpoint"]})
+                        .where(EndpointRow.id == endpoint.id)
+                    )
+                    await db_sess.execute(query)
+
+    async def delete_appproxy_endpoint(self, db_sess: AsyncSession, endpoint: EndpointRow) -> None:
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == endpoint.resource_group))
+        )
+
+        result = await db_sess.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        wsproxy_api_token = sgroup["wsproxy_api_token"]
+
+        async with aiohttp.ClientSession() as session:
+            async with session.delete(
+                f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
+                headers={
+                    "X-BackendAI-Token": wsproxy_api_token,
+                },
+            ):
+                pass
+
+
+async def handle_kernel_creation_lifecycle(
+    context: AgentRegistry,
+    source: AgentId,
+    event: (
+        KernelPreparingEvent
+        | KernelPullingEvent
+        | KernelCreatingEvent
+        | KernelStartedEvent
+        | KernelCancelledEvent
+    ),
+) -> None:
+    """
+    Update the database and perform post_create_kernel() upon
+    the events for each step of kernel creation.
+
+    To avoid race condition between consumer and subscriber event handlers,
+    we only have this handler to subscribe all kernel creation events,
+    but distinguish which one to process using a unique creation_id
+    generated when initiating the create_kernels() agent RPC call.
+    """
+    log.debug(
+        "handle_kernel_creation_lifecycle: ev:{} k:{}",
+        event.name,
+        event.kernel_id,
+    )
+    if isinstance(event, KernelPreparingEvent):
+        # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
+        pass
+    elif isinstance(event, KernelPullingEvent):
+        await KernelRow.set_kernel_status(
+            context.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
+        )
+    elif isinstance(event, KernelCreatingEvent):
+        await KernelRow.set_kernel_status(
+            context.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
+        )
+    elif isinstance(event, KernelStartedEvent):
+        session_id = event.session_id
+        await context.finalize_running(event.kernel_id, session_id, event.creation_info)
+    elif isinstance(event, KernelCancelledEvent):
+        log.warning(f"Kernel cancelled, {event.reason = }")
+
+
+async def handle_kernel_termination_lifecycle(
+    context: AgentRegistry,
+    source: AgentId,
+    event: KernelTerminatingEvent | KernelTerminatedEvent,
+) -> None:
+    if isinstance(event, KernelTerminatingEvent):
+        # The destroy_kernel() API handler will set the "TERMINATING" status.
+        pass
+    elif isinstance(event, KernelTerminatedEvent):
+        await context.mark_kernel_terminated(event.kernel_id, event.reason, event.exit_code)
+        session_id = event.session_id
+        await context.check_session_terminated(session_id, event.reason)
+
+
+async def handle_session_creation_lifecycle(
+    context: AgentRegistry,
+    source: AgentId,
+    event: SessionStartedEvent | SessionCancelledEvent,
+) -> None:
+    """
+    Update the database according to the session-level lifecycle events
+    published by the manager.
+    """
+    if event.creation_id not in context.session_creation_tracker:
+        return
+    log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.name, event.session_id)
+    if isinstance(event, SessionStartedEvent):
+        if tracker := context.session_creation_tracker.get(event.creation_id):
+            tracker.set()
+    elif isinstance(event, SessionCancelledEvent):
+        if tracker := context.session_creation_tracker.get(event.creation_id):
+            tracker.set()
+
+    await invoke_session_callback(context, source, event)
+    if event.creation_id in context.session_creation_tracker:
+        del context.session_creation_tracker[event.creation_id]
+
+
+async def handle_session_termination_lifecycle(
+    context: AgentRegistry,
+    agent_id: AgentId,
+    event: SessionTerminatingEvent | SessionTerminatedEvent,
+) -> None:
+    """
+    Update the database according to the session-level lifecycle events
+    published by the manager.
+    """
+    if isinstance(event, SessionTerminatingEvent):
+        await context.mark_session_terminating(event.session_id, event.reason)
+    elif isinstance(event, SessionTerminatedEvent):
+        await context.mark_session_terminated(event.session_id, event.reason)
+
+    await invoke_session_callback(context, agent_id, event)
+
+
+async def handle_destroy_session(
+    context: AgentRegistry,
+    source: AgentId,
+    event: DoTerminateSessionEvent,
+) -> None:
+    async with context.db.begin_session() as db_sess:
+        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+    await context.destroy_session(
+        session,
+        forced=False,
+        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
+    )
+
+
+async def invoke_session_callback(
+    context: AgentRegistry,
+    source: AgentId,
+    event: SessionEnqueuedEvent
+    | SessionScheduledEvent
+    | SessionPreparingEvent
+    | SessionStartedEvent
+    | SessionCancelledEvent
+    | SessionTerminatingEvent
+    | SessionTerminatedEvent
+    | SessionSuccessEvent
+    | SessionFailureEvent,
+) -> None:
+    log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
+    try:
+        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
+        async with context.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session_with_main_kernel(
+                event.session_id, db_session=db_sess, allow_stale=allow_stale
+            )
+    except SessionNotFound:
+        return
+
+    try:
+        # Update routing status
+        # TODO: Check session health
+        if session.session_type == SessionTypes.INFERENCE:
+
+            async def _update() -> None:
+                async with context.db.begin_session() as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
+
+                    if isinstance(event, SessionTerminatedEvent) or isinstance(
+                        event, SessionCancelledEvent
+                    ):
+                        await db_sess.delete(route)
+                        if (
+                            len(endpoint.routings) == 1
+                            and endpoint.desired_session_count < 0  # we just removed last one
+                        ):
+                            await db_sess.delete(endpoint)
+                            try:
+                                await context.delete_appproxy_endpoint(db_sess, endpoint)
+                            except aiohttp.ClientError as e:
+                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                        else:
+                            try:
+                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
+                            except aiohttp.ClientError as e:
+                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                        await db_sess.commit()
+                    else:
+                        new_route_status: Optional[RouteStatus] = None
+                        if isinstance(event, SessionStartedEvent):
+                            new_route_status = RouteStatus.HEALTHY
+                        elif isinstance(event, SessionTerminatingEvent):
+                            new_route_status = RouteStatus.TERMINATING
+
+                        if new_route_status:
+                            query = (
+                                sa.update(RoutingRow)
+                                .where(RoutingRow.id == route.id)
+                                .values({"status": new_route_status})
+                            )
+                            await db_sess.execute(query)
+                            try:
+                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
+                            except aiohttp.ClientError as e:
+                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+
+            await execute_with_retry(_update)
+    except Exception:
+        log.exception("error while updating route status:")
+
+    if (callback_url := session.callback_url) is None:
+        return
+
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
+    }
+
+    context.webhook_ptask_group.create_task(
+        _make_session_callback(data, callback_url),
+    )
+
+
+async def handle_batch_result(
+    context: AgentRegistry,
+    source: AgentId,
+    event: SessionSuccessEvent | SessionFailureEvent,
+) -> None:
+    """
+    Update the database according to the batch-job completion results
+    """
+    if isinstance(event, SessionSuccessEvent):
+        await SessionRow.set_session_result(context.db, event.session_id, True, event.exit_code)
+    elif isinstance(event, SessionFailureEvent):
+        await SessionRow.set_session_result(context.db, event.session_id, False, event.exit_code)
+    async with context.db.begin_session() as db_sess:
+        try:
+            session = await SessionRow.get_session_with_kernels(
+                event.session_id, db_session=db_sess
+            )
+        except SessionNotFound:
+            return
+    await context.destroy_session(
+        session,
+        reason=KernelLifecycleEventReason.TASK_FINISHED,
+    )
+
+    await invoke_session_callback(context, source, event)
+
+
+async def handle_agent_lifecycle(
+    context: AgentRegistry,
+    source: AgentId,
+    event: AgentStartedEvent | AgentTerminatedEvent,
+) -> None:
+    if isinstance(event, AgentStartedEvent):
+        log.info("instance_lifecycle: ag:{0} joined ({1})", source, event.reason)
+        await context.update_instance(
+            source,
+            {
+                "status": AgentStatus.ALIVE,
+            },
+        )
+    if isinstance(event, AgentTerminatedEvent):
+        if event.reason == "agent-lost":
+            await context.mark_agent_terminated(source, AgentStatus.LOST)
+        elif event.reason == "agent-restart":
+            log.info("agent@{0} restarting for maintenance.", source)
+            await context.update_instance(
+                source,
+                {
+                    "status": AgentStatus.RESTARTING,
+                },
+            )
+        else:
+            # On normal instance termination, kernel_terminated events were already
+            # triggered by the agent.
+            await context.mark_agent_terminated(source, AgentStatus.TERMINATED)
+
+
+async def handle_agent_heartbeat(
+    context: AgentRegistry,
+    source: AgentId,
+    event: AgentHeartbeatEvent,
+) -> None:
+    await context.handle_heartbeat(source, event.agent_info)
+
 
 async def check_scaling_group(
     conn: SAConnection,
@@ -2721,3 +3665,101 @@ async def check_scaling_group(
             raise ScalingGroupNotFound(err_msg)
     assert scaling_group is not None
     return scaling_group
+
+
+async def handle_kernel_log(
+    context: AgentRegistry,
+    source: AgentId,
+    event: DoSyncKernelLogsEvent,
+) -> None:
+    redis_conn = redis_helper.get_redis_object(
+        context.shared_config.data["redis"], db=REDIS_STREAM_DB
+    )
+    # The log data is at most 10 MiB.
+    log_buffer = BytesIO()
+    log_key = f"containerlog.{event.container_id}"
+    try:
+        list_size = await redis_helper.execute(
+            redis_conn,
+            lambda r: r.llen(log_key),
+        )
+        if list_size is None:
+            # The log data is expired due to a very slow event delivery.
+            # (should never happen!)
+            log.warning(
+                "tried to store console logs for cid:{}, but the data is expired",
+                event.container_id,
+            )
+            return
+        for _ in range(list_size):
+            # Read chunk-by-chunk to allow interleaving with other Redis operations.
+            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
+            if chunk is None:  # maybe missing
+                log_buffer.write(b"(container log unavailable)\n")
+                break
+            log_buffer.write(chunk)
+        try:
+            log_data = log_buffer.getvalue()
+
+            async def _update_log() -> None:
+                async with context.db.begin() as conn:
+                    update_query = (
+                        sa.update(kernels)
+                        .values(container_log=log_data)
+                        .where(kernels.c.id == event.kernel_id)
+                    )
+                    await conn.execute(update_query)
+
+            await execute_with_retry(_update_log)
+        finally:
+            # Clear the log data from Redis when done.
+            await redis_helper.execute(
+                redis_conn,
+                lambda r: r.delete(log_key),
+            )
+    finally:
+        log_buffer.close()
+        await redis_conn.close()
+
+
+async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
+    log_func = log.info
+    log_msg: str = ""
+    log_fmt: str = ""
+    log_arg: Any = None
+    begin = time.monotonic()
+    try:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30.0),
+        ) as session:
+            try:
+                async with session.post(url, json=data) as response:
+                    if response.content_length is not None and response.content_length > 0:
+                        log_func = log.warning
+                        log_msg = "warning"
+                        log_fmt = (
+                            "{3[0]} {3[1]} - the callback response body was not empty! "
+                            "(len: {3[2]:,} bytes)"
+                        )
+                        log_arg = (response.status, response.reason, response.content_length)
+                    else:
+                        log_msg = "result"
+                        log_fmt = "{3[0]} {3[1]}"
+                        log_arg = (response.status, response.reason)
+            except aiohttp.ClientError as e:
+                log_func = log.warning
+                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
+    except asyncio.CancelledError:
+        log_func = log.warning
+        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
+    except asyncio.TimeoutError:
+        log_func = log.warning
+        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
+    finally:
+        log_func(
+            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
+            data["event"],
+            data["session_id"],
+            url,
+            log_arg,
+        )

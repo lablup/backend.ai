@@ -264,7 +264,9 @@ class IdleCheckerHost:
                 )
                 .select_from(j)
                 .where(
-                    (kernels.c.status.in_(LIVE_STATUS)) & (kernels.c.cluster_role == DEFAULT_ROLE),
+                    (kernels.c.status.in_(LIVE_STATUS))
+                    & (kernels.c.cluster_role == DEFAULT_ROLE)
+                    & (kernels.c.session_type != SessionTypes.INFERENCE),
                 )
             )
             result = await conn.execute(query)
@@ -528,8 +530,8 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
+        d.subscribe(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
         self._evhandlers = [
-            d.consume(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
             d.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
@@ -588,6 +590,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         source: AgentId,
         event: SessionStartedEvent,
     ) -> None:
+        log.debug("Got SessionStartedEvent")
         await self._update_timeout(event.session_id)
 
     async def _execution_started_cb(

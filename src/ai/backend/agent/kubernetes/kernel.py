@@ -197,6 +197,11 @@ class KubernetesKernel(AbstractKernel):
         )
         return result
 
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
+        return result
+
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
