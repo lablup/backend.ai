@@ -104,6 +104,7 @@ scaling_groups = sa.Table(
     ),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
+    sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True),
     sa.Column("driver", sa.String(length=64), nullable=False),
     sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("scheduler", sa.String(length=64), nullable=False),
