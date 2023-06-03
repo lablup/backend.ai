@@ -2,7 +2,7 @@ import asyncio
 import random
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Mapping, Optional, Sequence, Tuple
+from typing import Any, FrozenSet, Literal, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
@@ -16,15 +16,19 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     MountTypes,
+    ResourceSlot,
     SessionId,
     SlotName,
+    current_resource_slots,
 )
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext
+from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
-from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount
+from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..types import Container, ContainerStatus, MountInfo
 from .kernel import DummyKernel
+from .resources import detect_resources
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -34,16 +38,27 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     async def prepare_resource_spec(
         self,
     ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
-        return (
-            KernelResourceSpec(
-                container_id="",
-                allocations={},
-                slots={},
-                mounts=[],
-                scratch_disk_size=0,
-            ),
-            {},
+        slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
+        # Ensure that we have intrinsic slots.
+        assert SlotName("cpu") in slots
+        assert SlotName("mem") in slots
+        # accept unknown slot type with zero values
+        # but reject if they have non-zero values.
+        for st, sv in slots.items():
+            if st not in known_slot_types and sv != Decimal(0):
+                raise UnsupportedResource(st)
+        # sanitize the slots
+        current_resource_slots.set(known_slot_types)
+        slots = slots.normalize_slots(ignore_unknown=True)
+        resource_spec = KernelResourceSpec(
+            container_id="",
+            allocations={},
+            slots={**slots},  # copy
+            mounts=[],
+            scratch_disk_size=0,  # TODO: implement (#70)
         )
+        resource_opts = self.kernel_config.get("resource_opts", {})
+        return resource_spec, resource_opts
 
     async def prepare_scratch(self) -> None:
         await asyncio.sleep(2)
@@ -129,6 +144,13 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             "block_service_ports": self.internal_data.get("block_service_ports", False),
         }
 
+    async def mount_krunner(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: MutableMapping[str, str],
+    ) -> None:
+        await asyncio.sleep(1)
+
 
 class DummyAgent(
     AbstractAgent[DummyKernel, DummyKernelCreationContext],
@@ -142,8 +164,7 @@ class DummyAgent(
     async def detect_resources(
         self,
     ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
-        await asyncio.sleep(0.1)
-        return {}, {}
+        return await detect_resources(self.etcd, self.local_config)
 
     async def scan_images(self) -> Mapping[str, str]:
         await asyncio.sleep(0.1)
