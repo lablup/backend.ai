@@ -104,6 +104,7 @@ ENV/
 /cuda-mock.toml
 /.pants.env
 /.pants.bootstrap
+/.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
