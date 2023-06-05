@@ -212,6 +212,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 bash_profile_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
                 )
+                zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
                 vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
                 tmux_conf_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf")
@@ -224,6 +225,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 shutil.copy(font_italic_path.resolve(), jupyter_custom_dir / "roboto-italic.ttf")
                 shutil.copy(bashrc_path.resolve(), self.work_dir / ".bashrc")
                 shutil.copy(bash_profile_path.resolve(), self.work_dir / ".bash_profile")
+                shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
 
