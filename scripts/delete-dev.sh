@@ -116,7 +116,10 @@ fi
 echo ""
 echo "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
-echo "  $ rm -r .tmp .pants.d pants-local ~/.cache/pants"
+echo "  $ rm -rf .pants.d ~/.cache/pants"
+if [ -f .pants.rc ]; then
+  echo "  $ rm -rf $(./py scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
+fi
 
 echo ""
 echo "Done."
