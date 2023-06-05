@@ -36,6 +36,26 @@ usage() {
   echo "  ${LWHITE}--skip-venvs${NC}       Skip removal of temporary virtualenvs (default: false)"
 }
 
+show_error() {
+  echo " "
+  echo "${RED}[ERROR]${NC} ${LRED}$1${NC}"
+}
+
+show_warning() {
+  echo " "
+  echo "${YELLOW}[ERROR]${NC} ${LYELLOW}$1${NC}"
+}
+
+show_info() {
+  echo " "
+  echo "${BLUE}[INFO]${NC} ${GREEN}$1${NC}"
+}
+
+show_note() {
+  echo " "
+  echo "${BLUE}[NOTE]${NC} $1"
+}
+
 has_python() {
   "$1" -c '' >/dev/null 2>&1
   if [ "$?" -eq 127 ]; then
@@ -95,23 +115,23 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $REMOVE_VENVS -eq 1 ]; then
-  echo "Removing the unified and temporary venvs..."
+  show_info "Removing the unified and temporary venvs..."
   rm -rf dist/export
   pyenv uninstall -f "tmp-grpcio-build"
 else
-  echo "Skipped removal of Python virtual environments."
+  show_info "Skipped removal of Python virtual environments."
 fi
 
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
-  echo "Removing Docker containers..."
+  show_info "Removing Docker containers..."
   $docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" down
   rm "docker-compose.halfstack.current.yml"
 else
-  echo "Skipped removal of Docker containers."
+  show_info "Skipped removal of Docker containers."
 fi
 
 echo ""
-echo "(FYI) To reset Pants and its cache data, run:"
+show_note "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
 echo "  $ rm -rf .pants.d ~/.cache/pants"
 if [ -f .pants.rc ]; then
@@ -119,4 +139,4 @@ if [ -f .pants.rc ]; then
 fi
 
 echo ""
-echo "Done."
+show_info "Done."
