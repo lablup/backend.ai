@@ -109,8 +109,9 @@ def main():
         if docker_version is not None:
             # For Snap-based Docker, use a home directory path
             print(Path.home() / f".cache/{build_root_name}-{build_root_hash}-pants")
-        # Otherwise, use the standard tmp directory
-        print(f"/tmp/{build_root_name}-{build_root_hash}-pants")
+        else:
+            # Otherwise, use the standard tmp directory
+            print(f"/tmp/{build_root_name}-{build_root_hash}-pants")
         return
 
     docker_version = detect_snap_docker()
