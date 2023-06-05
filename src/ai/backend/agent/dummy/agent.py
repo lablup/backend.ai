@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     KernelId,
     MountTypes,
     ResourceSlot,
+    ServicePort,
     SessionId,
     SlotName,
     current_resource_slots,
@@ -191,7 +192,6 @@ class DummyAgent(
     AbstractAgent[DummyKernel, DummyKernelCreationContext],
 ):
     dummy_config: Mapping[str, Any]
-    kernel_container_map: dict[KernelId, Container]
 
     def __init__(
         self,
@@ -202,7 +202,12 @@ class DummyAgent(
         raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
         self.dummy_config = dummy_local_config.check(raw_config)
         self.dummy_agent_cfg = self.dummy_config["agent"]
-        self.kernel_container_map = {}
+
+    def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
+        return []
+
+    async def sync_container_lifecycles(self, interval: float) -> None:
+        return
 
     async def enumerate_containers(
         self,
@@ -213,7 +218,7 @@ class DummyAgent(
     async def detect_resources(
         self,
     ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
-        return await detect_resources(self.etcd, self.local_config)
+        return await detect_resources(self.etcd, self.local_config, self.dummy_config)
 
     async def scan_images(self) -> Mapping[str, str]:
         delay = get_delay_from_cfg(self.dummy_agent_cfg["delay"]["scan-image"])

@@ -12,12 +12,22 @@ already-have = []
 need-to-pull = []
 missing = []
 
+
+[agent.resource.cpu]
+core-indexes = [0, 1, 2, 3, 4]
+
+
+[agent.resource.memory]
+size = 34359738368
+
+
 [kernel-creation-ctx.delay]
 prepare-scratch = 0.1
 prepare-ssh = 0.1
 spawn = 0.1
 start-container = 2.0
 mount-krunner = 0.1
+
 
 [kernel.delay]
 check-status = 0.1

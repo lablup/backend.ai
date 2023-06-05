@@ -19,6 +19,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 async def detect_resources(
     etcd: AsyncEtcd,
     local_config: Mapping[str, Any],
+    dummy_config: Mapping[str, Any],
 ) -> tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
     """
     Detect available computing resource of the system.
@@ -48,11 +49,11 @@ async def detect_resources(
     )
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
-        cpu_plugin = CPUPlugin(cpu_config, local_config)
+        cpu_plugin = CPUPlugin(cpu_config, local_config, dummy_config)
         compute_plugin_ctx.attach_intrinsic_device(cpu_plugin)
     if "mem" not in compute_plugin_ctx.plugins:
         memory_config = await etcd.get_prefix("config/plugins/memory")
-        memory_plugin = MemoryPlugin(memory_config, local_config)
+        memory_plugin = MemoryPlugin(memory_config, local_config, dummy_config)
         compute_plugin_ctx.attach_intrinsic_device(memory_plugin)
     for plugin_name, plugin_instance in compute_plugin_ctx.plugins.items():
         if not all(

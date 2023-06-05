@@ -2008,9 +2008,7 @@ class AbstractAgent(
                 await self.rescan_resource_usage()
                 raise e
 
-            public_service_ports: List[ServicePort] = [
-                port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
-            ]
+            public_service_ports: List[ServicePort] = self.get_public_service_ports(service_ports)
 
             kernel_creation_info: KernelCreationResult = {
                 "id": KernelId(kernel_id),
@@ -2057,6 +2055,9 @@ class AbstractAgent(
             # The startup command for the batch-type sessions will be executed by the manager
             # upon firing of the "session_started" event.
             return kernel_creation_info
+
+    def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
+        return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
     async def destroy_kernel(

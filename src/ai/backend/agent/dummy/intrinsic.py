@@ -41,12 +41,23 @@ class CPUPlugin(AbstractComputePlugin):
     Represents the CPU.
     """
 
+    resource_config: Mapping[str, Any]
+
     config_watch_enabled = False
 
     key = DeviceName("cpu")
     slot_types = [
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
+
+    def __init__(
+        self,
+        plugin_config: Mapping[str, Any],
+        local_config: Mapping[str, Any],
+        dummy_config: Mapping[str, Any],
+    ) -> None:
+        super().__init__(plugin_config, local_config)
+        self.resource_config = dummy_config["agent"]["resource"]
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -68,7 +79,7 @@ class CPUPlugin(AbstractComputePlugin):
         }
 
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        cores = {0, 1, 2, 3, 4}
+        cores = self.resource_config["cpu"]["core-indexes"]
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
@@ -183,12 +194,23 @@ class MemoryPlugin(AbstractComputePlugin):
     Represents the main memory.
     """
 
+    resource_config: Mapping[str, Any]
+
     config_watch_enabled = False
 
     key = DeviceName("mem")
     slot_types = [
         (SlotName("mem"), SlotTypes.BYTES),
     ]
+
+    def __init__(
+        self,
+        plugin_config: Mapping[str, Any],
+        local_config: Mapping[str, Any],
+        dummy_config: Mapping[str, Any],
+    ) -> None:
+        super().__init__(plugin_config, local_config)
+        self.resource_config = dummy_config["agent"]["resource"]
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -210,7 +232,7 @@ class MemoryPlugin(AbstractComputePlugin):
         }
 
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        memory_size = 34359738368
+        memory_size = self.resource_config["memory"]["size"]
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),

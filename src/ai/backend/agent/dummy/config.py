@@ -2,9 +2,12 @@ from pathlib import Path
 
 import trafaret as t
 
+from ai.backend.common import validators as tx
+
 DEFAULT_CONFIG_PATH = Path.cwd() / "dummy-config.toml"
 
 RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
+core_idx = {0, 1, 2, 3, 4}
 
 dummy_local_config = t.Dict(
     {
@@ -26,6 +29,20 @@ dummy_local_config = t.Dict(
                         t.Key("already-have", default=None): t.Null | t.List(t.String),
                         t.Key("need-to-pull", default=None): t.Null | t.List(t.String),
                         t.Key("missing", default=None): t.Null | t.List(t.String),
+                    }
+                ),
+                t.Key("resource"): t.Dict(
+                    {
+                        t.Key("cpu"): t.Dict(
+                            {
+                                t.Key("core-indexes", default=core_idx): tx.ToSet,
+                            }
+                        ),
+                        t.Key("memory"): t.Dict(
+                            {
+                                t.Key("size", default=34359738368): t.Int,
+                            }
+                        ),
                     }
                 ),
             }
