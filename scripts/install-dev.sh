@@ -236,8 +236,8 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
-PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
@@ -493,8 +493,7 @@ check_python() {
 bootstrap_pants() {
   pants_local_exec_root=$($bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
   mkdir -p "$pants_local_exec_root"
-  echo '[GLOBAL]' > .pants.rc
-  echo 'local_execution_root_dir = "'"$pants_local_exec_root"'"' >> .pants.rc
+  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."
@@ -563,7 +562,7 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket tomlkit
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
