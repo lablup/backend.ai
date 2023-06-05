@@ -37,8 +37,6 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
