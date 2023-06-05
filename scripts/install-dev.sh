@@ -491,7 +491,7 @@ check_python() {
 }
 
 bootstrap_pants() {
-  mkdir -p .tmp
+  mkdir -p /tmp/bai-edge-pants
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."
