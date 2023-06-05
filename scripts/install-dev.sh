@@ -220,7 +220,7 @@ STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_V
 if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
-if [ $(has_python $bpython) -eq 0 ]; then
+if [ $(has_python $bpython) -ne 0 ]; then
   install_static_python
 fi
 show_info "Checking the bootstrapper Python version..."
