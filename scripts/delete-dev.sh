@@ -124,8 +124,12 @@ fi
 
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
   show_info "Removing Docker containers..."
-  $docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" down
-  rm "docker-compose.halfstack.current.yml"
+  if [ -f "docker-compose.halfstack.current.yml" ]; then
+    $docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" down
+    rm "docker-compose.halfstack.current.yml"
+  else
+    show_warning "The halfstack containers are already removed."
+  fi
 else
   show_info "Skipped removal of Docker containers."
 fi
