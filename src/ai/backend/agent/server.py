@@ -366,7 +366,6 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     KernelTerminatedEvent(
                         kid,
-                        sid,
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
                     )
                 )
@@ -377,7 +376,6 @@ class AgentRPCServer(aobject):
                 # destroy kernel
                 await self.agent.inject_container_lifecycle_event(
                     kid,
-                    kernel.session_id,
                     LifecycleEvent.DESTROY,
                     KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                     suppress_events=True,
