@@ -570,28 +570,31 @@ class KernelRow(Base):
     ) -> KernelRow:
         from .agent import AgentStatus
 
-        async with db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(KernelRow)
-                .where(KernelRow.id == kern_id)
-                .options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).options(noload("*")),
+        async def _query():
+            async with db.begin_readonly_session() as db_sess:
+                query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kern_id)
+                    .options(
+                        noload("*"),
+                        selectinload(KernelRow.agent_row).options(noload("*")),
+                    )
                 )
-            )
-            result = (await db_sess.execute(query)).scalars().all()
+                result = (await db_sess.execute(query)).scalars().all()
 
-            cand = result
-            if not allow_stale:
-                cand = [
-                    k
-                    for k in result
-                    if (k.status not in DEAD_KERNEL_STATUSES)
-                    and (k.agent_row.status == AgentStatus.ALIVE)
-                ]
-            if not cand:
-                raise SessionNotFound
-            return cand[0]
+                cand = result
+                if not allow_stale:
+                    cand = [
+                        k
+                        for k in result
+                        if (k.status not in DEAD_KERNEL_STATUSES)
+                        and (k.agent_row.status == AgentStatus.ALIVE)
+                    ]
+                if not cand:
+                    raise SessionNotFound
+                return cand[0]
+
+        return await execute_with_retry(_query)
 
     @classmethod
     async def set_kernel_status(

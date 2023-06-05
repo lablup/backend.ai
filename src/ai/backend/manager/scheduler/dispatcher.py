@@ -3,10 +3,21 @@ from __future__ import annotations
 import asyncio
 import itertools
 import logging
+import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Final,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import aiotools
 import async_timeout
@@ -21,6 +32,7 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
     DoPrepareEvent,
+    DoScaleEvent,
     DoScheduleEvent,
     EventDispatcher,
     EventProducer,
@@ -32,9 +44,18 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, aobject
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    aobject,
+)
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.manager.models.session import _build_session_fetch_query
+from ai.backend.manager.types import DistributedLockFactory, UserScope
+from ai.backend.manager.utils import query_userinfo
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
@@ -42,14 +63,19 @@ from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentStatus,
+    EndpointRow,
     KernelRow,
     KernelStatus,
+    RouteStatus,
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
+    keypair_resource_policies,
+    keypairs,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
+    users,
 )
 from ..models.scaling_group import ScalingGroupOpts
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
@@ -120,6 +146,7 @@ class SchedulerDispatcher(aobject):
     event_producer: EventProducer
     schedule_timer: GlobalTimer
     prepare_timer: GlobalTimer
+    scale_timer: GlobalTimer
 
     def __init__(
         self,
@@ -154,6 +181,7 @@ class SchedulerDispatcher(aobject):
         evd.consume(AgentStartedEvent, None, self.schedule)
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoPrepareEvent, None, self.prepare)
+        evd.consume(DoScaleEvent, None, self.scale_services)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
@@ -167,12 +195,21 @@ class SchedulerDispatcher(aobject):
             interval=10.0,
             initial_delay=5.0,
         )
+        self.scale_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
+            self.event_producer,
+            lambda: DoScaleEvent(),
+            interval=10.0,
+            initial_delay=7.0,
+        )
         await self.schedule_timer.join()
         await self.prepare_timer.join()
+        await self.scale_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
+            tg.create_task(self.scale_timer.leave())
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
         log.info("Session scheduler stopped")
@@ -1040,6 +1077,176 @@ class SchedulerDispatcher(aobject):
             raise
         except asyncio.TimeoutError:
             log.warn("prepare(): timeout while executing start_session()")
+
+    async def scale_services(
+        self,
+        context: None,
+        source: AgentId,
+        event: DoScaleEvent,
+    ) -> None:
+        log.debug("scale_services(): triggered")
+        # Altering inference sessions should only be done by this method
+        routes_to_destroy = []
+        endpoints_to_expand: dict[EndpointRow, Any] = {}
+        async with self.db.begin_readonly_session() as session:
+            endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
+        # endpoints_to_flush = [
+        #     endpoint.id
+        #     for endpoint in endpoints
+        #     if endpoint.desired_session_count < 0 and len(endpoint.routings) == 0
+        # ]
+        # async with self.db.begin_session() as session:
+        #     query = sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoints_to_flush))
+        #     await session.execute(query)
+        for endpoint in endpoints:
+            desired_session_count = endpoint.desired_session_count
+            if desired_session_count < 0:
+                desired_session_count = 0
+            if len(endpoint.routings) > desired_session_count:
+                # We need to scale down!
+                destroy_count = len(endpoint.routings) - desired_session_count
+                routes_to_destroy += list(
+                    sorted(
+                        [
+                            route
+                            for route in endpoint.routings
+                            if (
+                                route.status != RouteStatus.PROVISIONING
+                                and route.status != RouteStatus.TERMINATING
+                            )
+                        ],
+                        key=lambda r: r.status == RouteStatus.UNHEALTHY,
+                    )
+                )[:destroy_count]
+                log.debug(
+                    "Shrinking {} from {} to {}",
+                    endpoint.name,
+                    len(endpoint.routings),
+                    endpoint.desired_session_count,
+                )
+            elif len(endpoint.routings) < desired_session_count:
+                # We need to scale up!
+                create_count = desired_session_count - len(endpoint.routings)
+                endpoints_to_expand[endpoint] = create_count
+                log.debug(
+                    "Expanding {} from {} to {}",
+                    endpoint.name,
+                    len(endpoint.routings),
+                    endpoint.desired_session_count,
+                )
+
+        async with self.db.begin_readonly_session() as db_session:
+            ids_of_session_to_destroy = [r.session for r in routes_to_destroy]
+            kernel_loading_op = (
+                noload("*"),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    selectinload(KernelRow.agent_row).noload("*"),
+                ),
+            )
+            query = _build_session_fetch_query(
+                SessionRow.id.in_(ids_of_session_to_destroy), eager_loading_op=kernel_loading_op
+            )
+            result = await db_session.execute(query)
+            target_sessions_to_destory = result.scalars().all()
+        # TODO: Update logic to not to wait for sessions to actually terminate
+        for session in target_sessions_to_destory:
+            await self.registry.destroy_session(
+                session,
+                forced=False,
+                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+            )
+
+        user_ids = tuple(
+            {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
+            | {endpoint.session_owner for endpoint in endpoints_to_expand.keys()}
+        )
+
+        async with self.db.begin_readonly() as conn:
+            join = sa.join(
+                users, keypairs, (users.c.uuid == keypairs.c.user) & keypairs.c.is_active.is_(True)
+            )
+            query = (
+                sa.select(
+                    [
+                        users.c.uuid,
+                        users.c.role,
+                        users.c.domain_name,
+                        keypairs.c.access_key,
+                        keypairs.c.resource_policy,
+                    ]
+                )
+                .select_from(join)
+                .where(users.c.uuid.in_(user_ids))
+            )
+            result = await conn.execute(query)
+            user_id_row_mapping = {row.uuid: row for row in result.fetchall()}
+            keypair_resource_policy_names = {
+                row.resource_policy for row in user_id_row_mapping.values()
+            }
+            query = (
+                sa.select([keypair_resource_policies])
+                .select_from(keypair_resource_policies)
+                .where(keypair_resource_policies.c.name.in_(keypair_resource_policy_names))
+            )
+            result = await conn.execute(query)
+            keypair_resource_policy_name_policy_mapping = {
+                row.name: row for row in result.fetchall()
+            }
+
+        for endpoint, expand_count in endpoints_to_expand.items():
+            log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
+            async with self.db.begin_readonly() as conn:
+                _, group_id, resource_policy = await query_userinfo(
+                    conn,
+                    user_id_row_mapping[endpoint.created_user].uuid,
+                    user_id_row_mapping[endpoint.created_user].access_key,
+                    user_id_row_mapping[endpoint.created_user].role,
+                    user_id_row_mapping[endpoint.created_user].domain_name,
+                    keypair_resource_policy_name_policy_mapping[
+                        user_id_row_mapping[endpoint.created_user].resource_policy
+                    ],
+                    endpoint.domain,
+                    endpoint.project,
+                    query_on_behalf_of=user_id_row_mapping[endpoint.session_owner]["access_key"],
+                )
+            for _ in range(expand_count):
+                try:
+                    await self.registry.create_session(
+                        f"{endpoint.name}-{uuid.uuid4()}",
+                        endpoint.image_row.name,
+                        endpoint.image_row.architecture,
+                        UserScope(
+                            domain_name=endpoint.domain,
+                            group_id=group_id,
+                            user_uuid=user_id_row_mapping[endpoint.created_user].uuid,
+                            user_role=user_id_row_mapping[endpoint.created_user].role,
+                        ),
+                        user_id_row_mapping[endpoint.session_owner]["access_key"],
+                        resource_policy,
+                        SessionTypes.INFERENCE,
+                        {
+                            "mounts": [endpoint.model],
+                            "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                            "environ": endpoint.environ,
+                            "scaling_group": endpoint.resource_group,
+                            "resources": endpoint.resource_slots,
+                            "resource_opts": endpoint.resource_opts,
+                            "preopen_ports": None,
+                            "agent_list": None,
+                        },
+                        ClusterMode[endpoint.cluster_mode],
+                        endpoint.cluster_size,
+                        bootstrap_script=endpoint.bootstrap_script,
+                        startup_command=endpoint.startup_command,
+                        tag=endpoint.tag,
+                        callback_url=endpoint.callback_url,
+                        enqueue_only=True,
+                        endpoint_id=endpoint.id,
+                    )
+                except Exception:
+                    # TODO: Handle
+                    log.exception("error while creating session:")
 
     async def start_session(
         self,
