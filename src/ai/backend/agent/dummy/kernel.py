@@ -6,6 +6,7 @@ from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from .utils import get_delay_from_cfg
 
 
 class DummyKernel(AbstractKernel):
@@ -61,29 +62,36 @@ class DummyKernel(AbstractKernel):
         )
 
     async def check_status(self):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["check-status"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["check-status"])
+        await asyncio.sleep(delay)
         return {}
 
     async def get_completions(self, text, opts):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["get-completions"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["get-completions"])
+        await asyncio.sleep(delay)
         return {"status": "finished", "completions": []}
 
     async def get_logs(self):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["get-logs"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["get-logs"])
+        await asyncio.sleep(delay)
         return {"logs": "my logs"}
 
     async def interrupt_kernel(self):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["interrupt-kernel"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["interrupt-kernel"])
+        await asyncio.sleep(delay)
 
     async def start_service(self, service, opts):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["start-service"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["start-service"])
+        await asyncio.sleep(delay)
 
     async def start_model_service(self, model_service: Mapping[str, Any]):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["start-model-service"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["start-model-service"])
+        await asyncio.sleep(delay)
         return {}
 
     async def shutdown_service(self, service):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["shutdown-service"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["shutdown-service"])
+        await asyncio.sleep(delay)
 
     async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         if self.is_commiting:
@@ -92,29 +100,35 @@ class DummyKernel(AbstractKernel):
 
     async def commit(self, kernel_id, subdir, filename):
         self.is_commiting = True
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["commit"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["commit"])
+        await asyncio.sleep(delay)
         self.is_commiting = False
 
     async def get_service_apps(self):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["get-service-apps"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["get-service-apps"])
+        await asyncio.sleep(delay)
         return {
             "status": "done",
             "data": [],
         }
 
     async def accept_file(self, filename, filedata):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["accept-file"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["accept-file"])
+        await asyncio.sleep(delay)
 
     async def download_file(self, filepath):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["download-file"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["download-file"])
+        await asyncio.sleep(delay)
         return b""
 
     async def download_single(self, filepath):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["download-single"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["download-single"])
+        await asyncio.sleep(delay)
         return b""
 
     async def list_files(self, path: str):
-        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["list-files"])
+        delay = get_delay_from_cfg(self.dummy_kernel_cfg["delay"]["list-files"])
+        await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}
 
 
