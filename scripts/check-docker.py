@@ -108,7 +108,7 @@ def main():
         build_root_hash = simple_hash(os.fsencode(build_root_path))
         if docker_version is not None:
             # For Snap-based Docker, use a home directory path
-            print(f"${{HOME}}/.cache/{build_root_name}-{build_root_hash}-pants")
+            print(Path.home() / f".cache/{build_root_name}-{build_root_hash}-pants")
         # Otherwise, use the standard tmp directory
         print(f"/tmp/{build_root_name}-{build_root_hash}-pants")
         return
