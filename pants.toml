@@ -37,6 +37,9 @@ root_patterns = [
     "/tools/pants-plugins",
 ]
 
+[test]
+extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s"]
+
 [python]
 enable_resolves = true
 # When changing this main Python version:
