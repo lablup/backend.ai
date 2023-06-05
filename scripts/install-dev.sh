@@ -214,17 +214,17 @@ else
   exit 1
 fi
 
+show_info "Checking the bootstrapper Python version..."
 STANDALONE_PYTHON_VERSION="3.11.3"
 STANDALONE_PYTHON_ARCH=$(arch)
 STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
 if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
-if [ $(has_python $bpython) -ne 0 ]; then
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
+if [ $(has_python "$bpython") -ne 0 ]; then
   install_static_python
 fi
-show_info "Checking the bootstrapper Python version..."
-bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
 $bpython -c 'import sys;print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"

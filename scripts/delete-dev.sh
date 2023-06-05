@@ -67,14 +67,11 @@ else
   DOCKER_COMPOSE="docker-compose"
 fi
 
-if [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
-else
-  # Ensure "readlinkf" is working...
+show_info "Checking the bootstrapper Python version..."
+STANDALONE_PYTHON_VERSION="3.11.3"
+STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
+if [ $(has_python "$bpython") -ne 0 ]; then
   show_error "python (for bootstrapping) is not available!"
   show_info "This script assumes Python 2.7+/3+ is already available on your system."
   exit 1
@@ -118,7 +115,7 @@ echo "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
 echo "  $ rm -rf .pants.d ~/.cache/pants"
 if [ -f .pants.rc ]; then
-  echo "  $ rm -rf $(./py scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
+  echo "  \$ rm -rf $($bpython scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
 fi
 
 echo ""
