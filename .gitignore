@@ -110,6 +110,7 @@ ENV/
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
+/dummy-config.toml
 
 # Local temp
 /.tmp/

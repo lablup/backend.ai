@@ -9,6 +9,8 @@ from ..resources import KernelResourceSpec
 
 
 class DummyKernel(AbstractKernel):
+    dummy_config: Mapping[str, Any]
+
     def __init__(
         self,
         kernel_id: KernelId,
@@ -22,6 +24,7 @@ class DummyKernel(AbstractKernel):
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
         data: Dict[str, Any],
+        dummy_config: Mapping[str, Any],
     ) -> None:
         super().__init__(
             kernel_id,
@@ -36,6 +39,8 @@ class DummyKernel(AbstractKernel):
             environ=environ,
         )
         self.is_commiting = False
+        self.dummy_config = dummy_config
+        self.dummy_kernel_cfg = self.dummy_config["kernel"]
 
     async def close(self) -> None:
         pass
@@ -56,29 +61,29 @@ class DummyKernel(AbstractKernel):
         )
 
     async def check_status(self):
-        await asyncio.sleep(1)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["check-status"])
         return {}
 
     async def get_completions(self, text, opts):
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["get-completions"])
         return {"status": "finished", "completions": []}
 
     async def get_logs(self):
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["get-logs"])
         return {"logs": "my logs"}
 
     async def interrupt_kernel(self):
-        await asyncio.sleep(1)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["interrupt-kernel"])
 
     async def start_service(self, service, opts):
-        await asyncio.sleep(10)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["start-service"])
 
     async def start_model_service(self, model_service: Mapping[str, Any]):
-        await asyncio.sleep(50)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["start-model-service"])
         return {}
 
     async def shutdown_service(self, service):
-        await asyncio.sleep(3)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["shutdown-service"])
 
     async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         if self.is_commiting:
@@ -87,38 +92,29 @@ class DummyKernel(AbstractKernel):
 
     async def commit(self, kernel_id, subdir, filename):
         self.is_commiting = True
-        await asyncio.sleep(200)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["commit"])
         self.is_commiting = False
 
     async def get_service_apps(self):
-        await asyncio.sleep(1)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["get-service-apps"])
         return {
             "status": "done",
-            "data": [
-                {"name": "jupyter"},
-                {"name": "vscode", "allowed_arguments": ["--auth"], "allowed_envs": ["PASSWORD"]},
-                {"name": "nni"},
-                {"name": "ipython"},
-                {"name": "digits"},
-                {"name": "jupyterlab"},
-                {"name": "sftp"},
-                {"name": "tensorboard", "allowed_arguments": ["--logdir"]},
-            ],
+            "data": [],
         }
 
     async def accept_file(self, filename, filedata):
-        await asyncio.sleep(3)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["accept-file"])
 
     async def download_file(self, filepath):
-        await asyncio.sleep(30)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["download-file"])
         return b""
 
     async def download_single(self, filepath):
-        await asyncio.sleep(30)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["download-single"])
         return b""
 
     async def list_files(self, path: str):
-        await asyncio.sleep(30)
+        await asyncio.sleep(self.dummy_kernel_cfg["delay"]["list-files"])
         return {"files": "", "errors": "", "abspath": ""}
 
 
