@@ -23,7 +23,7 @@ python_requirements(
         "types-PyYAML": ["yaml"],
         "types-python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "types-redis": ["redis"],
-        "types-six": ["six"],
+        "types-six": ["six", "graphql", "promise"],
         "types-tabulate": ["tabulate"],
     },
 )
