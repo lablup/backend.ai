@@ -491,7 +491,10 @@ check_python() {
 }
 
 bootstrap_pants() {
-  mkdir -p /tmp/bai-edge-pants
+  pants_local_exec_root=$($bpython check-docker.py --get-preferred-pants-local-exec-root)
+  mkdir -p "$pants_local_exec_root"
+  echo '[GLOBAL]' > .pants.rc
+  echo 'local_execution_root_dir = "'"$pants_local_exec_root"'"' >> .pants.rc
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."

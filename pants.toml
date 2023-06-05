@@ -1,7 +1,6 @@
 [GLOBAL]
 pants_version = "2.16.0rc4"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
-local_execution_root_dir="/tmp/bai-edge-pants"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
