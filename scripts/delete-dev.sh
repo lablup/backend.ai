@@ -58,10 +58,10 @@ show_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
-    echo 0
+  if [ "$?" -eq 0 ]; then
+    echo 0  # ok
   else
-    echo 1
+    echo 1  # missing
   fi
 }
 
@@ -92,8 +92,8 @@ STANDALONE_PYTHON_VERSION="3.11.3"
 STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
 bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
 if [ $(has_python "$bpython") -ne 0 ]; then
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
+  show_error "Python for bootstrapping is not available!"
+  echo "Check if you have installed using the 'install-dev.sh' script."
   exit 1
 fi
 

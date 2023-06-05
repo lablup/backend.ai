@@ -146,10 +146,10 @@ show_important_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -ne 0 ]; then
-    echo 0
+  if [ "$?" -eq 0 ]; then
+    echo 0  # ok
   else
-    echo 1
+    echo 1  # missing
   fi
 }
 
