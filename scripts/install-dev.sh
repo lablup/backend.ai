@@ -146,11 +146,32 @@ show_important_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
-    echo 0
+  if [ "$?" -eq 0 ]; then
+    echo 0  # ok
   else
-    echo 1
+    echo 1  # missing
   fi
+}
+
+install_static_python() {
+  local build_date="20230507"
+  local build_version="${STANDALONE_PYTHON_VERSION}"
+  local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
+  dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
+  checksum_url="${dist_url}.sha256"
+  cwd="$(pwd)"
+  mkdir -p "${STANDALONE_PYTHON_PATH}"
+  cd "${STANDALONE_PYTHON_PATH}"
+  show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
+  curl -o dist.tar.gz -L "$dist_url"
+  echo "$(curl -sL $checksum_url) *dist.tar.gz" | shasum -a 256 --check --status
+  if [ $? -ne 0 ]; then
+    echo "Failed to validate the downloaded static build of Python binary!"
+    exit 1
+  fi
+  tar xzf dist.tar.gz && rm dist.tar.gz
+  mv python/* . && rmdir python
+  cd "${cwd}"
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -174,31 +195,37 @@ DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN
 
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
+  STANDALONE_PYTHON_PLATFORM="apple-darwin"
 elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
   DISTRO="Debian"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
   DISTRO="SUSE"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
-else
-  # Ensure "readlinkf" is working...
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
-  exit 1
+
+show_info "Checking the bootstrapper Python version..."
+STANDALONE_PYTHON_VERSION="3.11.3"
+STANDALONE_PYTHON_ARCH=$(arch)
+STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
+if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
+  STANDALONE_PYTHON_ARCH="aarch64"
 fi
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
+if [ $(has_python "$bpython") -ne 0 ]; then
+  install_static_python
+fi
+$bpython -c 'import sys;print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -209,8 +236,8 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
-PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
@@ -464,7 +491,9 @@ check_python() {
 }
 
 bootstrap_pants() {
-  mkdir -p .tmp
+  pants_local_exec_root=$($bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  mkdir -p "$pants_local_exec_root"
+  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."
@@ -531,8 +560,9 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
+$bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q 'urllib3<2.0' requests requests-unixsocket
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket tomlkit
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
@@ -967,5 +997,4 @@ fi
 if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
 fi
-
 # vim: tw=0 sts=2 sw=2 et

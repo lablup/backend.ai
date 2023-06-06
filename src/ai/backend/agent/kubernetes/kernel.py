@@ -19,7 +19,7 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -36,6 +36,7 @@ class KubernetesKernel(AbstractKernel):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -48,6 +49,7 @@ class KubernetesKernel(AbstractKernel):
         super().__init__(
             kernel_id,
             session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -193,6 +195,11 @@ class KubernetesKernel(AbstractKernel):
                 "options": opts,
             }
         )
+        return result
+
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
         return result
 
     async def shutdown_service(self, service: str):

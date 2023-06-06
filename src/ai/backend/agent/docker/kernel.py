@@ -21,7 +21,7 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel, SessionId
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -40,6 +40,7 @@ class DockerKernel(AbstractKernel):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -52,6 +53,7 @@ class DockerKernel(AbstractKernel):
         super().__init__(
             kernel_id,
             session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -126,6 +128,11 @@ class DockerKernel(AbstractKernel):
                 "options": opts,
             }
         )
+        return result
+
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
         return result
 
     async def shutdown_service(self, service: str):

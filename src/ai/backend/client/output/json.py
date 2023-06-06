@@ -114,6 +114,7 @@ class JsonOutputHandler(BaseOutputHandler):
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
         page_size: int = None,
+        plain=False,
     ) -> None:
         page_size = page_size or 20
         result = fetch_func(initial_page_offset, page_size)
