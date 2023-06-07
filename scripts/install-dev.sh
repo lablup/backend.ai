@@ -200,6 +200,8 @@ if [ $(has_python "$bpython") -ne 0 ]; then
   install_static_python
 fi
 $bpython -c 'import sys;print(sys.version_info)'
+$bpython -m ensurepip --upgrade
+$bpython -m pip --disable-pip-version-check install -q -U tomlkit
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -537,7 +539,7 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket tomlkit
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
