@@ -23,7 +23,12 @@ python_requirements(
         "types-PyYAML": ["yaml"],
         "types-python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "types-redis": ["redis"],
-        "types-setuptools": ["setuptools", "pkg_resources", "ai.backend.testutils", "ai.backend.test"],
+        "types-setuptools": [
+            "setuptools",
+            "pkg_resources",
+            "ai.backend.testutils",
+            "ai.backend.test",
+        ],
         "types-six": ["six", "graphql", "promise", "ai.backend.manager.models"],
         "types-tabulate": ["tabulate"],
     },
