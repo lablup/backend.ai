@@ -46,7 +46,7 @@ class ExtendedAsyncSAEngine(SAEngine):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        self._txn_concurrency_threshold = kwargs.pop("txn_concurrency_threshold", 0)
+        self._txn_concurrency_threshold = kwargs.pop("_txn_concurrency_threshold", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
