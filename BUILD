@@ -25,7 +25,7 @@ python_requirements(
         "types-python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "types-redis": ["redis"],
         "types-setuptools": ["setuptools", "pkg_resources"],
-        "types-six": ["six", "graphql", "promise", "_pytest"],
+        "types-six": ["six", "graphql", "promise", "_pytest", "ai.backend"],
         "types-tabulate": ["tabulate"],
     },
 )
