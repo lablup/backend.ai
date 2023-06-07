@@ -202,6 +202,20 @@ class DummyAgent(
         self.dummy_config = dummy_local_config.check(raw_config)
         self.dummy_agent_cfg = self.dummy_config["agent"]
 
+    async def execute(
+        self,
+        session_id: SessionId,
+        kernel_id: KernelId,
+        run_id: str | None,
+        mode: Literal["query", "batch", "input", "continue"],
+        text: str,
+        *,
+        opts: Mapping[str, Any],
+        api_version: int,
+        flush_timeout: float,
+    ):
+        return {"status": "not-implemented"}
+
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return []
 
