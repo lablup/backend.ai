@@ -29,6 +29,10 @@ start-container = 2.0
 mount-krunner = 0.1
 
 
+[kernel]
+use-fake-code-runner = true
+
+
 [kernel.delay]
 check-status = 0.1
 get-completions = 0.1

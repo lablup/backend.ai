@@ -78,6 +78,7 @@ dummy_local_config = t.Dict(
         ),
         t.Key("kernel"): t.Dict(
             {
+                t.Key("use-fake-code-runner", default=True): t.Bool,
                 t.Key("delay"): t.Dict(
                     {
                         t.Key("check-status", default=0.1): Delay,
