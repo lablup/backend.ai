@@ -46,19 +46,25 @@ class ExtendedAsyncSAEngine(SAEngine):
     """
 
     def __init__(self, *args, **kwargs) -> None:
+        self._txn_concurrency_threshold = kwargs.pop("txn_concurrency_threshold", 0)
         super().__init__(*args, **kwargs)
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
-        self._txn_concurrency_threshold = kwargs.pop("txn_concurrency_threshold", 8)
         self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
 
     @actxmgr
     async def begin(self) -> AsyncIterator[SAConnection]:
         async with super().begin() as conn:
             self._generic_txn_count += 1
-            if self._generic_txn_count >= self._txn_concurrency_threshold:
+            if (
+                self._txn_concurrency_threshold > 0
+                and self._generic_txn_count >= self._txn_concurrency_threshold
+            ):
                 log.warning(
-                    "The number of concurrent generic transaction ({}) exceeded the threshold {}.",
+                    (
+                        "The number of concurrent generic transactions ({}) "
+                        "looks too high (warning threshold: {})."
+                    ),
                     self._generic_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -72,11 +78,14 @@ class ExtendedAsyncSAEngine(SAEngine):
     async def begin_readonly(self, deferrable: bool = False) -> AsyncIterator[SAConnection]:
         async with self.connect() as conn:
             self._readonly_txn_count += 1
-            if self._readonly_txn_count >= self._txn_concurrency_threshold:
+            if (
+                self._txn_concurrency_threshold > 0
+                and self._readonly_txn_count >= self._txn_concurrency_threshold
+            ):
                 log.warning(
                     (
-                        "The number of concurrent read-only transaction ({}) exceeded the"
-                        " threshold {}."
+                        "The number of concurrent read-only transactions ({}) "
+                        "looks too high (warning threshold: {})."
                     ),
                     self._readonly_txn_count,
                     self._txn_concurrency_threshold,
@@ -145,10 +154,17 @@ class ExtendedAsyncSAEngine(SAEngine):
                     )
 
 
-def create_async_engine(*args, **kwargs) -> ExtendedAsyncSAEngine:
+def create_async_engine(
+    *args,
+    _txn_concurrency_threshold: int = 0,
+    **kwargs,
+) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
-    return ExtendedAsyncSAEngine(sync_engine)
+    return ExtendedAsyncSAEngine(
+        sync_engine,
+        _txn_concurrency_threshold=_txn_concurrency_threshold,
+    )
 
 
 @actxmgr
@@ -180,6 +196,10 @@ async def connect_database(
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
         future=True,
+        _txn_concurrency_threshold=max(
+            int(local_config["db"]["pool-size"] + max(0, local_config["db"]["max-overflow"]) * 0.5),
+            2,
+        ),
     )
     yield db
     await db.dispose()
