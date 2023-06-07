@@ -212,6 +212,25 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     async def __ainit__(self) -> None:
         return
 
+    def __setstate__(self, props):
+        self.__dict__.update(props)
+        self.zctx = None
+        self.input_sock = None
+        self.output_sock = None
+
+        self.completion_queue = asyncio.Queue(maxsize=128)
+        self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
+        self.service_apps_info_queue = asyncio.Queue(maxsize=128)
+        self.status_queue = asyncio.Queue(maxsize=128)
+        self.output_queue = None
+        self.pending_queues = OrderedDict()
+        self.current_run_id = None
+        self.read_task = None
+        self.status_task = None
+        self.watchdog_task = None
+        self._closed = False
+
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
