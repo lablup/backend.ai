@@ -752,7 +752,7 @@ configure_backendai() {
   fi
 
   # configure agent
-  cp configs/agent/sample-dummy-config.toml ./dummy-agent-config.toml
+  cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
 
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml

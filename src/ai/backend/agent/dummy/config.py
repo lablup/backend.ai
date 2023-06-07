@@ -1,13 +1,29 @@
+import random
 from pathlib import Path
+from typing import Any
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
 
-DEFAULT_CONFIG_PATH = Path.cwd() / "dummy-agent-config.toml"
+DEFAULT_CONFIG_PATH = Path.cwd() / "agent.dummy.toml"
 
 RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
 core_idx = {0, 1, 2, 3, 4}
+
+
+class Delay(t.Trafaret):
+    def check_and_return(self, value: Any) -> float:
+        match value:
+            case float() | int():
+                return float(value)
+            case (a, b):
+                return random.uniform(a, b)
+            case None:
+                return 0
+            case _:
+                self._failure("Value must be float, tuple of float or None.")
+
 
 dummy_local_config = t.Dict(
     {
@@ -15,13 +31,13 @@ dummy_local_config = t.Dict(
             {
                 t.Key("delay"): t.Dict(
                     {
-                        t.Key("scan-image", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("pull-image", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("destroy-kernel", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("clean-kernel", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("create-network", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("destroy-network", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("destroy-network", default=1.0): t.ToFloat[0:] | RandomRange,
+                        t.Key("scan-image", default=0.1): Delay,
+                        t.Key("pull-image", default=1.0): Delay,
+                        t.Key("destroy-kernel", default=1.0): Delay,
+                        t.Key("clean-kernel", default=1.0): Delay,
+                        t.Key("create-network", default=1.0): Delay,
+                        t.Key("destroy-network", default=1.0): Delay,
+                        t.Key("destroy-network", default=1.0): Delay,
                     }
                 ),
                 t.Key("image"): t.Dict(
@@ -51,11 +67,11 @@ dummy_local_config = t.Dict(
             {
                 t.Key("delay"): t.Dict(
                     {
-                        t.Key("prepare-scratch", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("prepare-ssh", default=1.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("spawn", default=0.5): t.ToFloat[0:] | RandomRange,
-                        t.Key("start-container", default=2.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("mount-krunner", default=1.0): t.ToFloat[0:] | RandomRange,
+                        t.Key("prepare-scratch", default=1.0): Delay,
+                        t.Key("prepare-ssh", default=1.0): Delay,
+                        t.Key("spawn", default=0.5): Delay,
+                        t.Key("start-container", default=2.0): Delay,
+                        t.Key("mount-krunner", default=1.0): Delay,
                     }
                 )
             }
@@ -64,19 +80,19 @@ dummy_local_config = t.Dict(
             {
                 t.Key("delay"): t.Dict(
                     {
-                        t.Key("check-status", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("get-completions", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("get-logs", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("interrupt-kernel", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("start-service", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("start-model-service", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("shutdown-service", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("commit", default=5.0): t.ToFloat[0:] | RandomRange,
-                        t.Key("get-service-apps", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("accept-file", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("download-file", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("download-single", default=0.1): t.ToFloat[0:] | RandomRange,
-                        t.Key("list-files", default=0.1): t.ToFloat[0:] | RandomRange,
+                        t.Key("check-status", default=0.1): Delay,
+                        t.Key("get-completions", default=0.1): Delay,
+                        t.Key("get-logs", default=0.1): Delay,
+                        t.Key("interrupt-kernel", default=0.1): Delay,
+                        t.Key("start-service", default=0.1): Delay,
+                        t.Key("start-model-service", default=0.1): Delay,
+                        t.Key("shutdown-service", default=0.1): Delay,
+                        t.Key("commit", default=5.0): Delay,
+                        t.Key("get-service-apps", default=0.1): Delay,
+                        t.Key("accept-file", default=0.1): Delay,
+                        t.Key("download-file", default=0.1): Delay,
+                        t.Key("download-single", default=0.1): Delay,
+                        t.Key("list-files", default=0.1): Delay,
                     }
                 ),
             }

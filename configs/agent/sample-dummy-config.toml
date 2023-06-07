@@ -14,11 +14,11 @@ missing = []
 
 
 [agent.resource.cpu]
-core-indexes = [0, 1, 2, 3, 4]
+core-indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 [agent.resource.memory]
-size = 34359738368
+size = 50000000000
 
 
 [kernel-creation-ctx.delay]
