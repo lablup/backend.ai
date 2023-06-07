@@ -566,15 +566,13 @@ class AgentRegistry:
             image_min_slots["mem"] += shmem
 
             # Sanitize user input: does it have resource config?
-            if "resources" in creation_config:
+            if (resources := creation_config.get("resources")) is not None:
                 # Sanitize user input: does it have "known" resource slots only?
-                for slot_key, slot_value in creation_config["resources"].items():
+                for slot_key, slot_value in resources.items():
                     if slot_key not in known_slot_types:
                         raise InvalidAPIParameters(f"Unknown requested resource slot: {slot_key}")
                 try:
-                    requested_slots = ResourceSlot.from_user_input(
-                        creation_config["resources"], known_slot_types
-                    )
+                    requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
                 except ValueError:
                     log.exception("request_slots & image_slots calculation error")
                     # happens when requested_slots have more keys
