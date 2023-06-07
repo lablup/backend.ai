@@ -749,6 +749,9 @@ configure_backendai() {
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
 
+  # configure agent
+  cp configs/agent/sample-dummy-config.toml ./dummy-agent-config.toml
+
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')

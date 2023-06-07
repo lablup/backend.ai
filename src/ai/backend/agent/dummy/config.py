@@ -4,7 +4,7 @@ import trafaret as t
 
 from ai.backend.common import validators as tx
 
-DEFAULT_CONFIG_PATH = Path.cwd() / "dummy-config.toml"
+DEFAULT_CONFIG_PATH = Path.cwd() / "dummy-agent-config.toml"
 
 RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
 core_idx = {0, 1, 2, 3, 4}
