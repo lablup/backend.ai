@@ -45,6 +45,7 @@ resources(
         "*.json",
         ".bash_profile",
         ".bashrc",
+        ".zshrc",
         ".tmux.conf",
         ".vimrc",
         "terminfo.alpine3.8/**/*",

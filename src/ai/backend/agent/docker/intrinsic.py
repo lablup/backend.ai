@@ -583,7 +583,13 @@ class MemoryPlugin(AbstractComputePlugin):
                 match version:
                     case "1":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
-                        io_stats = (io_path / "blkio.throttle.io_service_bytes").read_text()
+
+                        for line in (mem_path / "memory.stat").read_text().splitlines():
+                            key, value = line.split(" ")
+                            if key == "total_inactive_file":
+                                mem_cur_bytes -= int(value)
+                                break
+
                         # example data:
                         #   8:0 Read 13918208
                         #   8:0 Write 0
@@ -591,7 +597,9 @@ class MemoryPlugin(AbstractComputePlugin):
                         #   8:0 Async 13918208
                         #   8:0 Total 13918208
                         #   Total 13918208
-                        for line in io_stats.splitlines():
+                        for line in (
+                            (io_path / "blkio.throttle.io_service_bytes").read_text().splitlines()
+                        ):
                             if line.startswith("Total "):
                                 continue
                             dev, op, nbytes = line.strip().split()
@@ -601,11 +609,17 @@ class MemoryPlugin(AbstractComputePlugin):
                                 io_write_bytes += int(nbytes)
                     case "2":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
-                        lines = (io_path / "io.stat").read_text().splitlines()
+
+                        for line in (mem_path / "memory.stat").read_text().splitlines():
+                            key, value = line.split(" ")
+                            if key == "inactive_file":
+                                mem_cur_bytes -= int(value)
+                                break
+
                         # example data:
                         # 8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
                         # 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
-                        for line in lines:
+                        for line in (io_path / "io.stat").read_text().splitlines():
                             for io_stat in line.split()[1:]:
                                 stat, value = io_stat.split("=")
                                 if stat == "rbytes":
