@@ -9,7 +9,7 @@ jobs:
   check-requirement:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Check if a precompiled binary file exists in dependencies
         run: |
             cat python.lock | grep -v '^//' | jq -r '.locked_resolves[].locked_requirements[]
