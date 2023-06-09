@@ -786,6 +786,8 @@ def scoped_query(
             if project_id is not None:
                 kwargs["project_id"] = project_id
                 kwargs["group_id"] = project_id  # legacy
+            if (project := kwargs.get("project")) is not None:
+                kwargs["project"] = project
             kwargs[user_key] = user_id
             return await resolve_func(executor, info, *args, **kwargs)
 

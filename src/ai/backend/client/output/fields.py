@@ -4,6 +4,7 @@ from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
     DependencyListFormatter,
+    InlineRoutingFormatter,
     KernelStatFormatter,
     ProjectListFormatter,
     SubFieldOutputFormatter,
@@ -308,13 +309,42 @@ permission_fields = FieldSet(
 
 service_fields = FieldSet(
     [
-        FieldSpec("model_id"),
-        FieldSpec("model_version"),
-        FieldSpec("image_ref"),
-        FieldSpec("project"),
-        FieldSpec("resource_opts", formatter=nested_dict_formatter),
         FieldSpec("endpoint_id"),
-        FieldSpec("service_id"),
-        FieldSpec("service_name"),
+        FieldSpec("image"),
+        FieldSpec("domain"),
+        FieldSpec("project"),
+        FieldSpec("resource_group"),
+        FieldSpec("resource_slots", formatter=nested_dict_formatter),
+        FieldSpec("url"),
+        FieldSpec("model"),
+        FieldSpec("model_mount_destiation"),
+        FieldSpec("created_user"),
+        FieldSpec("session_owner"),
+        FieldSpec("tag"),
+        FieldSpec("startup_command"),
+        FieldSpec("bootstrap_script"),
+        FieldSpec("callback_url"),
+        FieldSpec("environ", formatter=nested_dict_formatter),
+        FieldSpec("name"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("desired_session_count"),
+        FieldSpec("cluster_mode"),
+        FieldSpec("cluster_size"),
+        FieldSpec("open_to_public"),
+        FieldSpec(
+            "routings { routing_id session status traffic_ratio }",
+            formatter=InlineRoutingFormatter(),
+        ),
+    ]
+)
+
+
+routing_fields = FieldSet(
+    [
+        FieldSpec("routing_id"),
+        FieldSpec("status"),
+        FieldSpec("endpoint"),
+        FieldSpec("session"),
+        FieldSpec("traffic_ratio"),
     ]
 )

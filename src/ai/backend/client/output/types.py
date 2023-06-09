@@ -153,6 +153,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
         fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
         page_size: int = None,
+        plain: bool = False,
     ) -> None:
         raise NotImplementedError
 

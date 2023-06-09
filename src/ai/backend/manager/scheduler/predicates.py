@@ -69,18 +69,26 @@ async def check_concurrency(
         resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
             KeyPairRow.access_key == sess_ctx.access_key
         )
-        select_query = sa.select(KeyPairResourcePolicyRow.max_concurrent_sessions).where(
+        if sess_ctx.is_private:
+            concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sftp_sessions
+        else:
+            concurrent_session_column = KeyPairResourcePolicyRow.max_concurrent_sessions
+        select_query = sa.select(concurrent_session_column).where(
             KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
         )
         result = await db_sess.execute(select_query)
         return result.scalar()
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
+    if sess_ctx.is_private:
+        redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
+    else:
+        redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
     ok, concurrency_used = await redis_helper.execute_script(
         sched_ctx.registry.redis_stat,
         "check_keypair_concurrency_used",
         _check_keypair_concurrency_script,
-        [f"keypair.concurrency_used.{sess_ctx.access_key}"],
+        [redis_key],
         [max_concurrent_sessions],
     )
     if ok == 0:

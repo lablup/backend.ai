@@ -1,53 +1,49 @@
-import asyncio
 import logging
-import secrets
+import re
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
+import aiohttp
 import aiohttp_cors
 import aiotools
 import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from dateutil.parser import isoparse
-from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes
-from ai.backend.common.utils import str_to_timedelta
+from ai.backend.common.types import ClusterMode, SessionTypes, VFolderUsageMode
+from ai.backend.manager.registry import check_scaling_group
 
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
     ImageRow,
-    UserRole,
-    domains,
-    query_bootstrap_script,
-    verify_vfolder_name,
+    UserRow,
+    query_accessible_vfolders,
+    scaling_groups,
     vfolders,
 )
 from ..models.endpoint import EndpointRow
-from ..models.routing import RoutingRow
-from ..models.session import SessionRow, SessionStatus
-from ..models.utils import execute_with_retry
+from ..models.routing import RouteStatus, RoutingRow
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
-    BackendError,
-    ImageNotFound,
-    InsufficientPrivilege,
-    InternalServerError,
     InvalidAPIParameters,
-    UnknownImageReferenceError,
+    ObjectNotFound,
+    ServiceUnavailable,
+    VFolderNotFound,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_access_key_scopes, undefined
+from .utils import check_api_params, get_access_key_scopes, get_user_uuid_scopes, undefined
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -64,76 +60,101 @@ class UndefChecker(t.Trafaret):
             return None
 
 
+async def is_user_allowed_to_access_resource(
+    db_sess: AsyncSession,
+    request: web.Request,
+    resource_owner: uuid.UUID,
+) -> bool:
+    if request["user"]["is_superadmin"]:
+        return True
+    elif request["user"]["is_admin"]:
+        query = sa.select(UserRow).filter(UserRow.uuid == resource_owner)
+        result = await db_sess.execute(query)
+        user = result.scalar()
+        return user.domain_name == request["user"]["domain_name"]
+    else:
+        return request["user"]["uyud"] == resource_owner
+
+
 @auth_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["project_id", "projectId"]): tx.UUID,
+            t.Key("name", default=None): t.Null | t.String,
         }
-    ),
+    )
 )
 async def list_serve(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    project_id = params["project_id"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
+    query_conds = EndpointRow.session_owner == request["user"]["uuid"]
+    if params["name"]:
+        query_conds &= EndpointRow.name == params["name"]
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        j = sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session).join(
-            EndpointRow, RoutingRow.endpoint == EndpointRow.id
-        )
         query = (
-            sa.select(
-                SessionRow.id,
-                SessionRow.name,
-                SessionRow.status,
-            )
-            .select_from(j)
-            .where(SessionRow.project_id == project_id)
+            sa.select(EndpointRow).where(query_conds).options(selectinload(EndpointRow.routings))
         )
         result = await db_sess.execute(query)
         rows = result.scalars().all()
 
-    return web.json_response(rows, status=200)
+    return web.json_response(
+        [
+            {
+                "id": str(endpoint.id),
+                "name": endpoint.name,
+                "desired_session_count": endpoint.desired_session_count,
+                "active_route_count": len(
+                    [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+                ),
+                "service_endpoint": endpoint.url,
+                "is_public": endpoint.open_to_public,
+            }
+            for endpoint in rows
+        ],
+        status=200,
+    )
 
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID,
-        }
-    ),
-)
-async def get_info(request: web.Request, params: Any) -> web.Response:
+async def get_info(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
 
-    log.info("SERVE.GET_INFO (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info(
+        "SERVE.GET_INFO (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
+    )
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        j = sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session).join(
-            EndpointRow, RoutingRow.endpoint == EndpointRow.id
-        )
-        query = (
-            sa.select(
-                SessionRow.id,
-                SessionRow.name,
-                SessionRow.status,
-                EndpointRow.image,
-                EndpointRow.model,
-                EndpointRow.url,
-            )
-            .select_from(j)
-            .where(RoutingRow.endpoint == params["endpoint_id"])
-        )
-        result = await db_sess.execute(query)
-        rows = result.scalars().all()
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
 
-    return web.json_response(rows, status=200)
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+    resp = {
+        "endpoint_id": str(endpoint.id),
+        "name": endpoint.name,
+        "desired_session_count": endpoint.desired_session_count,
+        "active_routes": [
+            {
+                "route_id": str(r.id),
+                "session_id": str(r.session),
+                "traffic_ratio": r.traffic_ratio,
+            }
+            for r in endpoint.routings
+            if r.status == RouteStatus.HEALTHY
+        ],
+        "service_endpoint": endpoint.url,
+        "is_public": endpoint.open_to_public,
+    }
+
+    return web.json_response(resp, status=200)
 
 
 @auth_required
@@ -141,383 +162,416 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"], default=None): tx.UUID | t.Null,
-            tx.AliasedKey(["service_name", "serviceName"]): t.String,
-            tx.AliasedKey(["model_id", "modelId"]): tx.UUID,
-            tx.AliasedKey(["model_version", "modelVersion"]): t.String,
-            tx.AliasedKey(["image_ref", "imageRef"]): t.String,
+            tx.AliasedKey(["name", "clientSessionToken"])
+            >> "service_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+            tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
+            tx.AliasedKey(["image", "lang"]): t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
             >> "architecture": t.String,
             tx.AliasedKey(
-                ["group", "groupName", "group_name", "project", "project_name", "projectName"],
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
                 default="default",
             ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
-            tx.AliasedKey(["resource_opts", "resourceOpts"], default=dict): t.Mapping(
-                t.String, t.Any
-            ),
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],
+            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
             tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
                 ClusterMode
-            ),
+            ),  # new in APIv6
             t.Key("tag", default=None): t.Null | t.String,
-            t.Key("config", default=dict): t.Mapping(t.String, t.Any),
+            tx.AliasedKey(["startup_command", "startupCommand"], default=None): t.Null | t.String,
+            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
+            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+                t.Null | tx.URL
+            ),
+            t.Key("owner_access_key", default=None): t.Null | t.String,
+            t.Key("open_to_public", default=False): t.Bool,
+            t.Key("config"): t.Dict(
+                {
+                    t.Key("model"): t.String,
+                    tx.AliasedKey(["model_version", "modelVersion"], default=None): (
+                        t.Null | t.String
+                    ),
+                    tx.AliasedKey(
+                        ["model_mount_destination", "modelMountDestination"], default="/models"
+                    ): t.String,
+                    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+                    # cluster_size is moved to the root-level parameters
+                    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): (
+                        t.Null | t.String
+                    ),
+                    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+                    tx.AliasedKey(
+                        ["resource_opts", "resourceOpts"], default=None
+                    ): t.Null | t.Mapping(t.String, t.Any),
+                }
+            ),
         }
     ),
 )
 async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["services.context"]
-    access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    model_id = params["model_id"]
-
-    params["owner_access_key"] = access_key
-    async with root_ctx.db.begin_readonly() as db_conn:
-        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, db_conn)
-
-    log.info("SERVE.CREATE (email:{}, ak:{})", request["user"]["email"], access_key)
-    resp: MutableMapping[str, Any] = {}
-
-    # Resolve the image reference.
-    try:
-        async with root_ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(params["image_ref"], ["*"], params["architecture"]),
-                    params["image_ref"],
-                ],
-            )
-            img_id = image_row.id
-        requested_image_ref = image_row.image_ref
-        model_mount_path = image_row.labels.get("ai.backend.model-path")
-        async with root_ctx.db.begin_readonly() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == params["domain"])
-            )
-            allowed_registries = await conn.scalar(query)
-            if requested_image_ref.registry not in allowed_registries:
-                raise AliasResolutionFailed
-    except AliasResolutionFailed:
-        raise ImageNotFound("unknown alias or disallowed registry")
-
-    # Check work directory and reserved name directory.
-    mount_map = params["config"].get("mount_map", {})
-    if mount_map is not None:
-        original_folders = mount_map.keys()
-        alias_folders = mount_map.values()
-        if len(alias_folders) != len(set(alias_folders)):
-            raise InvalidAPIParameters("Duplicate alias folder name exists.")
-
-        alias_name: str
-        for alias_name in alias_folders:
-            if alias_name is None:
-                continue
-            if alias_name.startswith("/home/work/"):
-                alias_name = alias_name.replace("/home/work/", "")
-            if alias_name == "":
-                raise InvalidAPIParameters("Alias name cannot be empty.")
-            if alias_name == model_mount_path:
-                raise InvalidAPIParameters(
-                    f"Alias name cannot be the same with model path: `{model_mount_path}`"
-                )
-            if not verify_vfolder_name(alias_name):
-                raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
-            if alias_name in original_folders:
-                raise InvalidAPIParameters(
-                    f"Alias name cannot be set to an existing folder name: {alias_name}"
-                )
-
-    # Append model mount path
-    mounts: list[str] = params["config"].get("mounts", [])
-    async with root_ctx.db.begin_readonly() as db_conn:
-        query = sa.select([vfolders.c.name]).where(vfolders.c.id == model_id)
-        result = await db_conn.execute(query)
-        vfolder_name = result.first()["name"]
-    model_path = f"{vfolder_name}/versions/{params['model_version']}"
-    mounts = [*mounts, model_path]
-    mount_map = {
-        **mount_map,
-        model_path: model_mount_path,
+    scopes_param = {
+        "owner_access_key": (
+            None if params["owner_access_key"] is undefined else params["owner_access_key"]
+        ),
     }
-    params["config"]["mounts"] = mounts
-    params["config"]["mount_map"] = mount_map
-    for kern_config in params["config"]["kernel_configs"]:
-        kern_config["mounts"] = mounts
-        kern_config["mount_map"] = mount_map
-
-    # Create endpoint
-    async def _create_endpoint() -> uuid.UUID:
-        async with root_ctx.db.begin_session() as db_sess:
-            endpoint_id = uuid.uuid4()
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                image=img_id,
-                model=model_id,
-                domain=domain_name,
-                project=project_id,
-                resource_group=params["config"]["scaling_group"],
-            )
-            db_sess.add(endpoint)
-            return endpoint_id
-
-    if params["endpoint_id"] is None:
-        endpoint_id = await execute_with_retry(_create_endpoint)
-    else:
-        endpoint_id = params["endpoint_id"]
-
-    # # Check existing (owner_access_key, session_name) instance
-    # try:
-    #     # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-    #     # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-    #     async with root_ctx.db.begin_readonly_session() as db_sess:
-    #         sess = await SessionRow.get_session_with_main_kernel(
-    #             params["session_name"],
-    #             access_key,
-    #             db_session=db_sess,
-    #         )
-    #     running_image_ref = ImageRef(
-    #         sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
-    #     )
-    #     if running_image_ref != requested_image_ref:
-    #         # The image must be same if get_or_create() called multiple times
-    #         # against an existing (non-terminated) session
-    #         raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
-    #     if not params["reuse"]:
-    #         # Respond as error since the client did not request to reuse,
-    #         # but provide the overlapping session ID for later use.
-    #         raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
-    #     # Respond as success with the reused session's information.
-    #     return web.json_response(
-    #         {
-    #             "sessionId": str(sess.id),
-    #             "sessionName": str(sess.name),
-    #             "status": sess.status.name,
-    #             "service_ports": sess.main_kernel.service_ports,
-    #             "created": False,
-    #         },
-    #         status=200,
-    #     )
-    # except SessionNotFound:
-    #     # It's time to create a new session.
-    #     pass
-
-    # if params["session_type"] == SessionTypes.BATCH and not params["startup_command"]:
-    #     raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
-    # if params["session_type"] != SessionTypes.BATCH and params["starts_at"]:
-    #     raise InvalidAPIParameters("Parameter starts_at should be used only for batch sessions")
-
-    starts_at: Union[datetime, None] = None
-    if params["starts_at"]:
-        try:
-            starts_at = isoparse(params["starts_at"])
-        except ValueError:
-            _td = str_to_timedelta(params["starts_at"])
-            starts_at = datetime.now(tzutc()) + _td
-
-    # if params["cluster_size"] > 1:
-    #     log.debug(" -> cluster_mode:{} (replicate)", params["cluster_mode"])
-
-    # if params["dependencies"] is None:
-    #     params["dependencies"] = []
-
-    session_creation_id = secrets.token_urlsafe(16)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
 
     async with root_ctx.db.begin_readonly() as conn:
-        # Use keypair bootstrap_script if it is not delivered as a parameter
-        if not params["bootstrap_script"]:
-            script, _ = await query_bootstrap_script(conn, access_key)
-            params["bootstrap_script"] = script
-
-    try:
-        session_id = await asyncio.shield(
-            app_ctx.database_ptask_group.create_task(
-                root_ctx.registry.enqueue_session(
-                    session_creation_id,
-                    params["service_name"],
-                    access_key,
-                    {
-                        "creation_config": params["config"],
-                        "kernel_configs": [
-                            {
-                                "image_ref": requested_image_ref,
-                                "cluster_role": DEFAULT_ROLE,
-                                "cluster_idx": 1,
-                                "local_rank": 0,
-                                "cluster_hostname": f"{DEFAULT_ROLE}1",
-                                "creation_config": params["config"],
-                                "bootstrap_script": params["bootstrap_script"],
-                                "startup_command": params["startup_command"],
-                            }
-                        ],
-                    },
-                    params["config"]["scaling_group"],
-                    SessionTypes.INFERENCE,
-                    resource_policy,
-                    user_scope=UserScope(
-                        domain_name=domain_name,
-                        project_id=project_id,
-                        user_uuid=owner_uuid,
-                        user_role=user_role,
-                    ),
-                    cluster_mode=params["cluster_mode"],
-                    cluster_size=params["cluster_size"],
-                    session_tag=params["tag"],
-                    starts_at=starts_at,
-                    agent_list=params["config"]["agent_list"],
-                    dependency_sessions=params["dependencies"],
-                )
-            ),
+        checked_scaling_group = await check_scaling_group(
+            conn,
+            params["config"]["scaling_group"],
+            SessionTypes.INFERENCE,
+            owner_access_key,
+            params["domain"],
+            params["project"],
         )
 
-        # Create routing
-        await RoutingRow.create(root_ctx.db, endpoint_id, session_id)
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == checked_scaling_group))
+        )
 
-        resp["sessionId"] = str(session_id)  # changed since API v5
-        resp["sessionName"] = str(params["service_name"])
-        resp["status"] = SessionStatus.PENDING.name
-        resp["servicePorts"] = []
-        resp["created"] = True
+        result = await conn.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        if not wsproxy_addr:
+            raise ServiceUnavailable("No coordinator configured for this resource group")
 
-        # if not params["enqueue_only"]:
-        #     app_ctx.pending_waits.add(current_task)
-        #     max_wait = params["max_wait_seconds"]
-        #     try:
-        #         if max_wait > 0:
-        #             with timeout(max_wait):
-        #                 await start_event.wait()
-        #         else:
-        #             await start_event.wait()
-        #     except asyncio.TimeoutError:
-        #         resp["status"] = "TIMEOUT"
-        #     else:
-        #         await asyncio.sleep(0.5)
-        #         async with root_ctx.db.begin_readonly_session() as db_sess:
-        #             query = sa.select(KernelRow.status, KernelRow.service_ports).where(
-        #                 (KernelRow.session_id == session_id)
-        #                 & (KernelRow.cluster_role == DEFAULT_ROLE)
-        #             )
-        #             result = await db_sess.execute(query)
-        #             row = result.first()
-        #         if row.status == KernelStatus.RUNNING:
-        #             resp["status"] = "RUNNING"
-        #             for item in row.service_ports:
-        #                 response_dict = {
-        #                     "name": item["name"],
-        #                     "protocol": item["protocol"],
-        #                     "ports": item["container_ports"],
-        #                 }
-        #                 if "url_template" in item.keys():
-        #                     response_dict["url_template"] = item["url_template"]
-        #                 if "allowed_arguments" in item.keys():
-        #                     response_dict["allowed_arguments"] = item["allowed_arguments"]
-        #                 if "allowed_envs" in item.keys():
-        #                     response_dict["allowed_envs"] = item["allowed_envs"]
-        #                 resp["servicePorts"].append(response_dict)
-        #         else:
-        #             resp["status"] = row.status.name
-    except asyncio.CancelledError:
-        raise
-    except BackendError:
-        log.exception("GET_OR_CREATE: exception")
-        raise
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
-    except Exception:
-        log.exception("GET_OR_CREATE: unexpected error!")
-        raise InternalServerError
-    return web.json_response(resp, status=201)
+        params["config"]["scaling_group"] = checked_scaling_group
 
+        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
+        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        try:
+            extra_vf_conds = (vfolders.c.id == uuid.UUID(params["config"]["model"])) & (
+                vfolders.c.usage_mode == VFolderUsageMode.MODEL
+            )
+            matched_vfolders = await query_accessible_vfolders(
+                conn,
+                owner_uuid,
+                user_role=request["user"]["role"],
+                domain_name=params["domain"],
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=extra_vf_conds,
+            )
+        except Exception as e:
+            # just catching ValueError | VFolderNotFound will raise
+            # TypeError: catching classes that do not inherit from BaseException is not allowed
+            if isinstance(e, ValueError) or isinstance(e, VFolderNotFound):
+                try:
+                    extra_vf_conds = (vfolders.c.name == params["config"]["model"]) & (
+                        vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                    )
+                    matched_vfolders = await query_accessible_vfolders(
+                        conn,
+                        owner_uuid,
+                        user_role=request["user"]["role"],
+                        domain_name=params["domain"],
+                        allowed_vfolder_types=allowed_vfolder_types,
+                        extra_vf_conds=extra_vf_conds,
+                    )
+                except VFolderNotFound as e:
+                    raise VFolderNotFound("Cannot find model folder") from e
+            else:
+                raise
+        model_id = matched_vfolders[0]["id"]
 
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
-        }
-    ),
-)
-async def start(request: web.Request, params: Any) -> web.Response:
-    access_key = request["keypair"]["access_key"]
+    async with root_ctx.db.begin_readonly_session() as session:
+        image_row = await ImageRow.resolve(
+            session,
+            [
+                ImageRef(params["image"], ["*"], params["architecture"]),
+                params["image"],
+            ],
+        )
 
-    log.info("SERVE.START (email:{}, ak:{})", request["user"]["email"], access_key)
-    return web.Response(status=204)
+    params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
 
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
-        }
-    ),
-)
-async def stop(request: web.Request, params: Any) -> web.Response:
-    access_key = request["keypair"]["access_key"]
-
-    log.info("SERVE.STOP (email:{}, ak:{})", request["user"]["email"], access_key)
-    return web.Response(status=204)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
-            tx.AliasedKey(["input_args", "inputArgs"], default=dict): t.Mapping(t.String, t.Any),
-        }
-    ),
-)
-async def invoke_serving(request: web.Request, params: Any) -> web.Response:
-    access_key = request["keypair"]["access_key"]
-
-    log.info("SERVE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
-    return web.Response(status=204)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["service_id", "serviceId"]): tx.UUID,
-        }
-    ),
-)
-async def delete(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app["_root.context"]
-    access_key = request["keypair"]["access_key"]
-    # session_name = request.match_info["session_name"]
-    service_id = params["service_id"]
-
-    log.info("SERVE.DELETE (email:{}, ak:{})", request["user"]["email"], access_key)
-
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    if requester_access_key != owner_access_key and request["user"]["role"] not in (
-        UserRole.ADMIN,
-        UserRole.SUPERADMIN,
-    ):
-        raise InsufficientPrivilege("You are not allowed to delete others's services")
+    # check if session is valid to be created
+    await root_ctx.registry.create_session(
+        "",
+        params["image"],
+        params["architecture"],
+        UserScope(
+            domain_name=params["domain"],
+            project_id=project_id,
+            user_uuid=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+        ),
+        owner_access_key,
+        resource_policy,
+        SessionTypes.INFERENCE,
+        params["config"],
+        params["cluster_mode"],
+        params["cluster_size"],
+        dry_run=True,  # Setting this to True will prevent actual session from being enqueued
+        bootstrap_script=params["bootstrap_script"],
+        startup_command=params["startup_command"],
+        tag=params["tag"],
+        callback_url=params["callback_url"],
+    )
 
     async with root_ctx.db.begin_session() as db_sess:
-        # Delete endpoint first
-        await db_sess.execute(sa.delete(EndpointRow).where(session=service_id))
+        endpoint = EndpointRow(
+            params["service_name"],
+            request["user"]["uuid"],
+            owner_uuid,
+            params["desired_session_count"],
+            image_row,
+            model_id,
+            params["domain"],
+            project_id,
+            checked_scaling_group,
+            params["config"]["resources"],
+            params["cluster_mode"],
+            params["cluster_size"],
+            model_mount_destination=params["config"]["model_mount_destination"],
+            tag=params["tag"],
+            startup_command=params["startup_command"],
+            callback_url=params["callback_url"],
+            environ=params["config"]["environ"],
+            bootstrap_script=params["bootstrap_script"],
+            resource_opts=params["config"]["resource_opts"],
+            open_to_public=params["open_to_public"],
+        )
+        db_sess.add(endpoint)
+        await db_sess.commit()
 
-        session = await SessionRow.get_session_with_kernels(service_id, db_session=db_sess)
-    last_stat = await root_ctx.registry.destroy_session(
-        session,
+    return web.json_response({"endpoint_id": str(endpoint.id)})
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def delete(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info(
+        "SERVE.DELETE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
-    resp = {
-        "stats": last_stat,
-    }
-    return web.json_response(resp, status=200)
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+
+    async with root_ctx.db.begin_session() as db_sess:
+        query = (
+            sa.update(EndpointRow)
+            .where(EndpointRow.id == service_id)
+            .values({"desired_session_count": -1})
+        )
+        await db_sess.execute(query)
+    return web.json_response({"success": True}, status=200)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def sync(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info("SERVE.SYNC (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id)
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+
+    async with root_ctx.db.begin_session() as db_sess:
+        await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+    return web.json_response({"success": True}, status=200)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("to"): t.Int,
+        }
+    ),
+)
+async def scale(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info(
+        "SERVE.SCALE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+
+    if params["to"] < 0:
+        raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
+    if params["to"] == len(endpoint.routings):
+        return web.json_response(
+            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
+        )
+
+    async with root_ctx.db.begin_session() as db_sess:
+        query = (
+            sa.update(EndpointRow)
+            .where(EndpointRow.id == service_id)
+            .values({"desired_session_count": params["to"]})
+        )
+        await db_sess.execute(query)
+        return web.json_response(
+            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
+        )
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("traffic_ratio"): t.Float[0:],
+        }
+    ),
+)
+async def update_route(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+    route_id = uuid.UUID(request.match_info["route_id"])
+
+    log.info(
+        "SERVE.UPDATE_ROUTE (email:{}, ak:{}, s:{}, r:{})",
+        request["user"]["email"],
+        access_key,
+        service_id,
+        route_id,
+    )
+
+    async with root_ctx.db.begin_session() as db_sess:
+        try:
+            route = await RoutingRow.get(db_sess, route_id, load_endpoint=True)
+        except NoResultFound:
+            raise ObjectNotFound
+        if route.endpoint != service_id:
+            raise ObjectNotFound
+        await get_user_uuid_scopes(request, {"owner_uuid": route.endpoint_row.session_owner})
+
+        query = (
+            sa.update(RoutingRow)
+            .where(RoutingRow.id == route_id)
+            .values({"traffic_ratio": params["traffic_ratio"]})
+        )
+        await db_sess.execute(query)
+        endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        try:
+            await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+        except aiohttp.ClientError as e:
+            log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+        return web.json_response({"success": True})
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def delete_route(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+    route_id = uuid.UUID(request.match_info["route_id"])
+
+    log.info(
+        "SERVE.DELETE_ROUTE (email:{}, ak:{}, s:{})",
+        request["user"]["email"],
+        access_key,
+        service_id,
+    )
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            route = await RoutingRow.get(db_sess, route_id, load_session=True)
+        except NoResultFound:
+            raise ObjectNotFound
+        if route.endpoint != service_id:
+            raise ObjectNotFound
+    await get_user_uuid_scopes(request, {"owner_uuid": route.endpoint_row.session_owner})
+    if route.status == RouteStatus.PROVISIONING:
+        raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
+
+    await root_ctx.registry.destroy_session(
+        route.session_row,
+        forced=False,
+        reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+    )
+
+    async with root_ctx.db.begin_session() as db_sess:
+        query = (
+            sa.update(EndpointRow)
+            .where(EndpointRow.id == service_id)
+            .values({"desired_session_count": route.endpoint_row.desired_session_count})
+        )
+        await db_sess.execute(query)
+        return web.json_response({"success": True})
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("duration"): tx.TimeDuration,
+        }
+    ),
+)
+async def generate_token(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info(
+        "SERVE.GENERATE_TOKEN (email:{}, ak:{}, s:{})",
+        request["user"]["email"],
+        access_key,
+        service_id,
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+        query = (
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
+            .select_from(scaling_groups)
+            .where((scaling_groups.c.name == endpoint.resource_group))
+        )
+
+        result = await db_sess.execute(query)
+        sgroup = result.first()
+        wsproxy_addr = sgroup["wsproxy_addr"]
+        wsproxy_api_token = sgroup["wsproxy_api_token"]
+
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+
+    exp = datetime.now() + params["duration"]
+    body = {"user_uuid": str(endpoint.session_owner), "exp": int(exp.timestamp())}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
+            json=body,
+            headers={
+                "X-BackendAI-Token": wsproxy_api_token,
+            },
+        ) as resp:
+            token_json = await resp.json()
+            return web.json_response({"token": token_json["token"]})
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -549,9 +603,11 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
-    cors.add(root_resource.add_route("DELETE", delete))
-    cors.add(add_route("GET", r"/_/info", get_info))
-    cors.add(add_route("POST", r"/_/start", start))
-    cors.add(add_route("POST", r"/_/stop", stop))
-    cors.add(add_route("POST", r"/_/invoke", invoke_serving))
+    cors.add(add_route("GET", "/{service_id}", get_info))
+    cors.add(add_route("DELETE", "/{service_id}", delete))
+    cors.add(add_route("POST", "/{service_id}/scale", scale))
+    cors.add(add_route("POST", "/{service_id}/sync", sync))
+    cors.add(add_route("PUT", "/{service_id}/routings/{route_id}", update_route))
+    cors.add(add_route("DELETE", "/{service_id}/routings/{route_id}", delete_route))
+    cors.add(add_route("POST", "/{service_id}/token", generate_token))
     return app, []

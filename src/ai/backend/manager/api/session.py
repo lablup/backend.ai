@@ -10,11 +10,9 @@ import json
 import logging
 import re
 import secrets
-import time
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
-from io import BytesIO
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -24,7 +22,6 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
-    Optional,
     Set,
     Tuple,
     Union,
@@ -40,99 +37,54 @@ import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
-import yarl
 from aiohttp import hdrs, web
-from async_timeout import timeout
-from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
-
-from ai.backend.manager.models.image import ImageRow
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
-    AgentHeartbeatEvent,
-    AgentStartedEvent,
     AgentTerminatedEvent,
-    DoSyncKernelLogsEvent,
-    DoTerminateSessionEvent,
-    KernelCancelledEvent,
-    KernelCreatingEvent,
-    KernelLifecycleEventReason,
-    KernelPreparingEvent,
-    KernelPullingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
-    SessionCancelledEvent,
-    SessionEnqueuedEvent,
-    SessionFailureEvent,
-    SessionPreparingEvent,
-    SessionScheduledEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-    SessionTerminatingEvent,
 )
-from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
+from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    KernelEnqueueingConfig,
-    KernelId,
     SessionTypes,
-    check_typed_dict,
 )
-from ai.backend.common.utils import cancel_tasks, str_to_timedelta
 
 from ..config import DEFAULT_CHUNK_SIZE
-from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
+from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
-    PRIVATE_KERNEL_ROLES,
-    AgentStatus,
     KernelRole,
-    KernelRow,
-    KernelStatus,
-    RoutingRow,
     SessionRow,
     SessionStatus,
     UserRole,
-)
-from ..models import association_projects_users as apus
-from ..models import (
-    domains,
     kernels,
-    keypair_resource_policies,
     keypairs,
     projects,
     query_accessible_vfolders,
-    query_bootstrap_script,
     scaling_groups,
     session_templates,
-    users,
-    verify_vfolder_name,
     vfolders,
 )
 from ..models.session import SessionDependencyRow
-from ..models.utils import execute_with_retry
 from ..types import UserScope
+from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
     GenericForbidden,
-    ImageNotFound,
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
@@ -338,114 +290,29 @@ async def query_userinfo(
     params: Any,
     conn: SAConnection,
 ) -> Tuple[uuid.UUID, uuid.UUID, dict]:
-    if params["domain"] is None:
-        params["domain"] = request["user"]["domain_name"]
-    scopes_param = {
-        "owner_access_key": (
-            None if params["owner_access_key"] is undefined else params["owner_access_key"]
-        ),
-    }
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    requester_uuid = request["user"]["uuid"]
-
-    owner_uuid = None
-    project_id = None
-    resource_policy = None
-
-    if requester_access_key != owner_access_key:
-        # Admin or superadmin is creating sessions for another user.
-        # The check for admin privileges is already done in get_access_key_scope().
-        query = (
-            sa.select(
-                [keypairs.c.user, keypairs.c.resource_policy, users.c.role, users.c.domain_name]
-            )
-            .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
-            .where(keypairs.c.access_key == owner_access_key)
+    try:
+        return await _query_userinfo(
+            conn,
+            request["user"]["uuid"],
+            request["user"]["role"],
+            request["keypair"]["access_key"],
+            request["user"]["domain_name"],
+            request["keypair"]["resource_policy"],
+            params["domain"] or request["user"]["domain_name"],
+            params["project"],
+            query_on_behalf_of=(
+                None if params["owner_access_key"] is undefined else params["owner_access_key"]
+            ),
         )
-        result = await conn.execute(query)
-        row = result.first()
-        owner_domain = row["domain_name"]
-        owner_uuid = row["user"]
-        owner_role = row["role"]
-        query = (
-            sa.select([keypair_resource_policies])
-            .select_from(keypair_resource_policies)
-            .where(keypair_resource_policies.c.name == row["resource_policy"])
-        )
-        result = await conn.execute(query)
-        resource_policy = result.first()
-    else:
-        # Normal case when the user is creating her/his own session.
-        owner_domain = request["user"]["domain_name"]
-        owner_uuid = requester_uuid
-        owner_role = UserRole.USER
-        resource_policy = request["keypair"]["resource_policy"]
-
-    query = (
-        sa.select([domains.c.name])
-        .select_from(domains)
-        .where(
-            (domains.c.name == owner_domain) & (domains.c.is_active),
-        )
-    )
-    qresult = await conn.execute(query)
-    domain_name = qresult.scalar()
-    if domain_name is None:
-        raise InvalidAPIParameters("Invalid domain")
-
-    if owner_role == UserRole.SUPERADMIN:
-        # superadmin can spawn container in any designated domain/project.
-        query = (
-            sa.select([projects.c.id])
-            .select_from(projects)
-            .where(
-                (projects.c.domain_name == params["domain"])
-                & (projects.c.name == params["project"])
-                & (projects.c.is_active),
-            )
-        )
-        qresult = await conn.execute(query)
-        project_id = qresult.scalar()
-    elif owner_role == UserRole.ADMIN:
-        # domain-admin can spawn container in any project in the same domain.
-        if params["domain"] != owner_domain:
-            raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
-        query = (
-            sa.select([projects.c.id])
-            .select_from(projects)
-            .where(
-                (projects.c.domain_name == owner_domain)
-                & (projects.c.name == params["project"])
-                & (projects.c.is_active),
-            )
-        )
-        qresult = await conn.execute(query)
-        project_id = qresult.scalar()
-    else:
-        # normal users can spawn containers in their project and domain.
-        if params["domain"] != owner_domain:
-            raise InvalidAPIParameters("You can only set the domain to your domain.")
-        query = (
-            sa.select([apus.c.project_id])
-            .select_from(apus.join(projects, apus.c.project_id == projects.c.id))
-            .where(
-                (apus.c.user_id == owner_uuid)
-                & (projects.c.domain_name == owner_domain)
-                & (projects.c.name == params["project"])
-                & (projects.c.is_active),
-            )
-        )
-        qresult = await conn.execute(query)
-        project_id = qresult.scalar()
-    if project_id is None:
-        raise InvalidAPIParameters("Invalid project")
-
-    return owner_uuid, project_id, resource_policy
+    except ValueError as e:
+        raise InvalidAPIParameters(str(e))
 
 
 async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     if params["domain"] is None:
-        params["domain"] = request["user"]["domain_name"]
+        domain_name = request["user"]["domain_name"]
+    else:
+        domain_name = params["domain"]
     scopes_param = {
         "owner_access_key": (
             None if params["owner_access_key"] is undefined else params["owner_access_key"]
@@ -461,230 +328,47 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     )
 
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["session.context"]
-
-    resp: MutableMapping[str, Any] = {}
-    current_task = asyncio.current_task()
-    assert current_task is not None
-
-    # Check work directory and reserved name directory.
-    mount_map = params["config"].get("mount_map")
-
-    if mount_map is not None:
-        original_folders = mount_map.keys()
-        alias_folders = mount_map.values()
-        if len(alias_folders) != len(set(alias_folders)):
-            raise InvalidAPIParameters("Duplicate alias folder name exists.")
-
-        alias_name: str
-        for alias_name in alias_folders:
-            if alias_name is None:
-                continue
-            if alias_name.startswith("/home/work/"):
-                alias_name = alias_name.replace("/home/work/", "")
-            if alias_name == "":
-                raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
-                raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
-            if alias_name in original_folders:
-                raise InvalidAPIParameters(
-                    "Alias name cannot be set to an existing folder name: " + str(alias_name)
-                )
-
-    # Resolve the image reference.
-    try:
-        async with root_ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(params["image"], ["*"], params["architecture"]),
-                    params["image"],
-                ],
-            )
-        requested_image_ref = image_row.image_ref
-        if not requested_image_ref.is_local:
-            async with root_ctx.db.begin_readonly() as conn:
-                query = (
-                    sa.select([domains.c.allowed_docker_registries])
-                    .select_from(domains)
-                    .where(domains.c.name == params["domain"])
-                )
-                allowed_registries = await conn.scalar(query)
-                if requested_image_ref.registry not in allowed_registries:
-                    raise AliasResolutionFailed
-    except AliasResolutionFailed:
-        raise ImageNotFound("unknown alias or disallowed registry")
-
-    # Check existing (owner_access_key, session_name) instance
-    try:
-        # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-        # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            sess = await SessionRow.get_session_with_main_kernel(
-                params["session_name"],
-                owner_access_key,
-                db_session=db_sess,
-            )
-        running_image_ref = ImageRef(
-            sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
-        )
-        if running_image_ref != requested_image_ref:
-            # The image must be same if get_or_create() called multiple times
-            # against an existing (non-terminated) session
-            raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
-        if not params["reuse"]:
-            # Respond as error since the client did not request to reuse,
-            # but provide the overlapping session ID for later use.
-            raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
-        # Respond as success with the reused session's information.
-        return web.json_response(
-            {
-                "sessionId": str(sess.id),
-                "sessionName": str(sess.name),
-                "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,
-                "created": False,
-            },
-            status=200,
-        )
-    except SessionNotFound:
-        # It's time to create a new session.
-        pass
-
-    if params["session_type"] == SessionTypes.BATCH and not params["startup_command"]:
-        raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
-    if params["session_type"] != SessionTypes.BATCH and params["starts_at"]:
-        raise InvalidAPIParameters("Parameter starts_at should be used only for batch sessions")
-    starts_at: Union[datetime, None] = None
-    if params["starts_at"]:
-        try:
-            starts_at = isoparse(params["starts_at"])
-        except ValueError:
-            _td = str_to_timedelta(params["starts_at"])
-            starts_at = datetime.now(tzutc()) + _td
-
-    if params["cluster_size"] > 1:
-        log.debug(" -> cluster_mode:{} (replicate)", params["cluster_mode"])
-
-    if params["dependencies"] is None:
-        params["dependencies"] = []
-
-    session_creation_id = secrets.token_urlsafe(16)
-    start_event = asyncio.Event()
-    session_creation_tracker = app_ctx.session_creation_tracker
-    session_creation_tracker[session_creation_id] = start_event
 
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
 
-        # Use keypair bootstrap_script if it is not delivered as a parameter
-        if not params["bootstrap_script"]:
-            script, _ = await query_bootstrap_script(conn, owner_access_key)
-            params["bootstrap_script"] = script
-
-    public_sgroup_only = True
-    if _role_str := image_row.labels.get("ai.backend.role"):
-        public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
     try:
-        session_id = await asyncio.shield(
-            app_ctx.database_ptask_group.create_task(
-                root_ctx.registry.enqueue_session(
-                    session_creation_id,
-                    params["session_name"],
-                    owner_access_key,
-                    {
-                        "creation_config": params["config"],
-                        "kernel_configs": [
-                            {
-                                "image_ref": requested_image_ref,
-                                "cluster_role": DEFAULT_ROLE,
-                                "cluster_idx": 1,
-                                "local_rank": 0,
-                                "cluster_hostname": f"{DEFAULT_ROLE}1",
-                                "creation_config": params["config"],
-                                "bootstrap_script": params["bootstrap_script"],
-                                "startup_command": params["startup_command"],
-                            }
-                        ],
-                    },
-                    params["config"]["scaling_group"],
-                    params["session_type"],
-                    resource_policy,
-                    user_scope=UserScope(
-                        domain_name=params["domain"],  # type: ignore  # params always have it
-                        project_id=project_id,
-                        user_uuid=owner_uuid,
-                        user_role=request["user"]["role"],
-                    ),
-                    cluster_mode=params["cluster_mode"],
-                    cluster_size=params["cluster_size"],
-                    session_tag=params["tag"],
-                    starts_at=starts_at,
-                    agent_list=params["config"]["agent_list"],
-                    dependency_sessions=params["dependencies"],
-                    callback_url=params["callback_url"],
-                    public_sgroup_only=public_sgroup_only,
-                )
+        resp = await root_ctx.registry.create_session(
+            params["session_name"],
+            params["image"],
+            params["architecture"],
+            UserScope(
+                domain_name=domain_name,
+                project_id=project_id,
+                user_uuid=request["user"]["uuid"],
+                user_role=request["user"]["role"],
             ),
+            owner_access_key,
+            resource_policy,
+            params["session_type"],
+            params["config"],
+            params["cluster_mode"],
+            params["cluster_size"],
+            reuse=params["reuse"],
+            enqueue_only=params["enqueue_only"],
+            max_wait_seconds=params["max_wait_seconds"],
+            bootstrap_script=params["bootstrap_script"],
+            dependencies=params["dependencies"],
+            startup_command=params["startup_command"],
+            starts_at_timestamp=params["starts_at"],
+            tag=params["tag"],
+            callback_url=params["callback_url"],
         )
-        resp["sessionId"] = str(session_id)  # changed since API v5
-        resp["sessionName"] = str(params["session_name"])
-        resp["status"] = "PENDING"
-        resp["servicePorts"] = []
-        resp["created"] = True
-
-        if not params["enqueue_only"]:
-            app_ctx.pending_waits.add(current_task)
-            max_wait = params["max_wait_seconds"]
-            try:
-                if max_wait > 0:
-                    with timeout(max_wait):
-                        await start_event.wait()
-                else:
-                    await start_event.wait()
-            except asyncio.TimeoutError:
-                resp["status"] = "TIMEOUT"
-            else:
-                await asyncio.sleep(0.5)
-                async with root_ctx.db.begin_readonly_session() as db_sess:
-                    query = sa.select(KernelRow.status, KernelRow.service_ports).where(
-                        (KernelRow.session_id == session_id)
-                        & (KernelRow.cluster_role == DEFAULT_ROLE)
-                    )
-                    result = await db_sess.execute(query)
-                    row = result.first()
-                if row.status == KernelStatus.RUNNING:
-                    resp["status"] = "RUNNING"
-                    for item in row.service_ports:
-                        response_dict = {
-                            "name": item["name"],
-                            "protocol": item["protocol"],
-                            "ports": item["container_ports"],
-                        }
-                        if "url_template" in item.keys():
-                            response_dict["url_template"] = item["url_template"]
-                        if "allowed_arguments" in item.keys():
-                            response_dict["allowed_arguments"] = item["allowed_arguments"]
-                        if "allowed_envs" in item.keys():
-                            response_dict["allowed_envs"] = item["allowed_envs"]
-                        resp["servicePorts"].append(response_dict)
-                else:
-                    resp["status"] = row.status.name
-    except asyncio.CancelledError:
-        raise
+        return web.json_response(resp, status=201)
+    except UnknownImageReference:
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
-    except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except Exception:
         await root_ctx.error_monitor.capture_exception(context={"user": owner_uuid})
         log.exception("GET_OR_CREATE: unexpected error!")
         raise InternalServerError
-    finally:
-        app_ctx.pending_waits.discard(current_task)
-        del session_creation_tracker[session_creation_id]
-    return web.json_response(resp, status=201)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -991,9 +675,10 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 )
 async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["session.context"]
     if params["domain"] is None:
-        params["domain"] = request["user"]["domain_name"]
+        domain_name = request["user"]["domain_name"]
+    else:
+        domain_name = params["domain"]
     scopes_param = {
         "owner_access_key": (
             None if params["owner_access_key"] is undefined else params["owner_access_key"]
@@ -1007,25 +692,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         params["session_name"],
     )
 
-    resp: MutableMapping[str, Any] = {}
-
-    # Check existing (owner_access_key, session) kernel instance
-    try:
-        # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-        # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            await SessionRow.get_session(
-                params["session_name"],
-                owner_access_key,
-                db_session=db_sess,
-            )
-    except SessionNotFound:
-        pass
-    except TooManySessionsMatched:
-        raise SessionAlreadyExists
-    else:
-        raise SessionAlreadyExists
-
     async with root_ctx.db.begin_readonly() as conn:
         query = (
             sa.select([session_templates.c.template])
@@ -1038,198 +704,29 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.debug("task template: {}", template)
         if not template:
             raise TaskTemplateNotFound
-
-    mounts = []
-    mount_map = {}
-    environ = {}
-
-    if _mounts := template["spec"].get("mounts"):  # noqa
-        mounts = list(_mounts.keys())
-        mount_map = {key: value for (key, value) in _mounts.items() if len(value) > 0}
-    if _environ := template["spec"].get("environ"):  # noqa
-        environ = _environ
-
-    log.debug("cluster template: {}", template)
-
-    kernel_configs: List[KernelEnqueueingConfig] = []
-    for node in template["spec"]["nodes"]:
-        # Resolve session template.
-        kernel_config = {
-            "image": template["spec"]["kernel"]["image"],
-            "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
-            "cluster_role": node["cluster_role"],
-            "creation_config": {
-                "mount": mounts,
-                "mount_map": mount_map,
-                "environ": environ,
-            },
-        }
-
-        if template["spec"]["sess_type"] == "interactive":
-            kernel_config["sess_type"] = SessionTypes.INTERACTIVE
-        elif template["spec"]["sess_type"] == "batch":
-            kernel_config["sess_type"] = SessionTypes.BATCH
-        elif template["spec"]["sess_type"] == "inference":
-            kernel_config["sess_type"] = SessionTypes.INFERENCE
-
-        if tag := template["metadata"].get("tag", None):
-            kernel_config["tag"] = tag
-        if runtime_opt := template["spec"]["kernel"]["run"]:
-            if bootstrap := runtime_opt["bootstrap"]:
-                kernel_config["bootstrap_script"] = bootstrap
-            if startup := runtime_opt["startup_command"]:
-                kernel_config["startup_command"] = startup
-
-        if resources := template["spec"].get("resources"):
-            kernel_config["creation_config"]["resources"] = resources
-
-        if git := template["spec"]["kernel"]["git"]:
-            if _dest := git.get("dest_dir"):
-                target = _dest
-            else:
-                target = git["repository"].split("/")[-1]
-
-            cmd_builder = "git clone "
-            if credential := git.get("credential"):
-                proto, url = git["repository"].split("://")
-                cmd_builder += f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
-            else:
-                cmd_builder += git["repository"]
-            if branch := git.get("branch"):
-                cmd_builder += f" -b {branch}"
-            cmd_builder += f" {target}\n"
-
-            if commit := git.get("commit"):
-                cmd_builder = "CWD=$(pwd)\n" + cmd_builder
-                cmd_builder += f"cd {target}\n"
-                cmd_builder += f"git checkout {commit}\n"
-                cmd_builder += "cd $CWD\n"
-
-            bootstrap = base64.b64decode(kernel_config.get("bootstrap_script") or b"").decode()
-            bootstrap += "\n"
-            bootstrap += cmd_builder
-            kernel_config["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
-
-        # Resolve the image reference.
-        try:
-            async with root_ctx.db.begin_readonly_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageRef(kernel_config["image"], ["*"], kernel_config["architecture"]),
-                        kernel_config["image"],
-                    ],
-                )
-            requested_image_ref = image_row.image_ref
-            async with root_ctx.db.begin_readonly() as conn:
-                query = (
-                    sa.select([domains.c.allowed_docker_registries])
-                    .select_from(domains)
-                    .where(domains.c.name == params["domain"])
-                )
-                allowed_registries = await conn.scalar(query)
-                if requested_image_ref.registry not in allowed_registries:
-                    raise AliasResolutionFailed
-                kernel_config["image_ref"] = requested_image_ref
-        except AliasResolutionFailed:
-            raise ImageNotFound("unknown alias or disallowed registry")
-
-        for i in range(node["replicas"]):
-            kernel_config["cluster_idx"] = i + 1
-            kernel_configs.append(
-                check_typed_dict(kernel_config, KernelEnqueueingConfig),  # type: ignore
-            )
-
-    session_creation_id = secrets.token_urlsafe(16)
-    start_event = asyncio.Event()
-    kernel_id: Optional[KernelId] = None
-    session_creation_tracker = app_ctx.session_creation_tracker
-    session_creation_tracker[session_creation_id] = start_event
-    current_task = asyncio.current_task()
-    assert current_task is not None
+        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
 
     try:
-        async with root_ctx.db.begin_readonly() as conn:
-            owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
-
-        session_id = await asyncio.shield(
-            app_ctx.database_ptask_group.create_task(
-                root_ctx.registry.enqueue_session(
-                    session_creation_id,
-                    params["session_name"],
-                    owner_access_key,
-                    {
-                        "creation_config": {
-                            "mount_map": mount_map,
-                            "environ": environ,
-                        },
-                        "kernel_configs": kernel_configs,
-                    },
-                    params["scaling_group"],
-                    params["sess_type"],
-                    resource_policy,
-                    user_scope=UserScope(
-                        domain_name=params["domain"],  # type: ignore
-                        project_id=project_id,
-                        user_uuid=owner_uuid,
-                        user_role=request["user"]["role"],
-                    ),
-                    session_tag=params["tag"],
-                ),
-            )
+        resp = await root_ctx.registry.create_cluster(
+            template,
+            params["session_name"],
+            UserScope(
+                domain_name=domain_name,
+                project_id=project_id,
+                user_uuid=request["user"]["uuid"],
+                user_role=request["user"]["role"],
+            ),
+            owner_access_key,
+            resource_policy,
+            params["scaling_group"],
+            params["sess_type"],
+            params["tag"],
+            enqueue_only=params["enqueue_only"],
+            max_wait_seconds=params["max_wait_seconds"],
         )
-        kernel_id = cast(KernelId, session_id)  # the main kernel's ID is the session ID.
-        resp["kernelId"] = str(kernel_id)
-        resp["status"] = "PENDING"
-        resp["servicePorts"] = []
-        resp["created"] = True
-
-        if not params["enqueue_only"]:
-            app_ctx.pending_waits.add(current_task)
-            max_wait = params["max_wait_seconds"]
-            try:
-                if max_wait > 0:
-                    with timeout(max_wait):
-                        await start_event.wait()
-                else:
-                    await start_event.wait()
-            except asyncio.TimeoutError:
-                resp["status"] = "TIMEOUT"
-            else:
-                await asyncio.sleep(0.5)
-                async with root_ctx.db.begin_readonly() as conn:
-                    query = (
-                        sa.select(
-                            [
-                                kernels.c.status,
-                                kernels.c.service_ports,
-                            ]
-                        )
-                        .select_from(kernels)
-                        .where(kernels.c.id == kernel_id)
-                    )
-                    result = await conn.execute(query)
-                    row = result.first()
-                if row["status"] == KernelStatus.RUNNING:
-                    resp["status"] = "RUNNING"
-                    for item in row["service_ports"]:
-                        response_dict = {
-                            "name": item["name"],
-                            "protocol": item["protocol"],
-                            "ports": item["container_ports"],
-                        }
-                        if "url_template" in item.keys():
-                            response_dict["url_template"] = item["url_template"]
-                        if "allowed_arguments" in item.keys():
-                            response_dict["allowed_arguments"] = item["allowed_arguments"]
-                        if "allowed_envs" in item.keys():
-                            response_dict["allowed_envs"] = item["allowed_envs"]
-                        resp["servicePorts"].append(response_dict)
-                else:
-                    resp["status"] = row["status"].name
-
-    except asyncio.CancelledError:
-        raise
+        return web.json_response(resp, status=201)
+    except TooManySessionsMatched:
+        raise SessionAlreadyExists
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
@@ -1239,10 +736,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         await root_ctx.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
         raise InternalServerError
-    finally:
-        app_ctx.pending_waits.discard(current_task)
-        del session_creation_tracker[session_creation_id]
-    return web.json_response(resp, status=201)
 
 
 @server_status_required(READ_ALLOWED)
@@ -1310,6 +803,11 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
         kernel_host = session.main_kernel.kernel_host
     for sport in session.main_kernel.service_ports:
         if sport["name"] == service:
+            if sport["is_inference"]:
+                raise InvalidAPIParameters(
+                    f"{service} is an inference app. Starting inference apps can only be done by"
+                    " starting an inference service."
+                )
             if params["port"]:
                 # using one of the primary/secondary ports of the app
                 try:
@@ -1425,15 +923,36 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
                 session_name, owner_access_key, db_session=db_sess
             )
         kernel = session.main_kernel
-        report = await root_ctx.registry.get_abusing_report(
-            kernel.id, kernel.agent, kernel.agent_addr
-        )
+        report = await root_ctx.registry.get_abusing_report(kernel.id)
     except BackendError:
         log.exception("GET_ABUSING_REPORT: exception")
         raise
-    if report is None:
-        report = {}
-    return web.json_response(report, status=200)
+    return web.json_response(report or {}, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("agent"): t.String,
+        }
+    ),
+)
+async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    agent_id = AgentId(params["agent"])
+    log.info(
+        "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
+    )
+    try:
+        await root_ctx.registry.sync_agent_kernel_registry(agent_id)
+    except BackendError:
+        log.exception("SYNC_AGENT_REGISTRY: exception")
+        raise
+    return web.json_response({}, status=200)
 
 
 @server_status_required(ALL_ALLOWED)
@@ -1478,271 +997,6 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     return web.json_response(resp, status=201)
 
 
-async def handle_kernel_creation_lifecycle(
-    app: web.Application,
-    source: AgentId,
-    event: (
-        KernelPreparingEvent
-        | KernelPullingEvent
-        | KernelCreatingEvent
-        | KernelStartedEvent
-        | KernelCancelledEvent
-    ),
-) -> None:
-    """
-    Update the database and perform post_create_kernel() upon
-    the events for each step of kernel creation.
-
-    To avoid race condition between consumer and subscriber event handlers,
-    we only have this handler to subscribe all kernel creation events,
-    but distinguish which one to process using a unique creation_id
-    generated when initiating the create_kernels() agent RPC call.
-    """
-    root_ctx: RootContext = app["_root.context"]
-    log.debug(
-        "handle_kernel_creation_lifecycle: ev:{} k:{}",
-        event.name,
-        event.kernel_id,
-    )
-    if isinstance(event, KernelPreparingEvent):
-        # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
-        pass
-    elif isinstance(event, KernelPullingEvent):
-        await KernelRow.set_kernel_status(
-            root_ctx.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
-        )
-    elif isinstance(event, KernelCreatingEvent):
-        await KernelRow.set_kernel_status(
-            root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
-        )
-    elif isinstance(event, KernelStartedEvent):
-        session_id = event.session_id
-        await root_ctx.registry.finalize_running(event.kernel_id, session_id, event.creation_info)
-        if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
-            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(str(session_id)))
-    elif isinstance(event, KernelCancelledEvent):
-        log.warning(f"Kernel cancelled, {event.reason = }")
-
-
-async def handle_kernel_termination_lifecycle(
-    app: web.Application,
-    source: AgentId,
-    event: KernelTerminatingEvent | KernelTerminatedEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, KernelTerminatingEvent):
-        # The destroy_kernel() API handler will set the "TERMINATING" status.
-        pass
-    elif isinstance(event, KernelTerminatedEvent):
-        await root_ctx.registry.mark_kernel_terminated(
-            event.kernel_id, event.reason, event.exit_code
-        )
-        session_id = event.session_id
-        await root_ctx.registry.check_session_terminated(session_id, event.reason)
-
-
-async def handle_session_creation_lifecycle(
-    app: web.Application,
-    source: AgentId,
-    event: SessionStartedEvent | SessionCancelledEvent,
-) -> None:
-    """
-    Update the database according to the session-level lifecycle events
-    published by the manager.
-    """
-    app_ctx: PrivateContext = app["session.context"]
-    if event.creation_id not in app_ctx.session_creation_tracker:
-        return
-    log.debug("handle_session_creation_lifecycle: ev:{} s:{}", event.name, event.session_id)
-    if isinstance(event, SessionStartedEvent):
-        if tracker := app_ctx.session_creation_tracker.get(event.creation_id):
-            tracker.set()
-    elif isinstance(event, SessionCancelledEvent):
-        if tracker := app_ctx.session_creation_tracker.get(event.creation_id):
-            tracker.set()
-
-
-async def handle_session_termination_lifecycle(
-    app: web.Application,
-    agent_id: AgentId,
-    event: SessionTerminatingEvent | SessionTerminatedEvent,
-) -> None:
-    """
-    Update the database according to the session-level lifecycle events
-    published by the manager.
-    """
-    root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, SessionTerminatingEvent):
-        await root_ctx.registry.mark_session_terminating(event.session_id, event.reason)
-    elif isinstance(event, SessionTerminatedEvent):
-        await root_ctx.registry.mark_session_terminated(event.session_id, event.reason)
-
-
-async def handle_destroy_session(
-    app: web.Application,
-    source: AgentId,
-    event: DoTerminateSessionEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    async with root_ctx.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
-    await root_ctx.registry.destroy_session(
-        session,
-        forced=False,
-        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
-    )
-
-
-async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
-    log_func = log.info
-    log_msg: str = ""
-    log_fmt: str = ""
-    log_arg: Any = None
-    begin = time.monotonic()
-    try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30.0),
-        ) as session:
-            try:
-                async with session.post(url, json=data) as response:
-                    if response.content_length is not None and response.content_length > 0:
-                        log_func = log.warning
-                        log_msg = "warning"
-                        log_fmt = (
-                            "{3[0]} {3[1]} - the callback response body was not empty! "
-                            "(len: {3[2]:,} bytes)"
-                        )
-                        log_arg = (response.status, response.reason, response.content_length)
-                    else:
-                        log_msg = "result"
-                        log_fmt = "{3[0]} {3[1]}"
-                        log_arg = (response.status, response.reason)
-            except aiohttp.ClientError as e:
-                log_func = log.warning
-                log_msg, log_fmt, log_arg = "failed", "{3}", repr(e)
-    except asyncio.CancelledError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "cancelled", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    except asyncio.TimeoutError:
-        log_func = log.warning
-        log_msg, log_fmt, log_arg = "timeout", "elapsed_time = {3:.6f}", time.monotonic() - begin
-    finally:
-        log_func(
-            "Session lifecycle callback " + log_msg + " (e:{0}, s:{1}, url:{2}): " + log_fmt,
-            data["event"],
-            data["session_id"],
-            url,
-            log_arg,
-        )
-
-
-async def invoke_session_callback(
-    app: web.Application,
-    source: AgentId,
-    event: SessionEnqueuedEvent
-    | SessionScheduledEvent
-    | SessionPreparingEvent
-    | SessionStartedEvent
-    | SessionCancelledEvent
-    | SessionTerminatingEvent
-    | SessionTerminatedEvent
-    | SessionSuccessEvent
-    | SessionFailureEvent,
-) -> None:
-    log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
-    app_ctx: PrivateContext = app["session.context"]
-    root_ctx: RootContext = app["_root.context"]
-
-    try:
-        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess, allow_stale=allow_stale
-            )
-    except SessionNotFound:
-        return
-
-    if (callback_url := session.callback_url) is None:
-        return
-
-    data = {
-        "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
-
-    app_ctx.webhook_ptask_group.create_task(
-        _make_session_callback(data, callback_url),
-    )
-
-
-async def handle_batch_result(
-    app: web.Application,
-    source: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
-) -> None:
-    """
-    Update the database according to the batch-job completion results
-    """
-    root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, SessionSuccessEvent):
-        await SessionRow.set_session_result(root_ctx.db, event.session_id, True, event.exit_code)
-    elif isinstance(event, SessionFailureEvent):
-        await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
-    async with root_ctx.db.begin_session() as db_sess:
-        try:
-            session = await SessionRow.get_session_with_kernels(
-                event.session_id, db_session=db_sess
-            )
-        except SessionNotFound:
-            return
-    await root_ctx.registry.destroy_session(
-        session,
-        reason=KernelLifecycleEventReason.TASK_FINISHED,
-    )
-
-
-async def handle_agent_lifecycle(
-    app: web.Application,
-    source: AgentId,
-    event: AgentStartedEvent | AgentTerminatedEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined ({1})", source, event.reason)
-        await root_ctx.registry.update_instance(
-            source,
-            {
-                "status": AgentStatus.ALIVE,
-            },
-        )
-    if isinstance(event, AgentTerminatedEvent):
-        if event.reason == "agent-lost":
-            await root_ctx.registry.mark_agent_terminated(source, AgentStatus.LOST)
-        elif event.reason == "agent-restart":
-            log.info("agent@{0} restarting for maintenance.", source)
-            await root_ctx.registry.update_instance(
-                source,
-                {
-                    "status": AgentStatus.RESTARTING,
-                },
-            )
-        else:
-            # On normal instance termination, kernel_terminated events were already
-            # triggered by the agent.
-            await root_ctx.registry.mark_agent_terminated(source, AgentStatus.TERMINATED)
-
-
-async def handle_agent_heartbeat(
-    app: web.Application,
-    source: AgentId,
-    event: AgentHeartbeatEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    await root_ctx.registry.handle_heartbeat(source, event.agent_info)
-
-
 @catch_unexpected(log)
 async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
     try:
@@ -1760,62 +1014,6 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         await redis_helper.execute(root_ctx.redis_live, _check_impl)
     except asyncio.CancelledError:
         pass
-
-
-async def handle_kernel_log(
-    app: web.Application,
-    source: AgentId,
-    event: DoSyncKernelLogsEvent,
-) -> None:
-    root_ctx: RootContext = app["_root.context"]
-    redis_conn = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"], db=REDIS_STREAM_DB
-    )
-    # The log data is at most 10 MiB.
-    log_buffer = BytesIO()
-    log_key = f"containerlog.{event.container_id}"
-    try:
-        list_size = await redis_helper.execute(
-            redis_conn,
-            lambda r: r.llen(log_key),
-        )
-        if list_size is None:
-            # The log data is expired due to a very slow event delivery.
-            # (should never happen!)
-            log.warning(
-                "tried to store console logs for cid:{}, but the data is expired",
-                event.container_id,
-            )
-            return
-        for _ in range(list_size):
-            # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
-            if chunk is None:  # maybe missing
-                log_buffer.write(b"(container log unavailable)\n")
-                break
-            log_buffer.write(chunk)
-        try:
-            log_data = log_buffer.getvalue()
-
-            async def _update_log() -> None:
-                async with root_ctx.db.begin() as conn:
-                    update_query = (
-                        sa.update(kernels)
-                        .values(container_log=log_data)
-                        .where(kernels.c.id == event.kernel_id)
-                    )
-                    await conn.execute(update_query)
-
-            await execute_with_retry(_update_log)
-        finally:
-            # Clear the log data from Redis when done.
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(log_key),
-            )
-    finally:
-        log_buffer.close()
-        await redis_conn.close()
 
 
 @catch_unexpected(log)
@@ -2664,8 +1862,6 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    session_creation_tracker: Dict[str, asyncio.Event]
-    pending_waits: Set[asyncio.Task[None]]
     agent_lost_checker: asyncio.Task[None]
     stats_task: asyncio.Task[None]
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -2676,82 +1872,9 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["session.context"]
-    app_ctx.session_creation_tracker = {}
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.rpc_ptask_group = aiotools.PersistentTaskGroup()
     app_ctx.webhook_ptask_group = aiotools.PersistentTaskGroup()
-
-    # passive events
-    evd = root_ctx.event_dispatcher
-    evd.consume(
-        KernelPreparingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kprep"
-    )
-    evd.consume(KernelPullingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kpull")
-    evd.consume(
-        KernelCreatingEvent, app, handle_kernel_creation_lifecycle, name="api.session.kcreat"
-    )
-    evd.consume(
-        KernelStartedEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
-    )
-    evd.consume(
-        KernelCancelledEvent, app, handle_kernel_creation_lifecycle, name="api.session.kstart"
-    )
-    evd.subscribe(
-        SessionStartedEvent,
-        app,
-        handle_session_creation_lifecycle,
-        name="api.session.sstart",
-    )
-    evd.subscribe(
-        SessionCancelledEvent,
-        app,
-        handle_session_creation_lifecycle,
-        name="api.session.scancel",
-    )
-    evd.consume(
-        KernelTerminatingEvent,
-        app,
-        handle_kernel_termination_lifecycle,
-        name="api.session.kterming",
-    )
-    evd.consume(
-        KernelTerminatedEvent,
-        app,
-        handle_kernel_termination_lifecycle,
-        name="api.session.kterm",
-    )
-    evd.consume(
-        SessionTerminatingEvent,
-        app,
-        handle_session_termination_lifecycle,
-        name="api.session.sterming",
-    ),
-    evd.consume(
-        SessionTerminatedEvent,
-        app,
-        handle_session_termination_lifecycle,
-        name="api.session.sterm",
-    )
-    evd.consume(SessionEnqueuedEvent, app, invoke_session_callback)
-    evd.consume(SessionScheduledEvent, app, invoke_session_callback)
-    evd.consume(SessionPreparingEvent, app, invoke_session_callback)
-    evd.consume(SessionStartedEvent, app, invoke_session_callback)
-    evd.consume(SessionCancelledEvent, app, invoke_session_callback)
-    evd.consume(SessionTerminatingEvent, app, invoke_session_callback)
-    evd.consume(SessionTerminatedEvent, app, invoke_session_callback)
-    evd.consume(SessionSuccessEvent, app, invoke_session_callback)
-    evd.consume(SessionFailureEvent, app, invoke_session_callback)
-    evd.consume(SessionSuccessEvent, app, handle_batch_result)
-    evd.consume(SessionFailureEvent, app, handle_batch_result)
-    evd.consume(AgentStartedEvent, app, handle_agent_lifecycle)
-    evd.consume(AgentTerminatedEvent, app, handle_agent_lifecycle)
-    evd.consume(AgentHeartbeatEvent, app, handle_agent_heartbeat)
-
-    # action-trigerring events
-    evd.consume(DoSyncKernelLogsEvent, app, handle_kernel_log, name="api.session.syncklog")
-    evd.consume(DoTerminateSessionEvent, app, handle_destroy_session, name="api.session.doterm")
-
-    app_ctx.pending_waits = set()
 
     # Scan ALIVE agents
     app_ctx.agent_lost_checker = aiotools.create_timer(
@@ -2776,8 +1899,6 @@ async def shutdown(app: web.Application) -> None:
     await app_ctx.database_ptask_group.shutdown()
     await app_ctx.rpc_ptask_group.shutdown()
 
-    await cancel_tasks(app_ctx.pending_waits)
-
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -2793,6 +1914,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-from-template", create_from_template))
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
+    cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))
