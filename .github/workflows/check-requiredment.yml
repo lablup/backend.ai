@@ -1,0 +1,23 @@
+name: Check if a precompiled binary file exists in dependencies
+
+on:
+  pull_request:
+    paths:
+      python.lock
+
+jobs:
+  check-requirement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check if a precompiled binary file exists in dependencies
+        run: |
+            cat python.lock | grep -v '^//' | jq -r '.locked_resolves[].locked_requirements[]
+            | select(any(.artifacts[].url; endswith(".whl")) | not) | .project_name' >> no-exist-binary.txt
+      - run: |
+            if [ -s no-exist-binary.txt ]; then
+                echo "There are some dependencies that do not have precompiled binary files."
+                echo "Please check the following dependencies:"
+                cat no-exist-binary.txt
+                exit 1
+            fi
