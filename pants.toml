@@ -1,7 +1,6 @@
 [GLOBAL]
 pants_version = "2.16.0rc4"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
-local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
@@ -37,6 +36,9 @@ root_patterns = [
     "/tests",
     "/tools/pants-plugins",
 ]
+
+[test]
+extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s"]
 
 [python]
 enable_resolves = true
