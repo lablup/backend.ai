@@ -1,7 +1,7 @@
 """add-quota_scope_id
 
-Revision ID: 565293b7395a
-Revises: 10c58e701d87
+Revision ID: 5fbd368d12a2
+Revises: 85984c98b90f
 Create Date: 2023-03-29 07:29:27.592211
 
 """
@@ -10,8 +10,8 @@ from alembic import op
 from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
-revision = "565293b7395a"
-down_revision = "10c58e701d87"
+revision = "5fbd368d12a2"
+down_revision = "85984c98b90f"
 branch_labels = None
 depends_on = None
 
