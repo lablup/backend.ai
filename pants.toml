@@ -1,7 +1,6 @@
 [GLOBAL]
-pants_version = "2.16.0rc2"
+pants_version = "2.16.0rc4"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
-local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
@@ -15,11 +14,15 @@ backend_packages = [
     "towncrier_tool",
 ]
 pants_ignore = [
-    "scripts",
-    "plugins",
-    "docs",  # TODO: docs build config
+    ".*/",
+    "/dist/",
+    "__pycache__",
+    "*~",  # vim swap/backup files
+    "/scripts/",
+    "/plugins/",
+    "/docs/",  # TODO: docs build config
     "*.log",
-    "tools/pants-plugins",
+    "/tools/pants-plugins",
 ]
 
 [anonymous-telemetry]
@@ -33,6 +36,9 @@ root_patterns = [
     "/tests",
     "/tools/pants-plugins",
 ]
+
+[test]
+extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s"]
 
 [python]
 enable_resolves = true
@@ -99,20 +105,6 @@ report = ["xml", "console"]
 
 [mypy]
 install_from_resolve = "mypy"
-extra_type_stubs = [
-    "types-six",
-    "types-setuptools",
-    "types-pkg_resources",
-    "types-python-dateutil",
-    "types-aiofiles",
-    "types-click",
-    "types-cachetools",
-    "types-Jinja2",
-    "types-PyYAML",
-    "types-redis",
-    "types-tabulate",
-]
-extra_type_stubs_lockfile = "tools/mypy-extra-type-stubs.lock"
 
 [towncrier]
 install_from_resolve = "towncrier"

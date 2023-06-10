@@ -44,6 +44,8 @@ def upgrade():
         result = connection.execute(query).fetchall()
         kernel_ids_to_update = [kid[0] for kid in result]
 
+        if not kernel_ids_to_update:
+            break
         query = (
             sa.update(kernels)
             .values(
