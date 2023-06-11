@@ -1,6 +1,9 @@
 name: assign-pr-number
 on:
-  [workflow_call]
+  workflow_call:
+    secrets:
+      WORKFLOW_PAT:
+        required: true
 permissions:
   contents: write
 
@@ -9,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check out
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 2
+        token: ${{ secrets.WORKFLOW_PAT }}
 
     - name: Extract Python version from pants.toml
       run: |

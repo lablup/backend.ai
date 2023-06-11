@@ -146,10 +146,10 @@ show_important_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -ne 0 ]; then
-    echo 0
+  if [ "$?" -eq 0 ]; then
+    echo 0  # ok
   else
-    echo 1
+    echo 1  # missing
   fi
 }
 
@@ -214,18 +214,20 @@ else
   exit 1
 fi
 
+show_info "Checking the bootstrapper Python version..."
 STANDALONE_PYTHON_VERSION="3.11.3"
 STANDALONE_PYTHON_ARCH=$(arch)
 STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
 if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
-if [ $(has_python $bpython) -eq 0 ]; then
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
+if [ $(has_python "$bpython") -ne 0 ]; then
   install_static_python
 fi
-show_info "Checking the bootstrapper Python version..."
-bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
 $bpython -c 'import sys;print(sys.version_info)'
+$bpython -m ensurepip --upgrade
+$bpython -m pip --disable-pip-version-check install -q -U tomlkit
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -236,8 +238,8 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
-PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
@@ -491,7 +493,9 @@ check_python() {
 }
 
 bootstrap_pants() {
-  mkdir -p .tmp
+  pants_local_exec_root=$($bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  mkdir -p "$pants_local_exec_root"
+  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."

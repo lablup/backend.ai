@@ -10,6 +10,8 @@ import shutil
 import signal
 import sys
 import time
+import urllib.error
+import urllib.request
 import uuid
 from abc import ABCMeta, abstractmethod
 from functools import partial
@@ -40,7 +42,6 @@ from .intrinsic import (
     init_sshd_service,
     prepare_sshd_service,
     prepare_ttyd_service,
-    prepare_vscode_service,
 )
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
@@ -608,6 +609,7 @@ class BaseRunner(metaclass=ABCMeta):
         cwd: Path,
         service_env: Mapping[str, Any],
         service_info: Mapping[str, str],
+        do_not_wait: bool = False,
     ) -> dict[str, str]:
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -617,8 +619,9 @@ class BaseRunner(metaclass=ABCMeta):
             )
             self.services_running[service_info["name"]] = proc
             asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-            with timeout(40.0):
-                await wait_local_port_open(service_info["port"])
+            if not do_not_wait:
+                with timeout(40.0):
+                    await wait_local_port_open(service_info["port"])
             log.info(
                 "Service {} has started (pid: {}, port: {})",
                 service_info["name"],
@@ -654,7 +657,7 @@ class BaseRunner(metaclass=ABCMeta):
             }
         return result
 
-    async def _init_service(
+    async def _init_mounted_service(
         self,
         service_name: str,
         service_info: Mapping[str, Any],
@@ -683,7 +686,7 @@ class BaseRunner(metaclass=ABCMeta):
         def find_artifacts(pattern: str) -> dict[str, str]:
             artifacts = {}
             # search distro and version
-            # ex - dropbear<-ubuntu.22.04.>aarch64.bin
+            # e.g) dropbear-ubuntu.22.04.aarch64.bin -> dropbear(-ubuntu.22.04.)aarch64.bin
             _rx_distro = re.compile(r"\-([a-z]+\d+\.\d+)\.")
             for p in Path(mount_path).glob(pattern):
                 m = _rx_distro.search(p.name)
@@ -734,9 +737,7 @@ class BaseRunner(metaclass=ABCMeta):
         log.debug("Loaded new-style service definitions.")
         return service_parser
 
-    async def _start_mounted_service(
-        self, service_info: Mapping[str, Any], user_requested: bool = True
-    ) -> None:
+    async def _start_mounted_service(self, service_info: Mapping[str, Any]) -> None:
         mount_info: dict[str, Any] = service_info["mount_info"]
         mount_path: str = mount_info["kernel_path"]
 
@@ -748,7 +749,9 @@ class BaseRunner(metaclass=ABCMeta):
                     return
                 if service_name not in self.mounted_service_parsers:
                     try:
-                        service_parser = await self._init_service(service_name, service_info)
+                        service_parser = await self._init_mounted_service(
+                            service_name, service_info
+                        )
                     except InvalidServiceDefinition:
                         result = {
                             "status": "failed",
@@ -791,27 +794,84 @@ class BaseRunner(metaclass=ABCMeta):
                     "error": repr(e),
                 }
             finally:
-                if user_requested:
-                    await self.outsock.send_multipart(
-                        [
-                            b"service-result",
-                            json.dumps(result).encode("utf8"),
-                        ]
-                    )
+                await self.outsock.send_multipart(
+                    [
+                        b"service-result",
+                        json.dumps(result).encode("utf8"),
+                    ]
+                )
 
-    async def _start_service(self, service_info, user_requested: bool = True):
+    async def start_model_service(self, model_info):
+        assert self.service_parser is not None
+        model_service_info = model_info.get("service")
+        result = {}
+        is_healthy = False
+        try:
+            if model_service_info is None:
+                result = {"status": "failed", "error": "service info not provided"}
+                return
+            service_name = f"{model_info['name']}-{model_service_info['port']}"
+            self.service_parser.add_model_service(service_name, model_service_info)
+            service_info = {
+                "name": service_name,
+                "port": model_service_info["port"],
+                "ports": [model_service_info["port"]],
+                "protocol": "http",
+                "options": {},
+            }
+            result = await self._start_service(service_info, do_not_wait=True)
+            if (result["status"] == "running" or result["status"] == "started") and (
+                (health_check_info := model_service_info.get("health_check")) is not None
+            ):
+                health_check_endpoint = (
+                    f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
+                )
+                for _ in range(health_check_info["max_retries"]):
+                    try:
+                        async with timeout(health_check_info["max_wait_time"]):
+                            try:
+                                resp = await asyncio.get_running_loop().run_in_executor(
+                                    None, urllib.request.urlopen, health_check_endpoint
+                                )
+                                if resp.status == health_check_info["expected_status_code"]:
+                                    is_healthy = True
+                                    break
+                            except urllib.error.URLError:
+                                pass
+                            # falling to here means that health check has failed, so just wait until
+                            # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
+                            await asyncio.sleep(health_check_info["max_wait_time"])
+                    except asyncio.TimeoutError:
+                        pass
+        finally:
+            if not is_healthy:
+                result = {"status": "failed", "error": "service unhealthy"}
+            await self.outsock.send_multipart(
+                [
+                    b"model-service-result",
+                    json.dumps(result).encode("utf8"),
+                ]
+            )
+
+    async def _start_service_and_feed_result(self, service_info):
+        result = await self._start_service(service_info)
+        await self.outsock.send_multipart(
+            [
+                b"service-result",
+                json.dumps(result).encode("utf8"),
+            ]
+        )
+
+    async def _start_service(self, service_info, do_not_wait: bool = False) -> dict[str, str]:
         async with self._service_lock:
             try:
                 if service_info["protocol"] == "preopen":
                     # skip subprocess spawning as we assume the user runs it manually.
-                    result = {"status": "started"}
-                    return
+                    return {"status": "started"}
                 if service_info["name"] in self.services_running:
-                    result = {"status": "running"}
-                    return
+                    return {"status": "running"}
                 if service_info["protocol"] == "pty":
-                    result = {"status": "failed", "error": "not implemented yet"}
-                    return
+                    return {"status": "failed", "error": "not implemented yet"}
                 cwd = Path.cwd()
                 cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
                 env: Mapping[str, str]
@@ -820,8 +880,6 @@ class BaseRunner(metaclass=ABCMeta):
                     cmdargs, env = await prepare_ttyd_service(service_info)
                 elif service_info["name"] == "sshd":
                     cmdargs, env = await prepare_sshd_service(service_info)
-                elif service_info["name"] == "vscode":
-                    cmdargs, env = await prepare_vscode_service(service_info)
                 elif self.service_parser is not None:
                     self.service_parser.variables["ports"] = service_info["ports"]
                     cmdargs, env = await self.service_parser.start_service(
@@ -841,11 +899,10 @@ class BaseRunner(metaclass=ABCMeta):
                 if cmdargs is None:
                     # still not found?
                     log.warning("The service {0} is not supported.", service_info["name"])
-                    result = {
+                    return {
                         "status": "failed",
                         "error": "unsupported service",
                     }
-                    return
                 log.debug("cmdargs: {0}", cmdargs)
                 log.debug("env: {0}", env)
                 service_env = {**self.child_env, **env}
@@ -854,21 +911,13 @@ class BaseRunner(metaclass=ABCMeta):
                     service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
                         "/opt/backend.ai/lib:", ""
                     )
-                result = await self._run_cmd(cmdargs, cwd, service_env, service_info)
+                return await self._run_cmd(cmdargs, cwd, service_env, service_info, do_not_wait)
             except Exception as e:
                 log.exception("start_service: unexpected error")
-                result = {
+                return {
                     "status": "failed",
                     "error": repr(e),
                 }
-            finally:
-                if user_requested:
-                    await self.outsock.send_multipart(
-                        [
-                            b"service-result",
-                            json.dumps(result).encode("utf8"),
-                        ]
-                    )
 
     async def _wait_service_proc(
         self,
@@ -1034,7 +1083,6 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
-                user_requested=False,
             )
         )
         intrinsic_spawn_coros.append(
@@ -1044,7 +1092,6 @@ class BaseRunner(metaclass=ABCMeta):
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
-                user_requested=False,
             )
         )
         results = await asyncio.gather(*intrinsic_spawn_coros, return_exceptions=True)
@@ -1082,12 +1129,15 @@ class BaseRunner(metaclass=ABCMeta):
                     await self._interrupt()
                 elif op_type == "status":
                     await self._send_status()
-                elif op_type == "start-service":  # activate a service port
+                elif op_type == "start-model-service":  # activate a service port
                     data = json.loads(text)
-                    asyncio.create_task(self._start_service(data))
+                    asyncio.create_task(self.start_model_service(data))
                 elif op_type == "start-mounted-service":
                     data = json.loads(text)
                     asyncio.create_task(self._start_mounted_service(data))
+                elif op_type == "start-service":  # activate a service port
+                    data = json.loads(text)
+                    asyncio.create_task(self._start_service_and_feed_result(data))
                 elif op_type == "shutdown-service":  # shutdown the service by its name
                     data = json.loads(text)
                     await self._shutdown_service(data)

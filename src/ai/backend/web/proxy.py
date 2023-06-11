@@ -152,18 +152,13 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info.get("path", "")
-    first_path = request.path.lstrip("/").partition("/")[
-        0
-    ]  # extract the first path  # extract the first path
-    if first_path == "pipeline":
-        if not (pipeline_endpoint := request.app["config"]["pipeline"]["endpoint"]):
+    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
+    if proxy_path == "pipeline":
+        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
             log.error("WEB_HANDLER: 'pipeline.endpoint' has not been set.")
         else:
-            log.info(
-                f"WEB_HANDLER: {request.path} ->"
-                f" {pipeline_endpoint}/{request.path.lstrip('/').partition('/')[-1]}"
-            )
-        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
+            log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
+        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
@@ -359,7 +354,15 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
-    if is_anonymous:
+    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
+    if proxy_path == "pipeline":
+        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
+            log.error("WEBSOCKET_HANDLER: 'pipeline.endpoint' has not been set.")
+        else:
+            endpoint = endpoint.with_scheme("ws")
+            log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
+        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
+    elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))

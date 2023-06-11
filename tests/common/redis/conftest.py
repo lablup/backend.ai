@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import socket
 from typing import AsyncIterator
 
 import pytest
@@ -9,8 +10,22 @@ from .docker import DockerComposeRedisSentinelCluster
 from .types import RedisClusterInfo
 from .utils import wait_redis_ready
 
-# from .native import NativeRedisSentinelCluster  # unused now
-# A simple "redis_container" fixture is defined in ai.backend.testutils.bootstrap.
+# NOTE: A simple "redis_container" fixture is defined in ai.backend.testutils.bootstrap.
+
+
+@pytest.fixture(scope="session", autouse=True)
+def check_dns_config() -> None:
+    # The Redis test suite include clustering failover behavioral test cases
+    # which require a special host DNS configuration.
+    try:
+        assert "127.0.0.1" == socket.gethostbyname("node01")
+        assert "127.0.0.1" == socket.gethostbyname("node02")
+        assert "127.0.0.1" == socket.gethostbyname("node03")
+    except (socket.gaierror, AssertionError):
+        pytest.fail(
+            "The hostnames node01, node02, node03 should be set to indicate "
+            "127.0.0.1 via /etc/hosts"
+        )
 
 
 @pytest.fixture

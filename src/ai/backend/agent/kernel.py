@@ -18,7 +18,6 @@ from typing import (
     FrozenSet,
     List,
     Literal,
-    LiteralString,
     Mapping,
     Optional,
     Sequence,
@@ -290,6 +289,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def start_model_service(self, model_service):
+        raise NotImplementedError
+
+    @abstractmethod
     async def shutdown_service(self, service):
         raise NotImplementedError
 
@@ -377,6 +380,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
+    model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     output_queue: Optional[asyncio.Queue[ResultRecord]]
@@ -413,6 +417,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -443,6 +448,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["output_sock"]
         del props["completion_queue"]
         del props["service_queue"]
+        del props["model_service_queue"]
         del props["service_apps_info_queue"]
         del props["status_queue"]
         del props["output_queue"]
@@ -463,6 +469,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -599,18 +606,21 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return []
 
     async def _feed_start_service(
-        self, service_type: LiteralString, service_info: Mapping[str, Any]
+        self,
+        service_type: bytes,
+        service_info: Mapping[str, Any],
+        wait_for: int | float,
     ) -> dict[str, str]:
         if self.input_sock.closed:
             raise asyncio.CancelledError
         await self.input_sock.send_multipart(
             [
-                service_type.encode(encoding="ascii"),
+                service_type,
                 json.dumps(service_info).encode("utf8"),
             ]
         )
         try:
-            with timeout(40):
+            with timeout(wait_for):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
             return json.loads(result)
@@ -619,11 +629,20 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except asyncio.TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
+    async def feed_start_model_service(self, model_info):
+        if health_check_info := model_info.get("service", {}).get("health_check"):
+            timeout_seconds = (
+                health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
+            )
+        else:
+            timeout_seconds = 10
+        return await self._feed_start_service(b"start-model-service", model_info, timeout_seconds)
+
     async def feed_start_service(self, service_info) -> dict[str, str]:
-        return await self._feed_start_service("start-service", service_info)
+        return await self._feed_start_service(b"start-service", service_info, 10)
 
     async def feed_start_mounted_service(self, service_info) -> dict[str, str]:
-        return await self._feed_start_service("start-mounted-service", service_info)
+        return await self._feed_start_service(b"start-mounted-service", service_info, 40)
 
     async def feed_shutdown_service(self, service_name: str):
         if self.input_sock.closed:
@@ -892,6 +911,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         await self.completion_queue.put(msg_data)
                     elif msg_type == b"service-result":
                         await self.service_queue.put(msg_data)
+                    elif msg_type == b"model-service-result":
+                        await self.model_service_queue.put(msg_data)
                     elif msg_type == b"apps-result":
                         await self.service_apps_info_queue.put(msg_data)
                     elif msg_type == b"stdout":

@@ -42,6 +42,7 @@ from ai.backend.common.types import (
     RedisConnectionInfo,
     VFolderHostPermission,
     VFolderHostPermissionMap,
+    VFolderUsageMode,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -58,7 +59,6 @@ from ..models import (
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionValidator,
-    VFolderUsageMode,
     agents,
     ensure_host_permission_allowed,
     filter_host_allowed_permission,
