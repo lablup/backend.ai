@@ -793,7 +793,8 @@ class SchedulerDispatcher(aobject):
             for kernel in sess_ctx.kernels:
                 agent_alloc_ctx: AgentAllocationContext | None = None
                 try:
-                    agent = kernel.agent_row
+                    agent_id: Optional[AgentId] = None
+                    agent: Optional[AgentRow] = kernel.agent_row
                     if agent is not None:
                         # Check the resource availability of the manually designated agent
                         query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent.id)
@@ -802,6 +803,7 @@ class SchedulerDispatcher(aobject):
                             raise GenericBadRequest(f"No such agent: {agent.id}")
                         for key in available_agent_slots:
                             if available_agent_slots[key] >= kernel.requested_slots[key]:
+                                agent_id = agent.id
                                 continue
                             else:
                                 raise InstanceNotAvailable(
@@ -826,10 +828,10 @@ class SchedulerDispatcher(aobject):
                                 ),
                             )
                         # Let the scheduler check the resource availability and decide the target agent
-                        agent = scheduler.assign_agent_for_kernel(
+                        agent_id = scheduler.assign_agent_for_kernel(
                             compatible_candidate_agents, kernel
                         )
-                        if agent is None:
+                        if agent_id is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     "Could not find a contiguous resource region in any agent big"
@@ -837,7 +839,7 @@ class SchedulerDispatcher(aobject):
                                     f" resource group: {sess_ctx.scaling_group_name})"
                                 ),
                             )
-                    assert agent is not None
+                    assert agent_id is not None
 
                     async def _reserve() -> None:
                         nonlocal agent_alloc_ctx, candidate_agents
@@ -846,7 +848,7 @@ class SchedulerDispatcher(aobject):
                                 sched_ctx,
                                 agent_db_sess,
                                 sgroup_name,
-                                agent,
+                                agent_id,
                                 kernel.requested_slots,
                                 extra_conds=agent_query_extra_conds,
                             )
