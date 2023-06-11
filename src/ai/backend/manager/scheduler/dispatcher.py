@@ -846,7 +846,7 @@ class SchedulerDispatcher(aobject):
                                 sched_ctx,
                                 agent_db_sess,
                                 sgroup_name,
-                                agent.id,
+                                agent,
                                 kernel.requested_slots,
                                 extra_conds=agent_query_extra_conds,
                             )
