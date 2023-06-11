@@ -803,7 +803,6 @@ class SchedulerDispatcher(aobject):
                             raise GenericBadRequest(f"No such agent: {agent.id}")
                         for key in available_agent_slots:
                             if available_agent_slots[key] >= kernel.requested_slots[key]:
-                                agent_id = agent.id
                                 continue
                             else:
                                 raise InstanceNotAvailable(
@@ -814,6 +813,7 @@ class SchedulerDispatcher(aobject):
                                         f"available: {available_agent_slots[key]})."
                                     ),
                                 )
+                        agent_id = agent.id
                     else:
                         # Each kernel may have different images and different architectures
                         compatible_candidate_agents = [
