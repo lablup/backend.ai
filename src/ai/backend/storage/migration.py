@@ -114,7 +114,7 @@ async def upgrade_2_to_3(
             """)
 
     targets = [*scan_vfolders(volume.mount_path)]
-    created_quota_scopes: set[UUID] = set()
+    created_quota_scopes: set[str] = set()
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
@@ -217,9 +217,8 @@ async def upgrade_2_to_3(
                         )
                 else:
                     log.info(
-                        "completed migration of vfolder {}, folder size: {}",
+                        "completed migration of vfolder {}",
                         folder_id,
-                        int(current_size),
                     )
                     async with (
                         connect_database(ctx.dsn) as conn,
@@ -242,7 +241,7 @@ async def upgrade_2_to_3(
                                 if old_quota_map[folder_id] is not None
                                 else None
                             ),
-                            int(current_size),
+                            int(current_size or 0),
                         )
                     await volume.delete_vfolder(orig_vfid)
                 finally:
