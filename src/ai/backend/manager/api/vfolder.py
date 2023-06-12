@@ -45,6 +45,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
+    ACTIVE_USER_STATUSES,
     AgentStatus,
     KernelStatus,
     UserRole,
@@ -1704,11 +1705,15 @@ async def invite(request: web.Request, params: Any) -> web.Response:
         )
     async with root_ctx.db.begin() as conn:
         # Get invited user's keypairs except vfolder owner.
+        # Add filter on keypair in `ACTIVE` status
         query = (
             sa.select([keypairs.c.user_id, keypairs.c.user])
             .select_from(keypairs)
-            .where(keypairs.c.user_id.in_(invitee_emails))
-            .where(keypairs.c.user_id != request["user"]["email"])
+            .where(
+                (keypairs.c.user_id.in_(invitee_emails))
+                & (keypairs.c.user_id != request["user"]["email"])
+                & (keypairs.c.is_active.is_(True))
+            )
         )
         try:
             result = await conn.execute(query)
@@ -2045,7 +2050,8 @@ async def share(request: web.Request, params: Any) -> web.Response:
             .where(
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
-                & (agus.c.group_id == vf_info["group"]),
+                & (agus.c.group_id == vf_info["group"])
+                & (users.c.status == ACTIVE_USER_STATUSES),
             )
         )
         result = await conn.execute(query)
@@ -2057,7 +2063,10 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < len(params["emails"]):
             users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
-                "Some user does not belong to folder's group: ,".join(users_not_in_vfolder_group),
+                (
+                    "Some users do not belong to folder's group:"
+                    f" {','.join(users_not_in_vfolder_group)}"
+                ),
                 object_name="user",
             )
 
