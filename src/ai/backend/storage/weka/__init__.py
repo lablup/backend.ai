@@ -11,7 +11,7 @@ import aiofiles.os
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig
 
-from ..abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
@@ -111,7 +111,7 @@ class WekaVolume(BaseVolume):
         return WekaQuotaModel(self.mount_path, self._fs_uid, self.api_client)
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_SIZE])
+        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         assert self._fs_uid is not None

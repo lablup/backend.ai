@@ -22,6 +22,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import (
+    CAP_FAST_FS_SIZE,
     CAP_FAST_SIZE,
     CAP_METRIC,
     CAP_QUOTA,
@@ -441,7 +442,7 @@ class NetAppVolume(BaseVolume):
         await self.netapp_client.aclose()
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset([CAP_VFOLDER, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
+        return frozenset([CAP_VFOLDER, CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["files", "quota"])

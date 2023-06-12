@@ -10,7 +10,7 @@ from typing import AsyncIterator, FrozenSet
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
-from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
+from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
 from ..subproc import run
 from ..types import CapacityUsage, DirEntry, DirEntryType, FSPerfMetric, Stat, TreeUsage
 from ..utils import fstime2datetime
@@ -202,6 +202,7 @@ class FlashBladeVolume(BaseVolume):
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset(
             [
+                CAP_FAST_FS_SIZE,
                 CAP_VFOLDER,
                 CAP_METRIC,
                 CAP_FAST_SCAN,

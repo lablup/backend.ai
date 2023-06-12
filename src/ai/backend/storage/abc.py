@@ -30,6 +30,7 @@ from .types import (
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
 CAP_METRIC: Final = "metric"  # ability to report disk related metrics
 CAP_QUOTA: Final = "quota"  # ability to manage quota limits
+CAP_FAST_FS_SIZE: Final = "fast-fs-size"  # ability to scan filesystem size fast (e.g. by API)
 CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder fast (e.g. by API)
 CAP_FAST_SIZE: Final = "fast-size"  # ability to scan vFolder size fast (e.g. by API)
 

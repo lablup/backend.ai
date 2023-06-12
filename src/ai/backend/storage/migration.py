@@ -1,4 +1,5 @@
 import asyncio
+import csv
 import enum
 import logging
 import os
@@ -7,7 +8,7 @@ import traceback
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator
+from typing import Any, AsyncIterator, Iterator, Optional
 from uuid import UUID
 
 import asyncpg
@@ -18,7 +19,7 @@ import yarl
 
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 
-from .abc import AbstractVolume
+from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
 from .context import Context
 from .types import VFolderID
@@ -75,12 +76,18 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
     await conn.close()
 
 
-async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
+async def upgrade_2_to_3(
+    ctx: Context,
+    volume: AbstractVolume,
+    report_path: Optional[Path] = None,
+    force_scan_folder_size: bool = False,
+) -> None:
     assert ctx.dsn is not None
     rx_two_digits_hex = re.compile(r"^[a-f0-9]{2}$")
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
     log.info("upgrading {} ...", volume.mount_path)
     volume_id = os.fsdecode(volume.mount_path)
+    scan_folder_size = force_scan_folder_size or (CAP_FAST_SIZE in await volume.get_capabilities())
 
     def scan_vfolders(root: Path, *, depth: int = 0) -> Iterator[Path]:
         for p in root.iterdir():
@@ -97,6 +104,8 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                 volume_id VARCHAR(1024),
                 folder_id UUID,
                 status VARCHAR(16),
+                current_size INTEGER DEFAULT NULL,
+                old_quota INTEGER DEFAULT NULL,
                 log TEXT DEFAULT NULL,
                 PRIMARY KEY (volume_id, folder_id)
             );
@@ -106,6 +115,7 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
+            old_quota_map: dict[UUID, int] = {}
             quota_scope_map: dict[UUID, str] = {}
             async with connect_database(ctx.dsn) as conn:
                 for target in target_chunk:
@@ -113,12 +123,13 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                     folder_ids.append(folder_id)
                 rows = await conn.fetch(
                     """\
-                    SELECT "id", "quota_scope_id" FROM vfolders
+                    SELECT "id", "quota_scope_id", "max_size" FROM vfolders
                     WHERE "id" = ANY($1);
                     """,
                     folder_ids,
                 )
                 for row in rows:
+                    old_quota_map[row["id"]] = row["max_size"]
                     quota_scope_map[row["id"]] = row["quota_scope_id"]
 
                 progbar.write("checking {} ...".format(", ".join(map(str, folder_ids))))
@@ -168,6 +179,12 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                 orig_vfid = VFolderID(None, folder_id)
                 dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
                 try:
+                    if scan_folder_size:
+                        current_size = await volume.fsop_model.scan_tree_size(
+                            volume.mangle_vfpath(orig_vfid),
+                        )
+                    else:
+                        current_size = None
                     await volume.quota_model.create_quota_scope(quota_scope_map[folder_id])
                     await volume.fsop_model.move_tree(
                         volume.mangle_vfpath(orig_vfid),
@@ -201,14 +218,16 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
                         await conn.execute(
                             """\
                             INSERT INTO vfolder_migration_v3
-                            (volume_id, folder_id, status)
-                            VALUES ($1, $2, $3)
+                            (volume_id, folder_id, status, old_quota, current_size)
+                            VALUES ($1, $2, $3, $4, $5)
                             ON CONFLICT (volume_id, folder_id)
                             DO UPDATE SET log = NULL, status = excluded.status;
                             """,
                             volume_id,
                             folder_id,
                             VFolderMigrationStatus.COMPLETE,
+                            old_quota_map[folder_id],
+                            current_size,
                         )
                     await volume.delete_vfolder(orig_vfid)
                 finally:
@@ -238,6 +257,23 @@ async def upgrade_2_to_3(ctx: Context, volume: AbstractVolume) -> None:
             log.warning(
                 "You may re-run the migration to retry the failed ones and remaining vfolders."
             )
+        if report_path:
+            rows = await conn.fetch(
+                """\
+                SELECT "volume_id", "folder_id", "current_size", "old_quota" FROM vfolder_migration_v3
+                WHERE "status" = $1;
+                """,
+                VFolderMigrationStatus.COMPLETE,
+            )
+
+            def _write():
+                with open(report_path, "", newline="") as csvfile:
+                    fieldnames = ["volume_id", "folder_id", "current_size", "old_quota"]
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+
+            await asyncio.get_running_loop().run_in_executor(None, _write)
 
 
 upgrade_handlers = {
@@ -245,13 +281,23 @@ upgrade_handlers = {
 }
 
 
-async def check_and_upgrade(local_config: dict[str, Any], dsn: str):
+async def check_and_upgrade(
+    local_config: dict[str, Any],
+    dsn: str,
+    report_path: Optional[Path] = None,
+    force_scan_folder_size: bool = False,
+):
     etcd = load_shared_config(local_config)
     ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd, dsn=dsn)
     volumes_to_upgrade = await check_latest(ctx)
     for upgrade_info in volumes_to_upgrade:
         handler = upgrade_handlers[upgrade_info.target_version]
-        await handler(ctx, upgrade_info.volume)
+        await handler(
+            ctx,
+            upgrade_info.volume,
+            report_path=report_path,
+            force_scan_folder_size=force_scan_folder_size,
+        )
 
 
 @click.command()
@@ -275,11 +321,39 @@ async def check_and_upgrade(local_config: dict[str, Any], dsn: str):
     show_default=True,
 )
 @click.option(
+    "--report-path",
+    "--report",
+    type=Path,
+    default=None,
+    help=(
+        "If specified, this program creates a text file which contains information about migrated"
+        " folders. Generated report file includes ID of the vFolder, along with its current"
+        " occupied size and quota set (both in MiB). Calculating size of the folder without any"
+        " help from the storage backend takes so much time, and thus disabled by default. Specify"
+        " --force-scan-folder-size flag to override this behavior."
+    ),
+)
+@click.option(
+    "--force-scan-folder-size",
+    is_flag=True,
+    help=(
+        "Also scan size of the folder residing in FSOp solution without fast folder size scan"
+        " (CAP_FAST_SIZE) capability."
+        "WARNING: Enabling this option can slow down whole total migration process a lot!"
+    ),
+)
+@click.option(
     "--debug",
     is_flag=True,
     help="This option will soon change to --log-level TEXT option.",
 )
-def main(config_path: Path, dsn: str, debug: bool) -> None:
+def main(
+    config_path: Optional[Path],
+    dsn: str,
+    report_path: Optional[Path],
+    force_scan_folder_size: bool,
+    debug: bool,
+) -> None:
     local_config = load_local_config(config_path, debug=debug)
     ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
     log_sockpath = Path(
@@ -294,7 +368,14 @@ def main(config_path: Path, dsn: str, debug: bool) -> None:
         log_endpoint=log_endpoint,
     )
     with logger:
-        asyncio.run(check_and_upgrade(local_config, dsn))
+        asyncio.run(
+            check_and_upgrade(
+                local_config,
+                dsn,
+                report_path=report_path,
+                force_scan_folder_size=force_scan_folder_size,
+            )
+        )
 
 
 if __name__ == "__main__":

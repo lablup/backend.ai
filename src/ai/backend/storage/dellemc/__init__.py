@@ -7,7 +7,7 @@ import aiofiles.os
 
 from ai.backend.common.types import HardwareMetadata
 
-from ..abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..exception import NotEmptyError
 from ..types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
@@ -113,7 +113,7 @@ class DellEMCOneFSVolume(BaseVolume):
         return DellEMCOneFSQuotaModel(self.mount_path, api_client=self.api_client)
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
+        return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         raw_metadata = await self.api_client.get_metadata()
