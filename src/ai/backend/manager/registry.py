@@ -3376,6 +3376,7 @@ async def handle_kernel_creation_lifecycle(
         await KernelRow.set_kernel_status(
             context.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
         )
+        await SessionRow.set_session_status(context.db, event.session_id, SessionStatus.PULLING)
     elif isinstance(event, KernelCreatingEvent):
         await KernelRow.set_kernel_status(
             context.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
