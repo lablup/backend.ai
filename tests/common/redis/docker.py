@@ -5,14 +5,13 @@ import os
 import shutil
 import signal
 from pathlib import Path
-from typing import AsyncIterator, Optional, Tuple
+from pprint import pprint
+from typing import AsyncIterator, Tuple
 
 import aiohttp
 import async_timeout
 import pytest
 
-from ai.backend.common.lock import FileLock
-from ai.backend.testutils.bootstrap import get_free_port
 from ai.backend.testutils.pants import get_parallel_slot
 
 from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
@@ -35,46 +34,51 @@ class DockerRedisNode(AbstractRedisNode):
     async def pause(self) -> None:
         assert self.container_id is not None
         print(f"Docker container {self.container_id[:12]} is being paused...")
-        await simple_run_cmd(
+        p = await simple_run_cmd(
             ["docker", "pause", self.container_id],
             # stdout=asyncio.subprocess.DEVNULL,
             # stderr=asyncio.subprocess.DEVNULL,
         )
+        await p.wait()
         print(f"Docker container {self.container_id[:12]} is paused")
 
     async def unpause(self) -> None:
         assert self.container_id is not None
-        await simple_run_cmd(
+        p = await simple_run_cmd(
             ["docker", "unpause", self.container_id],
             # stdout=asyncio.subprocess.DEVNULL,
             # stderr=asyncio.subprocess.DEVNULL,
         )
+        await p.wait()
         print(f"Docker container {self.container_id[:12]} is unpaused")
 
     async def stop(self, force_kill: bool = False) -> None:
         assert self.container_id is not None
         if force_kill:
-            await simple_run_cmd(
+            p = await simple_run_cmd(
                 ["docker", "kill", self.container_id],
                 # stdout=asyncio.subprocess.DEVNULL,
                 # stderr=asyncio.subprocess.DEVNULL,
             )
+            await p.wait()
             print(f"Docker container {self.container_id[:12]} is killed")
         else:
-            await simple_run_cmd(
+            p = await simple_run_cmd(
                 ["docker", "stop", self.container_id],
                 # stdout=asyncio.subprocess.DEVNULL,
                 # stderr=asyncio.subprocess.DEVNULL,
             )
+            await p.wait()
             print(f"Docker container {self.container_id[:12]} is terminated")
 
     async def start(self) -> None:
         assert self.container_id is not None
-        await simple_run_cmd(
+        p = await simple_run_cmd(
             ["docker", "start", self.container_id],
             # stdout=asyncio.subprocess.DEVNULL,
             # stderr=asyncio.subprocess.DEVNULL,
         )
+        await p.wait()
         print(f"Docker container {self.container_id[:12]} started")
 
 
@@ -116,67 +120,80 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
     @contextlib.asynccontextmanager
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
-        cfg_dir = Path(__file__).parent
-        compose_cfg = cfg_dir / "redis-cluster.yml"
+        template_cfg_dir = Path(__file__).parent
+        template_compose_file = template_cfg_dir / "redis-cluster.yml"
+        assert template_compose_file.exists()
         project_name = f"{self.test_ns}_{self.test_case_ns}"
         compose_cmd = await self.probe_docker_compose()
 
-        snap_compose_dir: Optional[Path] = None
+        template_cfg_files = [
+            "redis-cluster.yml",
+            "sentinel.conf",
+        ]
+        compose_cfg_dir = (
+            Path.home() / ".cache" / "bai" / "testing" / f"bai-redis-test-{get_parallel_slot()}"
+        )
+        base_port = 9200 + get_parallel_slot() * 8
+        ports = {
+            "REDIS_MASTER_PORT": base_port,
+            "REDIS_SLAVE1_PORT": base_port + 1,
+            "REDIS_SLAVE2_PORT": base_port + 2,
+            "REDIS_SENTINEL1_PORT": base_port + 3,
+            "REDIS_SENTINEL2_PORT": base_port + 4,
+            "REDIS_SENTINEL3_PORT": base_port + 5,
+        }
+        os.environ.update({k: str(v) for k, v in ports.items()})
+        os.environ["COMPOSE_PATH"] = str(compose_cfg_dir)
+        os.environ["DOCKER_USER"] = f"{os.getuid()}:{os.getgid()}"
 
-        if (
-            await is_snap_docker()
-        ):  # FIXME: Remove this after we find out how to change pytest rootdir
-            files = [
-                "redis-cluster.yml",
-                "redis-sentinel.dockerfile",
-                "sentinel.conf",
+        if compose_cfg_dir.exists():
+            shutil.rmtree(compose_cfg_dir)
+        compose_cfg_dir.mkdir(parents=True)
+        for file in template_cfg_files:
+            shutil.copy(template_cfg_dir / file, compose_cfg_dir)
+        compose_tpl = (compose_cfg_dir / "sentinel.conf").read_text()
+        compose_tpl = compose_tpl.replace("REDIS_PASSWORD", "develove")
+        compose_tpl = compose_tpl.replace("REDIS_MASTER_HOST", "node01")
+        compose_tpl = compose_tpl.replace("REDIS_MASTER_PORT", str(ports["REDIS_MASTER_PORT"]))
+        sentinel01_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel01")
+        sentinel01_cfg = sentinel01_cfg.replace(
+            "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL1_PORT"])
+        )
+        sentinel02_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel02")
+        sentinel02_cfg = sentinel02_cfg.replace(
+            "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL2_PORT"])
+        )
+        sentinel03_cfg = compose_tpl.replace("REDIS_SENTINEL_SELF_HOST", "sentinel03")
+        sentinel03_cfg = sentinel03_cfg.replace(
+            "REDIS_SENTINEL_SELF_PORT", str(ports["REDIS_SENTINEL3_PORT"])
+        )
+        (compose_cfg_dir / "sentinel01.conf").write_text(sentinel01_cfg)
+        (compose_cfg_dir / "sentinel02.conf").write_text(sentinel02_cfg)
+        (compose_cfg_dir / "sentinel03.conf").write_text(sentinel03_cfg)
+
+        compose_file = compose_cfg_dir / "redis-cluster.yml"
+
+        async with async_timeout.timeout(30.0):
+            cmdargs = [
+                *compose_cmd,
+                "-p",
+                project_name,
+                "-f",
+                str(compose_file),
+                "up",
+                "-d",
             ]
-            snap_compose_dir = Path.home() / "tmp" / f"bai-redis-test-{get_parallel_slot()}"
+            p = await simple_run_cmd(
+                cmdargs,
+                env=os.environ,
+                cwd=compose_cfg_dir,
+                # stdout=asyncio.subprocess.DEVNULL,
+                # stderr=asyncio.subprocess.DEVNULL,
+            )
+            await p.wait()
+            assert p.returncode == 0, "Compose cluster creation has failed."
 
-            def _copy_files():
-                nonlocal cfg_dir
-                if snap_compose_dir.exists():
-                    shutil.rmtree(snap_compose_dir)
-                snap_compose_dir.mkdir(parents=True)
-
-                for file in files:
-                    shutil.copy(cfg_dir / file, snap_compose_dir)
-
-            await asyncio.get_running_loop().run_in_executor(None, _copy_files)
-            compose_cfg = snap_compose_dir / "redis-cluster.yml"
-
-        async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True, timeout=30)):
-
-            async def _get_free_port() -> int:
-                return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
-
-            ports = {
-                "REDIS_MASTER_PORT": await _get_free_port(),
-                "REDIS_SLAVE1_PORT": await _get_free_port(),
-                "REDIS_SLAVE2_PORT": await _get_free_port(),
-                "REDIS_SENTINEL1_PORT": await _get_free_port(),
-                "REDIS_SENTINEL2_PORT": await _get_free_port(),
-                "REDIS_SENTINEL3_PORT": await _get_free_port(),
-            }
-            os.environ.update({k: str(v) for k, v in ports.items()})
-            os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
-            async with async_timeout.timeout(30.0):
-                p = await simple_run_cmd(
-                    [
-                        *compose_cmd,
-                        "-p",
-                        project_name,
-                        "-f",
-                        str(compose_cfg),
-                        "up",
-                        "-d",
-                        "--build",
-                    ],
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                assert p.returncode == 0, "Compose cluster creation has failed."
-        await asyncio.sleep(2)
+        await asyncio.sleep(1.0)
         try:
             p = await simple_run_cmd(
                 [
@@ -184,23 +201,27 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "-p",
                     project_name,
                     "-f",
-                    str(compose_cfg),
+                    str(compose_file),
                     "ps",
+                    "-a",
                     "--format",
                     "json",
                 ],
+                cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-            assert p.stdout is not None
             try:
+                assert p.stdout is not None
                 ps_output = json.loads(await p.stdout.read())
+                pprint(f"{ps_output=}")
             except json.JSONDecodeError:
                 pytest.fail(
                     'Cannot parse "docker compose ... ps --format json" output. '
                     "You may need to upgrade to docker-compose v2.0.0.rc.3 or later"
                 )
-            await p.wait()
+            finally:
+                await p.wait()
 
             if not ps_output:
                 pytest.fail(
@@ -216,19 +237,20 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "inspect",
                     *cids,
                 ],
+                cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-
-            assert p.stdout is not None
             try:
+                assert p.stdout is not None
                 inspect_output = json.loads(await p.stdout.read())
             except json.JSONDecodeError:
                 pytest.fail(
                     'Cannot parse "docker inspect ..." output. '
                     "You may need to upgrade to docker-compose v2.0.0.rc.3 or later"
                 )
-            await p.wait()
+            finally:
+                await p.wait()
 
             if not inspect_output:
                 pytest.fail(
@@ -236,9 +258,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 )
 
             for container in inspect_output:
-                cid_mapping[
-                    container["Config"]["Labels"]["com.docker.compose.service"]
-                ] = container["Id"]
+                cid_mapping[container["Config"]["Labels"]["com.docker.compose.service"]] = (
+                    container["Id"]
+                )
+                print(f"--- logs of {container['Id']} ---")
+                try:
+                    p = await simple_run_cmd(["docker", "logs", container["Id"]])
+                finally:
+                    await p.wait()
+                print("--- end of logs ---")
+            print(f"{cids=}")
+            print(f"{cid_mapping=}")
 
             yield RedisClusterInfo(
                 node_addrs=[
@@ -289,18 +319,21 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         finally:
             await asyncio.sleep(0.2)
             async with async_timeout.timeout(30.0):
-                await simple_run_cmd(
+                p = await simple_run_cmd(
                     [
                         *compose_cmd,
                         "-p",
                         project_name,
                         "-f",
-                        os.fsencode(compose_cfg),
+                        str(compose_file),
                         "down",
+                        "-v",
                     ],
+                    cwd=compose_cfg_dir,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
+                await p.wait()
             await asyncio.sleep(0.2)
 
 

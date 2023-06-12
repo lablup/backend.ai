@@ -9,44 +9,54 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.12.1\n"
 
 # a6e6df2f9a3a475888eb594517eba401
-#: ../../client/lowlevel/exceptions.rst:2 7cf2fef41bcf4960ba354220dcd3b142
+#: ../../client/lowlevel/exceptions.rst:2 ca44cc92b24e4f7eb6c6e29a99aebf20
 msgid "Exceptions"
 msgstr "예외 클래스들"
 
 # 28ed6a551ed3437d8ddd7affd55eda48
-#: 00ff6671732c4fd4a1c71a4f29a78740 ai.backend.client.exceptions.BackendError:1
+#: 29a0a49a5f8840238148dda44ba19ff3 ai.backend.client.exceptions.BackendError:1
 #: of
 msgid "Exception type to catch all ai.backend-related errors."
 msgstr ""
 
-#: 89abe32e782d411094d69dc09e3c879b 8b05bf0d4dd44542bbd1d17d11fe56e3
+#: ai.backend.client.exceptions.BackendAPIError.add_note:1
+#: ai.backend.client.exceptions.BackendClientError.add_note:1
+#: ai.backend.client.exceptions.BackendError.add_note:1
+#: bbb588e7c9214df29dee381584b0e811 d61cbf638c934bf59ca18aef8e32f763
+#: e650137a34fc4e368dcf9258ad1b53bc of
+msgid "Exception.add_note(note) -- add a note to the exception"
+msgstr ""
+
+#: 9da898a6aa0d4a01a3157c7e7b15b4e4
 #: ai.backend.client.exceptions.BackendAPIError.with_traceback:1
 #: ai.backend.client.exceptions.BackendClientError.with_traceback:1
 #: ai.backend.client.exceptions.BackendError.with_traceback:1
-#: de56ed18bce54ad7be8064129d2b4209 of
+#: d134fce673b2450dbf95e274975468a6 ee62cd6e1a2149d28a43d7d8f79f268f of
 msgid ""
-"Exception.with_traceback(tb) -- set self.__traceback__ to tb and return self."
+"Exception.with_traceback(tb) -- set self.__traceback__ to tb and return "
+"self."
 msgstr ""
 
 # c622535b9c744e85b654d279b0297566
-#: 18e4e061be32498cb2a67cb17004e5ef
+#: 8eee656cc8004917ab4002da33c6801c
 #: ai.backend.client.exceptions.BackendAPIError:1 of
 msgid "Exceptions returned by the API gateway."
 msgstr ""
 
 #: ai.backend.client.exceptions.BackendClientError:1
-#: b8f2538fe4004addbe3a1aa25122bd01 of
+#: fbef17bd57f244258b5bbd0d740d489e of
 msgid ""
-"Exceptions from the client library, such as argument validation errors and "
-"connection failures."
+"Exceptions from the client library, such as argument validation errors "
+"and connection failures."
 msgstr ""
+

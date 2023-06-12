@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from ..registry import AgentRegistry
     from ..models.utils import ExtendedAsyncSAEngine
     from .storage import StorageSessionManager
+    from ..idle import IdleCheckerHost
 
 from ..api.exceptions import (
     ImageNotFound,
@@ -124,6 +125,7 @@ class GraphQueryContext:
     background_task_manager: BackgroundTaskManager
     storage_manager: StorageSessionManager
     registry: AgentRegistry
+    idle_checker_host: IdleCheckerHost
 
 
 class Mutations(graphene.ObjectType):
@@ -505,6 +507,9 @@ class Queries(graphene.ObjectType):
         filter=graphene.String(),
         order=graphene.String(),
         # filters
+        domain_name=graphene.String(),
+        group_id=graphene.String(),
+        access_key=graphene.String(),
         project=graphene.UUID(),
     )
 
@@ -1453,15 +1458,26 @@ class Queries(graphene.ObjectType):
         return await PredefinedAtomicPermission.load_all(graph_ctx)
 
     @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_endpoint(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         endpoint_id: uuid.UUID,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
     ) -> Endpoint:
         graph_ctx: GraphQueryContext = info.context
-        return await Endpoint.load_item(graph_ctx, endpoint_id=endpoint_id)
+        return await Endpoint.load_item(
+            graph_ctx,
+            endpoint_id=endpoint_id,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
 
     @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_endpoint_list(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
@@ -1471,31 +1487,48 @@ class Queries(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
     ) -> EndpointList:
         total_count = await Endpoint.load_count(
             info.context,
             project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
         )
         endpoint_list = await Endpoint.load_slice(
             info.context,
             limit,
             offset,
             project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
             filter=filter,
             order=order,
         )
         return EndpointList(endpoint_list, total_count)
 
     @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_routing(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         routing_id: uuid.UUID,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
     ) -> Routing:
         graph_ctx: GraphQueryContext = info.context
-        return await Routing.load_item(graph_ctx, routing_id=routing_id)
+        return await Routing.load_item(
+            graph_ctx,
+            routing_id=routing_id,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
 
     @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_routing_list(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
@@ -1505,10 +1538,16 @@ class Queries(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
         endpoint_id: Optional[uuid.UUID] = None,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
     ) -> RoutingList:
         total_count = await Routing.load_count(
             info.context,
             endpoint_id=endpoint_id,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
         )
         routing_list = await Routing.load_slice(
             info.context,
@@ -1517,6 +1556,9 @@ class Queries(graphene.ObjectType):
             endpoint_id=endpoint_id,
             filter=filter,
             order=order,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
         )
         return RoutingList(routing_list, total_count)
 

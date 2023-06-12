@@ -130,9 +130,9 @@ class CreateResourcePreset(graphene.Mutation):
         data = {
             "name": name,
             "resource_slots": ResourceSlot.from_user_input(props.resource_slots, None),
-            "shared_memory": BinarySize.from_str(props.shared_memory)
-            if props.shared_memory
-            else None,
+            "shared_memory": (
+                BinarySize.from_str(props.shared_memory) if props.shared_memory else None
+            ),
         }
         insert_query = sa.insert(resource_presets).values(data)
         return await simple_db_mutate_returning_item(

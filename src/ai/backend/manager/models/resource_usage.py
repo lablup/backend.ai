@@ -274,8 +274,8 @@ class SessionResourceUsage(BaseResourceUsageGroup):
     def from_base_usage_group(cls, usage_group: BaseResourceUsageGroup) -> SessionResourceUsage:
         if usage_group.group_unit not in (ResourceGroupUnit.KERNEL, ResourceGroupUnit.SESSION):
             raise ValueError(
-                "Unable to parse `SessionResourceUsage` from usage_group "
-                "that DOES NOT have `ResourceGroupUnit.KERNEL` or `ResourceGroupUnit.SESSION` on group_unit field."
+                "Unable to parse `SessionResourceUsage` from usage_group that DOES NOT have"
+                " `ResourceGroupUnit.KERNEL` or `ResourceGroupUnit.SESSION` on group_unit field."
             )
         if usage_group.project_row is None or usage_group.session_row is None:
             raise ValueError(
