@@ -409,6 +409,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .registry import AgentRegistry
 
     root_ctx.registry = AgentRegistry(
+        root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.db,
         root_ctx.redis_stat,

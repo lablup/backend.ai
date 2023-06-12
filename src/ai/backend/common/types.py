@@ -66,6 +66,7 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "VFolderUsageMode",
     "VFolderMount",
     "KernelCreationConfig",
     "KernelCreationResult",
@@ -783,6 +784,20 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
+class VFolderUsageMode(str, enum.Enum):
+    """
+    Usage mode of virtual folder.
+
+    GENERAL: normal virtual folder
+    MODEL: virtual folder which provides shared models
+    DATA: virtual folder which provides shared data
+    """
+
+    GENERAL = "general"
+    MODEL = "model"
+    DATA = "data"
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
@@ -791,6 +806,7 @@ class VFolderMount(JSONSerializableMixin):
     host_path: PurePosixPath
     kernel_path: PurePosixPath
     mount_perm: MountPermission
+    usage_mode: VFolderUsageMode
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -800,6 +816,7 @@ class VFolderMount(JSONSerializableMixin):
             "host_path": str(self.host_path),
             "kernel_path": str(self.kernel_path),
             "mount_perm": self.mount_perm.value,
+            "usage_mode": self.usage_mode.value,
         }
 
     @classmethod
@@ -818,6 +835,9 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
+                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
+                    VFolderUsageMode
+                ),
             }
         )
 
@@ -951,7 +971,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
-    startup_command: str
+    startup_command: Optional[str]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:

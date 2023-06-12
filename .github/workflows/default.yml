@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -27,8 +27,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
@@ -52,7 +50,7 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -71,7 +69,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -81,8 +79,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
@@ -100,7 +96,7 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -119,7 +115,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 2
+        fetch-depth: 100
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -139,8 +135,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
@@ -158,7 +152,7 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 1 origin "$BASE_REF_SHORT"
+          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
         else
           BASE_REF="HEAD~1"
         fi
@@ -201,8 +195,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v4-scie-pants
       with:
@@ -352,19 +344,17 @@ jobs:
           echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
           echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: ./backend.ai-client.Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: lablup/backend.ai-client:${{ github.ref_name }}
+          tags: |
+            lablup/backend.ai-client:${{ github.ref_name }}
+            lablup/backend.ai-client:latest
           build-args: |
             PYTHON_VERSION=${{ env.PROJECT_PYTHON_VERSION }}
             PKGVER=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Push to the Docker Hub
-        run: |
-          docker tag lablup/backend.ai-client:${{ github.ref_name }} lablup/backend.ai-client:latest
-          docker push lablup/backend.ai-client:latest
