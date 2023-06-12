@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, TypedDict
@@ -18,6 +19,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
@@ -40,6 +42,8 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import ModifyUserInput, UserRole
+
+log = BraceStyleAdapter(logging.getLogger(__file__))
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -489,6 +493,35 @@ class CreateKeyPair(graphene.Mutation):
             **data,
             user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
         )
+        from .audit_logs import CreateAuditLog
+
+        data_before: Dict[str, Any]
+        data_after = {
+            "user_id": data["user_id"],
+            "access_key": data["access_key"],
+            "is_active": data["is_active"],
+            "is_admin": data["is_admin"],
+            "resource_policy": data["resource_policy"],
+            "rate_limit": data["rate_limit"],
+            "user": sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
+        }
+        try:
+            # audit log on target: user
+            auditlog_data = graph_ctx.schema.get_type("AuditLogInput").create_container(
+                {
+                    "user_email": graph_ctx.user["email"],
+                    "user_id": graph_ctx.user["uuid"],
+                    "access_key": graph_ctx.access_key,
+                    "data_before": data_before,
+                    "data_after": data_after,
+                    "action": "CREATE",
+                    "target_type": "keypairs",
+                    "target": data["access_key"],
+                }
+            )
+            await CreateAuditLog.mutate(info, auditlog_data)
+        except Exception as e:
+            log.error(str(e))
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
     @classmethod
@@ -534,8 +567,49 @@ class ModifyKeyPair(graphene.Mutation):
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "rate_limit")
+
+        async def _pre_func(conn: SAConnection) -> None:
+            prev_data = await conn.execute(
+                sa.select(
+                    [
+                        keypairs.c.is_active,
+                        keypairs.c.is_admin,
+                        keypairs.c.resource_policy,
+                        keypairs.c.rate_limit,
+                    ]
+                )
+                .select_from(keypairs)
+                .where(keypairs.c.access_key == access_key),
+            )
+            from .audit_logs import CreateAuditLog
+
+            data_before = dict(prev_data.first())
+            data_after = {
+                "is_active": props.is_active,
+                "is_admin": props.is_admin,
+                "resource_policy": props.resource_policy,
+                "rate_limit": props.rate_limit,
+            }
+
+            try:
+                auditlog_data = ctx.schema.get_type("AuditLogInput").create_container(
+                    {
+                        "user_email": ctx.user["email"],
+                        "user_id": ctx.user["uuid"],
+                        "access_key": ctx.access_key,
+                        "data_before": data_before,
+                        "data_after": data_after,
+                        "action": "CHANGE",
+                        "target_type": "keypairs",
+                        "target": access_key,
+                    }
+                )
+                await CreateAuditLog.mutate(info, auditlog_data)
+            except Exception as e:
+                log.error(str(e))
+
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
-        return await simple_db_mutate(cls, ctx, update_query)
+        return await simple_db_mutate(cls, ctx, update_query, pre_func=_pre_func)
 
 
 class DeleteKeyPair(graphene.Mutation):
@@ -556,11 +630,48 @@ class DeleteKeyPair(graphene.Mutation):
     ) -> DeleteKeyPair:
         ctx: GraphQueryContext = info.context
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
+
+        async def _pre_func(conn: SAConnection) -> None:
+            from .audit_logs import CreateAuditLog
+
+            get_key_info = await conn.execute(
+                sa.select([keypairs])
+                .select_from(keypairs)
+                .where(keypairs.c.access_key == access_key),
+            )
+            key_info = dict(get_key_info.first())
+            data_before = {
+                "user_id": key_info["user_id"],
+                "access_key": key_info["access_key"],
+                "is_active": key_info["is_active"],
+                "is_admin": key_info["is_admin"],
+                "resource_policy": key_info["resource_policy"],
+                "rate_limit": key_info["rate_limit"],
+                "user": key_info["user"],
+            }
+            data_after: Dict[str, Any] = {}
+            try:
+                auditlog_data = ctx.schema.get_type("AuditLogInput").create_container(
+                    {
+                        "user_email": ctx.user["email"],
+                        "user_id": ctx.user["uuid"],
+                        "access_key": ctx.access_key,
+                        "data_before": data_before,
+                        "data_after": data_after,
+                        "action": "DELETE",
+                        "target_type": "keypairs",
+                        "target": access_key,
+                    }
+                )
+                await CreateAuditLog.mutate(info, auditlog_data)
+            except Exception as e:
+                log.error(str(e))
+
         await redis_helper.execute(
             ctx.redis_stat,
             lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
         )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        return await simple_db_mutate(cls, ctx, delete_query, pre_func=_pre_func)
 
 
 class Dotfile(TypedDict):

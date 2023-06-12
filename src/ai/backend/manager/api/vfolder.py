@@ -60,6 +60,7 @@ from ..models import (
     VFolderPermission,
     VFolderPermissionValidator,
     agents,
+    audit_logs,
     ensure_host_permission_allowed,
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
@@ -505,6 +506,21 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
+        data_before: Dict[str, Any] = {}
+        auditlog_data = {
+            "user_id": str(request["user"]["uuid"]),
+            "email": request["user"]["email"],
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "before": data_before,
+                "after": insert_values,
+            },
+            "action": "CREATE",
+            "target_type": "vfolder",
+            "target": params["id"],
+        }
+        insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
+        await conn.execute(insert_auditlog_query)
     return web.json_response(resp, status=201)
 
 
@@ -600,10 +616,11 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         params["id"],
     )
     async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == params["id"])
-        )
-        folder_host = await conn.scalar(query)
+        fetch_query = sa.select(vfolders).select_from(vfolders).where(vfolders.c.id == params["id"])
+        fetch_result = await conn.execute(fetch_query)
+        vfolder_info = fetch_result.first()
+        folder_host = vfolder_info["host"]
+        folder_id = uuid.UUID(params["id"])
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -613,7 +630,31 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             domain_name=domain_name,
             permission=VFolderHostPermission.DELETE,
         )
-    folder_id = uuid.UUID(params["id"])
+        prev_data = {
+            "id": str(vfolder_info["id"]),
+            "user": str(vfolder_info["user"]),
+            "permission": str(vfolder_info["permission"][1]),
+            "usage_mode": vfolder_info["usage_mode"][1],
+        }
+        auditlog_data = {
+            "email": request["user"]["email"],
+            "user_id": str(request["user"]["uuid"]),
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "data_before": prev_data,
+                "data_after": {},
+            },
+            "action": "DELETE",
+            "target_type": "vfolder",
+            "target": prev_data["id"],
+        }
+        insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
+        await conn.execute(insert_auditlog_query)
+        delete_query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
+        await conn.execute(delete_query)
+
+    # fs-level deletion may fail or take longer time
+    # but let's complete the db transaction to reflect that it's deleted.
     await initiate_vfolder_removal(
         root_ctx.db,
         [VFolderDeletionInfo(folder_id, folder_host)],
@@ -2242,6 +2283,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         folder_host = entry["host"]
+        folder_id = entry["id"]
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -2254,7 +2296,33 @@ async def delete_by_name(request: web.Request) -> web.Response:
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+        fetch_query = sa.select(vfolders).select_from(vfolders).where(vfolders.c.id == folder_id)
+        fetch_result = await conn.execute(fetch_query)
+        vfolder_info = fetch_result.first()
+        prev_data = {
+            "id": str(vfolder_info["id"]),
+            "user": str(vfolder_info["user"]),
+            "permission": str(vfolder_info["permission"][1]),
+            "usage_mode": vfolder_info["usage_mode"][1],
+        }
+        auditlog_data = {
+            "email": request["user"]["email"],
+            "user_id": str(request["user"]["uuid"]),
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "data_before": prev_data,
+                "data_after": {},
+            },
+            "action": "DELETE",
+            "target": prev_data["id"],
+        }
+        insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
+        await conn.execute(insert_auditlog_query)
+        delete_query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
+        await conn.execute(delete_query)
 
+    # fs-level deletion may fail or take longer time
+    # but let's complete the db transaction to reflect that it's deleted.
     await initiate_vfolder_removal(
         root_ctx.db,
         [VFolderDeletionInfo(entry["id"], folder_host)],

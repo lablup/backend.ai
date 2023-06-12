@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 
 import click
@@ -268,6 +269,22 @@ def umount_host(name, edit_fstab):
             print(" ", aid)
             for k, v in data.items():
                 print("   ", k, ":", v)
+        try:
+            access_key = session.config.access_key
+            user_info = session.User.detail()
+            data_before = {"name": name, "edit_fstab": edit_fstab}
+            data_after = {}
+            session.AuditLog.create(
+                user_info["uuid"],
+                access_key,
+                user_info["email"],
+                json.dumps(data_before),
+                json.dumps(data_after),
+                name,
+                "DELETE",
+            )
+        except Exception as e:
+            print_error(e)
 
 
 @vfolder.command
@@ -351,6 +368,7 @@ def update_shared_vf_permission(vfolder_id, user_id, permission):
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
+            # TODO: add audit log
             print("Updated.")
         except Exception as e:
             print_error(e)
@@ -372,6 +390,7 @@ def remove_shared_vf_permission(vfolder_id, user_id):
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
+            # TODO: add audit log
             print("Removed.")
         except Exception as e:
             print_error(e)
@@ -393,6 +412,7 @@ def change_vfolder_ownership(vfolder_id, user_email):
     with Session() as session:
         try:
             session.VFolder.change_vfolder_ownership(vfolder_id, user_email)
+            # TODO: add audit log
             print(f"Now ownership of VFolder:{vfolder_id} goes to User:{user_email}")
         except Exception as e:
             print_error(e)
