@@ -165,3 +165,42 @@ container_etcd_config_iv = t.Dict(
         t.Key("kernel-gid", optional=True): t.ToInt,
     }
 ).allow_extra("*")
+
+model_definition_iv = t.Dict(
+    {
+        t.Key("models"): t.List(
+            t.Dict(
+                {
+                    t.Key("name"): t.String,
+                    t.Key("model_path"): t.String,
+                    t.Key("service", default=None): t.Null | t.Dict(
+                        {
+                            # ai.backend.kernel.service.ServiceParser.start_service()
+                            # ai.backend.kernel.service_actions
+                            t.Key("pre_start_actions", default=[]): t.Null | t.List(
+                                t.Dict(
+                                    {
+                                        t.Key("action"): t.String,
+                                        t.Key("args"): t.Dict().allow_extra("*"),
+                                    }
+                                )
+                            ),
+                            t.Key("start_command"): t.List(t.String),
+                            t.Key("port"): t.ToInt[1:],
+                            t.Key("health_check", default=None): t.Null | t.Dict(
+                                {
+                                    t.Key("path"): t.String,
+                                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
+                                    t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
+                                    t.Key("expected_status_code", default=200): (
+                                        t.Null | t.ToInt[100:]
+                                    ),
+                                }
+                            ),
+                        }
+                    ),
+                }
+            )
+        )
+    }
+)

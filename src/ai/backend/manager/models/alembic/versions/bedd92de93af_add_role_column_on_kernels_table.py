@@ -1,7 +1,7 @@
 """add role column on kernels table
 
 Revision ID: bedd92de93af
-Revises: 10c58e701d87
+Revises: 3efd66393bd0, 10c58e701d87
 Create Date: 2023-04-24 11:57:53.111968
 
 """
@@ -16,7 +16,7 @@ from ai.backend.manager.models.base import EnumType
 
 # revision identifiers, used by Alembic.
 revision = "bedd92de93af"
-down_revision = "10c58e701d87"
+down_revision = ("3efd66393bd0", "10c58e701d87")
 branch_labels = None
 depends_on = None
 
@@ -44,6 +44,8 @@ def upgrade():
         result = connection.execute(query).fetchall()
         kernel_ids_to_update = [kid[0] for kid in result]
 
+        if not kernel_ids_to_update:
+            break
         query = (
             sa.update(kernels)
             .values(

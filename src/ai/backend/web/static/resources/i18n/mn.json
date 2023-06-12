@@ -246,7 +246,8 @@
       "ImageDoesNotProvideModelPath": "__NOT_TRANSLATED__",
       "ModelStorageToMount": "__NOT_TRANSLATED__",
       "AIAccelerator": "__NOT_TRANSLATED__",
-      "DescAIAccelerator": "__NOT_TRANSLATED__"
+      "DescAIAccelerator": "__NOT_TRANSLATED__",
+      "SessionAlreadyExists": "__NOT_TRANSLATED__"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -331,6 +332,10 @@
     "Message": "зурвас",
     "EnvironmentInfo": "__NOT_TRANSLATED__",
     "DownloadingSessionLogs": "__NOT_TRANSLATED__",
+    "VSCodeRemoteConnection": "__NOT_TRANSLATED__",
+    "VSCodeRemoteDescription": "__NOT_TRANSLATED__",
+    "VSCodeRemotePasswordTitle": "__NOT_TRANSLATED__",
+    "VSCodeRemoteNoticeSSHConfig": "__NOT_TRANSLATED__",
     "ElapsedTime": "__NOT_TRANSLATED__",
     "Timeout": "__NOT_TRANSLATED__",
     "SessionLifetime": "__NOT_TRANSLATED__",
@@ -359,7 +364,9 @@
     "GracePeriodDesc": "__NOT_TRANSLATED__",
     "UtilizationThreshold": "__NOT_TRANSLATED__",
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
-    "ExpiresAfter": "__NOT_TRANSLATED__"
+    "ExpiresAfter": "__NOT_TRANSLATED__",
+    "ConnectionExample": "__NOT_TRANSLATED__",
+    "System": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -498,7 +505,8 @@
       "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
       "LetterNumber-_dot": "Үсэг, тоо ба -_-г зөвшөөрдөг.",
       "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
-      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
+      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо",
+      "PleaseSelectOptions": "сонголтуудыг сонгоно уу"
     },
     "ProjectAndGroup": "Төсөл ба бүлгүүд",
     "ModifyKeypairResourcePolicy": "Түлхүүр хосын нөөцийн бодлогыг өөрчлөх",
@@ -647,7 +655,19 @@
       "NotEnoughResourceForFileBrowserSession": "Filebrowser-д зориулж Session үүсгэх хангалттай нөөц байхгүй (cpu: 1 Core, mem: 0.5GB). боломжтой нөөцийг шалгана уу.",
       "NoImagesSupportingFileBrowser": "Файл хөтөчийг дэмжих зураг хараахан алга байна. Фолдер хөтөчийг дэмждэг дор хаяж нэг буюу түүнээс дээш дүрс оруулах шаардлагатай.",
       "ClickFilebrowserButton": "Фолдер (ууд) -ыг байршуулахын тулд файл дарах товчийг ажиллуулах товчийг дарна уу.",
-      "ReadOnlyFolderOnFileBrowser": "__NOT_TRANSLATED__"
+      "ReadOnlyFolderOnFileBrowser": "__NOT_TRANSLATED__",
+      "ExecuteSSH/SFTP": "__NOT_TRANSLATED__",
+      "NoImagesSupportingSystemSession": "__NOT_TRANSLATED__",
+      "SftpScalingGroupsDoNotExist": "__NOT_TRANSLATED__",
+      "ExecutingSSH/SFTPSession": "__NOT_TRANSLATED__",
+      "RunSSH/SFTPserver": "__NOT_TRANSLATED__",
+      "SFTPSessionNotAvailable": "__NOT_TRANSLATED__",
+      "StartingSSH/SFTPSession": "__NOT_TRANSLATED__",
+      "UploadFolder": "__NOT_TRANSLATED__",
+      "EmptyFilesAndFoldersAreNotUploaded": "__NOT_TRANSLATED__",
+      "FolderAlreadyExists": "__NOT_TRANSLATED__",
+      "NumberOfSFTPSessionsExceededTitle": "__NOT_TRANSLATED__",
+      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__"
     },
     "invitation": {
       "EnterEmail": "Цахим хаягаа оруулна уу",
@@ -657,7 +677,8 @@
       "InvitationError": "Урилга амжилтгүй боллоо. Хэрэглэгчийг аль хэдийн урьсан байж магадгүй.",
       "Shared": "Бүлгийн фолдерыг амжилттай хуваалцав",
       "NoOneWasShared": "Бүлгийн фолдерыг хуваалцаж чадсангүй",
-      "SharingError": "Хуваалцаж чадсангүй. Хэрэглэгчийг аль хэдийн хуваалцсан эсвэл зохих төсөлд хамрагдаагүй байж болзошгүй."
+      "SharingError": "Хуваалцаж чадсангүй. Хэрэглэгчийг аль хэдийн хуваалцсан эсвэл зохих төсөлд хамрагдаагүй байж болзошгүй.",
+      "FolderSharingNotAvailableToUser": "__NOT_TRANSLATED__"
     },
     "permission": {
       "NoChanges": "Өөрчлөлт оруулаагүй болно",
@@ -818,6 +839,8 @@
     "AutoLogout": "Автоматаар гарах",
     "DescAutoLogout": "Аппликешнд зориулж суулгасан хуудсуудаас бусад нэвтэрсэн бүх хуудсыг хаасан тохиолдолд автоматаар гарах болно (ж.нь. Jupyter Notebook, вэб терминал гэх мэт).",
     "BootstrapScriptDescription": "__NOT_TRANSLATED__",
+    "NoExistingVSCodePassword": "__NOT_TRANSLATED__",
+    "VSCodePasswordClipboardCopy": "__NOT_TRANSLATED__",
     "SSHKeypairEnterManually": "__NOT_TRANSLATED__",
     "SSHKeypairEnterManuallyFinished": "__NOT_TRANSLATED__"
   },
@@ -935,7 +958,8 @@
     "ResourceGroupDetail": "Нөөцийн бүлгийн дэлгэрэнгүй",
     "RetriesToSkip": "__NOT_TRANSLATED__",
     "NoGroupToDisplay": "__NOT_TRANSLATED__",
-    "AllowedSessionTypes": "__NOT_TRANSLATED__"
+    "AllowedSessionTypes": "__NOT_TRANSLATED__",
+    "Domain": "Домэйн"
   },
   "maintenance": {
     "General": "Ерөнхий",
@@ -998,10 +1022,18 @@
     }
   },
   "statistics": {
-    "Usage": "Хэрэглээ",
+    "UsageHistory": "Хэрэглээ түүх",
     "SelectPeriod": "Хугацаа сонгох",
     "1Day": "1 өдөр",
-    "1Week": "1 долоо хоног"
+    "1Week": "1 долоо хоног",
+    "UsageHistoryDesc": "__NOT_TRANSLATED__",
+    "SessionsDesc": "__NOT_TRANSLATED__",
+    "CPUDesc": "__NOT_TRANSLATED__",
+    "MemoryDesc": "__NOT_TRANSLATED__",
+    "GPUDesc": "__NOT_TRANSLATED__",
+    "IOReadDesc": "__NOT_TRANSLATED__",
+    "IOWriteDesc": "__NOT_TRANSLATED__",
+    "UsageHistoryNote": "__NOT_TRANSLATED__"
   },
   "language": {
     "Browser": "Хөтөч",
@@ -1164,7 +1196,8 @@
       "LoginWithSAML": "__NOT_TRANSLATED__"
     },
     "EndpointInfo": "__NOT_TRANSLATED__",
-    "DescEndpoint": "__NOT_TRANSLATED__"
+    "DescEndpoint": "__NOT_TRANSLATED__",
+    "EndpointStartWith": "__NOT_TRANSLATED__"
   },
   "signup": {
     "SignupBETA": "Бүртгүүлэх (зөвхөн бета урилга)",
@@ -1333,6 +1366,7 @@
     "ValueRequired": "Утга Шаардлагатай",
     "InputTooShort": "Хэт богино байна"
   },
+  "OpenVSCodeRemote": "__NOT_TRANSLATED__",
   "totp": {
     "OTP": "__NOT_TRANSLATED__",
     "TotpRemoved": "__NOT_TRANSLATED__",
