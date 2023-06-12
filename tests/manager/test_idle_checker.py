@@ -800,7 +800,7 @@ async def utilization_idle_checker(
 
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-    occupied_slots: Mapping[str, Decimal] = {
+    occupied_slots = {
         "mem": Decimal(10.0),
     }
     live_stat = {
@@ -882,7 +882,7 @@ async def utilization_idle_checker(
 
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-    occupied_slots: Mapping[str, Decimal] = {
+    occupied_slots = {
         "mem": Decimal(10.0),
     }
     live_stat = {
