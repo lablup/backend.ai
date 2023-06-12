@@ -26,7 +26,13 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
-from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
+from ..api.exceptions import (
+    InvalidAPIParameters,
+    VFolderFilterStatusFailed,
+    VFolderFilterStatusNotAvailable,
+    VFolderNotFound,
+    VFolderOperationFailed,
+)
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
 from ..types import UserScope
 from .base import (
@@ -71,6 +77,7 @@ __all__: Sequence[str] = (
     "prepare_vfolder_mounts",
     "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
+    "ensure_vfolder_status",
 )
 
 
@@ -137,6 +144,7 @@ class VFolderAccessStatus(str, enum.Enum):
     READABLE = "readable"
     UPDATABLE = "updatable"
     DELETABLE = "deletable"
+    MOUNTABLE = "mountable"
 
 
 class VFolderDeletionInfo(NamedTuple):
@@ -156,6 +164,32 @@ class VFolderCloneInfo(NamedTuple):
     email: str
     user_id: uuid.UUID
     cloneable: bool
+
+
+VFOLDER_ACTION_STATUS_MAP = {
+    VFolderAccessStatus.READABLE: {
+        # if READABLE access status is requested, all operation statuses are accepted.
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.DELETING,
+        VFolderOperationStatus.MOUNTED,
+    },
+    VFolderAccessStatus.UPDATABLE: {
+        # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+    VFolderAccessStatus.DELETABLE: {
+        # if DELETABLE access status is requested, only READY operation status is accepted.
+        VFolderOperationStatus.READY,
+    },
+    VFolderAccessStatus.MOUNTABLE: {
+        # if MOUNTABLE access status is requested, READY and MOUNTED operation status is accepted.
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.MOUNTED,
+    },
+}
 
 
 vfolders = sa.Table(
@@ -554,6 +588,54 @@ async def get_allowed_vfolder_hosts_by_user(
     return allowed_hosts
 
 
+async def ensure_vfolder_status(
+    conn: SAConnection,
+    perm: VFolderAccessStatus,
+    user_info: Mapping[str, Any],
+    allowed_vfolder_types: Sequence[str],
+    *,
+    folder_id: Optional[str] = None,
+    folder_name: Optional[str] = None,
+):
+    """
+    Checks if the target vfolder status is READY.
+    This function should prevent user access
+    while storage-proxy operations such as vfolder clone, deletion is handling.
+    """
+
+    domain_name = user_info["domain_name"]
+    user_role = user_info["role"]
+    user_uuid = user_info["uuid"]
+
+    if folder_id:
+        vf_name_conds = vfolders.c.id == folder_id
+    elif folder_name:
+        vf_name_conds = vfolders.c.name == folder_name
+    else:
+        raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
+
+    try:
+        available_vf_statuses = VFOLDER_ACTION_STATUS_MAP[perm]
+    except KeyError:
+        raise VFolderFilterStatusNotAvailable()
+    entries = await query_accessible_vfolders(
+        conn,
+        user_uuid,
+        user_role=user_role,
+        domain_name=domain_name,
+        allowed_vfolder_types=allowed_vfolder_types,
+        extra_vf_conds=vf_name_conds,
+        allow_privileged_access=True,
+    )
+    if len(entries) == 0:
+        raise VFolderFilterStatusFailed(
+            f"Cannot find any folder with the given identity ({folder_id = }, {folder_name = })"
+        )
+    for entry in entries:
+        if entry["status"] not in available_vf_statuses:
+            raise VFolderFilterStatusFailed()
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
@@ -567,16 +649,40 @@ async def prepare_vfolder_mounts(
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
-    requested_mounts: list[str] = [
-        name for name in requested_mount_references if isinstance(name, str)
-    ]
+    requested_mounts: list[str] = []
+    vfolder_ids_to_resolve: list[uuid.UUID] = []
+    for vf_ref in requested_mount_references:
+        if isinstance(vf_ref, str):
+            await ensure_vfolder_status(
+                conn,
+                VFolderAccessStatus.MOUNTABLE,
+                {
+                    "uuid": user_scope.user_uuid,
+                    "role": user_scope.user_role,
+                    "domain_name": user_scope.domain_name,
+                },
+                allowed_vfolder_types,
+                folder_name=vf_ref,
+            )
+            requested_mounts.append(vf_ref)
+        elif isinstance(vf_ref, uuid.UUID):
+            await ensure_vfolder_status(
+                conn,
+                VFolderAccessStatus.MOUNTABLE,
+                {
+                    "uuid": user_scope.user_uuid,
+                    "role": user_scope.user_role,
+                    "domain_name": user_scope.domain_name,
+                },
+                allowed_vfolder_types,
+                folder_id=str(vf_ref),
+            )
+            vfolder_ids_to_resolve.append(vf_ref)
+
     requested_mount_map: dict[str, str] = {
         name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
     }
 
-    vfolder_ids_to_resolve = [
-        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
-    ]
     query = (
         sa.select([vfolders.c.id, vfolders.c.name])
         .select_from(vfolders)

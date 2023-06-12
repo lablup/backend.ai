@@ -20,7 +20,6 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
-    Optional,
     Sequence,
     Tuple,
     Type,
@@ -61,6 +60,7 @@ from ..models import (
     VFolderPermissionValidator,
     agents,
     ensure_host_permission_allowed,
+    ensure_vfolder_status,
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
@@ -92,8 +92,6 @@ from .exceptions import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderCreationFailed,
-    VFolderFilterStatusFailed,
-    VFolderFilterStatusNotAvailable,
     VFolderNotFound,
     VFolderOperationFailed,
 )
@@ -107,75 +105,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow = Mapping[str, Any]
-
-
-async def ensure_vfolder_status(
-    request: web.Request,
-    perm: VFolderAccessStatus,
-    folder_id: Optional[str] = None,
-    folder_name: Optional[str] = None,
-):
-    """
-    Checks if the target vfolder status is READY.
-    This function should prevent user access
-    while storage-proxy operations such as vfolder clone, deletion is handling.
-    """
-
-    root_ctx: RootContext = request.app["_root.context"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
-
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    if folder_id:
-        vf_name_conds = vfolders.c.id == folder_id
-    elif folder_name:
-        vf_name_conds = vfolders.c.name == folder_name
-    else:
-        raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
-
-    available_vf_statuses = set()
-    match perm:
-        case VFolderAccessStatus.READABLE:
-            # if READABLE access status is requested, all operation statuses are accepted.
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.PERFORMING,
-                VFolderOperationStatus.CLONING,
-                VFolderOperationStatus.DELETING,
-                VFolderOperationStatus.MOUNTED,
-            }
-        case VFolderAccessStatus.UPDATABLE:
-            # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.MOUNTED,
-            }
-        case VFolderAccessStatus.DELETABLE:
-            # if DELETABLE access status is requested, only READY operation status is accepted.
-            available_vf_statuses = {
-                VFolderOperationStatus.READY,
-            }
-        case _:
-            # Otherwise, raise VFolderFilterStatusNotAvailable()
-            raise VFolderFilterStatusNotAvailable()
-    async with root_ctx.db.begin_readonly() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=vf_name_conds,
-            allow_privileged_access=True,
-        )
-        if len(entries) == 0:
-            raise VFolderFilterStatusFailed(
-                f"Cannot find any folder with the given identity ({folder_id = }, {folder_name = })"
-            )
-        for entry in entries:
-            if entry["status"] not in available_vf_statuses:
-                raise VFolderFilterStatusFailed()
 
 
 def vfolder_permission_required(perm: VFolderPermission):
@@ -584,7 +513,6 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
 
@@ -600,6 +528,13 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         params["id"],
     )
     async with root_ctx.db.begin() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.DELETABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_id=params["id"],
+        )
         query = (
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == params["id"])
         )
@@ -823,19 +758,25 @@ async def list_allowed_types(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
 async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.READABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     resp: Dict[str, Any] = {}
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.GETINFO (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
         access_key,
         folder_name,
     )
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.READABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     if row["permission"] is None:
         is_owner = True
         permission = VFolderPermission.OWNER_PERM
@@ -888,7 +829,6 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     )
 )
 async def get_quota(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
@@ -918,6 +858,14 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
             )
         if len(entries) < 0:
             raise VFolderNotFound("no such accessible vfolder")
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.READABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_id=params["id"],
+        )
 
     async with root_ctx.storage_manager.request(
         proxy_name,
@@ -944,7 +892,6 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def update_quota(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
@@ -988,6 +935,14 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
             )
         if len(entries) < 0:
             raise VFolderNotFound("no such accessible vfolder")
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_id=params["id"],
+        )
 
     # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
     max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
@@ -1030,8 +985,8 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def get_usage(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
         "VFOLDER.GET_USAGE (email:{}, volume_name:{}, vf:{})",
@@ -1039,6 +994,14 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
         volume_name,
         params["id"],
     )
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.READABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_id=params["id"],
+        )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "GET",
@@ -1063,10 +1026,18 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.READABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_id=params["id"],
+        )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "GET",
@@ -1091,9 +1062,6 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     old_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1110,6 +1078,14 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         old_name,
         new_name,
     )
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -1160,14 +1136,19 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
         folder_host = await conn.scalar(query)
@@ -1211,12 +1192,10 @@ async def update_vfolder_options(
     )
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, path:{})",
         request["user"]["email"],
@@ -1224,6 +1203,14 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         folder_name,
         params["path"],
     )
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
     async with root_ctx.storage_manager.request(
         proxy_name,
@@ -1255,9 +1242,6 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 async def create_download_session(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "VFOLDER.CREATE_DOWNLOAD_SESSION(email:{}, ak:{}, vf:{}, path:{})"
     log_args = (
@@ -1274,6 +1258,13 @@ async def create_download_session(
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -1316,9 +1307,6 @@ async def create_download_session(
     )
 )
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1331,6 +1319,13 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -1373,9 +1368,6 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     )
 )
 async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1385,6 +1377,13 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -1430,9 +1429,6 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     )
 )
 async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1445,6 +1441,15 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
         params["dst"],
     )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1472,9 +1477,6 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
     )
 )
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1488,6 +1490,15 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         recursive,
     )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1514,9 +1525,6 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
     )
 )
 async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.READABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1528,6 +1536,15 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
         params["path"],
     )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.READABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1658,9 +1675,6 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def invite(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1678,6 +1692,7 @@ async def invite(request: web.Request, params: Any) -> web.Response:
     resource_policy = request["keypair"]["resource_policy"]
     if folder_name.startswith("."):
         raise GenericForbidden("Cannot share private dot-prefixed vfolders.")
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
         # Get virtual folder.
         query = (
@@ -1694,6 +1709,13 @@ async def invite(request: web.Request, params: Any) -> web.Response:
             raise VFolderNotFound()
         folder_host = vf.host
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -1988,9 +2010,6 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def share(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     """
     Share a group folder to users with overriding permission.
 
@@ -2012,8 +2031,17 @@ async def share(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin() as conn:
         from ..models import association_groups_users as agus
+
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
 
         # Get the group-type virtual folder.
         query = (
@@ -2031,7 +2059,6 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(vf_infos) > 1:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
-        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         await ensure_host_permission_allowed(
             conn,
             vf_info["host"],
@@ -2120,9 +2147,6 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
     """
     Unshare a group folder from users.
     """
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     folder_name = request.match_info["name"]
@@ -2136,7 +2160,16 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
+
         # Get the group-type virtual folder.
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
@@ -2153,7 +2186,6 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         if len(vf_infos) > 1:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
-        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         await ensure_host_permission_allowed(
             conn,
             vf_info["host"],
@@ -2185,9 +2217,6 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.DELETABLE, folder_name=request.match_info["name"]
-    )
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
 
@@ -2206,6 +2235,14 @@ async def delete_by_name(request: web.Request) -> web.Response:
         folder_name,
     )
     async with root_ctx.db.begin() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.DELETABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
+
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2280,9 +2317,6 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
     Cannot leave a group vfolder or a vfolder that the requesting user owns.
     """
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
 
@@ -2293,6 +2327,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     shared_user_uuid = params["shared_user_uuid"]
     vfolder_id = row["id"]
     perm = row["permission"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     if shared_user_uuid:
         # Allow only superadmin to leave the shared vfolder of others.
@@ -2313,6 +2348,14 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         perm,
     )
     async with root_ctx.db.begin() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
+
         query = (
             sa.delete(vfolder_permissions)
             .where(vfolder_permissions.c.vfolder == vfolder_id)
@@ -2338,9 +2381,6 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     ),
 )
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
-    )
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -2348,6 +2388,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.CLONE (email:{}, ak:{}, vf:{}, vft:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -2358,6 +2399,15 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         params["usage_mode"].value,
         params["permission"].value,
     )
+    async with root_ctx.db.begin() as conn:
+        await ensure_vfolder_status(
+            conn,
+            VFolderAccessStatus.UPDATABLE,
+            request["user"],
+            allowed_vfolder_types,
+            folder_name=request.match_info["name"],
+        )
+
     source_folder_host = row["host"]
     source_folder_id = row["id"]
     target_folder_host = params["folder_host"]
@@ -2375,7 +2425,6 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
                 "You must specify the vfolder host because the default host is not configured."
             )
 
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     for vf_type in allowed_vfolder_types:
         if vf_type not in ("user", "group"):
             raise ServerMisconfiguredError(
