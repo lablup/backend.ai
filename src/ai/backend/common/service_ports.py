@@ -11,11 +11,17 @@ _rx_service_ports = re.compile(
 
 
 def parse_service_ports(
-    s: str | Sequence[str],
+    service_ports_label: str | Sequence[str],
+    endpoint_ports_label: str | Sequence[str],
     exception_cls: Type[Exception] = ValueError,
 ) -> Sequence[ServicePort]:
     items: List[ServicePort] = []
     used_ports: Set[int] = set()
+    inference_apps: Sequence[str]
+    if isinstance(endpoint_ports_label, str):
+        inference_apps = endpoint_ports_label.split(",")
+    else:
+        inference_apps = endpoint_ports_label
 
     def _iter_ports(s: str | Sequence[str]) -> Iterator[re.Match]:
         if isinstance(s, Sequence) and not isinstance(s, str):
@@ -36,7 +42,7 @@ def parse_service_ports(
                         raise exception_cls("Invalid service-ports format")
                     break
 
-    for match in _iter_ports(s):
+    for match in _iter_ports(service_ports_label):
         name = match.group("name")
         if not name:
             raise exception_cls("Service port name must be not empty.")
@@ -53,14 +59,13 @@ def parse_service_ports(
             if p <= 1024:
                 raise exception_cls(
                     f"The service port number {p} must be "
-                    f"larger than 1024 to run without the root privilege."
+                    "larger than 1024 to run without the root privilege."
                 )
             if p >= 65535:
                 raise exception_cls(f"The service port number {p} must be smaller than 65535.")
             if p in (2000, 2001, 2002, 2003, 2200, 7681):
                 raise exception_cls(
-                    "The service ports 2000 to 2003, 2200 and 7681 "
-                    "are reserved for internal use."
+                    "The service ports 2000 to 2003, 2200 and 7681 are reserved for internal use."
                 )
             used_ports.add(p)
         items.append(
@@ -69,6 +74,7 @@ def parse_service_ports(
                 "protocol": ServicePortProtocols(protocol),
                 "container_ports": ports,
                 "host_ports": (None,) * len(ports),
+                "is_inference": name in inference_apps,
             }
         )
 

@@ -22,10 +22,15 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import (
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderMount,
+    VFolderUsageMode,
+)
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
-from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
+from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATHS_MAP
 from ..types import UserScope
 from .base import (
     GUID,
@@ -52,7 +57,6 @@ __all__: Sequence[str] = (
     "vfolder_invitations",
     "vfolder_permissions",
     "VirtualFolder",
-    "VFolderUsageMode",
     "VFolderOwnershipType",
     "VFolderInvitationState",
     "VFolderPermission",
@@ -77,20 +81,6 @@ __all__: Sequence[str] = (
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-
-class VFolderUsageMode(str, enum.Enum):
-    """
-    Usage mode of virtual folder.
-
-    GENERAL: normal virtual folder
-    MODEL: virtual folder which provides shared models
-    DATA: virtual folder which provides shared data
-    """
-
-    GENERAL = "general"
-    MODEL = "model"
-    DATA = "data"
 
 
 class VFolderOwnershipType(str, enum.Enum):
@@ -236,8 +226,10 @@ vfolders = sa.Table(
     # }
     sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.CheckConstraint(
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
+        (
+            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+            "(ownership_type = 'group' AND \"group\" IS NOT NULL)"
+        ),
         name="ownership_type_match_with_user_or_group",
     ),
     sa.CheckConstraint(
@@ -595,13 +587,34 @@ async def prepare_vfolder_mounts(
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
     resource_policy: Mapping[str, Any],
-    requested_mounts: Sequence[str],
-    requested_mount_map: Mapping[str, str],
+    requested_mount_references: Sequence[str | uuid.UUID],
+    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
+    requested_mounts: list[str] = [
+        name for name in requested_mount_references if isinstance(name, str)
+    ]
+    requested_mount_map: dict[str, str] = {
+        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
+    }
+
+    vfolder_ids_to_resolve = [
+        vfid for vfid in requested_mount_references if isinstance(vfid, uuid.UUID)
+    ]
+    query = (
+        sa.select([vfolders.c.id, vfolders.c.name])
+        .select_from(vfolders)
+        .where(vfolders.c.id.in_(vfolder_ids_to_resolve))
+    )
+    result = await conn.execute(query)
+
+    for vfid, name in result.fetchall():
+        requested_mounts.append(name)
+        if path := requested_mount_reference_map.get(vfid):
+            requested_mount_map[name] = path
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}
@@ -613,8 +626,7 @@ async def prepare_vfolder_mounts(
         name, _, subpath = key.partition("/")
         if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
             raise InvalidAPIParameters(
-                f"The subpath '{subpath}' should designate "
-                f"a subdirectory of the vfolder '{name}'.",
+                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
             )
         requested_vfolder_names[key] = name
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
@@ -692,6 +704,8 @@ async def prepare_vfolder_mounts(
             )
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
+        if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
+            requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
         if vfolder["name"] == ".local" and vfolder["group"] is not None:
             # Auto-create per-user subdirectory inside the group-owned ".local" vfolder.
             async with storage_manager.request(
@@ -715,6 +729,7 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / user_scope.user_uuid.hex,
                     kernel_path=PurePosixPath("/home/work/.local"),
                     mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
         else:
@@ -734,6 +749,7 @@ async def prepare_vfolder_mounts(
                     host_path=mount_base_path / requested_vfolder_subpaths[key],
                     kernel_path=kernel_path,
                     mount_perm=vfolder["permission"],
+                    usage_mode=vfolder["usage_mode"],
                 )
             )
 

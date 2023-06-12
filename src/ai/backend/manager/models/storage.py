@@ -51,6 +51,7 @@ class StorageProxyInfo:
     secret: str
     client_api_url: yarl.URL
     manager_api_url: yarl.URL
+    sftp_scaling_groups: list[str]
 
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
@@ -68,9 +69,11 @@ class VolumeInfo(TypedDict):
 
 class StorageSessionManager:
     _proxies: Mapping[str, StorageProxyInfo]
+    _exposed_volume_info: List[str]
 
     def __init__(self, storage_config: Mapping[str, Any]) -> None:
         self.config = storage_config
+        self._exposed_volume_info = self.config["exposed_volume_info"]
         self._proxies = {}
         for proxy_name, proxy_config in self.config["proxies"].items():
             connector = aiohttp.TCPConnector(ssl=proxy_config["ssl_verify"])
@@ -80,6 +83,7 @@ class StorageSessionManager:
                 secret=proxy_config["secret"],
                 client_api_url=yarl.URL(proxy_config["client_api"]),
                 manager_api_url=yarl.URL(proxy_config["manager_api"]),
+                sftp_scaling_groups=proxy_config["sftp_scaling_groups"],
             )
 
     async def aclose(self) -> None:
@@ -123,6 +127,11 @@ class StorageSessionManager:
         results = [*itertools.chain(*await asyncio.gather(*fetch_aws))]
         _ctx_volumes_cache.set(results)
         return results
+
+    async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
+        if proxy_name not in self._proxies:
+            raise IndexError(f"proxy {proxy_name} does not exist")
+        return self._proxies[proxy_name].sftp_scaling_groups or []
 
     async def get_mount_path(
         self,
@@ -176,8 +185,10 @@ class StorageSessionManager:
                 except aiohttp.ClientResponseError:
                     # when the response body is not JSON, just raise with status info.
                     raise VFolderOperationFailed(
-                        extra_msg=f"Storage proxy responded with "
-                        f"{client_resp.status} {client_resp.reason}",
+                        extra_msg=(
+                            "Storage proxy responded with "
+                            f"{client_resp.status} {client_resp.reason}"
+                        ),
                         extra_data=None,
                     )
                 except VFolderOperationFailed as e:

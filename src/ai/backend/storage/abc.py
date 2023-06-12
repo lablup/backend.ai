@@ -93,7 +93,6 @@ class AbstractVolume(metaclass=ABCMeta):
     async def clone_vfolder(
         self,
         src_vfid: UUID,
-        dst_volume: AbstractVolume,
         dst_vfid: UUID,
         options: VFolderCreationOptions = None,
     ) -> None:

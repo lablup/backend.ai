@@ -52,6 +52,11 @@ RESERVED_VFOLDERS = [
 ]
 RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 
+# Mapping between vfolder names and their in-container paths.
+VFOLDER_DSTPATHS_MAP = {
+    ".linuxbrew": "/home/linuxbrew/.linuxbrew",
+}
+
 # Redis database IDs depending on purposes
 REDIS_STAT_DB: Final = 0
 REDIS_RLIM_DB: Final = 1
@@ -69,6 +74,7 @@ class LockID(enum.IntEnum):
     LOCKID_PREPARE = 92
     LOCKID_SCHEDULE_TIMER = 191
     LOCKID_PREPARE_TIMER = 192
+    LOCKID_SCALE_TIMER = 193
     LOCKID_LOG_CLEANUP_TIMER = 195
     LOCKID_IDLE_CHECK_TIMER = 196
     LOCKID_STORAGE_TIMER = 197

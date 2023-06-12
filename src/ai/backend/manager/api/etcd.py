@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, Iterable, Mapping, Tuple
 
 import aiohttp_cors
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 
+from ai.backend.common import redis_helper
 from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
-from ai.backend.manager.models import agents
 
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -30,7 +30,7 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "description": "CPU",
         "human_readable_name": "CPU",
         "display_unit": "Core",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "cpu",
     },
     "mem": {
@@ -38,31 +38,39 @@ KNOWN_SLOT_METADATA: Mapping[str, AcceleratorMetadata] = {
         "description": "Memory",
         "human_readable_name": "RAM",
         "display_unit": "GiB",
-        "number_format": "#,###",
+        "number_format": {"binary": True, "round_length": 0},
         "display_icon": "cpu",
     },
-    "cuda": {
+    "cuda.device": {
         "slot_name": "cuda.device",
         "human_readable_name": "GPU",
         "description": "CUDA-capable GPU",
         "display_unit": "GPU",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "gpu1",
     },
-    "rocm": {
+    "cuda.shares": {
+        "slot_name": "cuda.shares",
+        "human_readable_name": "fGPU",
+        "description": "CUDA-capable GPU (fractional)",
+        "display_unit": "fGPU",
+        "number_format": {"binary": False, "round_length": 2},
+        "display_icon": "gpu1",
+    },
+    "rocm.device": {
         "slot_name": "rocm.device",
         "human_readable_name": "GPU",
         "description": "ROCm-capable GPU",
         "display_unit": "GPU",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "gpu2",
     },
-    "tpu": {
+    "tpu.device": {
         "slot_name": "tpu.device",
         "human_readable_name": "TPU",
         "description": "TPU device",
         "display_unit": "GPU",
-        "number_format": "#,###",
+        "number_format": {"binary": False, "round_length": 0},
         "display_icon": "tpu",
     },
 }
@@ -78,21 +86,18 @@ async def get_resource_slots(request: web.Request) -> web.Response:
 async def get_resource_metadata(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_METADATA ()")
     root_ctx: RootContext = request.app["_root.context"]
-    available_slot_metadata: Dict[str, Any] = {}
-
-    async with root_ctx.db.begin_readonly() as conn:
-        query = sa.select([agents.c.compute_plugins]).select_from(agents).where()
-        result = await conn.execute(query)
-        for row in result:
-            for key, value in row["compute_plugins"].items():
-                # return empty dictionary as value when:
-                # 1) accelerator plugin does not expose plugin metadata
-                # 2) no known metadata exists for target accelerator
-                if _data := value.get("metadata", KNOWN_SLOT_METADATA.get(key)):
-                    available_slot_metadata[_data["slot_name"]] = _data
-                else:
-                    available_slot_metadata[key] = {}
-    return web.json_response(available_slot_metadata, status=200)
+    accelerator_metadata_jsons: Dict[str, str] = await redis_helper.execute(
+        root_ctx.redis_stat,
+        lambda r: r.hgetall("computer.metadata"),
+        encoding="utf-8",
+    )
+    accelerator_metadatas: Dict[str, AcceleratorMetadata] = {}
+    for slot_name, metadata_json in accelerator_metadata_jsons.items():
+        accelerator_metadatas[slot_name] = json.loads(metadata_json)
+    for key, value in KNOWN_SLOT_METADATA.items():
+        if key not in accelerator_metadatas:
+            accelerator_metadatas[key] = value
+    return web.json_response(accelerator_metadatas, status=200)
 
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
@@ -146,8 +151,8 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("key"): t.String,
-            t.Key("value"): (
-                t.String(allow_blank=True) | t.Mapping(t.String(allow_blank=True), t.Any)
+            t.Key("value"): t.String(allow_blank=True) | t.Mapping(
+                t.String(allow_blank=True), t.Any
             ),
         }
     )
