@@ -7,10 +7,12 @@ import re
 import traceback
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any, AsyncIterator, Iterator, Optional
 from uuid import UUID
 
+import aiofiles
 import asyncpg
 import click
 import more_itertools
@@ -112,6 +114,7 @@ async def upgrade_2_to_3(
             """)
 
     targets = [*scan_vfolders(volume.mount_path)]
+    created_quota_scopes: set[UUID] = set()
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
@@ -170,14 +173,15 @@ async def upgrade_2_to_3(
                 if folder_id in completed_folder_ids:
                     progbar.update(1)
                     continue
+                quota_scope_id = quota_scope_map[folder_id]
                 progbar.write(
                     "moving vfolder {} into quota_scope {}".format(
                         folder_id,
-                        quota_scope_map[folder_id],
+                        quota_scope_id,
                     )
                 )
                 orig_vfid = VFolderID(None, folder_id)
-                dst_vfid = VFolderID(quota_scope_map[folder_id], folder_id)
+                dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:
                     if scan_folder_size:
                         current_size = await volume.fsop_model.scan_tree_size(
@@ -185,7 +189,9 @@ async def upgrade_2_to_3(
                         )
                     else:
                         current_size = None
-                    await volume.quota_model.create_quota_scope(quota_scope_map[folder_id])
+                    if quota_scope_id not in created_quota_scopes:
+                        await volume.quota_model.create_quota_scope(quota_scope_id)
+                        created_quota_scopes.add(quota_scope_id)
                     await volume.fsop_model.move_tree(
                         volume.mangle_vfpath(orig_vfid),
                         volume.quota_model.mangle_qspath(dst_vfid),
@@ -210,7 +216,11 @@ async def upgrade_2_to_3(
                             VFolderMigrationStatus.FAILED,
                         )
                 else:
-                    log.info("completed migration of vfolder {}", folder_id)
+                    log.info(
+                        "completed migration of vfolder {}, folder size: {}",
+                        folder_id,
+                        int(current_size),
+                    )
                     async with (
                         connect_database(ctx.dsn) as conn,
                         conn.transaction(),
@@ -221,13 +231,18 @@ async def upgrade_2_to_3(
                             (volume_id, folder_id, status, old_quota, current_size)
                             VALUES ($1, $2, $3, $4, $5)
                             ON CONFLICT (volume_id, folder_id)
-                            DO UPDATE SET log = NULL, status = excluded.status;
+                            DO UPDATE SET log = NULL, status = excluded.status,
+                            old_quota = excluded.old_quota, current_size = excluded.current_size;
                             """,
                             volume_id,
                             folder_id,
                             VFolderMigrationStatus.COMPLETE,
-                            old_quota_map[folder_id],
-                            current_size,
+                            (
+                                old_quota_map[folder_id] * (2**20)
+                                if old_quota_map[folder_id] is not None
+                                else None
+                            ),
+                            int(current_size),
                         )
                     await volume.delete_vfolder(orig_vfid)
                 finally:
@@ -258,22 +273,37 @@ async def upgrade_2_to_3(
                 "You may re-run the migration to retry the failed ones and remaining vfolders."
             )
         if report_path:
-            rows = await conn.fetch(
+            complete_count = await conn.fetchval(
                 """\
-                SELECT "volume_id", "folder_id", "current_size", "old_quota" FROM vfolder_migration_v3
-                WHERE "status" = $1;
+                SELECT COUNT(*) FROM vfolder_migration_v3
+                WHERE volume_id = $1
+                AND status = $2;
                 """,
+                volume_id,
                 VFolderMigrationStatus.COMPLETE,
             )
+            in_memory_file = StringIO()
+            fieldnames = ["volume_id", "folder_id", "current_size", "old_quota"]
+            writer = csv.DictWriter(in_memory_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for i in range(0, complete_count, 10):
+                rows = await conn.fetch(
+                    """\
+                    SELECT "volume_id", "folder_id", "current_size", "old_quota" FROM vfolder_migration_v3
+                    WHERE volume_id = $1
+                    AND "status" = $2
+                    ORDER BY "folder_id"
+                    LIMIT 10
+                    OFFSET $3;
+                    """,
+                    volume_id,
+                    VFolderMigrationStatus.COMPLETE,
+                    i,
+                )
+                writer.writerows([dict(x) for x in rows])
 
-            def _write():
-                with open(report_path, "", newline="") as csvfile:
-                    fieldnames = ["volume_id", "folder_id", "current_size", "old_quota"]
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(rows)
-
-            await asyncio.get_running_loop().run_in_executor(None, _write)
+            async with aiofiles.open(report_path, "w") as csvfile:
+                await csvfile.write(in_memory_file.getvalue())
 
 
 upgrade_handlers = {
@@ -328,7 +358,7 @@ async def check_and_upgrade(
     help=(
         "If specified, this program creates a text file which contains information about migrated"
         " folders. Generated report file includes ID of the vFolder, along with its current"
-        " occupied size and quota set (both in MiB). Calculating size of the folder without any"
+        " occupied size and quota set (both in bytes). Calculating size of the folder without any"
         " help from the storage backend takes so much time, and thus disabled by default. Specify"
         " --force-scan-folder-size flag to override this behavior."
     ),
