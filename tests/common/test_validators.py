@@ -4,6 +4,7 @@ import pickle
 import pwd
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address, ip_address
+from uuid import UUID
 
 import multidict
 import pytest
@@ -500,3 +501,45 @@ def test_url():
     assert iv.check("https://example.com") == yarl.URL("https://example.com")
     iv = tx.URL(scheme_required=False)
     assert iv.check("example.com") == yarl.URL("example.com")
+
+
+def test_vfolder_id():
+    iv = tx.VFolderID()
+    value = iv.check("aoih-23_50bha/f40ed400-5571-4a07-bc22-d557b7d44581")
+    assert value.quota_scope_id == "aoih-23_50bha"
+    assert value.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
+    value = iv.check("ZXCV/f40ed40055714a07bc22d557b7d44581")
+    assert value.quota_scope_id == "ZXCV"
+    assert value.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
+    value2 = iv.check(str(value))
+    assert value2 == value
+    assert value2.quota_scope_id == "ZXCV"
+    assert value2.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check(None)
+    with pytest.raises(t.DataError):
+        iv.check(1234)
+    with pytest.raises(t.DataError):
+        iv.check("")
+    with pytest.raises(t.DataError):
+        iv.check("/")
+    with pytest.raises(t.DataError):
+        iv.check("///")
+    with pytest.raises(t.DataError):
+        iv.check(":/x")
+    with pytest.raises(t.DataError):
+        iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("abc:def/f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("-abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("abcdef-/f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("abcdef//f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("abc/def/f40ed400-5571-4a07-bc22-d557b7d44581")
+    with pytest.raises(t.DataError):
+        iv.check("abcdef/5571-4a07-bc22-d557b7d44581")

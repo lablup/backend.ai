@@ -9,7 +9,21 @@ import attrs
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import QuotaConfig, VFolderID
+
+__all__ = (
+    "Sentinel",
+    "SENTINEL",
+    "FSPerfMetric",
+    "CapacityUsage",
+    "VolumeInfo",
+    "VFolderID",
+    "TreeUsage",
+    "QuotaConfig",
+    "Stat",
+    "DirEntry",
+    "DirEntryType",
+)
 
 
 class Sentinel(enum.Enum):
@@ -33,9 +47,15 @@ class FSPerfMetric:
 
 
 @attrs.define(slots=True, frozen=True)
-class FSUsage:
-    capacity_bytes: BinarySize
-    used_bytes: BinarySize
+class CapacityUsage:
+    used_bytes: int
+    capacity_bytes: int
+
+
+@attrs.define(slots=True, frozen=True)
+class QuotaUsage:
+    used_bytes: int
+    limit_bytes: int
 
 
 @attrs.define(slots=True, frozen=True)
@@ -58,26 +78,9 @@ class VolumeInfo:
 
 
 @attrs.define(slots=True, frozen=True)
-class VFolderCreationOptions:
-    quota: Optional[BinarySize]
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({t.Key("quota", default=None): t.Null | tx.BinarySize})
-
-    @classmethod
-    def as_object(cls, dict_opts: Mapping | None) -> VFolderCreationOptions:
-        if dict_opts is None:
-            quota = None
-        else:
-            quota = dict_opts.get("quota")
-        return VFolderCreationOptions(quota=quota)
-
-
-@attrs.define(slots=True, frozen=True)
-class VFolderUsage:
-    file_count: int
-    used_bytes: int
+class TreeUsage:
+    file_count: int  # TODO: refactor using DecimalSize
+    used_bytes: int  # TODO: refactor using DecimalSize
 
 
 @attrs.define(slots=True, frozen=True)

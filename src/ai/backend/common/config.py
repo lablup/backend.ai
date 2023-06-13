@@ -63,6 +63,11 @@ def find_config_file(daemon_name: str) -> Path:
             Path.cwd() / f"{daemon_name}.toml",
         ]
         if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
+            parent_path = Path.cwd().parent
+            while parent_path.is_relative_to(Path.home()):
+                if (parent_path / "BUILD_ROOT").exists():
+                    toml_paths.append(parent_path / f"{daemon_name}.toml")
+                parent_path = parent_path.parent
             toml_paths += [
                 Path.home() / ".config" / "backend.ai" / f"{daemon_name}.toml",
                 Path(f"/etc/backend.ai/{daemon_name}.toml"),
