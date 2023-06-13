@@ -66,7 +66,10 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "VFolderID",
+    "VFolderUsageMode",
     "VFolderMount",
+    "QuotaConfig",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -290,6 +293,16 @@ class ClusterMode(str, enum.Enum):
 class CommitStatus(str, enum.Enum):
     READY = "ready"
     ONGOING = "ongoing"
+
+
+class AbuseReportValue(str, enum.Enum):
+    DETECTED = "detected"
+    CLEANING = "cleaning"
+
+
+class AbuseReport(TypedDict):
+    kernel: str
+    abuse_report: Optional[str]
 
 
 class MovingStatValue(TypedDict):
@@ -773,14 +786,40 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@attrs.define(slots=True, frozen=True)
+class VFolderID:
+    quota_scope_id: str | None
+    folder_id: uuid.UUID
+
+    def __str__(self) -> str:
+        if self.quota_scope_id is None:
+            return self.folder_id.hex
+        return f"{self.quota_scope_id}/{self.folder_id.hex}"
+
+
+class VFolderUsageMode(str, enum.Enum):
+    """
+    Usage mode of virtual folder.
+
+    GENERAL: normal virtual folder
+    MODEL: virtual folder which provides shared models
+    DATA: virtual folder which provides shared data
+    """
+
+    GENERAL = "general"
+    MODEL = "model"
+    DATA = "data"
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
-    vfid: uuid.UUID
+    vfid: VFolderID
     vfsubpath: PurePosixPath
     host_path: PurePosixPath
     kernel_path: PurePosixPath
     mount_perm: MountPermission
+    usage_mode: VFolderUsageMode
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -790,6 +829,7 @@ class VFolderMount(JSONSerializableMixin):
             "host_path": str(self.host_path),
             "kernel_path": str(self.kernel_path),
             "mount_perm": self.mount_perm.value,
+            "usage_mode": self.usage_mode.value,
         }
 
     @classmethod
@@ -803,11 +843,14 @@ class VFolderMount(JSONSerializableMixin):
         return t.Dict(
             {
                 t.Key("name"): t.String,
-                t.Key("vfid"): tx.UUID,
+                t.Key("vfid"): tx.VFolderID,
                 t.Key("vfsubpath", default="."): tx.PurePath,
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
+                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
+                    VFolderUsageMode
+                ),
             }
         )
 
@@ -839,6 +882,27 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class QuotaConfig:
+    limit_bytes: int
+
+    class Validator(t.Trafaret):
+        def check_and_return(self, value: Any) -> QuotaConfig:
+            validator = t.Dict(
+                {
+                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
+                }
+            )
+            converted = validator.check(value)
+            return QuotaConfig(
+                limit_bytes=converted["limit_bytes"],
+            )
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return cls.Validator()
 
 
 class ImageRegistry(TypedDict):
@@ -941,7 +1005,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
-    startup_command: str
+    startup_command: Optional[str]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:

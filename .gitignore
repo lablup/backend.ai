@@ -78,8 +78,10 @@ ENV/
 
 # IDE/vim
 .idea
-*.swp
-*.swo
+.swp
+.swo
+.*.swp
+.*.swo
 .vscode/
 /.vimrc
 /.nvimrc
@@ -103,6 +105,7 @@ ENV/
 /mock-accelerator.toml
 /.pants.env
 /.pants.bootstrap
+/.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
@@ -125,3 +128,5 @@ ENV/
 
 # macOS specific
 .DS_Store
+
+.python-runtime

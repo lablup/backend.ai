@@ -215,6 +215,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     fetch_func,
                     initial_page_offset=offset,
                     page_size=limit,
+                    plain=plain,
                 )
         except Exception as e:
             ctx.output.print_error(e)

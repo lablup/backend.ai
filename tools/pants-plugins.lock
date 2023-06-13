@@ -24,7 +24,7 @@
   "constraints": [],
   "locked_resolves": [],
   "path_mappings": {},
-  "pex_version": "2.1.122",
+  "pex_version": "2.1.134",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [],

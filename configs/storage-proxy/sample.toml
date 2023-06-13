@@ -149,16 +149,14 @@ backend = "netapp"
 path = "/vfroot/netapp"
 
 [volume.netapp.options]
-netapp_endpoint = "https://netapp.example.com"
-netapp_admin = "signed-in-id"
-netapp_password = "signed-in-pw"
+netapp_ontap_endpoint = "https://netapp.example.com"
+netapp_ontap_user = "admin-username"
+netapp_ontap_password = "admin-passwd"
 netapp_svm = "svm-name"
 netapp_volume_name = "netapp-volume-name"
-netapp_qtree_name = "bai_qtree" # default qtree name for backend.ai exclusive
-netapp_xcp_container_name = "netapp-xcp" # only required when xcp activated by container
-netapp_xcp_hostname = "xcp-hostname"
-# default xcp catalog path goes to the directory named "catalog" of the first NetApp volume
-netapp_xcp_catalog_path = "path for xcp-catalog" # Hint: execute command cat /opt/NetApp/xFiles/xcp/xcp.ini and see nfs mount path
+netapp_xcp_cmd = ["/home/user/xcp/linux/xcp"]
+# For containerized xcp: netapp_xcp_cmd = ["docker", "exec", "netapp-xcp", "xcp"]
+netapp_nfs_host = "xcp-hostname"
 
 [volume.weka]
 backend = "weka"

@@ -13,7 +13,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.expression import true
+from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
@@ -89,6 +89,13 @@ agents = sa.Table(
     sa.Column("version", sa.String(length=64), nullable=False),
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
+    sa.Column(
+        "auto_terminate_abusing_kernel",
+        sa.Boolean(),
+        nullable=False,
+        server_default=false(),
+        default=False,
+    ),
 )
 
 
@@ -131,6 +138,7 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
+    auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
 
     # Legacy fields
@@ -171,6 +179,7 @@ class Agent(graphene.ObjectType):
             lost_at=row["lost_at"],
             version=row["version"],
             compute_plugins=row["compute_plugins"],
+            auto_terminate_abusing_kernel=row["auto_terminate_abusing_kernel"],
             # legacy fields
             mem_slots=BinarySize.from_str(row["available_slots"]["mem"]) // mega,
             cpu_slots=row["available_slots"]["cpu"],
@@ -223,11 +232,12 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
-    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
-        if self.status != AgentStatus.ALIVE.name:
-            return None
-        graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        return {
+            "agent": {
+                "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,
+            },
+        }
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
