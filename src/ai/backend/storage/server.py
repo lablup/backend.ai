@@ -17,7 +17,6 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common.config import ConfigurationError, override_key
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -25,7 +24,7 @@ from ai.backend.common.utils import env_info
 from . import __version__ as VERSION
 from .api.client import init_client_app
 from .api.manager import init_manager_app
-from .config import load_local_config
+from .config import load_local_config, load_shared_config
 from .context import Context
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -43,6 +42,12 @@ async def server_main_logwrapper(loop, pidx, _args):
     with logger:
         async with server_main(loop, pidx, _args):
             yield
+
+
+async def check_migration(ctx: Context):
+    from .migration import check_latest
+
+    await check_latest(ctx)
 
 
 @aiotools.server
@@ -69,28 +74,16 @@ async def server_main(
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     try:
-        etcd_credentials = None
-        if local_config["etcd"]["user"]:
-            etcd_credentials = {
-                "user": local_config["etcd"]["user"],
-                "password": local_config["etcd"]["password"],
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
-        }
-        etcd = AsyncEtcd(
-            local_config["etcd"]["addr"],
-            local_config["etcd"]["namespace"],
-            scope_prefix_map,
-            credentials=etcd_credentials,
-        )
+        etcd = load_shared_config(local_config)
         ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
         m.console_locals["ctx"] = ctx
         client_api_app = await init_client_app(ctx)
         manager_api_app = await init_manager_app(ctx)
         m.console_locals["client_api_app"] = client_api_app
         m.console_locals["manager_api_app"] = manager_api_app
+
+        if pidx == 0:
+            await check_migration(ctx)
 
         client_ssl_ctx = None
         manager_ssl_ctx = None

@@ -1383,7 +1383,7 @@ class AgentRegistry:
             )
             result = await db_sess.execute(query)
             resource_policy = result.scalars().first()
-        auto_pull = await self.shared_config.get_raw("config/docker/image/auto_pull")
+        auto_pull = self.shared_config["docker"]["image"]["auto_pull"]
 
         # Aggregate image registry information
         keyfunc = lambda item: item.kernel.image_ref
@@ -1443,7 +1443,7 @@ class AgentRegistry:
             elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
                 # Create overlay network for multi-node sessions
                 network_name = f"bai-multinode-{scheduled_session.id}"
-                mtu = await self.shared_config.get_raw("config/network/overlay/mtu")
+                mtu = self.shared_config["network"]["overlay"]["mtu"]
                 try:
                     # Overlay networks can only be created at the Swarm manager.
                     create_options = {
