@@ -22,7 +22,7 @@ class Delay(t.Trafaret):
             case None:
                 return 0
             case _:
-                self._failure("Value must be float, tuple of float or None.")
+                self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
 
 
 dummy_local_config = t.Dict(
