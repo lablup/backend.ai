@@ -1,8 +1,8 @@
 """rename_group_to_project
 
-Revision ID: 2dec6b3b584b
-Revises: 85984c98b90f
-Create Date: 2023-06-09 15:04:34.035958
+Revision ID: b4eb4eb9e12d
+Revises: 5fbd368d12a2
+Create Date: 2023-06-13 13:51:33.110035
 
 """
 import enum
@@ -16,13 +16,13 @@ from ai.backend.manager.models.base import convention
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, vfolders
 
 # revision identifiers, used by Alembic.
-revision = "2dec6b3b584b"
-down_revision = "85984c98b90f"
+revision = "b4eb4eb9e12d"
+down_revision = "5fbd368d12a2"
 branch_labels = None
 depends_on = None
+
+
 metadata = sa.MetaData(naming_convention=convention)
-
-
 enum_name = VFolderOwnershipType.__name__.lower()
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
