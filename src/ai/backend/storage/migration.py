@@ -118,7 +118,7 @@ async def upgrade_2_to_3(
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
-            old_quota_map: dict[UUID, int] = {}
+            old_quota_map: dict[UUID, Optional[int]] = {}
             quota_scope_map: dict[UUID, str] = {}
             async with connect_database(ctx.dsn) as conn:
                 for target in target_chunk:
@@ -224,6 +224,10 @@ async def upgrade_2_to_3(
                         connect_database(ctx.dsn) as conn,
                         conn.transaction(),
                     ):
+                        if old_quota := old_quota_map[folder_id]:
+                            quota_in_mib = old_quota * (2**20)
+                        else:
+                            quota_in_mib = None
                         await conn.execute(
                             """\
                             INSERT INTO vfolder_migration_v3
@@ -236,11 +240,7 @@ async def upgrade_2_to_3(
                             volume_id,
                             folder_id,
                             VFolderMigrationStatus.COMPLETE,
-                            (
-                                old_quota_map[folder_id] * (2**20)
-                                if old_quota_map[folder_id] is not None
-                                else None
-                            ),
+                            quota_in_mib,
                             int(current_size or 0),
                         )
                     await volume.delete_vfolder(orig_vfid)
