@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.5 (2023-06-13)
+
+### Features
+* Implement `container_pid_to_host_pid()` function ([#955](https://github.com/lablup/backend.ai/issues/955))
+* Introduce the vfolder structure v3 to handle per-user/per-project quota in a more sensible and compatible way ([#1191](https://github.com/lablup/backend.ai/issues/1191))
+* Use `zsh` as the default shell with minimal configs, but including smart auto-completion, when the binary is available in a kernel image. ([#1267](https://github.com/lablup/backend.ai/issues/1267))
+* Add basic support for model service ([#1278](https://github.com/lablup/backend.ai/issues/1278))
+
+### Fixes
+* Add filters and touch up on vfolder sharing fail
+  * Add `is_active` filter on querying from keypair when sharing both user and group(project) vfolder
+  * Touch-up message about handling group folder sharing results to display the failed account list properly. ([#1204](https://github.com/lablup/backend.ai/issues/1204))
+* Handle buggy ORM field loading when destroy session. ([#1312](https://github.com/lablup/backend.ai/issues/1312))
+* Check `None` value of config argument's `resources` key when enqueue session. ([#1322](https://github.com/lablup/backend.ai/issues/1322))
+* Fix to check type of `agent_id` strictly when schedule multi-node session. ([#1325](https://github.com/lablup/backend.ai/issues/1325))
+* Set session status `PULLING` when any sibling kernel is pulling image. ([#1326](https://github.com/lablup/backend.ai/issues/1326))
+
+
 ## 23.03.4 (2023-05-29)
 
 ### Features
