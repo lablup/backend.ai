@@ -105,7 +105,10 @@ class Socket:
         self.close()
 
 
-async def create_socket(local_addr=None, remote_addr=None, packets_queue_max_size=0, reuse_port=None):
+async def create_socket(local_addr=None,
+                        remote_addr=None,
+                        packets_queue_max_size=0,
+                        reuse_port=None):
     """Create a UDP socket with given local and remote addresses.
 
     >>> sock = await asyncudp.create_socket(local_addr=('127.0.0.1', 9999))

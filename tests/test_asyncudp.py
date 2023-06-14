@@ -136,8 +136,13 @@ class AsyncudpTest(unittest.TestCase):
         asyncio.run(self.create_socket_reuse_port())
 
     async def create_socket_reuse_port(self):
-        sock = await asyncudp.create_socket(local_addr=('127.0.0.1', 13003), reuse_port=True)
+        sock = await asyncudp.create_socket(local_addr=('127.0.0.1', 13003),
+                                            reuse_port=True)
+
+        with self.assertRaises(OSError):
+            await asyncudp.create_socket(local_addr=('127.0.0.1', 13003))
+
         sock.close()
-        sock2 = await asyncudp.create_socket(local_addr=('127.0.0.1', 13003), reuse_port=True)
+        sock2 = await asyncudp.create_socket(local_addr=('127.0.0.1', 13003),
+                                             reuse_port=True)
         sock2.close()
-        
