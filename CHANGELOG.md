@@ -16,6 +16,11 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.6 (2023-06-14)
+
+### Fixes
+* Fix vFolder v3 migration script screwing up folder structure
+
 ## 23.03.5 (2023-06-13)
 
 ### Features
