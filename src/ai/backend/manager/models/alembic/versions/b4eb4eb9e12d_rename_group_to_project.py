@@ -172,11 +172,32 @@ def upgrade():
     )
     # association_*_users
     # First, remove duplicated rows in association_projects_users.
-    from ai.backend.manager.models.project import association_projects_users
 
     op.add_column(
         "association_projects_users",
         sa.Column("id", PsqlUUID(), nullable=False, server_default=sa.text("uuid_generate_v4()")),
+    )
+    association_projects_users = sa.Table(
+        "association_projects_users",
+        metadata,
+        sa.Column(
+            "id",
+            PsqlUUID,
+            nullable=False,
+            primary_key=True,
+        ),
+        sa.Column(
+            "user_id",
+            PsqlUUID,
+            sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "project_id",
+            PsqlUUID,
+            sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
+            nullable=False,
+        ),
     )
 
     apu1 = association_projects_users.alias("apu1")
