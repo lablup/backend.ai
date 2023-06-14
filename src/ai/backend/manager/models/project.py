@@ -93,7 +93,7 @@ association_projects_users = sa.Table(
         nullable=False,
         primary_key=True,
     ),
-    # TODO: Remove duplicated rows and add unique constraint.
+    sa.UniqueConstraint("user_id", "project_id", name="uq_association_user_id_project_id"),
 )
 
 

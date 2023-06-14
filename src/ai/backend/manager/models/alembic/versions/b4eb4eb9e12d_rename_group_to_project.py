@@ -5,11 +5,14 @@ Revises: 5fbd368d12a2
 Create Date: 2023-06-13 13:51:33.110035
 
 """
+
 import enum
 import textwrap
+from uuid import UUID
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects.postgresql import UUID as PsqlUUID
 from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import convention
@@ -81,9 +84,6 @@ def upgrade():
     # endpoints
     op.drop_constraint("fk_endpoints_project_groups", "endpoints", type_="foreignkey")
     # association_*_users
-    # op.drop_constraint(
-    #     "uq_association_user_id_group_id", "association_groups_users", type_="unique"
-    # )
     op.drop_constraint(
         "fk_association_groups_users_group_id_groups",
         "association_groups_users",
@@ -171,9 +171,42 @@ def upgrade():
         ondelete="RESTRICT",
     )
     # association_*_users
-    # op.create_unique_constraint(
-    #     "uq_association_user_id_project_id", "association_projects_users", ["user_id", "project_id"]
-    # )
+    # First, remove duplicated rows in association_projects_users.
+    from ai.backend.manager.models.project import association_projects_users
+
+    op.add_column(
+        "association_projects_users",
+        sa.Column("id", PsqlUUID(), nullable=False, server_default=sa.text("uuid_generate_v4()")),
+    )
+
+    apu1 = association_projects_users.alias("apu1")
+    apu2 = association_projects_users.alias("apu2")
+    duplicated_rows: list[tuple[UUID, UUID, UUID]] = conn.execute(
+        sa.select([apu1.c.id, apu1.c.user_id, apu1.c.project_id])
+        .select_from(apu1)
+        .join(
+            apu2,
+            (apu1.c.user_id == apu2.c.user_id)
+            & (apu1.c.project_id == apu2.c.project_id)
+            & (apu1.c.id != apu2.c.id),
+        )
+    ).fetchall()
+
+    uid_pid: set[tuple[UUID, UUID]] = set()
+    delete_ids: list[UUID] = []
+    for row_id, user_id, project_id in duplicated_rows:
+        if (t := (user_id, project_id)) not in uid_pid:
+            uid_pid.add(t)
+        else:
+            delete_ids.append(row_id)
+    conn.execute(
+        sa.delete(association_projects_users).where(association_projects_users.c.id.in_(delete_ids))
+    )
+    op.drop_column("association_projects_users", "id")
+
+    op.create_unique_constraint(
+        "uq_association_user_id_project_id", "association_projects_users", ["user_id", "project_id"]
+    )
     op.create_foreign_key(
         op.f("fk_association_projects_users_project_id_projects"),
         "association_projects_users",
@@ -251,9 +284,9 @@ def downgrade():
     # endpoints
     op.drop_constraint("fk_endpoints_project_id_projects", "endpoints", type_="foreignkey")
     # association_*_users
-    # op.drop_constraint(
-    #     "uq_association_user_id_project_id", "association_projects_users", type_="unique"
-    # )
+    op.drop_constraint(
+        "uq_association_user_id_project_id", "association_projects_users", type_="unique"
+    )
     op.drop_constraint(
         "fk_association_projects_users_project_id_projects",
         "association_projects_users",
