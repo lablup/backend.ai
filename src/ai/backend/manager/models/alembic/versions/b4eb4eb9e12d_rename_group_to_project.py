@@ -171,9 +171,9 @@ def upgrade():
         ondelete="RESTRICT",
     )
     # association_*_users
-    op.create_unique_constraint(
-        "uq_association_user_id_project_id", "association_projects_users", ["user_id", "project_id"]
-    )
+    # op.create_unique_constraint(
+    #     "uq_association_user_id_project_id", "association_projects_users", ["user_id", "project_id"]
+    # )
     op.create_foreign_key(
         op.f("fk_association_projects_users_project_id_projects"),
         "association_projects_users",
@@ -251,9 +251,9 @@ def downgrade():
     # endpoints
     op.drop_constraint("fk_endpoints_project_id_projects", "endpoints", type_="foreignkey")
     # association_*_users
-    op.drop_constraint(
-        "uq_association_user_id_project_id", "association_projects_users", type_="unique"
-    )
+    # op.drop_constraint(
+    #     "uq_association_user_id_project_id", "association_projects_users", type_="unique"
+    # )
     op.drop_constraint(
         "fk_association_projects_users_project_id_projects",
         "association_projects_users",
