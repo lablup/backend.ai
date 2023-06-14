@@ -1119,7 +1119,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     if requester_access_key != owner_access_key and request["user"]["role"] not in (
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         UserRole.SUPERADMIN,
     ):
         raise InsufficientPrivilege("You are not allowed to force-terminate others's sessions")

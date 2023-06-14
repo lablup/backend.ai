@@ -395,7 +395,7 @@ class ModifyProjectInput(graphene.InputObjectType):
 
 
 class CreateProject(graphene.Mutation):
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         name = graphene.String(required=True)
@@ -407,7 +407,7 @@ class CreateProject(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda name, props, **kwargs: (props.domain_name, None),
     )
     async def mutate(
@@ -434,7 +434,7 @@ class CreateProject(graphene.Mutation):
 
 
 class ModifyProject(graphene.Mutation):
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
@@ -446,7 +446,7 @@ class ModifyProject(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
     async def mutate(
@@ -525,7 +525,7 @@ class DeleteProject(graphene.Mutation):
     Instead of deleting the project, just mark it as inactive.
     """
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
@@ -535,7 +535,7 @@ class DeleteProject(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteProject:
@@ -560,7 +560,7 @@ class PurgeProject(graphene.Mutation):
     There is no migration of the ownership for project folders.
     """
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
@@ -570,7 +570,7 @@ class PurgeProject(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeProject:

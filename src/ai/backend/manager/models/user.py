@@ -81,7 +81,8 @@ class UserRole(str, enum.Enum):
     """
 
     SUPERADMIN = "superadmin"
-    ADMIN = "admin"
+    DOMAIN_ADMIN = "domain-admin"
+    PROJECT_ADMIN = "project-admin"
     USER = "user"
     MONITOR = "monitor"
 
@@ -577,7 +578,10 @@ class CreateUser(graphene.Mutation):
                 graph_ctx.schema.get_type("KeyPairInput").create_container(
                     {
                         "is_active": _status == UserStatus.ACTIVE,
-                        "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                        "is_admin": user_data["role"] in [
+                            UserRole.SUPERADMIN,
+                            UserRole.DOMAIN_ADMIN,
+                        ],
                         "resource_policy": "default",
                         "rate_limit": 10000,
                     }
@@ -703,7 +707,7 @@ class ModifyUser(graphene.Mutation):
                     .order_by(sa.desc(keypairs.c.is_admin))
                     .order_by(sa.desc(keypairs.c.is_active)),
                 )
-                if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
+                if data["role"] in [UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN]:
                     # User's becomes admin. Set the keypair as active admin.
                     # TODO: Should we update the role of all users related to keypair?
                     kp = result.first()

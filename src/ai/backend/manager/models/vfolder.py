@@ -378,7 +378,7 @@ async def query_accessible_vfolders(
             vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
         ).select_from(j)
         if not allow_privileged_access or (
-            user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
+            user_role != UserRole.DOMAIN_ADMIN and user_role != UserRole.SUPERADMIN
         ):
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
@@ -410,7 +410,7 @@ async def query_accessible_vfolders(
 
     if "project" in allowed_vfolder_types:
         # Scan project vfolders.
-        if user_role == UserRole.ADMIN or user_role == "admin":
+        if user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
             query = (
                 sa.select([projects.c.id])
                 .select_from(projects)
@@ -433,7 +433,7 @@ async def query_accessible_vfolders(
             query = query.where(vfolders.c.project_id.in_(project_ids))
         if extra_vf_project_conds is not None:
             query = query.where(extra_vf_project_conds)
-        is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
+        is_owner = (user_role == UserRole.DOMAIN_ADMIN or user_role == "admin") or (
             user_role == UserRole.SUPERADMIN or user_role == "superadmin"
         )
         await _append_entries(query, is_owner)

@@ -112,7 +112,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
             qresult = await conn.execute(query)
             project_id = qresult.scalar()
-        elif owner_role == UserRole.ADMIN:
+        elif owner_role == UserRole.DOMAIN_ADMIN:
             # domain-admin can spawn container in any project in the same domain.
             if params["domain"] != owner_domain:
                 raise InvalidAPIParameters("You can only set the domain to the owner's domain.")

@@ -742,7 +742,7 @@ class Queries(graphene.ObjectType):
                 domain_name=domain_name,
             )
             project = await loader.load(id)
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -791,7 +791,7 @@ class Queries(graphene.ObjectType):
                 domain_name=domain_name,
             )
             project = await loader.load(id)
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -839,7 +839,7 @@ class Queries(graphene.ObjectType):
                 domain_name=domain_name,
             )
             projects = await loader.load(name)
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -888,7 +888,7 @@ class Queries(graphene.ObjectType):
                 domain_name=domain_name,
             )
             projects = await loader.load(name)
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -931,7 +931,7 @@ class Queries(graphene.ObjectType):
         client_user_id = ctx.user["uuid"]
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
@@ -961,7 +961,7 @@ class Queries(graphene.ObjectType):
         client_user_id = ctx.user["uuid"]
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
@@ -989,7 +989,7 @@ class Queries(graphene.ObjectType):
         item = await Image.load_item(info.context, reference, architecture)
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role in (UserRole.ADMIN, UserRole.USER):
+        elif client_role in (UserRole.DOMAIN_ADMIN, UserRole.USER):
             items = await Image.filter_allowed(info.context, [item], client_domain)
             if not items:
                 raise ImageNotFound
@@ -1012,7 +1012,7 @@ class Queries(graphene.ObjectType):
         items = await Image.load_all(ctx, is_installed=is_installed, is_operation=is_operation)
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role in (UserRole.ADMIN, UserRole.USER):
+        elif client_role in (UserRole.DOMAIN_ADMIN, UserRole.USER):
             items = await Image.filter_allowed(
                 info.context,
                 items,
@@ -1078,7 +1078,7 @@ class Queries(graphene.ObjectType):
         client_domain = ctx.user["domain_name"]
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
@@ -1119,7 +1119,7 @@ class Queries(graphene.ObjectType):
         client_domain = ctx.user["domain_name"]
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
@@ -1258,7 +1258,7 @@ class Queries(graphene.ObjectType):
         client_access_key = ctx.access_key
         if client_role == UserRole.SUPERADMIN:
             return await KeyPairResourcePolicy.load_all(info.context)
-        elif client_role == UserRole.ADMIN:
+        elif client_role == UserRole.DOMAIN_ADMIN:
             # TODO: filter resource policies by domains?
             return await KeyPairResourcePolicy.load_all(info.context)
         elif client_role == UserRole.USER:

@@ -131,7 +131,7 @@ async def push_session_events(
                     if evdata is sentinel:
                         break
                     event_name, row, reason, exit_code = evdata
-                    if user_role in (UserRole.USER, UserRole.ADMIN):
+                    if user_role in (UserRole.USER, UserRole.DOMAIN_ADMIN):
                         if row["domain_name"] != request["user"]["domain_name"]:
                             continue
                     if user_role == UserRole.USER:

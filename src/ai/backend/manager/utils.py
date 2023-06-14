@@ -27,7 +27,7 @@ def check_if_requester_is_eligible_to_act_as_target_user(
 ) -> bool:
     if requester_role == UserRole.SUPERADMIN:
         pass
-    elif requester_role == UserRole.ADMIN:
+    elif requester_role == UserRole.DOMAIN_ADMIN:
         if requester_domain != target_domain:
             raise RuntimeError(
                 (
@@ -181,7 +181,7 @@ async def query_userinfo(
         )
         qresult = await conn.execute(query)
         project_id = qresult.scalar()
-    elif owner_role == UserRole.ADMIN:
+    elif owner_role == UserRole.DOMAIN_ADMIN:
         # domain-admin can spawn container in any project in the same domain.
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to the owner's domain.")
