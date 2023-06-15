@@ -40,6 +40,22 @@ def check_if_requester_is_eligible_to_act_as_target_user(
                 "Domain-admins cannot perform operations on behalf of super-admins.",
             )
         pass
+    elif requester_role == UserRole.PROJECT_ADMIN:
+        if requester_domain != target_domain:
+            raise RuntimeError(
+                (
+                    "Project-admins can perform operations on behalf of "
+                    "other users in the same domain only."
+                ),
+            )
+        if target_role in (UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN):
+            raise RuntimeError(
+                (
+                    "Project-admins cannot perform operations on behalf of super-admins and"
+                    " domain-admins"
+                ),
+            )
+        pass
     else:
         raise RuntimeError(
             "Only admins can perform operations on behalf of other users.",
@@ -197,7 +213,7 @@ async def query_userinfo(
         qresult = await conn.execute(query)
         project_id = qresult.scalar()
     else:
-        # normal users can spawn containers in their project and domain.
+        # normal users and project-admin can spawn containers in their project and domain.
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to your domain.")
         query = (

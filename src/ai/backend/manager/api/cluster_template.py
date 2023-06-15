@@ -128,7 +128,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             qresult = await conn.execute(query)
             project_id = qresult.scalar()
         else:
-            # normal users can spawn containers in their project and domain.
+            # normal users and project-admin can spawn containers in their project and domain.
             if params["domain"] != owner_domain:
                 raise InvalidAPIParameters("You can only set the domain to your domain.")
             query = (

@@ -410,7 +410,7 @@ async def query_accessible_vfolders(
 
     if "project" in allowed_vfolder_types:
         # Scan project vfolders.
-        if user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
+        if user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin"):
             query = (
                 sa.select([projects.c.id])
                 .select_from(projects)
@@ -433,9 +433,9 @@ async def query_accessible_vfolders(
             query = query.where(vfolders.c.project_id.in_(project_ids))
         if extra_vf_project_conds is not None:
             query = query.where(extra_vf_project_conds)
-        is_owner = (user_role == UserRole.DOMAIN_ADMIN or user_role == "admin") or (
-            user_role == UserRole.SUPERADMIN or user_role == "superadmin"
-        )
+        is_owner = (
+            user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin")
+        ) or (user_role == UserRole.SUPERADMIN or user_role == "superadmin")
         await _append_entries(query, is_owner)
 
         # Override permissions, if exists, for project vfolders.

@@ -215,7 +215,7 @@ async def query_accessible_session_templates(
             )
     if "project" in allowed_types:
         # Query project session_templates
-        if user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
+        if user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin"):
             query = (
                 sa.select([projects.c.id])
                 .select_from(projects)
@@ -255,7 +255,7 @@ async def query_accessible_session_templates(
         if "user" in allowed_types:
             query = query.where(session_templates.c.user_uuid != user_uuid)
         result = await conn.execute(query)
-        is_owner = user_role == UserRole.DOMAIN_ADMIN or user_role == "admin"
+        is_owner = user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin")
         for row in result:
             entries.append(
                 {

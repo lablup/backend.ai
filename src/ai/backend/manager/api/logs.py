@@ -20,9 +20,9 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
 from ..defs import REDIS_LIVE_DB, LockID
-from ..models import UserRole
-from ..models import association_projects_users as apus
-from ..models import error_logs, projects
+from ..models import UserRole, error_logs, projects
+from ..models.project import Role as ProjectRole
+from ..models.project import association_projects_users as apus
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -124,7 +124,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
             select_query = select_query.offset((params["page_no"] - 1) * params["page_size"])
         if request["is_superadmin"]:
             pass
-        elif user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
+        elif user_role == UserRole.DOMAIN_ADMIN or user_role in ("domain-admin", "admin"):
             j = projects.join(apus, projects.c.id == apus.c.project_id)
             usr_query = (
                 sa.select([apus.c.user_id])
@@ -134,6 +134,24 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
             user_ids = [g.id for g in usrs]
+            where = error_logs.c.user.in_(user_ids)
+            select_query = select_query.where(where)
+            count_query = count_query.where(where)
+        elif user_role == UserRole.PROJECT_ADMIN or user_role == "project-admin":
+            apu1 = apus.alias("apu1")
+            apu2 = apus.alias("apu2")
+            j = sa.join(
+                apu1,
+                apu2,
+                (apu1.c.project_id == apu2.c.project_id)
+                & (apu1.c.role == ProjectRole.ADMIN)
+                & (apu1.c.user_id != apu2.c.user_id),
+            )
+            usr_query = (
+                sa.select([apu2.c.user_id]).select_from(j).where(apu1.c.user_id == user_uuid)
+            )
+            result = await conn.scalars(usr_query)
+            user_ids = [*result.all(), user_uuid]
             where = error_logs.c.user.in_(user_ids)
             select_query = select_query.where(where)
             count_query = count_query.where(where)
@@ -189,7 +207,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         update_query = sa.update(error_logs).values(is_cleared=True)
         if request["is_superadmin"]:
             update_query = update_query.where(error_logs.c.id == log_id)
-        elif user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
+        elif user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin"):
             j = projects.join(apus, projects.c.id == apus.c.project_id)
             usr_query = (
                 sa.select([apus.c.user_id])
@@ -199,6 +217,24 @@ async def mark_cleared(request: web.Request) -> web.Response:
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
             user_ids = [g.id for g in usrs]
+            update_query = update_query.where(
+                (error_logs.c.user.in_(user_ids)) & (error_logs.c.id == log_id),
+            )
+        elif user_role == UserRole.PROJECT_ADMIN or user_role == "project-admin":
+            apu1 = apus.alias("apu1")
+            apu2 = apus.alias("apu2")
+            j = sa.join(
+                apu1,
+                apu2,
+                (apu1.c.project_id == apu2.c.project_id)
+                & (apu1.c.role == ProjectRole.ADMIN)
+                & (apu1.c.user_id != apu2.c.user_id),
+            )
+            usr_query = (
+                sa.select([apu2.c.user_id]).select_from(j).where(apu1.c.user_id == user_uuid)
+            )
+            result = await conn.scalars(usr_query)
+            user_ids = [*result.all(), user_uuid]
             update_query = update_query.where(
                 (error_logs.c.user.in_(user_ids)) & (error_logs.c.id == log_id),
             )

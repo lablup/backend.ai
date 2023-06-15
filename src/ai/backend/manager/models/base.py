@@ -172,6 +172,22 @@ class EnumValueType(TypeDecorator, SchemaType):
         return self._enum_class
 
 
+class EnumValueStrType(TypeDecorator, SchemaType):
+    impl = sa.String
+    cache_ok = True
+
+    def __init__(self, enum_cls, *args, **opts):
+        assert issubclass(enum_cls, enum.Enum)
+        super().__init__(*args, **opts)
+        self._enum_cls = enum_cls
+
+    def process_bind_param(self, value, dialect):
+        return value.value if value else None
+
+    def process_result_value(self, value: str, dialect):
+        return self._enum_cls(value) if value else None
+
+
 class ResourceSlotColumn(TypeDecorator):
     """
     A column type wrapper for ResourceSlot from JSONB.

@@ -134,6 +134,9 @@ async def push_session_events(
                     if user_role in (UserRole.USER, UserRole.DOMAIN_ADMIN):
                         if row["domain_name"] != request["user"]["domain_name"]:
                             continue
+                    if user_role == UserRole.PROJECT_ADMIN:
+                        if row["project_id"] != project_id:
+                            continue
                     if user_role == UserRole.USER:
                         if row["user_uuid"] != user_uuid:
                             continue

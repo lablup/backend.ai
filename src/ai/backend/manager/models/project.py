@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 import uuid
+from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -33,6 +34,7 @@ from ..defs import RESERVED_DOTFILES
 from .base import (
     GUID,
     Base,
+    EnumValueStrType,
     IDColumn,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
@@ -76,6 +78,12 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
+
+class Role(StrEnum):
+    ADMIN = "admin"
+    USER = "user"
+
+
 association_projects_users = sa.Table(
     "association_projects_users",
     mapper_registry.metadata,
@@ -92,6 +100,13 @@ association_projects_users = sa.Table(
         sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         primary_key=True,
+    ),
+    sa.Column(
+        "role",
+        EnumValueStrType(Role, length=16),
+        nullable=False,
+        default=Role.USER,
+        server_default=Role.USER.value,
     ),
     sa.UniqueConstraint("user_id", "project_id", name="uq_association_user_id_project_id"),
 )

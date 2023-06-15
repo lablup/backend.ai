@@ -751,7 +751,7 @@ class Queries(graphene.ObjectType):
                 domain_name=client_domain,
             )
             project = await loader.load(id)
-        elif client_role == UserRole.USER:
+        elif client_role in (UserRole.PROJECT_ADMIN, UserRole.USER):
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -800,7 +800,7 @@ class Queries(graphene.ObjectType):
                 domain_name=client_domain,
             )
             project = await loader.load(id)
-        elif client_role == UserRole.USER:
+        elif client_role in (UserRole.PROJECT_ADMIN, UserRole.USER):
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -848,7 +848,7 @@ class Queries(graphene.ObjectType):
                 domain_name=client_domain,
             )
             projects = await loader.load(name)
-        elif client_role == UserRole.USER:
+        elif client_role in (UserRole.PROJECT_ADMIN, UserRole.USER):
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -897,7 +897,7 @@ class Queries(graphene.ObjectType):
                 domain_name=client_domain,
             )
             projects = await loader.load(name)
-        elif client_role == UserRole.USER:
+        elif client_role in (UserRole.PROJECT_ADMIN, UserRole.USER):
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             loader = ctx.dataloader_manager.get_loader(
@@ -935,7 +935,7 @@ class Queries(graphene.ObjectType):
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
-        elif client_role == UserRole.USER:
+        elif client_role in (UserRole.PROJECT_ADMIN, UserRole.USER):
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "Project.by_user",
@@ -965,7 +965,7 @@ class Queries(graphene.ObjectType):
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
-        elif client_role == UserRole.USER:
+        elif client_role in (UserRole.PROJECT_ADMIN, UserRole.USER):
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "Project.by_user",
@@ -989,7 +989,7 @@ class Queries(graphene.ObjectType):
         item = await Image.load_item(info.context, reference, architecture)
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role in (UserRole.DOMAIN_ADMIN, UserRole.USER):
+        elif client_role in (UserRole.DOMAIN_ADMIN, UserRole.PROJECT_ADMIN, UserRole.USER):
             items = await Image.filter_allowed(info.context, [item], client_domain)
             if not items:
                 raise ImageNotFound
@@ -1012,7 +1012,7 @@ class Queries(graphene.ObjectType):
         items = await Image.load_all(ctx, is_installed=is_installed, is_operation=is_operation)
         if client_role == UserRole.SUPERADMIN:
             pass
-        elif client_role in (UserRole.DOMAIN_ADMIN, UserRole.USER):
+        elif client_role in (UserRole.DOMAIN_ADMIN, UserRole.PROJECT_ADMIN, UserRole.USER):
             items = await Image.filter_allowed(
                 info.context,
                 items,
@@ -1076,12 +1076,20 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
+        client_project = ctx.user.get("project_id")
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
+        elif client_role == UserRole.PROJECT_ADMIN:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            if project_id is not None and project_id != client_project:
+                raise InsufficientPrivilege
+            domain_name = client_domain
+            project_id = client_project
         elif client_role == UserRole.USER:
             # Users cannot query other users.
             raise InsufficientPrivilege()
@@ -1117,12 +1125,20 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
+        client_project = ctx.user.get("project_id")
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role == UserRole.DOMAIN_ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
             domain_name = client_domain
+        elif client_role == UserRole.PROJECT_ADMIN:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            if project_id is not None and project_id != client_project:
+                raise InsufficientPrivilege
+            domain_name = client_domain
+            project_id = client_project
         elif client_role == UserRole.USER:
             # Users cannot query other users.
             raise InsufficientPrivilege()
@@ -1260,6 +1276,9 @@ class Queries(graphene.ObjectType):
             return await KeyPairResourcePolicy.load_all(info.context)
         elif client_role == UserRole.DOMAIN_ADMIN:
             # TODO: filter resource policies by domains?
+            return await KeyPairResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.PROJECT_ADMIN:
+            # TODO: filter resource policies by projects?
             return await KeyPairResourcePolicy.load_all(info.context)
         elif client_role == UserRole.USER:
             return await KeyPairResourcePolicy.load_all_user(
