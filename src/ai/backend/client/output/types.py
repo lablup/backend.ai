@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 _predefined_humanized_field_names = {
     "id": "ID",
     "uuid": "UUID",
-    "group_id": "Group ID",
+    "project_id": "Project ID",
     "user_id": "User ID",
     "resource_policy": "Res.Policy",
     "concurrency_used": "Concur.Used",
@@ -79,7 +79,7 @@ class FieldSpec:
 
     @humanized_name.default
     def _autogen_humanized_name(self) -> str:
-        # to handle cases like "groups { id name }", "user_info { full_name }"
+        # to handle cases like "projects { id name }", "user_info { full_name }"
         field_name = self.field_ref.partition(" ")[0]
         if h := _predefined_humanized_field_names.get(field_name):
             return h

@@ -37,7 +37,7 @@ session_templates = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False),
-    sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=True),
+    sa.Column("project_id", GUID, sa.ForeignKey("projects.id"), nullable=True),
     sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), index=True, nullable=False),
     sa.Column("type", EnumType(TemplateType), nullable=False, server_default="TASK", index=True),
     sa.Column("name", sa.String(length=128), nullable=True),
@@ -172,8 +172,8 @@ async def query_accessible_session_templates(
     allowed_types: Iterable[str] = ["user"],
     extra_conds=None,
 ) -> List[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-    from ai.backend.manager.models import groups, users
+    from ai.backend.manager.models import association_projects_users as apus
+    from ai.backend.manager.models import projects, users
 
     entries: List[Mapping[str, Any]] = []
     if "user" in allowed_types:
@@ -186,7 +186,7 @@ async def query_accessible_session_templates(
                     session_templates.c.id,
                     session_templates.c.created_at,
                     session_templates.c.user_uuid,
-                    session_templates.c.group_id,
+                    session_templates.c.project_id,
                     users.c.email,
                 ]
             )
@@ -208,29 +208,29 @@ async def query_accessible_session_templates(
                     "created_at": row.created_at,
                     "is_owner": True,
                     "user": str(row.user_uuid) if row.user_uuid else None,
-                    "group": str(row.group_id) if row.group_id else None,
+                    "project": str(row.project_id) if row.project_id else None,
                     "user_email": row.email,
-                    "group_name": None,
+                    "project_name": None,
                 }
             )
-    if "group" in allowed_types:
-        # Query group session_templates
-        if user_role == UserRole.ADMIN or user_role == "admin":
+    if "project" in allowed_types:
+        # Query project session_templates
+        if user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin"):
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
+                sa.select([projects.c.id])
+                .select_from(projects)
+                .where(projects.c.domain_name == domain_name)
             )
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.id for g in grps]
+            project_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            j = sa.join(apus, users, apus.c.user_id == users.c.uuid)
+            query = sa.select([apus.c.project_id]).select_from(j).where(apus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.group_id for g in grps]
-        j = session_templates.join(groups, session_templates.c.group_id == groups.c.id)
+            project_ids = [g.project_id for g in grps]
+        j = session_templates.join(projects, session_templates.c.project_id == projects.c.id)
         query = (
             sa.select(
                 [
@@ -238,14 +238,14 @@ async def query_accessible_session_templates(
                     session_templates.c.id,
                     session_templates.c.created_at,
                     session_templates.c.user_uuid,
-                    session_templates.c.group_id,
-                    groups.c.name,
+                    session_templates.c.project_id,
+                    projects.c.name,
                 ],
                 use_labels=True,
             )
             .select_from(j)
             .where(
-                session_templates.c.group_id.in_(group_ids)
+                session_templates.c.project_id.in_(project_ids)
                 & session_templates.c.is_active
                 & (session_templates.c.type == template_type),
             )
@@ -255,7 +255,7 @@ async def query_accessible_session_templates(
         if "user" in allowed_types:
             query = query.where(session_templates.c.user_uuid != user_uuid)
         result = await conn.execute(query)
-        is_owner = user_role == UserRole.ADMIN or user_role == "admin"
+        is_owner = user_role == UserRole.DOMAIN_ADMIN or user_role in ("admin", "domain-admin")
         for row in result:
             entries.append(
                 {
@@ -268,13 +268,13 @@ async def query_accessible_session_templates(
                         if row.session_templates_user_uuid
                         else None
                     ),
-                    "group": (
-                        str(row.session_templates_group_id)
-                        if row.session_templates_group_id
+                    "project": (
+                        str(row.session_templates_project_id)
+                        if row.session_templates_project_id
                         else None
                     ),
                     "user_email": None,
-                    "group_name": row.groups_name,
+                    "project_name": row.projects_name,
                 }
             )
     return entries

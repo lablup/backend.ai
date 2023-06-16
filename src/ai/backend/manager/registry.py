@@ -964,7 +964,7 @@ class AgentRegistry:
                 session_type,
                 access_key,
                 user_scope.domain_name,
-                user_scope.group_id,
+                user_scope.project_id,
                 public_sgroup_only,
             )
             if scaling_group is None:
@@ -1063,7 +1063,7 @@ class AgentRegistry:
             "cluster_size": cluster_size,
             "scaling_group_name": checked_scaling_group,
             "domain_name": user_scope.domain_name,
-            "group_id": user_scope.group_id,
+            "project_id": user_scope.project_id,
             "user_uuid": user_scope.user_uuid,
             "access_key": access_key,
             "tag": session_tag,
@@ -1086,7 +1086,7 @@ class AgentRegistry:
             "cluster_size": cluster_size,
             "scaling_group": checked_scaling_group,
             "domain_name": user_scope.domain_name,
-            "group_id": user_scope.group_id,
+            "project_id": user_scope.project_id,
             "user_uuid": user_scope.user_uuid,
             "access_key": access_key,
             "tag": session_tag,
@@ -1293,7 +1293,7 @@ class AgentRegistry:
                             session_id,
                             user_scope.user_uuid,
                             user_scope.domain_name,
-                            user_scope.group_id,
+                            user_scope.project_id,
                             traffic_ratio=traffic_ratio or 1.0,
                         )
                         db_sess.add(routing_row)
@@ -1541,7 +1541,7 @@ class AgentRegistry:
             key=keyfunc,
         ):
             items = [*group_iterator]
-            # Within a group, agent_alloc_ctx are same.
+            # Within a project, agent_alloc_ctx are same.
             agent_alloc_ctx = items[0].agent_alloc_ctx
             per_agent_tasks.append(
                 (
@@ -1872,14 +1872,14 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_group_occupancy(self, group_id, *, db_sess=None):
+    async def get_project_occupancy(self, project_id, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
                 query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.group_id == group_id)
+                    (KernelRow.project_id == project_id)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
                 )
@@ -3618,7 +3618,7 @@ async def check_scaling_group(
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
-    group_id: Union[uuid.UUID, str],
+    project_id: Union[uuid.UUID, str],
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.
@@ -3627,7 +3627,7 @@ async def check_scaling_group(
     candidates = await query_allowed_sgroups(
         conn,
         domain_name,
-        group_id,
+        project_id,
         access_key,
     )
     if public_sgroup_only:

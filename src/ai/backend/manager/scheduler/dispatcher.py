@@ -84,8 +84,8 @@ from .predicates import (
     check_concurrency,
     check_dependencies,
     check_domain_resource_limit,
-    check_group_resource_limit,
     check_keypair_resource_limit,
+    check_project_resource_limit,
     check_reserved_batch_session,
 )
 from .types import (
@@ -424,8 +424,8 @@ class SchedulerDispatcher(aobject):
                                 check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
                             (
-                                "user_group_resource_limit",
-                                check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
+                                "user_project_resource_limit",
+                                check_project_resource_limit(db_sess, sched_ctx, sess_ctx),
                             ),
                             (
                                 "domain_resource_limit",
@@ -1199,7 +1199,7 @@ class SchedulerDispatcher(aobject):
         for endpoint, expand_count in endpoints_to_expand.items():
             log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
             async with self.db.begin_readonly() as conn:
-                _, group_id, resource_policy = await query_userinfo(
+                _, project_id, resource_policy = await query_userinfo(
                     conn,
                     user_id_row_mapping[endpoint.created_user].uuid,
                     user_id_row_mapping[endpoint.created_user].access_key,
@@ -1220,7 +1220,7 @@ class SchedulerDispatcher(aobject):
                         endpoint.image_row.architecture,
                         UserScope(
                             domain_name=endpoint.domain,
-                            group_id=group_id,
+                            project_id=project_id,
                             user_uuid=user_id_row_mapping[endpoint.created_user].uuid,
                             user_role=user_id_row_mapping[endpoint.created_user].role,
                         ),

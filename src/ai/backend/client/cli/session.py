@@ -218,13 +218,24 @@ def _create_cmd(docs: str = None):
         ),
     )
     @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
+        "-j",
+        "--project",
+        metavar="PROJECT_NAME",
         default=None,
         help=(
-            "Group name where the session is spawned. "
-            "User should be a member of the group to execute the code."
+            "Project name where the session is spawned. "
+            "User should be a member of the project to execute the code."
+        ),
+    )
+    @click.option(
+        "-g",
+        "--group",
+        metavar="PROJECT_NAME",
+        default=None,
+        help=(
+            "Project name where the session is spawned. "
+            "User should be a member of the project to execute the code. "
+            "This option is deprecated, use `--project` option instead."
         ),
     )
     @click.option(
@@ -268,6 +279,7 @@ def _create_cmd(docs: str = None):
         assign_agent: str | None,
         # resource grouping
         domain: str | None,
+        project: str | None,
         group: str | None,
     ) -> None:
         """
@@ -287,6 +299,13 @@ def _create_cmd(docs: str = None):
         else:
             name = name
 
+        if group:
+            print_warn("`--group` option is deprecated. Use `--project` option instead.")
+            if not project:
+                project = group
+            else:
+                print_fail("Cannot use `--project` and `--group` options simultaneously.")
+                sys.exit(ExitCode.FAILURE)
         ######
         envs = prepare_env_arg(env)
         resources = prepare_resource_arg(resources)
@@ -317,7 +336,7 @@ def _create_cmd(docs: str = None):
                     resource_opts=resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
-                    group_name=group,
+                    project_name=project,
                     scaling_group=scaling_group,
                     bootstrap_script=(
                         bootstrap_script.read() if bootstrap_script is not None else None
@@ -535,13 +554,13 @@ def _create_from_template_cmd(docs: str = None):
         ),
     )
     @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
+        "-p",
+        "--project",
+        metavar="PROJECT_NAME",
         default=None,
         help=(
-            "Group name where the session is spawned. "
-            "User should be a member of the group to execute the code."
+            "Project name where the session is spawned. "
+            "User should be a member of the project to execute the code."
         ),
     )
     # template overrides
@@ -596,7 +615,7 @@ def _create_from_template_cmd(docs: str = None):
         resource_opts: Sequence[str],
         # resource grouping
         domain: str | None,
-        group: str | None,
+        project: str | None,
         # template overrides
         no_mount: bool,
         no_env: bool,
@@ -650,7 +669,7 @@ def _create_from_template_cmd(docs: str = None):
                     resource_opts=resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
-                    group_name=group,
+                    project_name=project,
                     scaling_group=scaling_group,
                     tag=tag,
                 )
@@ -1266,7 +1285,7 @@ def _fetch_session_names():
     fields: List[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],
-        session_fields["group_name"],
+        session_fields["project_name"],
         session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],

@@ -71,9 +71,9 @@ from .base import (
     batch_result,
     mapper_registry,
 )
-from .group import groups
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
+from .project import projects
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -416,7 +416,7 @@ kernels = sa.Table(
     sa.Column("agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True),
     sa.Column("agent_addr", sa.String(length=128), nullable=True),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False),
-    sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False),
+    sa.Column("project_id", GUID, sa.ForeignKey("projects.id"), nullable=False),
     sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False),
     sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key")),
     # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
@@ -908,7 +908,7 @@ class ComputeContainer(graphene.ObjectType):
         *,
         cluster_role: str = None,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: str = None,
         filter: str = None,
     ) -> int:
@@ -921,8 +921,8 @@ class ComputeContainer(graphene.ObjectType):
             query = query.where(kernels.c.cluster_role == cluster_role)
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+        if project_id is not None:
+            query = query.where(kernels.c.project_id == project_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
         if filter is not None:
@@ -942,7 +942,7 @@ class ComputeContainer(graphene.ObjectType):
         *,
         cluster_role: str = None,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: AccessKey = None,
         filter: str = None,
         order: str = None,
@@ -958,8 +958,8 @@ class ComputeContainer(graphene.ObjectType):
             query = query.where(kernels.c.cluster_role == cluster_role)
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+        if project_id is not None:
+            query = query.where(kernels.c.project_id == project_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
         if filter is not None:
@@ -1003,7 +1003,7 @@ class ComputeContainer(graphene.ObjectType):
         domain_name: str = None,
         access_key: AccessKey = None,
     ) -> Sequence[Optional[ComputeContainer]]:
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+        j = kernels.join(projects, projects.c.id == kernels.c.project_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
@@ -1058,8 +1058,8 @@ class LegacyComputeSession(graphene.ObjectType):
     architecture = graphene.String()
     registry = graphene.String()
     domain_name = graphene.String()
-    group_name = graphene.String()
-    group_id = graphene.UUID()
+    group_name = graphene.String()  # legacy
+    group_id = graphene.UUID()  # legacy
     scaling_group = graphene.String()
     user_uuid = graphene.UUID()
     access_key = graphene.String()
@@ -1205,10 +1205,13 @@ class LegacyComputeSession(graphene.ObjectType):
             "architecture": row["architecture"],
             "registry": row["registry"],
             "domain_name": row["domain_name"],
+            "project_name": row["name"],
+            "project_id": row["project_id"],
+            # legacy
             "group_name": row[
                 "name"
-            ],  # group.name (group is omitted since use_labels=True is not used)
-            "group_id": row["group_id"],
+            ],  # project.name (project is omitted since use_labels=True is not used)
+            "group_id": row["project_id"],
             "scaling_group": row["scaling_group"],
             "user_uuid": row["user_uuid"],
             "access_key": row["access_key"],
@@ -1263,7 +1266,7 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: AccessKey = None,
         status: str = None,
     ) -> int:
@@ -1278,8 +1281,8 @@ class LegacyComputeSession(graphene.ObjectType):
         )
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+        if project_id is not None:
+            query = query.where(kernels.c.project_id == project_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
         if status is not None:
@@ -1296,7 +1299,7 @@ class LegacyComputeSession(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: AccessKey = None,
         status: str = None,
         order_key: str = None,
@@ -1311,11 +1314,11 @@ class LegacyComputeSession(graphene.ObjectType):
         else:
             _order_func = sa.asc if order_asc else sa.desc
             _ordering = [_order_func(getattr(kernels.c, order_key))]
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+        j = kernels.join(projects, projects.c.id == kernels.c.project_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select([kernels, groups.c.name, users.c.email])
+            sa.select([kernels, projects.c.name, users.c.email])
             .select_from(j)
             .where(kernels.c.cluster_role == DEFAULT_ROLE)
             .order_by(*_ordering)
@@ -1324,8 +1327,8 @@ class LegacyComputeSession(graphene.ObjectType):
         )
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+        if project_id is not None:
+            query = query.where(kernels.c.project_id == project_id)
         if access_key is not None:
             query = query.where(kernels.c.access_key == access_key)
         if status is not None:
@@ -1344,14 +1347,14 @@ class LegacyComputeSession(graphene.ObjectType):
         access_keys: AccessKey,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         status: str = None,
     ) -> Sequence[Optional[LegacyComputeSession]]:
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+        j = kernels.join(projects, projects.c.id == kernels.c.project_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select([kernels, groups.c.name, users.c.email])
+            sa.select([kernels, projects.c.name, users.c.email])
             .select_from(j)
             .where(
                 (kernels.c.access_key.in_(access_keys)) & (kernels.c.cluster_role == DEFAULT_ROLE),
@@ -1369,8 +1372,8 @@ class LegacyComputeSession(graphene.ObjectType):
         )
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+        if project_id is not None:
+            query = query.where(kernels.c.project_id == project_id)
         if status is not None:
             query = query.where(kernels.c.status == status)
         async with ctx.db.begin_readonly() as conn:
@@ -1400,11 +1403,11 @@ class LegacyComputeSession(graphene.ObjectType):
             status_list = [status]
         elif status is None:
             status_list = [KernelStatus["RUNNING"]]
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+        j = kernels.join(projects, projects.c.id == kernels.c.project_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
-            sa.select([kernels, groups.c.name, users.c.email])
+            sa.select([kernels, projects.c.name, users.c.email])
             .select_from(j)
             .where((kernels.c.cluster_role == DEFAULT_ROLE) & (kernels.c.session_id.in_(sess_ids)))
         )

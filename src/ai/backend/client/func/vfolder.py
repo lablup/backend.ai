@@ -34,7 +34,7 @@ _default_list_fields = (
     vfolder_fields["name"],
     vfolder_fields["created_at"],
     vfolder_fields["creator"],
-    vfolder_fields["group_id"],
+    vfolder_fields["project_id"],
     vfolder_fields["permission"],
     vfolder_fields["ownership_type"],
     vfolder_fields["status"],
@@ -56,7 +56,7 @@ class VFolder(BaseFunction):
         name: str,
         host: str = None,
         unmanaged_path: str = None,
-        group: str = None,
+        project: str = None,
         usage_mode: str = "general",
         permission: str = "rw",
         quota: str = "0",
@@ -68,7 +68,7 @@ class VFolder(BaseFunction):
                 "name": name,
                 "host": host,
                 "unmanaged_path": unmanaged_path,
-                "group": group,
+                "project": project,
                 "usage_mode": usage_mode,
                 "permission": permission,
                 "quota": quota,
@@ -98,7 +98,7 @@ class VFolder(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        group: str = None,
+        project: str = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
@@ -109,13 +109,13 @@ class VFolder(BaseFunction):
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
 
-        :param group: Fetch vfolders in a specific group.
+        :param project: Fetch vfolders in a specific project.
         :param fields: Additional per-vfolder query fields to fetch.
         """
         return await fetch_paginated_result(
             "vfolder_list",
             {
-                "group_id": (group, "UUID"),
+                "project_id": (project, "UUID"),
                 "filter": (filter, "String"),
                 "order": (order, "String"),
             },

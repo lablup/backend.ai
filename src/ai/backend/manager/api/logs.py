@@ -20,9 +20,9 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
 from ..defs import REDIS_LIVE_DB, LockID
-from ..models import UserRole
-from ..models import association_groups_users as agus
-from ..models import error_logs, groups
+from ..models import UserRole, error_logs, users
+from ..models.domain import query_domain_user
+from ..models.project import query_project_user_where_user_is_admin
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -111,38 +111,37 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    async with root_ctx.db.begin() as conn:
-        is_admin = True
-        select_query = (
-            sa.select([error_logs])
-            .select_from(error_logs)
-            .order_by(sa.desc(error_logs.c.created_at))
-            .limit(params["page_size"])
-        )
-        count_query = sa.select([sa.func.count()]).select_from(error_logs)
-        if params["page_no"] > 1:
-            select_query = select_query.offset((params["page_no"] - 1) * params["page_size"])
-        if request["is_superadmin"]:
-            pass
-        elif user_role == UserRole.ADMIN or user_role == "admin":
-            j = groups.join(agus, groups.c.id == agus.c.group_id)
-            usr_query = (
-                sa.select([agus.c.user_id])
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
-            )
-            result = await conn.execute(usr_query)
-            usrs = result.fetchall()
-            user_ids = [g.id for g in usrs]
-            where = error_logs.c.user.in_(user_ids)
-            select_query = select_query.where(where)
-            count_query = count_query.where(where)
+    is_admin = True
+    select_from = error_logs
+    condition = None
+    if request["is_superadmin"]:
+        pass
+    elif user_role == UserRole.DOMAIN_ADMIN or user_role in ("domain-admin", "admin"):
+        select_from = sa.join(error_logs, users, error_logs.c.user == users.c.uuid)
+        condition = users.c.domain_name == domain_name
+    else:
+        # normal user or project admins
+        projects_user_ids = await query_project_user_where_user_is_admin(root_ctx.db, user_uuid)
+        if projects_user_ids:
+            is_admin = True
+            condition = error_logs.c.user.in_([*projects_user_ids, user_uuid])
         else:
             is_admin = False
-            where = (error_logs.c.user == user_uuid) & (~error_logs.c.is_cleared)
-            select_query = select_query.where(where)
-            count_query = count_query.where(where)
+            condition = (error_logs.c.user == user_uuid) & (~error_logs.c.is_cleared)
+    select_query = (
+        sa.select([error_logs])
+        .select_from(select_from)
+        .order_by(sa.desc(error_logs.c.created_at))
+        .limit(params["page_size"])
+    )
+    if params["page_no"] > 1:
+        select_query = select_query.offset((params["page_no"] - 1) * params["page_size"])
+    count_query = sa.select([sa.func.count()]).select_from(select_from)
+    if condition is not None:
+        select_query = select_query.where(condition)
+        count_query = count_query.where(condition)
 
+    async with root_ctx.db.begin() as conn:
         result = await conn.execute(select_query)
         for row in result:
             result_item = {
@@ -185,28 +184,19 @@ async def mark_cleared(request: web.Request) -> web.Response:
     log_id = uuid.UUID(request.match_info["log_id"])
 
     log.info("CLEAR")
+    if request["is_superadmin"]:
+        condition = error_logs.c.id == log_id
+    elif user_role == UserRole.DOMAIN_ADMIN or user_role in ("domain-admin", "admin"):
+        domain_user_ids = await query_domain_user(root_ctx.db, domain_name)
+        condition = (error_logs.c.user.in_(domain_user_ids)) & (error_logs.c.id == log_id)
+    else:
+        # normal user or project admins
+        projects_user_ids = await query_project_user_where_user_is_admin(root_ctx.db, user_uuid)
+        condition = error_logs.c.user.in_([*projects_user_ids, user_uuid]) & (
+            error_logs.c.id == log_id
+        )
+    update_query = sa.update(error_logs).values(is_cleared=True).where(condition)
     async with root_ctx.db.begin() as conn:
-        update_query = sa.update(error_logs).values(is_cleared=True)
-        if request["is_superadmin"]:
-            update_query = update_query.where(error_logs.c.id == log_id)
-        elif user_role == UserRole.ADMIN or user_role == "admin":
-            j = groups.join(agus, groups.c.id == agus.c.group_id)
-            usr_query = (
-                sa.select([agus.c.user_id])
-                .select_from(j)
-                .where(groups.c.domain_name == domain_name)
-            )
-            result = await conn.execute(usr_query)
-            usrs = result.fetchall()
-            user_ids = [g.id for g in usrs]
-            update_query = update_query.where(
-                (error_logs.c.user.in_(user_ids)) & (error_logs.c.id == log_id),
-            )
-        else:
-            update_query = update_query.where(
-                (error_logs.c.user == user_uuid) & (error_logs.c.id == log_id),
-            )
-
         result = await conn.execute(update_query)
         assert result.rowcount == 1
 

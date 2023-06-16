@@ -27,7 +27,6 @@ from ..models import (
     ImageRow,
     UserRow,
     query_accessible_vfolders,
-    resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
@@ -169,7 +168,10 @@ async def get_info(request: web.Request) -> web.Response:
             tx.AliasedKey(["image", "lang"]): t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
             >> "architecture": t.String,
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default="default",
+            ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
             tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
@@ -222,7 +224,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             SessionTypes.INFERENCE,
             owner_access_key,
             params["domain"],
-            params["group"],
+            params["project"],
         )
 
         query = (
@@ -239,7 +241,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         params["config"]["scaling_group"] = checked_scaling_group
 
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        owner_uuid, project_id, resource_policy = await query_userinfo(request, params, conn)
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
             extra_vf_conds = (vfolders.c.id == uuid.UUID(params["config"]["model"])) & (
@@ -293,7 +295,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         params["architecture"],
         UserScope(
             domain_name=params["domain"],
-            group_id=group_id,
+            project_id=project_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
         ),
@@ -311,11 +313,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
 
     async with root_ctx.db.begin_session() as db_sess:
-        project_id = await resolve_group_name_or_id(
-            await db_sess.connection(), params["domain"], params["group"]
-        )
-        if project_id is None:
-            raise InvalidAPIParameters(f"Invalid group name {project_id}")
         endpoint = EndpointRow(
             params["service_name"],
             request["user"]["uuid"],

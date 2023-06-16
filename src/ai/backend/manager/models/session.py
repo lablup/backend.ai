@@ -68,10 +68,10 @@ from .base import (
     batch_multiresult_in_session,
     batch_result_in_session,
 )
-from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
+from .project import ProjectRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -573,8 +573,8 @@ class SessionRow(Base):
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
     domain = relationship("DomainRow", back_populates="sessions")
-    group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
-    group = relationship("GroupRow", back_populates="sessions")
+    project_id = ForeignKeyIDColumn("project_id", "projects.id", nullable=False)
+    project = relationship("ProjectRow", back_populates="sessions")
     user_uuid = ForeignKeyIDColumn("user_uuid", "users.uuid", nullable=False)
     user = relationship("UserRow", back_populates="sessions")
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
@@ -1087,7 +1087,7 @@ class SessionRow(Base):
             )
             .options(
                 noload("*"),
-                selectinload(SessionRow.group).options(noload("*")),
+                selectinload(SessionRow.project).options(noload("*")),
                 selectinload(SessionRow.domain).options(noload("*")),
                 selectinload(SessionRow.access_key_row).options(noload("*")),
                 selectinload(SessionRow.kernels).options(noload("*")),
@@ -1219,8 +1219,10 @@ class ComputeSession(graphene.ObjectType):
 
     # ownership
     domain_name = graphene.String()
-    group_name = graphene.String()
-    group_id = graphene.UUID()
+    project_name = graphene.String()
+    project_id = graphene.UUID()
+    group_name = graphene.String()  # legacy
+    group_id = graphene.UUID()  # legacy
     user_email = graphene.String()
     full_name = graphene.String()
     user_id = graphene.UUID()
@@ -1268,7 +1270,7 @@ class ComputeSession(graphene.ObjectType):
         assert row is not None
         email = getattr(row, "email")
         full_name = getattr(row, "full_name")
-        group_name = getattr(row, "group_name")
+        project_name = getattr(row, "project_name")
         row = row.SessionRow
         return {
             # identity
@@ -1289,8 +1291,10 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "group_name": group_name,
-            "group_id": row.group_id,
+            "project_name": project_name,
+            "project_id": row.project_id,
+            "group_name": project_name,  # legacy
+            "group_id": row.project_id,  # legacy
             "user_email": email,
             "full_name": full_name,
             "user_id": row.user_uuid,
@@ -1418,7 +1422,7 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
         "domain_name": ("sessions_domain_name", None),
-        "group_name": ("groups_name", None),
+        "project_name": ("projects_name", None),
         "user_email": ("users_email", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
@@ -1441,7 +1445,7 @@ class ComputeSession(graphene.ObjectType):
         # "image": "image",
         # "architecture": "architecture",
         "domain_name": "sessions_domain_name",
-        "group_name": "groups_name",
+        "project_name": "projects_name",
         "user_email": "users_email",
         "full_name": "users_full_name",
         "access_key": "sessions_access_key",
@@ -1463,7 +1467,7 @@ class ComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
         access_key: Optional[str] = None,
         status: Optional[str] = None,
         filter: Optional[str] = None,
@@ -1472,14 +1476,14 @@ class ComputeSession(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+        j = sa.join(SessionRow, ProjectRow, SessionRow.project_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(SessionRow.group_id == group_id)
+        if project_id is not None:
+            query = query.where(SessionRow.project_id == project_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
         if status is not None:
@@ -1499,7 +1503,7 @@ class ComputeSession(graphene.ObjectType):
         offset: int,
         *,
         domain_name: Optional[str] = None,
-        group_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
         access_key: Optional[str] = None,
         status: Optional[str] = None,
         filter: Optional[str] = None,
@@ -1511,13 +1515,13 @@ class ComputeSession(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+        j = sa.join(SessionRow, ProjectRow, SessionRow.project_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(
                 SessionRow,
-                GroupRow.name.label("group_name"),
+                ProjectRow.name.label("project_name"),
                 UserRow.email,
                 UserRow.full_name,
             )
@@ -1528,8 +1532,8 @@ class ComputeSession(graphene.ObjectType):
         )
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
-        if group_id is not None:
-            query = query.where(SessionRow.group_id == group_id)
+        if project_id is not None:
+            query = query.where(SessionRow.project_id == project_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
         if status is not None:
@@ -1554,13 +1558,13 @@ class ComputeSession(graphene.ObjectType):
         domain_name: str = None,
         access_key: str = None,
     ) -> Sequence[ComputeSession | None]:
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+        j = sa.join(SessionRow, ProjectRow, SessionRow.project_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(
                 SessionRow,
-                GroupRow.name.label("group_name"),
+                ProjectRow.name.label("project_name"),
                 UserRow.email,
                 UserRow.full_name,
             )

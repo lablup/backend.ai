@@ -9,11 +9,11 @@
             "allowed_docker_registries": ["cr.backend.ai"]
         }
     ],
-    "groups": [
+    "projects": [
         {
             "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "name": "default",
-            "description": "The default user group",
+            "description": "The default user project",
             "is_active": true,
             "domain_name": "default",
             "total_resource_slots": {},
@@ -91,21 +91,21 @@
             "role": "monitor"
         }
     ],
-    "association_groups_users": [
+    "association_projects_users": [
         {
-            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "project_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "project_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "user_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "project_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "project_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         }
     ],

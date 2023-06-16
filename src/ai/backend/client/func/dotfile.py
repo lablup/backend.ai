@@ -16,18 +16,18 @@ class Dotfile(BaseFunction):
         permission: str,
         owner_access_key: str = None,
         domain: str = None,
-        group: str = None,
+        project: Optional[str] = None,
     ) -> "Dotfile":
         body = {
             "data": data,
             "path": path,
             "permission": permission,
         }
-        if group:
-            body["group"] = group
+        if project:
+            body["project"] = project
             if domain:
                 body["domain"] = domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif domain:
             body["domain"] = domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -40,7 +40,7 @@ class Dotfile(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             await resp.json()
-        return cls(path, owner_access_key=owner_access_key, group=group, domain=domain)
+        return cls(path, owner_access_key=owner_access_key, project=project, domain=domain)
 
     @api_function
     @classmethod
@@ -48,14 +48,14 @@ class Dotfile(BaseFunction):
         cls,
         owner_access_key: str = None,
         domain: str = None,
-        group: str = None,
+        project: Optional[str] = None,
     ) -> "List[Mapping[str, str]]":
         params = {}
-        if group:
-            params["group"] = group
+        if project:
+            params["project"] = project
             if domain:
                 params["domain"] = domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif domain:
             params["domain"] = domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -72,22 +72,22 @@ class Dotfile(BaseFunction):
         self,
         path: str,
         owner_access_key: Optional[str] = None,
-        group: str = None,
+        project: Optional[str] = None,
         domain: str = None,
     ):
         self.path = path
         self.owner_access_key = owner_access_key
-        self.group = group
+        self.project = project
         self.domain = domain
 
     @api_function
     async def get(self) -> str:
         params = {"path": self.path}
-        if self.group:
-            params["group"] = self.group
+        if self.project:
+            params["project"] = self.project
             if self.domain:
                 params["domain"] = self.domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif self.domain:
             params["domain"] = self.domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -107,11 +107,11 @@ class Dotfile(BaseFunction):
             "path": self.path,
             "permission": permission,
         }
-        if self.group:
-            body["group"] = self.group
+        if self.project:
+            body["project"] = self.project
             if self.domain:
                 body["domain"] = self.domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif self.domain:
             body["domain"] = self.domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -128,11 +128,11 @@ class Dotfile(BaseFunction):
     @api_function
     async def delete(self):
         params = {"path": self.path}
-        if self.group:
-            params["group"] = self.group
+        if self.project:
+            params["project"] = self.project
             if self.domain:
                 params["domain"] = self.domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif self.domain:
             params["domain"] = self.domain
             rqst_endpoint = "/domain-config/dotfiles"

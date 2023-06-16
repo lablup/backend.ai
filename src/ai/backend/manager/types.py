@@ -35,7 +35,7 @@ class Sentinel(enum.Enum):
 @attr.define(slots=True)
 class UserScope:
     domain_name: str
-    group_id: uuid.UUID
+    project_id: uuid.UUID
     user_uuid: uuid.UUID
     user_role: str
 

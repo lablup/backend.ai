@@ -9,12 +9,12 @@ from ai.backend.common.types import AccessKey
 from .models import (
     UserRole,
 )
-from .models import association_groups_users as agus
+from .models import association_projects_users as apus
 from .models import (
     domains,
-    groups,
     keypair_resource_policies,
     keypairs,
+    projects,
     users,
 )
 
@@ -27,7 +27,7 @@ def check_if_requester_is_eligible_to_act_as_target_user(
 ) -> bool:
     if requester_role == UserRole.SUPERADMIN:
         pass
-    elif requester_role == UserRole.ADMIN:
+    elif requester_role == UserRole.DOMAIN_ADMIN:
         if requester_domain != target_domain:
             raise RuntimeError(
                 (
@@ -105,7 +105,7 @@ async def query_userinfo(
     requester_domain: str,
     keypair_resource_policy: dict,
     requesting_domain: str,
-    requesting_group: str | UUID,
+    requesting_project: str | UUID,
     query_on_behalf_of: Optional[AccessKey] = None,
 ) -> tuple[UUID, UUID, dict]:
     if query_on_behalf_of is not None and query_on_behalf_of != requester_access_key:
@@ -120,7 +120,7 @@ async def query_userinfo(
         owner_access_key = requester_access_key
 
     owner_uuid = None
-    group_id = None
+    project_id = None
     resource_policy = None
 
     if requester_access_key != owner_access_key:
@@ -164,53 +164,55 @@ async def query_userinfo(
     if domain_name is None:
         raise ValueError("Invalid domain")
 
-    if isinstance(requesting_group, str):
-        group_match_query = groups.c.name == requesting_group
+    if isinstance(requesting_project, str):
+        project_match_query = projects.c.name == requesting_project
     else:
-        group_match_query = groups.c.id == requesting_group
+        project_match_query = projects.c.id == requesting_project
     if owner_role == UserRole.SUPERADMIN:
-        # superadmin can spawn container in any designated domain/group.
+        # superadmin can spawn container in any designated domain/project.
         query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
+            sa.select([projects.c.id])
+            .select_from(projects)
             .where(
-                (groups.c.domain_name == requesting_domain)
-                & (group_match_query)
-                & (groups.c.is_active),
+                (projects.c.domain_name == requesting_domain)
+                & (project_match_query)
+                & (projects.c.is_active),
             )
         )
         qresult = await conn.execute(query)
-        group_id = qresult.scalar()
-    elif owner_role == UserRole.ADMIN:
-        # domain-admin can spawn container in any group in the same domain.
+        project_id = qresult.scalar()
+    elif owner_role == UserRole.DOMAIN_ADMIN:
+        # domain-admin can spawn container in any project in the same domain.
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to the owner's domain.")
         query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
+            sa.select([projects.c.id])
+            .select_from(projects)
             .where(
-                (groups.c.domain_name == owner_domain) & (group_match_query) & (groups.c.is_active),
+                (projects.c.domain_name == owner_domain)
+                & (project_match_query)
+                & (projects.c.is_active),
             )
         )
         qresult = await conn.execute(query)
-        group_id = qresult.scalar()
+        project_id = qresult.scalar()
     else:
-        # normal users can spawn containers in their group and domain.
+        # normal users and project-admin can spawn containers in their project and domain.
         if requesting_domain != owner_domain:
             raise ValueError("You can only set the domain to your domain.")
         query = (
-            sa.select([agus.c.group_id])
-            .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
+            sa.select([apus.c.project_id])
+            .select_from(apus.join(projects, apus.c.project_id == projects.c.id))
             .where(
-                (agus.c.user_id == owner_uuid)
-                & (groups.c.domain_name == owner_domain)
-                & (group_match_query)
-                & (groups.c.is_active),
+                (apus.c.user_id == owner_uuid)
+                & (projects.c.domain_name == owner_domain)
+                & (project_match_query)
+                & (projects.c.is_active),
             )
         )
         qresult = await conn.execute(query)
-        group_id = qresult.scalar()
-    if group_id is None:
-        raise ValueError("Invalid group")
+        project_id = qresult.scalar()
+    if project_id is None:
+        raise ValueError("Invalid project")
 
-    return owner_uuid, group_id, resource_policy
+    return owner_uuid, project_id, resource_policy

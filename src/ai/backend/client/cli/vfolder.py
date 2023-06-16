@@ -61,12 +61,12 @@ def list_allowed_types():
 @click.argument("name", type=str)
 @click.argument("host", type=str, default=None)
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP",
+    "-t",
+    "--project",
+    metavar="PROJECT",
     type=str,
     default=None,
-    help="Group ID or NAME. Specify this option if you want to create a group folder.",
+    help="Project ID or NAME. Specify this option if you want to create a project folder.",
 )
 @click.option(
     "--unmanaged",
@@ -121,7 +121,7 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, usage_mode, permission, quota, cloneable):
+def create(name, host, project, host_path, usage_mode, permission, quota, cloneable):
     """Create a new virtual folder.
 
     \b
@@ -134,7 +134,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                 result = session.VFolder.create(
                     name=name,
                     unmanaged_path=host,
-                    group=group,
+                    project=project,
                     usage_mode=usage_mode,
                     permission=permission,
                     quota=quota,
@@ -144,7 +144,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                 result = session.VFolder.create(
                     name=name,
                     host=host,
-                    group=group,
+                    project=project,
                     usage_mode=usage_mode,
                     permission=permission,
                     quota=quota,
@@ -214,7 +214,7 @@ def info(name):
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
             print("- Usage Mode: {0}".format(result.get("usage_mode", "")))
-            print("- Group ID: {0}".format(result["group"]))
+            print("- Project ID: {0}".format(result["project"]))
             print("- User ID: {0}".format(result["user"]))
             print("- Clone Allowed: {0}".format(result["cloneable"]))
         except Exception as e:
@@ -622,10 +622,10 @@ def invitations():
     help='Permission to give. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).',
 )
 def share(name, emails, perm):
-    """Share a group folder to users with overriding permission.
+    """Share a project folder to users with overriding permission.
 
     \b
-    NAME: Name of a (group-type) virtual folder.
+    NAME: Name of a (project-type) virtual folder.
     EMAILS: Emails to share.
     """
     with Session() as session:
@@ -648,10 +648,10 @@ def share(name, emails, perm):
 @click.argument("name", type=str)
 @click.argument("emails", type=str, nargs=-1, required=True)
 def unshare(name, emails):
-    """Unshare a group folder from users.
+    """Unshare a project folder from users.
 
     \b
-    NAME: Name of a (group-type) virtual folder.
+    NAME: Name of a (project-type) virtual folder.
     EMAILS: Emails to share.
     """
     with Session() as session:
@@ -688,8 +688,8 @@ def leave(name, shared_user_uuid):
     with Session() as session:
         try:
             vfolder_info = session.VFolder(name).info()
-            if vfolder_info["type"] == "group":
-                print("You cannot leave a group virtual folder.")
+            if vfolder_info["type"] == "project":
+                print("You cannot leave a project virtual folder.")
                 return
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")

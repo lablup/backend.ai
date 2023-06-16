@@ -4,9 +4,9 @@ from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
     DependencyListFormatter,
-    GroupListFormatter,
     InlineRoutingFormatter,
     KernelStatFormatter,
+    ProjectListFormatter,
     SubFieldOutputFormatter,
     mibytes_output_formatter,
     nested_dict_formatter,
@@ -79,8 +79,7 @@ domain_fields = FieldSet(
     ]
 )
 
-
-group_fields = FieldSet(
+project_fields = FieldSet(
     [
         FieldSpec("id"),
         FieldSpec("name"),
@@ -179,8 +178,8 @@ session_fields = FieldSet(
         FieldSpec("cluster_mode"),
         FieldSpec("cluster_size"),
         FieldSpec("domain_name"),
-        FieldSpec("group_name", "Project/Group"),
-        FieldSpec("group_id"),
+        FieldSpec("project_name", "Project/Group"),
+        FieldSpec("project_id"),
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
@@ -270,7 +269,7 @@ user_fields = FieldSet(
         FieldSpec("modified_at"),
         FieldSpec("domain_name"),
         FieldSpec("role"),
-        FieldSpec("groups { id name }", formatter=GroupListFormatter()),
+        FieldSpec("projects { id name }", formatter=ProjectListFormatter()),
         FieldSpec("allowed_client_ip"),
         FieldSpec("totp_activated"),
     ]
@@ -283,7 +282,7 @@ vfolder_fields = FieldSet(
         FieldSpec("host"),
         FieldSpec("name"),
         FieldSpec("user", alt_name="user_id"),
-        FieldSpec("group", alt_name="group_id"),
+        FieldSpec("project_id"),
         FieldSpec("creator"),
         FieldSpec("status"),
         FieldSpec("unmanaged_path"),

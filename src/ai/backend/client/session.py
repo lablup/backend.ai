@@ -261,7 +261,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "ComputeSession",
         "SessionTemplate",
         "Domain",
-        "Group",
+        "Project",
         "Auth",
         "User",
         "KeyPair",
@@ -303,12 +303,12 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
-        from .func.group import Group
         from .func.image import Image
         from .func.keypair import KeyPair
         from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.manager import Manager
         from .func.model import Model
+        from .func.project import Project
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
         from .func.server_log import ServerLog
@@ -329,7 +329,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.BackgroundTask = BackgroundTask
         self.EtcdConfig = EtcdConfig
         self.Domain = Domain
-        self.Group = Group
+        self.Project = Project
         self.Image = Image
         self.ComputeSession = ComputeSession
         self.KeyPair = KeyPair
