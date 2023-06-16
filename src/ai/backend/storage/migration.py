@@ -194,7 +194,7 @@ async def upgrade_2_to_3(
                         created_quota_scopes.add(quota_scope_id)
                     await volume.fsop_model.move_tree(
                         volume.mangle_vfpath(orig_vfid),
-                        volume.quota_model.mangle_qspath(dst_vfid),
+                        volume.mangle_vfpath(dst_vfid),
                     )
                 except Exception:
                     log.exception("error during migration of vfolder {}", folder_id)
