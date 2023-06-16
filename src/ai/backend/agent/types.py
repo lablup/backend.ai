@@ -15,6 +15,7 @@ class AgentBackend(enum.Enum):
     # The list of importable backend names under "ai.backend.agent" pkg namespace.
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
+    DUMMY = "dummy"
 
 
 @attrs.define(auto_attribs=True, slots=True)
