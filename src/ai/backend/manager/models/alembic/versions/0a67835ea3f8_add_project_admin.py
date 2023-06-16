@@ -98,9 +98,6 @@ def downgrade():
 
     # replace role values
     _update_role_value(conn, UserRole.DOMAIN_ADMIN, LegacyUserRole.ADMIN)
-    _update_role_value(
-        conn, UserRole.PROJECT_ADMIN, LegacyUserRole.USER
-    )  # project admin will be users.
 
     for n in new_names:
         _delete_enum_value(conn, enum_name, n)

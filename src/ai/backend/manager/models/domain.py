@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, TypedDict
+from uuid import UUID
 
 import graphene
 import sqlalchemy as sa
@@ -28,7 +29,8 @@ from .base import (
     simple_db_mutate_returning_item,
 )
 from .scaling_group import ScalingGroup
-from .user import UserRole
+from .user import UserRole, users
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -394,3 +396,9 @@ def verify_dotfile_name(dotfile: str) -> bool:
     if dotfile in RESERVED_DOTFILES:
         return False
     return True
+
+
+async def query_domain_user(db: ExtendedAsyncSAEngine, domain_name: str) -> list[UUID]:
+    stmt = sa.select([users.c.uuid]).where(users.c.domain_name)
+    async with db.begin_readonly() as conn:
+        return (await conn.scalars(stmt)).all()

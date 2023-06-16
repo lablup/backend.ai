@@ -778,3 +778,35 @@ def verify_dotfile_name(dotfile: str) -> bool:
     if dotfile in RESERVED_DOTFILES:
         return False
     return True
+
+
+async def query_project_where_user_is_admin(
+    db: ExtendedAsyncSAEngine, user_id: uuid.UUID
+) -> list[ProjectRow]:
+    j = sa.join(
+        ProjectRow,
+        AssocProjectUserRow,
+        (ProjectRow.id == AssocProjectUserRow.project_id)
+        & (AssocProjectUserRow.role == Role.ADMIN),
+    )
+    stmt = sa.select(ProjectRow).select_from(j).where(AssocProjectUserRow.user_id == user_id)
+    async with db.begin_readonly_session() as db_sess:
+        return (await db_sess.scalars(stmt)).all()
+
+
+async def query_project_user_where_user_is_admin(
+    db: ExtendedAsyncSAEngine, user_id: uuid.UUID
+) -> list[uuid.UUID]:
+    apu1 = association_projects_users.alias("apu1")
+    apu2 = association_projects_users.alias("apu2")
+
+    j = sa.join(
+        apu1,
+        apu2,
+        (apu1.c.project_id == apu2.c.project_id)
+        & (apu1.c.role == Role.ADMIN)
+        & (apu1.c.user_id != apu2.c.user_id),
+    )
+    stmt = sa.select([apu2.c.user_id]).select_from(j).where(apu1.c.user_id == user_id)
+    async with db.begin_readonly() as conn:
+        return (await conn.scalars(stmt)).all()
