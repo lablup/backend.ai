@@ -796,7 +796,7 @@ class AbstractAgent(
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
                 "addr": f"tcp://{self.local_config['agent']['rpc-listen-addr']}",
-                "public_host": self._get_public_host(),
+                "public_host": str(self._get_public_host()),
                 "resource_slots": res_slots,
                 "version": VERSION,
                 "compute_plugins": {
