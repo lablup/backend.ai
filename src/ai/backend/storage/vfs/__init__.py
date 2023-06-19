@@ -354,6 +354,7 @@ class BaseVolume(AbstractVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
+        exist_ok=False,
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
@@ -361,7 +362,7 @@ class BaseVolume(AbstractVolume):
                 f"Quota scope {qspath} does not exist in the target volume"
             )
         vfpath = self.mangle_vfpath(vfid)
-        await aiofiles.os.makedirs(vfpath, 0o755)
+        await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
