@@ -1103,6 +1103,7 @@ async def test_manually_assign_agent_available(
     registry_ctx: tuple[
         AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
     ],
+    mocker,
     example_agents,
     example_pending_sessions,
 ):
@@ -1118,6 +1119,9 @@ async def test_manually_assign_agent_available(
     ) = registry_ctx
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
+    mock_redis_wrapper = MagicMock()
+    mock_redis_wrapper.execute = AsyncMock(return_value=[0 for _ in example_agents])
+    mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents

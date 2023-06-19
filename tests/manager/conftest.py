@@ -793,6 +793,7 @@ async def registry_ctx(mocker):
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
     )
+    registry.increase_agent_container_count = AsyncMock()
     await registry.init()
     try:
         yield (
