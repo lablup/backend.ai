@@ -96,6 +96,7 @@ agents = sa.Table(
         server_default=false(),
         default=False,
     ),
+    sa.Column("max_container_count", sa.Integer(), nullable=True),
 )
 
 
