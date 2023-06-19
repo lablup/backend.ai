@@ -728,6 +728,7 @@ class SchedulerDispatcher(aobject):
                         agent_addr=agent_alloc_ctx.agent_addr,
                         scaling_group=sgroup_name,
                         status=KernelStatus.SCHEDULED,
+                        scheduled_at=now,
                         status_info="scheduled",
                         status_data={},
                         status_changed=now,
@@ -750,7 +751,7 @@ class SchedulerDispatcher(aobject):
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        # status_changed=now,
+                        scheduled_at=now,
                         status_history=sql_json_merge(
                             SessionRow.status_history,
                             (),

@@ -453,6 +453,7 @@ kernels = sa.Table(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     ),
     sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
+    sa.Column("scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
     sa.Column(
         "status",
         EnumType(KernelStatus),
@@ -786,6 +787,7 @@ class ComputeContainer(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
     abusing_report = graphene.JSONString()
 
     # resources
@@ -830,6 +832,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "starts_at": row["starts_at"],
+            "scheduled_at": row["scheduled_at"],
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
@@ -882,6 +885,7 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
+        "scheduled_at": ("scheduled_at", dtparse),
     }
 
     _queryorder_colmap = {
@@ -898,6 +902,7 @@ class ComputeContainer(graphene.ObjectType):
         "status_changed": "status_info",
         "created_at": "created_at",
         "terminated_at": "terminated_at",
+        "scheduled_at": "scheduled_at",
     }
 
     @classmethod

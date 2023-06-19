@@ -607,6 +607,9 @@ class SessionRow(Base):
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
+    scheduled_at = sa.Column(
+        "scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+    )
     status = sa.Column(
         "status",
         EnumType(SessionStatus),
@@ -1237,6 +1240,7 @@ class ComputeSession(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
@@ -1306,6 +1310,7 @@ class ComputeSession(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
+            "scheduled_at": row.scheduled_at,
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
@@ -1431,6 +1436,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
+        "scheduled_at": ("scheduled_at", dtparse),
         "startup_command": ("sessions_startup_command", None),
     }
 
@@ -1455,6 +1461,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": "sessions_created_at",
         "terminated_at": "sessions_terminated_at",
         "starts_at": "sessions_starts_at",
+        "scheduled_at": "scheduled_at",
     }
 
     @classmethod
