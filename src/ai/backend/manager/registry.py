@@ -2408,7 +2408,7 @@ class AgentRegistry:
                 await self.recalc_resource_usage()
             return main_stat
 
-    async def update_agent_container_count(self, agent_id: AgentId, count: int) -> None:
+    async def increase_agent_container_count(self, agent_id: AgentId, count: int) -> None:
         await redis_helper.execute(
             self.redis_stat, lambda r: r.incrby(f"container_count.{agent_id}", count)
         )
@@ -2480,7 +2480,7 @@ class AgentRegistry:
             else:
                 pass
         for aid, cnt in agent_container_cnt_map.items():
-            await self.update_agent_container_count(aid, -cnt)
+            await self.increase_agent_container_count(aid, -cnt)
 
     async def restart_session(
         self,

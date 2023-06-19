@@ -793,7 +793,7 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.update_agent_container_count(agent_id, container_count)
+        await self.registry.increase_agent_container_count(agent_id, container_count)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -1011,7 +1011,7 @@ class SchedulerDispatcher(aobject):
 
         await execute_with_retry(_finalize_scheduled)
         for aid, cnt in agent_container_cnt_map.items():
-            await self.registry.update_agent_container_count(aid, cnt)
+            await self.registry.increase_agent_container_count(aid, cnt)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
