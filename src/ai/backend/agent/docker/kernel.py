@@ -21,7 +21,7 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -39,6 +39,8 @@ class DockerKernel(AbstractKernel):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -50,6 +52,8 @@ class DockerKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -124,6 +128,11 @@ class DockerKernel(AbstractKernel):
                 "options": opts,
             }
         )
+        return result
+
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
         return result
 
     async def shutdown_service(self, service: str):
@@ -291,8 +300,7 @@ class DockerKernel(AbstractKernel):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -313,8 +321,7 @@ class DockerKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
         proc = await asyncio.create_subprocess_exec(
             *[
                 "docker",
@@ -521,9 +528,12 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                 "Cmd": [
                     "/bin/sh",
                     "-c",
-                    "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
-                    "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
+                    (
+                        "ctr -n services.linuxkit t kill --exec-id metaproxy docker;ctr -n"
+                        " services.linuxkit t exec --exec-id metaproxy docker"
+                        " /host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port"
+                        f" {server_port}"
+                    ),
                 ],
                 "HostConfig": {
                     "PidMode": "host",

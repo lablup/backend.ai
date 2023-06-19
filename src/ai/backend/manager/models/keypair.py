@@ -180,8 +180,9 @@ class KeyPair(graphene.ObjectType):
 
     # Deprecated
     concurrency_limit = graphene.Int(
-        deprecation_reason="Moved to KeyPairResourcePolicy object as "
-        "the max_concurrent_sessions field."
+        deprecation_reason=(
+            "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
+        )
     )
 
     async def resolve_user_info(

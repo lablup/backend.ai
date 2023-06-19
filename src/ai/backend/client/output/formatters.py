@@ -3,6 +3,7 @@ from __future__ import annotations
 import decimal
 import json
 import textwrap
+from collections import defaultdict
 from typing import Any, Mapping, Optional
 
 import humanize
@@ -51,7 +52,8 @@ def format_nested_dicts(value: Mapping[str, Mapping[str, Any]]) -> str:
                     # TODO: refactor as a formatter
                     if outer_key == "shmem":
                         rows.append(
-                            f"- {outer_key}: {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
+                            f"- {outer_key}:"
+                            f" {humanize.naturalsize(str(outer_value), binary=True, gnu=True)}"
                         )
                     else:
                         rows.append(f"- {outer_key}: {outer_value}")
@@ -233,6 +235,22 @@ class AgentStatFormatter(OutputFormatter):
 class GroupListFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return ", ".join(g["name"] for g in value)
+
+    def format_json(self, value: Any, field: FieldSpec) -> Any:
+        return value
+
+
+class InlineRoutingFormatter(OutputFormatter):
+    def format_console(self, value: Any, field: FieldSpec) -> str:
+        count_by_status: defaultdict[int, int] = defaultdict(int)
+        for route in value:
+            count_by_status[route["status"]] += 1
+        return ", ".join(
+            [
+                f"{key} {value}"
+                for key, value in sorted(count_by_status.items(), key=lambda kv: kv[0])
+            ]
+        )
 
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return value
