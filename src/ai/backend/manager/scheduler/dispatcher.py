@@ -601,11 +601,6 @@ class SchedulerDispatcher(aobject):
             if ag.max_container_count is None or ag.max_container_count > int(count)
         ]
 
-    async def _update_agent_container_count(self, agent_id: AgentId, count: int) -> None:
-        await redis_helper.execute(
-            self.registry.redis_stat, lambda r: r.incrby(f"container_count.{agent_id}", count)
-        )
-
     async def _schedule_single_node_session(
         self,
         sched_ctx: SchedulingContext,
@@ -798,7 +793,7 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self._update_agent_container_count(agent_id, container_count)
+        await self.registry.update_agent_container_count(agent_id, container_count)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -1016,7 +1011,7 @@ class SchedulerDispatcher(aobject):
 
         await execute_with_retry(_finalize_scheduled)
         for aid, cnt in agent_container_cnt_map.items():
-            await self._update_agent_container_count(aid, cnt)
+            await self.registry.update_agent_container_count(aid, cnt)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
