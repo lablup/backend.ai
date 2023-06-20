@@ -1,16 +1,17 @@
-"""add_pending_session_policies
+"""add_max_pending_session
 
-Revision ID: 3c06e520fe92
-Revises: 85984c98b90f
-Create Date: 2023-06-06 16:15:02.535768
+Revision ID: 120c73821888
+Revises: 5fbd368d12a2
+Create Date: 2023-06-20 15:33:47.570939
 
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "3c06e520fe92"
-down_revision = "85984c98b90f"
+revision = "120c73821888"
+down_revision = "5fbd368d12a2"
 branch_labels = None
 depends_on = None
 
