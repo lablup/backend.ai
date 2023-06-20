@@ -2408,18 +2408,11 @@ class AgentRegistry:
                 await self.recalc_resource_usage()
             return main_stat
 
-    async def increase_agent_container_count(self, agent_id: AgentId, count: int) -> None:
-        await redis_helper.execute(
-            self.redis_stat, lambda r: r.incrby(f"container_count.{agent_id}", count)
-        )
-
     async def clean_session(
         self,
         session_id: SessionId,
     ) -> None:
-        agent_container_cnt_map: dict[AgentId, int] = defaultdict(int)
-
-        async def _fetch() -> list[Row]:
+        async def _fetch() -> Row:
             async with self.db.begin_readonly() as conn:
                 query = (
                     sa.select(
@@ -2430,22 +2423,18 @@ class AgentRegistry:
                             kernels.c.agent,
                             kernels.c.agent_addr,
                             kernels.c.use_host_network,
-                            kernels.c.cluster_role,
                         ]
                     )
                     .select_from(kernels)
-                    .where((kernels.c.session_id == session_id))
+                    .where(
+                        (kernels.c.session_id == session_id)
+                        & (kernels.c.cluster_role == DEFAULT_ROLE)
+                    )
                 )
                 result = await conn.execute(query)
-                return result.fetchall()
+                return result.first()
 
-        kernels = await execute_with_retry(_fetch)
-        if not kernels:
-            return
-        for kernel in kernels:
-            if kernel["cluster_role"] == DEFAULT_ROLE:
-                session = kernel
-            agent_container_cnt_map[kernel["agent"]] += 1
+        session = await execute_with_retry(_fetch)
         if session is None:
             return
         if not session["use_host_network"]:
@@ -2479,8 +2468,6 @@ class AgentRegistry:
                     log.exception(f"Failed to destroy the overlay network {network_name}")
             else:
                 pass
-        for aid, cnt in agent_container_cnt_map.items():
-            await self.increase_agent_container_count(aid, -cnt)
 
     async def restart_session(
         self,

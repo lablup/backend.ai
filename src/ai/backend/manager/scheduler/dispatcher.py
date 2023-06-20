@@ -4,7 +4,6 @@ import asyncio
 import itertools
 import logging
 import uuid
-from collections import defaultdict
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
@@ -32,6 +31,7 @@ from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
@@ -587,18 +587,27 @@ class SchedulerDispatcher(aobject):
         if num_scheduled > 0:
             await self.event_producer.produce_event(DoPrepareEvent())
 
-    async def _filter_agent_by_container_limit(self, cand_agents: list[AgentRow]) -> list[AgentRow]:
+    async def _filter_agent_by_container_limit(
+        self, candidate_agents: list[AgentRow]
+    ) -> list[AgentRow]:
+        raw_value = await self.shared_config.etcd.get(
+            "config/agent/max-container-count", scope=ConfigScopes.SGROUP
+        )
+        if raw_value is None:
+            return candidate_agents
+        max_container_count = int(raw_value)
+
         async def _pipe_builder(r: Redis) -> RedisPipeline:
             pipe = r.pipeline()
-            for ag in cand_agents:
+            for ag in candidate_agents:
                 await pipe.get(f"container_count.{ag.id}")
             return pipe
 
         raw_counts = await redis_helper.execute(self.registry.redis_stat, _pipe_builder)
         return [
             ag
-            for ag, count in zip(cand_agents, raw_counts)
-            if ag.max_container_count is None or ag.max_container_count > int(count)
+            for ag, count in zip(candidate_agents, raw_counts)
+            if max_container_count > int(count)
         ]
 
     async def _schedule_single_node_session(
@@ -639,11 +648,10 @@ class SchedulerDispatcher(aobject):
             if not available_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        "No agents found to be available because all agents have reached the limit"
-                        " of the number of containers."
+                        "No agents found to be available because all agents have reached the hard"
+                        " limit of the number of containers."
                     ),
                 )
-            container_count = len(sess_ctx.kernels)
 
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
@@ -793,7 +801,6 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        await self.registry.increase_agent_container_count(agent_id, container_count)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
@@ -814,7 +821,6 @@ class SchedulerDispatcher(aobject):
         log_args = _log_args.get()
         agent_query_extra_conds = None
         kernel_agent_bindings: List[KernelAgentBinding] = []
-        agent_container_cnt_map: dict[AgentId, int] = defaultdict(int)
         async with self.db.begin_session() as agent_db_sess:
             # This outer transaction is rolled back when any exception occurs inside,
             # including scheduling failures of a kernel.
@@ -865,7 +871,7 @@ class SchedulerDispatcher(aobject):
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     "No agents found to be available because all agents have"
-                                    " reached the limit of the number of containers."
+                                    " reached the hard limit of the number of containers."
                                 ),
                             )
                         # Let the scheduler check the resource availability and decide the target agent
@@ -958,7 +964,6 @@ class SchedulerDispatcher(aobject):
                 else:
                     assert agent_alloc_ctx is not None
                     kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
-                    agent_container_cnt_map[agent_id] += 1
 
         assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
         # Proceed to PREPARING only when all kernels are successfully scheduled.
@@ -1010,8 +1015,6 @@ class SchedulerDispatcher(aobject):
                 await db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
-        for aid, cnt in agent_container_cnt_map.items():
-            await self.registry.increase_agent_container_count(aid, cnt)
         await self.registry.event_producer.produce_event(
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
