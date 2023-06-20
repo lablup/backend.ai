@@ -745,13 +745,17 @@ class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
 
+    async def get(self, key: str, scope) -> Any:
+        return None
+
 
 @pytest.fixture
 async def registry_ctx(mocker):
     mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
     mock_shared_config.update_resource_slots = AsyncMock()
-    mock_shared_config.etcd = None
+    mocked_etcd = DummyEtcd()
+    mock_shared_config.etcd = mocked_etcd
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()
@@ -777,7 +781,6 @@ async def registry_ctx(mocker):
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.produce_event = AsyncMock()
-    mocked_etcd = DummyEtcd()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
 
