@@ -21,7 +21,7 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -39,6 +39,8 @@ class DockerKernel(AbstractKernel):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -50,6 +52,8 @@ class DockerKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -126,6 +130,11 @@ class DockerKernel(AbstractKernel):
         )
         return result
 
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
+        return result
+
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
@@ -141,7 +150,7 @@ class DockerKernel(AbstractKernel):
         lock_path = commit_path / "lock" / str(kernel_id)
         return commit_path, lock_path
 
-    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str):
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         _, lock_path = self._get_commit_path(kernel_id, subdir)
         if lock_path.exists():
             return CommitStatus.ONGOING
@@ -284,16 +293,14 @@ class DockerKernel(AbstractKernel):
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -314,8 +321,7 @@ class DockerKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
         proc = await asyncio.create_subprocess_exec(
             *[
                 "docker",
@@ -336,7 +342,6 @@ class DockerKernel(AbstractKernel):
 
 
 class DockerCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int
@@ -507,10 +512,7 @@ LinuxKit_CMD_EXEC_PREFIX = [
 
 
 async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) -> None:
-    async with closing_async(Docker()) as docker:
-        kernel_version = (await docker.version())["KernelVersion"]
-    if "linuxkit" in kernel_version:
-        local_config["agent"]["docker-mode"] = "linuxkit"
+    if local_config["agent"]["docker-mode"] == "linuxkit":
         # Docker Desktop mode
         arch = get_arch_name()
         proxy_worker_binary = pkg_resources.resource_filename(
@@ -526,9 +528,12 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                 "Cmd": [
                     "/bin/sh",
                     "-c",
-                    "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
-                    "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
+                    (
+                        "ctr -n services.linuxkit t kill --exec-id metaproxy docker;ctr -n"
+                        " services.linuxkit t exec --exec-id metaproxy docker"
+                        " /host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port"
+                        f" {server_port}"
+                    ),
                 ],
                 "HostConfig": {
                     "PidMode": "host",
@@ -577,6 +582,3 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
             log.info("Inserted the iptables rules.")
         else:
             log.info("The iptables rule already exists.")
-    else:
-        # Linux Mode
-        local_config["agent"]["docker-mode"] = "native"

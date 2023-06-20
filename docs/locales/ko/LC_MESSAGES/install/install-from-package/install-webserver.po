@@ -1,0 +1,165 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/install-webserver.rst:2
+#: d95663ba2ac44d3b84a344cf5506e05d
+msgid "Install Backend.AI Webserver"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:4
+#: 5aa6ecd3bf9a440b9e266fe2bc9cd918
+msgid ""
+"Refer to :ref:`prepare_python_and_venv` to setup Python and virtual "
+"environment for the service."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:7
+#: 290c7c9423564fe0bb65316ace9be77e
+msgid ""
+"Install the latest version of Backend.AI Webserver for the current Python"
+" version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:16
+#: fcfca72fe5204d928197600fd832e92f
+msgid "If you want to install a specific version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:24
+#: ce23b731dfd04f4b95273723e9ef2214
+msgid "Local configuration"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:26
+#: ee86615096d540f6af60fe620faf87b7
+msgid ""
+"Backend.AI Webserver uses a config file (``webserver.conf``) to configure"
+" local service. Refer to the `webserver.conf sample file "
+"<https://github.com/lablup/backend.ai/blob/main/configs/webserver/sample.conf>`_"
+" for a detailed description of each section and item. A configuration "
+"example would be:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:94
+#: 368c12e1c5e3411095950b6000403c1f
+msgid "Save the contents to ``${HOME}/.config/backend.ai/webserver.conf``."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:98
+#: 56112973737e4ed2a1f87708c4059b3c
+msgid "Run Backend.AI Webserver service"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:100
+#: 98bb07e6f95b4e15b45122931bde2107
+msgid ""
+"You can run the service by specifying the config file path with ``-f`` "
+"option:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:107
+#: b4c7d6e9edc2448f930a46577a79c1de
+msgid "Press ``Ctrl-C`` to stop both services."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:111
+#: 99ac2825de964561a32b0cd4150ce350
+msgid "Register systemd service"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:113
+#: 9e2411311be2444982a4f38fa0b8ad62
+msgid ""
+"The service can be registered as a systemd daemon. It is recommended to "
+"automatically run the service after rebooting the host machine, although "
+"this is entirely optional."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:117
+#: fd38ea67996e45bb9ad38a3c84c90ed5
+msgid "First, create a runner script at ``${HOME}/bin/run-webserver.sh``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:142
+#: 6f8d3bed396b4627b63dbd111444f6c4
+msgid "Make the scripts executable:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:148
+#: 6f6b4f8ca6c64382ad30d1805f619002
+msgid ""
+"Then, create a systemd service file at ``/etc/systemd/system/backendai-"
+"webserver.service``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:177
+#: 515b75166f984409b04def97efc210eb
+msgid "Finally, enable and start the service:"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:195
+#: 8d6987befec2488bbda5e4367d95fab0
+msgid "Check user GUI access via web"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:197
+#: 51e471fbaa574ee9a1b260a6fa89b0bc
+msgid ""
+"You can check the access to the web GUI by opening the URL ``http"
+"://<host-ip-or-domain>:8080`` in your web browser. If all goes well, you "
+"will see the login page."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:205
+#: c927c4c76b61422f844b8217b2008c79
+msgid "Enter the email and password you set in the previous step to check login."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:209
+#: b477b6eb7fe640ba8058b5533cb8721b
+msgid ""
+"You can use almost every feature from the web GUI, but launching compute "
+"sesison apps like Terminal and/or Jupyer notebook is not possible from "
+"the web in the open-source edition. You can instead use the GUI desktop "
+"client to fully use the GUI features."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:214
+#: c1972ba9e0aa4cb1bb49da7822140d37
+msgid ""
+"You can download the GUI desktop client from the web GUI in the Summary "
+"page. Please use the \"Download Backend.AI Web UI App\" at the bottom of "
+"the page."
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:221
+#: 0a596b2f79fc4d86ba49e5365d82d113
+msgid ""
+"Or, you can download from the following release page: "
+"https://github.com/lablup/backend.ai-webui/releases"
+msgstr ""
+
+#: ../../install/install-from-package/install-webserver.rst:224
+#: 361c498e973e448a845e8a2a7b947140
+msgid "Web UI (user GUI) guide can be found at https://webui.docs.backend.ai/."
+msgstr ""
+

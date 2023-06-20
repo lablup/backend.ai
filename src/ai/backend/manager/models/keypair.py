@@ -178,8 +178,9 @@ class KeyPair(graphene.ObjectType):
 
     # Deprecated
     concurrency_limit = graphene.Int(
-        deprecation_reason="Moved to KeyPairResourcePolicy object as "
-        "the max_concurrent_sessions field."
+        deprecation_reason=(
+            "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
+        )
     )
 
     async def resolve_user_info(
@@ -462,7 +463,6 @@ class ModifyKeyPairInput(graphene.InputObjectType):
 
 
 class CreateKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -511,7 +511,6 @@ class CreateKeyPair(graphene.Mutation):
 
 
 class ModifyKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -540,7 +539,6 @@ class ModifyKeyPair(graphene.Mutation):
 
 
 class DeleteKeyPair(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -602,6 +600,8 @@ def generate_ssh_keypair() -> Tuple[str, str]:
         )
         .decode("utf-8")
     )
+    public_key = f"{public_key.rstrip()}\n"
+    private_key = f"{private_key.rstrip()}\n"
     return (public_key, private_key)
 
 

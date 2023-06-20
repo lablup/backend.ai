@@ -9,268 +9,92 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.3\n"
+"Generated-By: Babel 2.12.1\n"
 
-#: ../../install/install-from-package.rst:2 d53a14d2ec214b9caf7384ecdf9b6e39
+#: ../../install/install-from-package.rst:43 014568633eef4e35898d1684329cdfb2
+msgid "Table of Contents"
+msgstr ""
+
+#: ../../install/install-from-package.rst:2 ce6c01c610174d5a8242fe9ba7471399
 msgid "Install from Packages"
 msgstr ""
 
-#: ../../install/install-from-package.rst:7 be77e8ad13cb4754b9aa0382333be3ac
-msgid "Setting Up Single Node All-in-one Deployment"
-msgstr ""
-
-#: ../../install/install-from-package.rst:9 c421799da104455ea249f9b7f03d36d3
+#: ../../install/install-from-package.rst:6 9d09de3f2bc249d8a989e169bc8aed41
 msgid ""
-"`Configure sysctl/ulimit parameters as recommended. "
-"<https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md"
-"#kernelsystem-configuration>`_"
+"This guide covers how to install Backend.AI from the official release "
+"packages. You can build a fully-functional Backend.AI cluster with open-"
+"source packages."
 msgstr ""
 
-#: ../../install/install-from-package.rst:11 5bdcd64467b64d9a9dc2e0e9febe3da8
-msgid "Install Docker and Docker Compose v2."
-msgstr ""
-
-#: ../../install/install-from-package.rst:13 3c8fcee8514c49cc9deb08b648a931e5
+#: ../../install/install-from-package.rst:9 71a03d857b0544b7a101e75ea7545788
 msgid ""
-"Prepare a Python distribution whose version matches with the package "
-"requirements. (e.g., Backend.AI 22.03 and 22.09 requires Python 3.10) "
-"Either:"
+"Backend.AI consists of a `variety of components "
+"<https://github.com/lablup/backend.ai#major-components>`_, including "
+"open-source core components, pluggable extensions, and enterprise "
+"modules. Some of the major components are:"
 msgstr ""
 
-#: ../../install/install-from-package.rst:15 e339f6e4df554d59b44bc36a9578df20
-msgid "Use the Linux distribution's official package"
-msgstr ""
-
-#: ../../install/install-from-package.rst:17 7e215f92f7da403dae0eda603d69b8fb
+#: ../../install/install-from-package.rst:14 1cc8435eead24542a527ca7643c9ad9f
 msgid ""
-"`Use a standalone static build of Python <https://github.com/indygreg"
-"/python-build-standalone/releases>`_"
+"Backend.AI Manager : API gateway and resource management. Manager "
+"delegates workload requests to Agent and storage/file requests to Storage"
+" Proxy."
 msgstr ""
 
-#: ../../install/install-from-package.rst:19 0d04e98547d34d2e81ea476497526ab2
+#: ../../install/install-from-package.rst:16 340f289f357a468096940af3513839f9
 msgid ""
-"`Use pyenv to manually build and select a specific Python version "
-"<https://github.com/pyenv/pyenv>`_"
+"Backend.AI Agent : Installs on a compute node (usually GPU nodes) to "
+"start and manage the workload execution. It sends periodic heartbeat "
+"signals to the Manager in order to register itself as a worker node. Even"
+" if the connection to the Manager is temporarily lost, the pre-initiated "
+"workloads continue to be executed."
 msgstr ""
 
-#: ../../install/install-from-package.rst:23 8af072f466324796bb02cb483749550a
+#: ../../install/install-from-package.rst:21 69086d7d23964ba3a7dd9260b117e451
 msgid ""
-"You also need to make ``pip`` available to the Python installation with "
-"the latest ``wheel`` and ``setuptools`` packages, so that any non-binary "
-"extension packages can be compiled and installed on your system."
+"Backend.AI Storage Proxy : Handles requests relating to storage and "
+"files. It offloads the Manager's burden of handling long-running file I/O"
+" operations. It embeds a plugin backend structure that provides dedicated"
+" features for each storage type."
 msgstr ""
 
-#: ../../install/install-from-package.rst:25 0a17b632195041428cfd1b79beec3d2e
+#: ../../install/install-from-package.rst:25 daf19b1c39cd4a8ea97ee1587753e0fd
 msgid ""
-"Create separate virtualenvs for each service daemons (manager, agent, "
-"storage-proxy, and webserver)."
+"Backend.AI Webserver : A web server that provides persistent user web "
+"sessions. Users can use the Backend.AI features without subsequent "
+"authentication upon initial login. It also serves the statically built "
+"graphical user interface in an Enterprise environment."
 msgstr ""
 
-#: ../../install/install-from-package.rst:27 53c9230d687d41209354a8382faaba47
+#: ../../install/install-from-package.rst:29 575b6fd7f2644725877a5d3cf48d5e77
 msgid ""
-"Install ``backend.ai-SERVICE`` PyPI packages in the respective "
-"virtualenvs, where ``SERVICE`` is one of: ``manager``, ``agent``, "
-"``storage-proxy``, and ``webserver``."
+"Backend.AI Web UI : Web application with a graphical user interface. "
+"Users can enjoy the easy-to-use interface to launch their secure "
+"execution environment and use apps like Jupyter and Terminal. It can be "
+"served as statically built JavaScript via Webserver. Or, it also offers "
+"desktop applications for many operating systems and architectures."
 msgstr ""
 
-#: ../../install/install-from-package.rst:29 7b6979f1fba84e1a9f579768d1eea9c9
+#: ../../install/install-from-package.rst:35 e630e39b5ab841538bc56b7bf7e1419a
 msgid ""
-"Refer `the halfstack docker-compose configuration "
-"<https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-"
-"main.yml>`_ (it's a symbolic link so follow the filename in it): copy it "
-"and run ``docker compose up -d`` with it.  Adjust the port numbers and "
-"volume paths as needed."
+"Most components can be installed in a single management node except "
+"Agent, which is usually installed on dedicated computing nodes (often GPU"
+" servers). However, this is not a rule and Agent can also be installed on"
+" the management node."
 msgstr ""
 
-#: ../../install/install-from-package.rst:33 9a8eb1262b5f4d10a6c30a4c0cb23456
+#: ../../install/install-from-package.rst:40 fe215042de104b95a1d51fbcfb33a46d
 msgid ""
-"For details about configuration in the steps 6 to 10, you can just refer "
-"`how our development setup script does. "
-"<https://github.com/lablup/backend.ai/blob/main/scripts/install-dev.sh>`_"
-msgstr ""
-
-#: ../../install/install-from-package.rst:35 91c89bcbe08d410aa5f7f97df50edc54
-msgid ""
-"Refer `the configuration examples in our repository "
-"<https://github.com/lablup/backend.ai/tree/main/configs>`_: copy them and"
-" adjust the values according to the above step. Be aware that the "
-"hostnames and port numbers used to refer other services. You must do "
-"configuration for all ``SERVICE`` components. Place them in either:"
-msgstr ""
-
-#: ../../install/install-from-package.rst:40 19a09306c35b411da84d56ba8d300ebd
-msgid "The current working directory for each ``SERVICE`` daemon"
-msgstr ""
-
-#: ../../install/install-from-package.rst:42 9c956dd625c843678734482c3bbf5957
-msgid "``~/.config/backend.ai``"
-msgstr ""
-
-#: ../../install/install-from-package.rst:44 2a8a13ffa14b4274bda1c75d301105fe
-msgid "``/etc/backend.ai``"
-msgstr ""
-
-#: ../../install/install-from-package.rst:48 5ddad2b0d44541fcbcef4a77e87e81bd
-msgid ""
-"The files named as ``sample`` contain detailed descriptions for each "
-"configuration option."
-msgstr ""
-
-#: ../../install/install-from-package.rst:50 035f65bf270549ceb27cad0721d5e42f
-msgid ""
-"Populate the initial etcd configuration as follows. etcd serves as a "
-"central shared configuration server for all nodes and provides some "
-"distributed synchronization primitives. The following procedure "
-"configures the Redis address to share with all nodes, our public image "
-"registry, and the storage proxy."
-msgstr ""
-
-#: ../../install/install-from-package.rst:62 ffbc42c59fb14099b6e608bf8c478f6d
-msgid "where ``REDIS_PORT`` is the TCP port number to access the Redis server."
-msgstr ""
-
-#: ../../install/install-from-package.rst:64 d7583d3f919948949fe95f45478d7541
-msgid ""
-"To enable the image registry so that agents can pull images from it, "
-"after installation, log in to the web UI using the superadmin account and"
-" enable the registry by navigating the \"Administration\" (side-bar) "
-"|rarr| the \"Environments\" menu |rarr| the \"Registries\" view."
-msgstr ""
-
-#: ../../install/install-from-package.rst:66 154265a89e8d46ad974a1f91dc1f0cce
-msgid ""
-"Also, populate the storage-proxy configuration to the etcd by copying "
-"`configs/manager/sample.etcd.volumes.json "
-"<https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.etcd.volumes.json>`_"
-" to ``./volumes.json`` and adjust the settings as you need. Note that you"
-" must change the secret to a unique random string for secure "
-"communication between the manager and storage-proxy."
-msgstr ""
-
-#: ../../install/install-from-package.rst:74 5b4bfabd51ca479cb82105bd4a24518d
-msgid ""
-"To enable access to the volumes defined by the storage-proxy from the "
-"users, you need to update the ``allowed_vfolder_hosts`` column of the "
-"``domains`` table to hold the storage volume reference (e.g., "
-"\"local:volume1\"). You can do this by issuing SQL statement directly "
-"inside the PostgreSQL container: ``docker exec -it {PGSQL_CONTAINER_ID} "
-"psql postgres://postgres:{DBPASSWORD}@localhost:5432/backend database -c "
-"'...';``"
-msgstr ""
-
-#: ../../install/install-from-package.rst:79 25e6f2d5e0f44b3abafa510dbf249e15
-msgid ""
-"When you install Backend.AI using packages, note that the entry command "
-"is changed to ``backend.ai`` instead of ``./backend.ai`` in a development"
-" setup using Pants."
-msgstr ""
-
-#: ../../install/install-from-package.rst:81 f8c48e6ecb7848eea498f87d5a943b50
-msgid ""
-"Populate the database schema and initial fixtures. Copy the example JSON "
-"files (`fixtures/manager/example-keypairs.json "
-"<https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-"
-"keypairs.json>`_, `fixtures/manager/example-resource-presets.json "
-"<https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-"
-"resource-presets.json>`_) as ``keypairs.json`` and ``resource-"
-"presets.json``. Customize them to have unique keypairs and passwords for "
-"your initial superadmin and sample user accounts."
-msgstr ""
-
-#: ../../install/install-from-package.rst:92 b692126a1e024cdaaaafbae493f094e0
-msgid "Scan the image registry to fetch the image catalog and metadata."
-msgstr ""
-
-#: ../../install/install-from-package.rst:99 0463dcf42f4b443cb155331f55165872
-msgid ""
-"Activate each virtualenv and start the services using ``python -m "
-"ai.backend.SERVICE.server`` commands, where ``SERVICE`` is one of: "
-"``manager``, ``agent``, ``storage``, and ``web``."
-msgstr ""
-
-#: ../../install/install-from-package.rst:101 b2078ed83929460bb98c5750b2806cc7
-msgid ""
-"If it works, daemonize the service daemons using systemctl or any other "
-"desired service supervisor."
-msgstr ""
-
-#: ../../install/install-from-package.rst:103 81f0d24b9b78444e9da5ef5b9fcb8aee
-msgid ""
-"Refer the following systemd configuration sample for an agent. As "
-"Backend.AI service daemons do not background by themselves, the main "
-"process should be kept track of."
-msgstr ""
-
-#: ../../install/install-from-package.rst:127 f88dd9e37e074267b55c9502d46f0387
-msgid ""
-"To activate the virtualenv when run via systemd, write ``run-SERVICE.sh``"
-" files like:"
-msgstr ""
-
-#: ../../install/install-from-package.rst:154 a7fa9adcf0f9481db5c032ea2d2ff4b4
-msgid "Setting Up Accelerators"
-msgstr ""
-
-#: ../../install/install-from-package.rst:156 023b9ddaaaa345cd82d11b51e72040e0
-msgid ""
-"Ensure that your accelerator is properly set up using vendor-specific "
-"installation methods."
-msgstr ""
-
-#: ../../install/install-from-package.rst:158 0e838578a208461ab4c6d6208b0b101b
-msgid ""
-"Within the virtualenv for ``backend.ai-agent``, additionally install "
-"accelerator plugin packages such as ``backend.ai-accelerator-cuda-open``."
-"  Restart the agent."
-msgstr ""
-
-#: ../../install/install-from-package.rst:160 78652e1a0913489b8f18778e079e0b30
-msgid ""
-"You also need to configure ``agent.toml``'s ``[agent].allow-compute-"
-"plugins`` with the full package path (e.g., "
-"``ai.backend.accelerator.cuda_open``) to activate them."
-msgstr ""
-
-#: ../../install/install-from-package.rst:163 6f96460e85594aa0917f19c0ef668cc2
-msgid "Setting Up Multiple Nodes Cluster"
-msgstr ""
-
-#: ../../install/install-from-package.rst:165 adec90a1c3614698bac3d9adc9fba54c
-msgid "Please refer :ref:`multi-node-setup`."
-msgstr ""
-
-#: ../../install/install-from-package.rst:167 e07797dc0418430c904f11838312e2a8
-msgid ""
-"The only difference is that you won't need to configure Pants, but just "
-"follow the above instructions to set up Python virtualenvs and install "
-"the agent packages for each agent node."
-msgstr ""
-
-#: ../../install/install-from-package.rst:170 8a7b0249230a46b5b613459ff8a055d0
-msgid "Setting Up Shared Storage"
-msgstr ""
-
-#: ../../install/install-from-package.rst:172 ffed729b420348e09591049d0a1f3bce
-msgid ""
-"To make vfolders working properly with multiple nodes, you must enable "
-"and configure Linux NFS to share a specific directory of the manager node"
-" or make a dedicated storage node exposing its volume via NFS "
-"(recommended).  You must mount it in the same path in all manager and "
-"agent nodes."
-msgstr ""
-
-#: ../../install/install-from-package.rst:174 24a89b18266b4995bd41657ee8015c75
-msgid ""
-"It is recommended to unify the UID and GID of the storage-proxy service, "
-"all of the agent services across nodes, container UID and GID "
-"(configurable in ``agent.toml``), and the NFS volume."
+"It is also possible to configure a high-availability (HA) setup with "
+"three or more management nodes, although this is not the focus of this "
+"guide."
 msgstr ""
 
 #~ msgid "Install from Package (Enterprise Edition)"
@@ -316,5 +140,283 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "(TODO)"
+#~ msgstr ""
+
+#~ msgid "Setting Up Single Node All-in-one Deployment"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Configure sysctl/ulimit parameters as "
+#~ "recommended. "
+#~ "<https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md"
+#~ "#kernelsystem-configuration>`_"
+#~ msgstr ""
+
+#~ msgid "Install Docker and Docker Compose v2."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Prepare a Python distribution whose "
+#~ "version matches with the package "
+#~ "requirements. (e.g., Backend.AI 22.03 and "
+#~ "22.09 requires Python 3.10) Either:"
+#~ msgstr ""
+
+#~ msgid "Use the Linux distribution's official package"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Use a standalone static build of "
+#~ "Python <https://github.com/indygreg/python-build-"
+#~ "standalone/releases>`_"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Use pyenv to manually build and "
+#~ "select a specific Python version "
+#~ "<https://github.com/pyenv/pyenv>`_"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You also need to make ``pip`` "
+#~ "available to the Python installation "
+#~ "with the latest ``wheel`` and "
+#~ "``setuptools`` packages, so that any "
+#~ "non-binary extension packages can be "
+#~ "compiled and installed on your system."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Create separate virtualenvs for each "
+#~ "service daemons (manager, agent, storage-"
+#~ "proxy, and webserver)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Install ``backend.ai-SERVICE`` PyPI packages"
+#~ " in the respective virtualenvs, where "
+#~ "``SERVICE`` is one of: ``manager``, "
+#~ "``agent``, ``storage-proxy``, and "
+#~ "``webserver``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Refer `the halfstack docker-compose "
+#~ "configuration <https://github.com/lablup/backend.ai/blob/main"
+#~ "/docker-compose.halfstack-main.yml>`_ (it's a "
+#~ "symbolic link so follow the filename "
+#~ "in it): copy it and run ``docker"
+#~ " compose up -d`` with it.  Adjust "
+#~ "the port numbers and volume paths "
+#~ "as needed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For details about configuration in the"
+#~ " steps 6 to 10, you can just"
+#~ " refer `how our development setup "
+#~ "script does. "
+#~ "<https://github.com/lablup/backend.ai/blob/main/scripts/install-"
+#~ "dev.sh>`_"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Refer `the configuration examples in our"
+#~ " repository "
+#~ "<https://github.com/lablup/backend.ai/tree/main/configs>`_: copy"
+#~ " them and adjust the values according"
+#~ " to the above step. Be aware "
+#~ "that the hostnames and port numbers "
+#~ "used to refer other services. You "
+#~ "must do configuration for all "
+#~ "``SERVICE`` components. Place them in "
+#~ "either:"
+#~ msgstr ""
+
+#~ msgid "The current working directory for each ``SERVICE`` daemon"
+#~ msgstr ""
+
+#~ msgid "``~/.config/backend.ai``"
+#~ msgstr ""
+
+#~ msgid "``/etc/backend.ai``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The files named as ``sample`` contain"
+#~ " detailed descriptions for each "
+#~ "configuration option."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Populate the initial etcd configuration "
+#~ "as follows. etcd serves as a "
+#~ "central shared configuration server for "
+#~ "all nodes and provides some distributed"
+#~ " synchronization primitives. The following "
+#~ "procedure configures the Redis address "
+#~ "to share with all nodes, our "
+#~ "public image registry, and the storage"
+#~ " proxy."
+#~ msgstr ""
+
+#~ msgid "where ``REDIS_PORT`` is the TCP port number to access the Redis server."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To enable the image registry so "
+#~ "that agents can pull images from "
+#~ "it, after installation, log in to "
+#~ "the web UI using the superadmin "
+#~ "account and enable the registry by "
+#~ "navigating the \"Administration\" (side-bar)"
+#~ " |rarr| the \"Environments\" menu |rarr|"
+#~ " the \"Registries\" view."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Also, populate the storage-proxy "
+#~ "configuration to the etcd by copying "
+#~ "`configs/manager/sample.etcd.volumes.json "
+#~ "<https://github.com/lablup/backend.ai/blob/main/configs/manager/sample.etcd.volumes.json>`_"
+#~ " to ``./volumes.json`` and adjust the "
+#~ "settings as you need. Note that "
+#~ "you must change the secret to a"
+#~ " unique random string for secure "
+#~ "communication between the manager and "
+#~ "storage-proxy."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To enable access to the volumes "
+#~ "defined by the storage-proxy from "
+#~ "the users, you need to update the"
+#~ " ``allowed_vfolder_hosts`` column of the "
+#~ "``domains`` table to hold the storage"
+#~ " volume reference (e.g., \"local:volume1\"). "
+#~ "You can do this by issuing SQL "
+#~ "statement directly inside the PostgreSQL "
+#~ "container: ``docker exec -it "
+#~ "{PGSQL_CONTAINER_ID} psql "
+#~ "postgres://postgres:{DBPASSWORD}@localhost:5432/backend database"
+#~ " -c '...';``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When you install Backend.AI using "
+#~ "packages, note that the entry command"
+#~ " is changed to ``backend.ai`` instead "
+#~ "of ``./backend.ai`` in a development "
+#~ "setup using Pants."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Populate the database schema and initial"
+#~ " fixtures. Copy the example JSON "
+#~ "files (`fixtures/manager/example-keypairs.json "
+#~ "<https://github.com/lablup/backend.ai/blob/main/fixtures/manager"
+#~ "/example-keypairs.json>`_, `fixtures/manager/example-"
+#~ "resource-presets.json "
+#~ "<https://github.com/lablup/backend.ai/blob/main/fixtures/manager"
+#~ "/example-resource-presets.json>`_) as "
+#~ "``keypairs.json`` and ``resource-presets.json``. "
+#~ "Customize them to have unique keypairs"
+#~ " and passwords for your initial "
+#~ "superadmin and sample user accounts."
+#~ msgstr ""
+
+#~ msgid "Scan the image registry to fetch the image catalog and metadata."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Activate each virtualenv and start the"
+#~ " services using ``python -m "
+#~ "ai.backend.SERVICE.server`` commands, where "
+#~ "``SERVICE`` is one of: ``manager``, "
+#~ "``agent``, ``storage``, and ``web``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If it works, daemonize the service "
+#~ "daemons using systemctl or any other "
+#~ "desired service supervisor."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Refer the following systemd configuration "
+#~ "sample for an agent. As Backend.AI "
+#~ "service daemons do not background by "
+#~ "themselves, the main process should be"
+#~ " kept track of."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To activate the virtualenv when run "
+#~ "via systemd, write ``run-SERVICE.sh`` "
+#~ "files like:"
+#~ msgstr ""
+
+#~ msgid "Setting Up Accelerators"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Ensure that your accelerator is properly"
+#~ " set up using vendor-specific "
+#~ "installation methods."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Within the virtualenv for ``backend.ai-"
+#~ "agent``, additionally install accelerator "
+#~ "plugin packages such as ``backend.ai-"
+#~ "accelerator-cuda-open``.  Restart the "
+#~ "agent."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You also need to configure "
+#~ "``agent.toml``'s ``[agent].allow-compute-plugins``"
+#~ " with the full package path (e.g.,"
+#~ " ``ai.backend.accelerator.cuda_open``) to activate "
+#~ "them."
+#~ msgstr ""
+
+#~ msgid "Setting Up Multiple Nodes Cluster"
+#~ msgstr ""
+
+#~ msgid "Please refer :ref:`multi-node-setup`."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The only difference is that you "
+#~ "won't need to configure Pants, but "
+#~ "just follow the above instructions to"
+#~ " set up Python virtualenvs and "
+#~ "install the agent packages for each "
+#~ "agent node."
+#~ msgstr ""
+
+#~ msgid "Setting Up Shared Storage"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To make vfolders working properly with"
+#~ " multiple nodes, you must enable and"
+#~ " configure Linux NFS to share a "
+#~ "specific directory of the manager node"
+#~ " or make a dedicated storage node "
+#~ "exposing its volume via NFS "
+#~ "(recommended).  You must mount it in "
+#~ "the same path in all manager and"
+#~ " agent nodes."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "It is recommended to unify the UID"
+#~ " and GID of the storage-proxy "
+#~ "service, all of the agent services "
+#~ "across nodes, container UID and GID "
+#~ "(configurable in ``agent.toml``), and the "
+#~ "NFS volume."
 #~ msgstr ""
 

@@ -220,7 +220,7 @@ def create_proxy_app():
     "--port",
     type=int,
     default=8084,
-    help="The TCP port to accept non-encrypted non-authorized " "API requests.",
+    help="The TCP port to accept non-encrypted non-authorized API requests.",
 )
 @click.pass_context
 def proxy(ctx, bind, port):

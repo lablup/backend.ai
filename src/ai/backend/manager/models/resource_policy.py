@@ -57,6 +57,9 @@ keypair_resource_policies = sa.Table(
     sa.Column("total_resource_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")),
     sa.Column("max_concurrent_sessions", sa.Integer(), nullable=False),
+    sa.Column(
+        "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
+    ),
     sa.Column("max_containers_per_session", sa.Integer(), nullable=False),
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
@@ -256,7 +259,6 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -297,7 +299,6 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
 
 
 class ModifyKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -341,7 +342,6 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
 
 
 class DeleteKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

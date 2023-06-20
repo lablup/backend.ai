@@ -5,6 +5,7 @@ from .formatters import (
     ContainerListFormatter,
     DependencyListFormatter,
     GroupListFormatter,
+    InlineRoutingFormatter,
     KernelStatFormatter,
     SubFieldOutputFormatter,
     mibytes_output_formatter,
@@ -77,6 +78,7 @@ domain_fields = FieldSet(
         FieldSpec("integration_id"),
     ]
 )
+
 
 group_fields = FieldSet(
     [
@@ -153,6 +155,7 @@ scaling_group_fields = FieldSet(
         FieldSpec("name"),
         FieldSpec("description"),
         FieldSpec("is_active"),
+        FieldSpec("is_public"),
         FieldSpec("created_at"),
         FieldSpec("driver"),
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
@@ -207,6 +210,7 @@ session_fields = FieldSet(
             formatter=DependencyListFormatter(),
         ),
         FieldSpec("abusing_reports"),
+        FieldSpec("idle_checks"),
     ]
 )
 
@@ -268,6 +272,7 @@ user_fields = FieldSet(
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
         FieldSpec("allowed_client_ip"),
+        FieldSpec("totp_activated"),
     ]
 )
 
@@ -295,8 +300,52 @@ vfolder_fields = FieldSet(
     ]
 )
 
+
 permission_fields = FieldSet(
     [
         FieldSpec("vfolder_host_permission_list"),
+    ]
+)
+
+
+service_fields = FieldSet(
+    [
+        FieldSpec("endpoint_id"),
+        FieldSpec("image"),
+        FieldSpec("domain"),
+        FieldSpec("project"),
+        FieldSpec("resource_group"),
+        FieldSpec("resource_slots", formatter=nested_dict_formatter),
+        FieldSpec("url"),
+        FieldSpec("model"),
+        FieldSpec("model_mount_destiation"),
+        FieldSpec("created_user"),
+        FieldSpec("session_owner"),
+        FieldSpec("tag"),
+        FieldSpec("startup_command"),
+        FieldSpec("bootstrap_script"),
+        FieldSpec("callback_url"),
+        FieldSpec("environ", formatter=nested_dict_formatter),
+        FieldSpec("name"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("desired_session_count"),
+        FieldSpec("cluster_mode"),
+        FieldSpec("cluster_size"),
+        FieldSpec("open_to_public"),
+        FieldSpec(
+            "routings { routing_id session status traffic_ratio }",
+            formatter=InlineRoutingFormatter(),
+        ),
+    ]
+)
+
+
+routing_fields = FieldSet(
+    [
+        FieldSpec("routing_id"),
+        FieldSpec("status"),
+        FieldSpec("endpoint"),
+        FieldSpec("session"),
+        FieldSpec("traffic_ratio"),
     ]
 )

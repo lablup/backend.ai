@@ -52,6 +52,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     BinarySize,
+    EndpointId,
     JSONSerializableMixin,
     KernelId,
     ReadableCIDR,
@@ -422,7 +423,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
             return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
-        # NOTE: SessionId, KernelId are *not* actual types defined as classes,
+        # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
@@ -450,6 +451,11 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
+class EndpointIDColumnType(GUID[EndpointId]):
+    uuid_subtype_func = EndpointId
+    cache_ok = True
+
+
 class SessionIDColumnType(GUID[SessionId]):
     uuid_subtype_func = SessionId
     cache_ok = True
@@ -462,6 +468,12 @@ class KernelIDColumnType(GUID[KernelId]):
 
 def IDColumn(name="id"):
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+
+
+def EndpointIDColumn(name="id"):
+    return sa.Column(
+        name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
 
 def SessionIDColumn(name="id"):
@@ -619,7 +631,7 @@ async def batch_result(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in (await db_conn.stream(query)):
+    async for row in await db_conn.stream(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
@@ -639,7 +651,7 @@ async def batch_multiresult(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in (await db_conn.stream(query)):
+    async for row in await db_conn.stream(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -662,7 +674,7 @@ async def batch_result_in_session(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in (await db_sess.stream(query)):
+    async for row in await db_sess.stream(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
@@ -683,7 +695,7 @@ async def batch_multiresult_in_session(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in (await db_sess.stream(query)):
+    async for row in await db_sess.stream(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -773,6 +785,8 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
+            if kwargs.get("project", None) is not None:
+                kwargs["project"] = group_id
             kwargs[user_key] = user_id
             return await resolve_func(executor, info, *args, **kwargs)
 
@@ -805,8 +819,10 @@ def privileged_mutation(required_role, target_func=None):
                     if target_domain is None and target_group is None:
                         return cls(
                             False,
-                            "misconfigured privileged mutation: "
-                            "both target_domain and target_group missing",
+                            (
+                                "misconfigured privileged mutation: "
+                                "both target_domain and target_group missing"
+                            ),
                             None,
                         )
                     permit_chains = []
