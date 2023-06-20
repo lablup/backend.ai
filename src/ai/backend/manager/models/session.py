@@ -1436,7 +1436,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
-        "scheduled_at": ("scheduled_at", dtparse),
+        "scheduled_at": ("sessions_scheduled_at", dtparse),
         "startup_command": ("sessions_startup_command", None),
     }
 
@@ -1461,7 +1461,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": "sessions_created_at",
         "terminated_at": "sessions_terminated_at",
         "starts_at": "sessions_starts_at",
-        "scheduled_at": "scheduled_at",
+        "scheduled_at": "sessions_scheduled_at",
     }
 
     @classmethod
