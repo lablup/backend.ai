@@ -608,7 +608,7 @@ class SessionRow(Base):
     )
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     scheduled_at = sa.Column(
-        "scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+        "scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
     status = sa.Column(
         "status",

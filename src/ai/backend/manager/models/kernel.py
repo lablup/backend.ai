@@ -453,7 +453,9 @@ kernels = sa.Table(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     ),
     sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
-    sa.Column("scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
+    sa.Column(
+        "scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
+    ),
     sa.Column(
         "status",
         EnumType(KernelStatus),
