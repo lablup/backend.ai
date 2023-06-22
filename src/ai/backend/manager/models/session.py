@@ -607,9 +607,6 @@ class SessionRow(Base):
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
-    scheduled_at = sa.Column(
-        "scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
-    )
     status = sa.Column(
         "status",
         EnumType(SessionStatus),
@@ -1310,7 +1307,6 @@ class ComputeSession(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": row.scheduled_at,
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources

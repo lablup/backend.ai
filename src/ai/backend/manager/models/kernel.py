@@ -454,9 +454,6 @@ kernels = sa.Table(
     ),
     sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
     sa.Column(
-        "scheduled_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
-    ),
-    sa.Column(
         "status",
         EnumType(KernelStatus),
         default=KernelStatus.PENDING,
@@ -834,7 +831,6 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "starts_at": row["starts_at"],
-            "scheduled_at": row["scheduled_at"],
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
