@@ -796,7 +796,7 @@ async def initiate_vfolder_clone(
     storage_manager: StorageSessionManager,
     background_task_manager: BackgroundTaskManager,
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id
+    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
 
     async def _update_status() -> None:
         async with db_engine.begin_session() as db_session:
@@ -817,7 +817,7 @@ async def initiate_vfolder_clone(
     #       the actual object (with RETURNING clause).  In that case, we need to temporarily
     #       mark the object to be "unusable-yet" until the storage proxy craetes the destination
     #       vfolder.  After done, we need to make another transaction to clear the unusable state.
-    target_folder_id = uuid.uuid4()
+    target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 
     async def _clone(reporter: ProgressReporter) -> None:
         try:
@@ -833,12 +833,12 @@ async def initiate_vfolder_clone(
             ):
                 pass
         except aiohttp.ClientResponseError:
-            raise VFolderOperationFailed(extra_msg=str(target_folder_id))
+            raise VFolderOperationFailed(extra_msg=str(target_folder_id.folder_id))
 
         async def _insert_vfolder() -> None:
             async with db_engine.begin_session() as db_session:
                 insert_values = {
-                    "id": target_folder_id,
+                    "id": target_folder_id.folder_id,
                     "name": vfolder_info.target_vfolder_name,
                     "usage_mode": vfolder_info.usage_mode,
                     "permission": vfolder_info.permission,
@@ -851,6 +851,7 @@ async def initiate_vfolder_clone(
                     "group": None,
                     "unmanaged_path": "",
                     "cloneable": vfolder_info.cloneable,
+                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
                 }
                 insert_query = sa.insert(vfolders, insert_values)
                 try:
@@ -889,7 +890,7 @@ async def initiate_vfolder_clone(
         await execute_with_retry(_update_source_vfolder)
 
     task_id = await background_task_manager.start(_clone)
-    return task_id, target_folder_id
+    return task_id, target_folder_id.folder_id
 
 
 async def initiate_vfolder_removal(
@@ -899,7 +900,7 @@ async def initiate_vfolder_removal(
     storage_ptask_group: aiotools.PersistentTaskGroup,
 ) -> int:
     vfolder_info_len = len(requested_vfolders)
-    vfolder_ids = tuple(vf_id for vf_id, _ in requested_vfolders)
+    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
     cond = vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return 0
