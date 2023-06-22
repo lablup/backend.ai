@@ -791,6 +791,10 @@ class VFolderID:
     quota_scope_id: str | None
     folder_id: uuid.UUID
 
+    @classmethod
+    def from_row(cls, row: Any) -> VFolderID:
+        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
     def __str__(self) -> str:
         if self.quota_scope_id is None:
             return self.folder_id.hex
