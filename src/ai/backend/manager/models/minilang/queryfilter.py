@@ -3,7 +3,7 @@ from typing import Any, Mapping, Union
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 
-from . import FieldSpecItem
+from . import FieldSpecItem, JSONFieldItem
 
 __all__ = (
     "FilterableSQLQuery",
@@ -79,7 +79,13 @@ class QueryFilterTransformer(Transformer):
     def _get_col(self, col_name: str) -> sa.Column:
         try:
             if self._fieldspec:
-                col = self._sa_table.c[self._fieldspec[col_name][0]]
+                match self._fieldspec[col_name][0]:
+                    case str(column):
+                        col = self._sa_table.c[column]
+                    case JSONFieldItem(_col, _key):
+                        col = self._sa_table.c[self._fieldspec[_col][0]].op("->>")(_key)
+                    case _:
+                        raise ValueError("Invalid type of field name", col_name)
             else:
                 col = self._sa_table.c[col_name]
             return col

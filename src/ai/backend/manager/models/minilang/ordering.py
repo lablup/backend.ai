@@ -3,6 +3,8 @@ from typing import Mapping
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 
+from . import JSONFieldItem
+
 __all__ = ("QueryOrderParser",)
 
 _grammar = r"""
@@ -22,7 +24,9 @@ _parser = Lark(
 
 
 class QueryOrderTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, column_map: Mapping[str, str] = None) -> None:
+    def __init__(
+        self, sa_table: sa.Table, column_map: Mapping[str, str | JSONFieldItem] = None
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
@@ -30,7 +34,13 @@ class QueryOrderTransformer(Transformer):
     def _get_col(self, col_name: str) -> sa.Column:
         try:
             if self._column_map:
-                col = self._sa_table.c[self._column_map[col_name]]
+                match self._column_map[col_name]:
+                    case str(column):
+                        col = self._sa_table.c[column]
+                    case JSONFieldItem(_col, _key):
+                        col = self._sa_table.c[self._column_map[_col]].op("->>")(_key)
+                    case _:
+                        raise ValueError("Invalid type of field name", col_name)
             else:
                 col = self._sa_table.c[col_name]
             return col
