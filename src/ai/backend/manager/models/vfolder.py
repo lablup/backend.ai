@@ -1018,15 +1018,15 @@ class VirtualFolder(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            enum_field_getter(EnumValueType, VFolderUsageMode),
+            enum_field_getter(VFolderUsageMode),
         ),
         "permission": (
             "vfolders_permission",
-            enum_field_getter(EnumValueType, VFolderPermission),
+            enum_field_getter(VFolderPermission),
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            enum_field_getter(EnumValueType, VFolderOwnershipType),
+            enum_field_getter(VFolderOwnershipType),
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -1035,7 +1035,7 @@ class VirtualFolder(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            enum_field_getter(EnumValueType, VFolderOperationStatus),
+            enum_field_getter(VFolderOperationStatus),
         ),
     }
 
@@ -1200,7 +1200,7 @@ class VirtualFolderPermission(graphene.ObjectType):
     _queryfilter_fieldspec = {
         "permission": (
             "vfolder_permissions_permission",
-            enum_field_getter(EnumValueType, VFolderPermission),
+            enum_field_getter(VFolderPermission),
         ),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),

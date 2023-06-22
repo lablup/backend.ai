@@ -241,7 +241,7 @@ class Agent(graphene.ObjectType):
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
-        "status": ("status", enum_field_getter(EnumType, AgentStatus)),
+        "status": ("status", enum_field_getter(AgentStatus)),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -467,7 +467,7 @@ class AgentSummary(graphene.ObjectType):
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
-        "status": ("status", enum_field_getter(EnumType, AgentStatus)),
+        "status": ("status", enum_field_getter(AgentStatus)),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulabe", None),
     }

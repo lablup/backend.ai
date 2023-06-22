@@ -1,10 +1,8 @@
 from enum import Enum
-from typing import Any, Callable, Mapping, Optional, Type, Union
+from typing import Any, Callable, Mapping, Type, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
-
-from ai.backend.manager.models.base import EnumType, EnumValueType
 
 from . import FieldSpecItem
 
@@ -50,21 +48,17 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-EnumField = Union[Type[EnumType], Type[EnumValueType]]
 
-
-def enum_field_getter(field_cls: EnumField, enum_cls: Type[Enum]) -> Callable[[str], Enum]:
+def enum_field_getter(enum_cls: Type[Enum]) -> Callable[[str], Enum]:
     def get_enum(value: str) -> Enum:
-        enum_names: Optional[str] = None
         try:
-            if field_cls is EnumType:
-                return enum_cls[value]
-            return enum_cls(value)
+            return enum_cls[value]
         except KeyError:
-            enum_names = ", ".join([e.name for e in enum_cls])
-        except ValueError:
-            enum_names = ", ".join([e.value for e in enum_cls])
-        raise ValueError(f"expected one of `{enum_names}`, got `{value}`")
+            try:
+                return enum_cls(value)
+            except ValueError:
+                enum_names = ", ".join([e.value for e in enum_cls])
+                raise ValueError(f"expected one of `{enum_names}`, got `{value}`")
 
     return get_enum
 

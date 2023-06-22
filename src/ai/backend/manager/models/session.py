@@ -1415,7 +1415,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),
-        "type": ("sessions_session_type", enum_field_getter(EnumType, SessionTypes)),
+        "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("groups_name", None),
@@ -1425,9 +1425,9 @@ class ComputeSession(graphene.ObjectType):
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
         "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", enum_field_getter(EnumType, SessionStatus)),
+        "status": ("sessions_status", enum_field_getter(SessionStatus)),
         "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", enum_field_getter(EnumType, SessionResult)),
+        "result": ("sessions_result", enum_field_getter(SessionResult)),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
