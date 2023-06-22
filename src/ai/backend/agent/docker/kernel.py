@@ -385,7 +385,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
 
     try:
         for item in await docker.images.list():
-            if item["RepoTags"] is None:
+            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
                 continue
             if item["RepoTags"][0] == extractor_image:
                 break
