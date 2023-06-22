@@ -35,24 +35,29 @@ def upgrade():
 
     batch_size = 100
     known_quota_scopes: dict[UUID, str] = {}
-    query = (
-        sa.select([SessionRow.id])
-        .order_by(SessionRow.id)
-        .where(
-            (SessionRow.vfolder_mounts != sa.cast(None, postgresql.JSONB))
-            & (sa.func.jsonb_array_length(SessionRow.vfolder_mounts) > 0)
-        )
+    query = sa.select([sa.func.count()]).where(
+        (SessionRow.vfolder_mounts != sa.cast(None, postgresql.JSONB))
+        & (sa.func.jsonb_array_length(SessionRow.vfolder_mounts) > 0)
     )
-    result = connection.execute(query).fetchall()
-    session_ids_to_update = [row[0] for row in result]
+    total_sessions = connection.execute(query).scalar()
     updated_count = 0
-    for session_ids in list_chunk(session_ids_to_update, batch_size):
+
+    prev_id = None
+    while True:
         query = (
             sa.select([SessionRow.id, sa.cast(SessionRow.vfolder_mounts, postgresql.JSONB)])
             .order_by(SessionRow.id)
-            .where(SessionRow.id.in_(session_ids))
+            .where(
+                (SessionRow.vfolder_mounts != sa.cast(None, postgresql.JSONB))
+                & (sa.func.jsonb_array_length(SessionRow.vfolder_mounts) > 0)
+            )
+            .limit(batch_size)
         )
+        if prev_id:
+            query = query.where(SessionRow.id > prev_id)
         rows = connection.execute(query).fetchall()
+        if len(rows) == 0:
+            break
         updates = []
         unknown_quota_scopes = set()
 
@@ -101,24 +106,20 @@ def upgrade():
             query,
             updates,
         )
-        updated_count += len(session_ids)
-        print(f"Updated {updated_count} of {len(session_ids_to_update)} rows")
+        updated_count += len(rows)
+        print(f"Updated {updated_count} of {total_sessions} rows")
+        prev_id = rows[-1][0]
 
 
 def downgrade():
     connection = op.get_bind()
 
     batch_size = 100
-    query = (
-        sa.select([SessionRow.id])
-        .order_by(SessionRow.id)
-        .where(
-            (SessionRow.vfolder_mounts != sa.cast(None, postgresql.JSONB))
-            & (sa.func.jsonb_array_length(SessionRow.vfolder_mounts) > 0)
-        )
+    query = sa.select([sa.func.count()]).where(
+        (SessionRow.vfolder_mounts != sa.cast(None, postgresql.JSONB))
+        & (sa.func.jsonb_array_length(SessionRow.vfolder_mounts) > 0)
     )
-    result = connection.execute(query).fetchall()
-    session_ids_to_update = [row[0] for row in result]
+    total_session = connection.execute(query).scalar()
     updated_count = 0
     fake_meta = sa.MetaData(naming_convention=convention)
     fake_sessions = sa.Table(
@@ -140,13 +141,22 @@ def downgrade():
         ),
         sa.Column("vfolder_mounts", postgresql.JSONB, nullable=True),
     )
-    for session_ids in list_chunk(session_ids_to_update, batch_size):
+    prev_id = None
+    while True:
         query = (
             sa.select([SessionRow.id, sa.cast(SessionRow.vfolder_mounts, postgresql.JSONB)])
             .order_by(SessionRow.id)
-            .where(SessionRow.id.in_(session_ids))
+            .where(
+                (SessionRow.vfolder_mounts != sa.cast(None, postgresql.JSONB))
+                & (sa.func.jsonb_array_length(SessionRow.vfolder_mounts) > 0)
+            )
+            .limit(batch_size)
         )
+        if prev_id:
+            query = query.where(SessionRow.id > prev_id)
         rows = connection.execute(query).fetchall()
+        if len(rows) == 0:
+            break
         updates = []
 
         for sess_id, vfolder_mounts in rows:
@@ -173,5 +183,6 @@ def downgrade():
             query,
             updates,
         )
-        updated_count += len(session_ids)
-        print(f"Updated {updated_count} of {len(session_ids_to_update)} rows")
+        updated_count += len(rows)
+        print(f"Updated {updated_count} of {total_session} rows")
+        prev_id = rows[-1][0]
