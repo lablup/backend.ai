@@ -79,8 +79,11 @@ def upgrade():
                     {
                         **mount,
                         "vfid": (
-                            f"{known_quota_scopes.get(UUID(mount['vfid']), ZERO_FILLED_UUID)}/{mount['vfid']}"
-                            if "/" not in mount["vfid"]
+                            f"{known_quota_scopes[UUID(mount['vfid'])]}/{mount['vfid']}"
+                            if (
+                                "/" not in mount["vfid"]
+                                and UUID(mount["vfid"]) in known_quota_scopes
+                            )
                             else mount["vfid"]
                         ),
                     }
@@ -161,7 +164,7 @@ def downgrade():
 
         for sess_id, vfolder_mounts in rows:
             new_mounts = [
-                {**mount, "vfid": mount["vfid"].split("/")[::-1][0]} for mount in vfolder_mounts
+                {**mount, "vfid": mount["vfid"].split("/")[0]} for mount in vfolder_mounts
             ]
             updates.append({"row_id": sess_id, "vfolder_mounts": new_mounts})
 
