@@ -23,9 +23,6 @@ branch_labels = None
 depends_on = None
 
 
-ZERO_FILLED_UUID = "00000000000000000000000000000000"
-
-
 def list_chunk(lst, n):
     return [lst[i : i + n] for i in range(0, len(lst), n)]
 
