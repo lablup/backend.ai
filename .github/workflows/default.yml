@@ -28,7 +28,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
@@ -78,7 +78,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache2209-1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -132,7 +132,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache2209-1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -192,7 +192,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache2209-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
