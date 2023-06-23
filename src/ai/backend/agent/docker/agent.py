@@ -1234,10 +1234,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     zmq_ctx.destroy()
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self, image_ref: ImageRef, registry_conf: ImageRegistry, do_wait: bool = True
+    ) -> None:
         if (other_pull := self.image_pull_tracker.get(image_ref.canonical)) is not None:
-            log.info("image {} is already being pulled. Waiting.", image_ref.canonical)
-            await other_pull.wait()
+            if do_wait:
+                log.info("image {} is already being pulled. Waiting...", image_ref.canonical)
+                await other_pull.wait()
+            else:
+                log.info("image {} is already being pulled.", image_ref.canonical)
             return
         auth_config = None
         reg_user = registry_conf.get("username")

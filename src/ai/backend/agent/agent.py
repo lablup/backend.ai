@@ -1431,7 +1431,9 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self, image_ref: ImageRef, registry_conf: ImageRegistry, do_wait: bool = True
+    ) -> None:
         """
         Pull the given image from the given registry.
         """

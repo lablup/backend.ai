@@ -933,7 +933,9 @@ class KubernetesAgent(
         # TODO: Add support for remote agent socket mechanism
         pass
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self, image_ref: ImageRef, registry_conf: ImageRegistry, do_wait: bool = True
+    ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 

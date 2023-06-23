@@ -371,7 +371,7 @@ class AgentRPCServer(aobject):
                     "password": raw_img["registry"]["password"],
                 }
             )
-            await self.agent.pull_image(img, registry)
+            await self.agent.pull_image(img, registry, do_wait=False)
 
     @rpc_function
     @collect_error
