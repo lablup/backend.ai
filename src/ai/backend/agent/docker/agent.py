@@ -1235,9 +1235,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     zmq_ctx.destroy()
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
-        if (pull_event := self.image_pull_tracker.get(image_ref.canonical)) is not None:
+        if (other_pull := self.image_pull_tracker.get(image_ref.canonical)) is not None:
             log.info("image {} is already being pulled. Waiting.", image_ref.canonical)
-            await pull_event.wait()
+            await other_pull.wait()
             return
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -1257,6 +1257,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 await docker.images.pull(image_ref.canonical, auth=auth_config)
         finally:
             if image_ref.canonical in self.image_pull_tracker:
+                pull_event.set()
                 del self.image_pull_tracker[image_ref.canonical]
 
     async def remove_image(self, image_ref: ImageRef) -> None:
