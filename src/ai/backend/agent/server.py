@@ -46,6 +46,7 @@ from trafaret.dataerror import DataError as TrafaretDataError
 
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     EventProducer,
@@ -59,6 +60,7 @@ from ai.backend.common.types import (
     EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
+    ImageRegistry,
     KernelCreationConfig,
     KernelId,
     LogSeverity,
@@ -349,6 +351,40 @@ class AgentRPCServer(aobject):
     @collect_error
     async def ping_kernel(self, kernel_id: str):
         log.debug("rpc::ping_kernel({0})", kernel_id)
+
+    @rpc_function
+    @collect_error
+    async def pull_image(self, raw_images: list[dict[str, Any]]):
+        log.debug("rpc::pull_image({0})", raw_images)
+        for raw_img in raw_images:
+            img = ImageRef(
+                raw_img["canonical"],
+                known_registries=[raw_img["registry"]["name"]],
+                is_local=raw_img["is_local"],
+                architecture=get_arch_name(),
+            )
+            registry = ImageRegistry(
+                {
+                    "name": raw_img["registry"]["name"],
+                    "url": raw_img["registry"]["url"],
+                    "username": raw_img["registry"]["username"],
+                    "password": raw_img["registry"]["password"],
+                }
+            )
+            await self.agent.pull_image(img, registry)
+
+    @rpc_function
+    @collect_error
+    async def remove_image(self, raw_images: list[dict[str, Any]]):
+        log.debug("rpc::remove_image({0})", raw_images)
+        for raw_img in raw_images:
+            img = ImageRef(
+                raw_img["canonical"],
+                known_registries=[raw_img["registry"]["name"]],
+                is_local=raw_img["is_local"],
+                architecture=get_arch_name(),
+            )
+            await self.agent.remove_image(img)
 
     @rpc_function
     @collect_error

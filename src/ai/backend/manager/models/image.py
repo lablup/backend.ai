@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, get_registry_info
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
@@ -37,6 +37,7 @@ from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry import get_container_registry
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from .agent import AgentRow
 from .base import (
     Base,
     BigInt,
@@ -310,6 +311,28 @@ class ImageRow(Base):
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
+
+    @classmethod
+    async def get_serialized(
+        cls,
+        session: AsyncSession,
+        shared_config: SharedConfig,
+        reference_candidates: List[Union[ImageAlias, ImageRef]],
+    ) -> dict[str, Any]:
+        img = await cls.resolve(session, reference_candidates)
+        registry_url, registry_creds = await get_registry_info(
+            shared_config.etcd, img.image_ref.registry
+        )
+        return {
+            "canonical": img.image_ref.canonical,
+            "is_local": False,
+            "registry": {
+                "name": img.image_ref.registry,
+                "url": registry_url,
+                "username": registry_creds.get("username", ""),
+                "password": registry_creds.get("password", ""),
+            },
+        }
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
@@ -677,7 +700,38 @@ class PreloadImage(graphene.Mutation):
         references: Sequence[str],
         target_agents: Sequence[str],
     ) -> PreloadImage:
-        return PreloadImage(ok=False, msg="Not implemented.", task_id=None)
+        log.info(
+            "preloading images ({0}) to agents ({1}) by API request",
+            ", ".join([img for img in references]),
+            ", ".join(target_agents),
+        )
+        ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_session() as db_sess:
+            agents = (
+                await db_sess.scalars(
+                    sa.select(AgentRow.id, AgentRow.addr).where(AgentRow.id.in_(target_agents))
+                )
+            ).all()
+            images = [
+                (
+                    await ImageRow.get_serialized(
+                        db_sess,
+                        ctx.shared_config,
+                        [
+                            ImageRef(ref, ["*"]),
+                            ImageAlias(ref),
+                        ],
+                    )
+                )
+                for ref in references
+            ]
+
+        async def _preload_task(reporter: ProgressReporter) -> None:
+            for agent in agents:
+                await ctx.registry.pull_image(agent.id, agent.addr, images)
+
+        task_id = await ctx.background_task_manager.start(_preload_task)
+        return PreloadImage(ok=True, msg="", task_id=task_id)
 
 
 class UnloadImage(graphene.Mutation):
@@ -698,7 +752,38 @@ class UnloadImage(graphene.Mutation):
         references: Sequence[str],
         target_agents: Sequence[str],
     ) -> UnloadImage:
-        return UnloadImage(ok=False, msg="Not implemented.", task_id=None)
+        log.info(
+            "unloading images ({0}) to agents ({1}) by API request",
+            ", ".join([img for img in references]),
+            ", ".join(target_agents),
+        )
+        ctx: GraphQueryContext = info.context
+        async with ctx.db.begin_session() as db_sess:
+            agents = (
+                await db_sess.scalars(
+                    sa.select(AgentRow.id, AgentRow.addr).where(AgentRow.id.in_(target_agents))
+                )
+            ).all()
+            images = [
+                (
+                    await ImageRow.get_serialized(
+                        db_sess,
+                        ctx.shared_config,
+                        [
+                            ImageRef(ref, ["*"]),
+                            ImageAlias(ref),
+                        ],
+                    )
+                )
+                for ref in references
+            ]
+
+        async def _unload_task(reporter: ProgressReporter) -> None:
+            for agent in agents:
+                await ctx.registry.remove_image(agent.id, agent.addr, images)
+
+        task_id = await ctx.background_task_manager.start(_unload_task)
+        return UnloadImage(ok=True, msg="", task_id=task_id)
 
 
 class RescanImages(graphene.Mutation):

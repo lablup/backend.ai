@@ -937,6 +937,9 @@ class KubernetesAgent(
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
+    async def remove_image(self, image_ref: ImageRef) -> None:
+        raise NotImplementedError
+
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:

@@ -1235,6 +1235,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     zmq_ctx.destroy()
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        if (pull_event := self.image_pull_tracker.get(image_ref.canonical)) is not None:
+            log.info("image {} is already being pulled. Waiting.", image_ref.canonical)
+            await pull_event.wait()
+            return
         auth_config = None
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
@@ -1246,8 +1250,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 "auth": encoded_creds,
             }
         log.info("pulling image {} from registry", image_ref.canonical)
+        pull_event = asyncio.Event()
+        self.image_pull_tracker[image_ref.canonical] = pull_event
+        try:
+            async with closing_async(Docker()) as docker:
+                await docker.images.pull(image_ref.canonical, auth=auth_config)
+        finally:
+            if image_ref.canonical in self.image_pull_tracker:
+                del self.image_pull_tracker[image_ref.canonical]
+
+    async def remove_image(self, image_ref: ImageRef) -> None:
+        log.info("remove image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config)
+            # Remove the given image along with any untagged parent images that were referenced by that image.
+            await docker.images.delete(image_ref.canonical)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

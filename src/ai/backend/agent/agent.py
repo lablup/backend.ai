@@ -531,6 +531,7 @@ class AbstractAgent(
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[str, ComputerContext]
     images: Mapping[str, str]
+    image_pull_tracker: MutableMapping[str, asyncio.Event]
     port_pool: Set[int]
 
     redis: Redis
@@ -582,6 +583,7 @@ class AbstractAgent(
                 local_config["container"]["port-range"][1] + 1,
             )
         )
+        self.image_pull_tracker = {}
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)
@@ -1416,6 +1418,12 @@ class AbstractAgent(
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         """
         Pull the given image from the given registry.
+        """
+
+    @abstractmethod
+    async def remove_image(self, image_ref: ImageRef) -> None:
+        """
+        Remove the given image.
         """
 
     @abstractmethod
