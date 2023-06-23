@@ -1341,7 +1341,7 @@ class AgentRegistry:
         return session_id
 
     async def pull_image(
-        self, agent_id: AgentId, agent_addr: str, references: Sequence[dict[str, Any]]
+        self, agent_id: AgentId, agent_addr: str, img_maps: Sequence[dict[str, Any]]
     ) -> None:
         async with RPCContext(
             agent_id,
@@ -1349,10 +1349,10 @@ class AgentRegistry:
             invoke_timeout=None,
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            await rpc.call.pull_image(references)
+            await rpc.call.pull_image(img_maps)
 
     async def remove_image(
-        self, agent_id: AgentId, agent_addr: str, image_names: Sequence[dict[str, Any]]
+        self, agent_id: AgentId, agent_addr: str, img_maps: Sequence[dict[str, Any]]
     ) -> None:
         async with RPCContext(
             agent_id,
@@ -1360,7 +1360,7 @@ class AgentRegistry:
             invoke_timeout=None,
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            await rpc.call.remove_image(image_names)
+            await rpc.call.remove_image(img_maps)
 
     async def start_session(
         self,
