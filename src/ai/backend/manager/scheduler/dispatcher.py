@@ -31,7 +31,6 @@ from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
@@ -590,9 +589,7 @@ class SchedulerDispatcher(aobject):
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
     ) -> list[AgentRow]:
-        raw_value = await self.shared_config.etcd.get(
-            "config/agent/max-container-count", scope=ConfigScopes.SGROUP
-        )
+        raw_value = await self.shared_config.etcd.get("config/agent/max-container-count")
         if raw_value is None:
             return candidate_agents
         max_container_count = int(raw_value)
