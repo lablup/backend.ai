@@ -1160,6 +1160,22 @@ class AbstractAgent(
             ),
         )
 
+    async def check_free_disk(self, image_ref: ImageRef) -> None:
+        """
+        Check remaining free disk.
+        return True if free disk is larger than 50 GiB, else False.
+
+        TODO: compare the size of image from metadata and compare it.
+        Still, the real size can be different from the metadata
+        cause this agent have duplicate image layers.
+        """
+        minimum = 5 * (2**30)
+        usage = shutil.disk_usage("/")
+        if usage.free < minimum:
+            raise AgentError(
+                f"Need at least {minimum} GiB of free disk space to install a new image."
+            )
+
     @abstractmethod
     async def enumerate_containers(
         self,
@@ -1645,6 +1661,7 @@ class AbstractAgent(
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
             if do_pull:
+                await self.check_free_disk(ctx.image_ref)
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
