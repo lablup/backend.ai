@@ -130,7 +130,7 @@ async def upgrade_2_to_3(
                     folder_ids,
                 )
                 for row in rows:
-                    old_quota_map[row["id"]] = row["max_size"]
+                    old_quota_map[row["id"]] = row["max_size"] * (2**20)
                     quota_scope_map[row["id"]] = row["quota_scope_id"]
 
                 log.info("checking {} ...".format(", ".join(map(str, folder_ids))))
@@ -146,8 +146,10 @@ async def upgrade_2_to_3(
                 dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:
                     if scan_folder_size:
-                        current_size = await volume.fsop_model.scan_tree_size(
-                            volume.mangle_vfpath(orig_vfid),
+                        current_size = int(
+                            await volume.fsop_model.scan_tree_size(
+                                volume.mangle_vfpath(orig_vfid),
+                            )
                         )
                     else:
                         current_size = None
