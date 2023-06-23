@@ -70,8 +70,9 @@ from .base import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang import JSONFieldItem
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -1271,6 +1272,7 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
+        status_history = row.status_history or {}
         return {
             # identity
             "id": row.id,
@@ -1303,10 +1305,11 @@ class ComputeSession(graphene.ObjectType):
             "status_changed": row.status_changed,
             "status_info": row.status_info,
             "status_data": row.status_data,
-            "status_history": row.status_history or {},
+            "status_history": status_history,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
+            "scheduled_at": status_history.get(SessionStatus.SCHEDULED.name),
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
@@ -1414,7 +1417,7 @@ class ComputeSession(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
@@ -1432,11 +1435,14 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
-        "scheduled_at": ("sessions_scheduled_at", dtparse),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            dtparse,
+        ),
         "startup_command": ("sessions_startup_command", None),
     }
 
-    _queryorder_colmap = {
+    _queryorder_colmap: ColumnMapType = {
         "id": "sessions_id",
         "type": "sessions_session_type",
         "name": "sessions_name",
@@ -1457,7 +1463,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": "sessions_created_at",
         "terminated_at": "sessions_terminated_at",
         "starts_at": "sessions_starts_at",
-        "scheduled_at": "sessions_scheduled_at",
+        "scheduled_at": JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
     }
 
     @classmethod

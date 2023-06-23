@@ -1,4 +1,4 @@
-from typing import Mapping
+from typing import Mapping, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -22,11 +22,11 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+ColumnMapType: TypeAlias = Mapping[str, str | JSONFieldItem] | None
+
 
 class QueryOrderTransformer(Transformer):
-    def __init__(
-        self, sa_table: sa.Table, column_map: Mapping[str, str | JSONFieldItem] = None
-    ) -> None:
+    def __init__(self, sa_table: sa.Table, column_map: ColumnMapType = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
@@ -38,7 +38,7 @@ class QueryOrderTransformer(Transformer):
                     case str(column):
                         col = self._sa_table.c[column]
                     case JSONFieldItem(_col, _key):
-                        col = self._sa_table.c[self._column_map[_col]].op("->>")(_key)
+                        col = self._sa_table.c[_col].op("->>")(_key)
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
             else:
@@ -64,7 +64,7 @@ class QueryOrderTransformer(Transformer):
 
 
 class QueryOrderParser:
-    def __init__(self, column_map: Mapping[str, str] = None) -> None:
+    def __init__(self, column_map: ColumnMapType = None) -> None:
         self._column_map = column_map
         self._parser = _parser
 

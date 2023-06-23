@@ -72,8 +72,9 @@ from .base import (
     mapper_registry,
 )
 from .group import groups
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang import JSONFieldItem
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -808,6 +809,7 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
+        status_history = row["status_history"] or {}
         return {
             # identity
             "id": row["id"],
@@ -831,6 +833,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "starts_at": row["starts_at"],
+            "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
@@ -869,7 +872,7 @@ class ComputeContainer(graphene.ObjectType):
             return None
         return await graph_ctx.registry.get_abusing_report(self.id)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: FieldSpecType = {
         "image": ("image", None),
         "architecture": ("architecture", None),
         "agent": ("agent", None),
@@ -883,10 +886,10 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
-        "scheduled_at": ("scheduled_at", dtparse),
+        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), dtparse),
     }
 
-    _queryorder_colmap = {
+    _queryorder_colmap: ColumnMapType = {
         "image": "image",
         "architecture": "architecture",
         "agent": "agent",
@@ -900,7 +903,7 @@ class ComputeContainer(graphene.ObjectType):
         "status_changed": "status_info",
         "created_at": "created_at",
         "terminated_at": "terminated_at",
-        "scheduled_at": "scheduled_at",
+        "scheduled_at": JSONFieldItem("status_history", KernelStatus.SCHEDULED.name),
     }
 
     @classmethod

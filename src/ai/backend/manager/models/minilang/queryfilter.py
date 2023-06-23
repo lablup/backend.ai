@@ -1,4 +1,4 @@
-from typing import Any, Mapping, Union
+from typing import Any, Mapping, TypeAlias, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -47,6 +47,8 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
+
 
 class QueryFilterTransformer(Transformer):
     def __init__(self, sa_table: sa.Table, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
@@ -83,7 +85,7 @@ class QueryFilterTransformer(Transformer):
                     case str(column):
                         col = self._sa_table.c[column]
                     case JSONFieldItem(_col, _key):
-                        col = self._sa_table.c[self._fieldspec[_col][0]].op("->>")(_key)
+                        col = self._sa_table.c[_col].op("->>")(_key)
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
             else:
