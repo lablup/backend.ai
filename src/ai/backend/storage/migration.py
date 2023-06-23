@@ -36,6 +36,7 @@ class VolumeUpgradeInfo:
 
 
 class MigrationFolderInfo(TypedDict):
+    volume_id: str
     folder_id: UUID
     quota_scope_id: str
     src_path: Path
@@ -154,6 +155,7 @@ async def upgrade_2_to_3(
                         created_quota_scopes.add(quota_scope_id)
                     migration_informations.append(
                         {
+                            "volume_id": volume_id,
                             "folder_id": folder_id,
                             "quota_scope_id": quota_scope_id,
                             "src_path": volume.mangle_vfpath(orig_vfid),
@@ -180,7 +182,15 @@ async def upgrade_2_to_3(
             await fw.writelines(script)
     if report_path:
         in_memory_file = StringIO()
-        fieldnames = ["volume_id", "folder_id", "current_size", "old_quota", "src_path", "dst_path"]
+        fieldnames = [
+            "volume_id",
+            "folder_id",
+            "quota_scope_id",
+            "current_size",
+            "old_quota",
+            "src_path",
+            "dst_path",
+        ]
         writer = csv.DictWriter(in_memory_file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(migration_informations)
