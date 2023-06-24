@@ -382,6 +382,8 @@ class AgentRPCServer(aobject):
                 }
                 continue
 
+            await self.agent.check_free_disk(img)
+
             async def _pull_image(
                 reporter: ProgressReporter,
             ) -> None:
