@@ -1431,12 +1431,23 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
-    async def pull_image(
-        self, image_ref: ImageRef, registry_conf: ImageRegistry, do_wait: bool = True
-    ) -> None:
+    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         """
         Pull the given image from the given registry.
         """
+
+    def get_ongoing_pulling(
+        self,
+        image_ref: ImageRef,
+    ) -> asyncio.Event | None:
+        return self.image_pull_tracker.get(image_ref.canonical)
+
+    async def check_and_pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+        if (other_pull := self.get_ongoing_pulling(image_ref)) is not None:
+            log.info("image {} is already being pulled. Waiting...", image_ref.canonical)
+            await other_pull.wait()
+            return
+        await self.pull_image(image_ref, registry_conf)
 
     @abstractmethod
     async def remove_image(self, image_ref: ImageRef) -> None:
@@ -1667,7 +1678,7 @@ class AbstractAgent(
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+                await self.check_and_pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
             if not restarting:
                 await self.produce_event(

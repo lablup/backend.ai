@@ -45,7 +45,7 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 
 from ai.backend.common import config, identity, msgpack, utils
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
@@ -356,6 +356,9 @@ class AgentRPCServer(aobject):
     @collect_error
     async def pull_image(self, raw_images: list[dict[str, Any]]):
         log.debug("rpc::pull_image({0})", raw_images)
+        bgtask_mgr: BackgroundTaskManager = self.local_config["background_task_manager"]
+
+        response: dict[str, Any] = {}
         for raw_img in raw_images:
             img = ImageRef(
                 raw_img["canonical"],
@@ -371,7 +374,28 @@ class AgentRPCServer(aobject):
                     "password": raw_img["registry"]["password"],
                 }
             )
-            await self.agent.pull_image(img, registry, do_wait=False)
+            if self.agent.get_ongoing_pulling(img) is not None:
+                response[img.canonical] = {
+                    "bgtask_id": None,
+                    "image_ref": img.canonical,
+                    "architecture": img.architecture,
+                }
+                continue
+
+            async def _pull_image(
+                reporter: ProgressReporter,
+            ) -> None:
+                await self.agent.pull_image(img, registry)
+
+            task_id = await bgtask_mgr.start(
+                _pull_image,
+            )
+            response[img.canonical] = {
+                "bgtask_id": str(task_id),
+                "image_ref": img.canonical,
+                "architecture": img.architecture,
+            }
+        return response
 
     @rpc_function
     @collect_error
