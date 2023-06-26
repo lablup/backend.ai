@@ -290,12 +290,12 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Generate REST API specification in OpenAPI fashion
       run: python -m ai.backend.manager.openapi openapi.json
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-region: ap-northeast-2
-          role-session-name: GitHubActions
-          role-to-assume: ${{ secrets.OPENAPI_BUCKET_AWS_IAM_ROLE_ARN }}
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-region: ap-northeast-2
+        role-session-name: GitHubActions
+        role-to-assume: ${{ secrets.OPENAPI_BUCKET_AWS_IAM_ROLE_ARN }}
     - name: Upload API specification to s3
       run: aws s3 cp ./openapi.json s3://$OPENAPI_BUCKET/openapi.json
       env:
