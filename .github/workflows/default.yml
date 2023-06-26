@@ -293,7 +293,7 @@ jobs:
     - name: Generate REST API specification in OpenAPI fashion
       run: ./py -m ai.backend.manager.openapi openapi.json
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v2
+      uses: aws-actions/configure-aws-credentials@v3
       with:
         aws-region: ap-northeast-2
         role-session-name: GitHubActions
