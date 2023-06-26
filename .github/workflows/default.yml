@@ -261,48 +261,6 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  build-api-docs:
-    # needs: [build-wheels]
-    # if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    needs: [lint]
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 100
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
-      with:
-        gha-cache-key: pants-cache-main-1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Create python-default virtualenv
-      run: pants export --resolve=python-default
-    - name: Generate REST API specification in OpenAPI fashion
-      run: ./py -m ai.backend.manager.openapi openapi.json
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-region: ap-northeast-2
-        role-session-name: GitHubActions
-        role-to-assume: ${{ secrets.OPENAPI_BUCKET_AWS_IAM_ROLE_ARN }}
-    - name: Upload API specification to s3
-      run: aws s3 cp ./openapi.json s3://$OPENAPI_BUCKET/openapi.json
-      env:
-        OPENAPI_BUCKET: ${{ secrets.OPENAPI_BUCKET }}
-
   build-conda-pack-for-windows:
     needs: [build-wheels]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')

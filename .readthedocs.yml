@@ -8,10 +8,11 @@ build:
   tools:
     python: "3.11"
   jobs:
-    post_build:
-      - cp docs/manager/rest-reference/index.html _readthedocs/html/manager/rest-reference/index.html
+    pre_build:
+      - PYTHONPATH="src" python -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
 python:
   install:
+    - requirements: requirements.txt
     - requirements: docs/requirements.txt
 
 sphinx:
