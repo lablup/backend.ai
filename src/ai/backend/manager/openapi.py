@@ -294,3 +294,7 @@ def main(output_path: Path) -> None:
     Generates OpenAPI specification of Backend.AI API.
     """
     asyncio.run(generate_openapi(output_path))
+
+
+if __name__ == "__main__":
+    main()
