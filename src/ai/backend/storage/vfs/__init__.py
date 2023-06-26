@@ -358,9 +358,9 @@ class BaseVolume(AbstractVolume):
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
-            raise InvalidQuotaScopeError(
-                f"Quota scope {qspath} does not exist in the target volume"
-            )
+            if not vfid.quota_scope_id:
+                raise InvalidQuotaScopeError("Cannot create quota scope with empty entity")
+            await self.quota_model.create_quota_scope(vfid.quota_scope_id)
         vfpath = self.mangle_vfpath(vfid)
         await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
 
