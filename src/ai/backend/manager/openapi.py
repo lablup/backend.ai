@@ -3,6 +3,7 @@ import inspect
 import json
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 import click
@@ -35,7 +36,7 @@ def get_path_parameters(resource: AbstractResource) -> list[dict]:
 
 
 def flatten_or(scheme: t.Trafaret) -> list[t.Trafaret]:
-    left, right = scheme.trafarets
+    left, right = scheme.trafarets  # type: ignore[attr-defined]
     items = []
     if isinstance(left, t.Or):
         items.extend(flatten_or(left))
@@ -69,33 +70,36 @@ def _traverse(scheme: t.Trafaret) -> dict:
         required_keys: list[str] = [d["name"] for d in items if d["required"]]
         return {"type": "object", "properties": properties, "required": required_keys}
     if isinstance(scheme, t.Enum):
-        return {"type": "string", "enum": scheme.variants}
+        enum_values = scheme.variants  # type: ignore[attr-defined]
+        return {"type": "string", "enum": enum_values}
     if isinstance(scheme, t.Float):
         resp = {"type": "integer"}
-        if scheme.gte is not None:
-            resp["minimum"] = scheme.gte
-        if scheme.lte is not None:
-            resp["maximum"] = scheme.lte
+        if gte := scheme.gte:  # type: ignore[attr-defined]
+            resp["minimum"] = gte
+        if lte := scheme.lte:  # type: ignore[attr-defined]
+            resp["maximum"] = lte
         return resp
     if isinstance(scheme, t.Int):
         resp = {"type": "integer"}
-        if scheme.gte is not None:
-            resp["minimum"] = scheme.gte
-        if scheme.lte is not None:
-            resp["maximum"] = scheme.lte
+        if gte := scheme.gte:  # type: ignore[attr-defined]
+            resp["minimum"] = gte
+        if lte := scheme.lte:  # type: ignore[attr-defined]
+            resp["maximum"] = lte
         return resp
     if isinstance(scheme, t.List):
-        return {"type": "array", "items": _traverse(scheme.trafaret)}
+        array_items = _traverse(scheme.trafaret)  # type: ignore[attr-defined]
+        return {"type": "array", "items": array_items}
     if isinstance(scheme, t.Mapping):
+        key_type = scheme.key.__class__.__name__  # type: ignore[attr-defined]
+        value_type = scheme.value.__class__.__name__  # type: ignore[attr-defined]
         return {
             "type": "object",
-            "description": (
-                f"Mapping({scheme.key.__class__.__name__} => {scheme.value.__class__.__name__})"
-            ),
+            "description": f"Mapping({key_type} => {value_type})",
             "additionalProperties": True,
         }
     if isinstance(scheme, t.Regexp):
-        return {"type": "string", "pattern": str(scheme.regexp.pattern)}
+        pattern = scheme.regexp.pattern  # type: ignore[attr-defined]
+        return {"type": "string", "pattern": str(pattern)}
     if isinstance(scheme, t.String):
         return {"type": "string"}
     if isinstance(scheme, t.ToBool):
@@ -150,7 +154,11 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
     optional = (
         isinstance(scheme, t.Or)
         and len(
-            [x for x in scheme.trafarets if (isinstance(x, t.Null) or isinstance(x, UndefChecker))]
+            [
+                x
+                for x in scheme.trafarets  # type: ignore[attr-defined]
+                if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
+            ]
         )
         > 0
     )
@@ -160,12 +168,12 @@ def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
 
 def parse_traferet_definition(root: t.Dict) -> list[dict]:
     resp = []
-    for key in root.keys:
+    for key in root.keys:  # type: ignore[attr-defined]
         names: list[str] = []
         if isinstance(key, tx.AliasedKey):
             names.extend(key.names)
         elif isinstance(key, t.Key):
-            names.append(key.name)
+            names.append(key.name)  # type: ignore[attr-defined]
         schema, optional = parse_trafaret_value(key.trafaret)
         if key.default and key.default != _empty:
             if inspect.isclass(key.default):
@@ -190,7 +198,7 @@ async def generate_openapi(output_path: Path) -> None:
         subapp_pkgs=global_subapp_pkgs,
     )
 
-    openapi = {
+    openapi: dict[str, Any] = {
         "openapi": "3.0.0",
         "info": {
             "title": "Backend.AI Manager API",
@@ -231,10 +239,10 @@ async def generate_openapi(output_path: Path) -> None:
             route_def = {
                 "operationId": operation_id,
                 "tags": [prefix],
-                "parameters": [],
                 "responses": {"200": {"description": "Successful response"}},
             }
-            route_def["parameters"].extend(get_path_parameters(resource))
+            parameters = []
+            parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
                 handler_attrs = getattr(route.handler, "_backend_attrs")
                 if handler_attrs.get("auth_required"):
@@ -254,9 +262,7 @@ async def generate_openapi(output_path: Path) -> None:
                 if request_scheme := handler_attrs.get("request_scheme"):
                     parsed_definition = parse_traferet_definition(request_scheme)
                     if method == "GET" or method == "DELETE":
-                        route_def["parameters"].extend(
-                            [{**d, "in": "query"} for d in parsed_definition]
-                        )
+                        parameters.extend([{**d, "in": "query"} for d in parsed_definition])
                     else:
                         properties = {d["name"]: d["schema"] for d in parsed_definition}
                         required_keys: list[str] = [
@@ -273,6 +279,7 @@ async def generate_openapi(output_path: Path) -> None:
                                 }
                             }
                         }
+            route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
             openapi["paths"][path][method.lower()] = route_def
 
