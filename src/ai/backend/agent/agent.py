@@ -1163,6 +1163,8 @@ class AbstractAgent(
     async def get_free_image_disk(self) -> int | float:
         """
         Get free disk for images.
+
+        TODO: get free disk of backend's data root.
         """
         usage = shutil.disk_usage("/")
         return usage.free
@@ -1176,6 +1178,8 @@ class AbstractAgent(
         Still, the real size can be different from the metadata
         cause this agent have duplicate image layers.
         """
+        if not self.local_config["agent"]["check_free_image_disk"]:
+            return
         minimum = 5 * (2**30)
         free = await self.get_free_image_disk()
         if free < minimum:
