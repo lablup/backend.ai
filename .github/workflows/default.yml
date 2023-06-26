@@ -289,7 +289,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Generate REST API specification in OpenAPI fashion
-      run: python -m ai.backend.manager.openapi openapi.json
+      run: ./py -m ai.backend.manager.openapi openapi.json
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
