@@ -261,6 +261,42 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
+  build-api-docs:
+    needs: [build-wheels]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    jobs:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 100
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      with:
+        gha-cache-key: pants-cache-main-1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Create output directory
+      run: mkdir openapi
+    - name: Generate REST API specification in OpenAPI fashion
+      run: python -m ai.backend.manager.openapi openapi/openapi.json
+    - name: Upload API specification to s3
+      uses: shallwefootball/s3-upload-action
+      with:
+        aws_key_id: ${{ secrets.OPENAPI_BUCKET_AWS_ACCESS_KEY_ID }}
+        aws_secret_access_key: ${{ secrets.OPENAPI_BUCKET_AWS_SECRET_ACCESS_KEY }}
+        aws_bucket: ${{ secrets.OPENAPI_BUCKET }}
+        source_dir: openapi
+        destination_dir: ''
+
   build-conda-pack-for-windows:
     needs: [build-wheels]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
