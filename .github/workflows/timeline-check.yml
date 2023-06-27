@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
-      uses: lablup/sparse-checkout@v2
+      uses: snow-actions/sparse-checkout@v1.2.0
       with:
         patterns: |
           changes
