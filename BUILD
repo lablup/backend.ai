@@ -26,9 +26,10 @@ python_requirements(
         "types-setuptools": [
             "setuptools",
             "pkg_resources",
-            "_pytest.monkeypatch",
+            "pytest",
             "ai.backend.testutils",
             "ai.backend.test",
+            "tests",
         ],
         "types-six": ["six", "graphql", "promise", "ai.backend.manager.models"],
         "types-tabulate": ["tabulate"],
