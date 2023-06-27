@@ -219,9 +219,8 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 }
                 sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                api_rqst.headers["X-BackendAI-SessionID"] = (
-                    request_headers.get("X-BackendAI-SessionID") or aiohttp_session
-                )
+                if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
+                    api_rqst.headers["X-BackendAI-SessionID"] = session_id
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:
