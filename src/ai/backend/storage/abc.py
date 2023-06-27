@@ -227,6 +227,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def create_vfolder(
         self,
         vfid: VFolderID,
+        exist_ok=False,
     ) -> None:
         raise NotImplementedError
 

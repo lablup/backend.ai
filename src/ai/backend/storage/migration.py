@@ -106,8 +106,8 @@ async def upgrade_2_to_3(
                 volume_id VARCHAR(1024),
                 folder_id UUID,
                 status VARCHAR(16),
-                current_size INTEGER DEFAULT NULL,
-                old_quota INTEGER DEFAULT NULL,
+                current_size BIGINT DEFAULT NULL,
+                old_quota BIGINT DEFAULT NULL,
                 log TEXT DEFAULT NULL,
                 PRIMARY KEY (volume_id, folder_id)
             );
@@ -173,7 +173,29 @@ async def upgrade_2_to_3(
                 if folder_id in completed_folder_ids:
                     progbar.update(1)
                     continue
-                quota_scope_id = quota_scope_map[folder_id]
+                try:
+                    quota_scope_id = quota_scope_map[folder_id]
+                except KeyError:
+                    log.warn("Folder does not exist in database, skipping")
+                    async with (
+                        connect_database(ctx.dsn) as conn,
+                        conn.transaction(),
+                    ):
+                        await conn.execute(
+                            """\
+                            INSERT INTO vfolder_migration_v3
+                            (volume_id, folder_id, log, status)
+                            VALUES ($1, $2, $3, $4)
+                            ON CONFLICT (volume_id, folder_id)
+                            DO UPDATE SET log = excluded.log, status = excluded.status;
+                            """,
+                            volume_id,
+                            folder_id,
+                            "Folder does not exist in database",
+                            VFolderMigrationStatus.FAILED,
+                        )
+                    progbar.update(1)
+                    continue
                 progbar.write(
                     "moving vfolder {} into quota_scope {}".format(
                         folder_id,
@@ -190,8 +212,12 @@ async def upgrade_2_to_3(
                     else:
                         current_size = None
                     if quota_scope_id not in created_quota_scopes:
-                        await volume.quota_model.create_quota_scope(quota_scope_id)
+                        try:
+                            await volume.quota_model.create_quota_scope(quota_scope_id)
+                        except FileExistsError:
+                            pass
                         created_quota_scopes.add(quota_scope_id)
+                    await volume.create_vfolder(dst_vfid, exist_ok=True)
                     await volume.fsop_model.move_tree(
                         volume.mangle_vfpath(orig_vfid),
                         volume.mangle_vfpath(dst_vfid),
