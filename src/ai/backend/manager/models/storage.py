@@ -18,7 +18,6 @@ from typing import (
     Tuple,
     TypedDict,
 )
-from uuid import UUID
 
 import aiohttp
 import attrs
@@ -26,7 +25,7 @@ import graphene
 import yarl
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata
+from ai.backend.common.types import HardwareMetadata, VFolderID
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
@@ -51,6 +50,7 @@ class StorageProxyInfo:
     secret: str
     client_api_url: yarl.URL
     manager_api_url: yarl.URL
+    sftp_scaling_groups: list[str]
 
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
@@ -82,6 +82,7 @@ class StorageSessionManager:
                 secret=proxy_config["secret"],
                 client_api_url=yarl.URL(proxy_config["client_api"]),
                 manager_api_url=yarl.URL(proxy_config["manager_api"]),
+                sftp_scaling_groups=proxy_config["sftp_scaling_groups"],
             )
 
     async def aclose(self) -> None:
@@ -122,10 +123,15 @@ class StorageSessionManager:
         _ctx_volumes_cache.set(results)
         return results
 
+    async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
+        if proxy_name not in self._proxies:
+            raise IndexError(f"proxy {proxy_name} does not exist")
+        return self._proxies[proxy_name].sftp_scaling_groups or []
+
     async def get_mount_path(
         self,
         vfolder_host: str,
-        vfolder_id: UUID,
+        vfolder_id: VFolderID,
         subpath: PurePosixPath = PurePosixPath("."),
     ) -> str:
         async with self.request(

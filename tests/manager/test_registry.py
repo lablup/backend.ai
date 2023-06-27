@@ -59,10 +59,12 @@ async def test_handle_heartbeat(
             "resource_slots": {"cpu": ("count", _1), "mem": ("bytes", _1g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.5",
+            "public_host": "10.0.0.5",
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "auto_terminate_abusing_kernel": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -76,11 +78,13 @@ async def test_handle_heartbeat(
         return_value={
             "status": AgentStatus.ALIVE,
             "addr": "10.0.0.5",
+            "public_host": "10.0.0.5",
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
+            "auto_terminate_abusing_kernel": False,
         }
     )
     await registry.handle_heartbeat(
@@ -90,10 +94,12 @@ async def test_handle_heartbeat(
             "resource_slots": {"cpu": ("count", _1), "mem": ("bytes", _2g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
+            "public_host": "10.0.0.5",
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "auto_terminate_abusing_kernel": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -111,11 +117,13 @@ async def test_handle_heartbeat(
         return_value={
             "status": AgentStatus.LOST,
             "addr": "10.0.0.5",
+            "public_host": "10.0.0.5",
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
+            "auto_terminate_abusing_kernel": False,
         }
     )
     await registry.handle_heartbeat(
@@ -125,10 +133,12 @@ async def test_handle_heartbeat(
             "resource_slots": {"cpu": ("count", _4), "mem": ("bytes", _2g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
+            "public_host": "10.0.0.5",
             "architecture": DEFAULT_IMAGE_ARCH,
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "auto_terminate_abusing_kernel": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()

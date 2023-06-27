@@ -16,6 +16,83 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.4 (2023-05-29)
+
+### Features
+* Enable hard-sync manager DB and agent's kernel_registry. ([#1292](https://github.com/lablup/backend.ai/issues/1292))
+* Add a new route to the `WebServer` to support websocket proxy for the pipeline service. ([#1294](https://github.com/lablup/backend.ai/issues/1294))
+
+### Fixes
+* Fix MemoryPlugin memory wrong calculation bug ([#1291](https://github.com/lablup/backend.ai/issues/1291))
+* Use `session_id` to update status of destroyed session rather `kernel.session_id`. ([#1304](https://github.com/lablup/backend.ai/issues/1304))
+
+
+## 23.03.3 (2023-05-26)
+
+### Features
+* Add support for DellEMC storage backend. ([#682](https://github.com/lablup/backend.ai/issues/682))
+* Set abusing report path in db for Scalability. ([#858](https://github.com/lablup/backend.ai/issues/858))
+* Enable vfolder upload function to allow you to upload folders by making parent directory of a target path. ([#1233](https://github.com/lablup/backend.ai/issues/1233))
+* Add recurvice option to vfolder upload function. ([#1235](https://github.com/lablup/backend.ai/issues/1235))
+* Include `scaling_group_name` when fail to assign session to agent. ([#1259](https://github.com/lablup/backend.ai/issues/1259))
+* Add `agent_id` label to containers as `ai.backend.owner`. ([#1266](https://github.com/lablup/backend.ai/issues/1266))
+* Add a manager-side status check API to the storage proxy for internal monitoring ([#1268](https://github.com/lablup/backend.ai/issues/1268))
+* Resolve `resource_opts` of session from sibling kernels. ([#1282](https://github.com/lablup/backend.ai/issues/1282))
+* Implement feature to force password updates periodically based on manager settings. ([#1284](https://github.com/lablup/backend.ai/issues/1284))
+* Add a detailed request handler statistics to the web server ([#1285](https://github.com/lablup/backend.ai/issues/1285))
+* Intoduce separate concurrency limit for SFTP upload sessions ([#1299](https://github.com/lablup/backend.ai/issues/1299))
+
+### Fixes
+* Rewrite the alembic history to resolve errors in migrating from 22.09. ([#1175](https://github.com/lablup/backend.ai/issues/1175))
+* Restore session callback function and remove a plugin for it ([#1212](https://github.com/lablup/backend.ai/issues/1212))
+* Update the priority of session allocation for the pipeline service. ([#1275](https://github.com/lablup/backend.ai/issues/1275))
+* Fix a potential hang-up and leak issue due to missing async-context managers around Redis pipelines ([#1281](https://github.com/lablup/backend.ai/issues/1281))
+* Handle error of Session `status_changed` if any status is not registered in `status_history`. ([#1288](https://github.com/lablup/backend.ai/issues/1288))
+* Fix doubling of agent's occupied resources when the transaction in `recalculate_usage()` is retried due to database contention ([#1295](https://github.com/lablup/backend.ai/issues/1295))
+* Remove vscode app from intrinsic service which blocks using image's own vscode service definition. ([#1298](https://github.com/lablup/backend.ai/issues/1298))
+
+
+## 23.03.2 (2023-05-05)
+
+### Fixes
+* Downgrade yarl to 1.8.2 to fix image scanning feature not working ([#1261](https://github.com/lablup/backend.ai/issues/1261))
+
+
+## 23.03.1 (2023-05-04)
+
+### Features
+* Add --recursive option to cancel all the dependent sessions to session terminate API ([#893](https://github.com/lablup/backend.ai/issues/893))
+* The new `mock-accelerator` plugin supsedes the `cuda-mock` plugin.  It may be set to have arbitrary accelerator resource slots.  Existing developers who use the cuda-mock plugin should update their mockup device list configuration (`cuda-mock.toml`) to follow the new format (`mock-accelerator.toml`). ([#1158](https://github.com/lablup/backend.ai/issues/1158))
+* Utilization checker returns `thresholds_check_operator`. ([#1202](https://github.com/lablup/backend.ai/issues/1202))
+* Fix SCP/SFTP not working ([#1225](https://github.com/lablup/backend.ai/issues/1225))
+* Add support for idle checking ATOM accelerators ([#1234](https://github.com/lablup/backend.ai/issues/1234))
+* Add `is_public` field to scaling_group table. ([#1236](https://github.com/lablup/backend.ai/issues/1236))
+* Add agent `public-host` config option and impl manager API to fetch direct access info of `SYSTEM` kernel. ([#1238](https://github.com/lablup/backend.ai/issues/1238))
+* Make image scanner handle OCI image metadata formats ([#1241](https://github.com/lablup/backend.ai/issues/1241))
+* Do not count stakes of `SYSTEM` role kernels when calculating resource occupancy ([#1243](https://github.com/lablup/backend.ai/issues/1243))
+* Update `/folder/_/list-hosts` API to expose client scaling groups designated only for SSH connection apps ([#1246](https://github.com/lablup/backend.ai/issues/1246))
+* Add `system_SSH_image` config to webserver so that system-role ssh image used to support fast scp and sftp in file browser dialog can be specified. ([#1250](https://github.com/lablup/backend.ai/issues/1250))
+* Fix destroying session on behalf of other user by providing owner_access_key not working ([#1255](https://github.com/lablup/backend.ai/issues/1255))
+
+### Improvements
+* Improve `status_data` generation when the debug mode is enabled ([#1203](https://github.com/lablup/backend.ai/issues/1203))
+
+### Fixes
+* Calculate idle checker's remaining time to expire correctly. ([#1205](https://github.com/lablup/backend.ai/issues/1205))
+* Fix relative path computation in the NetApp storage backend and disable cross-volume vfolder cloning until we have explicit export/import abstractions for the storage backends ([#1208](https://github.com/lablup/backend.ai/issues/1208))
+* Optimize monthly stat API by reducing the number of iteration and fetch to Redis. ([#1214](https://github.com/lablup/backend.ai/issues/1214))
+* Remove `DoSyncKernelStatsEvent` events since it is deprecated and adjust the interval of agent heart-beat event through configuration. ([#1223](https://github.com/lablup/backend.ai/issues/1223))
+* Consume kernel lifecycle events and remove `manager.registry.kernel_creation_tracker`. ([#1224](https://github.com/lablup/backend.ai/issues/1224))
+* Disable collecting per-container statistics on macOS backend until #1230 is resolved ([#1231](https://github.com/lablup/backend.ai/issues/1231))
+* fix minor typo error in mock-accelerator config ([#1240](https://github.com/lablup/backend.ai/issues/1240))
+* Fix logical errors in the fallback process for cpuset detection in agents when the docker API is not available ([#1248](https://github.com/lablup/backend.ai/issues/1248))
+* Upgrade aiotools to 1.6.1 for potential memory leak fix when there are unhandled exceptions inside persistent task groups ([#1256](https://github.com/lablup/backend.ai/issues/1256))
+
+### Miscellaneous
+* Bump base Python version from 3.11.2 to 3.11.3 to resolve potential bugs. ([#1227](https://github.com/lablup/backend.ai/issues/1227))
+* Replace `./pants` with the scie-pants project so that developers could use a much faster version of `pants` binary bootstrapper that auto-installs the required Python interpreter using a static build ([#1237](https://github.com/lablup/backend.ai/issues/1237))
+
+
 ## 23.03.0 (2023-03-30)
 
 ### Features

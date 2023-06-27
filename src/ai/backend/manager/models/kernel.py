@@ -28,7 +28,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
@@ -88,6 +88,7 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
+    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -97,6 +98,7 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
+    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
@@ -123,6 +125,15 @@ class KernelStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
+
+
+class KernelRole(enum.Enum):
+    INFERENCE = "INFERENCE"
+    COMPUTE = "COMPUTE"
+    SYSTEM = "SYSTEM"
+
+
+PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
 
 
 # statuses to consider when calculating current resource usage
@@ -450,6 +461,14 @@ kernels = sa.Table(
         nullable=False,
         index=True,
     ),
+    sa.Column(
+        "role",
+        EnumType(KernelRole),
+        default=KernelRole.COMPUTE,
+        server_default=KernelRole.COMPUTE.name,
+        nullable=False,
+        index=True,
+    ),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
@@ -541,48 +560,60 @@ class KernelRow(Base):
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
 
+    @property
+    def is_private(self) -> bool:
+        return self.role in PRIVATE_KERNEL_ROLES
+
     @staticmethod
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
         from .agent import AgentStatus
 
-        async with db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(KernelRow)
-                .where(KernelRow.id == kern_id)
-                .options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).options(noload("*")),
+        async def _query():
+            async with db.begin_readonly_session() as db_sess:
+                query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kern_id)
+                    .options(
+                        noload("*"),
+                        selectinload(KernelRow.agent_row).options(noload("*")),
+                    )
                 )
-            )
-            result = (await db_sess.execute(query)).scalars().all()
+                result = (await db_sess.execute(query)).scalars().all()
 
-            cand = result
-            if not allow_stale:
-                cand = [
-                    k
-                    for k in result
-                    if (k.status not in DEAD_KERNEL_STATUSES)
-                    and (k.agent_row.status == AgentStatus.ALIVE)
-                ]
-            if not cand:
-                raise SessionNotFound
-            return cand[0]
+                cand = result
+                if not allow_stale:
+                    cand = [
+                        k
+                        for k in result
+                        if (k.status not in DEAD_KERNEL_STATUSES)
+                        and (k.agent_row.status == AgentStatus.ALIVE)
+                    ]
+                if not cand:
+                    raise SessionNotFound
+                return cand[0]
 
-    @staticmethod
+        return await execute_with_retry(_query)
+
+    @classmethod
     async def set_kernel_status(
+        cls,
         db: ExtendedAsyncSAEngine,
         kernel_id: KernelId,
         status: KernelStatus,
         *,
         status_data: Optional[Mapping[str, Any]] = None,
         reason: Optional[str] = None,
+        status_changed_at: Optional[datetime] = None,
     ) -> None:
         assert (
             status != KernelStatus.TERMINATED
         ), "TERMINATED status update must be handled in mark_kernel_terminated()"
-        now = datetime.now(tzutc())
+        if status_changed_at is None:
+            now = datetime.now(tzutc())
+        else:
+            now = status_changed_at
         data = {
             "status": status,
             "status_changed": now,
@@ -601,15 +632,63 @@ class KernelRow(Base):
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _transit() -> None:
-            async with db.begin_session() as db_sess:
-                kernel_query = sa.select(KernelRow.status).where(KernelRow.id == kernel_id)
-                current_status = (await db_sess.execute(kernel_query)).scalar()
-                if status in KERNEL_STATUS_TRANSITION_MAP[current_status]:
-                    query = sa.update(KernelRow).values(**data).where(KernelRow.id == kernel_id)
-                    await db_sess.execute(query)
+        await cls.update_kernel(db, kernel_id, status, update_data=data)
 
-        await execute_with_retry(_transit)
+    @classmethod
+    async def update_kernel(
+        cls,
+        db: ExtendedAsyncSAEngine,
+        kernel_id: KernelId,
+        new_status: KernelStatus,
+        update_data: Optional[Mapping[str, Any]] = None,
+    ) -> bool:
+        """
+        Update kernel by given id and data.
+        Return True if the kernel is updated, else return False.
+        """
+
+        now = datetime.now(tzutc())
+
+        async def _update() -> bool:
+            async with db.begin_session() as db_session:
+                kernel_query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kernel_id)
+                    .with_for_update()
+                    .options(
+                        noload("*"),
+                        load_only(KernelRow.status, KernelRow.session_id),
+                    )
+                )
+                kernel_row = (await db_session.scalars(kernel_query)).first()
+
+                if new_status not in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]:
+                    # TODO: log or raise error
+                    return False
+                if update_data is None:
+                    update_values = {
+                        "status": new_status,
+                        "status_history": sql_json_merge(
+                            KernelRow.status_history,
+                            (),
+                            {
+                                new_status.name: now.isoformat(),
+                            },
+                        ),
+                    }
+                else:
+                    update_values = {
+                        **update_data,
+                        "status": new_status,
+                    }
+
+                update_query = (
+                    sa.update(KernelRow).where(KernelRow.id == kernel_id).values(**update_values)
+                )
+                await db_session.execute(update_query)
+            return True
+
+        return await execute_with_retry(_update)
 
 
 DEFAULT_KERNEL_ORDERING = [
@@ -661,10 +740,6 @@ class KernelStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                log.debug(
-                    "Getting {}",
-                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"],
-                )
                 await pipe.mget(
                     [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
                 )
@@ -672,7 +747,6 @@ class KernelStatistics:
 
         stats = []
         results = await redis_helper.execute(ctx.redis_live, _build_pipeline)
-        log.debug("results {}", results)
         for result in results:
             if result[0] is not None and result[1] is not None:
                 requests = int(result[0])
@@ -792,7 +866,7 @@ class ComputeContainer(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         if access_key is None:
             return None
-        return await graph_ctx.registry.get_abusing_report(self.id, self.agent, self.agent_addr)
+        return await graph_ctx.registry.get_abusing_report(self.id)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),
@@ -1370,16 +1444,35 @@ async def recalc_concurrency_used(
             .select_from(KernelRow)
             .where(
                 (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
             ),
         )
         concurrency_used = result.scalar()
+        result = await db_sess.execute(
+            sa.select(sa.func.count())
+            .select_from(KernelRow)
+            .where(
+                (KernelRow.access_key == access_key)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+            ),
+        )
+        sftp_concurrency_used = result.scalar()
         assert isinstance(concurrency_used, int)
+        assert isinstance(sftp_concurrency_used, int)
 
     await redis_helper.execute(
         redis_stat,
         lambda r: r.set(
             f"keypair.concurrency_used.{access_key}",
             concurrency_used,
+        ),
+    )
+    await redis_helper.execute(
+        redis_stat,
+        lambda r: r.set(
+            f"keypair.sftp_concurrency_used.{access_key}",
+            sftp_concurrency_used,
         ),
     )

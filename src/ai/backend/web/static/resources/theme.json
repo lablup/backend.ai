@@ -1,0 +1,11 @@
+{
+  "token": {
+    "fontFamily": "'Ubuntu', Roboto, sans-serif",
+    "colorPrimary": "#37B076"
+  },
+  "components": {
+    "Tag": {
+      "borderRadiusSM": 1
+    }
+  }
+}
