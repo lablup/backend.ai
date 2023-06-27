@@ -14,13 +14,13 @@ jobs:
     needs: [pr-number-assign]
     runs-on: ubuntu-latest
     steps:
-    - name: Sparse-checkout
-      uses: snow-actions/sparse-checkout@v1.2.0
+    - name: Get PR's fetch depth
+      run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+    - uses: actions/checkout@v3
       with:
-        patterns: |
-          changes
-          scripts
-        filter: "blob:limit=1"
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: ${{ env.PR_FETCH_DEPTH }}
+        sparse-checkout: changes
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -32,7 +32,16 @@ jobs:
         python -m pip install -U towncrier~=22.12
     - name: Check existence of news fragment
       run: |
-        git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
+        # Check if the PR has a news fragment
+        git fetch --depth=1 origin "${BASE_BRANCH}"
+        NEWS_FRAGMENTS=$(git diff --name-only origin/${BASE_BRANCH} -- changes/)
+        for change in $NEWS_FRAGMENTS; do
+          if [ $(basename $change | cut -d'.' -f1) != $PR_NUMBER ]; then
+            echo "$change is not valid news fragment file name"
+            echo "The news fragment file name must be $PR_NUMBER"
+            exit 1
+          fi
+        done
         python -m towncrier.check --compare-with=origin/${BASE_BRANCH}
       env:
         BASE_BRANCH: ${{ github.base_ref }}
