@@ -204,6 +204,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             if proxy_path == "pipeline":
+                # TODO: Iff no SSO token
                 aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
                 jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
                 now = datetime.now(tz=timezone(timedelta(hours=9)))
