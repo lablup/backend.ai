@@ -185,6 +185,8 @@ def check_api_params(
                 raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
             return await handler(request, checked_params, *args, **kwargs)
 
+        set_handler_attr(wrapped, "request_scheme", checker)
+
         return wrapped
 
     return wrap
