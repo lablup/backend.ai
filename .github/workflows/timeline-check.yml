@@ -22,6 +22,7 @@ jobs:
         patterns: |
           changes
           scripts
+        filter: "blob:limit=1"
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
