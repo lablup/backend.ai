@@ -699,6 +699,8 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
+        if self.status_history is None:
+            return None
         try:
             return datetime.fromisoformat(self.status_history[self.status.name])
         except KeyError:
