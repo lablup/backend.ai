@@ -26,6 +26,7 @@ python_requirements(
         "types-setuptools": [
             "setuptools",
             "pkg_resources",
+            "_pytest.monkeypatch",
             "ai.backend.testutils",
             "ai.backend.test",
         ],

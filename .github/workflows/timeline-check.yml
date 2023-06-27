@@ -17,12 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
-      uses: lablup/sparse-checkout@v1
+      uses: snow-actions/sparse-checkout@v1.2.0
       with:
         patterns: |
           changes
           scripts
-          packages
+        filter: "blob:limit=1"
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
