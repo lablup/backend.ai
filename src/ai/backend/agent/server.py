@@ -354,7 +354,7 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def pull_image(self, raw_images: list[dict[str, Any]]):
+    async def pull_image(self, raw_images: list[dict[str, Any]], force: bool):
         log.debug("rpc::pull_image({0})", raw_images)
         bgtask_mgr: BackgroundTaskManager = self.local_config["background_task_manager"]
 
@@ -382,7 +382,8 @@ class AgentRPCServer(aobject):
                 }
                 continue
 
-            await self.agent.check_free_image_disk(img)
+            if not force:
+                await self.agent.check_free_image_disk(img)
 
             async def _pull_image(
                 reporter: ProgressReporter,

@@ -1166,8 +1166,8 @@ class AbstractAgent(
 
         TODO: get free disk of backend's data root.
         """
-        usage = shutil.disk_usage("/")
-        return usage.free
+        stat = os.statvfs("/")
+        return stat.f_bfree * stat.f_bsize / (2**30)
 
     async def check_free_image_disk(self, image_ref: ImageRef) -> None:
         """
@@ -1180,7 +1180,7 @@ class AbstractAgent(
         """
         if not self.local_config["agent"]["check_free_image_disk"]:
             return
-        minimum = 5 * (2**30)
+        minimum = 50  # 50 GiB
         free = await self.get_free_image_disk()
         if free < minimum:
             raise AgentError(

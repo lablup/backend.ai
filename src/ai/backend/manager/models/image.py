@@ -688,6 +688,7 @@ class PreloadImage(graphene.Mutation):
     class Arguments:
         references = graphene.List(graphene.String, required=True)
         target_agents = graphene.List(graphene.String, required=True)
+        force = graphene.Boolean(required=False, default=False)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -699,6 +700,7 @@ class PreloadImage(graphene.Mutation):
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
+        force: bool,
     ) -> PreloadImage:
         log.info(
             "preloading images ({0}) to agents ({1}) by API request",
@@ -728,7 +730,7 @@ class PreloadImage(graphene.Mutation):
 
         async def _preload_task(reporter: ProgressReporter) -> None:
             for agent in agents:
-                await ctx.registry.pull_image(agent.id, agent.addr, images)
+                await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
 
         task_id = await ctx.background_task_manager.start(_preload_task)
         return PreloadImage(ok=True, msg="", task_id=task_id)
