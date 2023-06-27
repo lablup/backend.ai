@@ -131,3 +131,5 @@ ENV/
 .DS_Store
 
 .python-runtime
+
+docs/manager/rest-reference/openapi.json
