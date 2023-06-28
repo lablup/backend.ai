@@ -24,6 +24,10 @@ class VFolderNotFoundError(StorageProxyError):
     pass
 
 
+class QuotaScopeNotFoundError(StorageProxyError):
+    pass
+
+
 class InvalidSubpathError(StorageProxyError):
     pass
 

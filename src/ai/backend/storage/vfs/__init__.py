@@ -86,13 +86,23 @@ class BaseQuotaModel(AbstractQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> QuotaUsage:
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+
         return QuotaUsage(-1, -1)
 
     async def update_quota_scope(
         self,
         quota_scope_id: str,
         options: QuotaConfig,
+    ) -> None:
+        # This is a no-op.
+        pass
+
+    async def unset_quota(
+        self,
+        quota_scope_id: str,
     ) -> None:
         # This is a no-op.
         pass
@@ -134,7 +144,9 @@ class SetGIDQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> QuotaUsage:
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
         # TODO: setgid impl.
         return QuotaUsage(-1, -1)
 
@@ -142,6 +154,13 @@ class SetGIDQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: str,
         options: QuotaConfig,
+    ) -> None:
+        # TODO: setgid impl.
+        raise NotImplementedError
+
+    async def unset_quota(
+        self,
+        quota_scope_id: str,
     ) -> None:
         # TODO: setgid impl.
         raise NotImplementedError

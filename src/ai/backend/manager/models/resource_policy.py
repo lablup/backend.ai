@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import TYPE_CHECKING, Any, Dict, Sequence
 
 import graphene
@@ -11,6 +12,7 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.manager.models.utils import execute_with_retry
 
 from .base import (
     Base,
@@ -40,6 +42,16 @@ __all__: Sequence[str] = (
     "CreateKeyPairResourcePolicy",
     "ModifyKeyPairResourcePolicy",
     "DeleteKeyPairResourcePolicy",
+    "UserResourcePolicyRow",
+    "UserResourcePolicy",
+    "CreateUserResourcePolicy",
+    "ModifyUserResourcePolicy",
+    "DeleteUserResourcePolicy",
+    "ProjectResourcePolicyRow",
+    "ProjectResourcePolicy",
+    "CreateProjectResourcePolicy",
+    "ModifyProjectResourcePolicy",
+    "DeleteProjectResourcePolicy",
 )
 
 
@@ -78,6 +90,34 @@ keypair_resource_policies = sa.Table(
 class KeyPairResourcePolicyRow(Base):
     __table__ = keypair_resource_policies
     keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
+
+
+class UserResourcePolicyRow(Base):
+    __tablename__ = "user_resource_policies"
+    name = sa.Column("name", sa.String(length=256), primary_key=True)
+    created_at = (
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    )
+    max_vfolder_size = sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False)
+    users = relationship("UserRow", back_populates="resource_policy_row")
+
+    def __init__(self, name, max_vfolder_size) -> None:
+        self.name = name
+        self.max_vfolder_size = max_vfolder_size
+
+
+class ProjectResourcePolicyRow(Base):
+    __tablename__ = "project_resource_policies"
+    name = sa.Column("name", sa.String(length=256), primary_key=True)
+    created_at = (
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    )
+    max_vfolder_size = sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False)
+    projets = relationship("GroupRow", back_populates="resource_policy_row")
+
+    def __init__(self, name, max_vfolder_size) -> None:
+        self.name = name
+        self.max_vfolder_size = max_vfolder_size
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
@@ -359,5 +399,317 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
     ) -> DeleteKeyPairResourcePolicy:
         delete_query = sa.delete(keypair_resource_policies).where(
             keypair_resource_policies.c.name == name
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class UserResourcePolicy(graphene.ObjectType):
+    name = graphene.String()
+    created_at = GQLDateTime()
+    max_vfolder_size = BigInt()
+
+    @classmethod
+    def from_row(
+        cls,
+        ctx: GraphQueryContext,
+        row: Row | None,
+    ) -> UserResourcePolicy | None:
+        if row is None:
+            return None
+        return cls(
+            name=row["name"],
+            created_at=row["created_at"],
+            max_vfolder_size=row["max_vfolder_size"],
+        )
+
+    @classmethod
+    async def load_all(cls, ctx: GraphQueryContext) -> Sequence[UserResourcePolicy]:
+        query = sa.select(UserResourcePolicyRow)
+        async with ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(ctx, r)) is not None
+            ]
+
+    @classmethod
+    async def batch_load_by_name(
+        cls,
+        ctx: GraphQueryContext,
+        names: Sequence[str],
+    ) -> Sequence[UserResourcePolicy | None]:
+        query = (
+            sa.select(UserResourcePolicyRow)
+            .where(UserResourcePolicyRow.name.in_(names))
+            .order_by(keypair_resource_policies.name)
+        )
+        async with ctx.db.begin_readonly() as conn:
+            return await batch_result(
+                ctx,
+                conn,
+                query,
+                cls,
+                names,
+                lambda row: row["name"],
+            )
+
+    @classmethod
+    async def batch_load_by_user(
+        cls,
+        ctx: GraphQueryContext,
+        user_uuids: Sequence[uuid.UUID],
+    ) -> Sequence[UserResourcePolicy]:
+        query = (
+            sa.select(UserResourcePolicyRow)
+            .where((UserResourcePolicyRow.users.in_(user_uuids)))
+            .order_by(UserResourcePolicyRow.name)
+        )
+        async with ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(ctx, r)) is not None
+            ]
+
+
+class CreateUserResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_size = BigInt(required=True)
+
+
+class ModifyUserResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_size = BigInt(required=True)
+
+
+class CreateUserResourcePolicy(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+        props = CreateUserResourcePolicyInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    resource_policy = graphene.Field(lambda: UserResourcePolicy, required=False)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+        props: CreateUserResourcePolicyInput,
+    ) -> CreateUserResourcePolicy:
+        graph_ctx: GraphQueryContext = info.context
+
+        async def _do_mutate() -> UserResourcePolicy:
+            async with graph_ctx.db.begin_session() as sess:
+                row = UserResourcePolicy(uuid.uuid4(), name, props.max_vfolder_size)
+                sess.add(row)
+                await sess.flush()
+                return cls(True, "success", UserResourcePolicy.from_row(graph_ctx, row))
+
+        return await execute_with_retry(_do_mutate)
+
+
+class ModifyUserResourcePolicy(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+        props = ModifyUserResourcePolicyInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+        props: ModifyUserResourcePolicyInput,
+    ) -> ModifyUserResourcePolicy:
+        data: Dict[str, Any] = {}
+        set_if_set(props, data, "max_vfolder_size")
+        update_query = (
+            sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
+        )
+        return await simple_db_mutate(cls, info.context, update_query)
+
+
+class DeleteUserResourcePolicy(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+    ) -> DeleteUserResourcePolicy:
+        delete_query = sa.delete(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class ProjectResourcePolicy(graphene.ObjectType):
+    name = graphene.String()
+    created_at = GQLDateTime()
+    max_vfolder_size = BigInt()
+
+    @classmethod
+    def from_row(
+        cls,
+        ctx: GraphQueryContext,
+        row: Row | None,
+    ) -> ProjectResourcePolicy | None:
+        if row is None:
+            return None
+        return cls(
+            name=row["name"],
+            created_at=row["created_at"],
+            max_vfolder_size=row["max_vfolder_size"],
+        )
+
+    @classmethod
+    async def load_all(cls, ctx: GraphQueryContext) -> Sequence[ProjectResourcePolicy]:
+        query = sa.select(ProjectResourcePolicyRow)
+        async with ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(ctx, r)) is not None
+            ]
+
+    @classmethod
+    async def batch_load_by_name(
+        cls,
+        ctx: GraphQueryContext,
+        names: Sequence[str],
+    ) -> Sequence[ProjectResourcePolicy | None]:
+        query = (
+            sa.select(ProjectResourcePolicyRow)
+            .where(ProjectResourcePolicyRow.name.in_(names))
+            .order_by(keypair_resource_policies.name)
+        )
+        async with ctx.db.begin_readonly() as conn:
+            return await batch_result(
+                ctx,
+                conn,
+                query,
+                cls,
+                names,
+                lambda row: row["name"],
+            )
+
+    @classmethod
+    async def batch_load_by_project(
+        cls,
+        ctx: GraphQueryContext,
+        project_uuids: Sequence[uuid.UUID],
+    ) -> Sequence[ProjectResourcePolicy]:
+        query = (
+            sa.select(ProjectResourcePolicyRow)
+            .where((ProjectResourcePolicyRow.projects.in_(project_uuids)))
+            .order_by(ProjectResourcePolicyRow.name)
+        )
+        async with ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(ctx, r)) is not None
+            ]
+
+
+class CreateProjectResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_size = BigInt(required=True)
+
+
+class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_size = BigInt(required=True)
+
+
+class CreateProjectResourcePolicy(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+        props = CreateProjectResourcePolicyInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    resource_policy = graphene.Field(lambda: ProjectResourcePolicy, required=False)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+        props: CreateProjectResourcePolicyInput,
+    ) -> CreateProjectResourcePolicy:
+        graph_ctx: GraphQueryContext = info.context
+
+        async def _do_mutate() -> ProjectResourcePolicy:
+            async with graph_ctx.db.begin_session() as sess:
+                row = ProjectResourcePolicy(uuid.uuid4(), name, props.max_vfolder_size)
+                sess.add(row)
+                await sess.flush()
+                return cls(True, "success", ProjectResourcePolicy.from_row(graph_ctx, row))
+
+        return await execute_with_retry(_do_mutate)
+
+
+class ModifyProjectResourcePolicy(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+        props = ModifyProjectResourcePolicyInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+        props: ModifyProjectResourcePolicyInput,
+    ) -> ModifyProjectResourcePolicy:
+        data: Dict[str, Any] = {}
+        set_if_set(props, data, "max_vfolder_size")
+        update_query = (
+            sa.update(ProjectResourcePolicyRow)
+            .values(data)
+            .where(ProjectResourcePolicyRow.name == name)
+        )
+        return await simple_db_mutate(cls, info.context, update_query)
+
+
+class DeleteProjectResourcePolicy(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        name = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        name: str,
+    ) -> DeleteProjectResourcePolicy:
+        delete_query = sa.delete(ProjectResourcePolicyRow).where(
+            ProjectResourcePolicyRow.name == name
         )
         return await simple_db_mutate(cls, info.context, delete_query)

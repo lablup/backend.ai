@@ -909,6 +909,11 @@ class QuotaConfig:
         return cls.Validator()
 
 
+class QuotaScopeType(str, enum.Enum):
+    USER = "user"
+    PROJECT = "project"
+
+
 class ImageRegistry(TypedDict):
     name: str
     url: str

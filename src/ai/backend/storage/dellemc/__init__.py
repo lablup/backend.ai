@@ -38,7 +38,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> QuotaUsage:
+    ) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id_path = qspath / ".quota_id"
         if quota_id_path.exists():
@@ -49,7 +49,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
                 limit_bytes=data["thresholds"]["hard"],
             )
         else:
-            return QuotaUsage(-1, -1)
+            return None
 
     async def update_quota_scope(
         self,
@@ -71,6 +71,19 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
                 QuotaThresholds(hard=config.limit_bytes, soft=config.limit_bytes),
             )
             quota_id_path.write_text(result["id"])
+
+    async def unset_quota(
+        self,
+        quota_scope_id: str,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        quota_id_path = qspath / ".quota_id"
+        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            raise NotEmptyError(quota_scope_id)
+        if quota_id_path.exists():
+            quota_id = quota_id_path.read_text()
+            await self.api_client.delete_quota(quota_id)
+            await aiofiles.os.remove(quota_id_path)
 
     async def delete_quota_scope(
         self,

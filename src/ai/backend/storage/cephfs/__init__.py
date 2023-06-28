@@ -25,8 +25,10 @@ class CephDirQuotaModel(BaseQuotaModel):
         if config is not None:
             await self.update_quota_scope(quota_scope_id, config)
 
-    async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
+    async def describe_quota_scope(self, quota_scope_id: str) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            return None
         loop = asyncio.get_running_loop()
 
         def read_attrs() -> tuple[int, int]:

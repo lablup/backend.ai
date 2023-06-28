@@ -57,14 +57,25 @@ class WekaQuotaModel(BaseQuotaModel):
             qs_relpath = "/" + qs_relpath
         await self.api_client.set_quota_v1(qs_relpath, inode_id, hard_limit=config.limit_bytes)
 
-    async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
+    async def describe_quota_scope(self, quota_scope_id: str) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            return None
+
         inode_id = await self._get_inode_id(qspath)
         quota = await self.api_client.get_quota(self.fs_uid, inode_id)
         return QuotaUsage(
             used_bytes=quota.used_bytes if quota.used_bytes is not None else -1,
             limit_bytes=quota.hard_limit if quota.hard_limit is not None else -1,
         )
+
+    async def unset_quota(self, quota_scope_id: str) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        inode_id = await self._get_inode_id(qspath)
+        try:
+            await self.api_client.remove_quota(self.fs_uid, inode_id)
+        except WekaNotFoundError:
+            pass
 
     async def delete_quota_scope(self, quota_scope_id: str) -> None:
         qspath = self.mangle_qspath(quota_scope_id)

@@ -57,9 +57,10 @@ class AbstractQuotaModel(metaclass=ABCMeta):
     async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> QuotaUsage:
+    ) -> Optional[QuotaUsage]:
         """
         Get the information about the given quota scope.
+        Returns None if target quota scope does not exist.
         """
         raise NotImplementedError
 
@@ -71,6 +72,16 @@ class AbstractQuotaModel(metaclass=ABCMeta):
     ) -> None:
         """
         Update the quota option of the given quota scope.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def unset_quota(
+        self,
+        quota_scope_id: str,
+    ) -> None:
+        """
+        Lifts off quota set on given quota scope.
         """
         raise NotImplementedError
 

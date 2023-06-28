@@ -18,7 +18,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..abc import AbstractQuotaModel
-from ..exception import NotEmptyError
+from ..exception import InvalidQuotaScopeError, NotEmptyError
 from ..subproc import run
 from ..types import (
     QuotaConfig,
@@ -182,7 +182,9 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> QuotaUsage:
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
         full_report = await run(
             # -p: project quota only
             # -b: as number of blocks
@@ -230,6 +232,11 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 f"limit -p bsoft={config.limit_bytes} bhard={config.limit_bytes} {quota_scope_id}",
                 self.mount_path,
             ],
+        )
+
+    async def unset_quota(self, quota_scope_id: str) -> None:
+        raise InvalidQuotaScopeError(
+            "Unsetting folder limit without removing quota scope is not possible for this backend"
         )
 
     async def delete_quota_scope(

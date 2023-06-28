@@ -30,7 +30,7 @@ from ..abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..exception import ExecutionError, NotEmptyError
+from ..exception import ExecutionError, InvalidQuotaScopeError, NotEmptyError
 from ..subproc import spawn_and_watch
 from ..types import (
     SENTINEL,
@@ -83,8 +83,10 @@ class QTreeQuotaModel(BaseQuotaModel):
     async def describe_quota_scope(
         self,
         quota_scope_id: str,
-    ) -> QuotaUsage:
+    ) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            return None
         return await self.netapp_client.get_quota_report(self.svm_id, self.volume_id, qspath.name)
 
     async def update_quota_scope(
@@ -102,6 +104,12 @@ class QTreeQuotaModel(BaseQuotaModel):
         self.netapp_client.check_job_result(result, [])
         result = await self.netapp_client.enable_quota(self.volume_id)
         self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
+
+    # FIXME: How do we implement unset_quota() for NetApp?
+    async def unset_quota(self, quota_scope_id: str) -> None:
+        raise InvalidQuotaScopeError(
+            "Unsetting folder limit without removing quota scope is not possible for this backend"
+        )
 
     async def delete_quota_scope(
         self,

@@ -55,7 +55,10 @@ class GPFSQuotaModel(BaseQuotaModel):
     async def update_quota_scope(self, quota_scope_id: str, config: QuotaConfig) -> None:
         await self.api_client.set_quota(self.fs, quota_scope_id, config.limit_bytes)
 
-    async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
+    async def describe_quota_scope(self, quota_scope_id: str) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+
         quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id)
         custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
         if len(custom_defined_quotas) == 0:
@@ -66,6 +69,9 @@ class GPFSQuotaModel(BaseQuotaModel):
             used_bytes=quota_info.blockUsage * 1024 if quota_info.blockUsage is not None else -1,
             limit_bytes=quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1,
         )
+
+    async def unset_quota(self, quota_scope_id: str) -> None:
+        await self.api_client.remove_quota(self.fs, quota_scope_id)
 
     async def delete_quota_scope(self, quota_scope_id: str) -> None:
         await self.api_client.remove_fileset(self.fs, quota_scope_id)
