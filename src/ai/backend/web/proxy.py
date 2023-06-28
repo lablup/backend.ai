@@ -204,21 +204,21 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             if proxy_path == "pipeline":
-                # TODO: Iff no SSO token
                 aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
-                jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
-                now = datetime.now(tz=timezone(timedelta(hours=9)))
-                payload = {
-                    # Registered claims
-                    "exp": now + timedelta(hours=1),
-                    "iss": "Backend.AI Webserver",
-                    "iat": now,
-                    # Private claims
-                    "aiohttp_session": aiohttp_session,
-                    "access_key": api_session.config.access_key,
-                    # "secret_key": api_session.config.secret_key,
-                }
-                sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
+                if not (sso_token := request.headers.get("X-BackendAI-SSO")):
+                    jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
+                    now = datetime.now(tz=timezone(timedelta(hours=9)))
+                    payload = {
+                        # Registered claims
+                        "exp": now + timedelta(hours=1),
+                        "iss": "Backend.AI Webserver",
+                        "iat": now,
+                        # Private claims
+                        "aiohttp_session": aiohttp_session,
+                        "access_key": api_session.config.access_key,
+                        # "secret_key": api_session.config.secret_key,
+                    }
+                    sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token
                 if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
                     api_rqst.headers["X-BackendAI-SessionID"] = session_id
