@@ -27,7 +27,9 @@ async def wait_until_quota_changed(
     qusage = prev_usage
     async for attempt in AsyncRetrying(wait=wait_config, stop=stop_config):
         with attempt:
-            qusage = await quota_model.describe_quota_scope(quota_scope_id)
+            new_usage = await quota_model.describe_quota_scope(quota_scope_id)
+            assert new_usage
+            qusage = new_usage
             if qusage != prev_usage:
                 break
             prev_usage = qusage
@@ -65,6 +67,7 @@ async def test_quota_limit(test_id: str, volume: AbstractVolume) -> None:
     assert qspath.exists() and qspath.is_dir()
 
     qusage = await volume.quota_model.describe_quota_scope(qsid)
+    assert qusage
     assert 0 <= qusage.used_bytes <= block_size
     assert 10 * MiB - block_size <= qusage.limit_bytes <= 10 * MiB
 
