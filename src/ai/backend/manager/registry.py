@@ -1143,15 +1143,13 @@ class AgentRegistry:
             image_min_slots["mem"] += shmem
 
             # Sanitize user input: does it have resource config?
-            if "resources" in creation_config:
+            if (resources := creation_config.get("resources")) is not None:
                 # Sanitize user input: does it have "known" resource slots only?
-                for slot_key, slot_value in creation_config["resources"].items():
+                for slot_key, slot_value in resources.items():
                     if slot_key not in known_slot_types:
                         raise InvalidAPIParameters(f"Unknown requested resource slot: {slot_key}")
                 try:
-                    requested_slots = ResourceSlot.from_user_input(
-                        creation_config["resources"], known_slot_types
-                    )
+                    requested_slots = ResourceSlot.from_user_input(resources, known_slot_types)
                 except ValueError:
                     log.exception("request_slots & image_slots calculation error")
                     # happens when requested_slots have more keys
@@ -1385,7 +1383,7 @@ class AgentRegistry:
             )
             result = await db_sess.execute(query)
             resource_policy = result.scalars().first()
-        auto_pull = await self.shared_config.get_raw("config/docker/image/auto_pull")
+        auto_pull = self.shared_config["docker"]["image"]["auto_pull"]
 
         # Aggregate image registry information
         keyfunc = lambda item: item.kernel.image_ref
@@ -1445,7 +1443,7 @@ class AgentRegistry:
             elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
                 # Create overlay network for multi-node sessions
                 network_name = f"bai-multinode-{scheduled_session.id}"
-                mtu = await self.shared_config.get_raw("config/network/overlay/mtu")
+                mtu = self.shared_config["network"]["overlay"]["mtu"]
                 try:
                     # Overlay networks can only be created at the Swarm manager.
                     create_options = {
@@ -3378,6 +3376,7 @@ async def handle_kernel_creation_lifecycle(
         await KernelRow.set_kernel_status(
             context.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
         )
+        await SessionRow.set_session_status(context.db, event.session_id, SessionStatus.PULLING)
     elif isinstance(event, KernelCreatingEvent):
         await KernelRow.set_kernel_status(
             context.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
