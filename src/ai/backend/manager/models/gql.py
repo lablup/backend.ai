@@ -1595,6 +1595,8 @@ class Queries(graphene.ObjectType):
                 & (VFolderRow.host == storage_host_name)
             )
             row = await sess.scalar(query)
+            if not row:
+                raise ObjectNotFound
             return FolderQuota.from_vfolder_row(graph_ctx, row)
 
 

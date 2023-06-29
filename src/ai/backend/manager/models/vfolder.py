@@ -979,7 +979,7 @@ async def ensure_quota_scope_accessible_by_user(
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    query = sa.select(GroupRow).where(GroupRow.uuid == quota_scope)
+    query = sa.select(GroupRow).where(GroupRow.id == quota_scope)
     quota_scope_group = await conn.scalar(query)
     if quota_scope_group:
         match user["role"]:
@@ -1360,11 +1360,14 @@ class FolderQuota(graphene.ObjectType):
             raise_for_status=True,
         ) as (_, storage_resp):
             quota_config = await storage_resp.json()
-            log.debug("quota config: {}", quota_config)
+            usage_bytes = quota_config["used_bytes"]
+            if usage_bytes is None or usage_bytes < 0:
+                usage_bytes = None
             return QuotaDetails(
-                usage_bytes=quota_config["used_bytes"],
-                hard_limit_bytes=quota_config["limit_bytes"],
-                usage_count=-1,  # TODO: Implement
+                # FIXME: limit scaning this only for fast scan capable volumes
+                usage_bytes=usage_bytes,
+                hard_limit_bytes=quota_config["limit_bytes"] or None,
+                usage_count=None,  # TODO: Implement
             )
 
 
@@ -1421,38 +1424,32 @@ class SetFolderQuota(graphene.Mutation):
             and resource_policy_constraint > 0
             and resource_policy_constraint < props.hard_limit_bytes
         ):
-            max_vfolder_size = resource_policy_constraint
-        else:
-            max_vfolder_size = props.hard_limit_bytes
+            raise ValueError(
+                "Maximum vFolder quota for this user is limited to"
+                f" {resource_policy_constraint} bytes"
+            )
+
+        max_vfolder_size = props.hard_limit_bytes
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
         request_body = {
             "volume": volume_name,
             "qsid": quota_scope_id,
             "options": {"limit_bytes": max_vfolder_size},
         }
-        try:
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "PATCH",
-                "quota-scope",
-                json=request_body,
-                raise_for_status=True,
-            ):
-                pass
-        except aiohttp.ClientResponseError as e:
-            if e.status == 404:
-                async with graph_ctx.storage_manager.request(
-                    proxy_name,
-                    "POST",
-                    "quota-scope",
-                    json=request_body,
-                    raise_for_status=True,
-                ):
-                    pass
-        return FolderQuota(
-            id=f"QuotaConfig:{storage_host_name}/{quota_scope_id}",
-            quota_scope_id=quota_scope_id,
-            storage_host_name=storage_host_name,
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "PATCH",
+            "quota-scope",
+            json=request_body,
+            raise_for_status=True,
+        ):
+            pass
+        return cls(
+            FolderQuota(
+                id=f"QuotaConfig:{storage_host_name}/{quota_scope_id}",
+                quota_scope_id=quota_scope_id,
+                storage_host_name=storage_host_name,
+            )
         )
 
 
@@ -1463,7 +1460,7 @@ class UnsetFolderQuota(graphene.Mutation):
     )
 
     class Arguments:
-        quota_scope_id = graphene.UUID(required=True)
+        quota_scope_id = graphene.String(required=True)
         storage_host_name = graphene.String(required=True)
 
     folder_quota = graphene.Field(lambda: FolderQuota)
@@ -1501,7 +1498,7 @@ class UnsetFolderQuota(graphene.Mutation):
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
             result = await sess.scalar(query)
-            resource_policy_constraint = result.max_vfolder_size
+            resource_policy_constraint = result.resource_policy_row.max_vfolder_size
 
         if resource_policy_constraint and resource_policy_constraint > 0:
             request_body["options"] = {"limit_bytes": resource_policy_constraint}
@@ -1523,8 +1520,10 @@ class UnsetFolderQuota(graphene.Mutation):
             ):
                 pass
 
-        return FolderQuota(
-            id=f"QuotaConfig:{storage_host_name}/{quota_scope_id}",
-            quota_scope_id=quota_scope_id,
-            storage_host_name=storage_host_name,
+        return cls(
+            FolderQuota(
+                id=f"QuotaConfig:{storage_host_name}/{quota_scope_id}",
+                quota_scope_id=quota_scope_id,
+                storage_host_name=storage_host_name,
+            )
         )

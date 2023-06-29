@@ -34,6 +34,7 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
@@ -52,8 +53,6 @@ from ..models import (
     AgentStatus,
     GroupRow,
     KernelStatus,
-    ProjectResourcePolicyRow,
-    UserResourcePolicyRow,
     UserRole,
     UserRow,
     UserStatus,
@@ -372,52 +371,54 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
-    group_join = sa.join(
-        GroupRow,
-        ProjectResourcePolicyRow,
-        GroupRow.resource_policy == ProjectResourcePolicyRow.name,
-    )
 
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
             case str():
                 # Convert the group name to group uuid.
                 query = (
-                    sa.select([GroupRow.id, ProjectResourcePolicyRow.max_vfolder_size])
-                    .select_from(group_join)
-                    .where(GroupRow.domain_name == domain_name)
-                    .where(GroupRow.name == group_id_or_name)
+                    sa.select(GroupRow)
+                    .where(
+                        (GroupRow.domain_name == domain_name) & (GroupRow.name == group_id_or_name)
+                    )
+                    .options(selectinload(GroupRow.resource_policy_row))
                 )
-                result = await conn.execute(query)
-                _gid, max_vfolder_size = await result.fetchone()
+                result = await sess.execute(query)
+                group_row = result.scalar()
+                _gid, max_vfolder_size = (
+                    group_row.id,
+                    group_row.resource_policy_row.max_vfolder_size,
+                )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = _gid
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 query = (
-                    sa.select([GroupRow.id, ProjectResourcePolicyRow.max_vfolder_size])
-                    .select_from(group_join)
-                    .where(GroupRow.domain_name == domain_name)
-                    .where(GroupRow.id == group_id_or_name)
+                    sa.select(GroupRow)
+                    .where(
+                        (GroupRow.domain_name == domain_name) & (GroupRow.id == group_id_or_name)
+                    )
+                    .options(selectinload(GroupRow.resource_policy_row))
                 )
-                result = await conn.execute(query)
-                _gid, max_vfolder_size = await result.fetchone()
+                result = await sess.execute(query)
+                group_row = result.scalar()
+                _gid, max_vfolder_size = (
+                    group_row.id,
+                    group_row.resource_policy_row.max_vfolder_size,
+                )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
             case None:
-                user_join = sa.join(
-                    UserRow,
-                    UserResourcePolicyRow,
-                    UserRow.resource_policy == UserResourcePolicyRow.name,
-                )
                 query = (
-                    sa.select([UserResourcePolicyRow.max_vfolder_size])
-                    .select_from(user_join)
-                    .where(users.c.uuid == user_uuid)
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_uuid)
+                    .options(selectinload(UserRow.resource_policy_row))
                 )
-                max_vfolder_size = await conn.scalar(query)
+                result = await sess.execute(query)
+                user_row = result.scalar()
+                max_vfolder_size = user_row.resource_policy_row.max_vfolder_size
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
 
@@ -439,6 +440,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
             )
 
+    async with root_ctx.db.begin() as conn:
         if not unmanaged_path:
             await ensure_host_permission_allowed(
                 conn,
@@ -499,6 +501,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 #     },
                 # ):
                 #     pass
+                options = {}
+                if max_vfolder_size and max_vfolder_size > 0:
+                    options["initial_max_size_for_quota_scope"] = max_vfolder_size
                 async with root_ctx.storage_manager.request(
                     folder_host,
                     "POST",
@@ -506,38 +511,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     json={
                         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
                         "vfid": str(vfid),
+                        "options": options,
                     },
                 ):
                     pass
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailed from e
-        if max_vfolder_size and max_vfolder_size > 0:
-            try:
-                async with root_ctx.storage_manager.request(
-                    folder_host,
-                    "POST",
-                    "quota-scope",
-                    json={
-                        "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                        "vfid": str(vfid),
-                        "options": {
-                            "limit_bytes": max_vfolder_size,
-                        },
-                    },
-                ):
-                    pass
-            except aiohttp.ClientResponseError as e:
-                async with root_ctx.storage_manager.request(
-                    folder_host,
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                        "vfid": str(vfid),
-                    },
-                ):
-                    pass
-                raise VFolderCreationFailed from e
 
         # TODO: include quota scope ID in the database
         # TODO: include quota scope ID in the API response

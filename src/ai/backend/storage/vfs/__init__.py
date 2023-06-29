@@ -21,7 +21,13 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
-from ..exception import ExecutionError, InvalidAPIParameters, InvalidQuotaScopeError, NotEmptyError
+from ..exception import (
+    ExecutionError,
+    InvalidAPIParameters,
+    InvalidQuotaScopeError,
+    NotEmptyError,
+    QuotaScopeNotFoundError,
+)
 from ..subproc import run
 from ..types import (
     SENTINEL,
@@ -377,9 +383,7 @@ class BaseVolume(AbstractVolume):
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
-            if not vfid.quota_scope_id:
-                raise InvalidQuotaScopeError("Cannot create quota scope with empty entity")
-            await self.quota_model.create_quota_scope(vfid.quota_scope_id)
+            raise QuotaScopeNotFoundError
         vfpath = self.mangle_vfpath(vfid)
         await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
 

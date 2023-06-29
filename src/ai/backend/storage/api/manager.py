@@ -191,7 +191,7 @@ async def get_quota_scope(request: web.Request) -> web.Response:
             ),
         ),
     ) as params:
-        await log_manager_api_entry(log, "create_quota_scope", params)
+        await log_manager_api_entry(log, "get_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
@@ -226,7 +226,7 @@ async def update_quota_scope(request: web.Request) -> web.Response:
             ),
         ),
     ) as params:
-        await log_manager_api_entry(log, "create_quota_scope", params)
+        await log_manager_api_entry(log, "update_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
@@ -253,7 +253,7 @@ async def unset_quota(request: web.Request) -> web.Response:
             ),
         ),
     ) as params:
-        await log_manager_api_entry(log, "create_quota_scope", params)
+        await log_manager_api_entry(log, "unset_quota", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
@@ -285,7 +285,19 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.create_vfolder(params["vfid"])
+            try:
+                await volume.create_vfolder(params["vfid"])
+            except QuotaScopeNotFoundError:
+                assert params["vfid"].quota_scope_id
+                if initial_max_size_for_quota_scope := (params["options"] or {}).get(
+                    "initial_max_size_for_quota_scope"
+                ):
+                    options = QuotaConfig(initial_max_size_for_quota_scope)
+                else:
+                    options = None
+                await volume.quota_model.create_quota_scope(
+                    params["vfid"].quota_scope_id, options=options
+                )
             return web.Response(status=204)
 
 

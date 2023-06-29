@@ -7,6 +7,7 @@ from typing import Dict, FrozenSet, List
 import aiofiles.os
 
 from ai.backend.common.types import BinarySize
+from ai.backend.storage.exception import QuotaScopeNotFoundError
 
 from ..abc import CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel
 from ..subproc import run
@@ -18,12 +19,12 @@ class CephDirQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: str,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def describe_quota_scope(self, quota_scope_id: str) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -57,12 +58,28 @@ class CephDirQuotaModel(BaseQuotaModel):
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            raise QuotaScopeNotFoundError
+
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.setxattr() exists only for linux
             lambda: os.setxattr(qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()),  # type: ignore[attr-defined]
+        )
+
+    async def unset_quota(self, quota_scope_id: str) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            raise QuotaScopeNotFoundError
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            # without type: ignore mypy will raise error when trying to run on macOS
+            # because os.setxattr() exists only for linux
+            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", b"0"),  # type: ignore[attr-defined]
         )
 
 
