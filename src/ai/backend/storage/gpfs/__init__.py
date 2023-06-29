@@ -188,7 +188,7 @@ class GPFSVolume(BaseVolume):
                 continue
             total += pool.totalDataInKB
             free += pool.freeDataInKB
-        return CapacityUsage(BinarySize(total), BinarySize(total - free))
+        return CapacityUsage(BinarySize(total - free) * 1024, BinarySize(total) * 1024)
 
     async def get_performance_metric(self) -> FSPerfMetric:
         # ref: https://www.ibm.com/docs/en/spectrum-scale/5.0.3?topic=2-perfmondata-get

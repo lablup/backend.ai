@@ -6,7 +6,9 @@
             "is_active": true,
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
-            "allowed_docker_registries": ["cr.backend.ai"]
+            "allowed_docker_registries": [
+                "cr.backend.ai"
+            ]
         }
     ],
     "groups": [
@@ -149,6 +151,18 @@
                     "set-user-specific-permission"
                 ]
             }
+        }
+    ],
+    "user_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
+        }
+    ],
+    "project_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
         }
     ],
     "keypairs": [

@@ -539,7 +539,7 @@ class Queries(graphene.ObjectType):
 
     folder_quota = graphene.Field(
         FolderQuota,
-        storage_host_name=graphene.UUID(required=True),
+        storage_host_name=graphene.String(required=True),
         quota_scope_id=graphene.String(required=True),
     )
 
@@ -1581,9 +1581,12 @@ class Queries(graphene.ObjectType):
     async def resolve_folder_quota(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
-        quota_scope_id: uuid.UUID,
-        storage_host_name: str,
+        *,
+        quota_scope_id: Optional[str] = None,
+        storage_host_name: Optional[str] = None,
     ) -> FolderQuota:
+        if not quota_scope_id or not storage_host_name:
+            raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, quota_scope_id, graph_ctx.user)

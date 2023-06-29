@@ -957,7 +957,7 @@ async def initiate_vfolder_removal(
 
 async def ensure_quota_scope_accessible_by_user(
     conn: SASession,
-    quota_scope: uuid.UUID,
+    quota_scope: str,
     user: Mapping[str, Any],
 ) -> QuotaScopeType:
     from ai.backend.manager.models import GroupRow, UserRow
@@ -1336,8 +1336,8 @@ class FolderQuota(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
 
-    id = graphene.String(required=True)
-    quota_scope_id = graphene.UUID(required=True)
+    id = graphene.ID(required=True)
+    quota_scope_id = graphene.String(required=True)
     storage_host_name = graphene.String(required=True)
     details = graphene.NonNull(QuotaDetails)
 
@@ -1345,13 +1345,13 @@ class FolderQuota(graphene.ObjectType):
     def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> FolderQuota:
         return FolderQuota(
             id=f"QuotaConfig:{row.host}/{row.quota_scope_id}",
-            quota_scope_id=uuid.UUID(row.quota_scope_id),
+            quota_scope_id=row.quota_scope_id,
             storage_host_name=row.host,
         )
 
-    async def resolve_quota_details(self, info: graphene.ResolveInfo) -> Optional[int]:
+    async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
         graph_ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.host)
+        proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
         async with graph_ctx.storage_manager.request(
             proxy_name,
             "GET",
@@ -1360,8 +1360,9 @@ class FolderQuota(graphene.ObjectType):
             raise_for_status=True,
         ) as (_, storage_resp):
             quota_config = await storage_resp.json()
+            log.debug("quota config: {}", quota_config)
             return QuotaDetails(
-                usage_bytes=quota_config["usage_bytes"],
+                usage_bytes=quota_config["used_bytes"],
                 hard_limit_bytes=quota_config["limit_bytes"],
                 usage_count=-1,  # TODO: Implement
             )
@@ -1378,7 +1379,7 @@ class SetFolderQuota(graphene.Mutation):
     )
 
     class Arguments:
-        quota_scope_id = graphene.UUID(required=True)
+        quota_scope_id = graphene.String(required=True)
         storage_host_name = graphene.String(required=True)
         props = FolderQuotaInput(required=True)
 
@@ -1389,7 +1390,7 @@ class SetFolderQuota(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        quota_scope_id: uuid.UUID,
+        quota_scope_id: str,
         storage_host_name: str,
         props: FolderQuotaInput,
     ) -> SetFolderQuota:
@@ -1413,7 +1414,7 @@ class SetFolderQuota(graphene.Mutation):
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
             result = await sess.scalar(query)
-            resource_policy_constraint = result.max_vfolder_size
+            resource_policy_constraint = result.resource_policy_row.max_vfolder_size
 
         if (
             resource_policy_constraint
@@ -1472,14 +1473,14 @@ class UnsetFolderQuota(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        quota_scope_id: uuid.UUID,
+        quota_scope_id: str,
         storage_host_name: str,
     ) -> SetFolderQuota:
         from ai.backend.manager.models import GroupRow, UserRow
 
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
-        request_body = {
+        request_body: dict[str, Any] = {
             "volume": volume_name,
             "qsid": quota_scope_id,
         }
