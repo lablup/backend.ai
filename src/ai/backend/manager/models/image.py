@@ -688,7 +688,7 @@ class PreloadImage(graphene.Mutation):
     class Arguments:
         references = graphene.List(graphene.String, required=True)
         target_agents = graphene.List(graphene.String, required=True)
-        force = graphene.Boolean(required=False, default=False)
+        force = graphene.Boolean(required=False, default_value=False)
 
     ok = graphene.Boolean()
     msg = graphene.String()
