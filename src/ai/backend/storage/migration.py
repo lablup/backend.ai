@@ -4,12 +4,11 @@ import enum
 import logging
 import os
 import re
-import traceback
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator, Optional
+from typing import Any, AsyncIterator, Iterator, Optional, TypedDict
 from uuid import UUID
 
 import aiofiles
@@ -34,6 +33,16 @@ class VolumeUpgradeInfo:
     orig_version: int
     target_version: int
     volume: AbstractVolume
+
+
+class MigrationFolderInfo(TypedDict):
+    volume_id: str
+    folder_id: UUID
+    quota_scope_id: str
+    src_path: Path
+    dst_path: Path
+    current_size: Optional[int]
+    old_quota: Optional[int]
 
 
 class VFolderMigrationStatus(enum.StrEnum):
@@ -81,6 +90,7 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
 async def upgrade_2_to_3(
     ctx: Context,
     volume: AbstractVolume,
+    outfile: str,
     report_path: Optional[Path] = None,
     force_scan_folder_size: bool = False,
 ) -> None:
@@ -100,21 +110,9 @@ async def upgrade_2_to_3(
                 if p.is_dir() and rx_rest_digits_hex.search(p.name):
                     yield p
 
-    async with connect_database(ctx.dsn) as conn:
-        await conn.execute("""\
-            CREATE TABLE IF NOT EXISTS vfolder_migration_v3 (
-                volume_id VARCHAR(1024),
-                folder_id UUID,
-                status VARCHAR(16),
-                current_size BIGINT DEFAULT NULL,
-                old_quota BIGINT DEFAULT NULL,
-                log TEXT DEFAULT NULL,
-                PRIMARY KEY (volume_id, folder_id)
-            );
-            """)
-
     targets = [*scan_vfolders(volume.mount_path)]
     created_quota_scopes: set[str] = set()
+    migration_informations: list[MigrationFolderInfo] = []
     with tqdm.tqdm(total=len(targets)) as progbar:
         for target_chunk in more_itertools.ichunked(targets, 10):
             folder_ids: list[UUID] = []
@@ -132,203 +130,75 @@ async def upgrade_2_to_3(
                     folder_ids,
                 )
                 for row in rows:
-                    old_quota_map[row["id"]] = row["max_size"]
+                    old_quota_map[row["id"]] = row["max_size"] * (2**20)
                     quota_scope_map[row["id"]] = row["quota_scope_id"]
 
-                progbar.write("checking {} ...".format(", ".join(map(str, folder_ids))))
-
-                async with conn.transaction():
-                    await conn.executemany(
-                        """\
-                        INSERT INTO vfolder_migration_v3
-                        (volume_id, folder_id, status)
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (volume_id, folder_id)
-                        DO NOTHING;
-                        """,
-                        [
-                            (
-                                volume_id,
-                                folder_id,
-                                VFolderMigrationStatus.PENDING,
-                            )
-                            for folder_id in folder_ids
-                        ],
-                    )
-
-                rows = await conn.fetch(
-                    """\
-                    SELECT folder_id FROM vfolder_migration_v3
-                    WHERE volume_id = $1
-                      AND folder_id = ANY($2)
-                      AND status = $3;
-                    """,
-                    volume_id,
-                    folder_ids,
-                    VFolderMigrationStatus.COMPLETE,
-                )
-                completed_folder_ids = {row["folder_id"] for row in rows}
+                log.info("checking {} ...".format(", ".join(map(str, folder_ids))))
 
             for folder_id in folder_ids:
-                if folder_id in completed_folder_ids:
-                    progbar.update(1)
-                    continue
-                try:
-                    quota_scope_id = quota_scope_map[folder_id]
-                except KeyError:
-                    log.warn("Folder does not exist in database, skipping")
-                    async with (
-                        connect_database(ctx.dsn) as conn,
-                        conn.transaction(),
-                    ):
-                        await conn.execute(
-                            """\
-                            INSERT INTO vfolder_migration_v3
-                            (volume_id, folder_id, log, status)
-                            VALUES ($1, $2, $3, $4)
-                            ON CONFLICT (volume_id, folder_id)
-                            DO UPDATE SET log = excluded.log, status = excluded.status;
-                            """,
-                            volume_id,
-                            folder_id,
-                            "Folder does not exist in database",
-                            VFolderMigrationStatus.FAILED,
-                        )
-                    progbar.update(1)
-                    continue
-                progbar.write(
-                    "moving vfolder {} into quota_scope {}".format(
+                quota_scope_id = quota_scope_map[folder_id]
+                progbar.set_description(
+                    "inspecting contents of vfolder {}".format(
                         folder_id,
-                        quota_scope_id,
                     )
                 )
                 orig_vfid = VFolderID(None, folder_id)
                 dst_vfid = VFolderID(quota_scope_id, folder_id)
                 try:
                     if scan_folder_size:
-                        current_size = await volume.fsop_model.scan_tree_size(
-                            volume.mangle_vfpath(orig_vfid),
+                        current_size = int(
+                            await volume.fsop_model.scan_tree_size(
+                                volume.mangle_vfpath(orig_vfid),
+                            )
                         )
                     else:
                         current_size = None
                     if quota_scope_id not in created_quota_scopes:
-                        try:
-                            await volume.quota_model.create_quota_scope(quota_scope_id)
-                        except FileExistsError:
-                            pass
                         created_quota_scopes.add(quota_scope_id)
-                    await volume.create_vfolder(dst_vfid, exist_ok=True)
-                    await volume.fsop_model.move_tree(
-                        volume.mangle_vfpath(orig_vfid),
-                        volume.mangle_vfpath(dst_vfid),
+                    migration_informations.append(
+                        {
+                            "volume_id": volume_id,
+                            "folder_id": folder_id,
+                            "quota_scope_id": quota_scope_id,
+                            "src_path": volume.mangle_vfpath(orig_vfid),
+                            "dst_path": volume.mangle_vfpath(dst_vfid),
+                            "current_size": current_size,
+                            "old_quota": old_quota_map[folder_id],
+                        }
                     )
                 except Exception:
                     log.exception("error during migration of vfolder {}", folder_id)
-                    async with (
-                        connect_database(ctx.dsn) as conn,
-                        conn.transaction(),
-                    ):
-                        await conn.execute(
-                            """\
-                            INSERT INTO vfolder_migration_v3
-                            (volume_id, folder_id, log, status)
-                            VALUES ($1, $2, $3, $4)
-                            ON CONFLICT (volume_id, folder_id)
-                            DO UPDATE SET log = excluded.log, status = excluded.status;
-                            """,
-                            volume_id,
-                            folder_id,
-                            traceback.format_exc(),
-                            VFolderMigrationStatus.FAILED,
-                        )
-                else:
-                    log.info(
-                        "completed migration of vfolder {}",
-                        folder_id,
-                    )
-                    async with (
-                        connect_database(ctx.dsn) as conn,
-                        conn.transaction(),
-                    ):
-                        if old_quota := old_quota_map[folder_id]:
-                            quota_in_mib = old_quota * (2**20)
-                        else:
-                            quota_in_mib = None
-                        await conn.execute(
-                            """\
-                            INSERT INTO vfolder_migration_v3
-                            (volume_id, folder_id, status, old_quota, current_size)
-                            VALUES ($1, $2, $3, $4, $5)
-                            ON CONFLICT (volume_id, folder_id)
-                            DO UPDATE SET log = NULL, status = excluded.status,
-                            old_quota = excluded.old_quota, current_size = excluded.current_size;
-                            """,
-                            volume_id,
-                            folder_id,
-                            VFolderMigrationStatus.COMPLETE,
-                            quota_in_mib,
-                            int(current_size or 0),
-                        )
-                    await volume.delete_vfolder(orig_vfid)
                 finally:
                     progbar.update(1)
 
-    async with connect_database(ctx.dsn) as conn:
-        incomplete_count = await conn.fetchval(
-            """\
-            SELECT COUNT(*) FROM vfolder_migration_v3
-            WHERE volume_id = $1
-              AND status != $2;
-            """,
-            volume_id,
-            VFolderMigrationStatus.COMPLETE,
-        )
-        if incomplete_count == 0:
-            log.info("successfully upgraded {}", volume.mount_path)
-            (volume.mount_path / "version.txt").write_text("3")
-        else:
-            log.warning(
-                (
-                    "There were {} failed migrations. "
-                    "Check out vfolder_migration_v3 table in the database."
-                ),
-                incomplete_count,
-            )
-            log.warning(
-                "You may re-run the migration to retry the failed ones and remaining vfolders."
-            )
-        if report_path:
-            complete_count = await conn.fetchval(
-                """\
-                SELECT COUNT(*) FROM vfolder_migration_v3
-                WHERE volume_id = $1
-                AND status = $2;
-                """,
-                volume_id,
-                VFolderMigrationStatus.COMPLETE,
-            )
-            in_memory_file = StringIO()
-            fieldnames = ["volume_id", "folder_id", "current_size", "old_quota"]
-            writer = csv.DictWriter(in_memory_file, fieldnames=fieldnames)
-            writer.writeheader()
-            for i in range(0, complete_count, 10):
-                rows = await conn.fetch(
-                    """\
-                    SELECT "volume_id", "folder_id", "current_size", "old_quota" FROM vfolder_migration_v3
-                    WHERE volume_id = $1
-                    AND "status" = $2
-                    ORDER BY "folder_id"
-                    LIMIT 10
-                    OFFSET $3;
-                    """,
-                    volume_id,
-                    VFolderMigrationStatus.COMPLETE,
-                    i,
-                )
-                writer.writerows([dict(x) for x in rows])
+    script = (
+        "#! /bin/sh",
+        *[f"mkdir -p {volume_id}/{qscopeid}" for qscopeid in created_quota_scopes],
+        *[f"mv {m['src_path']} {m['dst_path']}" for m in migration_informations],
+        f"echo 3 > {volume_id}/version.txt",
+    )
+    if outfile == "-":
+        print("\n".join(script))
+    else:
+        async with aiofiles.open(outfile, "w") as fw:
+            await fw.writelines(script)
+    if report_path:
+        in_memory_file = StringIO()
+        fieldnames = [
+            "volume_id",
+            "folder_id",
+            "quota_scope_id",
+            "current_size",
+            "old_quota",
+            "src_path",
+            "dst_path",
+        ]
+        writer = csv.DictWriter(in_memory_file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(migration_informations)
 
-            async with aiofiles.open(report_path, "w") as csvfile:
-                await csvfile.write(in_memory_file.getvalue())
+        async with aiofiles.open(report_path, "w") as csvfile:
+            await csvfile.write(in_memory_file.getvalue())
 
 
 upgrade_handlers = {
@@ -339,6 +209,7 @@ upgrade_handlers = {
 async def check_and_upgrade(
     local_config: dict[str, Any],
     dsn: str,
+    outfile: str,
     report_path: Optional[Path] = None,
     force_scan_folder_size: bool = False,
 ):
@@ -350,12 +221,14 @@ async def check_and_upgrade(
         await handler(
             ctx,
             upgrade_info.volume,
+            outfile,
             report_path=report_path,
             force_scan_folder_size=force_scan_folder_size,
         )
 
 
 @click.command()
+@click.argument("outfile")
 @click.option(
     "-f",
     "--config-path",
@@ -403,12 +276,17 @@ async def check_and_upgrade(
     help="This option will soon change to --log-level TEXT option.",
 )
 def main(
+    outfile: str,
     config_path: Optional[Path],
     dsn: str,
     report_path: Optional[Path],
     force_scan_folder_size: bool,
     debug: bool,
 ) -> None:
+    """
+    Print migration script to OUTFILE.
+    Pass - as OUTFILE to print results to STDOUT.
+    """
     local_config = load_local_config(config_path, debug=debug)
     ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
     log_sockpath = Path(
@@ -427,6 +305,7 @@ def main(
             check_and_upgrade(
                 local_config,
                 dsn,
+                outfile,
                 report_path=report_path,
                 force_scan_folder_size=force_scan_folder_size,
             )
