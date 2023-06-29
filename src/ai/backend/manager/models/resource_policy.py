@@ -95,9 +95,7 @@ class KeyPairResourcePolicyRow(Base):
 class UserResourcePolicyRow(Base):
     __tablename__ = "user_resource_policies"
     name = sa.Column("name", sa.String(length=256), primary_key=True)
-    created_at = (
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
     max_vfolder_size = sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False)
     users = relationship("UserRow", back_populates="resource_policy_row")
 
@@ -109,11 +107,9 @@ class UserResourcePolicyRow(Base):
 class ProjectResourcePolicyRow(Base):
     __tablename__ = "project_resource_policies"
     name = sa.Column("name", sa.String(length=256), primary_key=True)
-    created_at = (
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
     max_vfolder_size = sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False)
-    projets = relationship("GroupRow", back_populates="resource_policy_row")
+    projects = relationship("GroupRow", back_populates="resource_policy_row")
 
     def __init__(self, name, max_vfolder_size) -> None:
         self.name = name
