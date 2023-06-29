@@ -850,13 +850,12 @@ async def initiate_vfolder_removal(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    async with db_engine.begin_session() as db_session:
-
-        async def _update_vfolder_status() -> None:
+    async def _update_vfolder_status() -> None:
+        async with db_engine.begin_session() as db_session:
             query = sa.update(vfolders).values(status=VFolderOperationStatus.DELETING).where(cond)
             await db_session.execute(query)
 
-        await execute_with_retry(_update_vfolder_status)
+    await execute_with_retry(_update_vfolder_status)
 
     async def _delete():
         for folder_id, host_name in requested_vfolders:
@@ -875,12 +874,11 @@ async def initiate_vfolder_removal(
             except aiohttp.ClientResponseError:
                 raise VFolderOperationFailed(extra_msg=str(folder_id))
 
-        async with db_engine.begin_session() as db_session:
-
-            async def _delete_row() -> None:
+        async def _delete_row() -> None:
+            async with db_engine.begin_session() as db_session:
                 await db_session.execute(sa.delete(vfolders).where(cond))
 
-            await execute_with_retry(_delete_row)
+        await execute_with_retry(_delete_row)
         log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
 
     storage_ptask_group.create_task(_delete())
