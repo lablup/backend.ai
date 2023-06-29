@@ -7,6 +7,7 @@ Create Date: 2023-06-28 20:51:13.352391
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import convention
 
@@ -34,12 +35,13 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
     )
-    conn.exec_driver_sql(
-        "INSERT INTO user_resource_policies (name, max_vfolder_size) VALUES (?, ?)", ("default", -1)
+    op.execute(
+        text("INSERT INTO user_resource_policies (name, max_vfolder_size) VALUES ('default', -1)")
     )
-    conn.exec_driver_sql(
-        "INSERT INTO project_resource_policies (name, max_vfolder_size) VALUES (?, ?)",
-        ("default", -1),
+    op.execute(
+        text(
+            "INSERT INTO project_resource_policies (name, max_vfolder_size) VALUES ('default', -1)"
+        )
     )
     op.add_column(
         "users",
@@ -59,8 +61,8 @@ def upgrade():
             nullable=True,
         ),
     )
-    conn.exec_driver_sql("UPDATE users SET resource_policy = ?", ("default",))
-    conn.exec_driver_sql("UPDATE groups SET resource_policy = ?", ("default",))
+    op.execute(text("UPDATE users SET resource_policy = 'default'"))
+    op.execute(text("UPDATE groups SET resource_policy = 'default'"))
     op.alter_column("users", "resource_policy", nullable=False)
     op.alter_column("groups", "resource_policy", nullable=False)
 
