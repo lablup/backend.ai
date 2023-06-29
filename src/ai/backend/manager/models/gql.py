@@ -198,8 +198,8 @@ class Mutations(graphene.ObjectType):
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
-    set_folder_quota = SetFolderQuota.field()
-    unset_folder_quota = UnsetFolderQuota.field()
+    set_folder_quota = SetFolderQuota.Field()
+    unset_folder_quota = UnsetFolderQuota.Field()
 
 
 class Queries(graphene.ObjectType):
