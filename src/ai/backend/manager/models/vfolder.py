@@ -35,6 +35,7 @@ from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS, VFOLDER_DSTPATH
 from ..types import UserScope
 from .base import (
     GUID,
+    Base,
     BigInt,
     EnumValueType,
     IDColumn,
@@ -66,6 +67,7 @@ __all__: Sequence[str] = (
     "VFolderAccessStatus",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
+    "VFolderRow",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
     "initiate_vfolder_removal",
@@ -275,6 +277,10 @@ vfolder_permissions = sa.Table(
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False),
 )
+
+
+class VFolderRow(Base):
+    __table__ = vfolders
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -1336,11 +1342,11 @@ class FolderQuota(graphene.ObjectType):
     details = graphene.NonNull(QuotaDetails)
 
     @classmethod
-    def from_vfolder_row(cls, ctx: GraphQueryContext, row: Row) -> FolderQuota:
+    def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> FolderQuota:
         return FolderQuota(
-            id=f"QuotaConfig:{row['host']}/{row['quota_scope_id']}",
-            quota_scope_id=uuid.UUID(row["quota_scope_id"]),
-            storage_host_name=row["host"],
+            id=f"QuotaConfig:{row.host}/{row.quota_scope_id}",
+            quota_scope_id=uuid.UUID(row.quota_scope_id),
+            storage_host_name=row.host,
         )
 
     async def resolve_quota_details(self, info: graphene.ResolveInfo) -> Optional[int]:
@@ -1366,6 +1372,11 @@ class FolderQuotaInput(graphene.InputObjectType):
 
 
 class SetFolderQuota(graphene.Mutation):
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
     class Arguments:
         quota_scope_id = graphene.UUID(required=True)
         storage_host_name = graphene.String(required=True)
@@ -1445,6 +1456,11 @@ class SetFolderQuota(graphene.Mutation):
 
 
 class UnsetFolderQuota(graphene.Mutation):
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
     class Arguments:
         quota_scope_id = graphene.UUID(required=True)
         storage_host_name = graphene.String(required=True)

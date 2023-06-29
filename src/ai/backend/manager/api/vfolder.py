@@ -50,10 +50,12 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
+    GroupRow,
     KernelStatus,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     UserRole,
+    UserRow,
     UserStatus,
     VFolderAccessStatus,
     VFolderCloneInfo,
@@ -68,7 +70,6 @@ from ..models import (
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
-    groups,
     initiate_vfolder_clone,
     initiate_vfolder_removal,
     kernels,
@@ -371,8 +372,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
-    group_join = groups.join(
-        ProjectResourcePolicyRow, groups.c.resource_policy == ProjectResourcePolicyRow.name
+    group_join = sa.join(
+        GroupRow,
+        ProjectResourcePolicyRow,
+        GroupRow.resource_policy == ProjectResourcePolicyRow.name,
     )
 
     async with root_ctx.db.begin() as conn:
@@ -380,10 +383,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             case str():
                 # Convert the group name to group uuid.
                 query = (
-                    sa.select([groups.c.id, ProjectResourcePolicyRow.max_vfolder_size])
+                    sa.select([GroupRow.id, ProjectResourcePolicyRow.max_vfolder_size])
                     .select_from(group_join)
-                    .where(groups.c.domain_name == domain_name)
-                    .where(groups.c.name == group_id_or_name)
+                    .where(GroupRow.domain_name == domain_name)
+                    .where(GroupRow.name == group_id_or_name)
                 )
                 result = await conn.execute(query)
                 _gid, max_vfolder_size = await result.fetchone()
@@ -393,10 +396,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 query = (
-                    sa.select([groups.c.id, ProjectResourcePolicyRow.max_vfolder_size])
+                    sa.select([GroupRow.id, ProjectResourcePolicyRow.max_vfolder_size])
                     .select_from(group_join)
-                    .where(groups.c.domain_name == domain_name)
-                    .where(groups.c.id == group_id_or_name)
+                    .where(GroupRow.domain_name == domain_name)
+                    .where(GroupRow.id == group_id_or_name)
                 )
                 result = await conn.execute(query)
                 _gid, max_vfolder_size = await result.fetchone()
@@ -404,14 +407,14 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
             case None:
+                user_join = sa.join(
+                    UserRow,
+                    UserResourcePolicyRow,
+                    UserRow.resource_policy == UserResourcePolicyRow.name,
+                )
                 query = (
                     sa.select([UserResourcePolicyRow.max_vfolder_size])
-                    .select_from(
-                        users.join(
-                            UserResourcePolicyRow,
-                            users.c.resource_policy == UserResourcePolicyRow.name,
-                        )
-                    )
+                    .select_from(user_join)
                     .where(users.c.uuid == user_uuid)
                 )
                 max_vfolder_size = await conn.scalar(query)

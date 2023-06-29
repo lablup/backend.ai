@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import attrs
 import graphene
+import sqlalchemy as sa
 
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
@@ -100,10 +101,15 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
+    FolderQuota,
+    SetFolderQuota,
+    UnsetFolderQuota,
+    VFolderRow,
     VirtualFolder,
     VirtualFolderList,
     VirtualFolderPermission,
     VirtualFolderPermissionList,
+    ensure_quota_scope_accessible_by_user,
 )
 
 
@@ -191,6 +197,9 @@ class Mutations(graphene.ObjectType):
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
+
+    set_folder_quota = SetFolderQuota.field()
+    unset_folder_quota = UnsetFolderQuota.field()
 
 
 class Queries(graphene.ObjectType):
@@ -526,6 +535,12 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # filters
         endpoint_id=graphene.UUID(),
+    )
+
+    folder_quota = graphene.Field(
+        FolderQuota,
+        storage_host_name=graphene.UUID(required=True),
+        quota_scope_id=graphene.String(required=True),
     )
 
     @staticmethod
@@ -1561,6 +1576,23 @@ class Queries(graphene.ObjectType):
             user_uuid=user_uuid,
         )
         return RoutingList(routing_list, total_count)
+
+    @staticmethod
+    async def resolve_folder_quota(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        quota_scope_id: uuid.UUID,
+        storage_host_name: str,
+    ) -> FolderQuota:
+        graph_ctx: GraphQueryContext = info.context
+        async with graph_ctx.db.begin_readonly_session() as sess:
+            await ensure_quota_scope_accessible_by_user(sess, quota_scope_id, graph_ctx.user)
+            query = sa.select(VFolderRow).where(
+                (VFolderRow.quota_scope_id == quota_scope_id)
+                & (VFolderRow.host == storage_host_name)
+            )
+            row = await sess.scalar(query)
+            return FolderQuota.from_vfolder_row(graph_ctx, row)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
