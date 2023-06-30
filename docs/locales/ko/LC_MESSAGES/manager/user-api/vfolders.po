@@ -9,26 +9,26 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.3\n"
+"Generated-By: Babel 2.12.1\n"
 
-#: ../../manager/user-api/vfolders.rst:2 fb0c5360ded1477ab04b01af747d9e3f
+#: ../../manager/user-api/vfolders.rst:2 d3c3ac4cd6c74f72a93882f1ec8414c1
 msgid "Virtual Folders"
 msgstr "가상 폴더"
 
-#: ../../manager/user-api/vfolders.rst:4 42b7f19cfd9b4d1a8e07f2a3b5b297fa
+#: ../../manager/user-api/vfolders.rst:4 95b91024664e4bb4b8a3cbba5b872bfc
 msgid ""
 "Virtual folders provide access to shared, persistent, and reused files "
 "across different sessions."
 msgstr "가상 폴더는 여러 다른 세션에서 공유되며, 지속적이고, 재사용 가능한 파일을 제공합니다."
 
-#: ../../manager/user-api/vfolders.rst:7 c872e6f31b154bff909c555cdd4e1d1c
+#: ../../manager/user-api/vfolders.rst:7 6d6313de588349e6847358f942f78d46
 msgid ""
 "You can mount virtual folders when creating new sessions, and use them "
 "like a plain directory on the local filesystem. Of course, reads/writes "
@@ -40,7 +40,7 @@ msgstr ""
 "폴더의 내용에 대한 읽기/쓰기는 내부적으로 네트워크 파일 시스템을 사용하기 때문에, 주요 스크래치 디렉토리(대부분의 커널에서는 "
 "``/home/work``)에 비해 성능이 저하될 수 있습니다."
 
-#: ../../manager/user-api/vfolders.rst:13 c648f7500a914fe797091a33b412e654
+#: ../../manager/user-api/vfolders.rst:13 cec5602cc769448884ac816bb3d9db0b
 msgid ""
 "Also, you might share your virtual folders with other users by inviting "
 "them and granting them proper permission. Currently, there are three "
@@ -53,17 +53,17 @@ msgstr ""
 "레벨로 구분됩니다: 읽기 전용, 읽기-쓰기, 읽기-쓰기-삭제. 이들은 각각 ``'ro'`` , ``'rw'``, ``'wd'`` "
 "라는 짧은 문자열로 표현됩니다. 가상 폴더의 소유자는 폴더에 대해 읽기-쓰기-삭제 권한을 가집니다."
 
-#: ../../manager/user-api/vfolders.rst:21 c53c5fb0293442c3b51036c0ebffb9cd
+#: ../../manager/user-api/vfolders.rst:21 f07d43326c83479ba09e07b928f08ec9
 msgid "Listing Virtual Folders"
 msgstr "가상 폴더 목록"
 
-#: ../../manager/user-api/vfolders.rst:23 7d3956fa8fc644ce8dae864906a50ae7
+#: ../../manager/user-api/vfolders.rst:23 3c6a9ec9e32449ad8f2c20d0ddc549ce
 msgid "Returns the list of virtual folders created by the current keypair."
 msgstr "현재 키페어로 생성된 가상 폴더의 목록을 반환합니다."
 
 #: ../../manager/user-api/vfolders.rst:25
-#: ../../manager/user-api/vfolders.rst:151 63e7ccb859f34dd2941614e2e1dd4c18
-#: a4199f9255274b89af55c60c752568b9
+#: ../../manager/user-api/vfolders.rst:151 455d5b26df884ce9b526a57ebcc743f7
+#: c06ae65d65f448aeb9c55398aa01e93f
 msgid "URI: ``/folders``"
 msgstr "URI: ``/folders``"
 
@@ -73,10 +73,10 @@ msgstr "URI: ``/folders``"
 #: ../../manager/user-api/vfolders.rst:400
 #: ../../manager/user-api/vfolders.rst:728
 #: ../../manager/user-api/vfolders.rst:912
-#: ../../manager/user-api/vfolders.rst:1052 3807464b077d4ff18add49f798629f2c
-#: 66ae052d6cbf4a2aa06b0f415798953c 796af16721a0419ab40b2100c6ce75d7
-#: 7a272c4daaa14e62b2cd97d8d3838cea 9b08061f032b428f9921cad87ad108d3
-#: b26621825a2f43bebf0381d4be0dacf2 ef18106ce9124202b04766f9358f45a3
+#: ../../manager/user-api/vfolders.rst:1052 0a604d65a3564a4e9378f96436387ee1
+#: 5bd4cbb7c4d74894b2151c75ade913ba 62fdd8bf6f9142c6855838a967f83b0e
+#: 7b1a484e415542dd9d299344747ee5c6 a1fc9d1abf4a43c49033e5f8bc87c59b
+#: b17b8069f8084efd9da65981d038f176 dc6dd3f7c93b4fa9a575b2d735813046
 msgid "Method: ``GET``"
 msgstr "메소드 : ``GET``"
 
@@ -103,19 +103,19 @@ msgstr "메소드 : ``GET``"
 #: ../../manager/user-api/vfolders.rst:1119
 #: ../../manager/user-api/vfolders.rst:1184
 #: ../../manager/user-api/vfolders.rst:1242
-#: ../../manager/user-api/vfolders.rst:1295 0b882659724542428b4bcbb614eeb985
-#: 1a4cfd4df4ff4f98837316fc7feeeaf1 399daaf93f394d1caea5abb4f9fa6561
-#: 4561d925e42642cd93f0a55b5fffdaa5 54c6c65353ef4cc5becfb064a6ce9967
-#: 5a41fde748714548a1d522bc372a449e 5f9ebccfa7d648a4a8ebb8f461e3c3d4
-#: 6b106274386e4c68949e621211ce7a24 76bc361288ee4d6f89d6c7d4f9ed29d8
-#: 7a264b08ff1d4057a8920a0ea82092d9 7ac50173328f4319b166364e48e77e8d
-#: 818fb374164b4bc1a3bb962f85b35ae9 8db390e6bf5a4e4993007baa0ef19490
-#: 9e4b3550356b4b348655897e027e36a6 9f08a1b9a2f640fca0fffacd84abd5e8
-#: a244c454770a4a9598ed8f2909086eba a83330a073b94d9aa0e3936c811140bd
-#: a9397886fadb463898a7ef0577c63518 c1c63079a8794e7cbca23306d2accfad
-#: c9759488feb4485d8d798e570ba3b47b ce7564ed4b1c4310ac2fae922a100bec
-#: e478ccaac2874f529854836461fb3c51 efbf01d2a74e452e827aea625ef2765b
-#: f07fb7dfcd254e8a97f19081df3dc6b1
+#: ../../manager/user-api/vfolders.rst:1295 0db2029c42144e82b80d3bcffdaedec5
+#: 16d1624655df4bebaaf16129f1d7c346 255f2e1775d5467ea7703a6359f20c93
+#: 2b9545d77ee84de6951f933ff14cd927 325ef0cb1dc74a99ba1805ff3468344c
+#: 4162f745772e47448d110516019a682a 41e9d8eb06d749b3b2347039884cfbc4
+#: 4bf0c3d69eac471a9f5044c9c93b1f1b 68acc2217d00438893b40dcae0c37df0
+#: 74e166bb36a74437994d57d302f8f0fa 8aa92754c92247909f20781e0fb09838
+#: 8af42a36fc1c4738a6c987601e00c996 8c3486e88dd14c06b2dd79acd3903602
+#: 9944bf74a39b423e8edb7598147187d1 99a639f9993e4b4095f5baa6d6251377
+#: a1b39d692e014c5ebe32eb99aad711d0 a9af2bef352649b49fa702f42faedb7e
+#: af3d978e800e4ae5a7266be011ae9ced d8a46605f8ac49b3a01719d293aceda4
+#: deb0f57461e04232ba7817de9ddee924 e736bf4117964e578f545105a45b9f4c
+#: f65a669fe3404c87825c0f6155a69561 ffcec7c824fd43ffb0ae8819e86e4fd5
+#: ffdc3943d3b84e828b572a5af0a21b07
 msgid "Parameters"
 msgstr "매개변수"
 
@@ -139,17 +139,17 @@ msgstr "매개변수"
 #: ../../manager/user-api/vfolders.rst:1125
 #: ../../manager/user-api/vfolders.rst:1190
 #: ../../manager/user-api/vfolders.rst:1248
-#: ../../manager/user-api/vfolders.rst:1301 010341e6dac747df9fd4343447c33268
-#: 10bdf1c3b36a4243b1003efdc84bc466 15d258c225fb469e95f09b19a4a7ed93
-#: 17edd66196fb42c6ac8b7af643d7f789 24c141b4d81942fd8a4ed6c3d0af54bf
-#: 38c3823146764cc8a93df28f5c3c3eb1 4d307fe650c846cab08d56446775ea13
-#: 4f4d95300e9e4ffc8d1021028d3162d9 59ab081539f24b318a577b3fd36bb468
-#: 5d5029b3397c49c5b8756c0bf6272591 6aefccb660104c93ba0880948d749813
-#: 6c3879ee877740f69fb0fb786131bd57 70266f4f1b5d47a2837989cd133394d8
-#: 77b7ac2dda684c3a98457d3f5aca2b79 9dbddd949c8644339427ff1733d3c160
-#: b20a5e28b0cf4fd5bb107219664e1a54 b21c0043f9864af7be87936b80eccbde
-#: b537a33b2cdd42e0a370dbbdcf1997ae c731cc5f74224ca09671b236818eeb4f
-#: f175214925ca43c9aa7b6b20f1b9fd7c fa1303a7ec9640beb68012f624a13c18
+#: ../../manager/user-api/vfolders.rst:1301 0eda46ef089645ad89fcea1931974f06
+#: 19bdc3125b244f2bb23077162d6966ef 346321f6dda447608017ee1a305fcee6
+#: 41ab88b101424bbb8c0f0870a78cf140 4b1d1e55363c400ea268f67bba3a3c28
+#: 5dc4e9efa04d49048162d38254e56140 606e0643492c4cc1826488e259bf6e36
+#: 78f0c11ff2364946bf1454cb39b11b77 82b12e7fa04f430ea9343ec3e7ada4f6
+#: 98415657f43c4ecb9e2ec36305c6945d 99bf4df1db554c439a5e8a4951e3422d
+#: aa102bfe97c349099c822c4ddd431d52 aa5c2f0298f5420da16987b9e8b67606
+#: abadaca000644cdca8716c96d52cb08b c43d3d17cc4840e3ad89778264b71c14
+#: d9f5d71e9f4449f78037d7cffc7e9c4b dca2fce19bb84a26bde4a1012a638cb9
+#: dcdbb665973b49beb82a8d1bb63fb881 e1bd161d9597453a932df7ca807c2ee7
+#: ee7b7517292b40e7845262d7fc43610d f046baf6c7984440a767c6e4a8af97f4
 msgid "Parameter"
 msgstr "매개변수"
 
@@ -191,26 +191,26 @@ msgstr "매개변수"
 #: ../../manager/user-api/vfolders.rst:1279
 #: ../../manager/user-api/vfolders.rst:1302
 #: ../../manager/user-api/vfolders.rst:1350
-#: ../../manager/user-api/vfolders.rst:1361 050bf791ff7a4b748e215211414b5acd
-#: 057cbcf6a2594330b2ba257f072163bf 0b95a3780ee245ceacc0bda60ef76cbe
-#: 0ee99dda43c947e09531c9f213be2d98 1516305838b94875b2bb49d00af5f6b0
-#: 1fb0d5aad0fe435bb16471adc4949a1f 2612f0b70efb47539bc4745535b2d376
-#: 2d0685fa77c4440e849d5de49ffcc5ec 35caa33182094eeaa73de19efadc19d7
-#: 5447839f1d1a4862904d0d0c2bd60319 54e206b981384f029840bf46e80d573e
-#: 75fd3bfc23134d2c8f7c01d15e73ad04 77db601dd1e24eeba8cb44297457f28e
-#: 8006fef64d67468bb31c8acb620b2a4e 86d766e5048843689d650d90275ce5c8
-#: 86f3e676cadf40668efde6105c41b36c 88285e02c224407b91901d8cdd8ea653
-#: 891f1142468545a6aed4cc9139b347fa 8b543218012549cb8fcc32f623d6915d
-#: 9086f0176ada4bc492be2dd448e60fa1 9879b218eb53445aa0419b666434dbd4
-#: 9e29ceba288e4e5e871bc7a657361b10 9f4c6d32864f49e787b65bd16418dd82
-#: a0703a7ab3d7411c9024733eacb03800 acfbd4e6dcea4525a91a8de5cce984fc
-#: ad993ad0166e4620aa008dbaf2bc8dc9 b2245fc7ab8344b6bd9ddbe2a57498e1
-#: b769e2845efc43fa83b6d142e081e68e b8bb33079eea4b93963da7a6ff002962
-#: c41a1743e33849c6ad2411132fe18367 c723a1b621eb44189a85a620c8248c1e
-#: c921100d2f2a4ee4a55143bed8e33c1a d6067711e26c4476b2d3da3ee3ca9685
-#: d643c7bb6d8d4470bce930f7f7925aac e68069b3aa1f4be6a32b8cfd031305dc
-#: e9daef44a8d54a5c81c0cac0a5785d74 ef34528b8d8e478daf11b9f598eadf56
-#: f14baac6d7a64244a052061da7791339 f1af318ed22f439aa124428a74b40cbb
+#: ../../manager/user-api/vfolders.rst:1361 069f08ec587b4fa29144cc945e3dfc40
+#: 09d0264b91994151b3b076a690d37744 16b89abe262449ef8e1582796b5c5778
+#: 255fd68bc5144b1ca90e4169b25cc0cb 299a57a68718473491282efb799b6ed7
+#: 3f5ccf7533fd454c8e09fc10e3215eb6 4bc542b72325474b97f20499fd383b0a
+#: 51a52ffbecfb46df80124c7aecc18baf 533d83b1e4cb4fb5ae4daf6796d7dbc3
+#: 542694dd86794f0092008fd4f88a6484 5904b8e292c3469eabe4719d9493c038
+#: 5d01e0c3044f4de9864f784de5464f65 70719c9f701748b1883f9778f00cf31b
+#: 72e113c6709a454ab3ecc4f8bda551ed 7b176b5b67ac4462b932d8af4d3ee957
+#: 844068da03f14fff8020012106b732dd 8459b1beb48a469f9ae25f3f757456ad
+#: 882f94c2994649df8053e39d00ba8663 92829a3d6d3f4865a43096031c45006c
+#: 94ac699f78674d9b944d287dfb6701de a800cab9fbc746bba960e9c54b951858
+#: b3d4099b09f04a39be91ba45602077f9 b3e5a9fa9c084153a58d8a2cd55e6248
+#: b7a0fe67ff5e48919c8b2c3f806820b6 bb031f753c32444e8c0872ad1d6a9ec4
+#: be52fe29623d494da5c04e9a0f033264 c2892374e4d94797b440c20fd699fe04
+#: c861bd1f14384ffaadcd2a2b2c0ac806 c8a4eddd74d342e8942427e8a0d83fe2
+#: ce1c1c24119748d08c6785cc828df4d0 dfe08049ba194217a8bb003ad091c7d1
+#: e49a029d851541d58155aab2d27a06a9 e4bb7e797f3f440d819dc77e61444994
+#: e62d72561e6a407dbae0cc2b29b898cf e92fcdea907d4e6ea843af68315d2f23
+#: ed26b5abf8854f90a2c922cd4f2bba60 f305dc3691e049a390e6961098d1fb9a
+#: f6e12722bdc84cc79c90b29f33ed3ed2 fcf3c769f80b4304a0d3a26e13d9e3e4
 msgid "Type"
 msgstr "타입"
 
@@ -258,33 +258,33 @@ msgstr "타입"
 #: ../../manager/user-api/vfolders.rst:1250
 #: ../../manager/user-api/vfolders.rst:1266
 #: ../../manager/user-api/vfolders.rst:1303
-#: ../../manager/user-api/vfolders.rst:1335 051a5a04093748cc89e74d0605453a43
-#: 0aeab9d835454340baad5592e633f9c6 1110d36555a74a91a8876801bcfe4cd4
-#: 1bc8d690aea644c5b4d094da0cc7c8d7 28eb62e71caf4dbaa5653348a5fb3687
-#: 311e2013a6d741e59e39b309df9e02a0 3263c6032319430684941e2343bb0bee
-#: 3f5fffbeddc347ce9d560c193845565b 40e34dee952243af8395a4ef623b0141
-#: 4dc6349962ed4cef87b1d505a2e6e04f 4ea1afb03b2b41fe9ac4a783502ac1ba
-#: 55ba0a9204374d1b837ce5fc3cbecf5e 5e706c3700624575a465b18b4372c90c
-#: 5f1fc6e0e5434a5e85134bdd42eb3330 645242980d74494eb5c545ead61d0df3
-#: 6998f6e9043c4635aacc16392d25ebb0 77a21ef29fee45a692530468bcedae6d
-#: 809c6ee830e24209a4c26cd4aa437462 8287a47d96574627a500975c5948c445
-#: 8903547af7ef4dc69da1830850ddd724 8b18dc41b13540888cb45b3ea52b5d19
-#: 8c3c1569af344d43a7cc357502fbf638 8d2de74b8ef643689bcc10bec93dbbb6
-#: 990f773e8cbf48d092c91e9156a5451c a86a559a5f00401bafec8b94cd213bc0
-#: b203e0b1904b41cab0dcb2d1269b2d6c b511727cb70e4609b518cb746c8d2168
-#: b560445a2e504595939de7c3aa4d0f31 b58c5d16063f4d20a6254d8decd0fa3b
-#: ba3ef9e4f11944738b727753f437abc1 ba666465e9f64dcd9494375314dfc549
-#: be6990727d8b4ec68028bcabda9cc2a1 c26d0d8e2cd54e1e833704096fee6458
-#: c506ae2ffe324d388f425f9ad301e5ec c54377bbd71a485e915479569a098235
-#: ca1f03eff63b4851be56e9f74628de37 cf8290fd28704d399ab701f728675922
-#: cfbf4185795740c1a23cb21d8468ef62 d2291f5a276f47fc877fdbe80ab5123b
-#: d9f2d764960f457283f8902bca2ea8ca e082f7d669c248d7b5a143d48a3117e4
-#: e7b36758dc794fd7a96929d3aad4af99 f335c1cffa814616ac07f2f72d68ed7e
-#: f5d11b8e6b6845b6952b09a7f4e39080 f6e5674c35924daf8c65ea8df987fa2d
+#: ../../manager/user-api/vfolders.rst:1335 01363e2b73df4d5f99ff4b484377b9f6
+#: 03766d2aca5941a79ad9b8c2d9ec6fd4 042ef059a39d46d9875776208acf3966
+#: 0a332ed9221d4b2bad09d73307838bc7 0c60e391e8c74ca4aa434eb0490c421c
+#: 0f1ef004dc0f46f99e775b9fbc39e5ab 130b11d7fe1a4c1cbcce9349e62f8760
+#: 133ae98e328540049d2ae1e918a11126 192d44d550d2410c8c3d5c2091ecd011
+#: 29134bb6e2854d96b2ce4be329d2b901 413d028bcee9424884c3c12d3b62ca4f
+#: 42353bed0a684f5192076d6c77dd5d8e 435ddc13431b43f8925eebab94721678
+#: 4da219a69bd64cc2a875d2c0cb29ee08 50b4c085fe014ebc9f27f51145148a66
+#: 56d2541b348f407b804d4331a7b0e452 6102945285e74e3180b6bcad916cc3a9
+#: 6a45999a53904cefbb211a491751c87f 6a9e2a1a52bd4df69051afcc09e55387
+#: 6dff215c369249478a0a3ef7043a8b02 72ab53bdcdc44d7eb6c6e8762fc81f2f
+#: 73165130613849ba97c0d78fce2cbf37 7414b22aaf4e4b3b8d9912833a956b90
+#: 75110d19d68b424386cdd623180ecb79 75df18e0cf814f819eab9e43b2c5fa8e
+#: 7a326ed1b4054923b837b8e622c588a9 81b3a8cf262846e2b3b024c6a00962ca
+#: 9c174d57687c480d82b5102307b824ca a0b74ced628c4ba4af77e1ff99b043ed
+#: a434568faeac4d208a68848249de3704 ab4af65642714ffcab396b0d48edfb6f
+#: ac633eb27c4543e5865c93a7b56ea5f0 bebf9264754c43f0acb4074f9239170d
+#: befbf5279b454c6688bde4182a8f19cc c2c8f490efd94de7b0b2ae73636f9d30
+#: c39c336c719542f6ad3c2f2a6d9a076a c72e8322899349f887f962f5bd07dc4d
+#: cd3438f98ce7402eb348e8100b682aa7 db97e0e1b8d8410189271ebfcdbbed0a
+#: e01450eaee514ea8a64a368d5c30a946 e9d8dc074bef4171a45323748a008ce4
+#: ed2e9e4cd78b4d3f8fbda534fd656156 f8c7ea3beea949e7b883ddf7bd26e9dd
+#: f9e686d01cbe4a3e8c946cebb4d2162c ff2cef58109941ba89a8c2795b44773b
 msgid "Description"
 msgstr "설명"
 
-#: ../../manager/user-api/vfolders.rst:38 bafe652cf59245eb8c387a42f1130901
+#: ../../manager/user-api/vfolders.rst:38 dfb95c3d8ada40658bb3a3477aaf1e96
 #, fuzzy
 msgid "``all``"
 msgstr "``slug``"
@@ -295,14 +295,14 @@ msgstr "``slug``"
 #: ../../manager/user-api/vfolders.rst:591
 #: ../../manager/user-api/vfolders.rst:654
 #: ../../manager/user-api/vfolders.rst:702
-#: ../../manager/user-api/vfolders.rst:1308 06e52f979692404dbeef99f7dda343f2
-#: 0770f829f159486da94b3ec3d061e792 39df3e9823d4479287aa092b63cd5d43
-#: 475753cab0254ab7803cad8ebf7d9591 68fbfe5f691a4bb5a6d863670bde07df
-#: 94170e91270a43b6b26228e977f934b4 b2cf28c395fb4234b32e6a33b2038386
+#: ../../manager/user-api/vfolders.rst:1308 85aff0f55cd749bf9de64efce246cfd0
+#: 89c2e1a8418b4c398bf0280695f1a79d 99300e82363446948ce5b457995d6a86
+#: 9e8eab3ff2364688a0a2497885f9e6c2 a839eb3731e54e0083102ef91ea07f64
+#: aa297911c8034dc5b0d37f9e99f781cb e15571977acd4deb97a303f0d85c75c1
 msgid "``bool``"
 msgstr "``bool``"
 
-#: ../../manager/user-api/vfolders.rst:40 76aeeeda14b74d2ea3291fcaf01fa009
+#: ../../manager/user-api/vfolders.rst:40 689790560d0d413c8d0dee8a822a915c
 msgid ""
 "(optional) If this parameter is ``True``, it returns all virtual folders,"
 " including those that do not belong to the current user. Only available "
@@ -312,20 +312,20 @@ msgstr ""
 "관리자만이 해당 매개변수(기본값: ``False``)를 사용할 수 있습니다."
 
 #: ../../manager/user-api/vfolders.rst:43
-#: ../../manager/user-api/vfolders.rst:183 4503099b6eb9464089221d118874545b
-#: e2f663ae40a045b5bd04c6ab096b9740
+#: ../../manager/user-api/vfolders.rst:183 26a21b543b7141a9b2bbe6bb8067d843
+#: 913bb4f568a94b9c9f446a75244060d0
 #, fuzzy
 msgid "``group_id``"
 msgstr "``group``"
 
 #: ../../manager/user-api/vfolders.rst:44
-#: ../../manager/user-api/vfolders.rst:184 01230f0afd884aa1a59f77d5e8fb73fe
-#: 42d52c85b3a44ceeac8393911a3e5e7e
+#: ../../manager/user-api/vfolders.rst:184 836665d425514ae4b246c8630ae9f1a5
+#: f484c2f72e2d48609c3a39bb52d91f18
 #, fuzzy
 msgid "``UUID | str``"
 msgstr "``str``"
 
-#: ../../manager/user-api/vfolders.rst:45 c428ebb191c94a6dbea26009b0d33f02
+#: ../../manager/user-api/vfolders.rst:45 c16e8d8f87c845058f44c26eba7a3295
 msgid ""
 "(optional) If this parameter is set, it returns the virtual folders that "
 "belong to the specified group. Have no effect in user-type virtual "
@@ -355,19 +355,19 @@ msgstr "(선택 사항) 매개 변수가 설정되면, 지정된 그룹에 속�
 #: ../../manager/user-api/vfolders.rst:1139
 #: ../../manager/user-api/vfolders.rst:1204
 #: ../../manager/user-api/vfolders.rst:1259
-#: ../../manager/user-api/vfolders.rst:1328 00c6d0fe063444968e9e01bfdc5e4f38
-#: 07be5273ffa3468583ae174f07a51c97 0e40c1b4fcd34987a9a1a679c31ae830
-#: 1d23216ff2b740758cb1a4fb5dbc172c 23534fc2c0d64e01a64a6fa26f72b81d
-#: 3342ee27f0c347f6b572808ee485e83f 3f18e72f44f64ff8ac848f874fd87eaf
-#: 44bff063d3ef46a39916a922f34f3852 450dd733cf974056bedb73b2738693e5
-#: 56acb97e6f5d49d5b241d424f4688e62 614aa34461f441178eb8d578fc02f973
-#: 7782611a5e46466d95819d95139af63b 78d81288d445491fadef2f62c17d6122
-#: 79511c3977174f89a25f746332ed7fdf 877b7e10eb1f48b9b5ea5f26e3b2ac68
-#: 8b97dd16c3a741a7a00fcd341ccac5fe 9c5d60b2bf9b453cb4e7e9b310795865
-#: 9d88f498a78c4147a6396f3118d55ccb b23463eae4dc4bc8a0477590163a365d
-#: b68bd06113434342accaffd8c4613afe b884628dff7a4c80b07a8bc7fd8aefba
-#: c0c2e1d0cc66434b90ce4c2120ca07be d95e79ac73b5423697995b86dd2867d3
-#: ed795590354741c990fe8e5d6086367b
+#: ../../manager/user-api/vfolders.rst:1328 001719d7e8ce44818d5704252a9767f1
+#: 064d940011364d39ad9ff9c677399a1f 0e9ffc6e6a6b4a9fad0a92fa0de22ce7
+#: 1436bc24d3b943048a1060c95d8935d5 18c9b406b42148d5af934e68ee061ce1
+#: 1fdbedffaec749579de236b4aeebad1d 2b2c4dafeb0f41899900fc975c49d413
+#: 3881a7b1c91744ad8318c7e1bb880bbf 3efb9b3c1c8e4a3eb05271dbc3081c78
+#: 51b3d03ca4e04ba383416715ed918c57 64c1086de47b4ee394268d6e681c4587
+#: 65fba5b4dc8a4d82846954b191d07d91 8358bbc6ae5d4684bcb2d7c14e150be5
+#: 98e53958bfeb45958c792dd83e1a335b a0956a55436b4b52afff1deba000e0cf
+#: a0da8563846641f196f2cdf1372e6c46 a987b43d4dd64955af6140f84080f25b
+#: ade63f4e949c4fa88d1ea3c5985ff61e b03999959ab5465cad944ffeaf7553c2
+#: c80eeda6d667409cba20a77a841ffb7d d09055d91c41419e858a151006cbb7cf
+#: e7fcbd7cc9c5424aa3f942914febf134 e97410e59d804cf5a67b098ad733b294
+#: fa44fb2f0ec54efc95cb9922edf574d4
 msgid "Response"
 msgstr "응답"
 
@@ -394,19 +394,19 @@ msgstr "응답"
 #: ../../manager/user-api/vfolders.rst:1145
 #: ../../manager/user-api/vfolders.rst:1210
 #: ../../manager/user-api/vfolders.rst:1265
-#: ../../manager/user-api/vfolders.rst:1334 0505d3c3678844e0bec935cdea191c72
-#: 07aacde4df19441586a57c734a8f4fd8 125a03bd433d460d8221b2d50f75c5c0
-#: 1f9f522b55f144d299106b29c4f4db96 389aa1bf71ae495c92eef7fb533bd5b7
-#: 3f00ae0279f84dc8b4281be26d2c0677 54e169fcc4a84a75b607fddd897ae612
-#: 60af6b8672da4a10afa722ffdc797571 6e7dadd50a7f4d73902a33ea9da1a7ee
-#: 7857e38dc1f7411dae53779fc4cef94f 81a2273baac045fc8a961b65b1f56e8c
-#: 8b0ebefab2234fabb661427ad86f9a51 908b6113d6b54b7db8505addd7128e65
-#: 9595ef92faa94971aa7cb6a376d75d05 a4cf4dcfee4045868e28ba4813c2d6ee
-#: a7f24ba8a2334a17900e7ad14e8c6c9b adf906ea2ef94f3b9d59674be37bd0ec
-#: bdd2819dbb4343e99bc8e618b5fcc3cb c0e6e8a2b6d94e5db93824c60c23155f
-#: c20845dcb3e04773800023a17f084480 ce74b69335724253bf851ae03174c18e
-#: d2f86d8f45d844c3b82f7c5b865d8f01 dcc3769d883548b38aff58fc2d7c9bc9
-#: f30838c4b677475abef46df4be7196a6
+#: ../../manager/user-api/vfolders.rst:1334 02d0ce50409548af8c77887e91255bb7
+#: 0442db533feb4c6881c563b57547c967 10c17ba2630646ea802a88913f640af8
+#: 1358e07e9c2a48d7b083aaa6b77c1acb 242bdfb6163546f58812a12736aed1dc
+#: 27a17e3b0b7246ffa4ce63f47d1fa017 2d2b093207874a858d3671c55932d70d
+#: 458ea9ab5b134cdebfa82efca14db835 4a1efc480d8743e7b4c92680b9db8c38
+#: 5702649aedca4785b3ce5c1cf571e250 603e96b6387c4e2ea12747d695cb190d
+#: 67229e0dac334eab8c2d70ae08d4b1de 909ab3b3e6004301a8b5ffd829b40d76
+#: 942ef8d8d7f945beaa16400e40a08cbd a05963c4d20847d7aac6187a5a9b236a
+#: b96572ce326e4f01a4e8474080f34816 ba00c23b56e344a88d5b5cde3a717bf7
+#: be369e2c28ec4a55bccb658aaebe5ad8 c75cc7734a8d41fe9d9d6d59f1516949
+#: de6cf9d9523141da84cc92da18af8dd9 e2e1bc60080e45a8891c1555cf01887a
+#: e478ca5f36884bd7a3e68ccfd0032101 ea37b29e8077465ab6d3e33cf4cad9a2
+#: f1a2d8ec63004dd385412a970d366e82
 msgid "HTTP Status Code"
 msgstr "HTTP 상태 코드"
 
@@ -428,51 +428,24 @@ msgstr "HTTP 상태 코드"
 #: ../../manager/user-api/vfolders.rst:1078
 #: ../../manager/user-api/vfolders.rst:1147
 #: ../../manager/user-api/vfolders.rst:1267
-#: ../../manager/user-api/vfolders.rst:1336 14e500ae499249cfb6ecc9b1afa30ace
-#: 1690864525c84ace92c372e9f3594b63 1c481acd65464225a12e18ecf591961e
-#: 20a200f3535e4097b31d8847b96d4bdb 2d2904576ba744c09997ad229c43a828
-#: 49d68f21d60d40ddba2ecd4b8e69ced8 4dcd4559d430411e8fcc34216fa7ab27
-#: 555b40586bbe4622a4d065bbc507efe2 724c16eb1c784544917c97a8843a611f
-#: 8cc08a03b79e4566a75376cb5282f258 960408f6624c4bf498610846a8801df3
-#: 97493c14c3e8409c8bbc2fa400f830b9 a15ada193a4c407e9e036257bb5129a6
-#: a409560df317496f89baf93e10d3ddd9 e90ecad0e0084055b57ac8bc835fff88
-#: f2b14e12411f477487616cf642ee99f2 f5e8050ffffe48fb9faa0120faab49a8
-#: fe080b4a55a0487c98af721592deacfa ffbcf6b96ae34a0a9b45ad488dff80c2
+#: ../../manager/user-api/vfolders.rst:1336 35f4255a31a5412fa112dd9704123d7f
+#: 41c3d74fa21d4db79f2a1da49ac0a3cc 4c467252338a4f639bcac0606cb40de6
+#: 55798b72d7c34ccc887a8a3d3005ef43 62295b3cca36445eacf809c68982773c
+#: 83df10fe2f04494dad23c23788f240fa 91857f8d496142be9259383adb2774d1
+#: 9fe1bbc5fbff449fae0e6ec1a53aacd3 a2774fc7627b4f3ab8f191e51e774f60
+#: a8f10809ab5a4cc7afc0f3b5a4d0a987 af3edd71208d4e75b6a7761a234bf57d
+#: b42e099de24c4e36acc8ca6264c4553e c5e304c531b149538fd11e657a0d5841
+#: cf2627dd72fe4a62a59143b91e6d6421 d34fe1d379cf47749c1dd05deab5b995
+#: dc06490818ed4896b874fa2397f8e86b ef258e16f5c9481bb216ccfa43887949
+#: f0e1f03e83b8473b92400da318530404 f55ebecf748e430b95155ce0ecf49098
 msgid "200 OK"
 msgstr "200 OK"
 
 #: ../../manager/user-api/vfolders.rst:58
-#: ../../manager/user-api/vfolders.rst:122
-#: ../../manager/user-api/vfolders.rst:428
-#: ../../manager/user-api/vfolders.rst:488
-#: ../../manager/user-api/vfolders.rst:553
-#: ../../manager/user-api/vfolders.rst:604
-#: ../../manager/user-api/vfolders.rst:666
-#: ../../manager/user-api/vfolders.rst:714
-#: ../../manager/user-api/vfolders.rst:745
-#: ../../manager/user-api/vfolders.rst:799
-#: ../../manager/user-api/vfolders.rst:849
-#: ../../manager/user-api/vfolders.rst:889
-#: ../../manager/user-api/vfolders.rst:929
-#: ../../manager/user-api/vfolders.rst:978
-#: ../../manager/user-api/vfolders.rst:1030
-#: ../../manager/user-api/vfolders.rst:1079
-#: ../../manager/user-api/vfolders.rst:1148
-#: ../../manager/user-api/vfolders.rst:1213
-#: ../../manager/user-api/vfolders.rst:1268
-#: ../../manager/user-api/vfolders.rst:1337 2125c7c640e84836a8f8f6fb4fc48572
-#: 227a7f5488354a49b8b1759f563b5a8b 2764a543d6674eb2a0a787cbcbd98d34
-#: 2ae9aef022b4419aa56d37402727db76 340599e05ce544d69d44f23a3f3bafa5
-#: 36d5249d24e84282806f8c9353d4ccba 3b4c97e3a46c4264ae344f597a71430c
-#: 4dd23acddd7c44e18695e50fac81d3cd 5df7acfbeb4f4ff2a7ad87b60e6df40a
-#: 6b131000eb604acca724c318cd71331e 7bc49804f2244713953c69772a4e1d7e
-#: 7e58181e5b244fac8d3158832d1c7562 855656aa1edc488a88c78e7692016896
-#: 8ded6398ad7a437582f6e48933372512 9334de541c61462f8e9ba6275af6b513
-#: 985490470b9d47fa9b9a52d59db316eb b2b9ff9d9cbf44f688e8ebab523adbe4
-#: d34392ee59c74c1e8aba46a301d26ca4 defcadb229704fd7bae232ff5780c1ca
-#: df19eeb208fe463f8f71032846b11d74
+#: ../../manager/user-api/vfolders.rst:122 57cd996144e847b0a7b6168ebab36e34
+#: 6ea643fc006e4a1d807168c09c291c0b
 #, fuzzy
-msgid "Success."
+msgid "Success"
 msgstr "성공"
 
 #: ../../manager/user-api/vfolders.rst:64
@@ -493,16 +466,16 @@ msgstr "성공"
 #: ../../manager/user-api/vfolders.rst:1223
 #: ../../manager/user-api/vfolders.rst:1278
 #: ../../manager/user-api/vfolders.rst:1349
-#: ../../manager/user-api/vfolders.rst:1360 0f813809d2c84b3bb255ba7c1dc5d9e1
-#: 1904750b7b7c4049be61957cf953d381 229d38369af24ca68ac19d069491f074
-#: 3ba4e842d13a4766bb00839e6e2d3d81 3c9e521e1f57412c9fe5ffe045c686b8
-#: 4264eb4d39c749dda3e8f8bc8298a8d4 4817816850b7412f93c3191a3ee047c2
-#: 4963a69ede474eeea9534cb4fe1ac9e2 61ff3a1933a049bf9d25120737965152
-#: 6d602eea67264370b5f8f66454fdcf2d 718ce9a3e9c44a3e9bb82001b6c89b90
-#: a29a061057f0478f8d6e4a5946f9a3a1 aa31a3118cc34fe6b640b504fca87fe8
-#: ad5dc656dfd04c58aa10f3a6069f6e31 bab5ddd3037248818c10b9220cdd875b
-#: bf570e3cf1c349c6b95ec627607dca4a c0e2e599600f48468bfc402db14b55b2
-#: e5324d8d9ec3445eb771dabe34edd44b f03a1248b9ca4c8db53e48df96b22f9f
+#: ../../manager/user-api/vfolders.rst:1360 0ddd89ccd8b747868f1df7dfc9ee2b58
+#: 14975d8dc6e14bb6a25e621df452fd3d 1fd830bd61f64dbb9e354df69b795e08
+#: 46624ae48a254998bc7802f84dbb126d 6abec7c8d7e24ba4b83b84596ac07fd3
+#: 7c5154a59ded4e5da7020e1a87950dd8 7e27cf09b82c41fd9c200b79d3c7d291
+#: 8b6ae3aab19d476e802935873992e944 a458eacdf02948cb842802280e69bae0
+#: aeaec44f00e040c98a572743373ecf76 b9366ec2a3f444c1b908a70e1ef2900d
+#: bcee2711efa9431e96e5c226677aebee c35f793905394fa08c5dd1ccded94db3
+#: cd5dafe9e6724362823f4a3952db8666 e070e6f87cad4e0b9e06a5ef720d27b6
+#: e8db184a2a25448e9aa7e703e160721a eec0308e014244aa90b76f5669864f06
+#: f4f824cf14a04c1c9b0576be35de846a fd6db767526742a19db8fdd77ea75964
 msgid "Fields"
 msgstr "필드"
 
@@ -524,23 +497,23 @@ msgstr "필드"
 #: ../../manager/user-api/vfolders.rst:1225
 #: ../../manager/user-api/vfolders.rst:1280
 #: ../../manager/user-api/vfolders.rst:1351
-#: ../../manager/user-api/vfolders.rst:1362 0df6eba1a0904cf3af957af0426365dc
-#: 1e0d7668eaaf4f91abaa9c642531a544 23f59387ef9c43c2ae448121e2019a26
-#: 2e21e2eaf1174eea845299f09f6012c4 329560f44aa3458396a588fc7aabf2bc
-#: 476fcc47b21b4de1b4c46b79bcd6bc84 478d663178de43538c9949476163c2ec
-#: 4e81fd63064f47fb89f1fbe6f67507ce 667ea9ed66c242e181b5a22c5f09be43
-#: 760b64c3368f48959a0f3bc1c8fb4434 8290b6193fa04408bbacdbc4eed1b35b
-#: 8af2a957542c4f6384d2482a90ff865c aac522965bb34cab84694bc88dac27c3
-#: b80fa4f74dc34acab12c1e9c1b4d1b82 ba94bdea6f9843b081fba15c1be250ed
-#: cbafcb23b124453da03e6d6266db15b6 dc6350f362a24a17b4730c19a5a7f1c9
-#: e8973dae06264b2288e0ec7a74b1d279 eba94d8d4caf4917909e76f674a948bf
+#: ../../manager/user-api/vfolders.rst:1362 01ffbed7ebad4630bc59f7041a140358
+#: 0a4f6629c93141d49702d31740ce3e9b 0f639533c3814cc7b6edce060d030bb9
+#: 141d82de8bb24298816c017134c5aa24 15dfce5868fe4a549863f05f8b9808da
+#: 20027fe3b1734190b8e04ea13ada6e97 2a8e900c007f4ae69d7a780eb99e07fa
+#: 437391367c3e4150b0f955d84a3326d7 4f00951accef4a94b914bc470627cd76
+#: 55a6988c1d6d4bd7b033ae1dc62e78d7 635bd6da75c6424a8c4256055ec67e03
+#: 7088178ac5d54487b484ba3335065d43 76bebdd9f9f34a99a341c2be0114f6a2
+#: 77a69c7f96594d058894c95bb5fab2d2 9dce4bd723f54acbb3a83b5083424063
+#: a30f1ad7806e498089b2f394b8c12888 b3ae603c3f204492a55287ffef924d31
+#: cf92a2f7076c4d7684a9dd3f1e9857f4 f0f6483cc2a54cf7a69e7d349ced0cd9
 msgid "Values"
 msgstr "값"
 
 #: ../../manager/user-api/vfolders.rst:67
 #: ../../manager/user-api/vfolders.rst:301
-#: ../../manager/user-api/vfolders.rst:1363 0d1e63ec6af246f4bc131cfa71add986
-#: c422c7f4161d436783a345839b65391d fcb7bd06c3a54e5bb7bcc1e0b9027d7f
+#: ../../manager/user-api/vfolders.rst:1363 63386c050dc44787a00ed47b461e333a
+#: 9738c66824e945c79dced3fc916522f3 d7898dec3ca14dfc925238b51a9362b8
 msgid "(root)"
 msgstr "(root)"
 
@@ -549,16 +522,16 @@ msgstr "(root)"
 #: ../../manager/user-api/vfolders.rst:755
 #: ../../manager/user-api/vfolders.rst:939
 #: ../../manager/user-api/vfolders.rst:1089
-#: ../../manager/user-api/vfolders.rst:1364 01509890d3af4dd4a821b4163b2a4d7b
-#: 02bc1c635abd42ed86f82ff0c336344e 032cb12604944d08a883cf38d6151f69
-#: 42d3b961d5fc4414b683600893e1962b 625771c7495e4cd889977c26cc3a3a1f
-#: ee4b24ea13c84ba7920c6d046d8ed1ee
+#: ../../manager/user-api/vfolders.rst:1364 8c4e022ebe59416997d11ed11065be68
+#: 9366fe5a2adc453ca29d11e3d1a607b8 9e6d0f1327884e48b420cdef15191fa4
+#: a3f3d81bf9c54e9abade7e000d05ab0b b89c89ea3e9e44968f289073d10b09ba
+#: f63f420d588f48c6af7d3fe3ce2cdc94
 msgid "``list[object]``"
 msgstr "``list[object]``"
 
-#: ../../manager/user-api/vfolders.rst:69 faa51e01c73a4a68bfdf2cd09631e4d4
+#: ../../manager/user-api/vfolders.rst:69 7a86f184900e41bfaddc9594a82b3641
 #, fuzzy
-msgid "A list of :ref:`vfolder-list-item-object`."
+msgid "A list of :ref:`vfolder-list-item-object`"
 msgstr ":ref:`vfolder-list-item-object` 목록"
 
 #: ../../manager/user-api/vfolders.rst:71
@@ -566,33 +539,33 @@ msgstr ":ref:`vfolder-list-item-object` 목록"
 #: ../../manager/user-api/vfolders.rst:193
 #: ../../manager/user-api/vfolders.rst:238
 #: ../../manager/user-api/vfolders.rst:1092
-#: ../../manager/user-api/vfolders.rst:1367 0e054df7b2624a6fb58fb194a4a85f81
-#: 1fc2dacd4c5649e4841916f4808b1e8f a0c078649a1644eb98ffa0959d0b3e40
-#: a7b211ad1862417eb735e26811ba44cb c741510a49394f79970c6d3ebebac42f
-#: f979063e666443f9849b0351cd8e768c
+#: ../../manager/user-api/vfolders.rst:1367 0ae3aa3d34ac434e802b575c69553992
+#: 5e823a84a8b041e28ec62f7cf6751015 66b429a2681d41e8926d0c5b25bf14cc
+#: 88f8e7214a5148ed999f95de85e022e6 bae44c1346574b85a0f5b2fb7b1191cb
+#: de08e75492d34e4ca789bd2220631c72
 msgid "Example:"
 msgstr "예시:"
 
-#: ../../manager/user-api/vfolders.rst:97 c3a0191b7dbc48e8b3e01af958f9f350
+#: ../../manager/user-api/vfolders.rst:97 94c77971f90944b784a30be3fffdf941
 msgid "Listing Virtual Folder Hosts"
 msgstr "가상 폴더 호스트 목록"
 
-#: ../../manager/user-api/vfolders.rst:99 82f00e9d67e848e681bb5ed869785a01
+#: ../../manager/user-api/vfolders.rst:99 7b842461a52144dfa21dbcad5c105067
 msgid ""
 "Returns the list of available host names where the current keypair can "
 "create new virtual folders."
 msgstr "새로운 가상 폴더를 만들 수 있는 현재 키페어의 호스트 이름 목록을 반환합니다."
 
-#: ../../manager/user-api/vfolders.rst:104 ad34100b81aa4d63af666d6665dee36e
+#: ../../manager/user-api/vfolders.rst:104 1f970ce24ebc4f21a492d85b7b54ef37
 msgid "URI: ``/folders/_/hosts``"
 msgstr "URI: ``/folders/_/hosts``"
 
-#: ../../manager/user-api/vfolders.rst:110 894e489b17164edc9ee11621f6da094c
+#: ../../manager/user-api/vfolders.rst:110 14bdfca153ca48c6a03469c5e2d32149
 #, fuzzy
-msgid "None."
+msgid "None"
 msgstr "없음"
 
-#: ../../manager/user-api/vfolders.rst:131 4701afe131a7425c9bb587c5281b97f7
+#: ../../manager/user-api/vfolders.rst:131 1dd44298f850474086a27c3dcb033f0a
 msgid "``default``"
 msgstr "``default``"
 
@@ -640,38 +613,38 @@ msgstr "``default``"
 #: ../../manager/user-api/vfolders.rst:1311
 #: ../../manager/user-api/vfolders.rst:1314
 #: ../../manager/user-api/vfolders.rst:1317
-#: ../../manager/user-api/vfolders.rst:1321 02ec4fb3e4564ddeb5b3ad1dcf858671
-#: 04399f7d3fc1488ba9ee05f02d6d1cfe 043ade1fb3624ba6bbe4ef5ead2382c5
-#: 0c556193765244c79ea8a5542bbb56b7 20d26a016e9b4db5afd230374384491d
-#: 22abe5f67c3a43c98e5660830cbadd23 23fdd6443f2d488cb8ae47e0e2745f80
-#: 2580023a56ff4e3d8a32b21a6cdf59b0 315dd0dd942f4a8185218afb819f8dca
-#: 3e677767f2b54ad7abd08420ff960f4f 420c00352df64830b97864f122ba95d7
-#: 45f97caf91bb4a10abd28e2939026a5f 4e0e615ced43446db4cf77beb49a346e
-#: 60761f98c26d4f6db243abd2f2471011 694f824a9c4a435c988bae7529c68749
-#: 69cb740e5472493bbdc7baaa9ce5957c 6e33152bc21343d9b67c1816bbd52b7a
-#: 6fdeb9e909864b548298f9bbf83ffbf5 718019e9eeff492bad79772de3d028fa
-#: 7a53913f098f42f782e08d054be95e03 7d67cf181fa948aea257d5c2c2c33e30
-#: 8429a4048f8e40c28d860488663c7124 a88bcfa9ea874a8ea385703bd7ccdbd5
-#: a9bed199e5514bbc904181ce36261186 acef19f6824c406d8cd9197b8bd0b7ae
-#: ad8bd7f606cb4826ad40e68ea867cd35 ad9ab0c995c84ad3a02c32d239971db4
-#: aedaca7e72b24cb39ccba123ef89e9a1 af75a660f3134265bd3ccc60174048af
-#: b00da797199243ba93e3007de2b92ea9 b15553948c3d4d6394c413d7e2525ee6
-#: b78031c80c2f463b9eb289580effbea6 bbc3d98d907a4c19a0f64c8b769fb71a
-#: bf951fe5037b490aa067ce9030dd7a4d c091f6243753456dbb0c21d2797643d1
-#: ce15ea6b13ca4ad59323e5e1416afd78 cf777db83d7b47e8b9a7eba834a02a24
-#: d78b395d479c42d08e24f87fe356a1be db06bd3b33bd4821acd4fc2657b278fe
-#: dbce33e738134a558f06a3653fd6753d f37a2d85642e4bef9c85cd8cc3c92586
-#: f3d9f764333c4d83a672f3c1923bf558 f67802cd583d4481bc156382e09ed2f0
-#: fa4799340d634b5fafea629c85da9f77 fd06b6a9724446f8805483d9a71733d1
+#: ../../manager/user-api/vfolders.rst:1321 015ce576f2ce4161b26833cab41bd685
+#: 0179db9a24854eccb3bc7da37871ddca 060523b982e84c27a60df06d0b90dfdb
+#: 11ff182772af4d7182737e83da8831a5 13acd0ef3d4a4cf2b799f60632b70b2f
+#: 142108a17ef441b79667545e53bffa31 18c022db9309479d9620a27b80e02511
+#: 1bdd7ad58b4d4e908292cce44d244164 1db834b90691430d93490453b9b2335a
+#: 2912d385a4fb40fa92b502471d58902d 30d9f777879e40d3bca6f9fbcbd85302
+#: 3805f4bfb405444aaf4a64f8fdc92735 38a2c7fde7754e31a35977421ad6e2c3
+#: 4f249b28127e46e1b2c9f0eb46a432bc 4fc119bbade3475c8ae17ec19debc15c
+#: 57b720121ff445feae7c54e047e5a15d 58ce50c032694d6ab455a8eed5c17cd2
+#: 5968c240709f41dcaf32490c60587abf 65d7032920904a8e8b17e73d8ed31711
+#: 66e7f30519a148c683adb68c15cc7ace 791a8bca7b4b4af5b6e804ac222207e0
+#: 7d6b8920bc8f464e8903efb1c7dc31dc 81cdc93c308e4890ae9e727c7bf65cf7
+#: 8c5a535ee02c45a5ba7f31bc623aa311 96f6ae4e4f2c41c7af518f2f2fae49a2
+#: 9856cefd236a41b2b2581bbb9a7a1727 9bed9a3eb23c408cb1c51824b2102e56
+#: a3ef448dbc2e4bd29ae43a3519f9f1e2 a4e3066eb1a843b3aeb9e779a858db1f
+#: a72253a5bf2046caa36487da9b40f403 ac188bffcba94803bf75f88ef8d414d8
+#: bdd94c6962b84d88abb860a12c54c46e c025acc9685a4d94bb2dee04630196b4
+#: c9ae9d6b1def48d6955d4cc94fb81d23 ca9f41c8f18c4f6fa5768a60dc754882
+#: d78555e681094f16857ed287ceff8637 d8a2dbe14f2445fdab67c2836baeb8b7
+#: ddaa33f344144ba7b862407684f86b5f e323dd3471154ab79edb47b929b8ce0a
+#: e41a05cd7ceb462287c37d4fc7461475 e4e6599ee5e94cce8bb56ba706d9c778
+#: f6398ed2d2084085a707007db37a3262 f681b039f7684df5a6f95f5845070584
+#: fbc5cf8283b54faeb44e738d47230dbc fdacc4d6aa8243c681b03ba695ca1eb5
 msgid "``str``"
 msgstr "``str``"
 
-#: ../../manager/user-api/vfolders.rst:133 cc90752a19454a418fd003112cbb8e4b
+#: ../../manager/user-api/vfolders.rst:133 66b01f1d3d6d40fbad40018f77e9bcbb
 #, fuzzy
-msgid "The default virtual folder host."
+msgid "The default virtual folder host"
 msgstr "기본 가상 폴더 호스트"
 
-#: ../../manager/user-api/vfolders.rst:134 b3c9440afeda4eee94061fbf625ac9b2
+#: ../../manager/user-api/vfolders.rst:134 23ab14659cf34bc9a853286765f4e3ea
 msgid "``allowed``"
 msgstr "``allowed``"
 
@@ -681,19 +654,19 @@ msgstr "``allowed``"
 #: ../../manager/user-api/vfolders.rst:1227
 #: ../../manager/user-api/vfolders.rst:1255
 #: ../../manager/user-api/vfolders.rst:1282
-#: ../../manager/user-api/vfolders.rst:1353 13ce2f3e7d4d42af8cb8d1e8eb51fab3
-#: 5bbfd33428aa4f2087ea96a6e33d6a2a 92b657df2296471486e9b8c5c504d704
-#: c86cea09341f4351b751597999406729 e0d5ee5dfe24402c82635ed00ddc8040
-#: e4eafde237584b02b9c7d80e3ada2782 f0140a0a07ae412f9e902beacd2bd50e
+#: ../../manager/user-api/vfolders.rst:1353 0b32c154992144839805d73626b5f554
+#: 5a43535de2bb46fab8612d6e83181dc1 5bd288051b0f4f789c2123f044cd50f4
+#: 998e06809c1d460a94d52735e669c996 a4ac5c80498d4225a11eb0a69c5ccfb4
+#: a65acea7f8884d609b6cdb3c930c55dd e10e269ce0424d2092c074e35b03ea4e
 msgid "``list[str]``"
 msgstr "``list[str]``"
 
-#: ../../manager/user-api/vfolders.rst:136 5f941d7619a943e0a92f81cbde10c285
+#: ../../manager/user-api/vfolders.rst:136 7ea7a9f9c2d34c70a6dddf1e8016e579
 #, fuzzy
-msgid "The list of available virtual folder hosts."
+msgid "The list of available virtual folder hosts"
 msgstr "사용 가능한 가상 폴더 호스트 목록"
 
-#: ../../manager/user-api/vfolders.rst:149 8956a1396e1d48c4b9f0f195d5c556dc
+#: ../../manager/user-api/vfolders.rst:149 3e1fd1c73c264dedac1a397153f82e55
 msgid "Creating a Virtual Folder"
 msgstr "가상 폴더 생성"
 
@@ -709,26 +682,26 @@ msgstr "가상 폴더 생성"
 #: ../../manager/user-api/vfolders.rst:1004
 #: ../../manager/user-api/vfolders.rst:1116
 #: ../../manager/user-api/vfolders.rst:1181
-#: ../../manager/user-api/vfolders.rst:1292 01ec4ded164a47f8b8069253d66383ad
-#: 06be23d02ca64b6b940ad9091f20c6b2 2ea00467940d4b21b4e837d9bfa8a24a
-#: 37aca76aa4f5450e910697c67349f59a 48c7c41d2643494c80d191c4b3c89a00
-#: 4d84d3e688184b3dad7ec333a7c4ad63 58278aa71a57484ba68a6e68c6dddfb3
-#: 94d2274060384c0dab9875e499bafab3 954b6ef70f704b13836936e8f72464d0
-#: ae24fa1402924cd2af5cedece47842f6 df01c6182a8542a99b1534357ee258c2
-#: e537ea839fdd456798bfd8433b10d132 fe9f89ffa7384064ae582462eafed77f
+#: ../../manager/user-api/vfolders.rst:1292 1ce7586a64274df5a9c3957fe1aa0a2d
+#: 2257703218ff4752b694363d2530d3de 2299e5744dc34773ae9578ee629704ea
+#: 2e62601581c1481e9bbf17adb37a5447 31580a881fdf4d0fac54ad8d6574d34a
+#: 52d3980412d54d7cbeda86c2f136f9ac 54af974bb10e40cdb5e08e4ef9020d18
+#: 5e291a95fd3a4660b956cefb5492a6f4 751b8ebe393c406889c33ba64c2f343b
+#: 8aa4bbd811db4e69876feb7b883b243c b2d24e65057941ff90265780c3d8e55b
+#: dddfa92193584c45a327cbef7874a678 f28a29c78498424a8a226cfb7e1bdda2
 msgid "Method: ``POST``"
 msgstr "Method: ``POST``"
 
-#: ../../manager/user-api/vfolders.rst:154 499d3523b1484b759f40b6d395cdb0e6
+#: ../../manager/user-api/vfolders.rst:154 e8bf6fcfbdfe44dc9c31222ee08af85e
 msgid "Creates a virtual folder associated with the current API key."
 msgstr "현재 API 키와 연결된 가상 폴더를 생성합니다."
 
 #: ../../manager/user-api/vfolders.rst:167
 #: ../../manager/user-api/vfolders.rst:230
 #: ../../manager/user-api/vfolders.rst:275
-#: ../../manager/user-api/vfolders.rst:333 0375432b99a446668a91c928822331d0
-#: b55d7668e0f6452389f460a60677b326 e92d2aecbbd44721b2a215a0a21b8a02
-#: f89edf43d0c349c185067b17e4cdb3cb
+#: ../../manager/user-api/vfolders.rst:333 3863a14585234dffa786a9818878a0be
+#: 6a2f4c96cf7b4d94be3eb3c285521d3b c6c30e39d9104c90a41c732e66475ec9
+#: e405ff3b7df84adcb89909094abb3bf4
 msgid "``name``"
 msgstr "``name``"
 
@@ -738,7 +711,6 @@ msgstr "``name``"
 #: ../../manager/user-api/vfolders.rst:373
 #: ../../manager/user-api/vfolders.rst:414
 #: ../../manager/user-api/vfolders.rst:471
-#: ../../manager/user-api/vfolders.rst:531
 #: ../../manager/user-api/vfolders.rst:586
 #: ../../manager/user-api/vfolders.rst:649
 #: ../../manager/user-api/vfolders.rst:694
@@ -746,37 +718,37 @@ msgstr "``name``"
 #: ../../manager/user-api/vfolders.rst:1018
 #: ../../manager/user-api/vfolders.rst:1195
 #: ../../manager/user-api/vfolders.rst:1253
-#: ../../manager/user-api/vfolders.rst:1306 032c778968da42acbd94190b763d8873
-#: 2b2cb66ce2e14ad38820b7a315febaa1 3d9c679c26fe4d86a1ab8f410cedceaa
-#: 848fa5e3a88441fb8eafa0f6b42c66a1 86311de04d3d4b818c3f9becd1890529
-#: 876c0460a4654a29bdbda909d44642e7 8e20e8e5931742eb9009de50ec1a18ee
-#: be18c4fb42fa4bd195b2df0573bc41b4 c22e65dc40274fcc9d48fd6a80e5533e
-#: cc7ca3e7e28446c9b5061a4ddee402a9 d915374babef491caf92c5dd320fa768
-#: e3263e65756542f9ab729758f93b8c29 e7c7d8948c33489bba1c5f5553fe613f
-#: f19cfbf6fcd04afa8f154002aa04e201 f309bb48fdf7439a9585c2c81edb869d
+#: ../../manager/user-api/vfolders.rst:1306 1fd489759ccb4819ab652e1cfe557738
+#: 22c9ed6dff9b4656b8b381f5dd3dcc7a 2639b25789a3446f8f174b3006321879
+#: 333a6977a53c46ee8bdd4aed9bff523d 61056b8bb5bb43368c0e0ac7253d4021
+#: 6c66e24216e345e183466d9557d6060a 95b268fa9b49498484770181156bc02c
+#: 9861c84b351e4730a4ecabd5058a4c52 a07b5838e17b49faa163c69897daf6a1
+#: a9893e760ffe44ca86c20663779ded7b b3e1e08d411b4840a21ace288ccd19f1
+#: df5ba401bfac47f586e6431646cea0f0 efeb6ded153f42909973b1240be6e2b1
+#: fcaa1771fba84117a1cc5c4ed57db6bf
 #, fuzzy
-msgid "The human-readable name of the virtual folder."
+msgid "The human-readable name of the virtual folder"
 msgstr "사람이 읽을 수 있는 가상 폴더 이름"
 
 #: ../../manager/user-api/vfolders.rst:170
-#: ../../manager/user-api/vfolders.rst:233 259997e2a866421da9b030263b6d7556
-#: dabb2d598ff54b5a80d95cbc122a2474
+#: ../../manager/user-api/vfolders.rst:233 3a31372fb25946e1bb06c35b2f544c97
+#: f6f9277d8dfb48418bfae8bc5d55d6d1
 msgid "``host``"
 msgstr "``host``"
 
-#: ../../manager/user-api/vfolders.rst:172 ab6bf183ca804249a57c753b037d36b1
+#: ../../manager/user-api/vfolders.rst:172 57af0f1531e34d939f1b4e998decdaaa
 #, fuzzy
-msgid "(optional) The name of the virtual folder host."
+msgid "(optional) The name of the virtual folder host"
 msgstr "(선택 사항) 가상 폴더 호스트의 이름"
 
 #: ../../manager/user-api/vfolders.rst:173
-#: ../../manager/user-api/vfolders.rst:1316 af764096b2fc4c358d0348c05907b0f8
-#: f325871766244d08bc9740145c01794a
+#: ../../manager/user-api/vfolders.rst:1316 6a40a8ea7f854f56a44d46185af80b84
+#: 954c0d28b23346a0972d0bc1dcdbcd81
 #, fuzzy
 msgid "``usage_mode``"
 msgstr "``mode``"
 
-#: ../../manager/user-api/vfolders.rst:175 95cf917efc0a41fcb459d413f94e7f45
+#: ../../manager/user-api/vfolders.rst:175 292c231955d544aca10898e858be66de
 msgid ""
 "(optional) The purpose of the virtual folder. Allowed values are "
 "``general``, ``model``, and ``data`` (default: ``general``)."
@@ -786,13 +758,13 @@ msgstr ""
 
 #: ../../manager/user-api/vfolders.rst:177
 #: ../../manager/user-api/vfolders.rst:1196
-#: ../../manager/user-api/vfolders.rst:1320 0c28a1de0a5447398687a750378093ad
-#: 47d81a7c531242719ca7147278ae7a77 670788bb30694670b4bccb2b8e9592e4
+#: ../../manager/user-api/vfolders.rst:1320 6bcd76b0fa8d4ef6b536c2aaf2296a73
+#: 74198c7333a4405ca818ad861bfc9511 7546d8ae12f940028c24cf29a0e25a25
 #, fuzzy
 msgid "``permission``"
 msgstr "``sessionId``"
 
-#: ../../manager/user-api/vfolders.rst:179 8b99da2fd3894a348fd2dc24c69bd4ab
+#: ../../manager/user-api/vfolders.rst:179 d064ab66f8e1467ca4a3c94f14fb8519
 msgid ""
 "(optional) The default share permission of the virtual folder. The owner "
 "of the virtual folder always have ``wd`` permission regardless of this "
@@ -802,7 +774,7 @@ msgstr ""
 "(선택 사항) 가상 폴더의 기본 공유 권한. 가상 폴더의 소유자는 해당 매개 변수와 관계없이 항상 ``wd`` 권한을 가집니다. "
 "가능한 값은 ``ro``, ``rw``, ``wd`` (기본값: ``rw``) 입니다."
 
-#: ../../manager/user-api/vfolders.rst:185 0504084a50634f5aade66c2c9197ee45
+#: ../../manager/user-api/vfolders.rst:185 b19b08ebd5744a6386b965a0d8092bf2
 msgid ""
 "(optional) If this parameter is set, it creates a group-type virtual "
 "folder. If empty, it creates a user-type virtual folder."
@@ -810,18 +782,18 @@ msgstr ""
 "(선택 사항) 해당 매개 변수가 설정되면 그룹 유형의 가상 폴더가 생성됩니다. 만약 비어 있다면, 사용자 유형의 가상 폴더가 "
 "생성됩니다."
 
-#: ../../manager/user-api/vfolders.rst:187 ecc025437453403c8ba9a151b555b825
+#: ../../manager/user-api/vfolders.rst:187 127ca6ad26b645bbbdaab553e024ef74
 #, fuzzy
 msgid "``quota``"
 msgstr "``result``"
 
 #: ../../manager/user-api/vfolders.rst:188
-#: ../../manager/user-api/vfolders.rst:476 333455bee0f5429baa90619a205f252a
-#: c5e3244045354323a2d4af5d429d1c9f
+#: ../../manager/user-api/vfolders.rst:476 21b6b948056346d5907da090a943c4df
+#: b3ca392a02484d5f90b060097ce1a43e
 msgid "``int``"
 msgstr "``int``"
 
-#: ../../manager/user-api/vfolders.rst:189 d4bf6abcd8b94ac19bd89695c1dd68d0
+#: ../../manager/user-api/vfolders.rst:189 b403a5f828f740498aca3a6caf7830b9
 msgid ""
 "(optional) Set the quota of the virtual folder in bytes. Note, however, "
 "that the quota is only supported under the xfs filesystems. Other "
@@ -834,13 +806,13 @@ msgstr ""
 #: ../../manager/user-api/vfolders.rst:211
 #: ../../manager/user-api/vfolders.rst:387
 #: ../../manager/user-api/vfolders.rst:552
-#: ../../manager/user-api/vfolders.rst:1212 07e2b39b4fa347868596876bf4d73701
-#: 5256ffc54cf647d38826597bd843a4d6 bb5064fd4c3c428faefc4b1ec851bc93
-#: f10f5dff493240be9a12c91a6f212065
+#: ../../manager/user-api/vfolders.rst:1212 199c81208f064d2d926fd8fb0028e815
+#: 20ca78fa81984ad2b42a69350bab0f60 dc01f1cbbd9b4d15978ab08990ac46e1
+#: dc1b6a12891146beb1280fa542ae1d60
 msgid "201 Created"
 msgstr "201 Created"
 
-#: ../../manager/user-api/vfolders.rst:212 6fc8d767ee104c25ae37b10051ef72a2
+#: ../../manager/user-api/vfolders.rst:212 21f31ab800064f7997ee6b58436d6487
 msgid "The kernel is successfully created."
 msgstr "커널이 성공적으로 생성되었습니다."
 
@@ -854,66 +826,66 @@ msgstr "커널이 성공적으로 생성되었습니다."
 #: ../../manager/user-api/vfolders.rst:1149
 #: ../../manager/user-api/vfolders.rst:1214
 #: ../../manager/user-api/vfolders.rst:1269
-#: ../../manager/user-api/vfolders.rst:1338 30064f6369bb42f3a2d9137cddca0f76
-#: 3e5439ab45394325b52030512cd0e952 461542ebdb854186a289bdc110090b9e
-#: 4832d514707a473ea4eb59ef239d8128 61e58edf313c42de961e178644efdb33
-#: 65603f263d6b4d588ca37fde9496e84b 768cdd9945734a7988e2c67ce042e4da
-#: 7edd19082bcb41598c92f23a9bf904d2 a0218dcff11b4823922079a129c1e613
-#: a164fbb1f0264409ac60937d18569115 a26e005a927f47c3986f76c49beeee11
+#: ../../manager/user-api/vfolders.rst:1338 38d70c978453440ebc21b2deb0e25cf0
+#: 40dfdd2acda94984a713493930b352b6 46d099c0f54341e9b5de4bfc9d48ba03
+#: 5ae47e7023974b5eb3fe5fbd54076743 7182715190084628adb455a4bfa20438
+#: 8f199945cffe4dee9e147f7a5a386195 907731eccb3142be8fb2f68a85a8f12a
+#: 9fc52917a7484d0e99b3530e0db424fb a944877f79c449f0a21dd85b5bee0891
+#: d67fc06b413c400d96f9e065722ca9e3 f4f674977bb145b9af4ef4feb163b7ce
 msgid "400 Bad Request"
 msgstr "400 Bad Request"
 
-#: ../../manager/user-api/vfolders.rst:214 487693d1f27c41d3979077a4996202d7
+#: ../../manager/user-api/vfolders.rst:214 2189345d1f3c408781b263cd3147aaf0
 msgid "The name is malformed or duplicate with your existing virtual folders."
 msgstr "잘못되었거나 이미 존재하는 가상 폴더와 중복되는 이름입니다."
 
-#: ../../manager/user-api/vfolders.rst:216 6ab54c1cf13e4a35964d0100b5d59af2
+#: ../../manager/user-api/vfolders.rst:216 80ab59aa91ed415a8c7a9830fbf689a4
 msgid "406 Not acceptable"
 msgstr "406 Not acceptable"
 
-#: ../../manager/user-api/vfolders.rst:217 8f754e8298884ec4b28f07feb6d822f9
+#: ../../manager/user-api/vfolders.rst:217 e1339ef878c846f8b694e407c054043d
 msgid ""
 "You have exceeded internal limits of virtual folders. (e.g., the maximum "
 "number of folders you can have.)"
 msgstr "가상 폴더의 개수 제한을 초과했습니다. (예: 가질 수 있는 최대 폴더 개수)"
 
-#: ../../manager/user-api/vfolders.rst:227 b84911113677442b8ddce811b610c917
+#: ../../manager/user-api/vfolders.rst:227 b7d7324e2dab43b0986d8f436e4dedb4
 msgid "``id``"
 msgstr "``id``"
 
 #: ../../manager/user-api/vfolders.rst:228
 #: ../../manager/user-api/vfolders.rst:836
-#: ../../manager/user-api/vfolders.rst:876 6419b85851514b85be54c1ab2e9fad17
-#: aff6b8f92b5241ea941d75aedfd2cd20 f0ba49a59de2473b85bfb77ef96a0263
+#: ../../manager/user-api/vfolders.rst:876 470379b8e95c426abb04ec859a419724
+#: 9736acffad67403289531653e18c0a88 d0fdf8344611432098dca2d176a7bb4f
 msgid "``slug``"
 msgstr "``slug``"
 
-#: ../../manager/user-api/vfolders.rst:229 f49b497954594ab891808056344dcc5f
+#: ../../manager/user-api/vfolders.rst:229 b48a2db86c254a04bcb7d6700c4b4885
 #, fuzzy
-msgid "The unique folder ID used for later API calls."
+msgid "The unique folder ID used for later API calls"
 msgstr "이후의 API 호출을 위해 사용되는 고유한 폴더 ID"
 
-#: ../../manager/user-api/vfolders.rst:232 c1d5b3ef21304f48b607333904d8813a
+#: ../../manager/user-api/vfolders.rst:232 ff80d25963214c9caeb2de27eb8e48a5
 #, fuzzy
-msgid "The human-readable name of the created virtual folder."
+msgid "The human-readable name of the created virtual folder"
 msgstr "생성된 가상 폴더의 사람이 읽을 수 있는 이름"
 
-#: ../../manager/user-api/vfolders.rst:235 99a448630e474dc2b820af066f0dafcb
+#: ../../manager/user-api/vfolders.rst:235 d82f400dddf74974b1693824f540b6b7
 #, fuzzy
-msgid "The name of the virtual folder host where the new folder is created."
+msgid "The name of the virtual folder host where the new folder is created"
 msgstr "새 폴더가 생성된 가상 폴더 호스트의 이름"
 
-#: ../../manager/user-api/vfolders.rst:256 b5d2ea48ad194e3db2db47cad9448972
+#: ../../manager/user-api/vfolders.rst:256 1b178d6faae24bb39f3bdcf33a518433
 msgid "Getting Virtual Folder Information"
 msgstr "가상 폴더 정보 얻기"
 
 #: ../../manager/user-api/vfolders.rst:258
-#: ../../manager/user-api/vfolders.rst:309 63f5790bc2be4926ad2edbf21394b528
-#: e85f57677cc34c278823dd5b38ecac14
+#: ../../manager/user-api/vfolders.rst:309 6e74179f0e3846249aef686c56bcb81b
+#: f580a27ce9fc438aaa73e1cc2e6e57ed
 msgid "URI: ``/folders/:name``"
 msgstr "URI: ``/folders/:name``"
 
-#: ../../manager/user-api/vfolders.rst:261 2a031ba9389844059160d2448b779b1d
+#: ../../manager/user-api/vfolders.rst:261 58712191978744b0b03b18ca67216ecb
 msgid ""
 "Retrieves information about a virtual folder. For performance reasons, "
 "the returned information may not be real-time; usually they are updated "
@@ -922,7 +894,7 @@ msgstr ""
 "가상 폴더의 정보를 검색합니다. 성능상의 이유로, 반환된 정보는 실시간이 아닐 수 있습니다; 보통 서버측에서 몇 초마다 "
 "업데이트됩니다."
 
-#: ../../manager/user-api/vfolders.rst:289 5f939ea575074539b38c43cdce50a3ea
+#: ../../manager/user-api/vfolders.rst:289 2b8f8d106bde43f98b55280a390ada6d
 msgid "The information is successfully returned."
 msgstr "정보가 성공적으로 반환되었습니다."
 
@@ -942,85 +914,85 @@ msgstr "정보가 성공적으로 반환되었습니다."
 #: ../../manager/user-api/vfolders.rst:1151
 #: ../../manager/user-api/vfolders.rst:1216
 #: ../../manager/user-api/vfolders.rst:1271
-#: ../../manager/user-api/vfolders.rst:1342 03860dc0e7174ce997f63ec16009cc6d
-#: 0857634fc2b541428ecea803ac944460 16edef99c259466d8a4c2c37ebc0e653
-#: 207ddbdd5ec44a70a411df927ed0daff 218d75c24462434fbedf68d0a2f751a8
-#: 2e170a2c69464aac97f46f8d2ef993cd 31066bd2da9d4f73aecffff514b5e53c
-#: 3588828091644dae907692585e6f46e6 36143874ba284262a4e32fd1b07c47fa
-#: 4a6873c88f1b4620a34e546a63ef963e 704d62f70fb6405b9b702e1800e1eacd
-#: 7b6d06e627104ff89659641c18503299 851948a28f5642f7944772a6a03659da
-#: 8825b4e5f71648cc9e270d5d2fe7e1c3 95089a484dbe48deb560800954b04f03
-#: bea2fe2490dc45c091d72e89050323c3 f834f189678e428ebc1b8013d79e3a70
+#: ../../manager/user-api/vfolders.rst:1342 03ba002aaa674951b173c1f00b7cfccd
+#: 0e2ac9767503414cbd48924fddc6f2ac 2b71aff95cd244d8a128d7744f5771b0
+#: 40abc5380fd74713955c47795840301c 60831547b6b646c6924b37b87ffb8570
+#: 83d0fd7ff14f45f0a6e935dde07abd71 8416ae3cec7c4673acd7ccbf27490e16
+#: 9e756b0ef6a645c2850d7d63248d7d37 b705e6fcc1ea48cf9a0ccb9c1938964f
+#: c8859c63b6be451baacdcded6acb913c cd09771bd5d84072828b77e6c7110924
+#: cdf4df52a8da4e94a8597a4813091fb9 d297b3af271d470dbd0c2acfbe6b4e44
+#: d736188b86cd455a967f91d89a60be09 e0f68a91c7334c4c9d0bd497b5917f64
+#: e34bfe9c5aa642f0a414f222a17fa88f f4b487c85e054f80a1a9e54a5e4345f4
 msgid "404 Not Found"
 msgstr "404 Not Found"
 
-#: ../../manager/user-api/vfolders.rst:291 fde19c9f5ee84083b22180b642b3e43c
+#: ../../manager/user-api/vfolders.rst:291 9706d6184c4f49b789930346fb531b57
 msgid ""
 "There is no such folder or you may not have proper permission to access "
 "the folder."
 msgstr "폴더가 없거나 폴더에 접근할 적절한 권한을 가지고 있지 않습니다."
 
-#: ../../manager/user-api/vfolders.rst:302 2285013e75384344a2eab48437ceae28
+#: ../../manager/user-api/vfolders.rst:302 a76055442e3f4c669697d03bf1bccd05
 msgid "``object``"
 msgstr "``object``"
 
-#: ../../manager/user-api/vfolders.rst:303 4d275bf1e90f4c20b7aae94ba0d69dba
+#: ../../manager/user-api/vfolders.rst:303 ca1e62d525594408907d97e1164df33a
 #, fuzzy
-msgid ":ref:`vfolder-item-object`."
+msgid ":ref:`vfolder-item-object`"
 msgstr ":ref:`vfolder-item-object`"
 
-#: ../../manager/user-api/vfolders.rst:307 a49e8051daef4f379fe07fd6b32e9abf
+#: ../../manager/user-api/vfolders.rst:307 b64653da36fa4c6f87ae29ff74098d67
 msgid "Deleting Virtual Folder"
 msgstr "가상 폴더 지우기"
 
 #: ../../manager/user-api/vfolders.rst:310
 #: ../../manager/user-api/vfolders.rst:635
 #: ../../manager/user-api/vfolders.rst:863
-#: ../../manager/user-api/vfolders.rst:1239 08e7563c76ae45ea9e78765f0019a01c
-#: 64eb127b40c14505914d2b86f3c1d437 907aae2de8f647ee844dcf0b6a73a946
-#: d883674e10674bf2828cf70c234bb925
+#: ../../manager/user-api/vfolders.rst:1239 11afa532f1224429a30cd93e4bb45841
+#: 20c44a05f3b4481290b7af0b5b452564 210c16ae8f214ea189db5fb8031b4be6
+#: 66ecf666164842ee9dd72c505bf4bd57
 msgid "Method: ``DELETE``"
 msgstr "Method: ``DELETE``"
 
-#: ../../manager/user-api/vfolders.rst:312 0034886cdc60468288651ff2fb72a3a8
+#: ../../manager/user-api/vfolders.rst:312 8414d4e6b43b46de974019d40a5b40ca
 msgid ""
 "This immediately deletes all contents of the given virtual folder and "
 "makes the folder unavailable for future mounts."
 msgstr "주어진 가상 폴더의 모든 내용을 즉시 삭제하고 미래의 마운트에 폴더를 사용할 수 없게 합니다."
 
-#: ../../manager/user-api/vfolders.rst:317 ad6c943f8007421cb682fcf0720915c6
+#: ../../manager/user-api/vfolders.rst:317 70f201be2ce94c5fa77e4789f3a4e713
 msgid ""
 "If there are running kernels that have mounted the deleted virtual "
 "folder, those kernels are likely to break!"
 msgstr "실행 중인 커널 중 삭제된 가상 폴더를 마운트한 커널이 있다면, 해당 커널은 오작동할 수 있습니다!"
 
-#: ../../manager/user-api/vfolders.rst:322 2c2d0eefbdbb4e3aad2d1eb5432ba509
+#: ../../manager/user-api/vfolders.rst:322 5770145aba394e21bbe4e91d9ad38e46
 msgid "There is NO way to get back the contents once this API is invoked."
 msgstr "이 API가 호출되면 내용을 되돌릴 수 있는 방법이 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:345 237c2df6b2ce442699c96f167b967f61
+#: ../../manager/user-api/vfolders.rst:345 e744697495ee422dbecc8f90043ad8c8
 msgid "204 No Content"
 msgstr "204 No Content"
 
-#: ../../manager/user-api/vfolders.rst:346 3045192b12d34b078e96fa97fbc9dcef
+#: ../../manager/user-api/vfolders.rst:346 5cbbb4092fef4b32acbb905d54ef717f
 msgid "The folder is successfully destroyed."
 msgstr "폴더가 성공적으로 삭제되었습니다."
 
-#: ../../manager/user-api/vfolders.rst:348 9db7556f9d694f3aa6bfd57a4e535804
+#: ../../manager/user-api/vfolders.rst:348 179dfd66f73b405ebf2f7b0259d31992
 msgid ""
 "There is no such folder or you may not have proper permission to delete "
 "the folder."
 msgstr "폴더가 없거나 폴더를 삭제할 적절한 권한을 가지고 있지 않습니다."
 
-#: ../../manager/user-api/vfolders.rst:353 a7ac853e0abc4e47b98d9403790481ef
+#: ../../manager/user-api/vfolders.rst:353 9721345f7a1b4325b99e34684cee7dc7
 msgid "Rename a Virtual Folder"
 msgstr "가상 폴더 이름 바꾸기"
 
-#: ../../manager/user-api/vfolders.rst:355 04bbdb4a9a0f439aa35351b33240d8be
+#: ../../manager/user-api/vfolders.rst:355 a1d2204609844b0ab212d92d81d16786
 msgid "URI: ``/folders/:name/rename``"
 msgstr "URI: ``/folders/:name/rename``"
 
-#: ../../manager/user-api/vfolders.rst:358 b7a60225637046868d9a66a4ae5b0fcc
+#: ../../manager/user-api/vfolders.rst:358 5300ff7f0da14d9d85d89cba4c7b6be4
 msgid "Rename a virtual folder associated with the current API key."
 msgstr "현재 API 키와 연결된 가상 폴더의 이름을 바꿉니다."
 
@@ -1035,88 +1007,119 @@ msgstr "현재 API 키와 연결된 가상 폴더의 이름을 바꿉니다."
 #: ../../manager/user-api/vfolders.rst:1016
 #: ../../manager/user-api/vfolders.rst:1193
 #: ../../manager/user-api/vfolders.rst:1251
-#: ../../manager/user-api/vfolders.rst:1304 0d6c0717a7f84fb4b9391884d5606ed0
-#: 0f45ac5eed9944a8b90e6a1ac093a465 16c1a0aded8d4667b46cea2b67913477
-#: 4b42d24e2fce4a588a53c679f4dca1e1 8ac85cab203643fd81fa365967193d67
-#: 8c0a14bdace84289bca6ae04630599c3 a782a8f1e9d346779d82d00279538815
-#: c1f1159cadf24ab4a3f552ab4ee93452 d92b01ee1d1840d59bcf2613a525d6b5
-#: eff7330b7deb4b69a656b19fb7f49469 f09537ce2bae4a058bcdb0cf370b2861
-#: f8126a3b69844cccafc1174645854820
+#: ../../manager/user-api/vfolders.rst:1304 061064ca06d245db8a01a14a05787f08
+#: 317c13c99bf54a46b035eed55be2125d 578273d3aa2c490aa02614495c8290dd
+#: 6c6499c3147448ee9db1550335c5ba00 6e772ad3fcfa4d8a9b7e60db7f704dcb
+#: 71f0a952b6aa477d8528c8bce1554994 7b8cc9b86e4d46ffb259ebe96e073dc2
+#: 80a9af8d3d8f4f218613e3300a953afa 86d4d529e9f3414399b89a89aeef017b
+#: a8e4529e02d142c5b9b0cecde5f4b2b9 b96e069af9a94bea93ecf8d5ab673bc2
+#: f0e1ae7a80a340408d503fcd1066fccc
 msgid "``:name``"
 msgstr "``:name``"
 
 #: ../../manager/user-api/vfolders.rst:374
-#: ../../manager/user-api/vfolders.rst:698 84169a951ac540858d1c3e5c7773174f
-#: aca33d0c22024882bfb1d2121029d74b
+#: ../../manager/user-api/vfolders.rst:698 4ccb4bfa14904a86a9707c6f9250b2d3
+#: daa624ddc80b465fa3a6617193ba76c8
 #, fuzzy
 msgid "``new_name``"
 msgstr "커널-종료"
 
-#: ../../manager/user-api/vfolders.rst:376 29066cbb08fa4dc486988dc1771fe8df
+#: ../../manager/user-api/vfolders.rst:376 defc0c3a93e54cdbbb3e512ec3c3dffd
 #, fuzzy
-msgid "New virtual folder name."
+msgid "New virtual folder name"
 msgstr "새로운 가상 폴더 이름"
 
-#: ../../manager/user-api/vfolders.rst:388 1163b2a7daa64047acc642aa797d655a
+#: ../../manager/user-api/vfolders.rst:388 62f92280d86f4f6881e21d9fcf27f420
 #, fuzzy
 msgid "The folder is successfully renamed."
 msgstr "폴더 이름이 성공적으로 변경되었습니다."
 
-#: ../../manager/user-api/vfolders.rst:390 f458ec5aaec640ca991823f4a0a3ecec
+#: ../../manager/user-api/vfolders.rst:390 0c410ef9fe844892836ea6ecfb872cba
 msgid ""
 "There is no such folder or you may not have proper permission to rename "
 "the folder."
 msgstr "폴더를 찾을 수 없거나 폴더 이름을 바꿀 적절한 권한을 가지고 있지 않습니다."
 
-#: ../../manager/user-api/vfolders.rst:395 ad33463aefa0405ba231412379f92a91
+#: ../../manager/user-api/vfolders.rst:395 3540b5dae2d344cba4013b89dbe1b3c7
 msgid "Listing Files in Virtual Folder"
 msgstr "가상 폴더 내 파일 목록"
 
-#: ../../manager/user-api/vfolders.rst:397 0659b40ab0104faaaf9b6e75a500bf0c
+#: ../../manager/user-api/vfolders.rst:397 e8c432e1c30244e2861686e5c7eb1963
 msgid ""
 "Returns the list of files in a virtual folder associated with current "
 "keypair."
 msgstr "현재 키페어와 연결된 가상 폴더 내 파일 목록을 반환합니다."
 
-#: ../../manager/user-api/vfolders.rst:399 71d21f6cfe95454baa7665a3fca8e88c
+#: ../../manager/user-api/vfolders.rst:399 d0e8fe2d135e4c3abf9f9dc40bca67ca
 msgid "URI: ``/folders/:name/files``"
 msgstr "URI: ``/folders/:name/files``"
 
 #: ../../manager/user-api/vfolders.rst:415
 #: ../../manager/user-api/vfolders.rst:472
 #: ../../manager/user-api/vfolders.rst:532
-#: ../../manager/user-api/vfolders.rst:587 03a9d8453e8946d2b179ae7f66e5cb71
-#: b24898ef058e4286baa53ae320c5a4bc ba060b5a00e94fefad9a340567bf24c8
-#: e76c139a5f2445a38ef22baf718b85a3
+#: ../../manager/user-api/vfolders.rst:587 4018ea800759435e96d886e3d15c9400
+#: 51660c3843564993950cd29a30c8c6be b1f75c4106e345c1aae2c6b60fa4f6d8
+#: ceeca13b7901453291633d5ca375829c
 msgid "``path``"
 msgstr "``path``"
 
-#: ../../manager/user-api/vfolders.rst:417 859349a028784c2ab22d07d09eed0495
+#: ../../manager/user-api/vfolders.rst:417 dc182a576bca4145a665d32fcc103002
 #, fuzzy
-msgid "Path inside the virtual folder (default: root)."
+msgid "Path inside the virtual folder (default: root)"
 msgstr "가상 폴더 내 경로 (기본값: root)"
 
-#: ../../manager/user-api/vfolders.rst:430 3610f21e99804e8dbf5439c5663e8c41
+#: ../../manager/user-api/vfolders.rst:428
+#: ../../manager/user-api/vfolders.rst:488
+#: ../../manager/user-api/vfolders.rst:553
+#: ../../manager/user-api/vfolders.rst:604
+#: ../../manager/user-api/vfolders.rst:666
+#: ../../manager/user-api/vfolders.rst:714
+#: ../../manager/user-api/vfolders.rst:745
+#: ../../manager/user-api/vfolders.rst:799
+#: ../../manager/user-api/vfolders.rst:849
+#: ../../manager/user-api/vfolders.rst:889
+#: ../../manager/user-api/vfolders.rst:929
+#: ../../manager/user-api/vfolders.rst:978
+#: ../../manager/user-api/vfolders.rst:1030
+#: ../../manager/user-api/vfolders.rst:1079
+#: ../../manager/user-api/vfolders.rst:1148
+#: ../../manager/user-api/vfolders.rst:1213
+#: ../../manager/user-api/vfolders.rst:1268
+#: ../../manager/user-api/vfolders.rst:1337 1caf1e5953484e54a7a2f34664770333
+#: 22fb740e4fff4d7d99f8f1e7d5d96cbf 393fbe6bf0644f0cbf2bb1a0745330d6
+#: 4f74295c372f4ec08a7708f23460beb9 55e02992f5e6466abc60b32cbfcf0e57
+#: 7be5d14755044baf9cf2d5e6eff7dadb 834b389a98eb42dab17b58e042d61d15
+#: 841781521cd8444789e01622adffd743 86e1dc6027304c5f86038ed59b2d35b8
+#: 8a66b98afe6c4c00af8b7fdc2f67120b a9beec192c764921add4a7937b3abb34
+#: adf0bb9f20cc49178282d576e0ab3e55 d45796a7cf884a7292f003fb5e69d3eb
+#: d82b3e9e58e547bf828e2a9089a9beb0 e16151a3f35c40ba9ae631aaaed6a013
+#: e68a0d0f5a984e75845c487210e93f56 ea43fd0cbd774eddaf5f148d5b8687e7
+#: fd3e109397ad4813931868de5812616f
+#, fuzzy
+msgid "Success."
+msgstr "성공"
+
+#: ../../manager/user-api/vfolders.rst:430 9bcc8603329544d099cd70ad1debb154
 msgid ""
 "There is no such path or you may not have proper permission to access the"
 " folder."
 msgstr "폴더에 접근할 수 없거나 경로를 찾을 수 없습니다."
 
 #: ../../manager/user-api/vfolders.rst:440
-#: ../../manager/user-api/vfolders.rst:650 5cf99aea916042bdb370c2f75e7bc296
-#: f8853d35838d412a9cccb5d60660e1ae
+#: ../../manager/user-api/vfolders.rst:650 63b02a6ca541404b890e625133171c17
+#: 8242dcdfceba4b3aa6e7150292b79bec
 msgid "``files``"
 msgstr "``files``"
 
-#: ../../manager/user-api/vfolders.rst:442 e37e37e21ba7411e9b81be0033a7abb2
+#: ../../manager/user-api/vfolders.rst:442 9daefb25a9d74937812155eb39fbe0e5
 msgid "List of :ref:`vfolder-file-object`"
 msgstr ":ref:`vfolder-file-object` 목록"
 
-#: ../../manager/user-api/vfolders.rst:446 1fcbe4e9259f4cc191f6e70e96e9bd81
+#: ../../manager/user-api/vfolders.rst:446 715719f2ba24457aa2b671326d6a9d81
 msgid "Uploading a File to Virtual Folder"
 msgstr "가상 폴더에 파일 업로드"
 
-#: ../../manager/user-api/vfolders.rst:448 a001699dfa9d47249e471184dabfb2a8
+#: ../../manager/user-api/vfolders.rst:448 86feb6351ebe4ce19b2c5448269d3c97
 msgid ""
 "Upload a local file to a virtual folder associated with the current "
 "keypair. Internally, the Manager will deligate the upload to a Backend.AI"
@@ -1126,118 +1129,123 @@ msgstr ""
 "현재 키페어와 연결된 가상 폴더에 로컬 파일을 업로드합니다. Manager는 내부적으로 Backend.AI Storage-Proxy"
 " 서비스에 업로드를 위임합니다. JSON 웹 토큰은 요청 인증에 사용됩니다."
 
-#: ../../manager/user-api/vfolders.rst:452 aea2811a96d04fa28c6b9dc32e58b481
+#: ../../manager/user-api/vfolders.rst:452 3d15502e7b8f4d77b9af5836d077a1b2
 msgid "URI: ``/folders/:name/request-upload``"
 msgstr "URI: ``/folders/:name/request-upload``"
 
-#: ../../manager/user-api/vfolders.rst:456 749f14bab36748449e964a84b9ded09a
+#: ../../manager/user-api/vfolders.rst:456 28434dbc375540599b1307434f3983cd
 msgid ""
 "If a file with the same name already exists in the virtual folder, it "
 "will be overwritten without warning."
 msgstr "가상 폴더 내 동일한 이름의 파일이 이미 존재하면 경고 없이 덮어써집니다."
 
-#: ../../manager/user-api/vfolders.rst:474 98397fc61bfa44d0a1090c7336c71d32
+#: ../../manager/user-api/vfolders.rst:474 22f415a9c75d4359a35db6eb986ebd34
 #, fuzzy
-msgid "Path of the local file to upload."
+msgid "Path of the local file to upload"
 msgstr "업로드할 로컬 파일의 경로"
 
-#: ../../manager/user-api/vfolders.rst:475 381edd3d352544aeb94b1a7a8937f1c0
+#: ../../manager/user-api/vfolders.rst:475 65258803082c4447b37e89cd596925f1
 #, fuzzy
 msgid "``size``"
 msgstr "``files``"
 
-#: ../../manager/user-api/vfolders.rst:477 837877c77d624417a68dc9bd84629395
+#: ../../manager/user-api/vfolders.rst:477 0052f47444a34721a83737bd694555f9
 #, fuzzy
-msgid "The total size of the local file to upload."
+msgid "The total size of the local file to upload"
 msgstr "업로드할 로컬 파일의 전체 크기"
 
 #: ../../manager/user-api/vfolders.rst:497
-#: ../../manager/user-api/vfolders.rst:616 56c27592612640709dd796bf0f558a94
-#: ad938ebd3fc248b781a869d7abac6619
+#: ../../manager/user-api/vfolders.rst:616 8a7b2663e40c413fa9b647b8bab4c978
+#: aa24d21637654d158a4b40b3ba6b1ea9
 #, fuzzy
 msgid "``token``"
 msgstr "``mode``"
 
-#: ../../manager/user-api/vfolders.rst:499 07735aeed5964806a83834b00b45eea6
+#: ../../manager/user-api/vfolders.rst:499 572b0ec3a5c244068aa4d3a9fefcc10e
 msgid ""
 "JSON web token for the authentication of the upload session to Storage-"
 "Proxy service."
 msgstr "Storage-Proxy 서비스에 업로드 세션 인증을 위한 JSON 웹 토큰"
 
 #: ../../manager/user-api/vfolders.rst:501
-#: ../../manager/user-api/vfolders.rst:620 60d90be02b0e4d4e8825f4a76a117653
-#: 61202228fa164fccb32e8eebd9ad6c61
+#: ../../manager/user-api/vfolders.rst:620 e0d204a444e043cc90a0c4738a305541
+#: eb8124b778e64796a82d70e8bcad790c
 #, fuzzy
 msgid "``url``"
 msgstr "``str``"
 
-#: ../../manager/user-api/vfolders.rst:503 e0b2177515cd4d2c90af045aaba8a051
+#: ../../manager/user-api/vfolders.rst:503 e606364d246f4636819cc23bb9424c49
 msgid ""
 "Request url for a Storage-Proxy. Client should use this URL to upload the"
 " file."
 msgstr "Storage-Proxy에 대한 요청 URL. 클라이언트는 이 URL을 사용하여 파일을 업로드해야 합니다."
 
-#: ../../manager/user-api/vfolders.rst:507 216babea0133480087595933c8128f34
+#: ../../manager/user-api/vfolders.rst:507 ccc59f19539c4c59aefcaca5a47db5b4
 msgid "Creating New Directory in Virtual Folder"
 msgstr "가상 폴더 내에 새 디렉토리 생성하기"
 
-#: ../../manager/user-api/vfolders.rst:509 7e1a2644965943d4b581f50e8e5256bd
+#: ../../manager/user-api/vfolders.rst:509 a3559b8ccb094cba9fc776890977738e
 msgid ""
 "Create a new directory in the virtual folder associated with current "
 "keypair. this API recursively creates parent directories if they does not"
 " exist."
 msgstr "현재 키페어에 연결된 가상 폴더에 새 디렉토리를 생성합니다. 이 API는 존재하지 않는 상위 디렉토리를 재귀적으로 생성합니다."
 
-#: ../../manager/user-api/vfolders.rst:512 788bfced24d84e86a4ffe542dc5609a5
+#: ../../manager/user-api/vfolders.rst:512 cc1ae91449304bc9885a0af2c5873198
 msgid "URI: ``/folders/:name/mkdir``"
 msgstr "URI: ``/folders/:name/mkdir``"
 
-#: ../../manager/user-api/vfolders.rst:516 780794b57a6e4525915997bcdf0c81b6
+#: ../../manager/user-api/vfolders.rst:516 bc6e70c18cb54f2d80b3cb835bd5e027
 msgid ""
 "If a directory with the same name already exists in the virtual folder, "
 "it may be overwritten without warning."
 msgstr "가상 폴더 내 동일한 이름의 디렉토리가 이미 존재하면 경고 없이 덮어써질 수 있습니다."
 
-#: ../../manager/user-api/vfolders.rst:534 0a03abeab084443bb249099a5accd3ac
+#: ../../manager/user-api/vfolders.rst:531 81f3ac1f596343d8bca700e1313932ce
 #, fuzzy
-msgid "The relative path of a new folder to create inside the virtual folder."
+msgid "The human-readable name of the virtual folder."
+msgstr "사람이 읽을 수 있는 가상 폴더 이름"
+
+#: ../../manager/user-api/vfolders.rst:534 8aa378ae358d46d985ad42c8582ee4b6
+#, fuzzy
+msgid "The relative path of a new folder to create inside the virtual folder"
 msgstr "가상 폴더 내 생성된 새 폴더의 상대 경로"
 
-#: ../../manager/user-api/vfolders.rst:536 eca57d8a9e78436b98e53388f3ddd1a4
+#: ../../manager/user-api/vfolders.rst:536 6fed516e1a3d4cdbaa3f9e87131f4263
 #, fuzzy
 msgid "``parents``"
 msgstr "``path``"
 
-#: ../../manager/user-api/vfolders.rst:538 44edfefaf558438d9cc9f96751554707
+#: ../../manager/user-api/vfolders.rst:538 4fd5f6234b644a3699be58c853bd127b
 msgid "If ``True``, the parent directories will be created if they do not exist."
 msgstr "``True`` 일 경우, 지정한 상위 디렉토리가 존재하지 않으면 같이 생성합니다."
 
-#: ../../manager/user-api/vfolders.rst:539 56ac4ef979c74a5c938f34725128558f
+#: ../../manager/user-api/vfolders.rst:539 58e20cb17144464083b7e4917de81aac
 #, fuzzy
 msgid "``exist_ok``"
 msgstr "``result``"
 
-#: ../../manager/user-api/vfolders.rst:541 22f1c1c6400e4286b0d26b764f398959
+#: ../../manager/user-api/vfolders.rst:541 26844aff404d41e98e41ed4b5751a584
 msgid ""
 "If a directory with the same name already exists, overwrite it without an"
 " error."
 msgstr "디렉토리 이름이 이미 존재하면 오류 없이 덮어씁니다."
 
-#: ../../manager/user-api/vfolders.rst:555 ab3d78f3b0f2442a86aaba2d0fb32a98
+#: ../../manager/user-api/vfolders.rst:555 1cc04e8bd7e94d689fadd7f9dfec644b
 msgid "There already exists a file, not a directory, with duplicated name."
 msgstr "디렉토리가 아닌 동일한 이름의 파일이 이미 존재합니다."
 
-#: ../../manager/user-api/vfolders.rst:557 bce209d91ffb446cab6f76f58fdc7823
+#: ../../manager/user-api/vfolders.rst:557 bd84999498804f7dbdca441a45818983
 msgid ""
 "There is no such folder or you may not have proper permission to write "
 "into folder."
 msgstr "파일이 없거나 해당 폴더에 쓰기 권한이 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:562 20ee9a4e8f984caa8c067a77aaab51ea
+#: ../../manager/user-api/vfolders.rst:562 1f8aef30c872489a80e2ec41832f632c
 msgid "Downloading a File or a Directory from a Virtual Folder"
 msgstr "가상 폴더에 있는 파일 또는 디렉토리 다운로드하기"
 
-#: ../../manager/user-api/vfolders.rst:564 da93ff272e2b482283bb350fedaf86fd
+#: ../../manager/user-api/vfolders.rst:564 f897410e1b15481599f4b5f5567866c4
 msgid ""
 "Download a file or a directory from a virtual folder associated with the "
 "current keypair. Internally, the Manager will deligate the download to a "
@@ -1247,20 +1255,20 @@ msgstr ""
 "현재 keypair에서 연결된 가상 폴더에 있는 파일 또는 디렉토리를 다운로드합니다. 내부적으로, Manager는 "
 "Backend.AI Storage-Proxy 서비스에 다운로드를 위임합니다. JSON 웹 토큰은 요청의 인증에 사용됩니다."
 
-#: ../../manager/user-api/vfolders.rst:571 913e2840289e4f3fa127c22eaeda8714
+#: ../../manager/user-api/vfolders.rst:571 8b243953f11c4628bc1440b964fe86e4
 msgid "URI: ``/folders/:name/request-download``"
 msgstr "URI: ``/folders/:name/request-download``"
 
-#: ../../manager/user-api/vfolders.rst:589 7f9402b580e64dee8c59bbdd079dfc35
+#: ../../manager/user-api/vfolders.rst:589 790e4c59b21b434580a4b5eb5c11caf2
 msgid "The path to a file or a directory inside the virtual folder to download."
 msgstr "다운로드를 위해 가상 폴더 내 파일 또는 디렉토리의 경로"
 
-#: ../../manager/user-api/vfolders.rst:590 c7f4a39520fb41caa9b8327e80aff406
+#: ../../manager/user-api/vfolders.rst:590 84968c26f46a4bb38b43478d72ed416d
 #, fuzzy
 msgid "``archive``"
 msgstr "``path``"
 
-#: ../../manager/user-api/vfolders.rst:592 b33de711d367428798820c8260f06635
+#: ../../manager/user-api/vfolders.rst:592 cd99481389da468b818b1020bffda674
 msgid ""
 "If this parameter is ``True`` and ``path`` is a directory, the directory "
 "will be archived into a zip file on the fly (default: ``False``)."
@@ -1268,146 +1276,147 @@ msgstr ""
 "해당 매개변수가 ``True`` 고 ``path``가 디렉토리일 경우, 디렉토리는 zip 파일로 압축됩니다 (기본값: "
 "``False``)."
 
-#: ../../manager/user-api/vfolders.rst:606 d05e95def30a49eab4b1107510baf433
+#: ../../manager/user-api/vfolders.rst:606 a873deabe1194fb5b69a0db61366e94a
 msgid "File not found or you may not have proper permission to access the folder."
 msgstr "파일을 찾을 수 없거나 해당 폴더에 접근할 수 있는 권한이 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:618 fab4023252164d6abc125580529215fa
+#: ../../manager/user-api/vfolders.rst:618 0f3289d7881a4494aad3b35c5410b5d2
 msgid ""
 "JSON web token for the authentication of the download session to Storage-"
 "Proxy service."
 msgstr "JSON 웹 토큰은 Storage-Proxy 서비스의 다운로드 세션 인증에 사용됩니다."
 
-#: ../../manager/user-api/vfolders.rst:622 6ece4e46407349be9a8cf941f250e30f
+#: ../../manager/user-api/vfolders.rst:622 e894043970fc4e1cac677345bfebf680
 msgid ""
 "Request url for a Storage-Proxy. Client should use this URL to download "
 "the file."
 msgstr "저장-프록시에 대한 요청 URL입니다. 클라이언트는 이 URL을 사용하여 파일을 다운로드해야 합니다."
 
-#: ../../manager/user-api/vfolders.rst:627 4a898309290041ebb2075438f08e1177
+#: ../../manager/user-api/vfolders.rst:627 316cd7b2664f495987d857ee8223a91b
 msgid "Deleting Files in Virtual Folder"
 msgstr "가상 폴더 내 파일 삭제하기"
 
-#: ../../manager/user-api/vfolders.rst:629 63107f23d72444e2834dfdb47f64aec1
+#: ../../manager/user-api/vfolders.rst:629 e4a12ebff6a042fa99a6202e71748e91
 msgid "This deletes files inside a virtual folder."
 msgstr "가상 폴더 내 파일을 삭제합니다."
 
-#: ../../manager/user-api/vfolders.rst:632 fdbfe813bcda426c937576445e0b371f
+#: ../../manager/user-api/vfolders.rst:632 ac0b4d0c6a1245ac8e988310957f664f
 msgid "There is NO way to get back the files once this API is invoked."
 msgstr "한 번 API가 호출되면 파일을 되돌릴 수 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:634 f718c4e32b2a4d6595ba4f1048cdca39
+#: ../../manager/user-api/vfolders.rst:634 6a4c200e447d43f4b4286759a708b987
 msgid "URI: ``/folders/:name/delete-files``"
 msgstr "URI: ``/folders/:name/delete-files``"
 
-#: ../../manager/user-api/vfolders.rst:652 de262b8b10fd4919a4f5206a18fed14a
+#: ../../manager/user-api/vfolders.rst:652 e52603e42cff473cac1b4d53d1686a1d
 #, fuzzy
-msgid "File paths inside the virtual folder to delete."
+msgid "File paths inside the virtual folder to delete"
 msgstr "삭제할 가상 폴더 내 파일 경로"
 
-#: ../../manager/user-api/vfolders.rst:653 cff636ea109448d28f8ac782ffd2d678
+#: ../../manager/user-api/vfolders.rst:653 df5ed0fe0a574fb082a369a991f82c37
 msgid "``recursive``"
 msgstr "``recursive``"
 
-#: ../../manager/user-api/vfolders.rst:655 7263fa751a6f4a20b135c4932d3f3435
+#: ../../manager/user-api/vfolders.rst:655 0b5213e027da4879ae1654f98dcfa7c1
 msgid "Recursive option to delete folders if set to True. The default is False."
 msgstr "설정이 True로 되어 있으면 폴더를 재귀적으로 삭제합니다. 기본값은 False입니다."
 
-#: ../../manager/user-api/vfolders.rst:668 743dc1f86426479ca96d34ac395ba4ea
+#: ../../manager/user-api/vfolders.rst:668 fa9ad3f0a6704053b427365108c7fe0e
 msgid "You tried to delete a folder without setting recursive option as True."
 msgstr "recursive 옵션을 True로 설정하지 않고 폴더를 삭제하려고 했습니다."
 
-#: ../../manager/user-api/vfolders.rst:670 e6510d58c8bf46a995db462777af9a58
+#: ../../manager/user-api/vfolders.rst:670 ba4e13413fa04ec2a1e9c7444277cf1b
 msgid ""
 "There is no such folder or you may not have proper permission to delete "
 "the file in the folder."
 msgstr "해당 폴더가 없거나 폴더 내 파일을 삭제할 수 있는 권한이 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:675 40082ea441b3489ba9cc2711013beae4
+#: ../../manager/user-api/vfolders.rst:675 faf8d57d808e4f87aa40d8c54b439da9
 msgid "Rename a File in Virtual Folder"
 msgstr "가상 폴더 내 파일 이름을 변경하기"
 
-#: ../../manager/user-api/vfolders.rst:677 72fc238b8ca94f1d9e4c8384cbe516c9
+#: ../../manager/user-api/vfolders.rst:677 97e887a8ad8d4d769e5f4f13eb0a86cf
 #, fuzzy
 msgid "Rename a file inside a virtual folder."
 msgstr "가상 폴더 내 파일 이름을 변경하기"
 
-#: ../../manager/user-api/vfolders.rst:679 8b77e3c66a5449278ecb24648958fe3b
+#: ../../manager/user-api/vfolders.rst:679 13608ee84e674e4297d2708df728efba
 msgid "URI: ``/folders/:name/rename-file``"
 msgstr "URI: ``/folders/:name/rename-file``"
 
-#: ../../manager/user-api/vfolders.rst:695 f9038d107e6847a2bfb49a083b3886f6
+#: ../../manager/user-api/vfolders.rst:695 bb45a63a8f81450f8dc7dfd4bcec8d38
 #, fuzzy
 msgid "``target_path``"
 msgstr "``path``"
 
-#: ../../manager/user-api/vfolders.rst:697 fb672a5819844365b80094c7ed121c03
+#: ../../manager/user-api/vfolders.rst:697 f4a62754fb3441d189e5c10205f5b077
 #, fuzzy
-msgid "The relative path of target file or directory."
+msgid "The relative path of target file or directory"
 msgstr "대상 파일 또는 디렉토리의 상대 경로"
 
-#: ../../manager/user-api/vfolders.rst:700 fd890fc2f01549d79937b4661deeff27
+#: ../../manager/user-api/vfolders.rst:700 95bfe1051fd348019c04379170628209
 #, fuzzy
-msgid "The new name of the file or directory."
+msgid "The new name of the file or directory"
 msgstr "파일 또는 디렉토리의 새 이름"
 
-#: ../../manager/user-api/vfolders.rst:701 6d244ed26e0c41c9a731856700e25747
+#: ../../manager/user-api/vfolders.rst:701 f545ae20a7d44193b0578cdd67c19af5
 #, fuzzy
 msgid "``is_dir``"
 msgstr "``str``"
 
-#: ../../manager/user-api/vfolders.rst:703 a3910b362de945199ddd4b713c45071e
+#: ../../manager/user-api/vfolders.rst:703 4e259d1657604794bc37f8cc08d76d92
 #, fuzzy
-msgid "Flag that indicates the ``target_path`` is a directory or not."
+msgid "Flag that indicates the ``target_path`` is a directory or not"
 msgstr "``target_path``가 디렉토리인지 여부를 나타내는 플래그"
 
-#: ../../manager/user-api/vfolders.rst:716 339932af178146a9bcffc9256922453f
+#: ../../manager/user-api/vfolders.rst:716 e1cecf46189942ea9fb6878cd0e088b5
 msgid "You tried to rename a directory without setting is_dir option as True."
 msgstr "is_dir 옵션을 True로 설정하지 않고 디렉토리 이름을 변경하려고 했습니다."
 
-#: ../../manager/user-api/vfolders.rst:718 6bc9f59bdb4b4fb68fe589dfcf3b8235
+#: ../../manager/user-api/vfolders.rst:718 58b8072df2724ab99a937765d4ae373a
 msgid ""
 "There is no such folder or you may not have proper permission to rename "
 "the file in the folder."
 msgstr "해당 폴더가 없거나 폴더 내 파일을 이름을 변경할 수 있는 권한이 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:722 f78db39427744dc4a1b565c523f324f2
+#: ../../manager/user-api/vfolders.rst:722 a8f755b819784482b512ad00916e9b86
 msgid "Listing Invitations for Virtual Folder"
 msgstr "가상 폴더 내 초대 목록 보기"
 
-#: ../../manager/user-api/vfolders.rst:724 221faf6bddaa41dc8d625f6ccdc4d420
+#: ../../manager/user-api/vfolders.rst:724 5b39e55be80f46f0b415d2b14c32b3ef
 msgid ""
 "Returns the list of pending invitations that the requested user received."
 " This will display the invitations sent to me by other users."
 msgstr "요청한 사용자가 받은 보류중인 초대 목록을 반환합니다. 이 목록 다른 사용자가 보낸 초대가 표시됩니다."
 
-#: ../../manager/user-api/vfolders.rst:727 92a7ae2ede0642dfb7d226e6d70cf122
+#: ../../manager/user-api/vfolders.rst:727 d82aad8dd1094b9199b4b4d78c1976de
 msgid "URI: ``/folders/invitations/list``"
 msgstr "URI : ``/folders/invitations/list``"
 
 #: ../../manager/user-api/vfolders.rst:733
-#: ../../manager/user-api/vfolders.rst:917 2890b43322ce40ea87c53435d446d769
-#: b731c8846f7c49b58ddcb87b9e43e18e
+#: ../../manager/user-api/vfolders.rst:917 7c1c05505c3141619ac9d25fba4396ac
+#: adc114a69cd4485291ef7cb8d4f8da34
 msgid "This API does not need any parameter."
 msgstr "이 API는 파라미터가 필요하지 않습니다."
 
 #: ../../manager/user-api/vfolders.rst:754
-#: ../../manager/user-api/vfolders.rst:938 8a1228838eb545e78e12092553c89278
-#: 9fac3ca15e2d4ade85175223bd22feab
+#: ../../manager/user-api/vfolders.rst:938 305ead331fe54cdd95577a1e2634231a
+#: 788af9dfa8644333a931bbc3271eb5a1
 msgid "``invitations``"
 msgstr "``invitations``"
 
 #: ../../manager/user-api/vfolders.rst:756
-#: ../../manager/user-api/vfolders.rst:940 0b117b999e86438e8870ec687d68de7c
-#: 19114e24ec6c47d8b3f6146ac114029b
-msgid "A list of :ref:`vfolder-invitation-object`."
+#: ../../manager/user-api/vfolders.rst:940 4c35342ecfbc4938aa93f02517c34f33
+#: 9be9a32fbc8b48ae91323a0acbdd497e
+#, fuzzy
+msgid "A list of :ref:`vfolder-invitation-object`"
 msgstr ":ref:`vfolder-invitation-object` 목록"
 
-#: ../../manager/user-api/vfolders.rst:760 622079ab48a5458b850be9dbc3d136e1
+#: ../../manager/user-api/vfolders.rst:760 0a206cc86ba845b89f7862149e886ab0
 msgid "Creating an Invitation"
 msgstr "초대 생성하기"
 
-#: ../../manager/user-api/vfolders.rst:762 76ca6cd69a624d79b462505acea889fc
+#: ../../manager/user-api/vfolders.rst:762 0299378796e34dd790cd3f7bb7810938
 msgid ""
 "Invite other users to share a virtual folder with proper permissions. If "
 "a user is already invited, then this API does not create a new invitation"
@@ -1416,184 +1425,186 @@ msgstr ""
 "적절한 권한으로 가상 폴더를 공유할 다른 사용자를 초대합니다. 해당 사용자가 이미 초대되어 있다면 이 API는 새로운 초대를 "
 "생성하지 않거나 기존 초대 권한을 업데이트하지 않습니다."
 
-#: ../../manager/user-api/vfolders.rst:766 a7236240a6ef48a5840fa9e4b84b79b3
+#: ../../manager/user-api/vfolders.rst:766 a9af99699c9c44a49d9161d9df2607ed
 msgid "URI: ``/folders/:name/invite``"
 msgstr "URI : ``/folders/:name/invite``"
 
 #: ../../manager/user-api/vfolders.rst:782
 #: ../../manager/user-api/vfolders.rst:964
-#: ../../manager/user-api/vfolders.rst:1134 565663d667414442ab521d701a4355cf
-#: 7d17934190304bfcbe2d1aa410999bae f07a85b0be724d9e9a0201b90d85acf5
+#: ../../manager/user-api/vfolders.rst:1134 26b03b2228a240bab250c1a1156c38f9
+#: 67c3da702ee64c1d9b08f7b643660a2c bd6ebdc1ee6f46eca2765621cc1f7a81
 msgid "``perm``"
 msgstr "``perm``"
 
 #: ../../manager/user-api/vfolders.rst:784
-#: ../../manager/user-api/vfolders.rst:966 05ceb0fc8b324402b02f59aa832bbd8b
-#: fdf84310b4aa4d4cbe518b6b22542a5e
-msgid "The permission to grant to invitee."
+#: ../../manager/user-api/vfolders.rst:966 2f38039f1d03483eac5a2ed2617d0d01
+#: dccb4d505a9544389e8f86efccd399b2
+#, fuzzy
+msgid "The permission to grant to invitee"
 msgstr "초대받은 사용자에게 부여할 권한"
 
 #: ../../manager/user-api/vfolders.rst:785
 #: ../../manager/user-api/vfolders.rst:1199
-#: ../../manager/user-api/vfolders.rst:1254 0c95e054b6214fa5bcac8569649da46b
-#: 2badc4e2a97a4e92ab4f2a701cbce67c ab35c7d694bc42b2a91b8c91dfc37948
+#: ../../manager/user-api/vfolders.rst:1254 1e4709e3c1f44fbb93dea4bbe21f53a3
+#: 6c80e453ed954c9ea54bd5cdb09e7b14 9f1f66f3467f482db1641b61b949ee43
 #, fuzzy
 msgid "``emails``"
 msgstr "``files``"
 
 #: ../../manager/user-api/vfolders.rst:786
-#: ../../manager/user-api/vfolders.rst:813 9420e20d12ee4ea99293b0831c33ddf0
-#: c87bad20f4b4498abf87d6b4fbbb7c78
+#: ../../manager/user-api/vfolders.rst:813 6356ee9df15e43ba90e2281740b5e367
+#: c9656512b81c4ac292d80d3095280c8a
 msgid "``list[slug]``"
 msgstr "``list[slug]``"
 
-#: ../../manager/user-api/vfolders.rst:787 5fa36bc6b7094d73b69e9020ecacf094
-msgid "A list of user emails to invite."
+#: ../../manager/user-api/vfolders.rst:787 cd77a1fea3424b958e589f2a9ca98e36
+#, fuzzy
+msgid "A list of user emails to invite"
 msgstr "초대할 사용자 이메일 목록"
 
-#: ../../manager/user-api/vfolders.rst:801 4fc8d39c2a634e87bd46a71783644c2b
+#: ../../manager/user-api/vfolders.rst:801 a7370070f2e64d4785ece05e73abd0af
 msgid "No invitee is given."
 msgstr "초대받을 사용자가 주어지지 않았습니다."
 
 #: ../../manager/user-api/vfolders.rst:803
-#: ../../manager/user-api/vfolders.rst:982 13413b12984a422bac60aa36cda35e53
-#: aca284db7e6749489cf8155a8a4bbe9a
+#: ../../manager/user-api/vfolders.rst:982 b51ef03382a64bdaa7acc734b2f98318
+#: c62f56fec9ed4cfc82336a687614e86b
 msgid "There is no invitation."
 msgstr "초대가 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:812 b44aec83c2804aa594422214a57eb628
+#: ../../manager/user-api/vfolders.rst:812 15c51721fa1a4a31b161e3d5d7e80c91
 msgid "``invited_ids``"
 msgstr "``invited_ids``"
 
-#: ../../manager/user-api/vfolders.rst:814 3449e4a812ae46e0a32aaf0e06044ff9
+#: ../../manager/user-api/vfolders.rst:814 c2433df4654b4af6b0ee412345ebb265
 #, fuzzy
-msgid "A list of invited user emails."
+msgid "A list of invited user emails"
 msgstr "초대받은 사용자 이메일 목록"
 
-#: ../../manager/user-api/vfolders.rst:818 b01340e460c54c47b9bbe91fea23c43f
+#: ../../manager/user-api/vfolders.rst:818 80a7989ec7eb49938ae8831041e6c5aa
 msgid "Accepting an Invitation"
 msgstr "초대 수락하기"
 
-#: ../../manager/user-api/vfolders.rst:820 ac2a5194c3a1441a8ba5acb45cba7952
+#: ../../manager/user-api/vfolders.rst:820 60b66664cdb546e99950d41004e97eef
 msgid ""
 "Accept an invitation and receive permission to a virtual folder as in the"
 " invitation."
 msgstr "초대를 수락하고 초대에 따른 가상 폴더의 권한을 부여받습니다."
 
-#: ../../manager/user-api/vfolders.rst:822 c19983a72a5144949bed55a7cce7d6a7
+#: ../../manager/user-api/vfolders.rst:822 cc338734ad964ae7834967eb48b6711b
 msgid "URI: ``/folders/invitations/accept``"
 msgstr "URI : ``/folders/invitations/accept``"
 
 #: ../../manager/user-api/vfolders.rst:835
-#: ../../manager/user-api/vfolders.rst:875 9b09280a61224ddc8f45c0610370db96
-#: bd85bb22c1b54f5bb858f715cc75d527
+#: ../../manager/user-api/vfolders.rst:875 5662c5027923421b87baf7b00dda6c98
+#: d83856d04ab04787933f1dff6d14b52f
 msgid "``inv_id``"
 msgstr "``inv_id``"
 
 #: ../../manager/user-api/vfolders.rst:837
 #: ../../manager/user-api/vfolders.rst:877
-#: ../../manager/user-api/vfolders.rst:963 19f59ae14ef14406a526a29af8b994b9
-#: 3af5ce4d99444657933c1c50e7e98fd3 3fe56f8896c04442b472b4f6db2c5702
+#: ../../manager/user-api/vfolders.rst:963 5a3d958b79ee47508e494a89f17358fb
+#: c16e84e4c3a6495f80b017ac89fca666 e054c6a94b6a400f9e66d8aa651446a2
 #, fuzzy
-msgid "The unique invitation ID."
+msgid "The unique invitation ID"
 msgstr "고유한 초대 ID"
 
-#: ../../manager/user-api/vfolders.rst:851 38bbe494e4624197bc5f5bd7e11cbe0e
+#: ../../manager/user-api/vfolders.rst:851 ed7f9a818ccc40d3b9af52ff46dd85a4
 msgid ""
 "The name of the target virtual folder is duplicate with your existing "
 "virtual folders."
 msgstr "대상 가상 폴더 이름이 이미 존재하는 가상 폴더 이름과 중복됩니다."
 
 #: ../../manager/user-api/vfolders.rst:854
-#: ../../manager/user-api/vfolders.rst:891 91bf2bba30b64e22b10ad16e4bc4e9f6
-#: f0271dbefeb4409fa60a2939bdb286a6
+#: ../../manager/user-api/vfolders.rst:891 2e618c8232ad413b8fa9a43994f6b98b
+#: 38178b9056df4cc2a9e5fb5e29a25574
 msgid "There is no such invitation."
 msgstr "존재하지 않는 초대입니다."
 
-#: ../../manager/user-api/vfolders.rst:858 4ec67fa1d54046e7afa561529a51b232
+#: ../../manager/user-api/vfolders.rst:858 2c24bd32af4e4571b928be215df4d2d2
 msgid "Rejecting an Invitation"
 msgstr "초대 거절하기"
 
-#: ../../manager/user-api/vfolders.rst:860 4348f2cad2b3413eb96177fadad6c898
+#: ../../manager/user-api/vfolders.rst:860 986a95ad2c794a14aa6a7b4d70398bcf
 msgid "Reject an invitation."
 msgstr "초대를 거절합니다."
 
-#: ../../manager/user-api/vfolders.rst:862 b84a2a9d37e4439298fe1e8085606925
+#: ../../manager/user-api/vfolders.rst:862 6039daffdfca487c9a97d5c32780430d
 msgid "URI: ``/folders/invitations/delete``"
 msgstr "URI : ``/folders/invitations/delete``"
 
 #: ../../manager/user-api/vfolders.rst:900
 #: ../../manager/user-api/vfolders.rst:991
 #: ../../manager/user-api/vfolders.rst:1041
-#: ../../manager/user-api/vfolders.rst:1161 84ceb61cb107476683f3572e2b61d8e6
-#: cc4217b3d312400a87705bb6504c9b20 eac80626cf6b49ca8c1faabd41ea8672
-#: ee91b4adf4594f7ab1d1e78bbd3837d2
+#: ../../manager/user-api/vfolders.rst:1161 1c90924bbad84f85b746d4deab3ad70b
+#: 3f5b21e06f57448d96653b16f067bfaa 8e3872e3ece147b8a200d4538f53246e
+#: 9b2d0058db12490c9a5606c0866899a9
 msgid "``msg``"
 msgstr "``msg``"
 
-#: ../../manager/user-api/vfolders.rst:902 32683f0ef0b04519a13725e52d4fd7af
+#: ../../manager/user-api/vfolders.rst:902 9a34724c4adb46f4959e227f225408d2
 #, fuzzy
-msgid "Detail message for the invitation deletion."
+msgid "Detail message for the invitation deletion"
 msgstr "초대 철회에 대한 상세 메시지"
 
-#: ../../manager/user-api/vfolders.rst:906 20eb056eba364049a15a139874fa3a64
+#: ../../manager/user-api/vfolders.rst:906 638f3a7d9b3b4add99c460c7200dd45c
 msgid "Listing Sent Invitations"
 msgstr "보낸 초대 목록"
 
-#: ../../manager/user-api/vfolders.rst:908 a58e6a372ba24f369b8daff355ed16cb
+#: ../../manager/user-api/vfolders.rst:908 c13dc80fd19041478b2f66a2de70b438
 msgid ""
 "Returns the list of virtual folder invitations the requested user sent. "
 "This does not include the invitations those are already accepted or "
 "rejected."
 msgstr "요청한 사용자가 보낸 가상 폴더 초대 목록을 반환합니다. 이미 수락하거나 거절한 초대는 포함되지 않습니다."
 
-#: ../../manager/user-api/vfolders.rst:911 87f9da0699e94b3ca1572c01ac68851f
+#: ../../manager/user-api/vfolders.rst:911 1d63b4cab6f7408dad83f002d0211376
 msgid "URI: ``/folders/invitations/list-sent``"
 msgstr "URI : ``/folders/invitations/list-sent``"
 
-#: ../../manager/user-api/vfolders.rst:944 33909337290a416c930f410d137bf5d0
+#: ../../manager/user-api/vfolders.rst:944 1bdd6367386f4f4caf600a8fa1c7ea83
 msgid "Updating an Invitation"
 msgstr "초대 업데이트"
 
-#: ../../manager/user-api/vfolders.rst:946 22055f8298c34753bc1d6a8fe827cdbf
+#: ../../manager/user-api/vfolders.rst:946 e607ea2bd5d447cc8016ab83399271c7
 msgid ""
 "Update the permission of an already-sent, but not accepted or rejected, "
 "invitation."
 msgstr "이미 보냈지만 수락하거나 거절하지 않은 초대 권한을 업데이트합니다."
 
-#: ../../manager/user-api/vfolders.rst:948 57b9a32c1b5c46f294225af41784bdd3
+#: ../../manager/user-api/vfolders.rst:948 ffd82c87a50f4ce2a96850ae9d6ae8e8
 msgid "URI: ``/folders/invitations/update/:inv_id``"
 msgstr "URI : ``/folders/invitations/update/:inv_id``"
 
-#: ../../manager/user-api/vfolders.rst:961 84fd070e3b8541968a50aad184f7d6b6
+#: ../../manager/user-api/vfolders.rst:961 570b5b4da6f64022aac3995373aa9d1b
 #, fuzzy
 msgid "``:inv_id``"
 msgstr "``:id``"
 
-#: ../../manager/user-api/vfolders.rst:980 e027b2481efb4239941af3ce477b67cb
+#: ../../manager/user-api/vfolders.rst:980 86ed281125be4919b95e18517d1a3abc
 msgid "No permission is given."
 msgstr "권한을 지정하지 않았습니다."
 
 #: ../../manager/user-api/vfolders.rst:993
-#: ../../manager/user-api/vfolders.rst:1163 642f36cf9e2947169893853c30891627
-#: e57d4dc09cd8430aa8f6a98a28afa941
+#: ../../manager/user-api/vfolders.rst:1163 24a5635b96d14fcaaf4283d8fab9fef0
+#: da5ebfeab7d546899c8f2bc1ed37c986
 #, fuzzy
-msgid "An update message string."
+msgid "An update message string"
 msgstr "업데이트된 메시지 문자열"
 
-#: ../../manager/user-api/vfolders.rst:997 920a0566d7da4be5be1e68a64f733107
+#: ../../manager/user-api/vfolders.rst:997 f8d45d01d65d42ab89c2535dd4264158
 msgid "Leave an Shared Virtual Folder"
 msgstr "공유받은 가상 폴더 나가기"
 
-#: ../../manager/user-api/vfolders.rst:999 836ae59080134b01ab9a2b5cb3159116
+#: ../../manager/user-api/vfolders.rst:999 82f8724608844113b709d6ef5bda96d2
 msgid "Leave a shared virtual folder."
 msgstr "공유받은 가상 폴더에서 나갑니다."
 
-#: ../../manager/user-api/vfolders.rst:1001 5b4ffcc2aa8247c4b569a34186dcf012
+#: ../../manager/user-api/vfolders.rst:1001 caae641f20984a72b6e8ff6105e1530c
 msgid "Cannot leave a group vfolder or a vfolder that the requesting user owns."
 msgstr "그룹 vfolder 또는 요청한 사용자가 소유한 vfolder는 나갈 수 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:1003 f6f79a3781634e3a893b1d7302570fa8
+#: ../../manager/user-api/vfolders.rst:1003 b6b5e91e0c3246af90c2e6b71f1ca2b0
 msgid "URI: ``/folders/:name/leave``"
 msgstr "URI : ``/folders/:name/leave``"
 
@@ -1601,37 +1612,37 @@ msgstr "URI : ``/folders/:name/leave``"
 #: ../../manager/user-api/vfolders.rst:1152
 #: ../../manager/user-api/vfolders.rst:1217
 #: ../../manager/user-api/vfolders.rst:1272
-#: ../../manager/user-api/vfolders.rst:1343 435d8a0259d642c7a527ca3d96eee7bd
-#: 52812f2b1f7340aa9c3e83b2610a4485 7f88163712b24621b5c42babb3b24261
-#: 97cd95f4cf414e5aaa8e32f8bae8ee48 a04254ca2e1c460bb75d93548cabc7d7
+#: ../../manager/user-api/vfolders.rst:1343 02878afb060f4a24b3468f25761d182e
+#: 055941f3abc14384a57c2ea20af0642a 10a233695e3540588017ab3409d5bc08
+#: 19a1a9da98c6421a8500972694fedd70 c04c5998bc6241c0b10f08dae20fa5e3
 msgid "There is no virtual folder."
 msgstr "가상 폴더가 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:1043 6ec8cbaebba249feab0d07676c3522a6
+#: ../../manager/user-api/vfolders.rst:1043 cc3f6dd7a2cc4dbfbae3b713c3171dca
 #, fuzzy
-msgid "A result message string."
+msgid "A result message string"
 msgstr "결과 메시지 문자열"
 
-#: ../../manager/user-api/vfolders.rst:1047 e1988bad89514b9eb17b8f814406da92
+#: ../../manager/user-api/vfolders.rst:1047 a04cfc74db98476b9758ae960d7a1406
 msgid "Listing Users Share Virtual Folders"
 msgstr "가상 폴더 공유 사용자 목록"
 
-#: ../../manager/user-api/vfolders.rst:1049 1c5c2735f5da4e55895f1b497c20bc54
+#: ../../manager/user-api/vfolders.rst:1049 f87b78f602424332b101de2d9568916a
 msgid "Returns the list of users who shares requester's virtual folders."
 msgstr "요청자의 가상 폴더를 공유하는 사용자 목록을 반환합니다."
 
 #: ../../manager/user-api/vfolders.rst:1051
-#: ../../manager/user-api/vfolders.rst:1115 1c8f80121ca34db6843b774bac2e2507
-#: 2823c96c85184718a8c15a8e0d317002
+#: ../../manager/user-api/vfolders.rst:1115 0afff144734c4e16b5081105d87c6ffd
+#: afd4272969ac4873bef2e7cd57ded951
 msgid "URI: ``/folders/_/shared``"
 msgstr "URI : ``/folders/_/shared``"
 
-#: ../../manager/user-api/vfolders.rst:1064 287c5ab1d6fa46689dae246e5676c3d8
+#: ../../manager/user-api/vfolders.rst:1064 e347d15445c242958f150ee5a3c85260
 #, fuzzy
 msgid "``vfolder_id``"
 msgstr "``folder_path``"
 
-#: ../../manager/user-api/vfolders.rst:1066 1f3d186c34a944979821c681c6970162
+#: ../../manager/user-api/vfolders.rst:1066 2b161b9ee53f494098c14db7396bf5e9
 msgid ""
 "(Optional) The unique virtual folder ID to list shared users. If not "
 "specified, all users who shares any virtual folders the requester "
@@ -1640,76 +1651,76 @@ msgstr ""
 "(선택 사항) 공유된 사용자를 나열할 가상 폴더의 고유 ID입니다. 지정하지 않으면 요청자가 생성한 모든 가상 폴더를 공유하는 "
 "사용자를 나열합니다."
 
-#: ../../manager/user-api/vfolders.rst:1088 07c47500ae6d479b87e5d75fa4f38c23
+#: ../../manager/user-api/vfolders.rst:1088 9dc84a0740814ecab5da109f1751f9b6
 #, fuzzy
 msgid "``shared``"
 msgstr "``str``"
 
-#: ../../manager/user-api/vfolders.rst:1090 99cd88d2ed504c94bf0105154850d8a0
+#: ../../manager/user-api/vfolders.rst:1090 cb7a1b24681a4033987e60a982ad64d9
 #, fuzzy
 msgid "A list of information about shared users."
 msgstr "공유된 사용자 정보 목록"
 
-#: ../../manager/user-api/vfolders.rst:1111 11efb9b642a04b259e0229b705381226
+#: ../../manager/user-api/vfolders.rst:1111 c06001866f784a49952930edeaab0e4b
 msgid "Updating the permission of a shared virtual folder"
 msgstr "공유된 가상 폴더의 권한 업데이트"
 
-#: ../../manager/user-api/vfolders.rst:1113 d2a84a85e174416fb046fff398ebf447
+#: ../../manager/user-api/vfolders.rst:1113 b5d84961ce1c4dc5871fb13522ea7fad
 msgid "Update the permission of a user for a shared virtual folder."
 msgstr "공유된 가상 폴더의 사용자 권한을 업데이트합니다."
 
-#: ../../manager/user-api/vfolders.rst:1128 ed5f1e4f81bb4bbabc375f2458d8f09e
+#: ../../manager/user-api/vfolders.rst:1128 76f7e5f88f1947eaaffb65d445b4cfc8
 #, fuzzy
 msgid "``vfolder``"
 msgstr "``folder_path``"
 
 #: ../../manager/user-api/vfolders.rst:1129
-#: ../../manager/user-api/vfolders.rst:1132 471388229fb34527b3fa9f2eb2bd7011
-#: 6bbf6ea1613b4c958201dd952969319f
+#: ../../manager/user-api/vfolders.rst:1132 2d46f4fb0a4642568ffe85892ef9d570
+#: e99a49286675459db5be8343434ec339
 #, fuzzy
 msgid "``UUID``"
 msgstr "``:id``"
 
-#: ../../manager/user-api/vfolders.rst:1130 bee7a4e8201249e3b4adc267e07bac78
+#: ../../manager/user-api/vfolders.rst:1130 e54364f7dc7642a0a1d29aec3ebfe12f
 #, fuzzy
-msgid "The unique virtual folder ID."
+msgid "The unique virtual folder ID"
 msgstr "고유 가상 폴더 ID"
 
-#: ../../manager/user-api/vfolders.rst:1131 6307cf62b0374793a0f3381a58beaee2
+#: ../../manager/user-api/vfolders.rst:1131 0ab06659a1c3472e91ae4ca0172cf73a
 #, fuzzy
 msgid "``user``"
 msgstr "``str``"
 
-#: ../../manager/user-api/vfolders.rst:1133 43636fb9637d4661bcca3a3dba995d3e
+#: ../../manager/user-api/vfolders.rst:1133 00b9139c1be5403980bdc6483836cd85
 #, fuzzy
-msgid "The unique user ID."
+msgid "The unique user ID"
 msgstr "고유 사용자 ID"
 
-#: ../../manager/user-api/vfolders.rst:1136 9cd29210d1d24a948cbaae433770d6bd
+#: ../../manager/user-api/vfolders.rst:1136 4733f01c085046b4a0a49990d914b9ce
 #, fuzzy
-msgid "The permission to update for the ``user`` on ``vfolder``."
+msgid "The permission to update for the ``user`` on ``vfolder``"
 msgstr "``vfolder``의 ``user``에 대해 업데이트할 권한"
 
-#: ../../manager/user-api/vfolders.rst:1150 b9743f6960dd4696a274926c87e02b53
+#: ../../manager/user-api/vfolders.rst:1150 3ea56a3a4f624122893c25b31aa5f7ea
 msgid "No permission or user is given."
 msgstr "권한 또는 사용자가 지정되지 않았습니다."
 
-#: ../../manager/user-api/vfolders.rst:1167 3fed3c35d48f4c4aafd430dfaae54931
+#: ../../manager/user-api/vfolders.rst:1167 7133a38bcb6c4e6097362733fb4e56b5
 msgid "Share a Group Virtual Folder to an Individual Users"
 msgstr "개별 사용자에게 그룹 가상 폴더 공유"
 
-#: ../../manager/user-api/vfolders.rst:1169 f62a3c7d599340c993eb3b3b4e447f2c
+#: ../../manager/user-api/vfolders.rst:1169 6d5231c15b164688965e5f471c3855ba
 msgid "Share a group virtual folder to users with overriding permission."
 msgstr "권한을 덮어쓰는 사용자에게 그룹 가상 폴더를 공유합니다."
 
-#: ../../manager/user-api/vfolders.rst:1171 defae63c979c44829a477d7bebb7dc17
+#: ../../manager/user-api/vfolders.rst:1171 b4119698aa0f4c629b8ac3d36cadca9b
 msgid ""
 "This will create vfolder_permission(s) relation directly without creating"
 " invitation(s). Only group virtual folders are allowed to be shared "
 "directly."
 msgstr "생성된 초대를 통해 vfolder_permission 관계를 직접 생성합니다. 그룹 가상 폴더만 직접 공유할 수 있습니다."
 
-#: ../../manager/user-api/vfolders.rst:1174 260404c6027541808a17be929d328be1
+#: ../../manager/user-api/vfolders.rst:1174 13a8e57580974716af887a8f741eaa79
 msgid ""
 "This API can be useful when you want to share a group virtual folder to "
 "every group members with read-only permission, but allows some users "
@@ -1719,113 +1730,113 @@ msgstr ""
 "때 유용합니다."
 
 #: ../../manager/user-api/vfolders.rst:1178
-#: ../../manager/user-api/vfolders.rst:1236 3d2a50393389438eae7fb11642e303b7
-#: b464e330cbd148c89ac36006c7e1e051
+#: ../../manager/user-api/vfolders.rst:1236 0c238e4469634e13a7a3f9b00b140072
+#: f15b74ee532d4f9f8733ad4b071ee314
 msgid "NOTE: This API is only available for group virtual folders."
 msgstr "안내: 이 API는 그룹 가상 폴더에만 사용할 수 있습니다."
 
-#: ../../manager/user-api/vfolders.rst:1180 2034405fa2f840a3a06ff0dcf771f1af
+#: ../../manager/user-api/vfolders.rst:1180 763c9e6ffc8b477d96f38623684f7699
 msgid "URI: ``/folders/:name/share``"
 msgstr "URI: ``/folders/:name/share``"
 
-#: ../../manager/user-api/vfolders.rst:1198 60634f86cd8241d1b3621d2c21834b02
+#: ../../manager/user-api/vfolders.rst:1198 dc49627d19ce4892b07fc1fcd6392c83
 #, fuzzy
-msgid "Overriding permission to share the group virtual folder."
+msgid "Overriding permission to share the group virtual folder"
 msgstr "가상 폴더를 공유할 권한을 덮어쓰기"
 
-#: ../../manager/user-api/vfolders.rst:1201 56764b72480d41fe8333e61fbb8138d3
-msgid "A list of user emails to share."
+#: ../../manager/user-api/vfolders.rst:1201 cda3572e3231478b928fed1609ccd23e
+#, fuzzy
+msgid "A list of user emails to share"
 msgstr "공유할 사용자 이메일 목록."
 
-#: ../../manager/user-api/vfolders.rst:1215 a27e93ae41cc41bd814fe36a43427794
+#: ../../manager/user-api/vfolders.rst:1215 c6e9249eca7946f38f31d27caea4d313
 msgid "No permission or email is given."
 msgstr "권한 혹은 이메일이 주어지지 않았습니다."
 
-#: ../../manager/user-api/vfolders.rst:1226 930bf13315f448b1b01995f95dea2675
+#: ../../manager/user-api/vfolders.rst:1226 15836a8f1fe644cfb0584619d6924b55
 msgid "``shared_emails``"
 msgstr "``shared_emails``"
 
-#: ../../manager/user-api/vfolders.rst:1228 cf7eb89952974aa9acf8de6295a42aae
+#: ../../manager/user-api/vfolders.rst:1228 25925b4510e34b48ae7a33adb1bce945
 #, fuzzy
-msgid "A list of user emails those are successfully shared the virtual folder."
+msgid "A list of user emails those are successfully shared the virtual folder"
 msgstr "가상 폴더를 공유중인 사용자의 이메일 목록"
 
-#: ../../manager/user-api/vfolders.rst:1232 e767b302d18c49cdac261a9983070174
+#: ../../manager/user-api/vfolders.rst:1232 d979c08073c341edb9ebaa4806498119
 msgid "Unshare a Group Virtual Folder from Users"
 msgstr "사용자로부터 그룹 가상 폴더 공유 해제"
 
-#: ../../manager/user-api/vfolders.rst:1234 fa3287165b2c443d97c59857c401a177
-msgid "Unshare a group virtual folder from users."
-msgstr "사용자로부터 그룹 가상 폴더 공유를 해제합니다."
+#: ../../manager/user-api/vfolders.rst:1234 b9976268fef94b48b0061d9abfdcc354
+#, fuzzy
+msgid "Unshare a group virtual folder from users"
+msgstr "사용자로부터 그룹 가상 폴더 공유 해제"
 
-#: ../../manager/user-api/vfolders.rst:1238 afea88d108294b2fae3efb16cd7fc1b5
+#: ../../manager/user-api/vfolders.rst:1238 8cd2cd1576254669a535b3684727ebd9
 msgid "URI: ``/folders/:name/unshare``"
 msgstr "URI: ``/folders/:name/unshare``"
 
-#: ../../manager/user-api/vfolders.rst:1256 00e024d562f249038e45446f43ff8260
+#: ../../manager/user-api/vfolders.rst:1256 341f68ac60944485a7ca5275f2487013
 #, fuzzy
-msgid "A list of user emails to unshare."
+msgid "A list of user emails to unshare"
 msgstr "공유 해제할 사용자 이메일 목록"
 
-#: ../../manager/user-api/vfolders.rst:1270 b6e788c871b843fca62daf509ea33b87
+#: ../../manager/user-api/vfolders.rst:1270 23333876874e41efa268ee9728287d02
 msgid "No email is given."
 msgstr "이메일이 주어지지 않았습니다."
 
 #: ../../manager/user-api/vfolders.rst:1281
-#: ../../manager/user-api/vfolders.rst:1352 4f0df15821f043eeaab9d95999f60e2f
-#: d0cd2fa9448c49bdba30cf7435a0a797
+#: ../../manager/user-api/vfolders.rst:1352 5417602d538240dca532d208056b8f36
+#: 782c869642c145b8b85d772aec69b3d7
 msgid "``unshared_emails``"
 msgstr "``unshared_emails``"
 
-#: ../../manager/user-api/vfolders.rst:1283
-#: ../../manager/user-api/vfolders.rst:1354 9e67c12b5da04f969891cc7c4485a345
-#: b3bf2a75bb5546708b3348d1ececcc8b
+#: ../../manager/user-api/vfolders.rst:1283 f8e62f9f0a004916bd963c4f74a73fa9
 #, fuzzy
-msgid "A list of user emails those are successfully unshared the virtual folder."
+msgid "A list of user emails those are successfully unshared the virtual folder"
 msgstr "가상 폴더 공유 해제를 완료한 사용자의 이메일 목록"
 
-#: ../../manager/user-api/vfolders.rst:1287 850301aa414e48cea9d96de1338bc9c9
+#: ../../manager/user-api/vfolders.rst:1287 6c2623ce26114a1ca93393ebc588c557
 msgid "Clone a Virtual Folder"
 msgstr "가상 폴더 복제"
 
-#: ../../manager/user-api/vfolders.rst:1289 bcf2b6372acd4f73bdd14676d33a8dfa
+#: ../../manager/user-api/vfolders.rst:1289 04a32c1773d145e8bdf42d1c98ee8df5
 #, fuzzy
-msgid "Clone a virtual folder."
+msgid "Clone a virtual folder"
 msgstr "가상 폴더 복제"
 
-#: ../../manager/user-api/vfolders.rst:1291 a8b9fe96e5e542f38e6eded37b46bcab
+#: ../../manager/user-api/vfolders.rst:1291 edc64c8e08cf4904a64cbf0fe5e11862
 msgid "URI: ``/folders/:name/clone``"
 msgstr "URI: ``/folders/:name/clone``"
 
-#: ../../manager/user-api/vfolders.rst:1307 c899ac3468df4bc793645c9a10cd1707
+#: ../../manager/user-api/vfolders.rst:1307 249eb6b3977946278657861bfdf713de
 #, fuzzy
 msgid "``cloneable``"
 msgstr "``code``"
 
-#: ../../manager/user-api/vfolders.rst:1309 7e49a1a82b5343d7b85cb9131efcea4b
+#: ../../manager/user-api/vfolders.rst:1309 c53dfd1a225b42168cd4670126662d99
 msgid "If ``True``, cloned virtual folder will be cloneable again."
 msgstr "``True``일 경우, 복제된 가상 폴더를 다시 복제할 수 있습니다."
 
-#: ../../manager/user-api/vfolders.rst:1310 a7d2cacff25145168288084ebdef066c
+#: ../../manager/user-api/vfolders.rst:1310 2dfd64b27548419898d081dbb1510ee2
 msgid "``target_name``"
 msgstr "``target_name``"
 
-#: ../../manager/user-api/vfolders.rst:1312 1bca008c6ab541e7b6ceb56995b42254
+#: ../../manager/user-api/vfolders.rst:1312 3a26b2cf714243b993e90f0150121f5d
 #, fuzzy
-msgid "The name of the new virtual folder."
+msgid "The name of the new virtual folder"
 msgstr "새 가상 폴더의 이름"
 
-#: ../../manager/user-api/vfolders.rst:1313 5ef0025e5c674abe8209f44f9a2a6315
+#: ../../manager/user-api/vfolders.rst:1313 3e29237a66f74da093f29ff909657ac1
 #, fuzzy
 msgid "``target_host``"
 msgstr "``result``"
 
-#: ../../manager/user-api/vfolders.rst:1315 aa2bcaba84b64a27a525ef2007618f17
+#: ../../manager/user-api/vfolders.rst:1315 0b5f98dac4e24da8a4213cb4b2a61ee4
 #, fuzzy
-msgid "The targe host volume of the new virtual folder."
+msgid "The targe host volume of the new virtual folder"
 msgstr "새 가상 폴더의 타겟 호스트 볼륨"
 
-#: ../../manager/user-api/vfolders.rst:1318 523b769bec8a46fc9508cdd74dcc449e
+#: ../../manager/user-api/vfolders.rst:1318 a5c8d4cf67e94b0ea0ef27f4a05baf3b
 msgid ""
 "(optional) The purpose of the new virtual folder. Allowed values are "
 "``general``, ``model``, and ``data`` (default: ``general``)."
@@ -1833,7 +1844,7 @@ msgstr ""
 "(선택 사항) 새 가상 폴더의 목적. 허용되는 값은 ``general``, ``model``, ``data`` (기본값: "
 "``general``)입니다."
 
-#: ../../manager/user-api/vfolders.rst:1322 fbaf9fb8b8de4ceeb663f2f6de6cec37
+#: ../../manager/user-api/vfolders.rst:1322 4a194b605fe94962bf135a51a75ce901
 msgid ""
 "(optional) The default share permission of the new virtual folder. The "
 "owner of the virtual folder always have ``wd`` permission regardless of "
@@ -1843,20 +1854,31 @@ msgstr ""
 "(선택 사항) 새 가상 폴더의 기본 공유 권한. 가상 폴더의 소유자는 해당 매개변수와 무관하게 항상 ``wd`` 권한을 가집니다. "
 "허용되는 값은 ``ro``, ``rw``, ``wd`` 입니다."
 
-#: ../../manager/user-api/vfolders.rst:1339 99606d903674455f8cbe339a30c143e9
+#: ../../manager/user-api/vfolders.rst:1339 fb481d4fe1fe4f778e065c960721541b
 msgid "No target name, target host, or no permission."
 msgstr "타겟 이름, 타겟 호스트, 권한이 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:1340 57110a9f58574fcf805dbde8df37b909
+#: ../../manager/user-api/vfolders.rst:1340 557aaf42ee764fa081d801761df81b93
 msgid "403 Forbidden"
 msgstr "403 Forbidden"
 
-#: ../../manager/user-api/vfolders.rst:1341 c5a7504364f345c294ddad8192472c37
+#: ../../manager/user-api/vfolders.rst:1341 cc641e407f864cdf8d766bf409f9f798
 msgid "The source virtual folder is not permitted to be cloned."
 msgstr "소스 가상 폴더는 복제할 수 없습니다."
 
-#: ../../manager/user-api/vfolders.rst:1365 6b1e37fb5597400881e47487c9ca86ef
+#: ../../manager/user-api/vfolders.rst:1354 a101e7fc4c94454bab96a442f2d60e8d
 #, fuzzy
-msgid ":ref:`vfolder-list-item-object`."
+msgid "A list of user emails those are successfully unshared the virtual folder."
+msgstr "가상 폴더 공유 해제를 완료한 사용자의 이메일 목록"
+
+#: ../../manager/user-api/vfolders.rst:1365 439d933e645d4b838014b258d960e1d5
+#, fuzzy
+msgid ":ref:`vfolder-list-item-object`"
 msgstr ":ref:`vfolder-list-item-object`"
+
+#~ msgid "Unshare a group virtual folder from users."
+#~ msgstr "사용자로부터 그룹 가상 폴더 공유를 해제합니다."
+
+#~ msgid "Clone a virtual folder."
+#~ msgstr "가상 폴더 복제"
 

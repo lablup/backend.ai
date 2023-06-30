@@ -52,6 +52,7 @@ would be:
 
    [resources]
    open_port_to_public = false
+   allow_preferred_port = false
    max_cpu_cores_per_container = 255
    max_memory_per_container = 1000
    max_cuda_devices_per_container = 8

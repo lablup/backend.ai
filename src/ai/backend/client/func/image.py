@@ -37,13 +37,7 @@ class Image(BaseFunction):
         """
         Fetches the list of registered images in this cluster.
         """
-        q = (
-            "query($is_operation: Boolean) {"
-            "  images(is_operation: $is_operation) {"
-            "    $fields"
-            "  }"
-            "}"
-        )
+        q = "query($is_operation: Boolean) {  images(is_operation: $is_operation) {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "is_operation": operation,
@@ -94,7 +88,7 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def dealias_image(cls, alias: str) -> dict:
-        q = "mutation($alias: String!) {" "  dealias_image(alias: $alias) {" "   ok msg" "  }" "}"
+        q = "mutation($alias: String!) {  dealias_image(alias: $alias) {   ok msg  }}"
         variables = {
             "alias": alias,
         }

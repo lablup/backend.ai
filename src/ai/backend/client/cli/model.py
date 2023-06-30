@@ -104,8 +104,10 @@ def info(ctx: CLIContext, model_name):
     "host_path",
     type=bool,
     is_flag=True,
-    help="Treats HOST as a mount point of unmanaged model. "
-    "This option can only be used by Admin or Superadmin.",
+    help=(
+        "Treats HOST as a mount point of unmanaged model. "
+        "This option can only be used by Admin or Superadmin."
+    ),
 )
 @click.option(
     "-p",
@@ -113,9 +115,11 @@ def info(ctx: CLIContext, model_name):
     metavar="PERMISSION",
     type=str,
     default="rw",
-    help="Folder's innate permission. "
-    'Group folders can be shared as read-only by setting this option to "ro". '
-    "Invited folders override this setting by its own invitation permission.",
+    help=(
+        "Folder's innate permission. "
+        'Group folders can be shared as read-only by setting this option to "ro". '
+        "Invited folders override this setting by its own invitation permission."
+    ),
 )
 @click.option(
     "-q",
@@ -123,9 +127,11 @@ def info(ctx: CLIContext, model_name):
     metavar="QUOTA",
     type=ByteSizeParamCheckType(),
     default="0",
-    help="Quota of the virtual folder. "
-    "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
-    "Default is maximum amount possible.",
+    help=(
+        "Quota of the virtual folder. "
+        "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
+        "Default is maximum amount possible."
+    ),
 )
 @click.option(
     "--cloneable",
@@ -201,25 +207,31 @@ def rm(ctx: CLIContext, model_name):
     "--base-dir",
     type=Path,
     default=None,
-    help="The local parent directory which contains the file to be uploaded.  "
-    "[default: current working directry]",
+    help=(
+        "The local parent directory which contains the file to be uploaded.  "
+        "[default: current working directry]"
+    ),
 )
 @click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
-    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-    "and networks (e.g., 40 GbE) for the maximum throughput.",
+    help=(
+        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+        "and networks (e.g., 40 GbE) for the maximum throughput."
+    ),
 )
 @click.option(
     "--override-storage-proxy",
     type=CommaSeparatedKVListParamType(),
     default=None,
-    help="Overrides storage proxy address. "
-    'The value must shape like "X1=Y1,X2=Y2...". '
-    "Each Yn address must at least include the IP address "
-    "or the hostname and may include the protocol part and the port number to replace.",
+    help=(
+        "Overrides storage proxy address. "
+        'The value must shape like "X1=Y1,X2=Y2...". '
+        "Each Yn address must at least include the IP address "
+        "or the hostname and may include the protocol part and the port number to replace."
+    ),
 )
 def upload(
     ctx: CLIContext,
@@ -266,25 +278,31 @@ def upload(
     "--base-dir",
     type=Path,
     default=None,
-    help="The local parent directory which will contain the downloaded file.  "
-    "[default: current working directry]",
+    help=(
+        "The local parent directory which will contain the downloaded file.  "
+        "[default: current working directry]"
+    ),
 )
 @click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
-    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-    "and networks (e.g., 40 GbE) for the maximum throughput.",
+    help=(
+        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+        "and networks (e.g., 40 GbE) for the maximum throughput."
+    ),
 )
 @click.option(
     "--override-storage-proxy",
     type=CommaSeparatedKVListParamType(),
     default=None,
-    help="Overrides storage proxy address. "
-    'The value must shape like "X1=Y1,X2=Y2...". '
-    "Each Yn address must at least include the IP address "
-    "or the hostname and may include the protocol part and the port number to replace.",
+    help=(
+        "Overrides storage proxy address. "
+        'The value must shape like "X1=Y1,X2=Y2...". '
+        "Each Yn address must at least include the IP address "
+        "or the hostname and may include the protocol part and the port number to replace."
+    ),
 )
 @click.option(
     "--max-retries",

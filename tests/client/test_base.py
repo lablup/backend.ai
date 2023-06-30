@@ -18,7 +18,6 @@ def api_version():
 
 
 class DummyFunction:
-
     session = None
 
     @api_function
@@ -77,7 +76,6 @@ def test_api_function_metaclass():
 
 @pytest.mark.asyncio
 async def test_api_function_metaclass_async():
-
     async with AsyncSession() as session:
         Dummy = type(
             "DummyFunction",

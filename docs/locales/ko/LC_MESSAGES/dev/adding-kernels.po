@@ -9,612 +9,706 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.12.1\n"
 
-#: ../../dev/adding-kernels.rst:2 cd0b8c6742654252a742e5bee3bf9406
+#: ../../dev/adding-kernels.rst:2 6aa0bc4b8b064c6993cf4f91a6833ca6
 msgid "Adding New Kernel Images"
 msgstr "새 커널 이미지 추가하는 방법"
 
-#: ../../dev/adding-kernels.rst:5 074d661364614353b1a5546784e1f669
+#: ../../dev/adding-kernels.rst:5 1b444c3936f542e0b85b6afa6767e216
 msgid "Overview"
 msgstr "둘러보기"
 
-#: ../../dev/adding-kernels.rst:7 831f8b0efdc14c17ad8d965a27e0a76d
+#: ../../dev/adding-kernels.rst:7 347cd72a6be845bda984f7f6e7fa6013
 msgid ""
 "Backend.AI supports running Docker containers to execute user-requested "
-"computations in a resource-constrained and isolated environment. Most Docker "
-"container images can be *imported* as Backend.AI kernels with appropriate "
-"metadata annotations."
+"computations in a resource-constrained and isolated environment. Most "
+"Docker container images can be *imported* as Backend.AI kernels with "
+"appropriate metadata annotations."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:10 04c4cda34d7a49949e22e323bae8db62
+#: ../../dev/adding-kernels.rst:10 f05cca897f8f49c5b37d42bf11e17c72
 msgid ""
-"Prepare a Docker image based on Ubuntu 16.04/18.04, CentOS 7.6, or Alpine "
-"3.8."
+"Prepare a Docker image based on Ubuntu 16.04/18.04, CentOS 7.6, or Alpine"
+" 3.8."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:11 27f090b5e3cc43a493a303baa543c446
+#: ../../dev/adding-kernels.rst:11 a0298ae3e2c84cd5943eaade8ddea6bb
 msgid "Create a Dockerfile that does:"
 msgstr "다음을 수행하는 Dockerfile을 만듭니다:"
 
-#: ../../dev/adding-kernels.rst:13 cac83e8c99a747ad8e095e5da9aee46e
+#: ../../dev/adding-kernels.rst:13 2e92591439c64afdb71f7c8e16ab0efd
 msgid ""
 "Install the OpenSSL library in the image for the kernel runner (if not "
 "installed)."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:14 388e1cf71b89494b9e792a1624ace42b
+#: ../../dev/adding-kernels.rst:14 0f71ee13a1b044f6b154d00d04e1fd54
 msgid "Add metadata labels."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:15 390005205002432493867792d7acb34b
+#: ../../dev/adding-kernels.rst:15 76745dd05608411a8c1c5276e9e46fb2
 msgid "Add service definition files."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:16 cf5e7999c971456e9968ac9631def7d1
+#: ../../dev/adding-kernels.rst:16 72a18d90edd24c3192c22f98d7e85842
 msgid "Add a jail policy file."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:18 ed5aca97e9c0498bb9f58fa346dc750d
+#: ../../dev/adding-kernels.rst:18 6932cc0fbd6f4270819b98247e794626
 msgid "Build a derivative image using the Dockerfile."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:19 85fb92e0a4f044969b47af1398421ce6
+#: ../../dev/adding-kernels.rst:19 c70bf10900ce4b758042622176363343
 msgid "Upload the image to a Docker registry to use with Backend.AI."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:23 03068afe5d09456f9a26f1d6ac02b1a8
+#: ../../dev/adding-kernels.rst:23 a12abac6252a428384825e587a2d7458
 msgid "Kernel Runner"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:25 5e1878460a8948ddbc68b91b1a5a2f0d
+#: ../../dev/adding-kernels.rst:25 f66ab2f1c81a49118bafa189bc9edfc1
 msgid ""
-"Every Backend.AI kernel should run a small daemon called \"kernel runner\". "
-"It communicates with the Backend.AI Agent running in the host via ZeroMQ, "
-"and manages user code execution and in-container service processes."
+"Every Backend.AI kernel should run a small daemon called \"kernel "
+"runner\". It communicates with the Backend.AI Agent running in the host "
+"via ZeroMQ, and manages user code execution and in-container service "
+"processes."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:28 c5812e417e6344bcb10327d882d0e840
+#: ../../dev/adding-kernels.rst:28 5f3e85890f634f598a0ad32e4f781ee8
 msgid ""
-"The kernel runner provides runtime-specific implementations for various code "
-"execution modes such as the query mode and the batch mode, compatible with a "
-"number of well-known programming languages. It also manages the process "
-"lifecycles of service-port processes."
+"The kernel runner provides runtime-specific implementations for various "
+"code execution modes such as the query mode and the batch mode, "
+"compatible with a number of well-known programming languages. It also "
+"manages the process lifecycles of service-port processes."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:31 26dac524031f4818a50a31659c44cf8e
+#: ../../dev/adding-kernels.rst:31 9c9f64ee15194bf6803c156a2ff16b5c
 msgid ""
 "To decouple the development and update cycles for Docker images and the "
-"Backend.AI Agent, we don't install the kernel runner inside images. Instead, "
-"Backend.AI Agent mounts a special \"krunner\" volume as ``/opt/backend.ai`` "
-"inside containers. This volume includes a customized static build of Python. "
-"The kernel runner daemon package is mounted as one of the site packages of "
-"this Python distribution as well. The agent also uses ``/opt/kernel`` as the "
-"directory for mounting other self-contained single-binary utilities. This "
-"way, image authors do not have to bother with installing Python and Backend."
-"AI specific software. All dirty jobs like volume deployment, its content "
-"updates, and mounting for new containers are automatically managed by "
-"Backend.AI Agent."
+"Backend.AI Agent, we don't install the kernel runner inside images. "
+"Instead, Backend.AI Agent mounts a special \"krunner\" volume as "
+"``/opt/backend.ai`` inside containers. This volume includes a customized "
+"static build of Python. The kernel runner daemon package is mounted as "
+"one of the site packages of this Python distribution as well. The agent "
+"also uses ``/opt/kernel`` as the directory for mounting other self-"
+"contained single-binary utilities. This way, image authors do not have to"
+" bother with installing Python and Backend.AI specific software. All "
+"dirty jobs like volume deployment, its content updates, and mounting for "
+"new containers are automatically managed by Backend.AI Agent."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:39 ff9c7b833a8b41d6b7c2a4cdf48bec35
+#: ../../dev/adding-kernels.rst:39 2ac373b282014a14b996705d09f7c71e
 msgid ""
-"Since the customized Python build and binary utilities need to be built for "
-"specific Linux distributions, we only support Docker images built on top of "
-"Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ base images. Note that these three "
-"base distributions practically cover all commonly available Docker images."
+"Since the customized Python build and binary utilities need to be built "
+"for specific Linux distributions, we only support Docker images built on "
+"top of Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ base images. Note that "
+"these three base distributions practically cover all commonly available "
+"Docker images."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:43 03749197c1304346817362ff060650bc
+#: ../../dev/adding-kernels.rst:43 78e93baab25c446d80124af2ab96e5f1
 msgid "Image Prerequisites"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:45 1ec969ec6157486c8e359f82ad05a02a
+#: ../../dev/adding-kernels.rst:45 df4957ee65a14ef785c7639fd3b10417
 msgid ""
-"Currently Python does not officially support static-linking OpenSSL it "
-"depends on until `bpo-38794 <https://bugs.python.org/issue38794>`_ is "
-"resolved. Therefore, All Docker images to be used as Backend.AI kernel "
-"images should have its own OpenSSL system packages, such as ``libssl`` or "
-"``openssl`` depending on the distributions."
+"For glibc-based (most) Linux kernel images, you don't have to add "
+"anything to the existing container image as we use a statically built "
+"Python distribution with precompiled wheels to run the kernel runner. The"
+" only requirement is that it should be compatible with `manylinux2014 "
+"<https://peps.python.org/pep-0599/#the-manylinux2014-policy>`_ or later."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:50 8761036061a942d3ac07324cd200e1d9
+#: ../../dev/adding-kernels.rst:48 5f2ce2b824004ee2a538eba704413322
+msgid ""
+"For musl-based Linux kernel images (e.g., Alpine), you have to install "
+"``libffi`` and ``sqlite-libs`` as the minimum. Please also refer `the "
+"Dockerfile to build a minimal compatible image "
+"<https://github.com/lablup/backend.ai-krunner-alpine/blob/master/compat-"
+"test.Dockerfile>`_."
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:53 c5ea9dff700d4a8b99663cf6a87663fe
 msgid "Metadata Labels"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:52 a58791d1f4bb49488a7534c5023203bf
+#: ../../dev/adding-kernels.rst:55 9e9b177dde0c47198b43e08cbc03d993
 msgid ""
-"Any Docker image based on Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ become a "
-"Backend.AI kernel image if you add the following image labels:"
+"Any Docker image based on Alpine 3.17+, CentOS 7+, and Ubuntu 16.04+ "
+"which satisfies the above prerequisites may become a Backend.AI kernel "
+"image if you add the following image labels:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:54 5538780c7c544ca1b5b74d3ed52d17b1
+#: ../../dev/adding-kernels.rst:57 4f43a08a0cfe4ba8ab6565dfdaa1749a
 msgid "Required Labels"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:56 bd0bc366259b4d47b3465ce9c5054c56
+#: ../../dev/adding-kernels.rst:59 7f19eb50ef104bd8aeb4b09a7a80962c
 msgid ""
-"``ai.backend.kernelspec``: ``1`` (this will be used for future versioning of "
-"the metadata specification)"
+"``ai.backend.kernelspec``: ``1`` (this will be used for future versioning"
+" of the metadata specification)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:57 e9796442052d4215b76bdb268b885386
+#: ../../dev/adding-kernels.rst:60 2224a0c3cbdb4558a6210017b2e8c098
 msgid ""
-"``ai.backend.features``: A list of constant strings indicating which Backend."
-"AI kernel features are available for the kernel."
+"``ai.backend.features``: A list of constant strings indicating which "
+"Backend.AI kernel features are available for the kernel."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:59 b9f32c75e35c421d80cf6eb6363a0949
+#: ../../dev/adding-kernels.rst:62 eb2755c2c2eb44c791623f7f38d6c482
 msgid "**batch**: Can execute user programs passed as files."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:60 77d6616b1f564daca7b213c6c17c8b32
+#: ../../dev/adding-kernels.rst:63 68b9b8d1b8e945989f99b0389a8c897a
 msgid ""
-"**query**: Can execute user programs passed as code snippets while keeping "
-"the context across multiple executions."
+"**query**: Can execute user programs passed as code snippets while "
+"keeping the context across multiple executions."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:61 9b5a2c3c3e2e428baa74553a3c600897
+#: ../../dev/adding-kernels.rst:64 d2347e493fc642459690d61dc5bb11d6
 msgid "**uid-match**: As of 19.03, this must be specified always."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:62 3d0fc924751d4adf945b2dbfaf524b9f
+#: ../../dev/adding-kernels.rst:65 21cf92eb284d4ac588b7c5d5fd6697e7
 msgid "**user-input**: The query/batch mode supports interactive user inputs."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:64 935785d2c14d426ba369be7989b06b98
+#: ../../dev/adding-kernels.rst:67 bcb9661a81234b4785a09ec6c02574fd
 msgid ""
-"``ai.backend.resource.min.*``: The minimum amount of resource to launch this "
-"kernel. At least, you must define the CPU core (``cpu``) and the main memory "
-"(``mem``). In the memory size values, you may use binary scale-suffixes such "
-"as ``m`` for ``MiB``, ``g`` for ``GiB``, etc."
+"``ai.backend.resource.min.*``: The minimum amount of resource to launch "
+"this kernel. At least, you must define the CPU core (``cpu``) and the "
+"main memory (``mem``). In the memory size values, you may use binary "
+"scale-suffixes such as ``m`` for ``MiB``, ``g`` for ``GiB``, etc."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:67 b1e0d865d6e34777a04248348023386f
+#: ../../dev/adding-kernels.rst:70 b60ed7b52ecd4216a201b926a388afee
 msgid ""
-"``ai.backend.base-distro``: Either \"ubuntu16.04\" or \"alpine3.8\".  Note "
-"that Ubuntu 18.04-based kernels also need to use \"ubuntu16.04\" here."
+"``ai.backend.base-distro``: Either \"ubuntu16.04\" or \"alpine3.8\".  "
+"Note that Ubuntu 18.04-based kernels also need to use \"ubuntu16.04\" "
+"here."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:69 9b2ac4253d2345be9d11bfaa49c1100f
+#: ../../dev/adding-kernels.rst:72 64bbd65b80bd4d71854c37a26f49b798
 msgid ""
-"``ai.backend.runtime-type``: The type of kernel runner to use. (One of the "
-"directories in |ai.backend.kernel nslink|_)"
+"``ai.backend.runtime-type``: The type of kernel runner to use. (One of "
+"the directories in |ai.backend.kernel nslink|_)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:72 f396c928ca9d4ea8b0f6704d868b0ec4
+#: ../../dev/adding-kernels.rst:75 6c6e737ce46043088173265e8ff64578
 msgid ""
 "**python**: This runtime is for Python-based kernels, allowing the given "
-"Python executable accessible via the query and batch mode, also as a Jupyter "
-"kernel service."
+"Python executable accessible via the query and batch mode, also as a "
+"Jupyter kernel service."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:74 17e90186d47544e4a95b42cd7c9188ff
+#: ../../dev/adding-kernels.rst:77 c03d81039be24300b8e2f6ee60d435e1
 msgid ""
 "**app**: This runtime does not support code execution in the query/batch "
-"modes but just manages the service port processes. For custom kernel images "
-"with their own service ports for their main applications, this is the most "
-"frequently used runtime type for derivative images."
+"modes but just manages the service port processes. For custom kernel "
+"images with their own service ports for their main applications, this is "
+"the most frequently used runtime type for derivative images."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:77 0290e2afb86849edaae6e4a9774ee1f8
-msgid ""
-"For the full list of available runtime types, |ai.backend.kernel modlink|_"
+#: ../../dev/adding-kernels.rst:80 cbfc637fec8142828994f75e4bf3e6b3
+msgid "For the full list of available runtime types, |ai.backend.kernel modlink|_"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:79 1cfc0155bb3b4a26aff04de42d2684da
-msgid ""
-"``ai.backend.runtime-path``: The path to the language runtime executable."
+#: ../../dev/adding-kernels.rst:82 cc6ea9c4ec08421296360fa2515a0b4b
+msgid "``ai.backend.runtime-path``: The path to the language runtime executable."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:81 6cee85c8d62046b2a43875206a87f7b0
+#: ../../dev/adding-kernels.rst:84 c331da2b2be94dde9e95236d354bc2db
 msgid "Optional Labels"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:83 aa24f8b201864cc792e8ead5bf829541
-msgid ""
-"``ai.backend.service-ports``: A list of port mapping declaration strings for "
-"services supported by the image. (See the next section for details) Backend."
-"AI manages the host-side port mapping and network tunneling via the API "
-"gateway automagically."
+#: ../../dev/adding-kernels.rst:86 ff887a0fd2cc4015bcc11b9f87c5f3d6
+msgid "``ai.backend.role``: ``COMPUTE`` (default if unspecified) or ``INFERENCE``"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:85 9d7c9d38d13940fb9c4610462767394f
+#: ../../dev/adding-kernels.rst:87 56b86173d2c54a9e9c9e624e93a18f4d
 msgid ""
-"``ai.backend.envs.corecount``: A comma-separated string list of environment "
-"variable names. They are set to the number of available CPU cores to the "
-"kernel container. It allows the CPU core restriction to be enforced to "
-"legacy parallel computation libraries. (e.g., ``JULIA_CPU_CORES``, "
-"``OPENBLAS_NUM_THREADS``)"
+"``ai.backend.service-ports``: A list of port mapping declaration strings "
+"for services supported by the image. (See the next section for details) "
+"Backend.AI manages the host-side port mapping and network tunneling via "
+"the API gateway automagically."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:97 e1a71d5235244afe94977c77d889b92d
+#: ../../dev/adding-kernels.rst:89 897f327c73584ec6b32f82bf0b1c0aef
+msgid ""
+"``ai.backend.endpoint-ports``: A comma-separated name(s) of service "
+"port(s) to be bound with the service endpoint. (At least one is required "
+"in inference sessions)"
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:90 364f4847dc0543919e34744037d1a4e0
+msgid ""
+"``ai.backend.model-path``: The path to mount the target model's target "
+"version storage folder. (Required in inference sessions)"
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:91 39b8296e363f4bc58d591b4a28126134
+msgid ""
+"``ai.backend.envs.corecount``: A comma-separated string list of "
+"environment variable names. They are set to the number of available CPU "
+"cores to the kernel container. It allows the CPU core restriction to be "
+"enforced to legacy parallel computation libraries. (e.g., "
+"``JULIA_CPU_CORES``, ``OPENBLAS_NUM_THREADS``)"
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:103 0949ff3c200a41f0baab8b91fc24df17
 msgid "Service Ports"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:99 160be561989b4569943d20e3fc677216
+#: ../../dev/adding-kernels.rst:105 24a1c4b98d4c43bb9f78f396eeb91907
 msgid ""
 "As of Backend.AI v19.03, *service ports* are our preferred way to run "
-"computation workloads inside Backend.AI kernels. It provides tunneled access "
-"to Jupyter Notebooks and other daemons running in containers."
+"computation workloads inside Backend.AI kernels. It provides tunneled "
+"access to Jupyter Notebooks and other daemons running in containers."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:102 653b4c2997c14695b6ec02646fa72e39
+#: ../../dev/adding-kernels.rst:108 b1c6f91efe06438abc6c9e40ed308223
 msgid ""
-"As of Backend.AI v19.09, Backend.AI provides SSH (including SFTP and SCP) "
-"and ttyd (web-based xterm shell) as intrinsic services for all kernels. "
-"\"Intrinsic\" means that image authors do not have to do anything to support/"
-"enable the services."
+"As of Backend.AI v19.09, Backend.AI provides SSH (including SFTP and SCP)"
+" and ttyd (web-based xterm shell) as intrinsic services for all kernels. "
+"\"Intrinsic\" means that image authors do not have to do anything to "
+"support/enable the services."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:105 c8a9564ff69b4f71ae72237b01d8a2c4
+#: ../../dev/adding-kernels.rst:111 8d84c171902b43d79c776c37591557a6
 msgid ""
-"As of Backend.AI v20.03, image authors may define their own service ports "
-"using service definition JSON files installed at ``/etc/backend.ai/service-"
-"defs`` in their images."
+"As of Backend.AI v20.03, image authors may define their own service ports"
+" using service definition JSON files installed at ``/etc/backend.ai"
+"/service-defs`` in their images."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:108 425c566af98a4338b515d7e52f74ef7c
+#: ../../dev/adding-kernels.rst:114 f7c823b7bf0f48a48f5942df92ae69df
 msgid "Port Mapping Declaration"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:110 b4475dc5b3744f2bb0cb204c1a2624a4
+#: ../../dev/adding-kernels.rst:116 b0c838d864184e16b4b621349315d11d
 msgid ""
-"A custom service port should define two things. First, the image label ``ai."
-"backend.service-ports`` contains the port mapping declarations. Second, the "
-"service definition file which specifies how to start the service process."
+"A custom service port should define two things. First, the image label "
+"``ai.backend.service-ports`` contains the port mapping declarations. "
+"Second, the service definition file which specifies how to start the "
+"service process."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:114 9297354647cd46ffa12098a318abf67a
+#: ../../dev/adding-kernels.rst:120 dab9e6c87f3b46ca8acab84d8ffa311f
 msgid ""
-"A port mapping declaration is composed of three values: the service name, "
-"the protocol, and the container-side port number. The label may contain "
-"multiple port mapping declarations separated by commas, like the following "
-"example:"
+"A port mapping declaration is composed of three values: the service name,"
+" the protocol, and the container-side port number. The label may contain "
+"multiple port mapping declarations separated by commas, like the "
+"following example:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:121 64cc40f7d35d4b649115457bf7f5550f
+#: ../../dev/adding-kernels.rst:127 8c42ca47e79844b094523f8e267c5a56
 msgid ""
-"The name may be an non-empty arbitrary ASCII alphanumeric string. We use the "
-"kebab-case for it. The protocol may be one of ``tcp``, ``http``, and "
+"The name may be an non-empty arbitrary ASCII alphanumeric string. We use "
+"the kebab-case for it. The protocol may be one of ``tcp``, ``http``, and "
 "``pty``, but currently most services use ``http``."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:125 9c7d4d66a7734f5da03cdb9b77da689f
+#: ../../dev/adding-kernels.rst:131 5bac201c3b35446a916476dcd970f9cd
 msgid ""
-"Note that there are a few port numbers reserved for Backend.AI itself and "
-"intrinsic service ports. The TCP port 2000 and 2001 is reserved for the "
+"Note that there are a few port numbers reserved for Backend.AI itself and"
+" intrinsic service ports. The TCP port 2000 and 2001 is reserved for the "
 "query mode, whereas 2002 and 2003 are reserved for the native pseudo-"
 "terminal mode (stdin and stdout combined with stderr), 2200 for the "
 "intrinsic SSH service, and 7681 for the intrinsic ttyd service."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:128 b6753d770cab4eca8cba40ba555d5118
+#: ../../dev/adding-kernels.rst:134 2f5e8f4a233a4cf493518c1580ae4ac3
 msgid ""
-"Up to Backend.AI 19.09, this was the only method to define a service port "
-"for images, and the service-specific launch sequences were all hard-coded in "
-"the ``ai.backend.kernel`` module."
+"Up to Backend.AI 19.09, this was the only method to define a service port"
+" for images, and the service-specific launch sequences were all hard-"
+"coded in the ``ai.backend.kernel`` module."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:131 7fd9c6fd92e7416db74f46c55f1639f2
+#: ../../dev/adding-kernels.rst:137 6a6f22e6c55248f1a1353fae22b6b471
 msgid "Service Definition DSL"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:133 dfdefbd3922743d5955e2e9a09eefed5
+#: ../../dev/adding-kernels.rst:139 6bc89eb759494ae4952dc21b47a05e23
 msgid ""
-"Now the image author should define the service launch sequences using a DSL "
-"(domain-specific language). The service definitions are written as JSON "
-"files in the container's ``/etc/backend.ai/service-defs`` directory. The "
-"file names must be same with the name parts of the port mapping declarations."
+"Now the image author should define the service launch sequences using a "
+"DSL (domain-specific language). The service definitions are written as "
+"JSON files in the container's ``/etc/backend.ai/service-defs`` directory."
+" The file names must be same with the name parts of the port mapping "
+"declarations."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:137 f37f95d29203414292b3a15b8a48185a
+#: ../../dev/adding-kernels.rst:143 42dadea1cf7a44a190cbed55aaaedba9
 msgid ""
-"For example, a sample service definition file for \"jupyter\" service (hence "
-"its filename must be ``/etc/backend.ai/service-defs/jupyter.json``) looks "
-"like:"
+"For example, a sample service definition file for \"jupyter\" service "
+"(hence its filename must be ``/etc/backend.ai/service-"
+"defs/jupyter.json``) looks like:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:166 c2df5e5aa6ed4823b4ad6f9fbd9da7b5
+#: ../../dev/adding-kernels.rst:172 885cbae86f764d2fba9110354fcf29d3
 msgid ""
-"A service definition is composed of three major fields: ``prestart`` that "
-"contains a list of prestart actions, ``command`` as a list of template-"
+"A service definition is composed of three major fields: ``prestart`` that"
+" contains a list of prestart actions, ``command`` as a list of template-"
 "enabled strings, and an optional ``url_template`` as a template-enabled "
-"string that defines the URL presented to the end-user on CLI or used as the "
-"redirection target on GUI with wsproxy."
+"string that defines the URL presented to the end-user on CLI or used as "
+"the redirection target on GUI with wsproxy."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:168 e244342544da4e60ab483321a6b4bf93
+#: ../../dev/adding-kernels.rst:174 2d32e251ba87448587d4ce0c8f80fdee
 msgid ""
-"The \"template-enabled\" strings may have references to a contextual set of "
-"variables in curly braces. All the variable substitution follows the "
+"The \"template-enabled\" strings may have references to a contextual set "
+"of variables in curly braces. All the variable substitution follows the "
 "Python's brace-style formatting syntax and rules."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:172 d25dbdf5c59640c5a45e25ece234053b
+#: ../../dev/adding-kernels.rst:178 9644da61f8b44623a12a5c2c2d285651
 msgid "Available predefined variables"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:174 61f6fd0ac03d407988386d4b007c6513
+#: ../../dev/adding-kernels.rst:180 2b349b5616eb4a108702a910d5a2fdc2
 msgid "There are a few predefined variables as follows:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:176 84e4e519ffca46b3af7d16a029336ac0
+#: ../../dev/adding-kernels.rst:182 24a80463d61142f4a98bf3826968924b
 msgid ""
-"**ports**: A list of TCP ports used by the service. Most services have only "
-"one port. An item in the list may be referenced using bracket notation like "
-"``{ports[0]}``."
+"**ports**: A list of TCP ports used by the service. Most services have "
+"only one port. An item in the list may be referenced using bracket "
+"notation like ``{ports[0]}``."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:177 201124b6f9e646ec810426dc123a1890
+#: ../../dev/adding-kernels.rst:183 2b2e5b0abec94e7c8f9ce679e0a0c04a
 msgid ""
 "**runtime_path**: A string representing the full path to the runtime, as "
 "specified in the ``ai.backend.runtime-path`` image label."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:180 e8c80fea547b420db3b0aeebddd1560a
+#: ../../dev/adding-kernels.rst:186 646cce6df6724eaeaa1dd79f1f819a0a
 msgid "Available prestart actions"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:182 49b410154242406ea2c0e0a44f3818ff
+#: ../../dev/adding-kernels.rst:188 118b65209ead41678353c948af543e96
 msgid ""
 "A prestart action is composed of two mandatory fields ``action`` and "
-"``args`` (see the table below), and an optional field ``ref``. The ``ref`` "
-"field defines a variable that stores the result of the action and can be "
-"referenced in later parts of the service definition file where the arguments "
-"are marked as \"template-enabled\"."
+"``args`` (see the table below), and an optional field ``ref``. The "
+"``ref`` field defines a variable that stores the result of the action and"
+" can be referenced in later parts of the service definition file where "
+"the arguments are marked as \"template-enabled\"."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:189 74d68c77820544e985750efe4283f394
+#: ../../dev/adding-kernels.rst:195 120286ce77a049588710e790a8596a14
 msgid "Action Name"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:190 b609d59be83e4e2f90b892aad4cfd6ca
+#: ../../dev/adding-kernels.rst:196 f0cfbdad7d014c3eae06645035258e34
 msgid "Arguments"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:191 6fb56e08e4c14a6ab0425c691ee82147
+#: ../../dev/adding-kernels.rst:197 b90a840056d24b519166914031ee5e0c
 msgid "Return"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:192 236f420843c7475da512b4b3d63e2a1f
+#: ../../dev/adding-kernels.rst:198 4a656848731b4d439c413eb39c07d09c
 msgid "``write_file``"
 msgstr "``write_file``"
 
-#: ../../dev/adding-kernels.rst:193 ba349db722a64359b0cf16c2d52b0678
+#: ../../dev/adding-kernels.rst:199 d5bf030e174d4830a2482755f12b95d5
 msgid "``body``: a list of string lines (template-enabled)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:194 355d89c957154c759fd47570ca67b6c5
+#: ../../dev/adding-kernels.rst:200 7a71ad5f4c0e447481d08106caa7c631
 msgid "``filename``: a string representing the file name (template-enabled)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:195 ../../dev/adding-kernels.rst:200
-#: 5b3dd6871cd44664b1336a02724bea94 95aa126cbf9648d6b5ad84c421688f0e
+#: ../../dev/adding-kernels.rst:201 ../../dev/adding-kernels.rst:206
+#: 66aaeccb880c40958a8e89063137633f d2ec5e71c8714d0080d49b0d6036a38b
 msgid ""
 "``mode``: an optional octal number as string, representing UNIX file "
 "permission (default: \"755\")"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:196 d75fb83f024041df93817e7009bf693c
+#: ../../dev/adding-kernels.rst:202 facb664a3a3a4eca97daf7759b8422ac
 msgid ""
-"``append``: an optional boolean. If set true, open the file in the appending "
-"mode."
+"``append``: an optional boolean. If set true, open the file in the "
+"appending mode."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:197 ../../dev/adding-kernels.rst:204
-#: ../../dev/adding-kernels.rst:211 0890756a29b14e0eba6c67da21bd33cc
-#: 754c9bd494e94bda8a97aadede1984e7 c7e8812f672a49719d80cb0e5355c830
+#: ../../dev/adding-kernels.rst:203 ../../dev/adding-kernels.rst:210
+#: ../../dev/adding-kernels.rst:217 14f26acc0914457a9ee7c9fec68189c1
+#: 76b6781eb20846cb9db59bed2fb44251 ecdee6c959db4b73affd6d7ad285a724
 msgid "None"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:198 97423900f53c4f40885b47ff44209544
+#: ../../dev/adding-kernels.rst:204 faec56b70e0e44e8897b2d69061901a8
 msgid "``write_tempfile``"
 msgstr "``write_tempfile``"
 
-#: ../../dev/adding-kernels.rst:199 253e1db8184c4c309d5f4ea8a59a3a4b
+#: ../../dev/adding-kernels.rst:205 5810f9ea2a5e4ea9ab65243e2e2338b6
 msgid "``body``: a list of string line (template-enabled)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:201 bf27dc76205a45b595f2d5eb818688e1
+#: ../../dev/adding-kernels.rst:207 1833f2ae862949e78babe8f958d47aeb
 msgid "The generated file path"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:202 127a296ac03c4a2f8dd577af17b2b506
+#: ../../dev/adding-kernels.rst:208 01bf6fb8e6954cfbbbab3fe5261346e7
 msgid "``mkdir``"
 msgstr "``mkdir``"
 
-#: ../../dev/adding-kernels.rst:203 6e69a657263e4822af161981ed056a43
+#: ../../dev/adding-kernels.rst:209 b6c0f44aa69d456ab4b9f6c181411a7b
 msgid ""
-"``path``: the directory path (template-enabled) where parent directories are "
-"auto-created"
+"``path``: the directory path (template-enabled) where parent directories "
+"are auto-created"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:205 69adcc21369540b08a1b2a730b1b3ecb
+#: ../../dev/adding-kernels.rst:211 60ef0d5dd6a94d078ba0de40f4b91ca2
 msgid "``run_command``"
 msgstr "``run_command``"
 
-#: ../../dev/adding-kernels.rst:206 a41a172abbae4c759f294a10a9c8e23c
+#: ../../dev/adding-kernels.rst:212 79a918e486ec420ea4cf7127a807ce64
 msgid ""
-"``command``: the command-line argument list as passed to ``exec`` syscall "
-"(template-enabled)"
+"``command``: the command-line argument list as passed to ``exec`` syscall"
+" (template-enabled)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:207 a75ca61cdbb343dd98ba33e96a421542
+#: ../../dev/adding-kernels.rst:213 577142a91dbb4f84a730e633207596a7
 msgid ""
-"A dictionary with two fields: ``out`` and ``err`` which contain the console "
-"output decoded as the UTF-8 encoding"
+"A dictionary with two fields: ``out`` and ``err`` which contain the "
+"console output decoded as the UTF-8 encoding"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:208 dc608171ea9f45b8bc16a68496cbb177
+#: ../../dev/adding-kernels.rst:214 6715559571bd4259a1aec5b6b7757f63
 msgid "``log``"
 msgstr "``log``"
 
-#: ../../dev/adding-kernels.rst:209 92534ec012cb45508d97ee39166710c7
+#: ../../dev/adding-kernels.rst:215 de32208088a64a7e8d8e15fa5e43d79d
 msgid "``body``: a string to send as kernel log (template-enabled)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:210 a935792c72454c7aa06542a4c3603d1f
-msgid ""
-"``debug``: a boolean to lower the logging level to DEBUG (default is INFO)"
+#: ../../dev/adding-kernels.rst:216 4249f786fea6438fa161bffe57777c32
+msgid "``debug``: a boolean to lower the logging level to DEBUG (default is INFO)"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:215 4530ac37dbfe4b0f804d6aed668ed472
+#: ../../dev/adding-kernels.rst:221 f495cae62cca4e989c4dae684dd97e63
 msgid ""
-"``run_command`` action should return quickly, otherwise the session creation "
-"latency will be increased. If you need to run a background process, you must "
-"use its own options to let it daemonize or wrap as a background shell "
-"command (``[\"/bin/sh\", \"-c\", \"... &\"]``)."
+"``run_command`` action should return quickly, otherwise the session "
+"creation latency will be increased. If you need to run a background "
+"process, you must use its own options to let it daemonize or wrap as a "
+"background shell command (``[\"/bin/sh\", \"-c\", \"... &\"]``)."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:219 95a1cb9574cb4197af82b34685446bb6
+#: ../../dev/adding-kernels.rst:225 95cb7a9e5aea450ea316117d30ed3536
 msgid "Interpretation of URL template"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:221 d22faffcf9184196a13e778a09fcc273
+#: ../../dev/adding-kernels.rst:227 e76902e0acd7405c97f01c839cfa2bb6
 msgid ""
-"``url_template`` field is used by the client SDK and wsproxy to fill up the "
-"actual URL presented to the end-user (or the end-user's web browser as the "
-"redirection target). So its template variables are not parsed when starting "
-"the service, but they are parsed and interpolated by the clients. There are "
-"only three fixed variables: ``{protocol}``, ``{host}``, and ``{port}``."
+"``url_template`` field is used by the client SDK and wsproxy to fill up "
+"the actual URL presented to the end-user (or the end-user's web browser "
+"as the redirection target). So its template variables are not parsed when"
+" starting the service, but they are parsed and interpolated by the "
+"clients. There are only three fixed variables: ``{protocol}``, "
+"``{host}``, and ``{port}``."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:225 1867b710f4ac43d392863d7c8764e3dd
+#: ../../dev/adding-kernels.rst:231 ddc9ab9368c64e7cb76b1f933b76d20d
 msgid "Here is a sample service-definition that utilizes the URL template:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:241 3d67894dfa0e499e965afba138db8bcd
+#: ../../dev/adding-kernels.rst:247 2f201bc14fb24f37bed60584788183e0
 msgid "Jail Policy"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:243 25b74b9aa67e4dd8b6e0189e1c2eb218
+#: ../../dev/adding-kernels.rst:249 3341294b8dfc47daa8271a3245ccbaf0
 msgid "**(TODO: jail policy syntax and interpretation)**"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:248 447bb268ddc34154bef7350e7729cdbc
+#: ../../dev/adding-kernels.rst:254 013c2982cdbe4653a22880c3fc4e5553
 msgid "Adding Custom Jail Policy"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:250 5bdce5e6c4c2435c82d3cd62fb46cc4f
+#: ../../dev/adding-kernels.rst:256 b265991d8ea84c4c99b858e71d16d55f
 msgid ""
 "To write a new policy implementation, extend `the jail policy interface "
-"<https://github.com/lablup/backend.ai-jail>`_ in Go. Ebmed it inside your "
-"jail build. Please give a look to existing jail policies as good references."
+"<https://github.com/lablup/backend.ai-jail>`_ in Go. Ebmed it inside your"
+" jail build. Please give a look to existing jail policies as good "
+"references."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:256 044c321981f24025ab9772384f5261da
+#: ../../dev/adding-kernels.rst:262 2b0e27ff24c347da86d18c53bd2828f0
 msgid "Example: An Ubuntu-based Kernel"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:281 0c9c0fe504fb4c0fa0741fd7a53fe35d
+#: ../../dev/adding-kernels.rst:288 4af64334b1334b288f67e696939f46d1
+msgid "Custom startup scripts (aka custom entrypoint)"
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:290 3afd1ab645624105ad3d167b6e14510b
+msgid ""
+"When the image has *preopen* service ports and/or an endpoint port, "
+"Backend.AI automatically sets up application proxy tunnels as if the "
+"listening applications are already started."
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:293 c14be39d89ca49339a4dd89bfb020348
+msgid ""
+"To initialize and start such applications, put a shell script as "
+"``/opt/container/bootstrap.sh`` when building the image. This per-image "
+"bootstrap script is executed as *root* by the agent-injected "
+"``entrypoint.sh``."
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:298 ed30d190119a43f8945b352e465ee655
+msgid ""
+"Since Backend.AI overrides the command and the entrypoint of container "
+"images to run the kernel runner regardless of the image content, setting "
+"``CMD`` or ``ENTRYPOINT`` in Dockerfile has **no effects**. You should "
+"use ``/opt/container/bootstrap.sh`` to migrate existing "
+"entrypoint/command wrappers."
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:304 fc4cb9f5e7884254aa1fbc0d08fe0c8d
+msgid ""
+"``/opt/container/bootstrap.sh`` **must return immediately** to prevent "
+"the session from staying in the ``PREPARING`` status. This means that it "
+"should run service applications in background by *daemonization*."
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:307 c56d7ec727c24387b267f915f60a3bb3
+msgid ""
+"To run a process as the user privilege, you should use ``su-exec`` which "
+"is also injected by the agent like:"
+msgstr ""
+
+#: ../../dev/adding-kernels.rst:315 ffae5fcb8f5a444d827aa9e554fefab9
 msgid "Implementation details"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:284 cadd71a8ce894fe0994f9799ec5df77f
+#: ../../dev/adding-kernels.rst:318 1b04aa8083c34a1ca8e3bde1b5e82128
 msgid "The query mode I/O protocol"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:286 cd23f26a8a874880b76c80e4c182d7ef
+#: ../../dev/adding-kernels.rst:320 f27c57761e1c4d869afbb77cf90e6300
 msgid ""
 "The input is a ZeroMQ's multipart message with two payloads. The first "
-"payload should contain a unique identifier for the code snippet (usually a "
-"hash of it), but currently it is ignored (reserved for future caching "
-"implementations). The second payload should contain a UTF-8 encoded source "
-"code string."
+"payload should contain a unique identifier for the code snippet (usually "
+"a hash of it), but currently it is ignored (reserved for future caching "
+"implementations). The second payload should contain a UTF-8 encoded "
+"source code string."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:290 abb670f2bcc542e3a5151a4c7f2a25cc
+#: ../../dev/adding-kernels.rst:324 5be4b5a7aadb46f99c4571208fe8af9b
 msgid ""
-"The reply is a ZeroMQ's multipart message with a single payload, containing "
-"a UTF-8 encoded string of the following JSON object:"
+"The reply is a ZeroMQ's multipart message with a single payload, "
+"containing a UTF-8 encoded string of the following JSON object:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:311 7f4d7d26015145cca9ff07fbfaa79ad0
+#: ../../dev/adding-kernels.rst:345 cd23151d1c0845079d21fe2cc281e67a
 msgid ""
-"Each item in ``exceptions`` is an array composed of four items: exception "
-"name, exception arguments (optional), a boolean indicating if the exception "
-"is raised outside the user code (mostly false), and a traceback string "
-"(optional)."
+"Each item in ``exceptions`` is an array composed of four items: exception"
+" name, exception arguments (optional), a boolean indicating if the "
+"exception is raised outside the user code (mostly false), and a traceback"
+" string (optional)."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:317 8efeeb5e9b3144968d108ab612c615f0
+#: ../../dev/adding-kernels.rst:351 6baf9783e4994ca3b1ffcd78ea769af1
 msgid ""
 "Each item in ``media`` is an array of two items: MIME-type and the data "
 "string. Specific formats are defined and handled by the Backend.AI Media "
 "module."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:320 b19c985008a44dbf8cb5d2df8b99e93f
+#: ../../dev/adding-kernels.rst:354 d68af99fad7a4179a6e808d342dca681
 msgid ""
-"The ``options`` field may present optionally. If ``upload_output_files`` is "
-"true (default), then the agent uploads the files generated by user code in "
-"the working directory (``/home/work``) to AWS S3 bucket and make their URLs "
-"available in the front-end."
+"The ``options`` field may present optionally. If ``upload_output_files`` "
+"is true (default), then the agent uploads the files generated by user "
+"code in the working directory (``/home/work``) to AWS S3 bucket and make "
+"their URLs available in the front-end."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:324 283117fcac514bf99483652a3c0a9682
+#: ../../dev/adding-kernels.rst:358 dbcb75fd154c4a6a990996e9401aec13
 msgid "The pseudo-terminal mode protocol"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:326 5a0dc8bb89cc4ebd97ec085c9effafab
+#: ../../dev/adding-kernels.rst:360 8af3cd86b19f46999947bb6c5a813dd3
 msgid ""
-"If you want to allow users to have real-time interactions with your kernel "
-"using web-based terminals, you should implement the PTY mode as well. A good "
-"example is `our \"git\" kernel runner <https://github.com/lablup/backend.ai-"
-"kernel-runner/blob/master/src/ai/backend/kernel/git/__init__.py>`_."
+"If you want to allow users to have real-time interactions with your "
+"kernel using web-based terminals, you should implement the PTY mode as "
+"well. A good example is `our \"git\" kernel runner "
+"<https://github.com/lablup/backend.ai-kernel-"
+"runner/blob/master/src/ai/backend/kernel/git/__init__.py>`_."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:329 4a1e6899fc8e4204a93c05d4c0958847
+#: ../../dev/adding-kernels.rst:363 2011bbaba196466eb37977a4f5a1edd1
 msgid ""
 "The key concept is separation of the \"outer\" daemon and the \"inner\" "
 "target program (e.g., a shell). The outer daemon should wrap the inner "
 "program inside a pseudo-tty. As the outer daemon is completely hidden in "
-"terminal interaction by the end-users, the programming language may differ "
-"from the inner program. The challenge is that you need to implement piping "
-"of ZeroMQ sockets from/to pseudo-tty file descriptors. It is up to you how "
-"you implement the outer daemon, but if you choose Python for it, we "
-"recommend to use asyncio or similar event loop libraries such as tornado and "
-"Twisted to mulitplex sockets and file descriptors for both input/output "
-"directions. When piping the messages, the outer daemon should not apply any "
-"specific transformation; it should send and receive all raw data/control "
-"byte sequences transparently because the front-end (e.g., terminal.js) is "
-"responsible for interpreting them. Currently we use PUB/SUB ZeroMQ socket "
-"types but this may change later."
+"terminal interaction by the end-users, the programming language may "
+"differ from the inner program. The challenge is that you need to "
+"implement piping of ZeroMQ sockets from/to pseudo-tty file descriptors. "
+"It is up to you how you implement the outer daemon, but if you choose "
+"Python for it, we recommend to use asyncio or similar event loop "
+"libraries such as tornado and Twisted to mulitplex sockets and file "
+"descriptors for both input/output directions. When piping the messages, "
+"the outer daemon should not apply any specific transformation; it should "
+"send and receive all raw data/control byte sequences transparently "
+"because the front-end (e.g., terminal.js) is responsible for interpreting"
+" them. Currently we use PUB/SUB ZeroMQ socket types but this may change "
+"later."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:337 2053281bf54c49afa1fdf03fb57900d1
+#: ../../dev/adding-kernels.rst:371 d6398559c01947499ba25b0e0621e6e3
 msgid ""
-"Optionally, you may run the query-mode loop side-by-side. For example, our "
-"git kernel supports terminal resizing and pinging commands as the query-mode "
-"inputs. There is no fixed specification for such commands yet, but the "
-"current CodeOnWeb uses the followings:"
+"Optionally, you may run the query-mode loop side-by-side. For example, "
+"our git kernel supports terminal resizing and pinging commands as the "
+"query-mode inputs. There is no fixed specification for such commands yet,"
+" but the current CodeOnWeb uses the followings:"
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:341 95151af30921462ca799e009c238777a
+#: ../../dev/adding-kernels.rst:375 4b7b627df7ed41f9adaa976d3cce7da8
 #, python-format
 msgid ""
-"``%resize <rows> <cols>``: resize the pseudo-tty's terminal to fit with the "
-"web terminal element in user browsers."
+"``%resize <rows> <cols>``: resize the pseudo-tty's terminal to fit with "
+"the web terminal element in user browsers."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:342 d2b6f4bf3a184fab94b7e3647f4c656e
+#: ../../dev/adding-kernels.rst:376 0f528a9ba6c3490da943108a03b816ae
 msgid ""
-"``%ping``: just a no-op command to prevent kernel idle timeouts while the "
-"web terminal is open in user browsers."
+"``%ping``: just a no-op command to prevent kernel idle timeouts while the"
+" web terminal is open in user browsers."
 msgstr ""
 
-#: ../../dev/adding-kernels.rst:344 b92cc619480d4fc2a297b7bd796d1ba6
+#: ../../dev/adding-kernels.rst:378 91553b47890241eb852f347afcaa4c07
 msgid ""
-"A best practice (not mandatory but recommended) for PTY mode kernels is to "
-"automatically respawn the inner program if it terminates (e.g., the user has "
-"exited the shell) so that the users are not locked in a \"blank screen\" "
-"terminal."
+"A best practice (not mandatory but recommended) for PTY mode kernels is "
+"to automatically respawn the inner program if it terminates (e.g., the "
+"user has exited the shell) so that the users are not locked in a \"blank "
+"screen\" terminal."
 msgstr ""
+
+#~ msgid ""
+#~ "Currently Python does not officially "
+#~ "support static-linking OpenSSL it "
+#~ "depends on until `bpo-38794 "
+#~ "<https://bugs.python.org/issue38794>`_ is resolved. "
+#~ "Therefore, All Docker images to be "
+#~ "used as Backend.AI kernel images should"
+#~ " have its own OpenSSL system "
+#~ "packages, such as ``libssl`` or "
+#~ "``openssl`` depending on the distributions."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Any Docker image based on Alpine "
+#~ "3.8+, CentOS 7+, and Ubuntu 16.04+ "
+#~ "become a Backend.AI kernel image if "
+#~ "you add the following image labels:"
+#~ msgstr ""
+

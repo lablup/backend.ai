@@ -1,10 +1,10 @@
 import logging
-import os
 import tempfile
 from pathlib import Path
 from typing import List
 
 from .. import BaseRunner
+from ..base import promote_path
 
 log = logging.getLogger()
 
@@ -12,24 +12,20 @@ DEFAULT_BFLAGS: List[str] = [""]
 
 
 class Runner(BaseRunner):
-
     log_prefix = "go-kernel"
     default_runtime_path = "/usr/local/bin/go"
     default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/ash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": "/home/work/bin:/go/bin:/usr/local/go/bin:"
-        + "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        **BaseRunner.default_child_env,
         "GOPATH": "/home/work",
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        path_env = self.child_env["PATH"]
+        path_env = promote_path(path_env, "/go/bin")
+        path_env = promote_path(path_env, "/usr/local/go/bin")
+        path_env = promote_path(path_env, "/home/work/bin")
+        self.child_env["PATH"] = path_env
 
     async def init_with_loop(self):
         pass

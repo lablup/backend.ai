@@ -20,7 +20,7 @@ def upgrade():
     op.drop_constraint("fk_kernel_dependencies_kernel_id_kernels", "kernel_dependencies")
     op.rename_table("kernel_dependencies", "session_dependencies")
     op.alter_column("session_dependencies", "kernel_id", new_column_name="session_id")
-    op.execute(text("ALTER INDEX pk_kernel_dependencies " "RENAME TO pk_session_dependencies"))
+    op.execute(text("ALTER INDEX pk_kernel_dependencies RENAME TO pk_session_dependencies"))
     op.execute(
         text(
             "ALTER INDEX ix_kernel_dependencies_depends_on "
@@ -61,7 +61,7 @@ def downgrade():
     op.drop_constraint("fk_session_dependencies_session_id_kernels", "session_dependencies")
     op.rename_table("session_dependencies", "kernel_dependencies")
     op.alter_column("kernel_dependencies", "session_id", new_column_name="kernel_id")
-    op.execute(text("ALTER INDEX pk_session_dependencies " "RENAME TO pk_kernel_dependencies"))
+    op.execute(text("ALTER INDEX pk_session_dependencies RENAME TO pk_kernel_dependencies"))
     op.execute(
         text(
             "ALTER INDEX ix_session_dependencies_depends_on "

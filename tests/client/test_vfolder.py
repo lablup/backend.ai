@@ -180,7 +180,7 @@ def test_vfolder_invitations():
 def test_vfolder_accept_invitation():
     with Session() as session, aioresponses() as m:
         payload = {
-            "msg": ("User invitee@lablup.com now can access" " vfolder fake-vfolder-id"),
+            "msg": "User invitee@lablup.com now can access vfolder fake-vfolder-id",
         }
         m.post(
             build_url(session.config, "/folders/invitations/accept"), status=200, payload=payload

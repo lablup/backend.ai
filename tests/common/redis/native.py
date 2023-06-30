@@ -14,7 +14,6 @@ from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisCluster
 
 
 class NativeRedisNode(AbstractRedisNode):
-
     proc: asyncio.subprocess.Process | None
 
     def __init__(self, node_type: str, port: int, start_args: Sequence[str | bytes]) -> None:
@@ -51,7 +50,8 @@ class NativeRedisNode(AbstractRedisNode):
                 self.proc.terminate()
             exit_code = await self.proc.wait()
             print(
-                f"Redis {self.node_type} (pid:{self.proc.pid}) has terminated with exit code {exit_code}."
+                f"Redis {self.node_type} (pid:{self.proc.pid}) has terminated with exit code"
+                f" {exit_code}."
             )
         except ProcessLookupError:
             print(f"Redis {self.node_type} (pid:{self.proc.pid}) already terminated")
@@ -74,8 +74,7 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
         nodes = []
         sentinels = []
-        sentinel_config = textwrap.dedent(
-            f"""
+        sentinel_config = textwrap.dedent(f"""
         sentinel resolve-hostnames yes
         sentinel monitor {self.service_name} 127.0.0.1 16379 2
         sentinel auth-pass {self.service_name} {self.password}
@@ -83,8 +82,7 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
         sentinel failover-timeout {self.service_name} 5000
         sentinel parallel-syncs {self.service_name} 2
         protected-mode no
-        """
-        ).lstrip()
+        """).lstrip()
         for node_port in [16379, 16380, 16381]:
             rdb_path = Path(f"node.{node_port}.rdb")
             try:

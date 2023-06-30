@@ -116,7 +116,6 @@ class WSProxy:
 
 
 class ProxyRunnerContext:
-
     __slots__ = (
         "session_name",
         "app_name",

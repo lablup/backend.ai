@@ -1,31 +1,21 @@
 import logging
-import os
 import tempfile
 from pathlib import Path
 
 import janus
 
 from .. import BaseRunner
+from ..base import promote_path
 
 log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "julia-kernel"
     default_runtime_path = "/usr/local/julia"
     default_child_env = {
-        "TERM": "xterm",
-        "LANG": "C.UTF-8",
-        "SHELL": "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash",
-        "USER": "work",
-        "HOME": "/home/work",
-        "PATH": (
-            "/usr/local/julia:/usr/local/julia/bin:/usr/local/sbin:"
-            "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        ),
-        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
-        "JULIA_LOAD_PATH": ":/opt/julia",
+        **BaseRunner.default_child_env,
+        "JULIA_LOAD_PATH": "/opt/julia:/usr/local/julia",
     }
     jupyter_kspec_name = "julia"
 
@@ -33,6 +23,12 @@ class Runner(BaseRunner):
         super().__init__(*args, **kwargs)
         self.input_queue = None
         self.output_queue = None
+        path_env = self.child_env["PATH"]
+        path_env = promote_path(path_env, "/usr/local/cuda/bin")
+        path_env = promote_path(path_env, "/usr/local/nvidia/bin")
+        path_env = promote_path(path_env, "/usr/local/julia/bin")
+        path_env = promote_path(path_env, "/opt/julia/bin")
+        self.child_env["PATH"] = path_env
 
     async def init_with_loop(self):
         self.input_queue = janus.Queue()

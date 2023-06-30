@@ -21,7 +21,7 @@ def upgrade():
         "kernels",
         ["access_key", "sess_id"],
         unique=True,
-        postgresql_where=sa.text("kernels.status != 'TERMINATED' and " "kernels.role = 'master'"),
+        postgresql_where=sa.text("kernels.status != 'TERMINATED' and kernels.role = 'master'"),
     )
 
 

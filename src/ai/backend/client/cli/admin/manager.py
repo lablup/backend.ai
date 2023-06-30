@@ -41,7 +41,7 @@ def status():
 @click.option(
     "--wait",
     is_flag=True,
-    help="Hold up freezing the manager until " "there are no running sessions in the manager.",
+    help="Hold up freezing the manager until there are no running sessions in the manager.",
 )
 @click.option(
     "--force-kill",
@@ -52,7 +52,7 @@ def freeze(wait, force_kill):
     """Freeze manager."""
     if wait and force_kill:
         print(
-            "You cannot use both --wait and --force-kill options " "at the same time.",
+            "You cannot use both --wait and --force-kill options at the same time.",
             file=sys.stderr,
         )
         return

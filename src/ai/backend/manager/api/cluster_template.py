@@ -12,7 +12,10 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models import TemplateType, UserRole
+from ..models import (
+    TemplateType,
+    UserRole,
+)
 from ..models import association_groups_users as agus
 from ..models import (
     domains,

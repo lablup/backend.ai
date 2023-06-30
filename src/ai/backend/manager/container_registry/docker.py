@@ -35,7 +35,7 @@ class DockerHubRegistry(BaseContainerRegistry):
                         yield f"{username}/{item['name']}"
                 else:
                     log.error(
-                        "Failed to fetch repository list from {0} " "(status={1})",
+                        "Failed to fetch repository list from {0} (status={1})",
                         repo_list_url,
                         resp.status,
                     )
@@ -74,8 +74,7 @@ class DockerRegistry_v2(BaseContainerRegistry):
                     log.debug("found {} repositories", len(data["repositories"]))
                 else:
                     log.warning(
-                        "Docker registry {0} does not allow/support "
-                        "catalog search. (status={1})",
+                        "Docker registry {0} does not allow/support catalog search. (status={1})",
                         self.registry_url,
                         resp.status,
                     )

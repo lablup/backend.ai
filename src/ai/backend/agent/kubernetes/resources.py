@@ -65,8 +65,7 @@ async def detect_resources(
             if sname not in {"cpu", "mem"}
         ):
             raise InitializationError(
-                "Slot types defined by an accelerator plugin must be prefixed "
-                "by the plugin's key.",
+                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
                 invalid_name,  # noqa: F821
                 plugin_instance.key,
             )

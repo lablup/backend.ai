@@ -49,7 +49,7 @@ def upgrade():
         ["access_key", "session_id"],
         unique=True,
         postgresql_where=sa.text(
-            "status NOT IN ('TERMINATED', 'CANCELLED') " "and cluster_role = 'main'"
+            "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
         ),
     )
 
@@ -68,6 +68,6 @@ def downgrade():
         "kernels",
         ["access_key", "session_name"],
         unique=True,
-        postgresql_where=sa.text("status NOT IN ('TERMINATED', 'CANCELLED') " "and role = 'main'"),
+        postgresql_where=sa.text("status NOT IN ('TERMINATED', 'CANCELLED') and role = 'main'"),
     )
     op.create_index("ix_kernels_sess_id_role", "kernels", ["session_name", "role"], unique=False)

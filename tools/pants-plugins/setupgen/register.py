@@ -49,13 +49,24 @@ async def setup_kwargs_plugin(
     # Validate that required fields are set.
     if not kwargs["name"].startswith("backend.ai-"):
         raise ValueError(
-            f"Invalid `name` kwarg in the `provides` field for {request.target.address}. The name "
-            f"must start with 'backend.ai-', but was {kwargs['name']}.",
+            (
+                f"Invalid `name` kwarg in the `provides` field for {request.target.address}. The"
+                f" name must start with 'backend.ai-', but was {kwargs['name']}."
+            ),
         )
     if "description" not in kwargs:
         raise ValueError(
             f"Missing a `description` kwarg in the `provides` field for {request.target.address}.",
         )
+
+    # Override the interpreter compatibility range
+    interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)  # type: ignore
+    m = re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires)
+    if m is not None:
+        major = int(m.group("major"))
+        minor = int(m.group("minor"))
+        kwargs["python_requires"] = f">={major}.{minor},<{major}.{minor + 1}"
 
     # Add classifiers. We preserve any that were already set.
     standard_classifiers = [
@@ -78,6 +89,7 @@ async def setup_kwargs_plugin(
         standard_classifiers.append("Development Status :: 4 - Beta")
     else:
         standard_classifiers.append("Development Status :: 5 - Production/Stable")
+    standard_classifiers.append("Programming Language :: Python :: " + f"{major}.{minor}")
 
     license_classifier = license_classifier_map.get(kwargs["license"])
     if license_classifier:
@@ -122,20 +134,13 @@ async def setup_kwargs_plugin(
     conflicting_hardcoded_kwargs = set(kwargs.keys()).intersection(hardcoded_kwargs.keys())
     if conflicting_hardcoded_kwargs:
         raise ValueError(
-            f"These kwargs should not be set in the `provides` field for {request.target.address} "
-            "because Pants's internal plugin will automatically set them: "
-            f"{sorted(conflicting_hardcoded_kwargs)}",
+            (
+                "These kwargs should not be set in the `provides` field for"
+                f" {request.target.address} because Pants's internal plugin will automatically set"
+                f" them: {sorted(conflicting_hardcoded_kwargs)}"
+            ),
         )
     kwargs.update(hardcoded_kwargs)
-
-    # Override the interpreter compatibility range
-    interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
-    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)  # type: ignore
-    m = re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires)
-    if m is not None:
-        major = int(m.group("major"))
-        minor = int(m.group("minor"))
-        kwargs["python_requires"] = f">={major}.{minor},<{major}.{minor + 1}"
 
     return SetupKwargs(kwargs, address=request.target.address)
 

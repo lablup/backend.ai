@@ -55,7 +55,6 @@ class LazyGroup(LazyClickMixin, click.Group):
 
 
 class EnumChoice(click.Choice):
-
     enum: Type[Enum]
 
     def __init__(self, enum: Type[Enum]):

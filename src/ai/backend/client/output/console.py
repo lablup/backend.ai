@@ -120,6 +120,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
         page_size: Optional[int] = None,
+        plain=False,
     ) -> None:
         fields: List[FieldSpec] = []
 
@@ -144,6 +145,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     tabulate_items(
                         infinite_fetch(preferred_page_size),
                         fields,
+                        tablefmt="plain" if plain else "simple",
                     ),
                 )
             except NoItems:
@@ -154,6 +156,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
             for line in tabulate_items(
                 infinite_fetch(page_size),
                 fields,
+                tablefmt="plain" if plain else "simple",
             ):
                 print(line, end="")
 

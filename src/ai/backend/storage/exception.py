@@ -12,6 +12,10 @@ class ExecutionError(StorageProxyError):
     pass
 
 
+class NotEmptyError(StorageProxyError):
+    pass
+
+
 class VFolderCreationError(StorageProxyError):
     pass
 
@@ -21,6 +25,10 @@ class VFolderNotFoundError(StorageProxyError):
 
 
 class InvalidSubpathError(StorageProxyError):
+    pass
+
+
+class InvalidQuotaScopeError(StorageProxyError):
     pass
 
 

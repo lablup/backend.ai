@@ -30,17 +30,17 @@ msgstr "vs. Notebooks"
 #: 79105172721e4098a6d25ad4e039fb0e 99950a9acda8452eaffe27fcc30be06f
 #: c4e968ca8763497aba424dfe7f1ead7c
 msgid "Product"
-msgstr "Product"
+msgstr "제품명"
 
 #: ../../concepts/faq.rst:10 ../../concepts/faq.rst:48
 #: 4142161b719541aab385b8b9476f2ff5 d505e1d8df484222bc733ea135673e36
 msgid "Role"
-msgstr "Role"
+msgstr "역할"
 
 #: ../../concepts/faq.rst:11 ../../concepts/faq.rst:49
 #: 6a524bc6c58d47d5995b3c688eaa7eaa f73422c6ae7845df94b0d9f79fff906c
 msgid "Problem and Solution"
-msgstr "Problem and Solution"
+msgstr "문제 및 해결방법"
 
 #: ../../concepts/faq.rst:13 0959e18cbd42458e90d894552006ceb9
 msgid "Apache Zeppelin, Jupyter Notebook"
@@ -48,11 +48,11 @@ msgstr "Apache Zeppelin, Jupyter Notebook"
 
 #: ../../concepts/faq.rst:14 f7b972764a1345f6841972b102b00230
 msgid "Notebook-style document + code *frontends*"
-msgstr "Notebook-style document + code *frontends*"
+msgstr "노트북 스타일의 문서 + 코드 *프론트엔드*"
 
 #: ../../concepts/faq.rst:15 3b95e0e752e44d35879aedc91c740e83
 msgid "Insecure host resource sharing"
-msgstr "Insecure host resource sharing"
+msgstr "보안상 취약한 호스트 리소스 공유"
 
 #: ../../concepts/faq.rst:17 ../../concepts/faq.rst:34
 #: ../../concepts/faq.rst:59 141096fc36e74ac2b75538d6ac114806
@@ -62,7 +62,7 @@ msgstr "**Backend.AI**"
 
 #: ../../concepts/faq.rst:18 46cfa7de594e4e388da2d1d143e0576a
 msgid "Pluggable *backend* to any frontends"
-msgstr "Pluggable *backend* to any frontends"
+msgstr "모든 프론트엔드들에 연결 가능한 *backend* 구조"
 
 #: ../../concepts/faq.rst:19 ec2b4bf5c7c94c0d86df38e32552dcdb
 msgid "Built for multi-tenancy: scalable and better isolation"
@@ -70,15 +70,15 @@ msgstr "Built for multi-tenancy: scalable and better isolation"
 
 #: ../../concepts/faq.rst:22 afd7dfbcfde74ba4a1d5dcec662f60f1
 msgid "vs. Orchestration Frameworks"
-msgstr "vs. Orchestration Frameworks"
+msgstr "vs. 오케스트레이션 프레임워크"
 
 #: ../../concepts/faq.rst:27 5a961b4114694a57857120bc2d78e6b6
 msgid "Target"
-msgstr "Target"
+msgstr "대상"
 
 #: ../../concepts/faq.rst:28 d641399d41144159940477ce36bb08ec
 msgid "Value"
-msgstr "Value"
+msgstr "특"
 
 #: ../../concepts/faq.rst:30 47860450a24246cc9c649c1da474e02c
 msgid "Amazon ECS, Kubernetes"
@@ -86,7 +86,7 @@ msgstr "Amazon ECS, Kubernetes"
 
 #: ../../concepts/faq.rst:31 76cf1c529c534ab6949a62e87f66ea8b
 msgid "Long-running service daemons"
-msgstr "Long-running service daemons"
+msgstr "장시 실행되는 서비스 데몬"
 
 #: ../../concepts/faq.rst:32 e35c4de5610043b2ab0602d9329e4da9
 msgid "Load balancing, fault tolerance, incremental deployment"
@@ -94,7 +94,7 @@ msgstr "Load balancing, fault tolerance, incremental deployment"
 
 #: ../../concepts/faq.rst:35 4348c99fed4047a8bc6a9fe2188c687d
 msgid "Stateful compute sessions"
-msgstr "Stateful compute sessions"
+msgstr "상태를 보관하는 컴퓨팅 세션"
 
 #: ../../concepts/faq.rst:36 fcaeed5b0b9349438a4a86331b3c2acb
 msgid "Low-cost high-density computation"
@@ -110,11 +110,11 @@ msgstr "Stateless, light-weight functions"
 
 #: ../../concepts/faq.rst:40 bb57ffa3fb7741f99fa3a01d04bfc762
 msgid "Serverless, zero-management"
-msgstr "Serverless, zero-management"
+msgstr "관리가 필요없는 서버리스 구조"
 
 #: ../../concepts/faq.rst:43 53259dfd98fe4c4691133716b9e3a9a5
 msgid "vs. Big-data and AI Frameworks"
-msgstr "vs. Big-data and AI Frameworks"
+msgstr "vs. 빅데이터와 AI 프레임워크"
 
 #: ../../concepts/faq.rst:51 41d2326e38054e3186f0661a22e98b8a
 msgid "TensorFlow, Apache Spark, Apache Hive"
@@ -122,11 +122,11 @@ msgstr "TensorFlow, Apache Spark, Apache Hive"
 
 #: ../../concepts/faq.rst:52 50c0bfbd3bb34719b1ecc10b9237218b
 msgid "Computation runtime"
-msgstr "Computation runtime"
+msgstr "연산 런타임"
 
 #: ../../concepts/faq.rst:53 dfe9a11366b246a39256df99fb48f864
 msgid "Difficult to install, configure, and operate"
-msgstr "Difficult to install, configure, and operate"
+msgstr "설치, 구성, 및 운용이 어려움"
 
 #: ../../concepts/faq.rst:55 1072859cbf934c16ad754bfdf61ba2b3
 msgid "Amazon ML, Azure ML, GCP ML"
@@ -138,11 +138,11 @@ msgstr "Managed MLaaS"
 
 #: ../../concepts/faq.rst:57 d1d25c7f372d441cb390f37794fdd9fc
 msgid "Still complicated for scientists, too restrictive for engineers"
-msgstr "Still complicated for scientists, too restrictive for engineers"
+msgstr "과학자에게는 여전히 복잡하고, 엔지니어 들에게는 너무 제한적인 개발 환경"
 
 #: ../../concepts/faq.rst:60 dd9a52d91cee4bf29a1553cd7e53ba73
 msgid "Host of computation runtimes"
-msgstr "Host of computation runtimes"
+msgstr "연산 런타임의 호스트"
 
 #: ../../concepts/faq.rst:61 2b9ad00a67f0432b914e2988198057fb
 msgid "Pre-configured, versioned, reproducible, customizable (open-source)"

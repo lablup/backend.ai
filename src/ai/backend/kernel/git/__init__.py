@@ -14,24 +14,12 @@ from .. import BaseRunner, Terminal
 
 log = logging.getLogger()
 
-CHILD_ENV = {
-    "TERM": "xterm",
-    "LANG": "C.UTF-8",
-    "SHELL": "/bin/bash",
-    "USER": "work",
-    "HOME": "/home/work",
-    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-    "LD_PRELOAD": os.environ.get("LD_PRELOAD", "/home/backend.ai/libbaihook.so"),
-}
-
 
 class Runner(BaseRunner):
-
     log_prefix = "shell-kernel"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.child_env.update(CHILD_ENV)
 
     async def init_with_loop(self):
         self.user_input_queue = asyncio.Queue()

@@ -33,16 +33,10 @@ def upgrade():
     conn.execute(
         text("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
     )
-    conn.execute(
-        text(
-            textwrap.dedent(
-                """\
+    conn.execute(text(textwrap.dedent("""\
         ALTER TABLE users
             ALTER COLUMN role TYPE userrole USING role::text::userrole;
-    """
-            )
-        )
-    )
+    """)))
     conn.execute(text("DROP TYPE userrole__;"))
 
     # Set admin@lablup.com's role as superadmin.
@@ -56,12 +50,10 @@ def upgrade():
     result = conn.execute(text(query)).first()
     uuid = result.uuid if hasattr(result, "uuid") else None
     if uuid is not None:  # update only when admin@lablup.com user exist
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             UPDATE users SET domain_name = 'default', role = 'superadmin'
             WHERE email = 'admin@lablup.com';
-        """
-        )
+        """)
         conn.execute(text(query))
 
 
@@ -84,14 +76,8 @@ def downgrade():
         conn.execute(
             text("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
         )
-        conn.execute(
-            text(
-                textwrap.dedent(
-                    """\
+        conn.execute(text(textwrap.dedent("""\
             ALTER TABLE users
                 ALTER COLUMN role TYPE userrole USING role::text::userrole;
-        """
-                )
-            )
-        )
+        """)))
         conn.execute(text("DROP TYPE userrole___;"))

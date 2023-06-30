@@ -93,5 +93,6 @@ async def test_pipeline_sentinel_cluster(redis_cluster: RedisClusterInfo) -> Non
         return pipe
 
     results = await execute(rconn, _build_pipeline_async)
+
     assert results[0] is True
     assert str(results[1]) == "124"

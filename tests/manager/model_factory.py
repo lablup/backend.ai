@@ -12,7 +12,6 @@ def get_random_string(length=10):
 
 
 class ModelFactory(ABC):
-
     model = None
     app = None
     defaults = None
@@ -63,7 +62,6 @@ class ModelFactory(ABC):
 
 
 class KeyPairFactory(ModelFactory):
-
     model = models.keypairs
 
     def get_creation_defaults(self, **kwargs):
@@ -85,7 +83,6 @@ class KeyPairFactory(ModelFactory):
 
 
 class UserFactory(ModelFactory):
-
     model = models.users
 
     def get_creation_defaults(self, **kwargs):
@@ -107,7 +104,6 @@ class UserFactory(ModelFactory):
 
 
 class DomainFactory(ModelFactory):
-
     model = models.domains
 
     def get_creation_defaults(self, **kwargs):
@@ -118,7 +114,6 @@ class DomainFactory(ModelFactory):
 
 
 class GroupFactory(ModelFactory):
-
     model = models.groups
 
     def get_creation_defaults(self, **kwargs):
@@ -130,7 +125,6 @@ class GroupFactory(ModelFactory):
 
 
 class AssociationGroupsUsersFactory(ModelFactory):
-
     model = models.association_groups_users
 
     def get_creation_defaults(self, **kwargs):
@@ -143,7 +137,6 @@ class AssociationGroupsUsersFactory(ModelFactory):
 
 
 class VFolderFactory(ModelFactory):
-
     model = models.vfolders
 
     def get_creation_defaults(self, **kwargs):
@@ -159,7 +152,6 @@ class VFolderFactory(ModelFactory):
 
 
 class VFolderInvitationFactory(ModelFactory):
-
     model = models.vfolder_invitations
 
     def get_creation_defaults(self, **kwargs):
@@ -181,7 +173,6 @@ class VFolderInvitationFactory(ModelFactory):
 
 
 class VFolderPermissionFactory(ModelFactory):
-
     model = models.vfolder_permissions
 
     def get_creation_defaults(self, **kwargs):

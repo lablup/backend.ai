@@ -1,0 +1,23 @@
+[general]
+#apiEndpoint =
+#apiEndpointText =
+#defaultSessionEnvironment =
+siteDescription = "Console"
+connectionMode = "SESSION"
+allowChangeSigninMode = true
+signupSupport = false
+allowSignout = false
+allowProjectResourceMonitor = true
+debug = true
+
+[wsproxy]
+proxyURL = "https://wsproxy.onprem.backend.ai:9443/"
+#proxyBaseURL = ""
+disableCertCheck = false
+
+[server]
+consoleServerURL =
+
+[plugin]
+#login = "signup-cloud.js"
+#sidebar = "report-cloud.js"

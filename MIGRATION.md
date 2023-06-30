@@ -6,6 +6,9 @@ Backend.AI Migration Guide
 * The migration should be done while the managers and agents are shut down.
 * This guide only describes additional steps to follow other than the code/package upgrades.
 
+# 22.09 to 23.03
+* All running containers **MUST** be shut down before starting 23.03 version of Backend.AI Agent.
+
 ## 21.09 to 22.03
 
 * `alembic upgrade head` is required to migrate the PostgreSQL database schema.

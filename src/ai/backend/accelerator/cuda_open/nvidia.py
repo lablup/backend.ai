@@ -25,7 +25,6 @@ TARGET_CUDA_VERSIONS = (
 
 
 class LibraryError(RuntimeError):
-
     lib: str
     func: str
     code: int
@@ -303,7 +302,6 @@ def _load_library(name):
 
 
 class LibraryBase(metaclass=ABCMeta):
-
     name = "LIBRARY"
 
     _lib = None
@@ -334,7 +332,6 @@ class LibraryBase(metaclass=ABCMeta):
 
 
 class libcudart(LibraryBase):
-
     name = "CUDART"
 
     _version = (0, 0)
@@ -445,7 +442,6 @@ class DeviceStat(NamedTuple):
 
 
 class libnvml(LibraryBase):
-
     name = "NVML"
 
     _initialized = False

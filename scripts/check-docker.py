@@ -1,5 +1,8 @@
+import argparse
+import base64
 import functools
-import json
+import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -15,7 +18,7 @@ run = subprocess.run
 
 def parse_version(expr):
     result = []
-    for part in expr.split('.'):
+    for part in expr.split("."):
         try:
             result.append(int(part))
         except ValueError:
@@ -23,34 +26,54 @@ def parse_version(expr):
     return tuple(result)
 
 
+def get_build_root() -> Path:
+    p = Path.cwd()
+    while p != p.parent:
+        if (p / "BUILD_ROOT").is_file():
+            return p
+        p = p.parent
+    raise RuntimeError("Cannot determine the build root path")
+
+
+def simple_hash(data: bytes) -> str:
+    h = hashlib.sha1()
+    h.update(data)
+    # generate a filesystem-safe base64 string
+    return base64.b64encode(h.digest()[:12], altchars=b"._").decode()
+
+
 def detect_snap_docker():
-    if not Path('/run/snapd.socket').is_socket():
+    if not Path("/run/snapd.socket").is_socket():
         return None
     with requests.get("http+unix://%2Frun%2Fsnapd.socket/v2/snaps?names=docker") as r:
         if r.status_code != 200:
             raise RuntimeError("Failed to query Snapd package information")
         response_data = r.json()
-        for pkg_data in response_data['result']:
-            if pkg_data['name'] == 'docker':
-                return pkg_data['version']
+        for pkg_data in response_data["result"]:
+            if pkg_data["name"] == "docker":
+                return pkg_data["version"]
 
 
 def detect_system_docker():
     sock_paths = [
-        Path('/run/docker.sock'),      # Linux default
-        Path('/var/run/docker.sock'),  # macOS default
+        Path("/run/docker.sock"),  # Linux default
+        Path("/var/run/docker.sock"),  # macOS default
     ]
+    if env_sock_path := os.environ.get("DOCKER_HOST", None):
+        # Some special setups like OrbStack may have a custom DOCKER_HOST.
+        env_sock_path = env_sock_path.removeprefix("unix://")
+        sock_paths.insert(0, Path(env_sock_path))
     for sock_path in sock_paths:
         if sock_path.is_socket():
             break
     else:
         return None
-    encoded_sock_path = quote(bytes(sock_path), safe='')
+    encoded_sock_path = quote(bytes(sock_path), safe="")
     with requests.get(f"http+unix://{encoded_sock_path}/version") as r:
         if r.status_code != 200:
             raise RuntimeError("Failed to query the Docker daemon API")
         response_data = r.json()
-        return response_data['Version']
+        return response_data["Version"]
 
 
 def fail_with_snap_docker_refresh_request():
@@ -74,6 +97,23 @@ def fail_with_compose_install_request():
 def main():
     requests_unixsocket.monkeypatch()
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--get-preferred-pants-local-exec-root", action="store_true", default=False)
+    args = parser.parse_args()
+
+    if args.get_preferred_pants_local_exec_root:
+        docker_version = detect_snap_docker()
+        build_root_path = get_build_root()
+        build_root_name = build_root_path.name
+        build_root_hash = simple_hash(os.fsencode(build_root_path))
+        if docker_version is not None:
+            # For Snap-based Docker, use a home directory path
+            print(Path.home() / f".cache/{build_root_name}-{build_root_hash}-pants")
+        else:
+            # Otherwise, use the standard tmp directory
+            print(f"/tmp/{build_root_name}-{build_root_hash}-pants")
+        return
+
     docker_version = detect_snap_docker()
     if docker_version is not None:
         log(f"Detected Docker installation: Snap package ({docker_version})")
@@ -87,11 +127,11 @@ def main():
             fail_with_system_docker_install_request()
 
     try:
-        proc = run(['docker', 'compose', 'version'], capture_output=True, check=True)
+        proc = run(["docker", "compose", "version"], capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
         fail_with_compose_install_request()
     else:
-        m = re.search(r'\d+\.\d+\.\d+', proc.stdout.decode())
+        m = re.search(r"\d+\.\d+\.\d+", proc.stdout.decode())
         if m is None:
             log("Failed to retrieve the docker-compose version!")
             sys.exit(1)
@@ -104,5 +144,5 @@ def main():
     # Now we can proceed with the given docker & docker-compose installation.
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

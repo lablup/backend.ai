@@ -81,7 +81,6 @@ async def list_versions(request: web.Request) -> web.Response:
 
 
 class MetadataServer(aobject):
-
     app: web.Application
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]

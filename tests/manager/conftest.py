@@ -348,8 +348,7 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
-    alembic_config_template = textwrap.dedent(
-        """
+    alembic_config_template = textwrap.dedent("""
     [alembic]
     script_location = ai.backend.manager.models:alembic
     sqlalchemy.url = {sqlalchemy_url:s}
@@ -375,8 +374,7 @@ def database(request, local_config, test_db):
 
     [formatter_simple]
     format = [%(name)s] %(message)s
-    """
-    ).strip()
+    """).strip()
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
@@ -750,6 +748,7 @@ class DummyEtcd:
 
 @pytest.fixture
 async def registry_ctx(mocker):
+    mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
     mock_shared_config.update_resource_slots = AsyncMock()
     mock_shared_config.etcd = None
@@ -783,6 +782,7 @@ async def registry_ctx(mocker):
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
+        local_config=mock_local_config,
         shared_config=mock_shared_config,
         db=mock_db,
         redis_stat=mock_redis_stat,

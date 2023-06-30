@@ -68,7 +68,7 @@ def list(ctx):
     "--default-for-unspecified",
     type=str,
     default="UNLIMITED",
-    help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
+    help="Default behavior for unspecified resources: LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
 @click.option(
@@ -93,7 +93,7 @@ def list(ctx):
     "--idle-timeout",
     type=int,
     default=1800,
-    help="The maximum period of time allowed for kernels to wait " "further requests.",
+    help="The maximum period of time allowed for kernels to wait further requests.",
 )
 @click.option(
     "--allowed-vfolder-hosts",
@@ -103,8 +103,10 @@ def list(ctx):
             "local:volume1": [perm.value for perm in VFolderHostPermission],
         }
     ),
-    help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
+    help=(
+        "Allowed virtual folder hosts. It must be JSON string (e.g:"
+        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
 )
 def add(
     ctx: CLIContext,
@@ -164,7 +166,7 @@ def add(
 @click.option(
     "--default-for-unspecified",
     type=str,
-    help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
+    help="Default behavior for unspecified resources: LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, help="Set total resource slots.")
 @click.option(
@@ -179,13 +181,15 @@ def add(
 @click.option(
     "--idle-timeout",
     type=int,
-    help="The maximum period of time allowed for kernels to wait " "further requests.",
+    help="The maximum period of time allowed for kernels to wait further requests.",
 )
 @click.option(
     "--allowed-vfolder-hosts",
     type=str,
-    help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
+    help=(
+        "Allowed virtual folder hosts. It must be JSON string (e.g:"
+        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+    ),
 )
 def update(
     ctx: CLIContext,

@@ -1,0 +1,49 @@
+[agent.delay]
+scan-image = 0.1
+pull-image = 0.1
+destroy-kernel = 0.1
+clean-kernel = 0.1
+create-network = 0.1
+destroy-network = 0.1
+
+
+[agent.image]
+already-have = []
+need-to-pull = []
+missing = []
+
+
+[agent.resource.cpu]
+core-indexes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+
+[agent.resource.memory]
+size = 50000000000
+
+
+[kernel-creation-ctx.delay]
+prepare-scratch = 0.1
+prepare-ssh = 0.1
+spawn = 0.1
+start-container = 2.0
+mount-krunner = 0.1
+
+
+[kernel]
+use-fake-code-runner = true
+
+
+[kernel.delay]
+check-status = 0.1
+get-completions = 0.1
+get-logs = 0.1
+interrupt-kernel = 0.1
+start-service = 0.1
+start-model-service = 0.1
+shutdown-service = 0.1
+commit = 10.0
+get-service-apps = 0.1
+accept-file = 0.1
+download-file = 0.1
+download-single = 0.1
+list-files = 0.1

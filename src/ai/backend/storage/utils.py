@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from datetime import timezone as tz
-from typing import Any, Optional, Union
+from typing import Any, AsyncIterator, Optional, Union
 
 import trafaret as t
 from aiohttp import web
@@ -30,7 +30,7 @@ async def check_params(
     *,
     read_from: CheckParamSource = CheckParamSource.BODY,
     auth_required: bool = True,
-) -> Any:
+) -> AsyncIterator[Any]:
     if checker is None:
         if request.can_read_body:
             raise web.HTTPBadRequest(

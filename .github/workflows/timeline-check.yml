@@ -7,20 +7,22 @@ on:
 
 jobs:
   pr-number-assign:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') && github.event.pull_request.number != null }}
     uses: ./.github/workflows/pr-number-assign.yml
+    secrets:
+      WORKFLOW_PAT: ${{ secrets.WORKFLOW_PAT }}
 
   towncrier:
     needs: [pr-number-assign]
     runs-on: ubuntu-latest
     steps:
-    - name: Sparse-checkout
-      uses: lablup/sparse-checkout@v1
+    - name: Get PR's fetch depth
+      run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+    - uses: actions/checkout@v3
       with:
-        patterns: |
-          changes
-          scripts
-          packages
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: ${{ env.PR_FETCH_DEPTH }}
+        sparse-checkout: changes
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -29,20 +31,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install -U pip setuptools
-        python -m pip install -U towncrier~=21.9
+        python -m pip install -U towncrier~=22.12
     - name: Check existence of news fragment
       run: |
-        # Check if the PR has a news fragment
-        NEWS_FRAGMENTS=$(git diff --name-only origin/${BASE_BRANCH}...HEAD -- changes/)
-        for change in $NEWS_FRAGMENTS; do
-          if [ $(basename $change | cut -d'.' -f1) != $PR_NUMBER ]; then
-            echo "$change is not valid news fragment file name"
-            echo "The news fragment file name must be $PR_NUMBER"
-            exit 1
-          fi
-        done
-        git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
-        python -m towncrier.check --compare-with=origin/${BASE_BRANCH}
+        BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+        BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+        git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF}"
+        python -m towncrier.check --compare-with=origin/${BASE_REF}
       env:
-        BASE_BRANCH: ${{ github.base_ref }}
-        PR_NUMBER: ${{ github.event.number }}
+        BASE_REF: ${{ github.event.pull_request.base.ref }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}

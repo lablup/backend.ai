@@ -156,7 +156,6 @@ class RangeExprOptionType(click.ParamType):
 
 
 class CommaSeparatedListType(click.ParamType):
-
     name = "List Expression"
 
     def convert(self, arg, param, ctx):

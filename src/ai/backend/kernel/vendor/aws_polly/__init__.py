@@ -13,7 +13,6 @@ log = logging.getLogger()
 
 
 class Runner(BaseRunner):
-
     log_prefix = "vendor.aws_polly-kernel"
 
     def __init__(self, *args, **kwargs):
@@ -79,9 +78,7 @@ class Runner(BaseRunner):
             log.error("Interrupt failed due to invalid thread identity.")
         elif affected_count > 1:
             ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(target_tid), ctypes.c_long(0))
-            log.error(
-                "Interrupt broke the interpreter state -- " "recommended to reset the session."
-            )
+            log.error("Interrupt broke the interpreter state -- recommended to reset the session.")
 
     async def start_service(self, service_info):
         return None, {}

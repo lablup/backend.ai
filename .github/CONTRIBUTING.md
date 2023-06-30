@@ -18,7 +18,7 @@ Versioning Scheme
 Before you make a contribution, ensure that which branch is the target you want to
 contribute to.
 Please take a look at [our versioning scheme
-document](https://docs.backend.ai/en/latest/install/version-management-and-upgrades.html#version-numbering)
+document](https://docs.backend.ai/en/latest/dev/version-management-and-upgrades.html#version-numbering)
 to understand how we name branches and tags.
 In short, we use "X.Y" in branch names for major releases, and "X.Y.Z" in tag names
 for minor patch releases.

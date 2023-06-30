@@ -3,13 +3,15 @@ Backend.AI
 
 [![PyPI release version](https://badge.fury.io/py/backend.ai-manager.svg)](https://pypi.org/project/backend.ai-manager/)
 ![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai-manager.svg)
+![Wheels](https://img.shields.io/pypi/wheel/backend.ai-manager.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
-Backend.AI is a streamlined, container-based computing cluster orchestrator
-that hosts diverse programming languages and popular computing/ML frameworks,
-with pluggable heterogeneous accelerator support including CUDA and ROCM.
+Backend.AI is a streamlined, container-based computing cluster platform 
+that hosts popular computing/ML frameworks and diverse programming languages, 
+with pluggable heterogeneous accelerator support including CUDA GPU, ROCm GPU, TPU, IPU and other NPUs.
+
 It allocates and isolates the underlying computing resources for multi-tenant
-computation sessions on-demand or in batches with customizable job schedulers.
+computation sessions on-demand or in batches with customizable job schedulers with its own orchestrator.
 All its functions are exposed as REST/GraphQL/WebSocket APIs.
 
 
@@ -36,6 +38,7 @@ as a reference implementation of API clients.
   - `storage/`: Storage proxy
   - `storage/api`: Storage proxy's manager-facing and client-facing APIs
   - `web/`: Web UI server
+    - `static/`: A git subtree of [lablup/backend.ai-app](https://github.com/lablup/backend.ai-app) tracking its main branch
   - `plugin/`: Plugin subsystem
   - `test/`: Integration test suite
   - `testutils/`: Shared utilities used by unit tests
@@ -170,15 +173,22 @@ and basic administration tasks.
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
 
+**Synchronizing the backend.ai-app repository as a subtree:**
+```console
+$ git remote add webui-package https://github.com/lablup/backend.ai-app  # first time only
+$ git subtree pull --squash --prefix=src/ai/backend/web/static webui-package main
+```
+
 ### Kernels
 
+Computing environment recipes (Dockerfile) to build the container images to execute
+on top of the Backend.AI platform.
+
 * https://github.com/lablup/backend.ai-kernels
-  - Computing environment recipes (Dockerfile) to build the container images to execute
-    on top of the Backend.AI platform
 
 ### Jail
 
-A programmable sandbox implemented using ptrace-based system call filtering written in Go.
+A programmable sandbox implemented using ptrace-based system call filtering written in Rust.
 
 * https://github.com/lablup/backend.ai-jail
 
@@ -217,7 +227,7 @@ Plugins
   - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
     - This emulates the presence of CUDA devices without actual CUDA devices,
       so that developers can work on CUDA integration without real GPUs.
-  - [`ai.backend.accelerator.rocm`]: ROCm accelerator plugin
+  - [`ai.backend.accelerator.rocm`](): ROCm accelerator plugin
   - More available in the enterprise edition!
 * `backendai_monitor_stats_v10`
   - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)

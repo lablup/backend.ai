@@ -1,0 +1,35 @@
+python_requirements(
+    name="reqs-pytest",
+    source="pytest-requirements.txt",
+    resolve="pytest",
+)
+python_requirements(
+    name="reqs-flake8",
+    source="flake8-requirements.txt",
+    resolve="flake8",
+)
+python_requirements(
+    name="reqs-black",
+    source="black-requirements.txt",
+    resolve="black",
+)
+python_requirements(
+    name="reqs-isort",
+    source="isort-requirements.txt",
+    resolve="isort",
+)
+python_requirements(
+    name="reqs-mypy",
+    source="mypy-requirements.txt",
+    resolve="mypy",
+)
+python_requirements(
+    name="reqs-coveragepy",
+    source="coveragepy-requirements.txt",
+    resolve="coverage-py",
+)
+python_requirements(
+    name="reqs-towncrier",
+    source="towncrier-requirements.txt",
+    resolve="towncrier",
+)

@@ -7,9 +7,7 @@ from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript, m
 
 def test_parse_build():
     with tempfile.NamedTemporaryFile("w") as f:
-        f.write(
-            tw.dedent(
-                """
+        f.write(tw.dedent("""
             python_sources(
                 name="lib",
             )
@@ -43,9 +41,7 @@ def test_parse_build():
             python_tests(
                 name="tests",
             )
-        """
-            )
-        )
+        """))
         f.flush()
         p = Path(f.name)
         items = [*extract_entrypoints_from_buildscript("backendai_cli_v10", p)]

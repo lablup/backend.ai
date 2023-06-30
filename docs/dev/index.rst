@@ -7,4 +7,5 @@ Developer Guides
    development-setup
    daily-workflows
    adding-kernels
+   using-mock-accelerator
    version-management-and-upgrades

@@ -3,9 +3,17 @@ from __future__ import annotations
 import asyncio
 import functools
 import sys
-from typing import TYPE_CHECKING, Awaitable, Callable, Final, Sequence, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    Final,
+    Optional,
+    Sequence,
+    TypeVar,
+    Union,
+)
 
-import async_timeout
 from redis.asyncio import Redis
 from redis.exceptions import AuthenticationError as RedisAuthenticationError
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -31,18 +39,15 @@ disruptions: Final = {
 async def simple_run_cmd(
     cmdargs: Sequence[Union[str, bytes]], **kwargs
 ) -> asyncio.subprocess.Process:
-    p = await asyncio.create_subprocess_exec(*cmdargs, **kwargs)
-    await p.wait()
-    return p
+    return await asyncio.create_subprocess_exec(*cmdargs, **kwargs)
 
 
-async def wait_redis_ready(host: str, port: int, password: str = None) -> None:
+async def wait_redis_ready(host: str, port: int, password: Optional[str] = None) -> None:
     r = Redis.from_url(f"redis://{host}:{port}", password=password, socket_timeout=0.2)
+    print("CheckReady.PING...", port, file=sys.stderr)
     while True:
         try:
-            print("CheckReady.PING", port, file=sys.stderr)
             await r.ping()
-            print("CheckReady.PONG", port, file=sys.stderr)
         except RedisAuthenticationError:
             raise
         except (
@@ -50,11 +55,11 @@ async def wait_redis_ready(host: str, port: int, password: str = None) -> None:
             ConnectionError,
             RedisConnectionError,
         ):
-            print("connectionError, retrying")
             await asyncio.sleep(0.1)
         except RedisTimeoutError:
             pass
         else:
+            print("CheckReady.PONG", port, file=sys.stderr)
             break
 
 
@@ -94,9 +99,6 @@ _TReturn = TypeVar("_TReturn")
 _PInner = ParamSpec("_PInner")
 
 
-# FIXME: mypy 0.910 does not support PEP-612 (ParamSpec) yet...
-
-
 def with_timeout(
     t: float,
 ) -> Callable[  # type: ignore
@@ -108,7 +110,7 @@ def with_timeout(
     ) -> Callable[_PInner, Awaitable[_TReturn]]:  # type: ignore
         @functools.wraps(corofunc)
         async def run(*args: _PInner.args, **kwargs: _PInner.kwargs) -> _TReturn:  # type: ignore
-            async with async_timeout.timeout(t):
+            async with asyncio.timeout(t):
                 return await corofunc(*args, **kwargs)
 
         return run

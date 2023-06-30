@@ -9,266 +9,259 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.12.1\n"
 
-#: ../../concepts/key-concepts.rst:6 c3e07076addb406e87864bc8edf19bdc
+#: ../../concepts/key-concepts.rst:6 a8ec517508f742a48824d9a67cb1e454
 msgid "Key Concepts"
 msgstr "핵심 개념"
 
-#: ../../concepts/key-concepts.rst:8 eef5b87bd70445e3919f1cf23eddeb0f
+#: ../../concepts/key-concepts.rst:8 9471d7b858044950b9bc722aeeea3f91
 msgid ""
-"Here we describe the key concepts that are required to understand and follow "
-"this documentation."
-msgstr ""
-"여기서는 이 문서를 이해하고 따라오는데 반드시 필요한 주요 개념들을 설명합니다."
+"Here we describe the key concepts that are required to understand and "
+"follow this documentation."
+msgstr "여기서는 이 문서를 이해하고 따라오는데 반드시 필요한 주요 개념들을 설명합니다."
 
-#: ../../concepts/key-concepts.rst:13 c0ce2b76209f4c2a9f79a52c4aef0687
+#: ../../concepts/key-concepts.rst:13 7d271b41cff94fbe9e44f97a56e5ab75
 msgid "The diagram of a typical multi-node Backend.AI server architecture"
-msgstr ""
-"멀티 노드 상의 Backend.AI 서버 구조 다이어그램"
+msgstr "멀티 노드 상의 Backend.AI 서버 구조 다이어그램"
 
-#: ../../concepts/key-concepts.rst:15 ad12a0d4dea4495eaddded6fc0d90f3c
+#: ../../concepts/key-concepts.rst:15 48c96134e72c407c9b471f1496766996
 msgid ""
 ":numref:`server-arch-diagram` shows a brief Backend.AI server-side "
-"architecture where the components are what you need to install and configure."
+"architecture where the components are what you need to install and "
+"configure."
 msgstr ""
-":numref:`server-arch-diagram` 은 설치하고 설정해야 할 구성요소인 Backend.AI 서버 단의 "
-"구조를 간략하게 보여줍니다."
+":numref:`server-arch-diagram` 은 설치하고 설정해야 할 구성요소인 Backend.AI 서버 단의 구조를 "
+"간략하게 보여줍니다."
 
-#: ../../concepts/key-concepts.rst:17 715df25fba85409a91f3ed774cd0b5f1
+#: ../../concepts/key-concepts.rst:17 c917fcb3f4d94d9ca4d97abbb4df8fb2
+#, fuzzy
 msgid ""
-"Each border-connected group of components is intended to be run on the same "
-"server, but you may split them into multiple servers or merge different "
-"groups into a single server as you need. For example, you can run separate "
-"servers for the nginx reverse-proxy and the Backend.AI manager or run both "
-"on a single server. In the [[development setup]], all these components run "
-"on a single PC such as your laptop."
+"Each border-connected group of components is intended to be run on the "
+"same server, but you may split them into multiple servers or merge "
+"different groups into a single server as you need. For example, you can "
+"run separate servers for the nginx reverse-proxy and the Backend.AI "
+"manager or run both on a single server. In the :doc:`development setup "
+"</dev/development-setup>`, all these components run on a single PC such "
+"as your laptop."
 msgstr ""
-"각 경계선이 맞닿아 있는 컴포넌트 그룹은 같은 서버에 실행되도록 의도한 것이지만, "
-"필요에 따라 여러 서버에 나누거나 하나의 서버에 몰아넣어 실행해도 됩니다. "
-"예를 들어, nginx reverse-proxy와 Backend.AI Manager를 다른 서버에 각각 실행시키거나, "
-"한 서버에 같이 실행시킬 수 있습니다. [[development setup]]에서, 랩탑과 같은 "
-"한 개의 PC에서 모든 컴포넌트들을 실행시킵니다."
+"각 경계선이 맞닿아 있는 컴포넌트 그룹은 같은 서버에 실행되도록 의도한 것이지만, 필요에 따라 여러 서버에 나누거나 하나의 서버에 "
+"몰아넣어 실행해도 됩니다. 예를 들어, nginx reverse-proxy와 Backend.AI Manager를 다른 서버에 각각 "
+"실행시키거나, 한 서버에 같이 실행시킬 수 있습니다. [[development setup]]에서, 랩탑과 같은 한 개의 PC에서 "
+"모든 컴포넌트들을 실행시킵니다."
 
-#: ../../concepts/key-concepts.rst:22 8a9cf7d51c224c7b85fc2e1facc48c0a
+#: ../../concepts/key-concepts.rst:22 7b95d9ccc8744123bd7f5a89bb522fb2
 msgid "Manager and Agents"
 msgstr "관리자와 에이전트"
 
-#: ../../concepts/key-concepts.rst:23 dafa6944b67c45279546dea685b1d301
+#: ../../concepts/key-concepts.rst:23 87dffb2d7fe142e48dc3c00ef8e33e9f
 msgid ""
-":raw-html-m2r:`<span style=\"background-color:#fafafa;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+":raw-html-m2r:`<span style=\"background-color:#fafafa;border:1px solid "
+"#ccc;display:inline-"
+"block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
 msgstr ""
 
-#: ../../concepts/key-concepts.rst:25 faf9d01e47d747468acebeebe792f085
+#: ../../concepts/key-concepts.rst:25 0b6ff2f2b0564359b7c5cdaa2d2cba92
 msgid ""
-"Backend.AI manager is the central governor of the cluster. It accepts user "
-"requests, creates/destroys the sessions, and routes code execution requests "
-"to appropriate agents and sessions. It also collects the output of sessions "
-"and responds the users with them."
+"Backend.AI manager is the central governor of the cluster. It accepts "
+"user requests, creates/destroys the sessions, and routes code execution "
+"requests to appropriate agents and sessions. It also collects the output "
+"of sessions and responds the users with them."
 msgstr ""
-"Backend.AI 관리자는 클러스터의 중앙 제어를 담당합니다. 관리자는 사용자의 "
-"요청을 수락하거나, 세션을 생성/삭제하거나, 코드 실행 요청을 적절한 에이전트와 "
-"세션에 라우팅하는 역할을 담당합니다. 관리자는 세션의 출력 값을 수집하고, 이 출력"
-"값을 이용하여 사용자에 응답하는 역할을 수행합니다."
+"Backend.AI 관리자는 클러스터의 중앙 제어를 담당합니다. 관리자는 사용자의 요청을 수락하거나, 세션을 생성/삭제하거나, 코드"
+" 실행 요청을 적절한 에이전트와 세션에 라우팅하는 역할을 담당합니다. 관리자는 세션의 출력 값을 수집하고, 이 출력값을 이용하여 "
+"사용자에 응답하는 역할을 수행합니다."
 
-#: ../../concepts/key-concepts.rst:29 105a17e1cf2a42b480783b0e90976a0f
+#: ../../concepts/key-concepts.rst:29 1c4e077a3d7c4efb9132226adff2ecd7
 msgid ""
-"Backend.AI agent is a small daemon installed onto individual worker servers "
-"to control them. It manages and monitors the lifecycle of kernel containers, "
-"and also mediates the input/output of sessions. Each agent also reports the "
-"resource capacity and status of its server, so that the manager can assign "
-"new sessions on idle servers to load balance."
+"Backend.AI agent is a small daemon installed onto individual worker "
+"servers to control them. It manages and monitors the lifecycle of kernel "
+"containers, and also mediates the input/output of sessions. Each agent "
+"also reports the resource capacity and status of its server, so that the "
+"manager can assign new sessions on idle servers to load balance."
 msgstr ""
-"Backend.AI 에이전트는 각각의 워커 서버를 관리하기 위해 설치되는 작은 데몬입니다. "
-"에이전트는 커널 컨테이너의 생명주기를 관리하고 모니터링하며, 세션의 입/출력을 "
-"중재하는 역할을 수행합니다. 각 에이전트는 담당하는 서버의 자원 용량과 상황을 "
-"제공함으로써 관리자가 로드 밸런싱을 위해 유휴 서버에 새로운 세션을 할당할 수 "
-"있도록 합니다."
+"Backend.AI 에이전트는 각각의 워커 서버를 관리하기 위해 설치되는 작은 데몬입니다. 에이전트는 커널 컨테이너의 생명주기를 "
+"관리하고 모니터링하며, 세션의 입/출력을 중재하는 역할을 수행합니다. 각 에이전트는 담당하는 서버의 자원 용량과 상황을 제공함으로써"
+" 관리자가 로드 밸런싱을 위해 유휴 서버에 새로운 세션을 할당할 수 있도록 합니다."
 
-#: ../../concepts/key-concepts.rst:34 2fe56c8b00ee4845888e114e185df32b
+#: ../../concepts/key-concepts.rst:34 ac1a7a1d70ae4e688d1616a6b80cc4b2
 msgid "Compute sessions and Kernels"
 msgstr "세션과 커널 컴퓨팅"
 
-#: ../../concepts/key-concepts.rst:35 4a6c8ac90ac44f72a7e01b95ea43340b
+#: ../../concepts/key-concepts.rst:35 5464ac3833b644a1965262e071e1cddf
 msgid ""
-":raw-html-m2r:`<span style=\"background-color:#c1e4f7;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>` :"
-"raw-html-m2r:`<span style=\"background-color:#e5f5ff;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+":raw-html-m2r:`<span style=\"background-color:#c1e4f7;border:1px solid "
+"#ccc;display:inline-"
+"block;width:16px;height:16px;margin:0;padding:0;\"></span>` :raw-html-"
+"m2r:`<span style=\"background-color:#e5f5ff;border:1px solid #ccc;display"
+":inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
 msgstr ""
 
-#: ../../concepts/key-concepts.rst:38 067e04aee91b4136852dd7afd2765c0c
+#: ../../concepts/key-concepts.rst:38 c19860419fa14a9ca25e3d2210166869
 msgid ""
-"Backend.AI spawns compute sessions as the form of containers upon user API "
-"requests. Each compute session may have one or more containers (distributed "
-"across different nodes), and we call those member containers \"kernels\". "
-"Such multi-container sessions are for distributed and parallel computation "
-"at large scales. The agent automatically pulls and updates the kernel images "
-"if needed."
+"Backend.AI spawns compute sessions as the form of containers upon user "
+"API requests. Each compute session may have one or more containers "
+"(distributed across different nodes), and we call those member containers"
+" \"kernels\". Such multi-container sessions are for distributed and "
+"parallel computation at large scales. The agent automatically pulls and "
+"updates the kernel images if needed."
 msgstr ""
-"Backend.AI는 사용자 API 요청에 따라 컴퓨팅 세션을 컨테이너의 형태로 생성합니다. "
-"각 컴퓨팅 세션은 (여러 노드에 분산되어 있는) 한 개 이상의 컨테이너를 "
-"가질 수 있으며, 이러한 멤버 컨테이너들을 \"커널\" 이라고 부릅니다."
-"이러한 다중 컨테이너 세션은 대규모 분산 및 병렬 컴퓨팅에 사용됩니다. "
-"에이전트는 필요에 따라 자동으로 커널 이미지를 가져오고 업데이트합니다. "
+"Backend.AI는 사용자 API 요청에 따라 컴퓨팅 세션을 컨테이너의 형태로 생성합니다. 각 컴퓨팅 세션은 (여러 노드에 "
+"분산되어 있는) 한 개 이상의 컨테이너를 가질 수 있으며, 이러한 멤버 컨테이너들을 \"커널\" 이라고 부릅니다.이러한 다중 "
+"컨테이너 세션은 대규모 분산 및 병렬 컴퓨팅에 사용됩니다. 에이전트는 필요에 따라 자동으로 커널 이미지를 가져오고 업데이트합니다. "
 
-
-#: ../../concepts/key-concepts.rst:44 cbcd6265e88d42a09bfc2363087b41b5
+#: ../../concepts/key-concepts.rst:44 f32789202f984e9893069df36c698135
 msgid "Cluster Networking"
 msgstr "클러스터 네트워킹"
 
-#: ../../concepts/key-concepts.rst:45 f5bb112c44d64973a209c01384b20851
+#: ../../concepts/key-concepts.rst:45 eb8a01a1c50246b2a2c440ba64a71005
 msgid ""
-":raw-html-m2r:`<span style=\"background-color:#99d5ca;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>` :"
-"raw-html-m2r:`<span style=\"background-color:#202020;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+":raw-html-m2r:`<span style=\"background-color:#99d5ca;border:1px solid "
+"#ccc;display:inline-"
+"block;width:16px;height:16px;margin:0;padding:0;\"></span>` :raw-html-"
+"m2r:`<span style=\"background-color:#202020;border:1px solid #ccc;display"
+":inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
 msgstr ""
 
-#: ../../concepts/key-concepts.rst:48 db30343b5a4a400d975d72949e4d11b7
+#: ../../concepts/key-concepts.rst:48 1dc2a3ef53e84f92a1ee00fe934eaf04
 msgid "The primary networking requirements are:"
 msgstr "기초적인 네트워킹 요구 사항은 다음과 같습니다: "
 
-#: ../../concepts/key-concepts.rst:50 5d1215df3f12479d9903bd78351aa4bf
+#: ../../concepts/key-concepts.rst:50 edb08d88b222450282ffb2cfa15e4d68
 msgid ""
 "The manager server (the HTTPS 443 port) should be exposed to the public "
 "Internet or the network that your client can access."
 msgstr ""
-"관리자 서버 (HTTPS 443 포트) 는 반드시 공용 인터넷 또는 여러분의 클라이언트"
-"가 접근할 수 있는 네트워크에 열려 있어야 합니다. "
+"관리자 서버 (HTTPS 443 포트) 는 반드시 공용 인터넷 또는 여러분의 클라이언트가 접근할 수 있는 네트워크에 열려 있어야 "
+"합니다. "
 
-#: ../../concepts/key-concepts.rst:51 ba55a7a664684fd38465dec9361a5153
+#: ../../concepts/key-concepts.rst:51 40ec82c779ab4611975eb7166a21bffc
 msgid ""
-"The manager, agents, and all other database/storage servers should reside at "
-"the same local private network where any traffic between them are "
+"The manager, agents, and all other database/storage servers should reside"
+" at the same local private network where any traffic between them are "
 "transparently allowed."
 msgstr ""
-"관리자, 에이전트와 기타 데이터베이스/저장소 서버는 상호간의 트래픽이 "
-"투명하게 허용되는 로컬 비공개 네트워크에 같이 함께 상주하여야 합니다."
+"관리자, 에이전트와 기타 데이터베이스/저장소 서버는 상호간의 트래픽이 투명하게 허용되는 로컬 비공개 네트워크에 같이 함께 상주하여야"
+" 합니다."
 
-#: ../../concepts/key-concepts.rst:52 8cd138ce6bb14e08adf98e7172349357
+#: ../../concepts/key-concepts.rst:52 6c15d55298ff4058aeaaa885b623aaaf
 msgid ""
-"For high-volume big-data processing, you may want to separate the network "
-"for the storage using a secondary network interface on each server, such as "
-"Infiniband and RoCE adaptors."
+"For high-volume big-data processing, you may want to separate the network"
+" for the storage using a secondary network interface on each server, such"
+" as Infiniband and RoCE adaptors."
 msgstr ""
-"대용량의 빅데이터 처리의 경우, Infiniband와 RoCE 어댑터 등을 사용하면 "
-"각 서버의 보조 네트워크 인터페이스를 이용하여 저장소를 위한 네트워크를 "
-"분리할 수 있습니다."
+"대용량의 빅데이터 처리의 경우, Infiniband와 RoCE 어댑터 등을 사용하면 각 서버의 보조 네트워크 인터페이스를 이용하여 "
+"저장소를 위한 네트워크를 분리할 수 있습니다."
 
-#: ../../concepts/key-concepts.rst:55 d47fa62d79d144b3b3c51cf6f80c12c8
+#: ../../concepts/key-concepts.rst:55 767f99b4a10d4322a27fbd9cbf6d189d
 msgid "Databases"
 msgstr "데이터베이스"
 
-#: ../../concepts/key-concepts.rst:56 33dde74e15ea41a0a447aff03f70051a
+#: ../../concepts/key-concepts.rst:56 a54b3a3aed4e4a3ea73d81abbc94dd99
 msgid ""
-":raw-html-m2r:`<span style=\"background-color:#ffbbb1;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+":raw-html-m2r:`<span style=\"background-color:#ffbbb1;border:1px solid "
+"#ccc;display:inline-"
+"block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
 msgstr ""
 
-#: ../../concepts/key-concepts.rst:58 234a346c6aee48329bd65e5eefcf0e77
+#: ../../concepts/key-concepts.rst:58 c3f86501a49d434095aae94b47378090
 msgid ""
 "Redis and PostgreSQL are used to keep track of liveness of agents and "
-"compute sessions (which may be composed of one or more kernels). They also "
-"store user metadata such as keypairs and resource usage statistics."
+"compute sessions (which may be composed of one or more kernels). They "
+"also store user metadata such as keypairs and resource usage statistics."
 msgstr ""
-"에이전트와 (하나 이상의 커널로 구성된) 컴퓨팅 세션의 수명을 추적하기 위해 "
-"Redis와 PostgreSQL이 사용됩니다. 이 서비스들은 키 페어와 자원 사용 현황 등 "
-"사용자 메타데이터를 저장하는 데에도 사용됩니다."
+"에이전트와 (하나 이상의 커널로 구성된) 컴퓨팅 세션의 수명을 추적하기 위해 Redis와 PostgreSQL이 사용됩니다. 이 "
+"서비스들은 키 페어와 자원 사용 현황 등 사용자 메타데이터를 저장하는 데에도 사용됩니다."
 
-#: ../../concepts/key-concepts.rst:62 c32de0da35314430b8cbef129058b02d
+#: ../../concepts/key-concepts.rst:62 4b8bfae0fd0b4ff58d66a90d8b68250b
 msgid "Configuration Management"
 msgstr "설정 관리"
 
-#: ../../concepts/key-concepts.rst:63 73133b1397074a2083994f50b540a2ec
+#: ../../concepts/key-concepts.rst:63 a3737f9069ce48b281d35eed1e131add
 msgid ""
-":raw-html-m2r:`<span style=\"background-color:#d1bcd2;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+":raw-html-m2r:`<span style=\"background-color:#d1bcd2;border:1px solid "
+"#ccc;display:inline-"
+"block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
 msgstr ""
 
-#: ../../concepts/key-concepts.rst:65 9afa4d5e1d154deeb28638ef3795a68c
+#: ../../concepts/key-concepts.rst:65 c5994644a8f548a0a7e6aa80a5fb81cb
 msgid ""
-"Most cluster-level configurations are stored in an etcd server or cluster. "
-"The etcd server is also used for service discovery; when new agents boot up "
-"they register themselves to the cluster manager via etcd. For production "
-"deployments, we recommend to use an etcd cluster composed of odd (3 or "
-"higher) number of nodes to keep high availability."
+"Most cluster-level configurations are stored in an etcd server or "
+"cluster. The etcd server is also used for service discovery; when new "
+"agents boot up they register themselves to the cluster manager via etcd. "
+"For production deployments, we recommend to use an etcd cluster composed "
+"of odd (3 or higher) number of nodes to keep high availability."
 msgstr ""
-"대부분의 클러스터 단계 설정들은 etcd 서버 또는 클러스터에 저장됩니다. "
-"etcd 서버는 서비스 복구에도 사용됩니다; 새로운 에이전트가 실행될 경우, "
-"에이전트들은 etcd를 통해 스스로를 클러스터 매니저에 등록합니다. 배포 환경의 "
-"경우 높은 기용성을 위해 홀수 개 (3개 이상) 의 노드로 구성된 etcd 클러스터를 "
-"사용하는 것이 좋습니다."
+"대부분의 클러스터 단계 설정들은 etcd 서버 또는 클러스터에 저장됩니다. etcd 서버는 서비스 복구에도 사용됩니다; 새로운 "
+"에이전트가 실행될 경우, 에이전트들은 etcd를 통해 스스로를 클러스터 매니저에 등록합니다. 배포 환경의 경우 높은 기용성을 위해 "
+"홀수 개 (3개 이상) 의 노드로 구성된 etcd 클러스터를 사용하는 것이 좋습니다."
 
-#: ../../concepts/key-concepts.rst:70 2cb447f480134873853364d43130bd1a
+#: ../../concepts/key-concepts.rst:70 51a4226c85844a91a3e9c3a21652e6e4
 msgid "Virtual Folders"
 msgstr "가상 폴더"
 
-#: ../../concepts/key-concepts.rst:71 94b8e50778e84281956cf88ec9e1530c
+#: ../../concepts/key-concepts.rst:71 6e4be085b8ea49c19936bd0820d65298
 msgid ""
-":raw-html-m2r:`<span style=\"background-color:#ffdba9;border:1px solid #ccc;"
-"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+":raw-html-m2r:`<span style=\"background-color:#ffdba9;border:1px solid "
+"#ccc;display:inline-"
+"block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
 msgstr ""
 
-#: ../../concepts/key-concepts.rst:76 a7768a5852bc4019b4ca1590108ab9d3
+#: ../../concepts/key-concepts.rst:76 0704a706963e4d059a7e92357ffebca5
 msgid ""
 "A conceptual diagram of virtual folders when using two NFS servers as "
 "vfolder hosts"
-msgstr ""
-"두 NFS 서버를 vfolder 호스트로 사용하는 경우의 가상 폴더 개념도"
+msgstr "두 NFS 서버를 vfolder 호스트로 사용하는 경우의 가상 폴더 개념도"
 
-#: ../../concepts/key-concepts.rst:78 71009e25f0cd43e0a100ff52166c29a4
+#: ../../concepts/key-concepts.rst:78 1cd7fb47d3444afb8b452d7c13509481
 msgid ""
-"As shown in :numref:`vfolder-concept-diagram`, Backend.AI abstracts network "
-"storages as \"virtual folder\", which provides a cloud-like private file "
-"storage to individual users. The users may create their own (one or more) "
-"virtual folders to store data files, libraries, and program codes. Each "
-"vfolder (virtual folder) is created under a designated storage mount (called "
-"\"vfolder hosts\"). Virtual folders are mounted into compute session "
-"containers at ``/home/work/{name}`` so that user programs have access to the "
-"virtual folder contents like a local directory. As of Backend.AI v18.12, "
-"users may also share their own virtual folders with other users in "
-"differentiated permissions such as read-only and read-write."
+"As shown in :numref:`vfolder-concept-diagram`, Backend.AI abstracts "
+"network storages as \"virtual folder\", which provides a cloud-like "
+"private file storage to individual users. The users may create their own "
+"(one or more) virtual folders to store data files, libraries, and program"
+" codes. Each vfolder (virtual folder) is created under a designated "
+"storage mount (called \"vfolder hosts\"). Virtual folders are mounted "
+"into compute session containers at ``/home/work/{name}`` so that user "
+"programs have access to the virtual folder contents like a local "
+"directory. As of Backend.AI v18.12, users may also share their own "
+"virtual folders with other users in differentiated permissions such as "
+"read-only and read-write."
 msgstr ""
-":numref:`vfolder-concept-diagram` 에서도 확인할 수 있듯이, Backend.AI는 "
-"네트워크 저장소를 \"가상 폴더\" 로 추상화하여 각 사용자에게 클라우드와 "
-"비슷한 형태의 개인용 파일 저장소를 제공합니다. 사용자는 개인별 (하나 이상의) "
-"가상 폴더를 생성하여 데이터 파일, 라이브러리와 프로그램 코드를 보관할 수 있습니다. "
-"각 vfolder (가상 폴더) 는 지정된 저장소 마운트 (\"vfolder hosts\") 하위에 생성됩니다. "
-"가상 폴더는 ``/home/work/{name}`` 에 존재하는 컴퓨팅 세션 컨테이너에 마운트되며, "
-"사용자의 프로그램은 가상 폴더의 내용물들을 로컬 디렉토리와 같이 접근하여 사용할 수 "
-"있습니다. Backend.AI v18.12부터는, 사용자들이 각자의 가상 폴더들에 읽기 전용, 쓰기 "
-"전용 등 다양한 권한을 부여하여 다른 유저와 공유할 수 있습니다."
+":numref:`vfolder-concept-diagram` 에서도 확인할 수 있듯이, Backend.AI는 네트워크 저장소를 "
+"\"가상 폴더\" 로 추상화하여 각 사용자에게 클라우드와 비슷한 형태의 개인용 파일 저장소를 제공합니다. 사용자는 개인별 (하나 "
+"이상의) 가상 폴더를 생성하여 데이터 파일, 라이브러리와 프로그램 코드를 보관할 수 있습니다. 각 vfolder (가상 폴더) 는 "
+"지정된 저장소 마운트 (\"vfolder hosts\") 하위에 생성됩니다. 가상 폴더는 ``/home/work/{name}`` 에"
+" 존재하는 컴퓨팅 세션 컨테이너에 마운트되며, 사용자의 프로그램은 가상 폴더의 내용물들을 로컬 디렉토리와 같이 접근하여 사용할 수 "
+"있습니다. Backend.AI v18.12부터는, 사용자들이 각자의 가상 폴더들에 읽기 전용, 쓰기 전용 등 다양한 권한을 부여하여"
+" 다른 유저와 공유할 수 있습니다."
 
-#: ../../concepts/key-concepts.rst:84 369721942d374502ba4d45871b0c484d
+#: ../../concepts/key-concepts.rst:84 898e5c2aaf4248adad083ae014830c21
 msgid ""
 "A Backend.AI cluster setup may use any filesystem that provides a local "
-"mount point at each node (including the manager and agents) given that the "
-"filesystem contents are synchronized across all nodes. The only requirement "
-"is that the local mount-point must be same across all cluster nodes (e.g., "
-"``/mnt/vfroot/mynfs``). Common setups may use a centralized network storage "
-"(served via NFS or SMB), but for more scalability, one might want to use "
-"distributed file systems such as CephFS and GlusterFS, or Alluxio that "
-"provides fast in-memory cache while backed by another storage server/service "
-"such as AWS S3."
+"mount point at each node (including the manager and agents) given that "
+"the filesystem contents are synchronized across all nodes. The only "
+"requirement is that the local mount-point must be same across all cluster"
+" nodes (e.g., ``/mnt/vfroot/mynfs``). Common setups may use a centralized"
+" network storage (served via NFS or SMB), but for more scalability, one "
+"might want to use distributed file systems such as CephFS and GlusterFS, "
+"or Alluxio that provides fast in-memory cache while backed by another "
+"storage server/service such as AWS S3."
 msgstr ""
-"파일 시스템 내용물은 모든 노드에 동기화되므로, Backend.AI 클러스터 설정은 "
-"(관리자와 에이전트를 포함한) 각 노드의 로컬 마운트 지점을 제공하는 모든 파일 "
-"시스템을 사용할 수 있습니다. 이를 위한 유일한 요구 사항은, 로컬 마운트 지점이 "
-"반드시 모든 클러스터 노드에서 동일해야 한다는 것입니다. (예를 들면, "
-"``/mnt/vfroot/mynfs`` 와 같이 말이죠) 일반적인 설정으로는 (NFS 또는 SMB를 통해 "
-"제공되는) 중앙 집중식 네트워크 저장소를 사용합니다만, 높은 확장성을 위해 CephFS나 "
-"GlusterFS, Alluxio와 같이 AWS S3과 같은 개별 저장소에 백업되면서 빠른 in-memory "
-"캐시를 지원하는 분산 파일 시스템 또한 사용할 수 있습니다."
+"파일 시스템 내용물은 모든 노드에 동기화되므로, Backend.AI 클러스터 설정은 (관리자와 에이전트를 포함한) 각 노드의 로컬 "
+"마운트 지점을 제공하는 모든 파일 시스템을 사용할 수 있습니다. 이를 위한 유일한 요구 사항은, 로컬 마운트 지점이 반드시 모든 "
+"클러스터 노드에서 동일해야 한다는 것입니다. (예를 들면, ``/mnt/vfroot/mynfs`` 와 같이 말이죠) 일반적인 "
+"설정으로는 (NFS 또는 SMB를 통해 제공되는) 중앙 집중식 네트워크 저장소를 사용합니다만, 높은 확장성을 위해 CephFS나 "
+"GlusterFS, Alluxio와 같이 AWS S3과 같은 개별 저장소에 백업되면서 빠른 in-memory 캐시를 지원하는 분산 "
+"파일 시스템 또한 사용할 수 있습니다."
 
-#: ../../concepts/key-concepts.rst:88 36fcf7bdbcd749e98c171bba805b68c5
+#: ../../concepts/key-concepts.rst:88 f0e0527ddf294ca997aef8c720e02419
 msgid "For a single-node setup, you may simply use an empty local directory."
 msgstr "단일 노드 설정을 위해, 간단하게 빈 로컬 디렉토리를 사용할 수도 있습니다."
+

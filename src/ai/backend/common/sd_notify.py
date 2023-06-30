@@ -39,7 +39,6 @@ import asyncudp
 
 
 class SystemdNotifier:
-
     socket: asyncudp.Socket | None
     address: str | None
 

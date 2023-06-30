@@ -32,7 +32,6 @@ def api_version():
 @pytest.mark.asyncio
 async def test_upload_jwt_generation(tmp_path):
     with aioresponses() as m:
-
         async with AsyncSession() as session:
             mock_file = tmp_path / "example.bin"
             mock_file.write_bytes(secrets.token_bytes(32))
@@ -41,9 +40,11 @@ async def test_upload_jwt_generation(tmp_path):
 
             file_size = "1024"
             payload = {
-                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9. \
-            eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9.\
-            5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
+                "token": (
+                    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                    "eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9."
+                    "5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
+                )
             }
 
             m.post(
@@ -71,25 +72,29 @@ async def test_upload_jwt_generation(tmp_path):
 
 @pytest.mark.asyncio
 async def test_tus_upload(tmp_path: Path):
-
     basedir = tmp_path / "example.bin"
     mock_file = basedir
     mock_file.write_bytes(secrets.token_bytes(1024))
     vfolder_name = "fake-vfolder-name"
     with aioresponses() as m:
-
         tus_client = client.TusClient()
         input_file = open(basedir, "rb")
         print(f"Uploading {basedir} ...")
         # TODO: refactor out the progress bar
-        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9pwd.\
-            eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9.\
-                5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
+        token = (
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9pwd."
+            "eyJwYXRoIjoiaHR0cDoxMjcuMC4wLjEvZm9sZGVycy9mYWtlLXZmb2xkZXItbmFtZS9yZXF1ZXN0LXVwbG9hZCIsInNpemUiOjEwMjR9."
+            "5IXk0xdrr6aPzVjud4cdfcXWch7Bq-m7SlFhnUv8XL8"
+        )
 
         storage_proxy_payload = {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type",
-            "Access-Control-Expose-Headers": "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type",
+            "Access-Control-Allow-Headers": (
+                "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+            ),
+            "Access-Control-Expose-Headers": (
+                "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+            ),
             "Access-Control-Allow-Methods": "*",
             "Cache-Control": "no-store",
             "Tus-Resumable": "1.0.0",
@@ -142,7 +147,6 @@ async def test_vfolder_download(mocker):
 
     today_timestamp = time()
     with aioresponses() as m:
-
         async with AsyncSession() as session:
             vfolder_name = "fake-vfolder-name"
             # client to manager
@@ -150,9 +154,11 @@ async def test_vfolder_download(mocker):
             storage_path = str(build_url(session.config, "/download".replace("8081", "6021")))
 
             payload = {
-                "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.\
-            eyJvcCI6ImRvd25sb2FkIiwidm9sdW1lIjoidm9sdW1lMSIsInZmaWQiOiI4ZGFlNjk5Mi1kMjIzLTQwM2MtYTUyZC1iYWRlNGYwMGFhMzIiLCJyZWxwYXRoIjoic2V0dXAuY2ZnIiwiZXhwIjoxNjAwMTM0MzI5fQ.\
-            -cirX1fTBVqDAuW6IPzwpHjtopnSdio_BeuD2DACsbQ",
+                "token": (
+                    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9."
+                    "eyJvcCI6ImRvd25sb2FkIiwidm9sdW1lIjoidm9sdW1lMSIsInZmaWQiOiI4ZGFlNjk5Mi1kMjIzLTQwM2MtYTUyZC1iYWRlNGYwMGFhMzIiLCJyZWxwYXRoIjoic2V0dXAuY2ZnIiwiZXhwIjoxNjAwMTM0MzI5fQ."
+                    "-cirX1fTBVqDAuW6IPzwpHjtopnSdio_BeuD2DACsbQ"
+                ),
                 "url": storage_path,
             }
 
@@ -167,10 +173,11 @@ async def test_vfolder_download(mocker):
                     "X-BackendAI-Version": "v6.20200815",
                     "Date": "2020-09-14T01:45:29.117351+00:00",
                     "Content-Type": "application/json",
-                    "Authorization": "BackendAI signMethod=HMAC-SHA256,\
-                                       credential=AKIAIOSFODNN7EXAMPLE:\
-                                       623674bb421ff0c96a9fe78a4a8c6a\
-                                       45fc5c0a370257800310cd9c7826819b3c",
+                    "Authorization": (
+                        "BackendAI signMethod=HMAC-SHA256,"
+                        "credential=AKIAIOSFODNN7EXAMPLE:"
+                        "623674bb421ff0c96a9fe78a4a8c6a45fc5c0a370257800310cd9c7826819b3c"
+                    ),
                 },
             )
 

@@ -1,0 +1,199 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 23.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-03-25 14:34+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ko\n"
+"Language-Team: ko <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../install/install-from-package/install-agent.rst:2
+#: a7a831cb33e1481ea47002c554e3ef5e
+msgid "Install Backend.AI Agent"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:4
+#: 9fbcd01ed26d4b4cadefc835cb277ab5
+msgid ""
+"If there are dedicated compute nodes (often, GPU nodes) in your cluster, "
+"Backend.AI Agent service should be installed on the compute nodes, not on"
+" the management node."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:8
+#: f9e198d13e3a427db4c281a671390125
+msgid ""
+"Refer to :ref:`prepare_python_and_venv` to setup Python and virtual "
+"environment for the service."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:11
+#: 86441a6c50674e9989a7ba5ce2936529
+msgid ""
+"Install the latest version of Backend.AI Agent for the current Python "
+"version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:19
+#: ff6f49ab96ea4c34aace0701ca0189bf
+msgid "If you want to install a specific version:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:27
+#: 7f91a507bb854eaf858aa2a56b027a6b
+msgid "Setting Up Accelerators"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:29
+#: 8d2ca17efea44f27b56e6c9bc6bec519
+msgid "You can skip this section if your system does not have H/W accelerators."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:31
+#: 6e470c6f103b4cd1a6d80a11426a9e08
+msgid ""
+"Backend.AI supports various H/W accelerators. To integrate them with "
+"Backend.AI, you need to install the corresponding accelerator plugin "
+"package. Before installing the package, make sure that the accelerator is"
+" properly set up using vendor-specific installation methods."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:36
+#: 7895e19c63dd42628f0a359fdc84c227
+msgid ""
+"Most popular accelerator today would be NVIDIA GPU. To install the open-"
+"source CUDA accelerator plugin, run:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:45
+#: d5d2527ce7914ebbbd818284ec6ce9ba
+msgid ""
+"Backend.AI's fractional GPU sharing is available only on the enterprise "
+"version but not supported on the open-source version."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:50
+#: 56ae1c34d0dc40788345877c7b9d1e09
+msgid "Local configuration"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:52
+#: c3613fd3a54d4e7593cdf5ffecade5f6
+msgid ""
+"Backend.AI Agent uses a TOML file (``agent.toml``) to configure local "
+"service. Refer to the `agent.toml sample file "
+"<https://github.com/lablup/backend.ai/blob/main/configs/agent/sample.toml>`_"
+" for a detailed description of each section and item. A configuration "
+"example would be:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:139
+#: 4c3b6a7aea9648bcae0728ad9a1ba88c
+msgid ""
+"You may need to configure ``[agent].allow-compute-plugins`` with the full"
+" package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate "
+"them."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:142
+#: 8cfbb01033ad49cba7d71be70380680c
+msgid ""
+"Save the contents to ``${HOME}/.config/backend.ai/agent.toml``. "
+"Backend.AI will automatically recognize the location. Adjust each field "
+"to conform to your system."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:148
+#: 9576294b04f044e28dc2e908ac8de0de
+msgid "Run Backend.AI Agent service"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:150
+#: 9ffca8329aaa4a16a6353158326e1582
+msgid "You can run the service:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:157
+#: 3cf83a80c94d418980418840a76289cf
+msgid "You should see a log message like ``started handling RPC requests at ...``"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:159
+#: 98c8cefd2ce84f0bbdaa1efcdc30df12
+msgid ""
+"There is an add-on service, Agent Watcher, that can be used to monitor "
+"and manage the Agent service. It is not required to run the Agent "
+"service, but it is recommended to use it for production environments."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:168
+#: 3900b1cd5603411ba9d7017224d7447f
+msgid "Press ``Ctrl-C`` to stop both services."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:172
+#: f1ec1e87545940d28f75b3a919a404e0
+msgid "Register systemd service"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:174
+#: 153379dd641f43b9856ff6b842105ead
+msgid ""
+"The service can be registered as a systemd daemon. It is recommended to "
+"automatically run the service after rebooting the host machine, although "
+"this is entirely optional."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:178
+#: 028d4a1a9f6d466692484c2454b45e9f
+msgid ""
+"It is better to set ``[container].stats-type = \"cgroup\"`` in the "
+"``agent.toml`` for better metric collection which is only available with "
+"root privileges."
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:181
+#: 40456a50c6394584b05b3557555c64df
+msgid "First, create a runner script at ``${HOME}/bin/run-agent.sh``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:206
+#: e877ff039be94207b43deec3599e8694
+msgid "Create a runner script for Watcher at ``${HOME}/bin/run-watcher.sh``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:231
+#: 0de7d9cfb0eb4012b7a87b168f6aa1d8
+msgid "Make the scripts executable:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:238
+#: 3ccb5b80ef964d418a4064edd0a3da22
+msgid ""
+"Then, create a systemd service file at ``/etc/systemd/system/backendai-"
+"agent.service``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:265
+#: 02507e33f81240ea823ce1736c0be4fb
+msgid "And for Watcher at ``/etc/systemd/system/backendai-watcher.service``:"
+msgstr ""
+
+#: ../../install/install-from-package/install-agent.rst:287
+#: c40f5c9f4ec54d7a9bc366b7af468a68
+msgid "Finally, enable and start the service:"
+msgstr ""
+
