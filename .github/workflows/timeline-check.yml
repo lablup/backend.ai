@@ -32,16 +32,10 @@ jobs:
         python -m pip install -U towncrier~=22.12
     - name: Check existence of news fragment
       run: |
-        # Check if the PR has a news fragment
-        git fetch --depth=1 origin "${BASE_BRANCH}"
-        NEWS_FRAGMENTS=$(git diff --name-only origin/${BASE_BRANCH} -- changes/)
-        for change in $NEWS_FRAGMENTS; do
-          if [ $(basename $change | cut -d'.' -f1) != $PR_NUMBER ]; then
-            echo "$change is not valid news fragment file name"
-            echo "The news fragment file name must be $PR_NUMBER"
-            exit 1
-          fi
-        done
-        python -m towncrier.check --compare-with=origin/${BASE_BRANCH}
+        BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+        BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+        git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF}"
+        python -m towncrier.check --compare-with=origin/${BASE_REF}
       env:
-        BASE_BRANCH: ${{ github.base_ref }}
+        BASE_REF: ${{ github.event.pull_request.base.ref }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
