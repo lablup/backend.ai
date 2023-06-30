@@ -8,6 +8,7 @@ import ipaddress
 import json
 import os
 import pwd
+import random
 import re
 import uuid
 from collections.abc import Iterable
@@ -692,3 +693,21 @@ class ToSet(t.Trafaret):
             return set(value)
         else:
             self._failure("value must be Iterable")
+
+
+class Delay(t.Trafaret):
+    """
+    Convert a float or a tuple of 2 floats into a random generated float value
+    to use in time.sleep() or asyncio.sleep()
+    """
+
+    def check_and_return(self, value: Any) -> float:
+        match value:
+            case float() | int():
+                return float(value)
+            case (a, b):
+                return random.uniform(a, b)
+            case None:
+                return 0
+            case _:
+                self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")

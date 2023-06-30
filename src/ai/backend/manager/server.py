@@ -132,6 +132,29 @@ PUBLIC_INTERFACES: Final = [
 
 public_interface_objs: MutableMapping[str, Any] = {}
 
+global_subapp_pkgs: Final[list[str]] = [
+    ".acl",
+    ".etcd",
+    ".events",
+    ".auth",
+    ".ratelimit",
+    ".vfolder",
+    ".admin",
+    ".service",
+    ".session",
+    ".stream",
+    ".manager",
+    ".resource",
+    ".scaling_group",
+    ".cluster_template",
+    ".session_template",
+    ".image",
+    ".userconfig",
+    ".domainconfig",
+    ".projectconfig",
+    ".logs",
+]
+
 
 async def hello(request: web.Request) -> web.Response:
     """
@@ -516,7 +539,9 @@ def _init_subapp(
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
-    prefix = subapp.get("prefix", pkg_name.split(".")[-1].replace("_", "-"))
+    if "prefix" not in subapp:
+        subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
+    prefix = subapp["prefix"]
     root_app.add_subapp("/" + prefix, subapp)
     root_app.middlewares.extend(global_middlewares)
 
@@ -663,29 +688,7 @@ async def server_main(
     pidx: int,
     _args: List[Any],
 ) -> AsyncIterator[None]:
-    subapp_pkgs = [
-        ".acl",
-        ".etcd",
-        ".events",
-        ".auth",
-        ".ratelimit",
-        ".vfolder",
-        ".admin",
-        ".service",
-        ".session",
-        ".stream",
-        ".manager",
-        ".resource",
-        ".scaling_group",
-        ".cluster_template",
-        ".session_template",
-        ".image",
-        ".userconfig",
-        ".domainconfig",
-        ".projectconfig",
-        ".logs",
-    ]
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=subapp_pkgs)
+    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.

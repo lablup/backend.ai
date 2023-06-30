@@ -570,6 +570,7 @@ def auth_required(handler):
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "user")
     return wrapped
 
 
@@ -581,6 +582,7 @@ def admin_required(handler):
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "admin")
     return wrapped
 
 
@@ -592,6 +594,7 @@ def superadmin_required(handler):
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "superadmin")
     return wrapped
 
 

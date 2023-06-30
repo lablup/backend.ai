@@ -58,6 +58,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     SessionTypes,
+    VFolderID,
 )
 
 from ..config import DEFAULT_CHUNK_SIZE
@@ -1834,7 +1835,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             "folder/file/fetch",
             json={
                 "volume": volume_name,
-                "vfid": str(log_vfolder["id"]),
+                "vfid": str(VFolderID.from_row(log_vfolder)),
                 "relpath": str(
                     PurePosixPath("task")
                     / kernel_id_str[:2]

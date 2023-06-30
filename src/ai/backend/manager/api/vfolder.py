@@ -896,7 +896,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "folder/usage",
         json={
             "volume": volume_name,
-            "vfid": str(row["id"]),
+            "vfid": str(VFolderID.from_row(row)),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -937,7 +937,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     )
 )
 async def get_quota(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
@@ -974,7 +974,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         "volume/quota",
         json={
             "volume": volume_name,
-            "vfid": str(params["id"]),
+            "vfid": str(VFolderID.from_row(vfolder_row)),
         },
     ) as (_, storage_resp):
         storage_reply = await storage_resp.json()
@@ -993,7 +993,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def update_quota(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
+    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
@@ -1049,7 +1049,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         "volume/quota",
         json={
             "volume": volume_name,
-            "vfid": str(params["id"]),
+            "vfid": str(VFolderID.from_row(vfolder_row)),
             "size_bytes": quota,
         },
     ):
@@ -2282,7 +2282,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
 
     await initiate_vfolder_removal(
         root_ctx.db,
-        [VFolderDeletionInfo(entry["id"], folder_host)],
+        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
