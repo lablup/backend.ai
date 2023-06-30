@@ -8,7 +8,7 @@ import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
@@ -400,31 +400,33 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
 
 
 class UserResourcePolicy(graphene.ObjectType):
-    name = graphene.String()
-    created_at = GQLDateTime()
+    id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    created_at = GQLDateTime(required=True)
     max_vfolder_size = BigInt()
 
     @classmethod
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row | None,
+        row: UserResourcePolicyRow | None,
     ) -> UserResourcePolicy | None:
         if row is None:
             return None
         return cls(
-            name=row["name"],
-            created_at=row["created_at"],
-            max_vfolder_size=row["max_vfolder_size"],
+            id=f"UserResourcePolicy:{row.name}",
+            name=row.name,
+            created_at=row.created_at,
+            max_vfolder_size=row.max_vfolder_size,
         )
 
     @classmethod
     async def load_all(cls, ctx: GraphQueryContext) -> Sequence[UserResourcePolicy]:
         query = sa.select(UserResourcePolicyRow)
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as sess:
             return [
                 obj
-                async for r in (await conn.stream(query))
+                async for r in (await sess.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r)) is not None
             ]
 
@@ -437,16 +439,16 @@ class UserResourcePolicy(graphene.ObjectType):
         query = (
             sa.select(UserResourcePolicyRow)
             .where(UserResourcePolicyRow.name.in_(names))
-            .order_by(keypair_resource_policies.name)
+            .order_by(UserResourcePolicyRow.name)
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as sess:
             return await batch_result(
                 ctx,
-                conn,
+                sess,
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
     @classmethod
@@ -455,16 +457,19 @@ class UserResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
     ) -> Sequence[UserResourcePolicy]:
+        from .user import UserRow
+
         query = (
-            sa.select(UserResourcePolicyRow)
-            .where((UserResourcePolicyRow.users.in_(user_uuids)))
-            .order_by(UserResourcePolicyRow.name)
+            sa.select(UserRow)
+            .where((UserRow.uuid.in_(user_uuids)))
+            .options(selectinload(UserRow.resource_policy_row))
+            .order_by(UserRow.resource_policy)
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as sess:
             return [
                 obj
-                async for r in (await conn.stream(query))
-                if (obj := cls.from_row(ctx, r)) is not None
+                async for r in (await sess.stream_scalars(query))
+                if (obj := cls.from_row(ctx, r.resource_policy_row)) is not None
             ]
 
 
@@ -499,10 +504,15 @@ class CreateUserResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> UserResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicy(uuid.uuid4(), name, props.max_vfolder_size)
+                row = UserResourcePolicyRow(name, props.max_vfolder_size)
                 sess.add(row)
                 await sess.flush()
-                return cls(True, "success", UserResourcePolicy.from_row(graph_ctx, row))
+                query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
+                return cls(
+                    True,
+                    "success",
+                    UserResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
+                )
 
         return await execute_with_retry(_do_mutate)
 
@@ -554,31 +564,38 @@ class DeleteUserResourcePolicy(graphene.Mutation):
 
 
 class ProjectResourcePolicy(graphene.ObjectType):
-    name = graphene.String()
-    created_at = GQLDateTime()
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
+    id = graphene.ID(required=True)
+    name = graphene.String(required=True)
+    created_at = GQLDateTime(required=True)
     max_vfolder_size = BigInt()
 
     @classmethod
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row | None,
+        row: ProjectResourcePolicyRow | None,
     ) -> ProjectResourcePolicy | None:
         if row is None:
             return None
         return cls(
-            name=row["name"],
-            created_at=row["created_at"],
-            max_vfolder_size=row["max_vfolder_size"],
+            id=f"ProjectResourcePolicy:{row.name}",
+            name=row.name,
+            created_at=row.created_at,
+            max_vfolder_size=row.max_vfolder_size,
         )
 
     @classmethod
     async def load_all(cls, ctx: GraphQueryContext) -> Sequence[ProjectResourcePolicy]:
         query = sa.select(ProjectResourcePolicyRow)
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as sess:
             return [
                 obj
-                async for r in (await conn.stream(query))
+                async for r in (await sess.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r)) is not None
             ]
 
@@ -591,16 +608,16 @@ class ProjectResourcePolicy(graphene.ObjectType):
         query = (
             sa.select(ProjectResourcePolicyRow)
             .where(ProjectResourcePolicyRow.name.in_(names))
-            .order_by(keypair_resource_policies.name)
+            .order_by(ProjectResourcePolicyRow.name)
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as sess:
             return await batch_result(
                 ctx,
-                conn,
+                sess,
                 query,
                 cls,
                 names,
-                lambda row: row["name"],
+                lambda row: row.name,
             )
 
     @classmethod
@@ -609,16 +626,19 @@ class ProjectResourcePolicy(graphene.ObjectType):
         ctx: GraphQueryContext,
         project_uuids: Sequence[uuid.UUID],
     ) -> Sequence[ProjectResourcePolicy]:
+        from .group import GroupRow
+
         query = (
-            sa.select(ProjectResourcePolicyRow)
-            .where((ProjectResourcePolicyRow.projects.in_(project_uuids)))
-            .order_by(ProjectResourcePolicyRow.name)
+            sa.select(GroupRow)
+            .where((GroupRow.id.in_(project_uuids)))
+            .order_by(GroupRow.resource_policy)
+            .options(selectinload(GroupRow.resource_policy_row))
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as sess:
             return [
                 obj
-                async for r in (await conn.stream(query))
-                if (obj := cls.from_row(ctx, r)) is not None
+                async for r in (await sess.stream(query))
+                if (obj := cls.from_row(ctx, r.resource_policy_row)) is not None
             ]
 
 
@@ -653,10 +673,17 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> ProjectResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicy(uuid.uuid4(), name, props.max_vfolder_size)
+                row = ProjectResourcePolicyRow(name, props.max_vfolder_size)
                 sess.add(row)
                 await sess.flush()
-                return cls(True, "success", ProjectResourcePolicy.from_row(graph_ctx, row))
+                query = sa.select(ProjectResourcePolicyRow).where(
+                    ProjectResourcePolicyRow.name == name
+                )
+                return cls(
+                    True,
+                    "success",
+                    ProjectResourcePolicy.from_row(graph_ctx, await sess.scalar(query)),
+                )
 
         return await execute_with_retry(_do_mutate)
 

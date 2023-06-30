@@ -618,7 +618,7 @@ class _SQLBasedGQLObject(Protocol):
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -631,14 +631,18 @@ async def batch_result(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in await db_conn.stream(query):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
 
 async def batch_multiresult(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -651,7 +655,11 @@ async def batch_multiresult(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in await db_conn.stream(query):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )

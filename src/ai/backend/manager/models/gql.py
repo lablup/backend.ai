@@ -63,9 +63,17 @@ from .kernel import (
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
+    CreateProjectResourcePolicy,
+    CreateUserResourcePolicy,
     DeleteKeyPairResourcePolicy,
+    DeleteProjectResourcePolicy,
+    DeleteUserResourcePolicy,
     KeyPairResourcePolicy,
     ModifyKeyPairResourcePolicy,
+    ModifyProjectResourcePolicy,
+    ModifyUserResourcePolicy,
+    ProjectResourcePolicy,
+    UserResourcePolicy,
 )
 from .resource_preset import (
     CreateResourcePreset,
@@ -179,6 +187,16 @@ class Mutations(graphene.ObjectType):
     create_keypair_resource_policy = CreateKeyPairResourcePolicy.Field()
     modify_keypair_resource_policy = ModifyKeyPairResourcePolicy.Field()
     delete_keypair_resource_policy = DeleteKeyPairResourcePolicy.Field()
+
+    # super-admin only
+    create_user_resource_policy = CreateUserResourcePolicy.Field()
+    modify_user_resource_policy = ModifyUserResourcePolicy.Field()
+    delete_user_resource_policy = DeleteUserResourcePolicy.Field()
+
+    # super-admin only
+    create_project_resource_policy = CreateProjectResourcePolicy.Field()
+    modify_project_resource_policy = ModifyProjectResourcePolicy.Field()
+    delete_project_resource_policy = DeleteProjectResourcePolicy.Field()
 
     # super-admin only
     create_resource_preset = CreateResourcePreset.Field()
@@ -356,8 +374,18 @@ class Queries(graphene.ObjectType):
         KeyPairResourcePolicy,
         name=graphene.String(),
     )
+    user_resource_policy = graphene.Field(
+        UserResourcePolicy,
+        name=graphene.String(),
+    )
+    project_resource_policy = graphene.Field(
+        ProjectResourcePolicy,
+        name=graphene.String(required=True),
+    )
 
     keypair_resource_policies = graphene.List(KeyPairResourcePolicy)
+    user_resource_policies = graphene.List(UserResourcePolicy)
+    project_resource_policies = graphene.List(ProjectResourcePolicy)
 
     resource_preset = graphene.Field(
         ResourcePreset,
@@ -1105,6 +1133,76 @@ class Queries(graphene.ObjectType):
                 info.context,
                 client_access_key,
             )
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+
+    @staticmethod
+    async def resolve_user_resource_policy(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        name: str = None,
+    ) -> UserResourcePolicy:
+        ctx: GraphQueryContext = info.context
+        user_uuid = ctx.user["uuid"]
+        if name is None:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "UserResourcePolicy.by_user",
+            )
+            return await loader.load(user_uuid)
+        else:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "UserResourcePolicy.by_name",
+            )
+            return await loader.load(name)
+
+    @staticmethod
+    async def resolve_user_resource_policies(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+    ) -> Sequence[UserResourcePolicy]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        user_uuid = ctx.user["uuid"]
+        if client_role == UserRole.SUPERADMIN:
+            return await UserResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.ADMIN:
+            # TODO: filter resource policies by domains?
+            return await UserResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.USER:
+            return await UserResourcePolicy.batch_load_by_user(
+                info.context,
+                [user_uuid],
+            )
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+
+    @staticmethod
+    async def resolve_project_resource_policy(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        name: str,
+    ) -> ProjectResourcePolicy:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "ProjectResourcePolicy.by_name",
+        )
+        return await loader.load(name)
+
+    @staticmethod
+    async def resolve_project_resource_policies(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+    ) -> Sequence[ProjectResourcePolicy]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        if client_role == UserRole.SUPERADMIN:
+            return await ProjectResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.ADMIN:
+            # TODO: filter resource policies by domains?
+            return await ProjectResourcePolicy.load_all(info.context)
         else:
             raise InvalidAPIParameters("Unknown client role")
 
