@@ -745,7 +745,7 @@ class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
 
-    async def get(self, key: str, scope) -> Any:
+    async def get(self, key: str) -> Any:
         return None
 
 
