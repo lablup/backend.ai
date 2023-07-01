@@ -206,6 +206,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     def scan_tree(
         self,
         target_path: Path,
+        recursive=True,
     ) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
         loop = asyncio.get_running_loop()
@@ -253,7 +254,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                         if entry.is_dir() and not entry.is_symlink():
                             next_paths.append(Path(entry.path))
                         count += 1
-                        if limit > 0 and count == limit:
+                        if recursive and limit > 0 and count == limit:
                             break
 
         async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
@@ -354,14 +355,15 @@ class BaseVolume(AbstractVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
+        exist_ok=False,
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
-            raise InvalidQuotaScopeError(
-                f"Quota scope {qspath} does not exist in the target volume"
-            )
+            if not vfid.quota_scope_id:
+                raise InvalidQuotaScopeError("Cannot create quota scope with empty entity")
+            await self.quota_model.create_quota_scope(vfid.quota_scope_id)
         vfpath = self.mangle_vfpath(vfid)
-        await aiofiles.os.makedirs(vfpath, 0o755)
+        await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
@@ -457,9 +459,11 @@ class BaseVolume(AbstractVolume):
     # ------ vfolder internal operations -------
 
     @final
-    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(
+        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+    ) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        return self.fsop_model.scan_tree(target_path)
+        return self.fsop_model.scan_tree(target_path, recursive=recursive)
 
     async def mkdir(
         self,

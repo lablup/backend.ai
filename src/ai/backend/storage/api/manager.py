@@ -189,8 +189,12 @@ async def create_vfolder(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_vfolder", params)
+        assert params["vfid"].quota_scope_id is not None
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
+            qspath = volume.quota_model.mangle_qspath(params["vfid"])
+            if not qspath.exists():
+                await volume.quota_model.create_quota_scope(params["vfid"].quota_scope_id)
             await volume.create_vfolder(params["vfid"])
             return web.Response(status=204)
 
@@ -668,6 +672,7 @@ async def list_files(request: web.Request) -> web.Response:
                     async for item in volume.scandir(
                         params["vfid"],
                         params["relpath"],
+                        recursive=False,
                     )
                 ]
         return web.json_response(

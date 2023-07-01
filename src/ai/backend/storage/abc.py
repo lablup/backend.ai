@@ -124,6 +124,7 @@ class AbstractFSOpModel(metaclass=ABCMeta):
     def scan_tree(
         self,
         path: Path,
+        recursive=False,
     ) -> AsyncIterator[DirEntry]:
         """
         Iterates over all files within the given path recursively.
@@ -227,6 +228,7 @@ class AbstractVolume(metaclass=ABCMeta):
     async def create_vfolder(
         self,
         vfid: VFolderID,
+        exist_ok=False,
     ) -> None:
         raise NotImplementedError
 
@@ -281,7 +283,9 @@ class AbstractVolume(metaclass=ABCMeta):
     # ------ vfolder operations -------
 
     @abstractmethod
-    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(
+        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+    ) -> AsyncIterator[DirEntry]:
         pass
 
     @abstractmethod

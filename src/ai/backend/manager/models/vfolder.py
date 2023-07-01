@@ -40,8 +40,8 @@ from .base import (
     batch_multiresult,
     metadata,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
@@ -907,13 +907,12 @@ async def initiate_vfolder_removal(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    async with db_engine.begin_session() as db_session:
-
-        async def _update_vfolder_status() -> None:
+    async def _update_vfolder_status() -> None:
+        async with db_engine.begin_session() as db_session:
             query = sa.update(vfolders).values(status=VFolderOperationStatus.DELETING).where(cond)
             await db_session.execute(query)
 
-        await execute_with_retry(_update_vfolder_status)
+    await execute_with_retry(_update_vfolder_status)
 
     async def _delete():
         for folder_id, host_name in requested_vfolders:
@@ -932,12 +931,11 @@ async def initiate_vfolder_removal(
             except aiohttp.ClientResponseError:
                 raise VFolderOperationFailed(extra_msg=str(folder_id))
 
-        async with db_engine.begin_session() as db_session:
-
-            async def _delete_row() -> None:
+        async def _delete_row() -> None:
+            async with db_engine.begin_session() as db_session:
                 await db_session.execute(sa.delete(vfolders).where(cond))
 
-            await execute_with_retry(_delete_row)
+        await execute_with_retry(_delete_row)
         log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
 
     storage_ptask_group.create_task(_delete())
@@ -1005,7 +1003,7 @@ class VirtualFolder(graphene.ObjectType):
         # TODO: measure on-the-fly
         return 0
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("vfolders_id", uuid.UUID),
         "host": ("vfolders_host", None),
         "quota_scope_id": ("vfolders_quota_scope_id", None),
@@ -1027,26 +1025,26 @@ class VirtualFolder(graphene.ObjectType):
         "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
     }
 
-    _queryorder_colmap = {
-        "id": "vfolders_id",
-        "host": "vfolders_host",
-        "quota_scope_id": "vfolders_quota_scope_id",
-        "name": "vfolders_name",
-        "group": "vfolders_group",
-        "group_name": "groups_name",
-        "user": "vfolders_user",
-        "user_email": "users_email",
-        "creator": "vfolders_creator",
-        "usage_mode": "vfolders_usage_mode",
-        "permission": "vfolders_permission",
-        "ownership_type": "vfolders_ownership_type",
-        "max_files": "vfolders_max_files",
-        "max_size": "vfolders_max_size",
-        "created_at": "vfolders_created_at",
-        "last_used": "vfolders_last_used",
-        "cloneable": "vfolders_cloneable",
-        "status": "vfolders_status",
-        "cur_size": "vfolders_cur_size",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("vfolders_id", None),
+        "host": ("vfolders_host", None),
+        "quota_scope_id": ("vfolders_quota_scope_id", None),
+        "name": ("vfolders_name", None),
+        "group": ("vfolders_group", None),
+        "group_name": ("groups_name", None),
+        "user": ("vfolders_user", None),
+        "user_email": ("users_email", None),
+        "creator": ("vfolders_creator", None),
+        "usage_mode": ("vfolders_usage_mode", None),
+        "permission": ("vfolders_permission", None),
+        "ownership_type": ("vfolders_ownership_type", None),
+        "max_files": ("vfolders_max_files", None),
+        "max_size": ("vfolders_max_size", None),
+        "created_at": ("vfolders_created_at", None),
+        "last_used": ("vfolders_last_used", None),
+        "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", None),
+        "cur_size": ("vfolders_cur_size", None),
     }
 
     @classmethod
@@ -1185,7 +1183,7 @@ class VirtualFolderPermission(graphene.ObjectType):
             user_email=row["email"],
         )
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "permission": ("vfolder_permissions_permission", lambda s: VFolderPermission[s]),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
@@ -1193,12 +1191,12 @@ class VirtualFolderPermission(graphene.ObjectType):
         "user_email": ("users_email", None),
     }
 
-    _queryorder_colmap = {
-        "permission": "vfolder_permissions_permission",
-        "vfolder": "vfolder_permissions_vfolder",
-        "vfolder_name": "vfolders_name",
-        "user": "vfolder_permissions_user",
-        "user_email": "users_email",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "permission": ("vfolder_permissions_permission", None),
+        "vfolder": ("vfolder_permissions_vfolder", None),
+        "vfolder_name": ("vfolders_name", None),
+        "user": ("vfolder_permissions_user", None),
+        "user_email": ("users_email", None),
     }
 
     @classmethod
