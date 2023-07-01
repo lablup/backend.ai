@@ -22,6 +22,11 @@ agent_local_config_iv = (
             t.Key("agent"): t.Dict(
                 {
                     tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
+                    t.Key(
+                        "check-free-image-disk",
+                        default=True,
+                    ): t.Bool(),
+                    t.Key("backend-data-root", default="/var/lib/docker"): t.String(),
                     t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
                         allow_blank_host=True
                     ),
@@ -142,7 +147,6 @@ docker_extra_config_iv = t.Dict(
 default_container_logs_config = {
     "max-length": "10M",  # the maximum tail size
     "chunk-size": "64K",  # used when storing logs to Redis as a side-channel to the event bus
-    "check-free-image-disk": True,
 }
 
 agent_etcd_config_iv = t.Dict(
@@ -155,10 +159,6 @@ agent_etcd_config_iv = t.Dict(
                 t.Key(
                     "chunk-size", default=default_container_logs_config["chunk-size"]
                 ): tx.BinarySize(),
-                t.Key(
-                    "check-free-image-disk",
-                    default=default_container_logs_config["check-free-image-disk"],
-                ): t.Bool(),
             }
         ).allow_extra("*"),
     }

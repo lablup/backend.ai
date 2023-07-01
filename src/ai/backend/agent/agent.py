@@ -1166,7 +1166,10 @@ class AbstractAgent(
 
         TODO: get free disk of backend's data root.
         """
-        stat = os.statvfs("/")
+        data_root = Path(self.local_config["agent"]["backend-data-root"])
+        if not data_root.exists():
+            data_root = Path("/")
+        stat = os.statvfs(data_root)
         return stat.f_bfree * stat.f_bsize / (2**30)
 
     async def check_free_image_disk(self, image_ref: ImageRef) -> None:
@@ -1178,7 +1181,7 @@ class AbstractAgent(
         Still, the real size can be different from the metadata
         cause this agent have duplicate image layers.
         """
-        if not self.local_config["agent"]["check_free_image_disk"]:
+        if not self.local_config["agent"]["check-free-image-disk"]:
             return
         minimum = 50  # 50 GiB
         free = await self.get_free_image_disk()
