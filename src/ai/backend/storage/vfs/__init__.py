@@ -206,7 +206,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     def scan_tree(
         self,
         target_path: Path,
-        recursive=True,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
         loop = asyncio.get_running_loop()
