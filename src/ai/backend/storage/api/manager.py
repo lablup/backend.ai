@@ -231,7 +231,7 @@ async def update_quota_scope(request: web.Request) -> web.Response:
         async with ctx.get_volume(params["volume"]) as volume:
             quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
-                raise QuotaScopeNotFoundError
+                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
             await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
             return web.Response(status=204)
 
