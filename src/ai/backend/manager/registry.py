@@ -1346,25 +1346,25 @@ class AgentRegistry:
         agent_addr: str,
         image_maps: Sequence[dict[str, Any]],
         force: bool = False,
-    ) -> None:
+    ) -> dict[str, Any]:
         async with RPCContext(
             agent_id,
             agent_addr,
             invoke_timeout=None,
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            await rpc.call.pull_image(image_maps, force)
+            return await rpc.call.pull_image(image_maps, force)
 
     async def remove_image(
         self, agent_id: AgentId, agent_addr: str, image_maps: Sequence[dict[str, Any]]
-    ) -> None:
+    ) -> dict[str, Any]:
         async with RPCContext(
             agent_id,
             agent_addr,
             invoke_timeout=None,
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            await rpc.call.remove_image(image_maps)
+            return await rpc.call.remove_image(image_maps)
 
     async def start_session(
         self,

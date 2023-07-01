@@ -404,6 +404,8 @@ class AgentRPCServer(aobject):
     @collect_error
     async def remove_image(self, raw_images: list[dict[str, Any]]):
         log.debug("rpc::remove_image({0})", raw_images)
+        bgtask_mgr: BackgroundTaskManager = self.local_config["background_task_manager"]
+        response: dict[str, Any] = {}
         for raw_img in raw_images:
             img = ImageRef(
                 raw_img["canonical"],
@@ -411,7 +413,21 @@ class AgentRPCServer(aobject):
                 is_local=raw_img["is_local"],
                 architecture=get_arch_name(),
             )
-            await self.agent.remove_image(img)
+
+            async def _remove_image(
+                reporter: ProgressReporter,
+            ) -> None:
+                await self.agent.remove_image(img)
+
+            task_id = await bgtask_mgr.start(
+                _remove_image,
+            )
+            response[img.canonical] = {
+                "bgtask_id": str(task_id),
+                "image_ref": img.canonical,
+                "architecture": img.architecture,
+            }
+        return response
 
     @rpc_function
     @collect_error

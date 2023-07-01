@@ -692,7 +692,7 @@ class PreloadImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    task_id = graphene.String()
+    tasks = graphene.JSONString()
 
     @staticmethod
     async def mutate(
@@ -708,7 +708,7 @@ class PreloadImage(graphene.Mutation):
             ", ".join(target_agents),
         )
         ctx: GraphQueryContext = info.context
-        async with ctx.db.begin_session() as db_sess:
+        async with ctx.db.begin_readonly_session() as db_sess:
             agents = (
                 await db_sess.scalars(
                     sa.select(AgentRow.id, AgentRow.addr).where(AgentRow.id.in_(target_agents))
@@ -732,8 +732,12 @@ class PreloadImage(graphene.Mutation):
             for agent in agents:
                 await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
 
-        task_id = await ctx.background_task_manager.start(_preload_task)
-        return PreloadImage(ok=True, msg="", task_id=task_id)
+        tasks = {}
+        for agent in agents:
+            results = await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
+            tasks.update(results)
+
+        return PreloadImage(ok=True, msg="", tasks=tasks)
 
 
 class UnloadImage(graphene.Mutation):
@@ -745,7 +749,7 @@ class UnloadImage(graphene.Mutation):
 
     ok = graphene.Boolean()
     msg = graphene.String()
-    task_id = graphene.String()
+    tasks = graphene.JSONString()
 
     @staticmethod
     async def mutate(
@@ -760,7 +764,7 @@ class UnloadImage(graphene.Mutation):
             ", ".join(target_agents),
         )
         ctx: GraphQueryContext = info.context
-        async with ctx.db.begin_session() as db_sess:
+        async with ctx.db.begin_readonly_session() as db_sess:
             agents = (
                 await db_sess.scalars(
                     sa.select(AgentRow.id, AgentRow.addr).where(AgentRow.id.in_(target_agents))
@@ -780,12 +784,12 @@ class UnloadImage(graphene.Mutation):
                 for ref in references
             ]
 
-        async def _unload_task(reporter: ProgressReporter) -> None:
-            for agent in agents:
-                await ctx.registry.remove_image(agent.id, agent.addr, images)
+        tasks = {}
+        for agent in agents:
+            result = await ctx.registry.remove_image(agent.id, agent.addr, images)
+            tasks.update(result)
 
-        task_id = await ctx.background_task_manager.start(_unload_task)
-        return UnloadImage(ok=True, msg="", task_id=task_id)
+        return UnloadImage(ok=True, msg="", tasks=tasks)
 
 
 class RescanImages(graphene.Mutation):
