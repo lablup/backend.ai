@@ -251,13 +251,11 @@ class BaseFSOpModel(AbstractFSOpModel):
                             symlink_target=symlink_target,
                         )
                         q.put(item)
-                        if entry.is_dir() and not entry.is_symlink():
+                        if recursive and entry.is_dir() and not entry.is_symlink():
                             next_paths.append(Path(entry.path))
                         count += 1
                         if limit > 0 and count == limit:
                             break
-                    if not recursive:
-                        break
 
         async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
             try:
