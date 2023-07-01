@@ -20,7 +20,7 @@ jobs:
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
         else
-          echo "GIT_FETCH_DEPTH=1" >> "${GITHUB_ENV}"
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - uses: actions/checkout@v3
       with:
@@ -81,7 +81,7 @@ jobs:
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
         else
-          echo "GIT_FETCH_DEPTH=1" >> "${GITHUB_ENV}"
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - uses: actions/checkout@v3
       with:
@@ -136,7 +136,7 @@ jobs:
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
           echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
         else
-          echo "GIT_FETCH_DEPTH=1" >> "${GITHUB_ENV}"
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - uses: actions/checkout@v3
       with:
