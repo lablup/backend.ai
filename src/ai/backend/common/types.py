@@ -67,6 +67,7 @@ __all__ = (
     "MountPermissionLiteral",
     "MountTypes",
     "VFolderID",
+    "QuotaScopeID",
     "VFolderUsageMode",
     "VFolderMount",
     "QuotaConfig",
@@ -787,13 +788,59 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 
 
 @attrs.define(slots=True, frozen=True)
+class QuotaScopeID:
+    scope_type: QuotaScopeType
+    scope_id: Any
+
+    @classmethod
+    def parse(cls, raw: str) -> QuotaScopeID:
+        scope_type, _, rest = raw.partition(":")
+        match scope_type:
+            case "project":
+                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
+            case "user":
+                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+
+    def __str__(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return f"{self.scope_type.value}:{str(self.scope_id)}"
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @property
+    def pathname(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return self.scope_id.hex
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+
 class VFolderID:
-    quota_scope_id: str | None
+    quota_scope_id: QuotaScopeID | None
     folder_id: uuid.UUID
 
     @classmethod
     def from_row(cls, row: Any) -> VFolderID:
         return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+        self.folder_id = folder_id
+        match quota_scope_id:
+            case QuotaScopeID():
+                self.quota_scope_id = quota_scope_id
+            case str():
+                self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
+            case None:
+                self.quota_scope_id = None
+            case _:
+                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
 
     def __str__(self) -> str:
         if self.quota_scope_id is None:

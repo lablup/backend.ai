@@ -562,7 +562,7 @@ class CreateUser(graphene.Mutation):
             "role": UserRole(props.role),
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
-            "resource_policy": props.resource_policy,
+            "resource_policy": props.resource_policy or "default",
         }
         user_insert_query = sa.insert(users).values(user_data)
 

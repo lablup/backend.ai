@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType
 from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.config import load_local_config
 from ai.backend.storage.types import VFolderID
@@ -112,7 +113,7 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
 
 @pytest.fixture
 async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
-    qsid = f"testing-qs-{secrets.token_hex(16)}-0"
+    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
     vfid = VFolderID(qsid, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid)
     await volume.create_vfolder(vfid)

@@ -5,7 +5,7 @@ from typing import FrozenSet, Optional
 
 import aiofiles.os
 
-from ai.backend.common.types import HardwareMetadata
+from ai.backend.common.types import HardwareMetadata, QuotaScopeID
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..exception import NotEmptyError
@@ -27,7 +27,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -37,7 +37,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id_path = qspath / ".quota_id"
@@ -53,7 +53,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -74,7 +74,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
     async def unset_quota(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id_path = qspath / ".quota_id"
@@ -87,7 +87,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id_path = qspath / ".quota_id"

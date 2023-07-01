@@ -25,7 +25,7 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
 from ..abc import AbstractVolume
@@ -151,7 +151,7 @@ async def get_hwinfo(request: web.Request) -> web.Response:
 async def create_quota_scope(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
-        qsid: str
+        qsid: QuotaScopeID
         options: QuotaConfig | None
 
     async with cast(
@@ -177,7 +177,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
 async def get_quota_scope(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
-        qsid: str
+        qsid: QuotaScopeID
 
     async with cast(
         AsyncContextManager[Params],
@@ -210,7 +210,7 @@ async def get_quota_scope(request: web.Request) -> web.Response:
 async def update_quota_scope(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
-        qsid: str
+        qsid: QuotaScopeID
         options: QuotaConfig
 
     async with cast(
@@ -239,7 +239,7 @@ async def update_quota_scope(request: web.Request) -> web.Response:
 async def unset_quota(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
-        qsid: str
+        qsid: QuotaScopeID
 
     async with cast(
         AsyncContextManager[Params],

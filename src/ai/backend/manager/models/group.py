@@ -435,7 +435,7 @@ class CreateGroup(graphene.Mutation):
             "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
             "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
             "integration_id": props.integration_id,
-            "resource_policy": props.resource_policy,
+            "resource_policy": props.resource_policy or "default",
         }
         insert_query = sa.insert(groups).values(data)
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)

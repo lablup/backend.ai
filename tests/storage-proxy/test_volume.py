@@ -1,23 +1,23 @@
-import secrets
 import uuid
 from pathlib import PurePosixPath
 
 import pytest
 
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType
 from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.types import VFolderID
 
 
 @pytest.mark.asyncio
-async def test_volume_vfolder_prefix_handling(test_id: str, volume: AbstractVolume) -> None:
-    qsid = f"test-{test_id}-qs-{secrets.token_hex(8)}-0"
+async def test_volume_vfolder_prefix_handling(volume: AbstractVolume) -> None:
+    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
     vfid = VFolderID(qsid, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid)
     await volume.create_vfolder(vfid)
     assert vfid.quota_scope_id is not None
     vfpath = (
         volume.mount_path
-        / vfid.quota_scope_id
+        / vfid.quota_scope_id.pathname
         / vfid.folder_id.hex[0:2]
         / vfid.folder_id.hex[2:4]
         / vfid.folder_id.hex[4:]
@@ -34,14 +34,14 @@ async def test_volume_vfolder_prefix_handling(test_id: str, volume: AbstractVolu
     await volume.create_vfolder(vfid2)
     vfpath1 = (
         volume.mount_path
-        / qsid
+        / qsid.pathname
         / vfid1.folder_id.hex[0:2]
         / vfid1.folder_id.hex[2:4]
         / vfid1.folder_id.hex[4:]
     )
     vfpath2 = (
         volume.mount_path
-        / qsid
+        / qsid.pathname
         / vfid2.folder_id.hex[0:2]
         / vfid2.folder_id.hex[2:4]
         / vfid2.folder_id.hex[4:]
@@ -102,10 +102,9 @@ async def test_volume_scandir(volume: AbstractVolume, empty_vfolder: VFolderID) 
 
 
 @pytest.mark.asyncio
-async def test_volume_clone(test_id: str, volume: AbstractVolume) -> None:
-    qsid_base = secrets.token_hex(8)
-    qsid1 = f"test-{test_id}-qs-{qsid_base}-0"
-    qsid2 = f"test-{test_id}-qs-{qsid_base}-1"
+async def test_volume_clone(volume: AbstractVolume) -> None:
+    qsid1 = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qsid2 = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
     await volume.quota_model.create_quota_scope(qsid1)
     await volume.quota_model.create_quota_scope(qsid2)
     vfid1 = VFolderID(qsid1, uuid.uuid4())

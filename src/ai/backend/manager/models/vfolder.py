@@ -22,6 +22,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
@@ -41,6 +42,7 @@ from .base import (
     IDColumn,
     Item,
     PaginatedList,
+    QuotaScopeIDType,
     batch_multiresult,
     metadata,
 )
@@ -171,7 +173,7 @@ vfolders = sa.Table(
     IDColumn("id"),
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False),
-    sa.Column("quota_scope_id", sa.String(length=64), nullable=False),
+    sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
     sa.Column("name", sa.String(length=64), nullable=False, index=True),
     sa.Column(
         "usage_mode",
@@ -955,46 +957,48 @@ async def initiate_vfolder_removal(
 
 async def ensure_quota_scope_accessible_by_user(
     conn: SASession,
-    quota_scope: str,
+    quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
-) -> QuotaScopeType:
+) -> None:
     from ai.backend.manager.models import GroupRow, UserRow
     from ai.backend.manager.models import association_groups_users as agus
 
     # Lookup user table to match if quota is scoped to the user
-    query = sa.select(UserRow).where(UserRow.uuid == quota_scope)
+    query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
     quota_scope_user = await conn.scalar(query)
     if quota_scope_user:
         match user["role"]:
             case UserRole.SUPERADMIN:
-                return QuotaScopeType.USER
+                return
             case UserRole.ADMIN:
                 if quota_scope_user.domain == user["domain"]:
-                    return QuotaScopeType.USER
+                    return
             case _:
                 if quota_scope_user.uuid == user["uuid"]:
-                    return QuotaScopeType.USER
+                    return
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    query = sa.select(GroupRow).where(GroupRow.id == quota_scope)
+    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
     quota_scope_group = await conn.scalar(query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:
-                return QuotaScopeType.PROJECT
+                return
             case UserRole.ADMIN:
                 if quota_scope_group.domain == user["domain"]:
-                    return QuotaScopeType.PROJECT
+                    return
             case _:
                 query = (
                     sa.select([agus.c.group_id])
                     .select_from(agus)
-                    .where((agus.c.group_id == quota_scope) & (agus.c.user_id == user["uuid"]))
+                    .where(
+                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
+                    )
                 )
                 matched_group_id = await conn.scalar(query)
                 if matched_group_id:
-                    return QuotaScopeType.PROJECT
+                    return
 
     raise InvalidAPIParameters
 
@@ -1343,7 +1347,7 @@ class FolderQuota(graphene.ObjectType):
     def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> FolderQuota:
         return FolderQuota(
             id=f"QuotaConfig:{row.host}/{row.quota_scope_id}",
-            quota_scope_id=row.quota_scope_id,
+            quota_scope_id=str(row.quota_scope_id),
             storage_host_name=row.host,
         )
 
@@ -1397,21 +1401,20 @@ class SetFolderQuota(graphene.Mutation):
     ) -> SetFolderQuota:
         from ai.backend.manager.models import GroupRow, UserRow
 
+        qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
-            quota_scope_type = await ensure_quota_scope_accessible_by_user(
-                sess, quota_scope_id, graph_ctx.user
-            )
-            if quota_scope_type == QuotaScopeType.USER:
+            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+            if qsid.scope_type == QuotaScopeType.USER:
                 query = (
                     sa.select(UserRow)
-                    .where(UserRow.uuid == quota_scope_id)
+                    .where(UserRow.uuid == qsid.scope_id)
                     .options(selectinload(UserRow.resource_policy_row))
                 )
             else:
                 query = (
                     sa.select(GroupRow)
-                    .where(GroupRow.id == quota_scope_id)
+                    .where(GroupRow.id == qsid.scope_id)
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
             result = await sess.scalar(query)
@@ -1431,7 +1434,7 @@ class SetFolderQuota(graphene.Mutation):
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
         request_body = {
             "volume": volume_name,
-            "qsid": quota_scope_id,
+            "qsid": str(qsid),
             "options": {"limit_bytes": max_vfolder_size},
         }
         async with graph_ctx.storage_manager.request(
@@ -1444,7 +1447,7 @@ class SetFolderQuota(graphene.Mutation):
             pass
         return cls(
             FolderQuota(
-                id=f"QuotaConfig:{storage_host_name}/{quota_scope_id}",
+                id=f"QuotaConfig:{storage_host_name}/{qsid}",
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )
@@ -1473,26 +1476,25 @@ class UnsetFolderQuota(graphene.Mutation):
     ) -> SetFolderQuota:
         from ai.backend.manager.models import GroupRow, UserRow
 
+        qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
         request_body: dict[str, Any] = {
             "volume": volume_name,
-            "qsid": quota_scope_id,
+            "qsid": str(qsid),
         }
         async with graph_ctx.db.begin_readonly_session() as sess:
-            quota_scope_type = await ensure_quota_scope_accessible_by_user(
-                sess, quota_scope_id, graph_ctx.user
-            )
-            if quota_scope_type == QuotaScopeType.USER:
+            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+            if qsid.scope_type == QuotaScopeType.USER:
                 query = (
                     sa.select(UserRow)
-                    .where(UserRow.uuid == quota_scope_id)
+                    .where(UserRow.uuid == qsid.scope_id)
                     .options(selectinload(UserRow.resource_policy_row))
                 )
             else:
                 query = (
                     sa.select(GroupRow)
-                    .where(GroupRow.id == quota_scope_id)
+                    .where(GroupRow.id == qsid.scope_id)
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
             result = await sess.scalar(query)
@@ -1520,7 +1522,7 @@ class UnsetFolderQuota(graphene.Mutation):
 
         return cls(
             FolderQuota(
-                id=f"QuotaConfig:{storage_host_name}/{quota_scope_id}",
+                id=f"QuotaConfig:{storage_host_name}/{qsid}",
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )

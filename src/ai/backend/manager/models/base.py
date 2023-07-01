@@ -55,6 +55,7 @@ from ai.backend.common.types import (
     EndpointId,
     JSONSerializableMixin,
     KernelId,
+    QuotaScopeID,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
@@ -170,6 +171,24 @@ class EnumValueType(TypeDecorator, SchemaType):
     @property
     def python_type(self):
         return self._enum_class
+
+
+class QuotaScopeIDType(TypeDecorator):
+    """
+    A column type wrapper for string-based quota scope ID.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(64))
+
+    def process_bind_param(self, value: Optional[QuotaScopeID], dialect) -> Optional[str]:
+        return str(value) if value else None
+
+    def process_result_value(self, raw_value: str, dialect) -> QuotaScopeID:
+        return QuotaScopeID.parse(raw_value)
 
 
 class ResourceSlotColumn(TypeDecorator):

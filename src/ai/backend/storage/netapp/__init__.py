@@ -19,7 +19,7 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -71,7 +71,7 @@ class QTreeQuotaModel(BaseQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -82,7 +82,7 @@ class QTreeQuotaModel(BaseQuotaModel):
 
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
@@ -91,7 +91,7 @@ class QTreeQuotaModel(BaseQuotaModel):
 
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -106,14 +106,14 @@ class QTreeQuotaModel(BaseQuotaModel):
         self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
     # FIXME: How do we implement unset_quota() for NetApp?
-    async def unset_quota(self, quota_scope_id: str) -> None:
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         raise InvalidQuotaScopeError(
             "Unsetting folder limit without removing quota scope is not possible for this backend"
         )
 
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:

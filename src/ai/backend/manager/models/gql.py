@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from ai.backend.common.types import (
         AccessKey,
         AgentId,
+        QuotaScopeID,
         RedisConnectionInfo,
         SlotName,
         SlotTypes,
@@ -1686,11 +1687,11 @@ class Queries(graphene.ObjectType):
         if not quota_scope_id or not storage_host_name:
             raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
         graph_ctx: GraphQueryContext = info.context
+        qsid = QuotaScopeID.parse(quota_scope_id)
         async with graph_ctx.db.begin_readonly_session() as sess:
-            await ensure_quota_scope_accessible_by_user(sess, quota_scope_id, graph_ctx.user)
+            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
             query = sa.select(VFolderRow).where(
-                (VFolderRow.quota_scope_id == quota_scope_id)
-                & (VFolderRow.host == storage_host_name)
+                (VFolderRow.quota_scope_id == qsid) & (VFolderRow.host == storage_host_name)
             )
             row = await sess.scalar(query)
             if not row:

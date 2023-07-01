@@ -40,6 +40,8 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
     RedisConnectionInfo,
     VFolderHostPermission,
     VFolderHostPermissionMap,
@@ -429,12 +431,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
         # Determine the ownership type and the quota scope ID.
         if group_uuid is not None:
             ownership_type = "group"
-            quota_scope_id = group_uuid.hex
+            quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
             if not request["is_admin"]:
                 raise GenericForbidden("no permission")
         else:
             ownership_type = "user"
-            quota_scope_id = user_uuid.hex
+            quota_scope_id = QuotaScopeID(QuotaScopeType.USER, user_uuid)
         if ownership_type not in allowed_vfolder_types:
             raise InvalidAPIParameters(
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
@@ -523,7 +525,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         insert_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
-            "quota_scope_id": quota_scope_id,
+            "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
             "last_used": None,
@@ -540,7 +542,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         resp = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
-            "quota_scope_id": quota_scope_id,
+            "quota_scope_id": str(quota_scope_id),
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
@@ -613,7 +615,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                 {
                     "name": entry["name"],
                     "id": entry["id"].hex,
-                    "quota_scope_id": entry["quota_scope_id"],
+                    "quota_scope_id": str(entry["quota_scope_id"]),
                     "host": entry["host"],
                     "status": entry["status"],
                     "usage_mode": entry["usage_mode"].value,
@@ -924,7 +926,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "name": row["name"],
         "id": row["id"].hex,
         "host": row["host"],
-        "quota_scope_id": row["quota_scope_id"],
+        "quota_scope_id": str(row["quota_scope_id"]),
         "status": row["status"],
         "numFiles": usage["file_count"],  # legacy
         "num_files": usage["file_count"],
