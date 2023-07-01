@@ -59,7 +59,7 @@ jobs:
           git remote set-branches origin "$BASE_REF_SHORT"
           BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
           BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHOIRT}"
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -114,7 +114,7 @@ jobs:
           git remote set-branches origin "$BASE_REF_SHORT"
           BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
           BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHOIRT}"
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -179,7 +179,7 @@ jobs:
           git remote set-branches origin "$BASE_REF_SHORT"
           BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
           BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
-          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHOIRT}"
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
