@@ -65,7 +65,7 @@ async def test_scan_tree_with_limit(dummy_path) -> None:
     result = []
     async for item in fsop_model.scan_tree(dummy_path, recursive=True):
         result.append(item)
-    # There is no guaranteed ordering of os.scandir(), so Cannot
+    # There is no guaranteed ordering of os.scandir(), so we cannot
     # deterministically test which file/dir is included or not.
     assert len(result) == 5
 
