@@ -110,9 +110,9 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
-    FolderQuota,
-    SetFolderQuota,
-    UnsetFolderQuota,
+    QuotaScope,
+    UnsetQuotaScope,
+    UpdateQuotaScope,
     VFolderRow,
     VirtualFolder,
     VirtualFolderList,
@@ -217,8 +217,8 @@ class Mutations(graphene.ObjectType):
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
-    set_folder_quota = SetFolderQuota.Field()
-    unset_folder_quota = UnsetFolderQuota.Field()
+    update_quota_scope = UpdateQuotaScope.Field()
+    unset_quota_scope = UnsetQuotaScope.Field()
 
 
 class Queries(graphene.ObjectType):
@@ -566,8 +566,8 @@ class Queries(graphene.ObjectType):
         endpoint_id=graphene.UUID(),
     )
 
-    folder_quota = graphene.Field(
-        FolderQuota,
+    quota_scope = graphene.Field(
+        QuotaScope,
         storage_host_name=graphene.String(required=True),
         quota_scope_id=graphene.String(required=True),
     )
@@ -1677,13 +1677,13 @@ class Queries(graphene.ObjectType):
         return RoutingList(routing_list, total_count)
 
     @staticmethod
-    async def resolve_folder_quota(
+    async def resolve_quota_scope(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         *,
         quota_scope_id: Optional[str] = None,
         storage_host_name: Optional[str] = None,
-    ) -> FolderQuota:
+    ) -> QuotaScope:
         if not quota_scope_id or not storage_host_name:
             raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
         graph_ctx: GraphQueryContext = info.context
@@ -1696,7 +1696,7 @@ class Queries(graphene.ObjectType):
             row = await sess.scalar(query)
             if not row:
                 raise ObjectNotFound
-            return FolderQuota.from_vfolder_row(graph_ctx, row)
+            return QuotaScope.from_vfolder_row(graph_ctx, row)
 
 
 class GQLMutationPrivilegeCheckMiddleware:

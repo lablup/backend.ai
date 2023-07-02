@@ -70,6 +70,9 @@ __all__: Sequence[str] = (
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
     "VFolderRow",
+    "QuotaScope",
+    "UpdateQuotaScope",
+    "UnsetQuotaScope",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
     "initiate_vfolder_removal",
@@ -1334,7 +1337,7 @@ class QuotaDetails(graphene.ObjectType):
     hard_limit_bytes = BigInt(required=False)
 
 
-class FolderQuota(graphene.ObjectType):
+class QuotaScope(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
 
@@ -1344,12 +1347,14 @@ class FolderQuota(graphene.ObjectType):
     details = graphene.NonNull(QuotaDetails)
 
     @classmethod
-    def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> FolderQuota:
-        return FolderQuota(
-            id=f"QuotaConfig:{row.host}/{row.quota_scope_id}",
+    def from_vfolder_row(cls, ctx: GraphQueryContext, row: VFolderRow) -> QuotaScope:
+        return QuotaScope(
             quota_scope_id=str(row.quota_scope_id),
             storage_host_name=row.host,
         )
+
+    def resolve_id(self, info: graphene.ResolveInfo) -> str:
+        return f"QuotaScope:{self.stroage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
         graph_ctx: GraphQueryContext = info.context
@@ -1373,11 +1378,11 @@ class FolderQuota(graphene.ObjectType):
             )
 
 
-class FolderQuotaInput(graphene.InputObjectType):
+class QuotaScopeInput(graphene.InputObjectType):
     hard_limit_bytes = BigInt(required=False)
 
 
-class SetFolderQuota(graphene.Mutation):
+class UpdateQuotaScope(graphene.Mutation):
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -1386,9 +1391,9 @@ class SetFolderQuota(graphene.Mutation):
     class Arguments:
         quota_scope_id = graphene.String(required=True)
         storage_host_name = graphene.String(required=True)
-        props = FolderQuotaInput(required=True)
+        props = QuotaScopeInput(required=True)
 
-    folder_quota = graphene.Field(lambda: FolderQuota)
+    folder_quota = graphene.Field(lambda: QuotaScope)
 
     @classmethod
     async def mutate(
@@ -1397,8 +1402,8 @@ class SetFolderQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,
-        props: FolderQuotaInput,
-    ) -> SetFolderQuota:
+        props: QuotaScopeInput,
+    ) -> UpdateQuotaScope:
         from ai.backend.manager.models import GroupRow, UserRow
 
         qsid = QuotaScopeID.parse(quota_scope_id)
@@ -1446,15 +1451,14 @@ class SetFolderQuota(graphene.Mutation):
         ):
             pass
         return cls(
-            FolderQuota(
-                id=f"QuotaConfig:{storage_host_name}/{qsid}",
+            QuotaScope(
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )
         )
 
 
-class UnsetFolderQuota(graphene.Mutation):
+class UnsetQuotaScope(graphene.Mutation):
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -1464,7 +1468,7 @@ class UnsetFolderQuota(graphene.Mutation):
         quota_scope_id = graphene.String(required=True)
         storage_host_name = graphene.String(required=True)
 
-    folder_quota = graphene.Field(lambda: FolderQuota)
+    folder_quota = graphene.Field(lambda: QuotaScope)
 
     @classmethod
     async def mutate(
@@ -1473,7 +1477,7 @@ class UnsetFolderQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,
-    ) -> SetFolderQuota:
+    ) -> UpdateQuotaScope:
         from ai.backend.manager.models import GroupRow, UserRow
 
         qsid = QuotaScopeID.parse(quota_scope_id)
@@ -1521,8 +1525,7 @@ class UnsetFolderQuota(graphene.Mutation):
                 pass
 
         return cls(
-            FolderQuota(
-                id=f"QuotaConfig:{storage_host_name}/{qsid}",
+            QuotaScope(
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )
