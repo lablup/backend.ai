@@ -214,7 +214,7 @@ class KeyPair(graphene.ObjectType):
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
-            projects=row["groups_name"],
+            projects=row["groups_name"] if "groups_name" in row.keys() else [],
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
@@ -325,11 +325,15 @@ class KeyPair(graphene.ObjectType):
         from .user import users
 
         j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid, isouter=True)
+            .join(
+                association_groups_users,
+                users.c.uuid == association_groups_users.c.user_id,
+                isouter=True,
+            )
+            .join(groups, association_groups_users.c.group_id == groups.c.id, isouter=True)
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count(sa.distinct(keypairs.c.user_id))]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
@@ -360,9 +364,13 @@ class KeyPair(graphene.ObjectType):
         from .user import users
 
         j = (
-            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid, isouter=True)
+            .join(
+                association_groups_users,
+                users.c.uuid == association_groups_users.c.user_id,
+                isouter=True,
+            )
+            .join(groups, association_groups_users.c.group_id == groups.c.id, isouter=True)
         )
         query = (
             sa.select(
