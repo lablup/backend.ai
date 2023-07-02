@@ -7,6 +7,7 @@ import attrs
 import graphene
 import sqlalchemy as sa
 
+from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 if TYPE_CHECKING:
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
     from ai.backend.common.types import (
         AccessKey,
         AgentId,
-        QuotaScopeID,
         RedisConnectionInfo,
         SlotName,
         SlotTypes,
