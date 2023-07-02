@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import attrs
 import graphene
-import sqlalchemy as sa
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
@@ -113,7 +112,6 @@ from .vfolder import (
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
-    VFolderRow,
     VirtualFolder,
     VirtualFolderList,
     VirtualFolderPermission,
@@ -1688,15 +1686,18 @@ class Queries(graphene.ObjectType):
             raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
         graph_ctx: GraphQueryContext = info.context
         qsid = QuotaScopeID.parse(quota_scope_id)
+        volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
+        for host, volume in volumes_by_host:
+            if f"{host}:{volume['name']}" == storage_host_name:
+                break
+        else:
+            raise ValueError(f"storage volume {storage_host_name} does not exist")
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-            query = sa.select(VFolderRow).where(
-                (VFolderRow.quota_scope_id == qsid) & (VFolderRow.host == storage_host_name)
+            return QuotaScope(
+                quota_scope_id=quota_scope_id,
+                storage_host_name=storage_host_name,
             )
-            row = await sess.scalar(query)
-            if not row:
-                raise ObjectNotFound
-            return QuotaScope.from_vfolder_row(graph_ctx, row)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
