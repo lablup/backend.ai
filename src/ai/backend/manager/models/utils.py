@@ -360,4 +360,10 @@ def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
 
 
 def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
-    return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
+    return sa.case(
+        (
+            sa.func.array_agg(column) != [None],
+            sa.func.array_agg(psql.aggregate_order_by(column, column.asc())),
+        ),
+        else_=[],
+    )
