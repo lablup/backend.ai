@@ -71,7 +71,7 @@ __all__: Sequence[str] = (
     "VFolderDeletionInfo",
     "VFolderRow",
     "QuotaScope",
-    "UpdateQuotaScope",
+    "SetQuotaScope",
     "UnsetQuotaScope",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
@@ -1382,7 +1382,7 @@ class QuotaScopeInput(graphene.InputObjectType):
     hard_limit_bytes = BigInt(required=False)
 
 
-class UpdateQuotaScope(graphene.Mutation):
+class SetQuotaScope(graphene.Mutation):
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -1403,7 +1403,7 @@ class UpdateQuotaScope(graphene.Mutation):
         quota_scope_id: str,
         storage_host_name: str,
         props: QuotaScopeInput,
-    ) -> UpdateQuotaScope:
+    ) -> SetQuotaScope:
         from ai.backend.manager.models import GroupRow, UserRow
 
         qsid = QuotaScopeID.parse(quota_scope_id)
@@ -1477,7 +1477,7 @@ class UnsetQuotaScope(graphene.Mutation):
         info: graphene.ResolveInfo,
         quota_scope_id: str,
         storage_host_name: str,
-    ) -> UpdateQuotaScope:
+    ) -> SetQuotaScope:
         from ai.backend.manager.models import GroupRow, UserRow
 
         qsid = QuotaScopeID.parse(quota_scope_id)
