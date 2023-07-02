@@ -829,9 +829,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         encoded_preopen_ports = ",".join(
             f"{port_no}:preopen:{port_no}" for port_no in preopen_ports
         )
-        container_config["Labels"]["ai.backend.service-ports"] = (
-            image_service_ports + "," if image_service_ports else ""
-        ) + encoded_preopen_ports
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join(
+            ports for ports in [image_service_ports, encoded_preopen_ports] if ports
+        )
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
         if self.local_config["debug"]["log-kernel-config"]:
