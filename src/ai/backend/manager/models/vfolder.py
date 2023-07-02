@@ -1354,7 +1354,7 @@ class QuotaScope(graphene.ObjectType):
         )
 
     def resolve_id(self, info: graphene.ResolveInfo) -> str:
-        return f"QuotaScope:{self.stroage_host_name}/{self.quota_scope_id}"
+        return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
         graph_ctx: GraphQueryContext = info.context
@@ -1393,7 +1393,7 @@ class SetQuotaScope(graphene.Mutation):
         storage_host_name = graphene.String(required=True)
         props = QuotaScopeInput(required=True)
 
-    folder_quota = graphene.Field(lambda: QuotaScope)
+    quota_scope = graphene.Field(lambda: QuotaScope)
 
     @classmethod
     async def mutate(
@@ -1468,7 +1468,7 @@ class UnsetQuotaScope(graphene.Mutation):
         quota_scope_id = graphene.String(required=True)
         storage_host_name = graphene.String(required=True)
 
-    folder_quota = graphene.Field(lambda: QuotaScope)
+    quota_scope = graphene.Field(lambda: QuotaScope)
 
     @classmethod
     async def mutate(
