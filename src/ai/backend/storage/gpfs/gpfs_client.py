@@ -32,7 +32,7 @@ from .types import (
     GPFSSystemHealthState,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 def error_handler(inner):
@@ -213,13 +213,9 @@ class GPFSAPIClient:
         self,
         fs_name: str,
         fileset_name: str,
-        limit: BinarySize,
+        limit_bytes: int,
     ) -> None:
-        ss = str(limit)
-        if ss.endswith("bytes"):
-            limit_str = ss.replace("bytes", "B")
-        limit_str = ss.replace(" ", "").replace("iB", "")
-
+        limit_str = str(limit_bytes)
         body = {
             "operationType": "setQuota",
             "quotaType": GPFSQuotaType.FILESET,
@@ -227,7 +223,6 @@ class GPFSAPIClient:
             "blockSoftLimit": limit_str,
             "blockHardLimit": limit_str,
         }
-
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,

@@ -2,7 +2,6 @@ resources(
     name="redis-cluster-compose",
     sources=[
         "redis-cluster.yml",
-        "redis-sentinel.dockerfile",
         "sentinel.conf",
     ],
 )

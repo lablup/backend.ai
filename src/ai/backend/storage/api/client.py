@@ -9,7 +9,16 @@ import os
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, Mapping, MutableMapping, cast
+from typing import (
+    Any,
+    AsyncContextManager,
+    Final,
+    Literal,
+    Mapping,
+    MutableMapping,
+    TypedDict,
+    cast,
+)
 
 import aiohttp_cors
 import janus
@@ -20,6 +29,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderID
 
 from ..abc import AbstractVolume
 from ..context import Context
@@ -27,17 +37,26 @@ from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+
+class DownloadTokenData(TypedDict):
+    op: Literal["download"]
+    volume: str
+    vfid: VFolderID
+    relpath: str
+    archive: bool
+    unmanaged_path: str | None
 
 
 download_token_data_iv = t.Dict(
     {
         t.Key("op"): t.Atom("download"),
         t.Key("volume"): t.String,
-        t.Key("vfid"): tx.UUID,
+        t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("archive", default=False): t.Bool,
         t.Key("unmanaged_path", default=None): t.Null | t.String,
@@ -46,11 +65,21 @@ download_token_data_iv = t.Dict(
     "*",
 )  # allow JWT-intrinsic keys
 
+
+class UploadTokenData(TypedDict):
+    op: Literal["upload"]
+    volume: str
+    vfid: VFolderID
+    relpath: str
+    session: str
+    size: int
+
+
 upload_token_data_iv = t.Dict(
     {
         t.Key("op"): t.Atom("upload"),
         t.Key("volume"): t.String,
-        t.Key("vfid"): tx.UUID,
+        t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
@@ -63,19 +92,30 @@ upload_token_data_iv = t.Dict(
 async def download(request: web.Request) -> web.StreamResponse:
     ctx: Context = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=download_token_data_iv,
-                ),
-                t.Key("archive", default=False): t.ToBool,
-                t.Key("no_cache", default=False): t.ToBool,
-            },
+
+    class Params(TypedDict):
+        token: DownloadTokenData
+        dst_dir: str
+        archive: bool
+        no_cache: bool
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=download_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                    t.Key("archive", default=False): t.ToBool,
+                    t.Key("no_cache", default=False): t.ToBool,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         async with ctx.get_volume(params["token"]["volume"]) as volume:
             token_data = params["token"]
@@ -84,7 +124,10 @@ async def download(request: web.Request) -> web.StreamResponse:
             else:
                 vfpath = volume.mangle_vfpath(token_data["vfid"])
             try:
-                file_path = (vfpath / token_data["relpath"]).resolve()
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                file_path = parent_dir / token_data["relpath"]
                 file_path.relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
@@ -132,7 +175,7 @@ async def download(request: web.Request) -> web.StreamResponse:
         hdrs.CONTENT_TYPE: "application/octet-stream",
         hdrs.CONTENT_DISPOSITION: " ".join(
             [
-                "attachment;" f'filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
                 f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
             ],
         ),
@@ -195,7 +238,7 @@ async def download_directory_as_archive(
             hdrs.CONTENT_TYPE: "application/zip",
             hdrs.CONTENT_DISPOSITION: " ".join(
                 [
-                    "attachment;" f'filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                    f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
                     f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
                 ],
             ),
@@ -213,17 +256,26 @@ async def tus_check_session(request: web.Request) -> web.Response:
     """
     ctx: Context = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=upload_token_data_iv,
-                ),
-            },
+
+    class Params(TypedDict):
+        token: UploadTokenData
+        dst_dir: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
@@ -237,23 +289,32 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     """
     ctx: Context = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=upload_token_data_iv,
-                ),
-            },
+
+    class Params(TypedDict):
+        token: UploadTokenData
+        dst_dir: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path = vfpath / ".upload" / token_data["session"]
+            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
 
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,
@@ -266,7 +327,12 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             current_size = Path(upload_temp_path).stat().st_size
             if current_size >= int(token_data["size"]):
-                target_path = vfpath / token_data["relpath"]
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                target_path: Path = parent_dir / token_data["relpath"]
+                if not target_path.parent.exists():
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()
@@ -287,12 +353,12 @@ async def tus_options(request: web.Request) -> web.Response:
     ctx: Context = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers[
-        "Access-Control-Allow-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    headers[
-        "Access-Control-Expose-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers["Access-Control-Allow-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
+    headers["Access-Control-Expose-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
@@ -322,12 +388,12 @@ async def prepare_tus_session_headers(
         )
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
-    headers[
-        "Access-Control-Allow-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
-    headers[
-        "Access-Control-Expose-Headers"
-    ] = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    headers["Access-Control-Allow-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
+    headers["Access-Control-Expose-Headers"] = (
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+    )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
@@ -354,4 +420,5 @@ async def init_client_app(ctx: Context) -> web.Application:
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
+
     return app

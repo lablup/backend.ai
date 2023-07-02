@@ -34,6 +34,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -46,6 +47,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    SessionId,
     SlotName,
     VFolderMount,
     current_resource_slots,
@@ -71,7 +73,7 @@ from .kube_object import (
 )
 from .resources import detect_resources
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.kubernetes.agent"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -91,6 +93,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -98,7 +102,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         static_pvc_name: str,
         restarting: bool = False,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
 
         self.scratch_dir = scratch_dir
@@ -200,6 +212,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 bash_profile_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
                 )
+                zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
                 vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
                 tmux_conf_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf")
@@ -212,6 +225,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 shutil.copy(font_italic_path.resolve(), jupyter_custom_dir / "roboto-italic.ttf")
                 shutil.copy(bashrc_path.resolve(), self.work_dir / ".bashrc")
                 shutil.copy(bash_profile_path.resolve(), self.work_dir / ".bash_profile")
+                shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
 
@@ -558,6 +572,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         kernel_obj = KubernetesKernel(
             self.kernel_id,
+            self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -621,7 +637,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ):
             rollback_functions: List[Optional[functools.partial]] = []
 
-            for (rollup_function, future_rollback_function) in functions:
+            for rollup_function, future_rollback_function in functions:
                 try:
                     if rollup_function:
                         await rollup_function()
@@ -801,7 +817,10 @@ class KubernetesAgent(
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    f'Scratch type {self.local_config["container"]["scratch-type"]} is not supported',
+                    (
+                        f'Scratch type {self.local_config["container"]["scratch-type"]} is not'
+                        " supported"
+                    ),
                 )
 
             try:
@@ -928,6 +947,7 @@ class KubernetesAgent(
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -935,6 +955,8 @@ class KubernetesAgent(
     ) -> KubernetesKernelCreationContext:
         return KubernetesKernelCreationContext(
             kernel_id,
+            session_id,
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
@@ -977,12 +999,6 @@ class KubernetesAgent(
         if not restarting:
             scratch_dir = self.local_config["container"]["scratch-root"] / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
-
-    async def create_overlay_network(self, network_name: str) -> None:
-        raise NotImplementedError
-
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        raise NotImplementedError
 
     async def create_local_network(self, network_name: str) -> None:
         raise NotImplementedError

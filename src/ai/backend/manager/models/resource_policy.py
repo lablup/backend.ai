@@ -7,17 +7,19 @@ import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import relationship
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 
 from .base import (
+    Base,
     BigInt,
     EnumType,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -32,6 +34,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
     "keypair_resource_policies",
+    "KeyPairResourcePolicyRow",
     "KeyPairResourcePolicy",
     "DefaultForUnspecified",
     "CreateKeyPairResourcePolicy",
@@ -42,7 +45,7 @@ __all__: Sequence[str] = (
 
 keypair_resource_policies = sa.Table(
     "keypair_resource_policies",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("name", sa.String(length=256), primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column(
@@ -54,6 +57,9 @@ keypair_resource_policies = sa.Table(
     sa.Column("total_resource_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")),
     sa.Column("max_concurrent_sessions", sa.Integer(), nullable=False),
+    sa.Column(
+        "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
+    ),
     sa.Column("max_containers_per_session", sa.Integer(), nullable=False),
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
@@ -67,6 +73,11 @@ keypair_resource_policies = sa.Table(
     # TODO: implement with a many-to-many association table
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
 )
+
+
+class KeyPairResourcePolicyRow(Base):
+    __table__ = keypair_resource_policies
+    keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
@@ -248,7 +259,6 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -289,7 +299,6 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
 
 
 class ModifyKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -333,7 +342,6 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
 
 
 class DeleteKeyPairResourcePolicy(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

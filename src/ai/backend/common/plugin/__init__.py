@@ -14,7 +14,7 @@ from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
 from ..logging_utils import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "AbstractPlugin",
@@ -144,7 +144,9 @@ class BasePluginContext(Generic[P]):
             if union := allowlist & blocklist:
                 raise ConfigurationError(
                     {
-                        "plugin.BasePluginContext": f"allowlist and blocklist has union value '{union}'"
+                        "plugin.BasePluginContext": (
+                            f"allowlist and blocklist has union value '{union}'"
+                        )
                     }
                 )
         scanned_plugins = self.discover_plugins(

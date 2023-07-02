@@ -13,7 +13,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import text
 from sqlalchemy.sql.expression import bindparam
 
-from ai.backend.manager.models import VFolderOwnershipType, VFolderPermission, VFolderUsageMode
+from ai.backend.common.types import VFolderUsageMode
+from ai.backend.manager.models import VFolderOwnershipType, VFolderPermission
 from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, convention
 
 # revision identifiers, used by Alembic.
@@ -113,8 +114,10 @@ def upgrade():
     op.create_check_constraint(
         "ownership_type_match_with_user_or_group",
         "vfolders",
-        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
+        (
+            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+            "(ownership_type = 'group' AND \"group\" IS NOT NULL)"
+        ),
     )
     op.create_check_constraint(
         "either_one_of_user_or_group",

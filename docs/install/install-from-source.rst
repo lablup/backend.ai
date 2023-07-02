@@ -45,7 +45,7 @@ you need to manually perform the same repository cloning along with the pyenv, P
    Just clone the entire repository and configure/execute the agent only.
    Ensure that you **also pull the LFS files and submodules** when you manually clone it.
 
-Once your ``./pants`` is up and working, run ``./pants export ::`` to populate virtualenvs and install dependencies.
+Once your ``pants`` is up and working, run ``pants export`` to populate virtualenvs and install dependencies.
 
 Then start to configure ``agent.toml`` by copying it from `configs/agent/halfstack.toml <https://github.com/lablup/backend.ai/blob/main/configs/agent/halfstack.toml>`_ as follows:
 

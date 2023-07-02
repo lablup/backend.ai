@@ -1,6 +1,6 @@
 name: Bug Report
 description: Create a report to help us improve
-labels: bug
+labels: type:bug
 assignees: []
 body:
   - type: dropdown

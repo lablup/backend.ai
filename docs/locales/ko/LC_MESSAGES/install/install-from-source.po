@@ -87,7 +87,7 @@ msgstr ""
 
 #: ../../install/install-from-source.rst:48 e9866a26ff964ef49c5d0ad653343e14
 msgid ""
-"Once your ``./pants`` is up and working, run ``./pants export ::`` to "
+"Once your ``pants`` is up and working, run ``pants export`` to "
 "populate virtualenvs and install dependencies."
 msgstr ""
 

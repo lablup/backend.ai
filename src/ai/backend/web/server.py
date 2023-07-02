@@ -32,9 +32,11 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
+from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
+from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
@@ -69,6 +71,8 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     static_path = request.app["config"]["service"]["static_path"]
     file_path = (static_path / request_path).resolve()
@@ -98,6 +102,8 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def config_ini_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
@@ -114,6 +120,8 @@ async def config_ini_handler(request: web.Request) -> web.Response:
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_config_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
@@ -130,6 +138,8 @@ async def config_toml_handler(request: web.Request) -> web.Response:
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
+    stats: WebStats = request.app["stats"]
+    stats.active_webui_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     config = request.app["config"]
     static_path = config["service"]["static_path"]
@@ -153,8 +163,92 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     return apply_cache_headers(web.FileResponse(static_path / "index.html"), "index.html")
 
 
+async def update_password_no_auth(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    client_ip = get_client_ip(request)
+    try:
+        text = await request.text()
+        creds = json.loads(text)
+    except json.JSONDecodeError as e:
+        log.error("Login: JSON decoding error: {}", e)
+        creds = {}
+
+    def _check_params(param_names: list[str]) -> web.Response | None:
+        for param in param_names:
+            if creds.get(param) is None:
+                return web.HTTPBadRequest(
+                    text=json.dumps(
+                        {
+                            "type": "https://api.backend.ai/probs/invalid-api-params",
+                            "title": f"You must provide the {param} field.",
+                        }
+                    ),
+                    content_type="application/problem+json",
+                )
+        return None
+
+    if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
+        return fail_resp
+
+    result: dict[str, Any] = {
+        "data": None,
+        "password_changed_at": None,
+    }
+
+    try:
+        anon_api_config = APIConfig(
+            domain=config["api"]["domain"],
+            endpoint=config["api"]["endpoint"][0],
+            access_key="",
+            secret_key="",  # anonymous session
+            user_agent=user_agent,
+            skip_sslcert_validation=not config["api"]["ssl_verify"],
+        )
+        assert anon_api_config.is_anonymous
+        async with APISession(config=anon_api_config) as api_session:
+            fill_forwarding_hdrs_to_api_session(request, api_session)
+            result = await api_session.Auth.update_password_no_auth(
+                config["api"]["domain"],
+                creds["username"],
+                creds["current_password"],
+                creds["new_password"],
+            )
+            log.info(
+                "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+                creds["username"],
+                client_ip,
+            )
+    except BackendClientError as e:
+        # This is error, not failed login, so we should not update login history.
+        return web.HTTPBadGateway(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/bad-gateway",
+                    "title": "The proxy target server is inaccessible.",
+                    "details": str(e),
+                }
+            ),
+            content_type="application/problem+json",
+        )
+    except BackendAPIError as e:
+        log.info(
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+            creds["username"],
+            client_ip,
+            e,
+        )
+        result["data"] = {
+            "type": e.data.get("type"),
+            "title": e.data.get("title"),
+            "details": e.data.get("msg"),
+        }
+    return web.json_response(result)
+
+
 async def login_check_handler(request: web.Request) -> web.Response:
     session = await get_session(request)
+    stats: WebStats = request.app["stats"]
+    stats.active_login_check_handlers.add(asyncio.current_task())  # type: ignore
     authenticated = bool(session.get("authenticated", False))
     public_data = None
     if authenticated:
@@ -175,6 +269,8 @@ async def login_check_handler(request: web.Request) -> web.Response:
 
 async def login_handler(request: web.Request) -> web.Response:
     config = request.app["config"]
+    stats: WebStats = request.app["stats"]
+    stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
         return web.HTTPBadRequest(
@@ -188,6 +284,7 @@ async def login_handler(request: web.Request) -> web.Response:
         )
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    client_ip = get_client_ip(request)
     if not secure_context:
         # For non-encrypted requests, just read the body as-is.
         # Encrypted requests are handled by the `decrypt_payload` middleware.
@@ -265,9 +362,10 @@ async def login_handler(request: web.Request) -> web.Response:
     last_login_attempt = login_time
     if login_fail_count >= ALLOWED_FAIL_COUNT:
         log.info(
-            "Too many consecutive login attempts for {}: {}",
+            "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
             creds["username"],
             login_fail_count,
+            client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
         return web.HTTPTooManyRequests(
@@ -291,7 +389,14 @@ async def login_handler(request: web.Request) -> web.Response:
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
-            token = await api_session.User.authorize(creds["username"], creds["password"])
+            fill_forwarding_hdrs_to_api_session(request, api_session)
+            extra_args = {}
+            extra_keys = set(creds.keys()) ^ {"username", "password"}
+            for extra_key in extra_keys:
+                extra_args[extra_key] = creds[extra_key]
+            token = await api_session.User.authorize(
+                creds["username"], creds["password"], extra_args=extra_args
+            )
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],
@@ -310,6 +415,11 @@ async def login_handler(request: web.Request) -> web.Response:
             result["data"] = public_return  # store public info from token
             login_fail_count = 0
             await _set_login_history(last_login_attempt, login_fail_count)
+            log.info(
+                "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                creds["username"],
+                client_ip,
+            )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -323,7 +433,12 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     except BackendAPIError as e:
-        log.info("Authorization failed for {}: {}", creds["username"], e)
+        log.info(
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+            creds["username"],
+            client_ip,
+            e,
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -337,12 +452,16 @@ async def login_handler(request: web.Request) -> web.Response:
 
 
 async def logout_handler(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     session.invalidate()
     return web.Response(status=201)
 
 
-async def webserver_healthcheck(_: web.Request) -> web.Response:
+async def webserver_healthcheck(request: web.Request) -> web.Response:
+    stats: WebStats = request.app["stats"]
+    stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
     result = {
         "version": __version__,
         "details": "Success",
@@ -352,6 +471,8 @@ async def webserver_healthcheck(_: web.Request) -> web.Response:
 
 async def token_login_handler(request: web.Request) -> web.Response:
     config = request.app["config"]
+    stats: WebStats = request.app["stats"]
+    stats.active_token_login_handlers.add(asyncio.current_task())  # type: ignore
 
     # Check browser session exists.
     session = await get_session(request)
@@ -398,11 +519,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For", request.remote)
-            if client_ip:
-                _headers = {"X-Forwarded-For": client_ip}
-                api_session.aiohttp_session.headers.update(_headers)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Instead of email and password, cookie token will be used for auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             token = await api_session.User.authorize("fake-email", "fake-pwd")
@@ -460,7 +577,7 @@ async def server_main(
     args: Tuple[Any, ...],
 ) -> AsyncIterator[None]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload])
+    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
     app["config"] = config
     j2env = jinja2.Environment(
         extensions=[
@@ -504,6 +621,8 @@ async def server_main(
     }
     cors = aiohttp_cors.setup(app, defaults=cors_options)
 
+    app["stats"] = WebStats()
+
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
@@ -516,6 +635,10 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/server/token-login", token_login_handler))
     cors.add(app.router.add_route("POST", "/server/login-check", login_check_handler))
     cors.add(app.router.add_route("POST", "/server/logout", logout_handler))
+    cors.add(
+        app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
+    )
+    cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
@@ -534,6 +657,7 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", websocket_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
@@ -604,7 +728,7 @@ def main(config_path: str, debug: bool) -> None:
         debugFlag = "DEBUG"
     else:
         debugFlag = "INFO"
-    setproctitle(f"backend.ai: webserver " f"{config['service']['ip']}:{config['service']['port']}")
+    setproctitle(f"backend.ai: webserver {config['service']['ip']}:{config['service']['port']}")
 
     logging.config.dictConfig(
         {
@@ -613,7 +737,7 @@ def main(config_path: str, debug: bool) -> None:
             "formatters": {
                 "colored": {
                     "()": "coloredlogs.ColoredFormatter",
-                    "format": "%(asctime)s %(levelname)s %(name)s " "[%(process)d] %(message)s",
+                    "format": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
                     "field_styles": {
                         "levelname": {"color": 248, "bold": True},
                         "name": {"color": 246, "bold": False},

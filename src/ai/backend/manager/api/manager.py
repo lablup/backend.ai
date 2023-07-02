@@ -33,14 +33,14 @@ from .exceptions import (
     ServiceUnavailable,
 )
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
+from .utils import check_api_params, set_handler_attr
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class SchedulerOps(enum.Enum):
@@ -60,6 +60,9 @@ def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
                 msg = f"Server is not in the required status: {allowed_status}"
                 raise ServiceUnavailable(msg)
             return await handler(request, *args, **kwargs)
+
+        set_handler_attr(wrapped, "server_status_required", True)
+        set_handler_attr(wrapped, "required_server_statuses", allowed_status)
 
         return wrapped
 

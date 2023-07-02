@@ -31,7 +31,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class DoLogCleanupEvent(EmptyEventArgs, AbstractEvent):
@@ -224,8 +224,10 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
     except ValueError:
         lifetime = dt.timedelta(days=90)
         log.warning(
-            "Failed to parse the error log retention period ({}) read from etcd; "
-            "falling back to 90 days",
+            (
+                "Failed to parse the error log retention period ({}) read from etcd; "
+                "falling back to 90 days"
+            ),
             raw_lifetime,
         )
     boundary = datetime.now() - lifetime

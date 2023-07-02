@@ -146,11 +146,32 @@ show_important_note() {
 
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
-    echo 0
+  if [ "$?" -eq 0 ]; then
+    echo 0  # ok
   else
-    echo 1
+    echo 1  # missing
   fi
+}
+
+install_static_python() {
+  local build_date="20230507"
+  local build_version="${STANDALONE_PYTHON_VERSION}"
+  local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
+  dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
+  checksum_url="${dist_url}.sha256"
+  cwd="$(pwd)"
+  mkdir -p "${STANDALONE_PYTHON_PATH}"
+  cd "${STANDALONE_PYTHON_PATH}"
+  show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
+  curl -o dist.tar.gz -L "$dist_url"
+  echo "$(curl -sL $checksum_url) *dist.tar.gz" | shasum -a 256 --check --status
+  if [ $? -ne 0 ]; then
+    echo "Failed to validate the downloaded static build of Python binary!"
+    exit 1
+  fi
+  tar xzf dist.tar.gz && rm dist.tar.gz
+  mv python/* . && rmdir python
+  cd "${cwd}"
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -174,31 +195,39 @@ DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN
 
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
+  STANDALONE_PYTHON_PLATFORM="apple-darwin"
 elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
   DISTRO="Debian"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
   DISTRO="SUSE"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
-else
-  # Ensure "readlinkf" is working...
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
-  exit 1
+
+show_info "Checking the bootstrapper Python version..."
+STANDALONE_PYTHON_VERSION="3.11.3"
+STANDALONE_PYTHON_ARCH=$(arch)
+STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
+if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
+  STANDALONE_PYTHON_ARCH="aarch64"
 fi
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
+if [ $(has_python "$bpython") -ne 0 ]; then
+  install_static_python
+fi
+$bpython -c 'import sys;print(sys.version_info)'
+$bpython -m ensurepip --upgrade
+$bpython -m pip --disable-pip-version-check install -q -U tomlkit
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -209,8 +238,8 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
-PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
@@ -382,20 +411,13 @@ set_brew_python_build_flags() {
   local _prefix_gdbm="$(brew --prefix gdbm)"
   local _prefix_tcltk="$(brew --prefix tcl-tk)"
   local _prefix_xz="$(brew --prefix xz)"
-  local _prefix_snappy="$(brew --prefix snappy)"
   local _prefix_libffi="$(brew --prefix libffi)"
   local _prefix_protobuf="$(brew --prefix protobuf)"
-  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
-  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
+  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
 }
 
 install_python() {
-  if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-    PYTHON_39_LATEST_MINOR=$(pyenv install -l | grep -i -E '^\s+3\.9\..+' | awk -F. '{print $3}' | sort -nr | head -n 1)
-    PANTS_PYTHON_VERSION="3.9.${PYTHON_39_LATEST_MINOR}"
-    show_info "Installing python ${PANTS_PYTHON_VERSION} for pants to run"
-    pyenv install --skip-existing "${PANTS_PYTHON_VERSION}"
-  fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
@@ -417,7 +439,7 @@ install_python() {
       exit 1
     fi
   else
-    echo "${PYTHON_VERSION} is already installed."
+    echo "✓ Python ${PYTHON_VERSION} as the Backend.AI runtime is already installed."
   fi
 }
 
@@ -470,61 +492,35 @@ check_python() {
   pyenv shell --unset
 }
 
-search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
-  if [ -z "$_PYENV_PYVER" ]; then
-    >&2 echo "No Python 3.9 available via pyenv!"
-    >&2 echo "Please install Python 3.9 using pyenv and try again."
-    exit 1
-  else
-    >&2 echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
-  fi
-  echo "$_PYENV_PYVER"
-}
-
 bootstrap_pants() {
-  set -e
-  mkdir -p .tmp
-  if [ -f '.pants.env' -a -f './pants-local' ]; then
-    echo "It seems that you have an already locally bootstrapped Pants."
-    echo "The installer will keep using it."
-    echo "If you want to reset it, delete ./.pants.env and ./pants-local files."
-    ./pants-local version
-    PANTS="./pants-local"
-    return
-  fi
+  pants_local_exec_root=$($bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  mkdir -p "$pants_local_exec_root"
+  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
-  if [ "$(uname -m)" = "arm64" -a "$DISTRO" = "Darwin" ]; then
-    # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  elif [ "$(uname -m)" = "aarch64" ]; then
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
+  if command -v pants &> /dev/null ; then
+    echo "Pants system command is already installed."
+  else
+    case $DISTRO in
+    Darwin)
+      brew install pantsbuild/tap/pants
+      ;;
+    *)
+      curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
+      bash /tmp/get-pants.sh
+      if ! command -v pants &> /dev/null ; then
+        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+      fi
+      ;;
+    esac
   fi
-  PANTS="./pants"
-  ./pants version
+  pants version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
-    show_info "Downloading and building Pants for the current setup"
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    # In most cases, we won't need to modify the source code of pants.
-    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
-    echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
-    if [ -d tools/pants-src ]; then
-      rm -rf tools/pants-src
-    fi
-    local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
-    set -e
-    git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
-    cd tools/pants-src
-    local arch_name=$(uname -p)
-    cd ../..
-    ln -s tools/pants-local
-    ./pants-local version
-    PANTS="./pants-local"
+    show_error "Cannot proceed the installation because Pants is not available for your platform!"
+    exit 1
   fi
-  set +e
+  set -e
 }
 
 install_editable_webui() {
@@ -566,7 +562,9 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
+$bpython -m ensurepip --upgrade
+# FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
@@ -608,15 +606,6 @@ if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   exit 1
 fi
 
-check_snappy() {
-  pip download python-snappy
-  local pkgfile=$(ls | grep snappy)
-  if [[ $pkgfile =~ .*\.tar.gz ]]; then
-    # source build is required!
-    install_system_pkg "libsnappy-dev" "snappy-devel" "snappy"
-  fi
-  rm -f $pkgfile
-}
 read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
@@ -681,8 +670,16 @@ setup_environment() {
   show_info "Using the current working-copy directory as the installation path..."
 
   show_info "Creating the unified virtualenv for IDEs..."
-  check_snappy
-  $PANTS export '::'
+  pants export \
+    --resolve=python-default \
+    --resolve=python-kernel \
+    --resolve=pants-plugins \
+    --resolve=flake8 \
+    --resolve=mypy \
+    --resolve=isort \
+    --resolve=black
+  # NOTE: Some resolves like pytest are not needed to be exported at this point
+  # because pants will generate temporary resolves when actually running the test cases.
 
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
@@ -719,7 +716,7 @@ configure_backendai() {
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    cp "configs/accelerator/cuda-mock.toml" cuda-mock.toml
+    cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
   fi
 
   # configure manager
@@ -751,16 +748,20 @@ configure_backendai() {
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
+
+  # configure agent
+  cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
 
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./storage-proxy.toml
   # comment out all sample volumes
   sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
   sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
@@ -778,10 +779,10 @@ configure_backendai() {
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
   sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
   sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
-
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
+    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
   fi
 
   # configure tester
@@ -843,8 +844,18 @@ configure_backendai() {
   chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+
+  case $(basename $SHELL) in
+    fish)
+        echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+    ;;
+    *)
+        echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+    ;;
+  esac
+
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
@@ -860,8 +871,18 @@ configure_backendai() {
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+
+  case $(basename $SHELL) in
+    fish)
+        echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+    ;;
+    *)
+        echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+    ;;
+  esac
+
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
@@ -885,8 +906,18 @@ configure_backendai() {
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+
+  case $(basename $SHELL) in
+    fish)
+        echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+    ;;
+    *)
+        echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+    ;;
+  esac
+
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
@@ -899,6 +930,9 @@ configure_backendai() {
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
 
+  show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."
+  ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json
+
   show_info "Installation finished."
   show_note "Check out the default API keypairs and account credentials for local development and testing:"
   echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
@@ -909,9 +943,6 @@ configure_backendai() {
   echo "> ${WHITE}cat env-local-user-session.sh${NC}"
   show_note "To apply the client config, source one of the configs like:"
   echo "> ${WHITE}source env-local-user-session.sh${NC}"
-  echo " "
-  show_note "Your pants invocation command:"
-  echo "> ${WHITE}${PANTS}${NC}"
   echo " "
   show_important_note "You should change your default admin API keypairs for production environment!"
   show_note "How to run Backend.AI manager:"
@@ -973,5 +1004,4 @@ fi
 if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
 fi
-
 # vim: tw=0 sts=2 sw=2 et

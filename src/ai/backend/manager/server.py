@@ -40,6 +40,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifec
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -93,6 +94,8 @@ VALID_VERSIONS: Final = frozenset(
         "v6.20220315",
         # added payload encryption / decryption on selected transfer
         "v6.20220615",
+        # added config/resource-slots/details, model mgmt & serving APIs
+        "v6.20230315",
     ]
 )
 LATEST_REV_DATES: Final = {
@@ -101,11 +104,11 @@ LATEST_REV_DATES: Final = {
     3: "20181215",
     4: "20190615",
     5: "20191215",
-    6: "20220615",
+    6: "20230315",
 }
-LATEST_API_VERSION: Final = "v6.20220615"
+LATEST_API_VERSION: Final = "v6.20230315"
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PUBLIC_INTERFACES: Final = [
     "pidx",
@@ -128,6 +131,29 @@ PUBLIC_INTERFACES: Final = [
 ]
 
 public_interface_objs: MutableMapping[str, Any] = {}
+
+global_subapp_pkgs: Final[list[str]] = [
+    ".acl",
+    ".etcd",
+    ".events",
+    ".auth",
+    ".ratelimit",
+    ".vfolder",
+    ".admin",
+    ".service",
+    ".session",
+    ".stream",
+    ".manager",
+    ".resource",
+    ".scaling_group",
+    ".cluster_template",
+    ".session_template",
+    ".image",
+    ".userconfig",
+    ".domainconfig",
+    ".groupconfig",
+    ".logs",
+]
 
 
 async def hello(request: web.Request) -> web.Response:
@@ -406,6 +432,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .registry import AgentRegistry
 
     root_ctx.registry = AgentRegistry(
+        root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.db,
         root_ctx.redis_stat,
@@ -415,6 +442,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        debug=root_ctx.local_config["debug"]["enabled"],
     )
     await root_ctx.registry.init()
     yield
@@ -550,7 +578,8 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
                 threshold = timedelta(seconds=int(threshold_fmt[:-1]))
             case _:
                 log.error(
-                    f'Skip "{status}:{threshold_fmt}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
+                    f'Skip "{status}:{threshold_fmt}" as it is an invalid argument. Supported'
+                    ' postfixes: "h", "m", "s"'
                 )
                 continue
 
@@ -619,7 +648,9 @@ def _init_subapp(
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
-    prefix = subapp.get("prefix", pkg_name.split(".")[-1].replace("_", "-"))
+    if "prefix" not in subapp:
+        subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
+    prefix = subapp["prefix"]
     root_app.add_subapp("/" + prefix, subapp)
     root_app.middlewares.extend(global_middlewares)
 
@@ -767,28 +798,7 @@ async def server_main(
     pidx: int,
     _args: List[Any],
 ) -> AsyncIterator[None]:
-    subapp_pkgs = [
-        ".acl",
-        ".etcd",
-        ".events",
-        ".auth",
-        ".ratelimit",
-        ".vfolder",
-        ".admin",
-        ".session",
-        ".stream",
-        ".manager",
-        ".resource",
-        ".scaling_group",
-        ".cluster_template",
-        ".session_template",
-        ".image",
-        ".userconfig",
-        ".domainconfig",
-        ".groupconfig",
-        ".logs",
-    ]
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=subapp_pkgs)
+    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
@@ -889,15 +899,27 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
+def main(
+    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> None:
     """
     Start the manager service as a foreground process.
     """
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
-    cfg = load_config(config_path, debug)
+    cfg = load_config(config_path, log_level.value)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

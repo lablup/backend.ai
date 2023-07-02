@@ -78,8 +78,10 @@ ENV/
 
 # IDE/vim
 .idea
-*.swp
-*.swo
+.swp
+.swo
+.*.swp
+.*.swo
 .vscode/
 /.vimrc
 /.nvimrc
@@ -100,13 +102,17 @@ ENV/
 /storage-proxy.toml
 /webserver.conf
 /cuda-mock.toml
+/mock-accelerator.toml
 /.pants.env
 /.pants.bootstrap
+/.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
+/dev.etcd.installed.json
 /dev.session.hang-tolerance-threshold.json
 /env-*.sh
+/agent.dummy.toml
 
 # Local temp
 /.tmp/
@@ -124,3 +130,7 @@ ENV/
 
 # macOS specific
 .DS_Store
+
+.python-runtime
+
+docs/manager/rest-reference/openapi.json

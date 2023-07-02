@@ -7,7 +7,6 @@ from jinja2.parser import Parser
 
 
 class TOMLField(Extension):
-
     tags = {"toml_field"}
 
     def parse(self, parser: Parser) -> nodes.Node | List[nodes.Node]:
@@ -51,7 +50,6 @@ class TOMLField(Extension):
 
 
 class TOMLStringListField(TOMLField):
-
     tags = {"toml_strlist_field"}
 
     def _transform(self, field_value: nodes.Expr, lineno: Optional[int] = None) -> nodes.Expr:
