@@ -40,7 +40,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifec
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.types import LogSeverity, SessionId
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -60,6 +60,7 @@ from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
+from .models import SessionRow
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -541,10 +542,13 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
                 *[
                     asyncio.create_task(
                         root_ctx.registry.destroy_session(
-                            functools.partial(
-                                root_ctx.registry.get_session_by_session_id,
-                                session_id,
+                            await SessionRow.get_session_to_destroy(
+                                root_ctx.db, SessionId(session_id)
                             ),
+                            # functools.partial(
+                            #     root_ctx.registry.get_session_by_session_id,
+                            #     session_id,
+                            # ),
                             forced=True,
                             reason=reason,
                         )
