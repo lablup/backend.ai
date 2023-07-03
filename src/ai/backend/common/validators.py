@@ -484,7 +484,10 @@ class VFolderID(t.Trafaret):
         match value:
             case str():
                 pieces = value.partition("/")
-                converted = tuple_t.check((pieces[0], pieces[2]))
+                if len(pieces[2]) == 0:  # for old vFolder ID without quota scope ID
+                    converted = (None, UUID().check(pieces[0]))
+                else:
+                    converted = tuple_t.check((pieces[0], pieces[2]))
             case tuple():
                 converted = tuple_t.check(value)
             case _:
