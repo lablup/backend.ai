@@ -12,10 +12,7 @@ build:
       # Skip the build if there is no docs label
       - |
         if [ "${READTHEDOCS_VERSION_TYPE}" = "external" ]; then
-          curl -sL https://api.github.com/repos/lablup/backend.ai/issues/${READTHEDOCS_VERSION}/labels | jq -e '.[] | select(.name == "area:docs")';
-          if [ $? -ne 0 ]; then
-            exit 183;
-          fi
+          curl -sL https://api.github.com/repos/lablup/backend.ai/issues/${READTHEDOCS_VERSION}/labels | jq -e '.[] | select(.name == "area:docs")' || exit 183
         fi
     pre_build:
       # Auto-generate REST API reference
