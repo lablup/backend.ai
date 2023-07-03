@@ -28,6 +28,13 @@ Update all existing references (if applicable) to the library like:
 + from ai.backend.vendor import LIB
 ```
 
+Remove it from `requirements.txt` and regenerate the lockfiles if necessary.
+
+```
+$EDITOR requirements.txt
+pants generate-lockfiles --resolve=python-default
+```
+
 
 ## Updating an existing vendored libary
 
