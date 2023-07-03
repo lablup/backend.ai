@@ -99,7 +99,9 @@
 //     "zipstream-new~=1.1.8"
 //   ],
 //   "manylinux": "manylinux2014",
-//   "requirement_constraints": [],
+//   "requirement_constraints": [
+//     "Rx~=3.2.0"
+//   ],
 //   "only_binary": [],
 //   "no_binary": []
 // }
@@ -110,7 +112,9 @@
   "allow_prereleases": false,
   "allow_wheels": true,
   "build_isolation": true,
-  "constraints": [],
+  "constraints": [
+    "Rx~=3.2.0"
+  ],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -1540,34 +1544,32 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "44c9bac4514e5e30c5a595fac8e3c76c1975cae14db215e8174c7fe995825bad",
-              "url": "https://files.pythonhosted.org/packages/11/71/d51beba3d8986fa6d8670ec7bcba989ad6e852d5ae99d95633e5dacc53e7/graphql_core-2.3.2-py2.py3-none-any.whl"
+              "hash": "6288fe97c32d2f868a2dfe62e766dc85d48c96c1d085294edf44714190f2e4f3",
+              "url": "https://files.pythonhosted.org/packages/f1/88/a4a7bf8ab66c35b146e44d77a1f9fd2c36e0ec9fb1a51581608c16deb6e3/graphql_core-2.2-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "aac46a9ac524c9855910c14c48fc5d60474def7f99fd10245e76608eba7af746",
-              "url": "https://files.pythonhosted.org/packages/88/a2/dd91d55a6f6dd88c4d3c284d387c94f1f933fedec43a86a4422940b9de18/graphql-core-2.3.2.tar.gz"
+              "hash": "60ef8277b82aaad49e87154a0288a9542a82a63909568375712f826b1c280ef5",
+              "url": "https://files.pythonhosted.org/packages/ee/69/4a9345f33e117129f68d8eca601f0c37057266f5df5b3be96442e1df91b2/graphql-core-2.2.tar.gz"
             }
           ],
           "project_name": "graphql-core",
           "requires_dists": [
-            "coveralls==1.11.1; extra == \"test\"",
-            "cython==0.29.17; extra == \"test\"",
-            "gevent==1.5.0; extra == \"test\"",
+            "coveralls; extra == \"test\"",
             "gevent>=1.1; extra == \"gevent\"",
-            "promise<3,>=2.3",
-            "pyannotate==1.2.0; extra == \"test\"",
-            "pytest-benchmark==3.2.3; extra == \"test\"",
-            "pytest-cov==2.8.1; extra == \"test\"",
-            "pytest-django==3.9.0; extra == \"test\"",
-            "pytest-mock==2.0.0; extra == \"test\"",
-            "pytest==4.6.10; extra == \"test\"",
-            "rx<2,>=1.6",
-            "six==1.14.0; extra == \"test\"",
-            "six>=1.10.0"
+            "gevent>=1.1; extra == \"test\"",
+            "promise>=2.1",
+            "pytest-benchmark==3.0.0; extra == \"test\"",
+            "pytest-cov==2.3.1; extra == \"test\"",
+            "pytest-django==2.9.1; extra == \"test\"",
+            "pytest-mock==1.2; extra == \"test\"",
+            "pytest<4.0,>=3.3; extra == \"test\"",
+            "rx>=1.6.0",
+            "six>=1.10.0",
+            "six>=1.10.0; extra == \"test\""
           ],
           "requires_python": null,
-          "version": "2.3.2"
+          "version": "2.2"
         },
         {
           "artifacts": [
@@ -3393,14 +3395,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ca71b65d0fc0603a3b5cfaa9e33f5ba81e4aae10a58491133595088d7734b2da",
-              "url": "https://files.pythonhosted.org/packages/3c/51/d37235bad8df7536cc950e0d0a26e94131a6a3f7d5e1bed5f37f0846f2ef/Rx-1.6.3.tar.gz"
+              "hash": "922c5f4edb3aa1beaa47bf61d65d5380011ff6adcd527f26377d05cb73ed8ec8",
+              "url": "https://files.pythonhosted.org/packages/e2/a9/efeaeca4928a9a56d04d609b5730994d610c82cf4d9dd7aa173e6ef4233e/Rx-3.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "b657ca2b45aa485da2f7dcfd09fac2e554f7ac51ff3c2f8f2ff962ecd963d91c",
+              "url": "https://files.pythonhosted.org/packages/34/b5/e0f602453b64b0a639d56f3c05ab27202a4eec993eb64d66c077c821b621/Rx-3.2.0.tar.gz"
             }
           ],
           "project_name": "rx",
           "requires_dists": [],
-          "requires_python": null,
-          "version": "1.6.3"
+          "requires_python": ">=3.6.0",
+          "version": "3.2.0"
         },
         {
           "artifacts": [

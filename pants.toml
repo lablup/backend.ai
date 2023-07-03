@@ -62,6 +62,9 @@ indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 find_links = ["file://%(buildroot)s/vendor/wheelhouse"]
 path_mappings = ["WHEELS_DIR|%(buildroot)s/vendor/wheelhouse"]
 
+[python.resolves_to_constraints_file]
+python-default = "constraints.txt"
+
 [python.resolves]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
