@@ -35,7 +35,7 @@ import asyncio
 import os
 import socket
 
-import asyncudp
+from ai.backend.vendor import asyncudp
 
 
 class SystemdNotifier:
