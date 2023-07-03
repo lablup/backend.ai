@@ -74,8 +74,7 @@ def upgrade():
 
 
 def downgrade():
-    conn = op.get_bind()
-    conn.execute(text("UPDATE vfolders SET quota_scope_id = SPLIT_PART(quota_scope_id, ':', 2);"))
+    op.execute(text("UPDATE vfolders SET quota_scope_id = SPLIT_PART(quota_scope_id, ':', 2);"))
     op.drop_column("users", "resource_policy")
     op.drop_column("groups", "resource_policy")
     op.drop_table("user_resource_policies")
