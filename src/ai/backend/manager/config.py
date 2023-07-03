@@ -326,7 +326,7 @@ _config_defaults: Mapping[str, Any] = {
         "token": None,
     },
     "session": {
-        "hang-toleration-threshold": {},
+        "hang-tolerance-threshold": {},
     },
 }
 
@@ -422,8 +422,8 @@ shared_config_iv = t.Dict(
         t.Key("session", default=_config_defaults["session"]): t.Dict(
             {
                 t.Key(
-                    "hang-toleration-threshold",
-                    default=_config_defaults["session"]["hang-toleration-threshold"],
+                    "hang-tolerance-threshold",
+                    default=_config_defaults["session"]["hang-tolerance-threshold"],
                 ): t.Dict(
                     {
                         t.Key("PREPARING", optional=True): t.String,

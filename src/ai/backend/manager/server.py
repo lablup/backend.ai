@@ -545,10 +545,6 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
                             await SessionRow.get_session_to_destroy(
                                 root_ctx.db, SessionId(session_id)
                             ),
-                            # functools.partial(
-                            #     root_ctx.registry.get_session_by_session_id,
-                            #     session_id,
-                            # ),
                             forced=True,
                             reason=reason,
                         )
@@ -562,11 +558,11 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
     raw_session_config = await root_ctx.shared_config.etcd.get_prefix("config/session")
     assert isinstance(raw_session_config, Mapping)
 
-    hang_toleration_threshold_dict = raw_session_config.get("hang-toleration-threshold", {})
-    assert isinstance(hang_toleration_threshold_dict, Mapping)
+    hang_tolerance_threshold_dict = raw_session_config.get("hang-tolerance-threshold", {})
+    assert isinstance(hang_tolerance_threshold_dict, Mapping)
 
     session_force_termination_tasks = []
-    for status, threshold_fmt in hang_toleration_threshold_dict.items():
+    for status, threshold_fmt in hang_tolerance_threshold_dict.items():
         assert isinstance(threshold_fmt, str)
         try:
             kernel_status = KernelStatus[status]

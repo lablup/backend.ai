@@ -37,7 +37,7 @@
     "token": "some-random-long-string"
   },
   "session": {
-    "hang-toleration-threshold": {
+    "hang-tolerance-threshold": {
       "PREPARING": "1h",
       "TERMINATING": "30m"
     }
