@@ -1,8 +1,12 @@
 require:db-migration:
 - any: ['src/ai/backend/manager/alembic/versions/*.py']
 
-docs:
-- any: ['docs/**/*']
+area:docs:
+- any: [
+    'docs/**/*',
+    'src/ai/backend/manager/api/**/*.py',
+    'src/ai/backend/manager/models/gql.py',
+  ]
 
 storage-proxy:
 - any: ['src/ai/backend/storage/**/*.py']

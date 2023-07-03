@@ -7,7 +7,13 @@ build:
   os: "ubuntu-20.04"
   tools:
     python: "3.10"
-
+  jobs:
+    post_checkout:
+      # Skip the build if there is no docs label
+      - scripts/check-docs-label.sh
+    pre_build:
+      # Auto-generate REST API reference
+      - PYTHONPATH="src" python -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
 python:
   install:
     - requirements: docs/requirements.txt
