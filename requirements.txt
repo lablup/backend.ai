@@ -15,7 +15,6 @@ appdirs~=1.4.4
 async_timeout~=4.0
 asyncpg>=0.27.0
 asynctest>=0.13.0
-asyncudp>=0.4
 attrs>=20.3
 boto3~=1.26
 cachetools~=5.2.0
