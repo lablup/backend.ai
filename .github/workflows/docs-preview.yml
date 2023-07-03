@@ -11,10 +11,16 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'area:docs') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: readthedocs/actions/preview@v1
+      - name: Trigger RTD builds by the generic API integration
+        run: |
+          curl -X POST -d "branches=${{ github.head_ref }}" -d "token=${{ secrets.RTD_WEBHOOK_SORNA }}" -d "default_branch=main" https://readthedocs.org/api/v2/webhook/sorna/243807/
+          curl -X POST -d "branches=${{ github.head_ref }}" -d "token=${{ secrets.RTD_WEBHOOK_SORNA_KO }}" -d "default_branch=main" https://readthedocs.org/api/v2/webhook/sorna-ko/243808/
+      - name: Make a link to the doc preview build (en)
+        uses: readthedocs/actions/preview@v1
         with:
           project-slug: "sorna"
-      - uses: readthedocs/actions/preview@v1
+      - name: Make a link to the doc preview build (ko)
+        uses: readthedocs/actions/preview@v1
         with:
           project-slug: "sorna-ko"
           project-language: "ko"
