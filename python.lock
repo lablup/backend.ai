@@ -3670,6 +3670,11 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "74276ab743a145305cc28e86212f45a30ad0fc5dbe39122e5ecadba04a8def65",
+              "url": "file://${WHEELS_DIR}/temporenc-0.1.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
               "hash": "b07e8ea0684e73ded0cd4fa3622ca00477ee85cf32ea686f38db06c2e8e17bda",
               "url": "https://files.pythonhosted.org/packages/1b/cc/8cc2406d9b022cb0379f983560aee13e874f426477d5cbdcfcf46423eb08/temporenc-0.1.0.tar.gz"
             }

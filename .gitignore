@@ -133,3 +133,5 @@ ENV/
 .python-runtime
 
 docs/manager/rest-reference/openapi.json
+/vendor/*/build/
+/vendor/*/dist/
