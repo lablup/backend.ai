@@ -1357,23 +1357,52 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
+        from ai.backend.manager.models import GroupRow, UserRow
+
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
-        async with graph_ctx.storage_manager.request(
-            proxy_name,
-            "GET",
-            "quota-scope",
-            json={"volume": volume_name, "qsid": self.quota_scope_id},
-            raise_for_status=True,
-        ) as (_, storage_resp):
-            quota_config = await storage_resp.json()
-            usage_bytes = quota_config["used_bytes"]
-            if usage_bytes is None or usage_bytes < 0:
-                usage_bytes = None
+        try:
+            async with graph_ctx.storage_manager.request(
+                proxy_name,
+                "GET",
+                "quota-scope",
+                json={"volume": volume_name, "qsid": self.quota_scope_id},
+                raise_for_status=True,
+            ) as (_, storage_resp):
+                quota_config = await storage_resp.json()
+                usage_bytes = quota_config["used_bytes"]
+                if usage_bytes is not None and usage_bytes < 0:
+                    usage_bytes = None
+                return QuotaDetails(
+                    # FIXME: limit scaning this only for fast scan capable volumes
+                    usage_bytes=usage_bytes,
+                    hard_limit_bytes=quota_config["limit_bytes"] or None,
+                    usage_count=None,  # TODO: Implement
+                )
+        except aiohttp.ClientResponseError:
+            qsid = QuotaScopeID.parse(self.quota_scope_id)
+            async with graph_ctx.db.begin_readonly_session() as sess:
+                await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+                if qsid.scope_type == QuotaScopeType.USER:
+                    query = (
+                        sa.select(UserRow)
+                        .where(UserRow.uuid == qsid.scope_id)
+                        .options(selectinload(UserRow.resource_policy_row))
+                    )
+                else:
+                    query = (
+                        sa.select(GroupRow)
+                        .where(GroupRow.id == qsid.scope_id)
+                        .options(selectinload(GroupRow.resource_policy_row))
+                    )
+                result = await sess.scalar(query)
+                resource_policy_constraint = result.resource_policy_row.max_vfolder_size
+                if resource_policy_constraint is not None and resource_policy_constraint < 0:
+                    resource_policy_constraint = None
+
             return QuotaDetails(
-                # FIXME: limit scaning this only for fast scan capable volumes
-                usage_bytes=usage_bytes,
-                hard_limit_bytes=quota_config["limit_bytes"] or None,
+                usage_bytes=None,
+                hard_limit_bytes=resource_policy_constraint,
                 usage_count=None,  # TODO: Implement
             )
 
