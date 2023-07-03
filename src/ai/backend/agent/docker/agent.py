@@ -406,7 +406,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         return mounts
 
-    def resolve_krunner_filepath(self, filename) -> Path:
+    @staticmethod
+    def resolve_krunner_filepath(filename) -> Path:
         return Path(
             pkg_resources.resource_filename(
                 "ai.backend.runner",
@@ -1089,6 +1090,85 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
     ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
         return await detect_resources(self.etcd, self.local_config)
+
+    async def _compare_data_root(self) -> bool:
+        proc = await asyncio.create_subprocess_exec(
+            *["stat", "-f", "'%i'", "/"],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            log.warning(f"Unable to read inode of root directory, err: {stderr.decode('utf8')}")
+            return False
+        root_inode: str = stdout.decode("utf8").split()[0]
+
+        docker_cmd = [
+            "docker",
+            "run",
+            "-it",
+            "--rm",
+            "-v",
+            "/:/host",
+            "alpine:latest",
+            "sh",
+            "stat",
+            "-c",
+            "'%i'",
+            "/host",
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *docker_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            log.warning(f"Unable to read inode from docker backend, err: {stderr.decode('utf8')}")
+            return False
+        root_inode_from_docker: str = stdout.decode("utf8").split()[0]
+        return root_inode == root_inode_from_docker
+
+    async def get_free_image_disk(self) -> int | float | None:
+        data_root = Path(self.local_config["agent"]["backend-data-root"])
+        if self.has_native_backend:
+            if not data_root.exists():
+                data_root = Path("/")
+            stat = os.statvfs(data_root)
+            return stat.f_bfree * stat.f_bsize / (2**30)
+        reader_path = DockerKernelCreationContext.resolve_krunner_filepath(
+            "runner/docker-dataroot-reader.bin"
+        )
+        cmd = [
+            "docker",
+            "run",
+            "-it",
+            "--rm",
+            "-i",
+            "--pid=host",
+            "--privileged",
+            "-v",
+            "/:/host",
+            "-v",
+            f"{reader_path}:/reader.bin",
+            "alpine:latest",
+            "sh",
+            "-c",
+            f"/reader.bin {data_root}",
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            log.warning(f"Unable to read docker data root. err: {stderr.decode('utf8')}")
+            return None
+
+        result = stdout.decode("utf8").split()
+        available = int(result[-3])  # KiB
+        return available / (2**20)
 
     async def enumerate_containers(
         self,

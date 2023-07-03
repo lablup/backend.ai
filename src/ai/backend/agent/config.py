@@ -23,9 +23,11 @@ agent_local_config_iv = (
                 {
                     tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
                     t.Key(
-                        "check-free-image-disk",
-                        default=True,
-                    ): t.Bool(),
+                        "required-image-disk",
+                        default=None,
+                    ): (
+                        t.Int | t.Null
+                    ),  # GiB
                     t.Key("backend-data-root", default="/var/lib/docker"): t.String(),
                     t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
                         allow_blank_host=True

@@ -268,8 +268,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     ) -> List[MountInfo]:
         raise NotImplementedError
 
+    @staticmethod
     @abstractmethod
-    def resolve_krunner_filepath(self, filename) -> Path:
+    def resolve_krunner_filepath(filename) -> Path:
         """
         Return matching krunner path object for given filename.
         """
@@ -533,6 +534,7 @@ class AbstractAgent(
     images: Mapping[str, str]
     image_pull_tracker: MutableMapping[str, asyncio.Event]
     port_pool: Set[int]
+    has_native_backend: bool
 
     redis: Redis
 
@@ -583,6 +585,7 @@ class AbstractAgent(
                 local_config["container"]["port-range"][1] + 1,
             )
         )
+        self.has_native_backend = True
         self.image_pull_tracker = {}
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
@@ -598,6 +601,7 @@ class AbstractAgent(
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
+        self.has_native_backend = await self._compare_data_root()
 
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
@@ -930,6 +934,14 @@ class AbstractAgent(
             or container_config["bind-host"]
         )
 
+    @abstractmethod
+    async def _compare_data_root(self) -> bool:
+        """
+        Compare the inode values of mounted 'root' directory inside of container and host.
+        If they are same, the container backend is running on host macine, return True.
+        Else, the container backend is running on VM such as Orbstack or Docker Desktop, return False.
+        """
+
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
         async with self.registry_lock:
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
@@ -1160,31 +1172,25 @@ class AbstractAgent(
             ),
         )
 
-    async def get_free_image_disk(self) -> int | float:
+    @abstractmethod
+    async def get_free_image_disk(self) -> int | float | None:
         """
         Get free disk for images.
-
-        TODO: get free disk of backend's data root.
         """
-        data_root = Path(self.local_config["agent"]["backend-data-root"])
-        if not data_root.exists():
-            data_root = Path("/")
-        stat = os.statvfs(data_root)
-        return stat.f_bfree * stat.f_bsize / (2**30)
 
     async def check_free_image_disk(self, image_ref: ImageRef) -> None:
         """
         Check free disk for images.
-        Free disk should be larger than 50 GiB.
 
         TODO: get the size of image from metadata and compare it to free disk size.
         Still, the real size can be different from the metadata
         cause this agent have duplicate image layers.
         """
-        if not self.local_config["agent"]["check-free-image-disk"]:
+        if (minimum := self.local_config["agent"]["required-image-disk"]) is None:
             return
-        minimum = 50  # 50 GiB
         free = await self.get_free_image_disk()
+        if free is None:
+            return
         if free < minimum:
             raise AgentError(
                 f"Need at least {minimum} GiB of free disk space to install a new image."

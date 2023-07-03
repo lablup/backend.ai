@@ -338,7 +338,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     mount.type,
                 )
 
-    def resolve_krunner_filepath(self, filename: str) -> Path:
+    @staticmethod
+    def resolve_krunner_filepath(filename: str) -> Path:
         return Path(filename)
 
     def get_runner_mount(
