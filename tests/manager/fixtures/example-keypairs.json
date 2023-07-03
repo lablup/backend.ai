@@ -1,4 +1,16 @@
 {
+    "user_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
+        }
+    ],
+    "project_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
+        }
+    ],
     "domains": [
         {
             "name": "default",
