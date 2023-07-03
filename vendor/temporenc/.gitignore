@@ -1,0 +1,14 @@
+# Packaging cruft
+/*.egg-info/
+
+# Byte code
+__pycache__/
+*.py[co]
+
+# Testing cruft
+/.tox/
+/.coverage
+htmlcov/
+
+# Documentation
+/doc/build/
