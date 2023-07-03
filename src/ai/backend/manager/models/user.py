@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiotools
@@ -22,7 +22,7 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.types import RedisConnectionInfo, VFolderID
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
@@ -39,8 +39,8 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .storage import StorageSessionManager
 from .utils import ExtendedAsyncSAEngine
 
@@ -138,6 +138,12 @@ users = sa.Table(
     sa.Column("totp_key", sa.String(length=32)),
     sa.Column("totp_activated", sa.Boolean, server_default=sa.false(), default=False),
     sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
+    sa.Column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("user_resource_policies.name"),
+        nullable=False,
+    ),
 )
 
 
@@ -146,6 +152,7 @@ class UserRow(Base):
     sessions = relationship("SessionRow", back_populates="user")
     domain = relationship("DomainRow", back_populates="users")
     groups = relationship("AssocGroupUserRow", back_populates="user")
+    resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
 
 
 class UserGroup(graphene.ObjectType):
@@ -200,6 +207,7 @@ class User(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     role = graphene.String()
+    resource_policy = graphene.String()
     allowed_client_ip = graphene.List(lambda: graphene.String)
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
@@ -236,6 +244,7 @@ class User(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             role=row["role"],
+            resource_policy=row["resource_policy"],
             allowed_client_ip=row["allowed_client_ip"],
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
@@ -276,7 +285,7 @@ class User(graphene.ObjectType):
         async with ctx.db.begin_readonly() as conn:
             return [cls.from_row(ctx, row) async for row in (await conn.stream(query))]
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "uuid": ("uuid", None),
         "username": ("username", None),
         "email": ("email", None),
@@ -290,26 +299,28 @@ class User(graphene.ObjectType):
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", lambda s: UserRole[s]),
+        "resource_policy": ("domain_name", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
     }
 
-    _queryorder_colmap = {
-        "uuid": "uuid",
-        "username": "username",
-        "email": "email",
-        "need_password_change": "need_password_change",
-        "full_name": "full_name",
-        "is_active": "is_active",
-        "status": "status",
-        "status_info": "status_info",
-        "created_at": "created_at",
-        "modified_at": "modified_at",
-        "domain_name": "domain_name",
-        "role": "role",
-        "totp_activated": "totp_activated",
-        "totp_activated_at": "totp_activated_at",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "uuid": ("uuid", None),
+        "username": ("username", None),
+        "email": ("email", None),
+        "need_password_change": ("need_password_change", None),
+        "full_name": ("full_name", None),
+        "is_active": ("is_active", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "created_at": ("created_at", None),
+        "modified_at": ("modified_at", None),
+        "domain_name": ("domain_name", None),
+        "role": ("role", None),
+        "resource_policy": ("resource_policy", None),
+        "totp_activated": ("totp_activated", None),
+        "totp_activated_at": ("totp_activated_at", None),
     }
 
     @classmethod
@@ -394,7 +405,7 @@ class User(graphene.ObjectType):
         if order is not None:
             if group_id is not None:
                 qoparser = QueryOrderParser(
-                    {k: "users_" + v for k, v in cls._queryorder_colmap.items()}
+                    {k: ("users_" + v[0], v[1]) for k, v in cls._queryorder_colmap.items()}
                 )
             else:
                 qoparser = QueryOrderParser(cls._queryorder_colmap)
@@ -487,6 +498,7 @@ class UserInput(graphene.InputObjectType):
     group_ids = graphene.List(lambda: graphene.String, required=False)
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
+    resource_policy = graphene.String(required=False, default="default")
 
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
@@ -505,6 +517,7 @@ class ModifyUserInput(graphene.InputObjectType):
     group_ids = graphene.List(lambda: graphene.String, required=False)
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
+    resource_policy = graphene.String(required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -549,6 +562,7 @@ class CreateUser(graphene.Mutation):
             "role": UserRole(props.role),
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
+            "resource_policy": props.resource_policy or "default",
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -637,6 +651,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "role", clean_func=UserRole)
         set_if_set(props, data, "allowed_client_ip")
         set_if_set(props, data, "totp_activated")
+        set_if_set(props, data, "resource_policy")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -1005,7 +1020,7 @@ class PurgeUser(graphene.Mutation):
         try:
             deleted_count = await initiate_vfolder_removal(
                 engine,
-                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
                 storage_ptask_group,
             )

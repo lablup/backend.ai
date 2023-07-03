@@ -16,12 +16,17 @@ import aiofiles.os
 import janus
 import trafaret as t
 
-from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
 from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
-from ..exception import ExecutionError, InvalidAPIParameters, InvalidQuotaScopeError, NotEmptyError
+from ..exception import (
+    ExecutionError,
+    InvalidAPIParameters,
+    InvalidQuotaScopeError,
+    NotEmptyError,
+    QuotaScopeNotFoundError,
+)
 from ..subproc import run
 from ..types import (
     SENTINEL,
@@ -51,17 +56,18 @@ class BaseQuotaModel(AbstractQuotaModel):
     def __init__(self, mount_path: Path) -> None:
         self.mount_path = mount_path
 
-    def mangle_qspath(self, ref: VFolderID | str | None) -> Path:
+    def mangle_qspath(self, ref: VFolderID | QuotaScopeID | str | None) -> Path:
         try:
             match ref:
                 case VFolderID():
                     if ref.quota_scope_id is None:
                         return self.mount_path  # for legacy vfolder paths during migration
-                    tx.QuotaScopeID().check(ref.quota_scope_id)
-                    return Path(self.mount_path, ref.quota_scope_id)
+                    return Path(self.mount_path, ref.quota_scope_id.pathname)
+                case QuotaScopeID():
+                    return Path(self.mount_path, ref.pathname)
                 case str():
-                    tx.QuotaScopeID().check(ref)
-                    return Path(self.mount_path, ref)
+                    typed_scope_id = QuotaScopeID.parse(ref)
+                    return Path(self.mount_path, typed_scope_id.pathname)
                 case None:
                     return self.mount_path  # for legacy vfolder paths during migration
                 case _:
@@ -73,7 +79,7 @@ class BaseQuotaModel(AbstractQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -85,21 +91,31 @@ class BaseQuotaModel(AbstractQuotaModel):
 
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
-    ) -> QuotaUsage:
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+
         return QuotaUsage(-1, -1)
 
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         options: QuotaConfig,
+    ) -> None:
+        # This is a no-op.
+        pass
+
+    async def unset_quota(
+        self,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         # This is a no-op.
         pass
 
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
@@ -120,7 +136,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -133,22 +149,31 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
-    ) -> QuotaUsage:
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
         # TODO: setgid impl.
         return QuotaUsage(-1, -1)
 
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         options: QuotaConfig,
+    ) -> None:
+        # TODO: setgid impl.
+        raise NotImplementedError
+
+    async def unset_quota(
+        self,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         # TODO: setgid impl.
         raise NotImplementedError
 
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
@@ -206,6 +231,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     def scan_tree(
         self,
         target_path: Path,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
         loop = asyncio.get_running_loop()
@@ -219,6 +245,8 @@ class BaseFSOpModel(AbstractFSOpModel):
                 next_path = next_paths.popleft()
                 with os.scandir(next_path) as scanner:
                     for entry in scanner:
+                        if limit > 0 and count == limit:
+                            break
                         symlink_target = ""
                         entry_type = DirEntryType.FILE
                         try:
@@ -250,11 +278,9 @@ class BaseFSOpModel(AbstractFSOpModel):
                             symlink_target=symlink_target,
                         )
                         q.put(item)
-                        if entry.is_dir() and not entry.is_symlink():
+                        if recursive and entry.is_dir() and not entry.is_symlink():
                             next_paths.append(Path(entry.path))
                         count += 1
-                        if limit > 0 and count == limit:
-                            break
 
         async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
             try:
@@ -354,14 +380,13 @@ class BaseVolume(AbstractVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
+        exist_ok=False,
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
-            raise InvalidQuotaScopeError(
-                f"Quota scope {qspath} does not exist in the target volume"
-            )
+            raise QuotaScopeNotFoundError
         vfpath = self.mangle_vfpath(vfid)
-        await aiofiles.os.makedirs(vfpath, 0o755)
+        await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
@@ -457,9 +482,11 @@ class BaseVolume(AbstractVolume):
     # ------ vfolder internal operations -------
 
     @final
-    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(
+        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+    ) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        return self.fsop_model.scan_tree(target_path)
+        return self.fsop_model.scan_tree(target_path, recursive=recursive)
 
     async def mkdir(
         self,

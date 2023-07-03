@@ -13,6 +13,7 @@ import yarl
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
+from ai.backend.common.types import VFolderID
 
 
 def test_trafaret_dataerror_pickling():
@@ -505,15 +506,19 @@ def test_url():
 
 def test_vfolder_id():
     iv = tx.VFolderID()
-    value = iv.check("aoih-23_50bha/f40ed400-5571-4a07-bc22-d557b7d44581")
-    assert value.quota_scope_id == "aoih-23_50bha"
+    value: VFolderID = iv.check(
+        "user:c6bb4a5d-dde6-42bc-92a2-58dc60adfdf1/f40ed400-5571-4a07-bc22-d557b7d44581"
+    )
+    assert str(value.quota_scope_id) == "user:c6bb4a5d-dde6-42bc-92a2-58dc60adfdf1"
     assert value.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
-    value = iv.check("ZXCV/f40ed40055714a07bc22d557b7d44581")
-    assert value.quota_scope_id == "ZXCV"
+    value = iv.check(
+        "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8/f40ed40055714a07bc22d557b7d44581"
+    )
+    assert str(value.quota_scope_id) == "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8"
     assert value.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
-    value2 = iv.check(str(value))
+    value2: VFolderID = iv.check(str(value))
     assert value2 == value
-    assert value2.quota_scope_id == "ZXCV"
+    assert str(value2.quota_scope_id) == "project:6784e3dc-e91c-4b2f-8e0e-d8be890256d8"
     assert value2.folder_id == UUID("f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
         iv.check(None)
@@ -529,7 +534,7 @@ def test_vfolder_id():
         iv.check(":/x")
     with pytest.raises(t.DataError):
         iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581")
-    with pytest.raises(t.DataError):
+    with pytest.raises(ValueError, match="Unsupported vFolder quota scope type abc"):
         iv.check("abc:def/f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
         iv.check("_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")
@@ -542,4 +547,4 @@ def test_vfolder_id():
     with pytest.raises(t.DataError):
         iv.check("abc/def/f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
-        iv.check("abcdef/5571-4a07-bc22-d557b7d44581")
+        iv.check("user:/5571-4a07-bc22-d557b7d44581")
