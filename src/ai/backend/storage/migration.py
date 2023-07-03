@@ -130,13 +130,18 @@ async def upgrade_2_to_3(
                     folder_ids,
                 )
                 for row in rows:
-                    old_quota_map[row["id"]] = row["max_size"] * (2**20)
+                    old_quota_map[row["id"]] = (
+                        row["max_size"] * (2**20) if row["max_size"] else None
+                    )
                     quota_scope_map[row["id"]] = row["quota_scope_id"]
 
                 log.info("checking {} ...".format(", ".join(map(str, folder_ids))))
 
             for folder_id in folder_ids:
-                quota_scope_id = quota_scope_map[folder_id]
+                try:
+                    quota_scope_id = quota_scope_map[folder_id]
+                except KeyError:
+                    continue
                 progbar.set_description(
                     "inspecting contents of vfolder {}".format(
                         folder_id,
@@ -172,15 +177,16 @@ async def upgrade_2_to_3(
                     progbar.update(1)
 
     script = (
-        "#! /bin/sh",
-        *[f"mkdir -p {volume_id}/{qscopeid}" for qscopeid in created_quota_scopes],
-        *[f"mv {m['src_path']} {m['dst_path']}" for m in migration_informations],
-        f"echo 3 > {volume_id}/version.txt",
+        "#! /bin/sh\n",
+        *[f"mkdir -p {m['dst_path'].parent}\n" for m in migration_informations],
+        *[f"mv {m['src_path']} {m['dst_path']}\n" for m in migration_informations],
+        f"echo 3 > {volume_id}/version.txt\n",
     )
     if outfile == "-":
-        print("\n".join(script))
+        print("".join(script))
     else:
-        async with aiofiles.open(outfile, "w") as fw:
+        file_suffix = str(volume.mount_path).split("/")[-1]
+        async with aiofiles.open(f"{outfile}.{file_suffix}", "w") as fw:
             await fw.writelines(script)
     if report_path:
         in_memory_file = StringIO()
