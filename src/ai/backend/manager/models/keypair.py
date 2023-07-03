@@ -416,14 +416,27 @@ class KeyPair(graphene.ObjectType):
         domain_name: str = None,
         is_active: bool = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(
-            keypairs,
-            users,
-            keypairs.c.user == users.c.uuid,
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([keypairs]).select_from(j).where(keypairs.c.user_id.in_(user_ids))
+        query = (
+            sa.select(
+                [
+                    keypairs,
+                    users.c.email,
+                    users.c.full_name,
+                    agg_to_array(groups.c.name).label("groups_name"),
+                ]
+            )
+            .select_from(j)
+            .where(keypairs.c.user_id.in_(user_ids))
+            .group_by(keypairs, users.c.email, users.c.full_name)
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
@@ -446,14 +459,27 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: str = None,
     ) -> Sequence[Optional[KeyPair]]:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(
-            keypairs,
-            users,
-            keypairs.c.user == users.c.uuid,
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([keypairs]).select_from(j).where(keypairs.c.access_key.in_(access_keys))
+        query = (
+            sa.select(
+                [
+                    keypairs,
+                    users.c.email,
+                    users.c.full_name,
+                    agg_to_array(groups.c.name).label("groups_name"),
+                ]
+            )
+            .select_from(j)
+            .where(keypairs.c.access_key.in_(access_keys))
+            .group_by(keypairs, users.c.email, users.c.full_name)
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         async with graph_ctx.db.begin_readonly() as conn:
