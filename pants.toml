@@ -23,6 +23,8 @@ pants_ignore = [
     "/docs/",  # TODO: docs build config
     "*.log",
     "/tools/pants-plugins",
+    "/vendor/",
+    "!/vendor/wheelhouse",
 ]
 
 [anonymous-telemetry]
@@ -57,6 +59,8 @@ search_path = ["<PYENV>"]
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
+find_links = ["file://%(buildroot)s/vendor/wheelhouse"]
+path_mappings = ["WHEELS_DIR|%(buildroot)s/vendor/wheelhouse"]
 
 [python.resolves]
 python-default = "python.lock"
