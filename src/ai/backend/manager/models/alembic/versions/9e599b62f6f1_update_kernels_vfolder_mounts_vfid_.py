@@ -1,7 +1,7 @@
 """update kernels.vfolder_mounts.vfid structure
 
 Revision ID: 9e599b62f6f1
-Revises: 5fbd368d12a2
+Revises: a9eb2b002330
 Create Date: 2023-06-22 20:57:16.726624
 
 """
@@ -12,12 +12,11 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import bindparam
 
-from ai.backend.common.types import VFolderMount
 from ai.backend.manager.models.base import IDColumn, SessionIDColumnType, convention
 
 # revision identifiers, used by Alembic.
 revision = "9e599b62f6f1"
-down_revision = "5fbd368d12a2"
+down_revision = "a9eb2b002330"
 branch_labels = None
 depends_on = None
 
@@ -65,6 +64,20 @@ def upgrade():
     total_sessions = connection.execute(query).scalar()
     updated_count = 0
 
+    def render_vfolder_id(old_vfid: str) -> str:
+        if "/" in old_vfid and (old_vfid.startswith("user:") or old_vfid.startswith("project:")):
+            return old_vfid
+
+        if "/" in old_vfid:
+            v2_id = old_vfid.split("/")[1]
+        else:
+            v2_id = old_vfid
+
+        if quota_scope_id := known_quota_scopes.get(UUID(v2_id)):
+            return f"{quota_scope_id}/{v2_id}"
+        else:
+            return v2_id
+
     prev_id = None
     while True:
         query = (
@@ -85,11 +98,12 @@ def upgrade():
         unknown_quota_scopes = set()
 
         for sess_id, vfolder_mounts in rows:
-            unknown_quota_scopes |= set(
-                UUID(m["vfid"])
-                for m in vfolder_mounts
-                if (m["vfid"] not in known_quota_scopes and "/" not in m["vfid"])
-            )
+            for m in vfolder_mounts:
+                v2_id = m["vfid"].split("/")[-1]
+                if v2_id in known_quota_scopes:
+                    continue
+                unknown_quota_scopes.add(v2_id)
+
         query = sa.select([vfolders.c.id, vfolders.c.quota_scope_id]).where(
             vfolders.c.id.in_(unknown_quota_scopes)
         )
@@ -100,11 +114,7 @@ def upgrade():
             new_mounts = [
                 {
                     **mount,
-                    "vfid": (
-                        f"{known_quota_scopes[UUID(mount['vfid'])]}/{mount['vfid']}"
-                        if ("/" not in mount["vfid"] and UUID(mount["vfid"]) in known_quota_scopes)
-                        else mount["vfid"]
-                    ),
+                    "vfid": render_vfolder_id(mount["vfid"]),
                 }
                 for mount in vfolder_mounts
             ]
@@ -162,7 +172,7 @@ def downgrade():
 
         for sess_id, vfolder_mounts in rows:
             new_mounts = [
-                {**mount, "vfid": mount["vfid"].split("/")[1]} for mount in vfolder_mounts
+                {**mount, "vfid": mount["vfid"].split(":")[-1]} for mount in vfolder_mounts
             ]
             updates.append({"row_id": sess_id, "vfolder_mounts": new_mounts})
 
