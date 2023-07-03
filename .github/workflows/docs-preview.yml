@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   docs-preview-links-:
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'docs') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'area:docs') }}
     runs-on: ubuntu-latest
     steps:
       - uses: readthedocs/actions/preview@v1
