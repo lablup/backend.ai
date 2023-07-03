@@ -10,7 +10,7 @@ build:
   jobs:
     post_checkout:
       # Skip the build if there is no docs label
-      - exit 439
+      - echo "cancel"; exit 439
     pre_build:
       # Auto-generate REST API reference
       - PYTHONPATH="src" python -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
