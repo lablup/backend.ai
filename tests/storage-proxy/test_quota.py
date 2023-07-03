@@ -41,14 +41,14 @@ async def wait_until_quota_changed(
 
 @pytest.mark.asyncio
 async def test_quota_scope_creation_and_deletion(volume: AbstractVolume) -> None:
-    qs = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qs = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qs)
     assert volume.quota_model.mangle_qspath(qs).is_dir()
     await volume.quota_model.delete_quota_scope(qs)
     assert not volume.quota_model.mangle_qspath(qs).exists()
 
     if CAP_QUOTA in (await volume.get_capabilities()):
-        qs = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+        qs = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
         await volume.quota_model.create_quota_scope(qs, QuotaConfig(10 * MiB))
         assert volume.quota_model.mangle_qspath(qs).is_dir()
         await volume.quota_model.delete_quota_scope(qs)
@@ -62,7 +62,7 @@ async def test_quota_limit(volume: AbstractVolume) -> None:
         pytest.skip("this backend does not support quota management")
 
     block_size = os.statvfs(volume.mount_path).f_bsize
-    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     qspath = volume.quota_model.mangle_qspath(qsid)
 
     await volume.quota_model.create_quota_scope(qsid, QuotaConfig(10 * MiB))
@@ -89,8 +89,8 @@ async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolu
     """
     Tests if the storage backend could guarantee the correct behavior of the vfolder v2 -> v3 migration script.
     """
-    qsrc = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
-    qdst = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qsrc = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
+    qdst = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsrc, QuotaConfig(10 * MiB))
     await volume.quota_model.create_quota_scope(qdst, QuotaConfig(10 * MiB))
     qsrc_path = volume.quota_model.mangle_qspath(qsrc)

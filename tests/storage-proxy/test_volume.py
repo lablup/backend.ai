@@ -10,7 +10,7 @@ from ai.backend.storage.types import VFolderID
 
 @pytest.mark.asyncio
 async def test_volume_vfolder_prefix_handling(volume: AbstractVolume) -> None:
-    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     vfid = VFolderID(qsid, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid)
     await volume.create_vfolder(vfid)
@@ -103,8 +103,8 @@ async def test_volume_scandir(volume: AbstractVolume, empty_vfolder: VFolderID) 
 
 @pytest.mark.asyncio
 async def test_volume_clone(volume: AbstractVolume) -> None:
-    qsid1 = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
-    qsid2 = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qsid1 = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
+    qsid2 = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid1)
     await volume.quota_model.create_quota_scope(qsid2)
     vfid1 = VFolderID(qsid1, uuid.uuid4())

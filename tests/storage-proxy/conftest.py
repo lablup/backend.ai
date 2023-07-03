@@ -113,7 +113,7 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
 
 @pytest.fixture
 async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
-    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.UUID())
+    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     vfid = VFolderID(qsid, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid)
     await volume.create_vfolder(vfid)
