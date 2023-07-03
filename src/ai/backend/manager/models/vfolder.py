@@ -1433,36 +1433,10 @@ class SetQuotaScope(graphene.Mutation):
         storage_host_name: str,
         props: QuotaScopeInput,
     ) -> SetQuotaScope:
-        from ai.backend.manager.models import GroupRow, UserRow
-
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-            if qsid.scope_type == QuotaScopeType.USER:
-                query = (
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == qsid.scope_id)
-                    .options(selectinload(UserRow.resource_policy_row))
-                )
-            else:
-                query = (
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == qsid.scope_id)
-                    .options(selectinload(GroupRow.resource_policy_row))
-                )
-            result = await sess.scalar(query)
-            resource_policy_constraint = result.resource_policy_row.max_vfolder_size
-
-        if (
-            resource_policy_constraint
-            and resource_policy_constraint > 0
-            and resource_policy_constraint < props.hard_limit_bytes
-        ):
-            raise ValueError(
-                "Maximum vFolder quota for this user is limited to"
-                f" {resource_policy_constraint} bytes"
-            )
 
         max_vfolder_size = props.hard_limit_bytes
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
@@ -1507,8 +1481,6 @@ class UnsetQuotaScope(graphene.Mutation):
         quota_scope_id: str,
         storage_host_name: str,
     ) -> SetQuotaScope:
-        from ai.backend.manager.models import GroupRow, UserRow
-
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
@@ -1518,40 +1490,14 @@ class UnsetQuotaScope(graphene.Mutation):
         }
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-            if qsid.scope_type == QuotaScopeType.USER:
-                query = (
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == qsid.scope_id)
-                    .options(selectinload(UserRow.resource_policy_row))
-                )
-            else:
-                query = (
-                    sa.select(GroupRow)
-                    .where(GroupRow.id == qsid.scope_id)
-                    .options(selectinload(GroupRow.resource_policy_row))
-                )
-            result = await sess.scalar(query)
-            resource_policy_constraint = result.resource_policy_row.max_vfolder_size
-
-        if resource_policy_constraint and resource_policy_constraint > 0:
-            request_body["options"] = {"limit_bytes": resource_policy_constraint}
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "PATCH",
-                "quota-scope",
-                json=request_body,
-                raise_for_status=True,
-            ):
-                pass
-        else:
-            async with graph_ctx.storage_manager.request(
-                proxy_name,
-                "DELETE",
-                "quota-scope/quota",
-                json=request_body,
-                raise_for_status=True,
-            ):
-                pass
+        async with graph_ctx.storage_manager.request(
+            proxy_name,
+            "DELETE",
+            "quota-scope/quota",
+            json=request_body,
+            raise_for_status=True,
+        ):
+            pass
 
         return cls(
             QuotaScope(
