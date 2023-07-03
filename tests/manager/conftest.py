@@ -837,6 +837,7 @@ async def session_info(database_engine):
             name=group_name,
             domain_name=domain_name,
             total_resource_slots={},
+            resource_policy="default",
         )
         db_sess.add(group)
 
@@ -846,6 +847,7 @@ async def session_info(database_engine):
             username=f"TestCaseRunner-{postfix}",
             password=user_password,
             domain_name=domain_name,
+            resource_policy="default",
         )
         db_sess.add(user)
 
