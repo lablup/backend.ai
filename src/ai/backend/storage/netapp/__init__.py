@@ -211,6 +211,7 @@ class XCPFSOpModel(BaseFSOpModel):
     def scan_tree(
         self,
         target_path: Path,
+        recursive=False,
     ) -> AsyncIterator[DirEntry]:
         target_relpath = target_path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{target_relpath}"

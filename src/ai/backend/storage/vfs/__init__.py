@@ -231,6 +231,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     def scan_tree(
         self,
         target_path: Path,
+        recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Sentinel | DirEntry] = janus.Queue()
         loop = asyncio.get_running_loop()
@@ -244,6 +245,8 @@ class BaseFSOpModel(AbstractFSOpModel):
                 next_path = next_paths.popleft()
                 with os.scandir(next_path) as scanner:
                     for entry in scanner:
+                        if limit > 0 and count == limit:
+                            break
                         symlink_target = ""
                         entry_type = DirEntryType.FILE
                         try:
@@ -275,11 +278,9 @@ class BaseFSOpModel(AbstractFSOpModel):
                             symlink_target=symlink_target,
                         )
                         q.put(item)
-                        if entry.is_dir() and not entry.is_symlink():
+                        if recursive and entry.is_dir() and not entry.is_symlink():
                             next_paths.append(Path(entry.path))
                         count += 1
-                        if limit > 0 and count == limit:
-                            break
 
         async def _scan_task(q: janus.Queue[Sentinel | DirEntry]) -> None:
             try:
@@ -481,9 +482,11 @@ class BaseVolume(AbstractVolume):
     # ------ vfolder internal operations -------
 
     @final
-    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(
+        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+    ) -> AsyncIterator[DirEntry]:
         target_path = self.sanitize_vfpath(vfid, relpath)
-        return self.fsop_model.scan_tree(target_path)
+        return self.fsop_model.scan_tree(target_path, recursive=recursive)
 
     async def mkdir(
         self,
