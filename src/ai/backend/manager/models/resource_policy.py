@@ -36,6 +36,8 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
     "keypair_resource_policies",
+    "user_resource_policies",
+    "project_resource_policies",
     "KeyPairResourcePolicyRow",
     "KeyPairResourcePolicy",
     "DefaultForUnspecified",
@@ -92,11 +94,17 @@ class KeyPairResourcePolicyRow(Base):
     keypairs = relationship("KeyPairRow", back_populates="resource_policy_row")
 
 
+user_resource_policies = sa.Table(
+    "user_resource_policies",
+    mapper_registry.metadata,
+    sa.Column("name", sa.String(length=256), primary_key=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
+)
+
+
 class UserResourcePolicyRow(Base):
-    __tablename__ = "user_resource_policies"
-    name = sa.Column("name", sa.String(length=256), primary_key=True)
-    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
-    max_vfolder_size = sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False)
+    __table__ = user_resource_policies
     users = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(self, name, max_vfolder_size) -> None:
@@ -104,11 +112,17 @@ class UserResourcePolicyRow(Base):
         self.max_vfolder_size = max_vfolder_size
 
 
+project_resource_policies = sa.Table(
+    "project_resource_policies",
+    mapper_registry.metadata,
+    sa.Column("name", sa.String(length=256), primary_key=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
+)
+
+
 class ProjectResourcePolicyRow(Base):
-    __tablename__ = "project_resource_policies"
-    name = sa.Column("name", sa.String(length=256), primary_key=True)
-    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
-    max_vfolder_size = sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False)
+    __table__ = project_resource_policies
     projects = relationship("GroupRow", back_populates="resource_policy_row")
 
     def __init__(self, name, max_vfolder_size) -> None:

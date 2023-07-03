@@ -847,6 +847,9 @@ class VFolderID:
             return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
+    def __eq__(self, other) -> bool:
+        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
 
 class VFolderUsageMode(str, enum.Enum):
     """
