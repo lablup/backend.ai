@@ -11,6 +11,18 @@
             ]
         }
     ],
+    "user_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
+        }
+    ],
+    "project_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
+        }
+    ],
     "groups": [
         {
             "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
@@ -157,18 +169,6 @@
                     "set-user-specific-permission"
                 ]
             }
-        }
-    ],
-    "user_resource_policies": [
-        {
-            "name": "default",
-            "max_vfolder_size": -1
-        }
-    ],
-    "project_resource_policies": [
-        {
-            "name": "default",
-            "max_vfolder_size": -1
         }
     ],
     "keypairs": [
