@@ -133,7 +133,7 @@ from .defs import (
     INTRINSIC_SLOTS,
     REDIS_STREAM_DB,
 )
-from .exceptions import MultiAgentError, convert_to_status_data
+from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     PRIVATE_KERNEL_ROLES,
@@ -161,7 +161,6 @@ from .models import (
     query_allowed_sgroups,
     query_bootstrap_script,
     recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
     scaling_groups,
     verify_vfolder_name,
 )
@@ -172,6 +171,9 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
+from .schemas.context import DBContext
+from .schemas.kernel import CreatedKernel, KernelMutation, KernelMutationArgs, KernelResource
+from .schemas.session import SessionMutation
 from .types import UserScope
 
 if TYPE_CHECKING:
@@ -322,6 +324,11 @@ class AgentRegistry:
         self.debug = debug
         self.rpc_keepalive_timeout = int(
             shared_config.get("config/network/rpc/keepalive-timeout", "60")
+        )
+        self.db_ctx = DBContext(
+            self.db,
+            self.redis_stat,
+            shared_config.etcd,
         )
 
     async def init(self) -> None:
@@ -663,13 +670,8 @@ class AgentRegistry:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
-                    async with self.db.begin_readonly_session() as db_sess:
-                        query = sa.select(KernelRow.status, KernelRow.service_ports).where(
-                            (KernelRow.session_id == session_id)
-                            & (KernelRow.cluster_role == DEFAULT_ROLE)
-                        )
-                        result = await db_sess.execute(query)
-                        row = result.first()
+                    kernel_queries = await CreatedKernel.to_respond(self.db_ctx, session_id)
+                    row = [kernel for kernel in kernel_queries if kernel.role == DEFAULT_ROLE][0]
                     if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
                         for item in row.service_ports:
@@ -831,7 +833,6 @@ class AgentRegistry:
 
         session_creation_id = secrets.token_urlsafe(16)
         start_event = asyncio.Event()
-        kernel_id: Optional[KernelId] = None
         self.session_creation_tracker[session_creation_id] = start_event
         current_task = asyncio.current_task()
         assert current_task is not None
@@ -858,8 +859,8 @@ class AgentRegistry:
                     ),
                 )
             )
-            kernel_id = cast(KernelId, session_id)  # the main kernel's ID is the session ID.
-            resp["kernelId"] = str(kernel_id)
+            resp["sessionId"] = str(session_id)  # changed since API v5
+            resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
             resp["servicePorts"] = []
             resp["created"] = True
@@ -877,19 +878,8 @@ class AgentRegistry:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
-                    async with self.db.begin_readonly() as conn:
-                        query = (
-                            sa.select(
-                                [
-                                    kernels.c.status,
-                                    kernels.c.service_ports,
-                                ]
-                            )
-                            .select_from(kernels)
-                            .where(kernels.c.id == kernel_id)
-                        )
-                        result = await conn.execute(query)
-                        row = result.first()
+                    kernel = (await CreatedKernel.to_respond(self.db_ctx, session_id))[0]
+                    row = kernel.dict()
                     if row["status"] == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
                         for item in row["service_ports"]:
@@ -1353,7 +1343,7 @@ class AgentRegistry:
                 agent_alloc_ctx=AgentAllocationContext(
                     agent_id=k.agent,
                     agent_addr=k.agent_addr,
-                    scaling_group=scheduled_session.scaling_group,
+                    scaling_group=scheduled_session.scaling_group_name,
                 ),
                 allocated_host_ports=set(),
             )
@@ -1608,38 +1598,30 @@ class AgentRegistry:
                 created_info["resource_spec"]["allocations"]
             )
             new_status = KernelStatus.RUNNING
-            update_data = {
-                "occupied_slots": actual_allocs,
-                "scaling_group": created_info["scaling_group"],
-                "container_id": created_info["container_id"],
-                "occupied_shares": {},
-                "attached_devices": created_info.get("attached_devices", {}),
-                "kernel_host": kernel_host,
-                "repl_in_port": created_info["repl_in_port"],
-                "repl_out_port": created_info["repl_out_port"],
-                "stdin_port": created_info["stdin_port"],
-                "stdout_port": created_info["stdout_port"],
-                "service_ports": service_ports,
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    (),
-                    {
-                        new_status.name: datetime.now(tzutc()).isoformat(),
-                    },
-                ),
-            }
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-            kernel_did_update = await KernelRow.update_kernel(
-                self.db, kernel_id, new_status, update_data=update_data
+
+            args = KernelMutationArgs(
+                status=new_status,
+                occupied_slots=actual_allocs,
+                scaling_group=created_info["scaling_group"],
+                container_id=created_info["container_id"],
+                attached_devices=created_info.get("attached_devices", {}),
+                kernel_host=kernel_host,
+                repl_in_port=created_info["repl_in_port"],
+                repl_out_port=created_info["repl_out_port"],
+                stdin_port=created_info["stdin_port"],
+                stdout_port=created_info["stdout_port"],
+                service_ports=service_ports,
             )
+            kernel_did_update = await KernelMutation.finalize_running(self.db_ctx, kernel_id, args)
             if not kernel_did_update:
                 return
 
-            new_session_status = await SessionRow.transit_session_status(self.db, session_id)
-            if new_session_status is None or new_session_status != SessionStatus.RUNNING:
+            session = await SessionMutation.transit_status(self.db_ctx, session_id)
+            if session is None:
+                # TODO: log or raise error
                 return
-
-            updated_session = await SessionRow.get_session_to_produce_event(self.db, session_id)
+            updated_session = session
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -1774,35 +1756,9 @@ class AgentRegistry:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
                 ex = e
-                for binding in items:
-                    kernel_id = binding.kernel.id
-
-                    async def _update_failure() -> None:
-                        async with self.db.begin_session() as db_sess:
-                            now = datetime.now(tzutc())
-                            query = (
-                                sa.update(KernelRow)
-                                .where(KernelRow.id == kernel_id)
-                                .values(
-                                    status=KernelStatus.ERROR,
-                                    status_info=f"other-error ({ex!r})",
-                                    status_changed=now,
-                                    terminated_at=now,
-                                    status_history=sql_json_merge(
-                                        KernelRow.status_history,
-                                        (),
-                                        {
-                                            KernelStatus.ERROR.name: (
-                                                now.isoformat()
-                                            ),  # ["PULLING", "PREPARING"]
-                                        },
-                                    ),
-                                    status_data=convert_to_status_data(ex, self.debug),
-                                )
-                            )
-                            await db_sess.execute(query)
-
-                    await execute_with_retry(_update_failure)
+                await KernelMutation.update_failure(
+                    self.db_ctx, [binding.kernel.id for binding in items], ex
+                )
                 raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -1967,39 +1923,27 @@ class AgentRegistry:
             set
         )  # key: access_key, value: set of session_id
 
-        async def _recalc() -> None:
-            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-                lambda: ResourceSlot({"cpu": 0, "mem": 0})
-            )
-            async with self.db.begin() as conn:
-                # Query running containers and calculate concurrency_used per AK and
-                # occupied_slots per agent.
-                query = (
-                    sa.select([kernels.c.access_key, kernels.c.agent, kernels.c.occupied_slots])
-                    .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    .order_by(sa.asc(kernels.c.access_key))
-                )
-                async for row in await conn.stream(query):
-                    occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
-                query = (
-                    sa.select(
-                        [
-                            kernels.c.access_key,
-                            kernels.c.session_id,
-                            kernels.c.agent,
-                            kernels.c.occupied_slots,
-                            kernels.c.role,
-                        ]
-                    )
-                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    .order_by(sa.asc(kernels.c.access_key))
-                )
-                async for row in await conn.stream(query):
-                    if row.role in PRIVATE_KERNEL_ROLES:
-                        sftp_concurrency_used_per_key[row.access_key].add(row.session_id)
-                    else:
-                        concurrency_used_per_key[row.access_key].add(row.session_id)
+        occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
+            lambda: ResourceSlot({"cpu": 0, "mem": 0})
+        )
 
+        async for kernel_resources in KernelResource.stream_by_statuses(
+            self.db_ctx, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        ):
+            for kernel in kernel_resources:
+                occupied_slots_per_agent[kernel.agent] += kernel.occupied_slots
+
+        async for kernel_resources in KernelResource.stream_by_statuses(
+            self.db_ctx, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        ):
+            for kernel in kernel_resources:
+                if kernel.role in PRIVATE_KERNEL_ROLES:
+                    sftp_concurrency_used_per_key[kernel.access_key].add(kernel.session_id)
+                else:
+                    concurrency_used_per_key[kernel.access_key].add(kernel.session_id)
+
+        async def _recalc() -> None:
+            async with self.db.begin() as conn:
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
                     for aid, slots in occupied_slots_per_agent.items():
@@ -2150,8 +2094,8 @@ class AgentRegistry:
 
             match target_session.status:
                 case SessionStatus.PENDING:
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.CANCELLED
+                    await SessionMutation.cancel_sessions(
+                        self.db_ctx, (session_id,), reason="user-requested"
                     )
                 case SessionStatus.PULLING:
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
@@ -2168,16 +2112,12 @@ class AgentRegistry:
                         session_id,
                         target_session.status,
                     )
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.TERMINATING
-                    )
+                    await SessionMutation.mark_terminating(self.db_ctx, (session_id,))
                     await self.event_producer.produce_event(
                         SessionTerminatingEvent(session_id, reason),
                     )
                 case _:
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.TERMINATING
-                    )
+                    await SessionMutation.mark_terminating(self.db_ctx, (session_id,))
                     await self.event_producer.produce_event(
                         SessionTerminatingEvent(session_id, reason),
                     )
@@ -2185,7 +2125,6 @@ class AgentRegistry:
             kernel_list = target_session.kernels
             main_stat = {}
             per_agent_tasks = []
-            now = datetime.now(tzutc())
             to_be_terminated = []
 
             keyfunc = lambda item: item.agent if item.agent is not None else ""
@@ -2199,25 +2138,11 @@ class AgentRegistry:
                 for kernel in grouped_kernels:
                     match kernel.status:
                         case KernelStatus.PENDING:
-                            await KernelRow.set_kernel_status(
-                                self.db,
-                                kernel.id,
-                                KernelStatus.CANCELLED,
-                                reason=reason,
-                                status_changed_at=now,
-                            )
                             await self.event_producer.produce_event(
                                 KernelCancelledEvent(kernel.id, session_id, reason),
                             )
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 main_stat = {"status": "cancelled"}
-                                await SessionRow.set_session_status(
-                                    self.db,
-                                    session_id,
-                                    SessionStatus.CANCELLED,
-                                    reason=reason,
-                                    status_changed_at=now,
-                                )
                                 await self.event_producer.produce_event(
                                     SessionCancelledEvent(
                                         session_id,
@@ -2245,32 +2170,7 @@ class AgentRegistry:
                             else:
                                 to_be_terminated.append(kernel)
 
-                            async def _update() -> None:
-                                kern_stat = await redis_helper.execute(
-                                    self.redis_stat,
-                                    lambda r: r.get(str(kernel.id)),
-                                )
-                                async with self.db.begin_session() as db_sess:
-                                    values = {
-                                        "status": KernelStatus.TERMINATED,
-                                        "status_info": reason,
-                                        "status_changed": now,
-                                        "terminated_at": now,
-                                        "status_history": sql_json_merge(
-                                            KernelRow.status_history,
-                                            (),
-                                            {
-                                                KernelStatus.TERMINATED.name: now.isoformat(),
-                                            },
-                                        ),
-                                    }
-                                    if kern_stat:
-                                        values["last_stat"] = msgpack.unpackb(kern_stat)
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(**values)
-                                        .where(KernelRow.id == kernel.id),
-                                    )
+                            await KernelMutation.mark_terminated(self.db_ctx, kernel.id, reason)
 
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
@@ -2287,35 +2187,11 @@ class AgentRegistry:
                                     ),
                                 )
 
-                            await execute_with_retry(_update)
                             await self.event_producer.produce_event(
                                 KernelTerminatedEvent(kernel.id, target_session.id, reason),
                             )
                         case _:
-
-                            async def _update() -> None:
-                                async with self.db.begin_session() as db_sess:
-                                    values = {
-                                        "status": KernelStatus.TERMINATING,
-                                        "status_info": reason,
-                                        "status_changed": now,
-                                        "status_data": {
-                                            "kernel": {"exit_code": None},
-                                            "session": {"status": "terminating"},
-                                        },
-                                        "status_history": sql_json_merge(
-                                            KernelRow.status_history,
-                                            (),
-                                            {
-                                                KernelStatus.TERMINATING.name: now.isoformat(),
-                                            },
-                                        ),
-                                    }
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(**values)
-                                        .where(KernelRow.id == kernel.id),
-                                    )
+                            await KernelMutation.mark_terminating(self.db_ctx, kernel.id, reason)
 
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
@@ -2332,7 +2208,6 @@ class AgentRegistry:
                                     ),
                                 )
 
-                            await execute_with_retry(_update)
                             await self.event_producer.produce_event(
                                 KernelTerminatingEvent(kernel.id, target_session.id, reason),
                             )
@@ -2475,25 +2350,7 @@ class AgentRegistry:
     ) -> None:
         log.warning("restart_session({})", session.id)
 
-        async def _restarting_session() -> None:
-            async with self.db.begin_session() as db_sess:
-                query = (
-                    sa.update(SessionRow)
-                    .values(
-                        status=SessionStatus.RESTARTING,
-                        status_history=sql_json_merge(
-                            SessionRow.status_history,
-                            (),
-                            {
-                                SessionStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
-                            },
-                        ),
-                    )
-                    .where(SessionRow.id == session.id)
-                )
-                await db_sess.execute(query)
-
-        await execute_with_retry(_restarting_session)
+        await SessionMutation.mark_restarting(self.db_ctx, session.id)
 
         kernel_list = session.kernels
 
@@ -3015,17 +2872,9 @@ class AgentRegistry:
         If agent's kernel_registry has unknown kernel data,
         """
 
-        async with self.db.begin_readonly() as db_conn:
-            query = (
-                sa.select([kernels.c.id, kernels.c.session_id, kernels.c.agent_addr])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.agent == agent_id)
-                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                )
-            )
-            result = await db_conn.execute(query)
-            kernel_list = result.fetchall()
+        kernel_list = await KernelResource.by_statuses(
+            self.db_ctx, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agent_id=agent_id
+        )
 
         keyfunc = lambda item: item.agent_addr or ""
         for agent_addr, group_iterator in itertools.groupby(
@@ -3054,84 +2903,20 @@ class AgentRegistry:
         Mark the kernel (individual worker) terminated and release
         the resource slots occupied by it.
         """
-
-        kern_stat = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(str(kernel_id)),
+        agent_id = await KernelMutation.handle_terminated(
+            self.db_ctx, kernel_id, reason, exit_code=exit_code
         )
-
-        async def _update_kernel() -> tuple[AccessKey, AgentId] | None:
-            async with self.db.begin_session() as db_sess:
-                # Check the current status.
-                select_query = (
-                    sa.select(
-                        KernelRow.access_key,
-                        KernelRow.agent,
-                        KernelRow.status,
-                        KernelRow.occupied_slots,
-                        KernelRow.session_id,
-                    )
-                    .where(KernelRow.id == kernel_id)
-                    .with_for_update()
-                )
-                result = await db_sess.execute(select_query)
-                kernel = result.first()
-                if kernel is None or kernel.status in (
-                    KernelStatus.CANCELLED,
-                    KernelStatus.TERMINATED,
-                    KernelStatus.RESTARTING,
-                ):
-                    # Skip if non-existent, already terminated, or restarting.
-                    return None
-
-                # Change the status to TERMINATED.
-                # (we don't delete the row for later logging and billing)
-                now = datetime.now(tzutc())
-                values = {
-                    "status": KernelStatus.TERMINATED,
-                    "status_info": reason,
-                    "status_changed": now,
-                    "status_data": sql_json_merge(
-                        KernelRow.status_data,
-                        ("kernel",),
-                        {"exit_code": exit_code},
-                    ),
-                    "status_history": sql_json_merge(
-                        KernelRow.status_history,
-                        (),
-                        {
-                            KernelStatus.TERMINATED.name: now.isoformat(),
-                        },
-                    ),
-                    "terminated_at": now,
-                }
-                if kern_stat:
-                    values["last_stat"] = msgpack.unpackb(kern_stat)
-                update_query = (
-                    sa.update(KernelRow).values(**values).where(KernelRow.id == kernel_id)
-                )
-                await db_sess.execute(update_query)
-                return kernel.access_key, kernel.agent
-
-        result = await execute_with_retry(_update_kernel)
-
-        if result is None:
+        if agent_id is None:
             return
 
-        access_key, agent = result
-
         async def _recalc() -> None:
+            assert agent_id is not None
             async with self.db.begin() as conn:
                 log.debug(
-                    "recalculate concurrency used in kernel termination (ak: {})",
-                    access_key,
-                )
-                await recalc_concurrency_used(conn, self.redis_stat, access_key)
-                log.debug(
                     "recalculate agent resource occupancy in kernel termination (agent: {})",
-                    agent,
+                    agent_id,
                 )
-                await recalc_agent_resource_occupancy(conn, agent)
+                await recalc_agent_resource_occupancy(conn, agent_id)
 
         await execute_with_retry(_recalc)
 

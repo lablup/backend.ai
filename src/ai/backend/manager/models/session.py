@@ -533,6 +533,37 @@ class SessionOp(str, enum.Enum):
     GET_AGENT_LOGS = "get_logs_from_agent"
 
 
+def _parse_data_to_update_status(
+    status: SessionStatus | None = None,
+    status_data: Mapping[str, Any] | None = None,
+    reason: str | None = None,
+    status_changed_at: datetime | None = None,
+) -> dict[str, Any]:
+    if status_changed_at is None:
+        now = datetime.now(tzutc())
+    else:
+        now = status_changed_at
+    data = {}
+    if status is not None:
+        data = {
+            "status": status,
+            "status_history": sql_json_merge(
+                SessionRow.status_history,
+                (),
+                {
+                    status.name: datetime.now(tzutc()).isoformat(),
+                },
+            ),
+        }
+    if status_data is not None:
+        data["status_data"] = status_data
+    if reason is not None:
+        data["status_info"] = reason
+    if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+        data["terminated_at"] = now
+    return data
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -827,6 +858,144 @@ class SessionRow(Base):
                 await db_sess.execute(query)
 
         await execute_with_retry(_update)
+
+    @staticmethod
+    async def set_status(
+        db: ExtendedAsyncSAEngine,
+        session_ids: Sequence[SessionId],
+        status: SessionStatus | None = None,
+        *,
+        status_data: Optional[Mapping[str, Any]] = None,
+        reason: Optional[str] = None,
+        status_changed_at: Optional[datetime] = None,
+    ) -> None:
+        data = _parse_data_to_update_status(status, status_data, reason, status_changed_at)
+
+        async def _update() -> None:
+            async with db.begin_session() as db_sess:
+                query = sa.update(SessionRow).values(**data).where(SessionRow.id.in_(session_ids))
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update)
+
+    @staticmethod
+    async def get_session_to_determine_status(
+        db: ExtendedAsyncSAEngine,
+        session_id: SessionId,
+    ) -> SessionRow:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.id == session_id)
+            .options(
+                noload("*"),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.name,
+                    SessionRow.access_key,
+                ),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    load_only(
+                        KernelRow.status,
+                        KernelRow.cluster_role,
+                    ),
+                ),
+            )
+        )
+        async with db.begin_readonly_session() as db_sess:
+            return (await db_sess.scalars(stmt)).first()
+
+    @staticmethod
+    async def get_scheduled_sessions(
+        db: ExtendedAsyncSAEngine,
+    ) -> list[SessionRow]:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == SessionStatus.SCHEDULED)
+            .options(
+                noload("*"),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.name,
+                    SessionRow.session_type,
+                    SessionRow.vfolder_mounts,
+                    SessionRow.access_key,
+                    SessionRow.status,
+                    SessionRow.scaling_group_name,
+                    SessionRow.cluster_mode,
+                    SessionRow.cluster_size,
+                    SessionRow.environ,
+                    SessionRow.use_host_network,
+                ),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.cluster_role,
+                        KernelRow.preopen_ports,
+                        KernelRow.internal_data,
+                    ),
+                ),
+            )
+        )
+        async with db.begin_readonly_session() as db_sess:
+            return await db_sess.scalars(stmt)
+
+    @staticmethod
+    async def get_session_by_status(
+        db: ExtendedAsyncSAEngine,
+        status: SessionStatus,
+        with_kernels: bool = True,
+    ) -> list[SessionRow]:
+        stmt = sa.select(SessionRow).where(SessionRow.status == status)
+        if with_kernels:
+            stmt = stmt.options(noload("*"), selectinload(SessionRow.kernels).noload("*"))
+        async with db.begin_readonly_session() as db_sess:
+            return await db_sess.scalars(stmt)
+
+    @staticmethod
+    async def get_pending_session_by_id(
+        db: ExtendedAsyncSAEngine,
+        session_ids: Sequence[SessionId],
+    ) -> list[SessionRow]:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.id.in_(session_ids))
+            .options(
+                noload("*"),
+                load_only(
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.name,
+                    SessionRow.session_type,
+                    SessionRow.vfolder_mounts,
+                    SessionRow.access_key,
+                    SessionRow.status,
+                    SessionRow.scaling_group_name,
+                    SessionRow.cluster_mode,
+                    SessionRow.cluster_size,
+                    SessionRow.environ,
+                    SessionRow.use_host_network,
+                ),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    load_only(
+                        KernelRow.id,
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.cluster_role,
+                        KernelRow.preopen_ports,
+                        KernelRow.internal_data,
+                    ),
+                ),
+            )
+        )
+        async with db.begin_readonly_session() as db_sess:
+            return await db_sess.scalars(stmt)
 
     async def set_session_result(
         db: ExtendedAsyncSAEngine,

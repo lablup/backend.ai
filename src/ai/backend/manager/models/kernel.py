@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    AsyncGenerator,
     AsyncIterator,
     Mapping,
     Optional,
@@ -35,6 +36,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     BinarySize,
     ClusterMode,
     KernelId,
@@ -78,6 +80,7 @@ from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
+    from ..schemas.kernel import KernelMutationArgs
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -544,6 +547,30 @@ kernels = sa.Table(
 )
 
 
+def _parse_data_to_update_status(
+    args: KernelMutationArgs,
+    status_changed_at: datetime | None = None,
+) -> dict[str, Any]:
+    now = status_changed_at or datetime.now(tzutc())
+    data = args.value_dict
+
+    if (status := args.status) is not None:
+        data = {
+            "status": status,
+            "status_changed": now,
+            "status_history": sql_json_merge(
+                KernelRow.status_history,
+                (),
+                {
+                    status.name: datetime.now(tzutc()).isoformat(),
+                },
+            ),
+        }
+        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+            data["terminated_at"] = now
+    return data
+
+
 class KernelRow(Base):
     __table__ = kernels
     session = relationship("SessionRow", back_populates="kernels")
@@ -689,6 +716,170 @@ class KernelRow(Base):
             return True
 
         return await execute_with_retry(_update)
+
+    @staticmethod
+    async def get_kernel_to_update_status(
+        db: ExtendedAsyncSAEngine,
+        kernel_ids: Sequence[KernelId],
+    ) -> KernelRow:
+        select_query = (
+            sa.select(KernelRow)
+            .where(KernelRow.id.in_(kernel_ids))
+            .options(
+                noload("*"),
+                load_only(
+                    KernelRow.status,
+                    KernelRow.access_key,
+                    KernelRow.agent,
+                    KernelRow.occupied_slots,
+                    KernelRow.session_id,
+                ),
+            )
+        )
+        async with db.begin_readonly_session() as db_sess:
+            return (await db_sess.scalars(select_query)).first()
+
+    @staticmethod
+    async def get_kernel_by_status(
+        db: ExtendedAsyncSAEngine,
+        statuses: Sequence[KernelStatus],
+        agent_id: AgentId | None = None,
+    ) -> list[KernelRow]:
+        stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.status.in_(statuses))
+            .options(
+                load_only(
+                    KernelRow.id,
+                    KernelRow.session_id,
+                    KernelRow.access_key,
+                    KernelRow.role,
+                    KernelRow.agent,
+                    KernelRow.agent_addr,
+                    KernelRow.occupied_slots,
+                )
+            )
+        )
+        if agent_id is not None:
+            stmt = stmt.where(KernelRow.agent == agent_id)
+        async with db.begin_readonly_session() as db_sess:
+            return (await db_sess.scalars(stmt)).all()
+
+    @staticmethod
+    async def stream_kernel_by_status(
+        db: ExtendedAsyncSAEngine,
+        statuses: Sequence[KernelStatus],
+        agent_id: AgentId | None = None,
+    ) -> AsyncGenerator[list[KernelRow], None]:
+        stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.status.in_(statuses))
+            .options(
+                load_only(
+                    KernelRow.id,
+                    KernelRow.session_id,
+                    KernelRow.access_key,
+                    KernelRow.role,
+                    KernelRow.agent,
+                    KernelRow.agent_addr,
+                    KernelRow.occupied_slots,
+                )
+            )
+        )
+        if agent_id is not None:
+            stmt = stmt.where(KernelRow.agent == agent_id)
+        async with db.begin_readonly_session() as db_sess:
+            async for row in await db_sess.stream_scalars(stmt):
+                yield row.all()
+
+    @staticmethod
+    async def get_by_session_id(
+        db: ExtendedAsyncSAEngine,
+        session_id: SessionId,
+    ) -> list[KernelRow]:
+        stmt = sa.select(KernelRow).where(KernelRow.session_id == session_id)
+        async with db.begin_readonly_session() as db_sess:
+            return (await db_sess.scalars(stmt)).all()
+
+    @staticmethod
+    async def set_status_by_session_id(
+        db: ExtendedAsyncSAEngine,
+        session_ids: Sequence[SessionId],
+        update_args: KernelMutationArgs,
+        status_changed_at: datetime | None = None,
+    ) -> list[KernelId] | None:
+        data = _parse_data_to_update_status(update_args, status_changed_at)
+
+        query = sa.update(KernelRow).values(**data).where(KernelRow.session_id.in_(session_ids))
+
+        async def _update() -> None:
+            async with db.begin_session() as db_sess:
+                await db_sess.execute(query)
+
+        return await execute_with_retry(_update)
+
+    @staticmethod
+    async def set_status_by_kernel_id(
+        db: ExtendedAsyncSAEngine,
+        kernel_ids: Sequence[KernelId],
+        update_args: KernelMutationArgs,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        data = _parse_data_to_update_status(update_args, status_changed_at)
+
+        async def _update() -> None:
+            async with db.begin_session() as db_sess:
+                query = sa.update(KernelRow).values(**data).where(KernelRow.id.in_(kernel_ids))
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update)
+
+    @staticmethod
+    async def get_concurrency(
+        db: ExtendedAsyncSAEngine,
+        access_key: AccessKey,
+    ) -> tuple[int, int]:
+        async with db.begin_readonly_session() as db_sess:
+            concurrency_used = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(
+                    (KernelRow.access_key == access_key)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                )
+            )
+            sftp_concurrency_used = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(KernelRow)
+                .where(
+                    (KernelRow.access_key == access_key)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+                ),
+            )
+        assert isinstance(concurrency_used, int)
+        assert isinstance(sftp_concurrency_used, int)
+        return concurrency_used, sftp_concurrency_used
+
+    @staticmethod
+    async def is_transitable(
+        db: ExtendedAsyncSAEngine,
+        kernel_id: KernelId,
+        new_status: KernelStatus,
+    ) -> bool:
+        async with db.begin_session() as db_session:
+            kernel_query = (
+                sa.select(KernelRow)
+                .where(KernelRow.id == kernel_id)
+                .with_for_update()
+                .options(
+                    noload("*"),
+                    load_only(KernelRow.status, KernelRow.session_id),
+                )
+            )
+            kernel_row = (await db_session.scalars(kernel_query)).first()
+            return new_status in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]
 
 
 DEFAULT_KERNEL_ORDERING = [
