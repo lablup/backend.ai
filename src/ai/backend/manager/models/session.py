@@ -700,6 +700,8 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
+        if self.status_history is None:
+            return None
         try:
             return datetime.fromisoformat(self.status_history[self.status.name])
         except KeyError:
@@ -1443,27 +1445,30 @@ class ComputeSession(graphene.ObjectType):
     }
 
     _queryorder_colmap: ColumnMapType = {
-        "id": "sessions_id",
-        "type": "sessions_session_type",
-        "name": "sessions_name",
+        "id": ("sessions_id", None),
+        "type": ("sessions_session_type", None),
+        "name": ("sessions_name", None),
         # "image": "image",
         # "architecture": "architecture",
-        "domain_name": "sessions_domain_name",
-        "group_name": "groups_name",
-        "user_email": "users_email",
-        "full_name": "users_full_name",
-        "access_key": "sessions_access_key",
-        "scaling_group": "sessions_scaling_group_name",
-        "cluster_mode": "sessions_cluster_mode",
+        "domain_name": ("sessions_domain_name", None),
+        "group_name": ("groups_name", None),
+        "user_email": ("users_email", None),
+        "full_name": ("users_full_name", None),
+        "access_key": ("sessions_access_key", None),
+        "scaling_group": ("sessions_scaling_group_name", None),
+        "cluster_mode": ("sessions_cluster_mode", None),
         # "cluster_template": "cluster_template",
-        "cluster_size": "sessions_cluster_size",
-        "status": "sessions_status",
-        "status_info": "sessions_status_info",
-        "result": "sessions_result",
-        "created_at": "sessions_created_at",
-        "terminated_at": "sessions_terminated_at",
-        "starts_at": "sessions_starts_at",
-        "scheduled_at": JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+        "cluster_size": ("sessions_cluster_size", None),
+        "status": ("sessions_status", None),
+        "status_info": ("sessions_status_info", None),
+        "result": ("sessions_result", None),
+        "created_at": ("sessions_created_at", None),
+        "terminated_at": ("sessions_terminated_at", None),
+        "starts_at": ("sessions_starts_at", None),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            None,
+        ),
     }
 
     @classmethod

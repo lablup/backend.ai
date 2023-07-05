@@ -1,4 +1,6 @@
-from typing import Any, Callable, NamedTuple, Optional, Tuple
+from typing import Any, Callable, NamedTuple
+
+import sqlalchemy as sa
 
 
 class JSONFieldItem(NamedTuple):
@@ -6,4 +8,5 @@ class JSONFieldItem(NamedTuple):
     key_name: str
 
 
-FieldSpecItem = Tuple[str | JSONFieldItem, Optional[Callable[[str], Any]]]
+FieldSpecItem = tuple[str | JSONFieldItem, Callable[[str], Any] | None]
+OrderSpecItem = tuple[str | JSONFieldItem, Callable[[sa.Column], Any] | None]

@@ -2,8 +2,9 @@ from typing import Mapping, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
+from lark.lexer import Token
 
-from . import JSONFieldItem
+from . import JSONFieldItem, OrderSpecItem
 
 __all__ = ("QueryOrderParser",)
 
@@ -22,7 +23,7 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
-ColumnMapType: TypeAlias = Mapping[str, str | JSONFieldItem] | None
+ColumnMapType: TypeAlias = Mapping[str, OrderSpecItem] | None
 
 
 class QueryOrderTransformer(Transformer):
@@ -34,21 +35,23 @@ class QueryOrderTransformer(Transformer):
     def _get_col(self, col_name: str) -> sa.Column:
         try:
             if self._column_map:
-                match self._column_map[col_name]:
+                col_value, func = self._column_map[col_name]
+                match col_value:
                     case str(column):
-                        col = self._sa_table.c[column]
+                        matched_col = self._sa_table.c[column]
                     case JSONFieldItem(_col, _key):
-                        col = self._sa_table.c[_col].op("->>")(_key)
+                        matched_col = self._sa_table.c[_col].op("->>")(_key)
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
+                col = func(matched_col) if func is not None else matched_col
             else:
                 col = self._sa_table.c[col_name]
             return col
         except KeyError:
             raise ValueError("Unknown/unsupported field name", col_name)
 
-    def col(self, *args):
-        children = args[0]
+    def col(self, *args) -> sa.sql.elements.UnaryExpression:
+        children: list[Token] = args[0]
         if len(children) == 2:
             op = children[0].value
             col = self._get_col(children[1].value)

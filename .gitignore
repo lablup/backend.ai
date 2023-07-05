@@ -120,6 +120,7 @@ ENV/
 /vfroot/
 /*.pid
 /scratches/
+logs
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -131,3 +132,5 @@ ENV/
 .DS_Store
 
 .python-runtime
+
+docs/manager/rest-reference/openapi.json

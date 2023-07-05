@@ -890,20 +890,20 @@ class ComputeContainer(graphene.ObjectType):
     }
 
     _queryorder_colmap: ColumnMapType = {
-        "image": "image",
-        "architecture": "architecture",
-        "agent": "agent",
-        "agent_addr": "agent_addr",
-        "cluster_idx": "cluster_idx",
-        "local_rank": "local_rank",
-        "cluster_role": "cluster_role",
-        "cluster_hostname": "cluster_hostname",
-        "status": "status",
-        "status_info": "status_info",
-        "status_changed": "status_info",
-        "created_at": "created_at",
-        "terminated_at": "terminated_at",
-        "scheduled_at": JSONFieldItem("status_history", KernelStatus.SCHEDULED.name),
+        "image": ("image", None),
+        "architecture": ("architecture", None),
+        "agent": ("agent", None),
+        "agent_addr": ("agent_addr", None),
+        "cluster_idx": ("cluster_idx", None),
+        "local_rank": ("local_rank", None),
+        "cluster_role": ("cluster_role", None),
+        "cluster_hostname": ("cluster_hostname", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "status_changed": ("status_info", None),
+        "created_at": ("created_at", None),
+        "terminated_at": ("terminated_at", None),
+        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
     }
 
     @classmethod
