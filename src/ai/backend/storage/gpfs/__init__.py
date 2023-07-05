@@ -40,7 +40,7 @@ class GPFSQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
@@ -49,8 +49,8 @@ class GPFSQuotaModel(BaseQuotaModel):
             path=qspath,
             owner=self.gpfs_owner,
         )
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
         await self.api_client.set_quota(self.fs, quota_scope_id.pathname, config.limit_bytes)
