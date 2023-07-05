@@ -268,9 +268,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     ) -> List[MountInfo]:
         raise NotImplementedError
 
-    @staticmethod
     @abstractmethod
-    def resolve_krunner_filepath(filename) -> Path:
+    def resolve_krunner_filepath(self, filename) -> Path:
         """
         Return matching krunner path object for given filename.
         """
@@ -534,7 +533,7 @@ class AbstractAgent(
     images: Mapping[str, str]
     image_pull_tracker: MutableMapping[str, asyncio.Event]
     port_pool: Set[int]
-    has_native_backend: bool
+    backend_data_root: Path
 
     redis: Redis
 
@@ -585,13 +584,13 @@ class AbstractAgent(
                 local_config["container"]["port-range"][1] + 1,
             )
         )
-        self.has_native_backend = True
         self.image_pull_tracker = {}
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self.backend_data_root = Path("/")
 
     async def __ainit__(self) -> None:
         """
@@ -601,7 +600,6 @@ class AbstractAgent(
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
         self.container_lifecycle_queue = asyncio.Queue()
-        self.has_native_backend = await self._compare_data_root()
 
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
@@ -610,6 +608,7 @@ class AbstractAgent(
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
+        self.backend_data_root = await self._read_data_root()
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
@@ -934,13 +933,11 @@ class AbstractAgent(
             or container_config["bind-host"]
         )
 
-    @abstractmethod
-    async def _compare_data_root(self) -> bool:
+    async def _read_data_root(self) -> Path:
         """
-        Compare the inode values of mounted 'root' directory inside of container and host.
-        If they are same, the container backend is running on host macine, return True.
-        Else, the container backend is running on VM such as Orbstack or Docker Desktop, return False.
+        Read data root of container backend.
         """
+        return Path("/")
 
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
         async with self.registry_lock:
@@ -1173,7 +1170,7 @@ class AbstractAgent(
         )
 
     @abstractmethod
-    async def get_free_image_disk(self) -> int | float | None:
+    async def get_free_image_disk(self) -> int | float:
         """
         Get free disk for images.
         """
@@ -1188,9 +1185,10 @@ class AbstractAgent(
         """
         if (minimum := self.local_config["agent"]["required-image-disk"]) is None:
             return
-        free = await self.get_free_image_disk()
-        if free is None:
-            return
+        try:
+            free = await self.get_free_image_disk()
+        except Exception as e:
+            raise AgentError(f"Unable to get free image disk. (e: {repr(e)})")
         if free < minimum:
             raise AgentError(
                 f"Need at least {minimum} GiB of free disk space to install a new image."

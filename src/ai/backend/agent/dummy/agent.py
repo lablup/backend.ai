@@ -120,8 +120,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> list[MountInfo]:
         return []
 
-    @staticmethod
-    def resolve_krunner_filepath(filename) -> Path:
+    def resolve_krunner_filepath(self, filename) -> Path:
         return Path()
 
     def get_runner_mount(
