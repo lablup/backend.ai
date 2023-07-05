@@ -8,10 +8,9 @@ from . import FieldSpecItem, JSONFieldItem
 
 __all__ = (
     "FilterableSQLQuery",
+    "FieldSpecType",
     "QueryFilterParser",
 )
-
-FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 
 _grammar = r"""
     ?start: expr
@@ -47,6 +46,7 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
 
 

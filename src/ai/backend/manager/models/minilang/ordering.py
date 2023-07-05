@@ -6,7 +6,10 @@ from lark.lexer import Token
 
 from . import JSONFieldItem, OrderSpecItem
 
-__all__ = ("QueryOrderParser",)
+__all__ = (
+    "ColumnMapType",
+    "QueryOrderParser",
+)
 
 _grammar = r"""
     ?start: expr
