@@ -556,6 +556,7 @@ class SessionRow(Base):
         server_default=ClusterMode.SINGLE_NODE.name,
     )
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
+    agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
     kernels = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -1274,7 +1275,6 @@ class ComputeSession(graphene.ObjectType):
         email = getattr(row, "email")
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
-        agent_ids = getattr(row, "agent_ids")
         row = row.SessionRow
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
@@ -1320,7 +1320,7 @@ class ComputeSession(graphene.ObjectType):
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
-            "agent_ids": agent_ids,
+            "agent_ids": row.agent_ids,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
@@ -1429,7 +1429,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
-        "agent_ids": ("kernels_agent", None),
+        "agent_ids": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
@@ -1457,7 +1457,7 @@ class ComputeSession(graphene.ObjectType):
         "name": ("sessions_name", None),
         # "image": "image",
         # "architecture": "architecture",
-        "agent_ids": ("kernels_agent", agg_to_array),
+        "agent_ids": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
@@ -1538,14 +1538,13 @@ class ComputeSession(graphene.ObjectType):
             status_list = [status]
         j = (
             # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
-            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
-            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
-            .join(KernelRow, SessionRow.id == KernelRow.session_id)
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+                UserRow, SessionRow.user_uuid == UserRow.uuid
+            )
         )
         query = (
             sa.select(
                 SessionRow,
-                agg_to_array(KernelRow.agent).label("agent_ids"),
                 agg_to_array(GroupRow.name).label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
