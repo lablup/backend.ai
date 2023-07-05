@@ -5,6 +5,7 @@ import concurrent.futures
 import json
 import logging
 import os
+import resource
 import signal
 import sys
 import time
@@ -41,7 +42,7 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
 from .service import ServiceParser
-from .utils import wait_local_port_open
+from .utils import scan_proc_stats, wait_local_port_open
 
 log = BraceStyleAdapter(logging.getLogger())
 
@@ -579,6 +580,60 @@ class BaseRunner(metaclass=ABCMeta):
         if hasattr(self, "kernel_mgr") and self.kernel_mgr is not None:
             await self.kernel_mgr.interrupt_kernel()
 
+    async def log_oom(self):
+        log.warning("Out-of-memory detected!")
+        prev_pid_set = {}
+        for history in self._pid_set_history:  # merge the history
+            prev_pid_set.update(history)
+        for _ in range(30):
+            current_pid_set = scan_proc_stats()
+            terminated_pid_list = sorted(set(prev_pid_set.keys()) - set(current_pid_set.keys()))
+            if not terminated_pid_list:
+                await asyncio.sleep(0.5)
+                continue
+            else:
+                break
+        else:
+            log.warning("failed to get the information of oom-killed processes")
+            return
+        pgsize = resource.getpagesize()
+        for pid, pstat in map(lambda p: (p, prev_pid_set[p]), terminated_pid_list):
+            process_tree = []
+            count = 0
+            while True:
+                if count > 0:
+                    indent = ("   " * (count - 1)) + "└─ "
+                else:
+                    indent = ""
+                cmdline = pstat["cmdline"].replace(b"\0", b" ").decode("utf8")
+                elapsed_time = "{:,.2f}".format(time.monotonic() - pstat["starttime"])
+                vm_size = "{:,}".format(pstat["vsize"] // (2**20))
+                rss = "{:,}".format((pstat["rss"] * pgsize) // (2**20))
+                process_tree.append(
+                    f"{indent}{pid} (running for {elapsed_time}s, vm: {vm_size}m, rss:"
+                    f" {rss}m): {cmdline}"
+                )
+                ppid = pstat["ppid"]
+                if ppid == 0 or ppid == pid:
+                    break
+                pid = ppid
+                pstat = prev_pid_set[ppid]
+                count += 1
+            log.warning(
+                "detected potentially oom-killed process:\n{}",
+                "\n".join(process_tree),
+            )
+
+    async def log_event(self, data):
+        match data["type"]:
+            case "oom":
+                await self.log_oom()
+            case _:
+                log.info(
+                    "Agent-notified event: {}",
+                    data,
+                )
+
     async def _send_status(self):
         data = {
             "started_at": self.started_at,
@@ -848,6 +903,16 @@ class BaseRunner(metaclass=ABCMeta):
             ]
         )
 
+    async def _monitor_processes(self):
+        while True:
+            self._pid_set_history.append(scan_proc_stats())
+            if len(self._pid_set_history) > 2:
+                self._pid_set_history.pop(0)
+            try:
+                await asyncio.sleep(2)
+            except asyncio.CancelledError:
+                return
+
     async def main_loop(self, cmdargs):
         log.debug("starting user input server...")
         user_input_server = await asyncio.start_unix_server(
@@ -862,6 +927,9 @@ class BaseRunner(metaclass=ABCMeta):
         if user_bootstrap_path.is_file():
             log.debug("running user bootstrap script...")
             await self._bootstrap(user_bootstrap_path)
+
+        self._pid_set_history = []
+        monitor_proc_task = asyncio.create_task(self._monitor_processes())
 
         log.debug("starting intrinsic services: sshd, ttyd ...")
         intrinsic_spawn_coros = []
@@ -920,6 +988,9 @@ class BaseRunner(metaclass=ABCMeta):
                     await self._interrupt()
                 elif op_type == "status":
                     await self._send_status()
+                elif op_type == "event":
+                    data = json.loads(text)
+                    asyncio.create_task(self.log_event(data))
                 elif op_type == "start-service":  # activate a service port
                     data = json.loads(text)
                     asyncio.create_task(self._start_service(data))
@@ -939,4 +1010,6 @@ class BaseRunner(metaclass=ABCMeta):
                 continue
         user_input_server.close()
         await user_input_server.wait_closed()
+        monitor_proc_task.cancel()
+        await monitor_proc_task
         await self.shutdown()

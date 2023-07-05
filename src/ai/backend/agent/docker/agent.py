@@ -75,7 +75,7 @@ from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..server import get_extra_volumes
-from ..types import Container, ContainerStatus, LifecycleEvent, MountInfo, Port
+from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -1467,6 +1467,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 exit_code=exit_code,
             )
 
+        async def handle_action_oom(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+            kernel_obj = self.kernel_registry.get(kernel_id, None)
+            if kernel_obj is None:
+                return
+            await kernel_obj.notify_event(
+                AgentEventData(
+                    type="oom",
+                    data={},
+                )
+            )
+
         while True:
             async with closing_async(Docker()) as docker:
                 subscriber = docker.events.subscribe(create_task=True)
@@ -1493,24 +1504,31 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 continue
                             if self.local_config["debug"]["log-docker-events"] and evdata[
                                 "Action"
-                            ] in ("start", "die"):
+                            ] in ("start", "die", "oom"):
                                 log.debug(
                                     "docker-event: action={}, actor={}",
                                     evdata["Action"],
                                     evdata["Actor"],
                                 )
-                            if evdata["Action"] == "start":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_start(kernel_id, evdata),
+                            match evdata["Action"]:
+                                case "start":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_start(kernel_id, evdata),
+                                        )
                                     )
-                                )
-                            elif evdata["Action"] == "die":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_die(kernel_id, evdata),
+                                case "die":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_die(kernel_id, evdata),
+                                        )
                                     )
-                                )
+                                case "oom":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_oom(kernel_id, evdata),
+                                        )
+                                    )
                         except asyncio.CancelledError:
                             # We are shutting down...
                             return

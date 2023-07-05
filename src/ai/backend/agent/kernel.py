@@ -42,6 +42,7 @@ from ai.backend.common.types import CommitStatus, KernelId, ServicePort, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
+from .types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -305,6 +306,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     async def list_files(self, path: str):
         raise NotImplementedError
 
+    @abstractmethod
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
+
     async def execute(
         self,
         run_id: Optional[str],
@@ -545,6 +550,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         if self.input_sock.closed:
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"input", text.encode("utf8")])
+
+    async def feed_event(self, evdata: AgentEventData):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        data = {
+            "type": evdata.type,
+            "data": evdata.data,
+        }
+        await self.input_sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
 
     async def feed_interrupt(self):
         if self.input_sock.closed:
