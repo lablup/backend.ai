@@ -19,7 +19,7 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -30,7 +30,7 @@ from ..abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
-from ..exception import ExecutionError, NotEmptyError
+from ..exception import ExecutionError, InvalidQuotaScopeError, NotEmptyError
 from ..subproc import spawn_and_watch
 from ..types import (
     SENTINEL,
@@ -71,25 +71,27 @@ class QTreeQuotaModel(BaseQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
-        config: Optional[QuotaConfig] = None,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
         self.netapp_client.check_job_result(result, [])
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
-    ) -> QuotaUsage:
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            return None
         return await self.netapp_client.get_quota_report(self.svm_id, self.volume_id, qspath.name)
 
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -103,9 +105,15 @@ class QTreeQuotaModel(BaseQuotaModel):
         result = await self.netapp_client.enable_quota(self.volume_id)
         self.netapp_client.check_job_result(result, ["5308507"])  # pass if "already on"
 
+    # FIXME: How do we implement unset_quota() for NetApp?
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
+        raise InvalidQuotaScopeError(
+            "Unsetting folder limit without removing quota scope is not possible for this backend"
+        )
+
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
