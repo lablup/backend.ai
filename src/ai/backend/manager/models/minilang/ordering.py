@@ -1,15 +1,15 @@
-from typing import Any, Callable, Mapping, Optional
+from typing import Mapping, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
-__all__ = (
-    "QueryOrderParser",
-    "OrderSpecItem",
-)
+from . import JSONFieldItem, OrderSpecItem
 
-OrderSpecItem = tuple[str, Optional[Callable[[sa.Column], Any]]]
+__all__ = (
+    "ColumnMapType",
+    "QueryOrderParser",
+)
 
 _grammar = r"""
     ?start: expr
@@ -26,11 +26,11 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+ColumnMapType: TypeAlias = Mapping[str, OrderSpecItem] | None
+
 
 class QueryOrderTransformer(Transformer):
-    def __init__(
-        self, sa_table: sa.Table, column_map: Optional[Mapping[str, OrderSpecItem]] = None
-    ) -> None:
+    def __init__(self, sa_table: sa.Table, column_map: ColumnMapType = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
@@ -39,10 +39,14 @@ class QueryOrderTransformer(Transformer):
         try:
             if self._column_map:
                 col_value, func = self._column_map[col_name]
-                if func is not None:
-                    col = func(self._sa_table.c[col_value])
-                else:
-                    col = self._sa_table.c[col_value]
+                match col_value:
+                    case str(column):
+                        matched_col = self._sa_table.c[column]
+                    case JSONFieldItem(_col, _key):
+                        matched_col = self._sa_table.c[_col].op("->>")(_key)
+                    case _:
+                        raise ValueError("Invalid type of field name", col_name)
+                col = func(matched_col) if func is not None else matched_col
             else:
                 col = self._sa_table.c[col_name]
             return col
@@ -66,7 +70,7 @@ class QueryOrderTransformer(Transformer):
 
 
 class QueryOrderParser:
-    def __init__(self, column_map: Optional[Mapping[str, OrderSpecItem]] = None) -> None:
+    def __init__(self, column_map: ColumnMapType = None) -> None:
         self._column_map = column_map
         self._parser = _parser
 

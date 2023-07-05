@@ -194,6 +194,7 @@ session_fields = FieldSet(
         FieldSpec("created_at"),
         FieldSpec("terminated_at"),
         FieldSpec("starts_at"),
+        FieldSpec("scheduled_at"),
         FieldSpec("startup_command"),
         FieldSpec("result"),
         FieldSpec("resoucre_opts", formatter=nested_dict_formatter),
