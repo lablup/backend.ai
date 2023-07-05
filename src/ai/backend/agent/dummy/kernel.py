@@ -7,6 +7,7 @@ from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 
 
 class DummyKernel(AbstractKernel):
@@ -140,6 +141,9 @@ class DummyKernel(AbstractKernel):
         delay = self.dummy_kernel_cfg["delay"]["list-files"]
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}
+
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
 
 
 class DummyCodeRunner(AbstractCodeRunner):
