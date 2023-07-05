@@ -40,7 +40,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifec
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import LogSeverity, SessionId
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -495,61 +495,60 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
-    from uuid import UUID
+    from typing import TYPE_CHECKING
 
     import sqlalchemy as sa
     from dateutil.tz import tzutc
+    from sqlalchemy.orm import load_only, noload
 
-    from .models import kernels
-    from .models.kernel import KernelStatus
-    from .models.utils import ExtendedAsyncSAEngine
+    from .models.session import SessionStatus
 
-    async def _fetch_kernels_staying_in_status_over_threshold_time(
+    if TYPE_CHECKING:
+        from .models.utils import ExtendedAsyncSAEngine
+
+    async def _fetch_hanging_sessions(
         db: ExtendedAsyncSAEngine,
-        status: KernelStatus | None = None,
-        threshold: timedelta | None = None,
-    ) -> tuple[UUID, ...]:
-        async with db.begin_readonly() as conn:
-            query = sa.select(kernels)
-            if status:
-                query = query.where(kernels.c.status == status)
-                if threshold is not None:
-                    query = query.where(
-                        (
-                            datetime.now(tz=tzutc())
-                            - kernels.c.status_history[status.name].astext.cast(
-                                sa.types.DateTime(timezone=True)
-                            )
-                        )
-                        > threshold
+        status: SessionStatus,
+        threshold: timedelta,
+    ) -> tuple[SessionRow, ...]:
+        query = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == status)
+            .where(
+                (
+                    datetime.now(tz=tzutc())
+                    - SessionRow.status_history[status.name].astext.cast(
+                        sa.types.DateTime(timezone=True)
                     )
-                query = query.order_by(kernels.c.status_history[status.name].asc())
+                )
+                > threshold
+            )
+            .options(
+                noload("*"),
+                load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
+            )
+        )
+        async with db.begin_readonly() as conn:
             result = await conn.execute(query)
-            return tuple(kernel.session_id for kernel in result.fetchall())
+            return result.fetchall()
 
     async def _force_terminate_hanging_sessions(
-        status: KernelStatus,
+        status: SessionStatus,
         threshold: timedelta,
         reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANGTIME_EXCEEDED,
     ) -> None:
         while True:
-            session_ids = await _fetch_kernels_staying_in_status_over_threshold_time(
+            sessions = await _fetch_hanging_sessions(
                 root_ctx.db, status=status, threshold=threshold
             )
-            log.debug(f"{len(session_ids)} {status} kernels found.")
+            log.debug(f"{len(sessions)} {status} sessions found.")
 
             _ = await asyncio.gather(
                 *[
                     asyncio.create_task(
-                        root_ctx.registry.destroy_session(
-                            await SessionRow.get_session_to_destroy(
-                                root_ctx.db, SessionId(session_id)
-                            ),
-                            forced=True,
-                            reason=reason,
-                        )
+                        root_ctx.registry.destroy_session(session, forced=True, reason=reason),
                     )
-                    for session_id in session_ids
+                    for session in sessions
                 ]
             )
 
@@ -565,7 +564,7 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
     for status, threshold_fmt in hang_tolerance_threshold_dict.items():
         assert isinstance(threshold_fmt, str)
         try:
-            kernel_status = KernelStatus[status]
+            session_status = SessionStatus[status]
         except KeyError:
             continue
 
@@ -585,7 +584,7 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
 
         session_force_termination_tasks.append(
             asyncio.create_task(
-                _force_terminate_hanging_sessions(status=kernel_status, threshold=threshold)
+                _force_terminate_hanging_sessions(status=session_status, threshold=threshold)
             )
         )
 
