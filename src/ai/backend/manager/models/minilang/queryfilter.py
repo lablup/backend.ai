@@ -7,8 +7,8 @@ from lark.lexer import Token
 from . import FieldSpecItem, JSONFieldItem
 
 __all__ = (
-    "FilterableSQLQuery",
     "FieldSpecType",
+    "FilterableSQLQuery",
     "QueryFilterParser",
 )
 
