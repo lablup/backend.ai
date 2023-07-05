@@ -72,13 +72,13 @@ class QTreeQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)
         self.netapp_client.check_job_result(result, [])
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def describe_quota_scope(
         self,
