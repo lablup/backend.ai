@@ -583,9 +583,9 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def log_oom(self):
         log.warning("Out-of-memory detected!")
-        if len(self._pid_set_history) < 1:
-            return
-        prev_pid_set = self._pid_set_history[-1]
+        prev_pid_set = {}
+        for history in self._pid_set_history:  # merge the history
+            prev_pid_set.update(history)
         for _ in range(30):
             current_pid_set = scan_proc_stats()
             terminated_pid_list = sorted(set(prev_pid_set.keys()) - set(current_pid_set.keys()))
