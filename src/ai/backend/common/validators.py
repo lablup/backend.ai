@@ -46,6 +46,7 @@ from trafaret.lib import _empty
 
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
+from .types import QuotaScopeID as _QuotaScopeID
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -65,6 +66,7 @@ __all__ = (
     "UserID",
     "GroupID",
     "UUID",
+    "QuotaScopeID",
     "VFolderID",
     "TimeZone",
     "TimeDuration",
@@ -470,10 +472,10 @@ class UUID(t.Trafaret):
 
 
 class QuotaScopeID(t.Trafaret):
-    regex = r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"
+    regex = r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*:[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"
 
-    def check_and_return(self, value: Any) -> str:
-        return t.Regexp(self.regex).check(value)
+    def check_and_return(self, value: Any) -> _QuotaScopeID:
+        return _QuotaScopeID.parse(t.Regexp(self.regex).check(value))
 
 
 class VFolderID(t.Trafaret):
@@ -482,7 +484,10 @@ class VFolderID(t.Trafaret):
         match value:
             case str():
                 pieces = value.partition("/")
-                converted = tuple_t.check((pieces[0], pieces[2]))
+                if len(pieces[2]) == 0:  # for old vFolder ID without quota scope ID
+                    converted = (None, UUID().check(pieces[0]))
+                else:
+                    converted = tuple_t.check((pieces[0], pieces[2]))
             case tuple():
                 converted = tuple_t.check(value)
             case _:

@@ -70,8 +70,9 @@ from .base import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, enum_field_getter
+from .minilang import JSONFieldItem
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -699,6 +700,8 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
+        if self.status_history is None:
+            return None
         try:
             return datetime.fromisoformat(self.status_history[self.status.name])
         except KeyError:
@@ -1237,6 +1240,7 @@ class ComputeSession(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
@@ -1270,6 +1274,8 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
+        status_history = row.status_history or {}
+        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         return {
             # identity
             "id": row.id,
@@ -1302,10 +1308,13 @@ class ComputeSession(graphene.ObjectType):
             "status_changed": row.status_changed,
             "status_info": row.status_info,
             "status_data": row.status_data,
-            "status_history": row.status_history or {},
+            "status_history": status_history,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
+            "scheduled_at": (
+                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
+            ),
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
@@ -1413,7 +1422,7 @@ class ComputeSession(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
@@ -1431,30 +1440,38 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            dtparse,
+        ),
         "startup_command": ("sessions_startup_command", None),
     }
 
-    _queryorder_colmap = {
-        "id": "sessions_id",
-        "type": "sessions_session_type",
-        "name": "sessions_name",
+    _queryorder_colmap: ColumnMapType = {
+        "id": ("sessions_id", None),
+        "type": ("sessions_session_type", None),
+        "name": ("sessions_name", None),
         # "image": "image",
         # "architecture": "architecture",
-        "domain_name": "sessions_domain_name",
-        "group_name": "groups_name",
-        "user_email": "users_email",
-        "full_name": "users_full_name",
-        "access_key": "sessions_access_key",
-        "scaling_group": "sessions_scaling_group_name",
-        "cluster_mode": "sessions_cluster_mode",
+        "domain_name": ("sessions_domain_name", None),
+        "group_name": ("groups_name", None),
+        "user_email": ("users_email", None),
+        "full_name": ("users_full_name", None),
+        "access_key": ("sessions_access_key", None),
+        "scaling_group": ("sessions_scaling_group_name", None),
+        "cluster_mode": ("sessions_cluster_mode", None),
         # "cluster_template": "cluster_template",
-        "cluster_size": "sessions_cluster_size",
-        "status": "sessions_status",
-        "status_info": "sessions_status_info",
-        "result": "sessions_result",
-        "created_at": "sessions_created_at",
-        "terminated_at": "sessions_terminated_at",
-        "starts_at": "sessions_starts_at",
+        "cluster_size": ("sessions_cluster_size", None),
+        "status": ("sessions_status", None),
+        "status_info": ("sessions_status_info", None),
+        "result": ("sessions_result", None),
+        "created_at": ("sessions_created_at", None),
+        "terminated_at": ("sessions_terminated_at", None),
+        "starts_at": ("sessions_starts_at", None),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            None,
+        ),
     }
 
     @classmethod

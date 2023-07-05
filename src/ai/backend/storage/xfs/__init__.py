@@ -15,10 +15,11 @@ import aiofiles.os
 
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import QuotaScopeID
 from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..abc import AbstractQuotaModel
-from ..exception import NotEmptyError
+from ..exception import InvalidQuotaScopeError, NotEmptyError
 from ..subproc import run
 from ..types import (
     QuotaConfig,
@@ -65,7 +66,7 @@ class XfsProjectRegistry:
 
     async def add_project_entry(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         qspath: Path,
         *,
         project_id: Optional[int] = None,
@@ -93,7 +94,7 @@ class XfsProjectRegistry:
                 _projid_content = Path(self.file_projid).read_text()
                 if _projid_content.strip() != "" and not _projid_content.endswith("\n"):
                     _projid_content += "\n"
-                _projid_content += f"{quota_scope_id}:{project_id}\n"
+                _projid_content += f"{quota_scope_id.pathname}:{project_id}\n"
                 _tmp_projid.write(_projid_content.encode("ascii"))
                 temp_name_projid = _tmp_projid.name
             finally:
@@ -118,9 +119,9 @@ class XfsProjectRegistry:
         finally:
             await loop.run_in_executor(None, _delete_temp_files)
 
-    async def remove_project_entry(self, quota_scope_id: str) -> None:
-        await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id}/d", self.file_projects])
-        await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id}/d", self.file_projid])
+    async def remove_project_entry(self, quota_scope_id: QuotaScopeID) -> None:
+        await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id.pathname}/d", self.file_projects])
+        await run(["sudo", "sed", "-i.bak", f"/{quota_scope_id.pathname}/d", self.file_projid])
 
     def get_free_project_id(self) -> int:
         """
@@ -155,17 +156,21 @@ class XFSProjectQuotaModel(BaseQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
-        config: Optional[QuotaConfig] = None,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         try:
-            if config is None:
+            if options is None:
                 # Set the limit as the filesystem size
                 vfs_stat = os.statvfs(self.mount_path)
-                config = QuotaConfig(vfs_stat.f_blocks * self.block_size)
+                options = QuotaConfig(vfs_stat.f_blocks * self.block_size)
             async with FileLock(LOCK_FILE):
-                log.info("creating project quota (qs:{}, q:{})", quota_scope_id, config.limit_bytes)
+                log.info(
+                    "creating project quota (qs:{}, q:{})",
+                    quota_scope_id,
+                    (options.limit_bytes if options else None),
+                )
                 await aiofiles.os.makedirs(qspath)
                 await self.project_registry.read_project_info()
                 await self.project_registry.add_project_entry(quota_scope_id, qspath)
@@ -176,13 +181,15 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         except Exception:
             log.exception("quota-scope creation error")
             raise
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
-    ) -> QuotaUsage:
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
         full_report = await run(
             # -p: project quota only
             # -b: as number of blocks
@@ -191,11 +198,11 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         )
         print(full_report)
         for line in full_report.splitlines():
-            if quota_scope_id in line:
+            if quota_scope_id.pathname in line:
                 report = line
                 break
         else:
-            raise RuntimeError(f"unknown xfs project ID: {quota_scope_id}")
+            raise RuntimeError(f"unknown xfs project ID: {quota_scope_id.pathname}")
         if len(report.split()) != 6:
             raise ValueError("unexpected format for xfs_quota report")
         _, used_kbs, _, hard_limit_kbs, _, _ = report.split()
@@ -206,7 +213,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
 
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
         # This will annotate all entries under the quota scope tree as a part of the project.
@@ -216,7 +223,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 "xfs_quota",
                 "-x",
                 "-c",
-                f"project -s {quota_scope_id}",
+                f"project -s {quota_scope_id.pathname}",
                 self.mount_path,
             ],
         )
@@ -227,14 +234,22 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 "xfs_quota",
                 "-x",
                 "-c",
-                f"limit -p bsoft={config.limit_bytes} bhard={config.limit_bytes} {quota_scope_id}",
+                (
+                    "limit -p"
+                    f" bsoft={config.limit_bytes} bhard={config.limit_bytes} {quota_scope_id.pathname}"
+                ),
                 self.mount_path,
             ],
         )
 
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
+        raise InvalidQuotaScopeError(
+            "Unsetting folder limit without removing quota scope is not possible for this backend"
+        )
+
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
