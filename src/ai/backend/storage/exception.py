@@ -1,7 +1,8 @@
 import json
-from typing import Any
+from typing import Any, Optional
 
 from aiohttp import web
+from aiohttp.web_exceptions import HTTPNotFound
 
 
 class StorageProxyError(Exception):
@@ -24,6 +25,10 @@ class VFolderNotFoundError(StorageProxyError):
     pass
 
 
+class QuotaScopeNotFoundError(StorageProxyError, HTTPNotFound):
+    pass
+
+
 class InvalidSubpathError(StorageProxyError):
     pass
 
@@ -41,7 +46,7 @@ class InvalidAPIParameters(web.HTTPBadRequest):
         self,
         type_suffix: str = "invalid-api-params",
         title: str = "Invalid API parameters",
-        msg: str = None,
+        msg: Optional[str] = None,
         data: Any = None,
     ) -> None:
         payload = {

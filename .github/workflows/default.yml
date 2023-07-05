@@ -15,9 +15,16 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 100
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -50,7 +57,9 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -67,9 +76,16 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest-8-cores
     steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 100
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -96,7 +112,9 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -113,9 +131,16 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest-8-cores
     steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 100
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -152,7 +177,9 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi

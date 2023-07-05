@@ -784,7 +784,6 @@ class SchedulerDispatcher(aobject):
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        # status_changed=now,
                         status_history=sql_json_merge(
                             SessionRow.status_history,
                             (),
