@@ -955,7 +955,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def _monitor_processes(self):
         while True:
             self._pid_set_history.append(scan_proc_stats())
-            if len(self._pid_set_history) > 5:
+            if len(self._pid_set_history) > 2:
                 self._pid_set_history.pop(0)
             try:
                 await asyncio.sleep(2)
