@@ -595,7 +595,7 @@ class BaseRunner(metaclass=ABCMeta):
             else:
                 break
         else:
-            log.warning("failed to get the infromation of oom-killed processes")
+            log.warning("failed to get the information of oom-killed processes")
             return
         pgsize = resource.getpagesize()
         for pid, pstat in map(lambda p: (p, prev_pid_set[p]), terminated_pid_list):
