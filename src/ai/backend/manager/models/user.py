@@ -351,7 +351,11 @@ class User(graphene.ObjectType):
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser(
-                    {k: ("users_" + v[0], v[1]) for k, v in cls._queryfilter_fieldspec.items()}
+                    {
+                        k: ("users_" + v[0], v[1])
+                        for k, v in cls._queryfilter_fieldspec.items()
+                        if isinstance(v[0], str)
+                    }
                 )
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -397,7 +401,11 @@ class User(graphene.ObjectType):
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser(
-                    {k: ("users_" + v[0], v[1]) for k, v in cls._queryfilter_fieldspec.items()}
+                    {
+                        k: ("users_" + v[0], v[1])
+                        for k, v in cls._queryfilter_fieldspec.items()
+                        if isinstance(v[0], str)
+                    }
                 )
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)

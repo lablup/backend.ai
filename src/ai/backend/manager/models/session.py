@@ -1275,6 +1275,7 @@ class ComputeSession(graphene.ObjectType):
         group_name = getattr(row, "group_name")
         row = row.SessionRow
         status_history = row.status_history or {}
+        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         return {
             # identity
             "id": row.id,
@@ -1311,7 +1312,9 @@ class ComputeSession(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": status_history.get(SessionStatus.SCHEDULED.name),
+            "scheduled_at": (
+                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
+            ),
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
