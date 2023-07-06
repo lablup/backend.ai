@@ -539,6 +539,8 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         threshold: Union[timedelta, relativedelta],
         reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANG_TIMEOUT,
     ) -> None:
+        heuristic_weight = 0.4  # NOTE: Shorter than a half(0.5)
+        heuristic_interval = threshold.seconds * heuristic_weight
         while True:
             sessions = await _fetch_hanging_sessions(
                 root_ctx.db, status=status, threshold=threshold
@@ -554,7 +556,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 ]
             )
 
-            await asyncio.sleep(threshold.seconds)
+            await asyncio.sleep(heuristic_interval)
 
     hang_tolerance_threshold_dict = session_hang_tolerance_threshold_iv.check(
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance-threshold")
