@@ -205,6 +205,7 @@ from ai.backend.common.types import (
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
+from .models.session import SessionStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -341,6 +342,13 @@ container_registry_iv = t.Dict(
     }
 ).allow_extra("*")
 
+session_hang_tolerance_threshold_iv = t.Dict(
+    {
+        t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
+        t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
+    }
+).ignore_extra("*")
+
 shared_config_iv = t.Dict(
     {
         t.Key("system", default=_config_defaults["system"]): t.Dict(
@@ -421,15 +429,7 @@ shared_config_iv = t.Dict(
         ),
         t.Key("session", default=_config_defaults["session"]): t.Dict(
             {
-                t.Key(
-                    "hang-tolerance-threshold",
-                    default=_config_defaults["session"]["hang-tolerance-threshold"],
-                ): t.Dict(
-                    {
-                        t.Key("PREPARING", optional=True): t.String,
-                        t.Key("TERMINATING", optional=True): t.String,
-                    },
-                ),
+                t.Key("hang-tolerance-threshold"): session_hang_tolerance_threshold_iv,
             },
         ).allow_extra("*"),
     }
