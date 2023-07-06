@@ -114,7 +114,8 @@
     "connectingToCluster": "Подключение к Backend.AI кластеру ...",
     "DownloadWebUIApp": "__NOT_TRANSLATED__",
     "IPUEnabled": "__NOT_TRANSLATED__",
-    "ATOMEnabled": "__NOT_TRANSLATED__"
+    "ATOMEnabled": "__NOT_TRANSLATED__",
+    "WarboyEnabled": "__NOT_TRANSLATED__"
   },
   "session": {
     "launcher": {
@@ -366,7 +367,12 @@
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
     "ExpiresAfter": "__NOT_TRANSLATED__",
     "ConnectionExample": "__NOT_TRANSLATED__",
-    "System": "__NOT_TRANSLATED__"
+    "System": "__NOT_TRANSLATED__",
+    "SFTPExtraNotification": "__NOT_TRANSLATED__",
+    "ConnectionNotice": "__NOT_TRANSLATED__",
+    "ReadMore": "__NOT_TRANSLATED__",
+    "Readless": "__NOT_TRANSLATED__",
+    "Readmore": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Отмена",
@@ -1062,7 +1068,7 @@
     "DescAllowAgentSideRegistration": "Разрешить агенту зарегистрироваться в качестве менеджера. <br/> Используйте, только если кластер Backend.AI управляется в безопасном месте.",
     "Plugins": "Плагины",
     "CUDAGPUsupport": "Поддержка CUDA GPU",
-    "DescCUDAGPUsupport": "Поддержка графического процессора NVidia CUDA. <br/> Требуется подключаемый модуль Backend.AI CUDA.",
+    "DescCUDAGPUsupport": "Поддержка графического процессора NVIDIA CUDA. <br/> Требуется подключаемый модуль Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Отключено, поскольку в системе используется плагин Fractional GPU.",
     "ROCMGPUsupport": "Поддержка графического процессора ROCm",
     "DescROCMGPUsupport": "Поддержка графического процессора AMD ROCm. <br/> Требуется подключаемый модуль Backend.AI ROCm.",
@@ -1112,7 +1118,10 @@
     "ATOMsupport": "__NOT_TRANSLATED__",
     "DescATOMsupport": "__NOT_TRANSLATED__",
     "RequireIPUPlugin": "__NOT_TRANSLATED__",
-    "RequireATOMPlugin": "__NOT_TRANSLATED__"
+    "RequireATOMPlugin": "__NOT_TRANSLATED__",
+    "Warboysupport": "__NOT_TRANSLATED__",
+    "DescWarboysupport": "__NOT_TRANSLATED__",
+    "RequireWarboyPlugin": "__NOT_TRANSLATED__"
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
