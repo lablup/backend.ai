@@ -523,13 +523,13 @@ class TimeDuration(t.Trafaret):
 
     Example:
     >>> t = datetime(2020, 2, 29)
-    >>> t + check_and_return(years=1)
+    >>> t + check_and_return("1yr")
     datetime.datetime(2021, 2, 28, 0, 0)
-    >>> t + check_and_return(years=2)
+    >>> t + check_and_return("2yr")
     datetime.datetime(2022, 2, 28, 0, 0)
-    >>> t + check_and_return(years=3)
+    >>> t + check_and_return("3yr")
     datetime.datetime(2023, 2, 28, 0, 0)
-    >>> t + check_and_return(years=4)
+    >>> t + check_and_return("4yr")
     datetime.datetime(2024, 2, 29, 0, 0)  # preserves the same day of month
     """
 
