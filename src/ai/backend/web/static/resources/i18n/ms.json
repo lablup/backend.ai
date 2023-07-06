@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Benarkan ejen mendaftarkan dirinya kepada pengurus. <br/> Gunakan hanya jika kluster Backend.AI diuruskan di lokasi yang selamat.",
     "Plugins": "Pemalam",
     "CUDAGPUsupport": "Sokongan GPU CUDA",
-    "DescCUDAGPUsupport": "Sokongan GPU NVidia CUDA. <br/> Memerlukan Backend.AI CUDA Plugin.",
+    "DescCUDAGPUsupport": "Sokongan GPU NVIDIA CUDA. <br/> Memerlukan Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Dinyahdayakan kerana sistem menggunakan pemalam GPU pecahan",
     "ROCMGPUsupport": "Sokongan GPU ROCm",
     "DescROCMGPUsupport": "Sokongan GPU AMD ROCm. <br/> Memerlukan Backend.AI ROCm Plugin.",

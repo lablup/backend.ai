@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Salli agentin rekisteröidä itsensä johtajaan. <br/> Käytä vain, jos Backend.AI-klusteria hallitaan suojatussa paikassa.",
     "Plugins": "Laajennukset",
     "CUDAGPUsupport": "CUDA-näytönohjaimen tuki",
-    "DescCUDAGPUsupport": "NVidia CUDA -näytönohjaimen tuki. <br/> Vaatii Backend.AI CUDA -laajennuksen.",
+    "DescCUDAGPUsupport": "NVIDIA CUDA -näytönohjaimen tuki. <br/> Vaatii Backend.AI CUDA -laajennuksen.",
     "CUDAGPUdisabledByFGPUsupport": "Pois käytöstä, koska järjestelmä käyttää murto-osan GPU-laajennusta",
     "ROCMGPUsupport": "ROCm-näytönohjaimen tuki",
     "DescROCMGPUsupport": "AMD ROCm -näytönohjaimen tuki. <br/> Vaatii Backend.AI ROCm -laajennuksen.",
