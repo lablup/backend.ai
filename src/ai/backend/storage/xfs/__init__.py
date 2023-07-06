@@ -157,16 +157,20 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         try:
-            if config is None:
+            if options is None:
                 # Set the limit as the filesystem size
                 vfs_stat = os.statvfs(self.mount_path)
-                config = QuotaConfig(vfs_stat.f_blocks * self.block_size)
+                options = QuotaConfig(vfs_stat.f_blocks * self.block_size)
             async with FileLock(LOCK_FILE):
-                log.info("creating project quota (qs:{}, q:{})", quota_scope_id, config.limit_bytes)
+                log.info(
+                    "creating project quota (qs:{}, q:{})",
+                    quota_scope_id,
+                    (options.limit_bytes if options else None),
+                )
                 await aiofiles.os.makedirs(qspath)
                 await self.project_registry.read_project_info()
                 await self.project_registry.add_project_entry(quota_scope_id, qspath)
@@ -177,8 +181,8 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         except Exception:
             log.exception("quota-scope creation error")
             raise
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def describe_quota_scope(
         self,

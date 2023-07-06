@@ -80,7 +80,7 @@ class BaseQuotaModel(AbstractQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -137,7 +137,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()

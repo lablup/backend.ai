@@ -40,7 +40,7 @@ class GPFSQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
@@ -49,8 +49,8 @@ class GPFSQuotaModel(BaseQuotaModel):
             path=qspath,
             owner=self.gpfs_owner,
         )
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
         await self.api_client.set_quota(self.fs, quota_scope_id.pathname, config.limit_bytes)
@@ -188,7 +188,10 @@ class GPFSVolume(BaseVolume):
                 continue
             total += pool.totalDataInKB
             free += pool.freeDataInKB
-        return CapacityUsage(BinarySize(total - free) * 1024, BinarySize(total) * 1024)
+        return CapacityUsage(
+            used_bytes=BinarySize(total - free) * 1024,
+            capacity_bytes=BinarySize(total) * 1024,
+        )
 
     async def get_performance_metric(self) -> FSPerfMetric:
         # ref: https://www.ibm.com/docs/en/spectrum-scale/5.0.3?topic=2-perfmondata-get
