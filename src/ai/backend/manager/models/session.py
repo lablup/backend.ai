@@ -582,11 +582,8 @@ class SessionRow(Base):
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
     access_key_row = relationship("KeyPairRow", back_populates="sessions")
 
-    # # if image_id is null, should find a image field from related kernel row.
-    # image_id = ForeignKeyIDColumn("image_id", "images.id")
-    # # `image` column is identical to kernels `image` column.
-    # image = sa.Column("image", sa.String(length=512))
-    # image_row = relationship("ImageRow", back_populates="sessions")
+    # `image` column is identical to kernels `image` column.
+    images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
@@ -1288,8 +1285,7 @@ class ComputeSession(graphene.ObjectType):
             "type": row.session_type.name,
             "main_kernel_role": row.main_kernel.role.name,
             # image
-            # "image": row.image_id,
-            "image": row.main_kernel.image,
+            "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
             "registry": row.main_kernel.registry,
             "cluster_template": None,  # TODO: implement
@@ -1429,6 +1425,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
+        "image": ("sessions_images", None),
         "agent_ids": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
@@ -1455,8 +1452,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", None),
         "name": ("sessions_name", None),
-        # "image": "image",
-        # "architecture": "architecture",
+        "image": ("sessions_images", None),
         "agent_ids": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
