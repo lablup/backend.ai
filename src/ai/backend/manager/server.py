@@ -576,8 +576,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     for task in session_force_termination_tasks:
         if not task.done():
-            if not task.cancelled():
-                task.cancel()
+            task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
 
