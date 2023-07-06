@@ -501,6 +501,8 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     from dateutil.tz import tzutc
     from sqlalchemy.orm import load_only, noload
 
+    from ai.backend.common.validators import TimeDuration
+
     from .models.session import SessionStatus
 
     if TYPE_CHECKING:
@@ -541,7 +543,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             sessions = await _fetch_hanging_sessions(
                 root_ctx.db, status=status, threshold=threshold
             )
-            log.debug(f"{len(sessions)} {status} sessions found.")
+            log.debug(f"{len(sessions)} {status.name} sessions found.")
 
             _ = await asyncio.gather(
                 *[
@@ -560,28 +562,15 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     hang_tolerance_threshold_dict = raw_session_config.get("hang-tolerance-threshold", {})
     assert isinstance(hang_tolerance_threshold_dict, Mapping)
 
+    time_duration = TimeDuration(allow_negative=False)
+
     session_force_termination_tasks = []
-    for status, threshold_fmt in hang_tolerance_threshold_dict.items():
-        assert isinstance(threshold_fmt, str)
+    for status, duration in hang_tolerance_threshold_dict.items():
         try:
             session_status = SessionStatus[status]
         except KeyError:
             continue
-
-        match threshold_fmt[-1]:
-            case "h":
-                threshold = timedelta(hours=int(threshold_fmt[:-1]))
-            case "m":
-                threshold = timedelta(minutes=int(threshold_fmt[:-1]))
-            case "s":
-                threshold = timedelta(seconds=int(threshold_fmt[:-1]))
-            case _:
-                log.error(
-                    f'Skip "{status}:{threshold_fmt}" as it is an invalid argument. Supported'
-                    ' postfixes: "h", "m", "s"'
-                )
-                continue
-
+        threshold = time_duration.check_and_return(duration)
         session_force_termination_tasks.append(
             asyncio.create_task(
                 _force_terminate_hanging_sessions(status=session_status, threshold=threshold)
