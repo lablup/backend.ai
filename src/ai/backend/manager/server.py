@@ -495,7 +495,7 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
-    from typing import TYPE_CHECKING, Union
+    from typing import TYPE_CHECKING
 
     import sqlalchemy as sa
     from dateutil.relativedelta import relativedelta
@@ -536,7 +536,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     async def _force_terminate_hanging_sessions(
         status: SessionStatus,
-        threshold: Union[timedelta, relativedelta],
+        threshold: timedelta,
         reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANG_TIMEOUT,
     ) -> None:
         heuristic_weight = 0.4  # NOTE: Shorter than a half(0.5)
@@ -568,6 +568,16 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             session_status = SessionStatus[status]
         except KeyError:
             continue
+
+        if isinstance(threshold, relativedelta):  # months, years
+            if months := threshold.months:
+                threshold = timedelta(seconds=months * 30 * 24 * 60 * 60)
+            elif years := threshold.years:
+                threshold = timedelta(seconds=years * 365 * 24 * 60 * 60)
+            else:
+                log.warning("Skipping {}:{}...", status, threshold)
+                continue
+
         session_force_termination_tasks.append(
             asyncio.create_task(
                 _force_terminate_hanging_sessions(status=session_status, threshold=threshold)
