@@ -734,8 +734,6 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
-  cp configs/manager/sample.session.hang-tolerance-threshold.json ./dev.session.hang-tolerance-threshold.json
-  ./backend.ai mgr etcd put-json config/session/hang-tolerance-threshold "./dev.session.hang-tolerance-threshold.json"
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml

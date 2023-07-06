@@ -110,7 +110,6 @@ ENV/
 /alembic.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
-/dev.session.hang-tolerance-threshold.json
 /env-*.sh
 /agent.dummy.toml
 
