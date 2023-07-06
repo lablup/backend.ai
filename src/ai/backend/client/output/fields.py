@@ -182,6 +182,7 @@ session_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("group_name", "Project/Group"),
         FieldSpec("group_id"),
+        FieldSpec("agent_ids"),
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
