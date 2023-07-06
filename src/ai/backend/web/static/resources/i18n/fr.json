@@ -114,7 +114,8 @@
     "connectingToCluster": "Connexion au cluster Backend.AI...",
     "DownloadWebUIApp": "__NOT_TRANSLATED__",
     "IPUEnabled": "__NOT_TRANSLATED__",
-    "ATOMEnabled": "__NOT_TRANSLATED__"
+    "ATOMEnabled": "__NOT_TRANSLATED__",
+    "WarboyEnabled": "__NOT_TRANSLATED__"
   },
   "session": {
     "launcher": {
@@ -366,7 +367,12 @@
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
     "ExpiresAfter": "__NOT_TRANSLATED__",
     "ConnectionExample": "__NOT_TRANSLATED__",
-    "System": "__NOT_TRANSLATED__"
+    "System": "__NOT_TRANSLATED__",
+    "SFTPExtraNotification": "__NOT_TRANSLATED__",
+    "ConnectionNotice": "__NOT_TRANSLATED__",
+    "ReadMore": "__NOT_TRANSLATED__",
+    "Readless": "__NOT_TRANSLATED__",
+    "Readmore": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Annuler",
@@ -1062,7 +1068,7 @@
     "DescAllowAgentSideRegistration": "Autoriser l'agent à s'inscrire auprès du gestionnaire. <br/> À utiliser uniquement si le cluster Backend.AI est géré sur un emplacement sécurisé.",
     "Plugins": "Plugins",
     "CUDAGPUsupport": "Prise en charge du processeur graphique CUDA",
-    "DescCUDAGPUsupport": "Prise en charge du GPU NVidia CUDA. <br/> Nécessite le plugin Backend.AI CUDA.",
+    "DescCUDAGPUsupport": "Prise en charge du GPU NVIDIA CUDA. <br/> Nécessite le plugin Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Désactivé car le système utilise le plug-in Fractional GPU",
     "ROCMGPUsupport": "Prise en charge du GPU ROCm",
     "DescROCMGPUsupport": "Prise en charge du GPU AMD ROCm. <br/> Nécessite le plugin Backend.AI ROCm.",
@@ -1112,7 +1118,10 @@
     "ATOMsupport": "__NOT_TRANSLATED__",
     "DescATOMsupport": "__NOT_TRANSLATED__",
     "RequireIPUPlugin": "__NOT_TRANSLATED__",
-    "RequireATOMPlugin": "__NOT_TRANSLATED__"
+    "RequireATOMPlugin": "__NOT_TRANSLATED__",
+    "Warboysupport": "__NOT_TRANSLATED__",
+    "DescWarboysupport": "__NOT_TRANSLATED__",
+    "RequireWarboyPlugin": "__NOT_TRANSLATED__"
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
