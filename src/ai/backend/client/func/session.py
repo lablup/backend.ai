@@ -126,8 +126,7 @@ class ComputeSession(BaseFunction):
                 "filter": (filter, "String"),
                 "order": (order, "String"),
             },
-            # fields,
-            [session_fields["session_id"], session_fields["agent_ids"]],
+            fields,
             page_offset=page_offset,
             page_size=page_size,
         )
