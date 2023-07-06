@@ -70,7 +70,7 @@ from .base import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang import JSONFieldItem
+from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRow
@@ -1250,6 +1250,7 @@ class ComputeSession(graphene.ObjectType):
 
     # resources
     agent_ids = graphene.List(lambda: graphene.String)
+    agents = graphene.List(lambda: graphene.String)
     resource_opts = graphene.JSONString()
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
@@ -1321,6 +1322,7 @@ class ComputeSession(graphene.ObjectType):
             "result": row.result.name,
             # resources
             "agent_ids": row.agent_ids,
+            "agents": row.agent_ids,  # for backward compatibility
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
@@ -1430,6 +1432,8 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
         "agent_ids": ("sessions_agent_ids", None),
+        "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
+        "agents": (ArrayFieldItem("sessions_agent_ids"), None),  # for backward compatibility
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
@@ -1458,6 +1462,8 @@ class ComputeSession(graphene.ObjectType):
         # "image": "image",
         # "architecture": "architecture",
         "agent_ids": ("sessions_agent_ids", None),
+        "agent_id": ("sessions_agent_ids", None),
+        "agents": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("group_name", None),
         "user_email": ("users_email", None),
