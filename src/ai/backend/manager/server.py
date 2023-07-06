@@ -542,24 +542,35 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     async def _force_terminate_hanging_sessions(
         status: SessionStatus,
         threshold: timedelta,
-        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANG_TIMEOUT,
     ) -> None:
         heuristic_weight = 0.4  # NOTE: Shorter than a half(0.5)
         heuristic_interval = threshold.total_seconds() * heuristic_weight
         while True:
-            sessions = await _fetch_hanging_sessions(
-                root_ctx.db, status=status, threshold=threshold
-            )
+            try:
+                sessions = await _fetch_hanging_sessions(
+                    root_ctx.db, status=status, threshold=threshold
+                )
+            except Exception as e:
+                log.error(e)
+                await asyncio.sleep(10)
+                continue
+
             log.debug(f"{len(sessions)} {status.name} sessions found.")
 
-            _ = await asyncio.gather(
+            results_and_exceptions = await asyncio.gather(
                 *[
                     asyncio.create_task(
-                        root_ctx.registry.destroy_session(session, forced=True, reason=reason),
+                        root_ctx.registry.destroy_session(
+                            session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
+                        ),
                     )
                     for session in sessions
-                ]
+                ],
+                return_exceptions=True,
             )
+            for result_or_exception in results_and_exceptions:
+                if isinstance(result_or_exception, (BaseException, Exception)):
+                    log.error(result_or_exception)
 
             await asyncio.sleep(heuristic_interval)
 
