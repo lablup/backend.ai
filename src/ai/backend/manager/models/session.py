@@ -74,7 +74,7 @@ from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -556,6 +556,7 @@ class SessionRow(Base):
         server_default=ClusterMode.SINGLE_NODE.name,
     )
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
+    agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
     kernels = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -1248,6 +1249,7 @@ class ComputeSession(graphene.ObjectType):
     idle_checks = graphene.JSONString()
 
     # resources
+    agent_ids = graphene.List(lambda: graphene.String)
     resource_opts = graphene.JSONString()
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
@@ -1318,6 +1320,7 @@ class ComputeSession(graphene.ObjectType):
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
+            "agent_ids": row.agent_ids,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
@@ -1426,8 +1429,9 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
+        "agent_ids": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
-        "group_name": ("groups_name", None),
+        "group_name": ("group_name", None),
         "user_email": ("users_email", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
@@ -1453,8 +1457,9 @@ class ComputeSession(graphene.ObjectType):
         "name": ("sessions_name", None),
         # "image": "image",
         # "architecture": "architecture",
+        "agent_ids": ("sessions_agent_ids", None),
         "domain_name": ("sessions_domain_name", None),
-        "group_name": ("groups_name", None),
+        "group_name": ("group_name", None),
         "user_email": ("users_email", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
@@ -1489,10 +1494,13 @@ class ComputeSession(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
+        j = (
+            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
+            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+            .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count(sa.distinct(SessionRow.id))]).select_from(j)
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
         if group_id is not None:
@@ -1528,18 +1536,22 @@ class ComputeSession(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
+        j = (
+            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+                UserRow, SessionRow.user_uuid == UserRow.uuid
+            )
         )
         query = (
             sa.select(
                 SessionRow,
-                GroupRow.name.label("group_name"),
+                agg_to_array(GroupRow.name).label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
             )
             .select_from(j)
-            .options(selectinload(SessionRow.kernels))
+            .options(selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)))
+            .group_by(SessionRow, UserRow.email, UserRow.full_name)
             .limit(limit)
             .offset(offset)
         )

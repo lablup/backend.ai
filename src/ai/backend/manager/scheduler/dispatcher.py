@@ -719,6 +719,7 @@ class SchedulerDispatcher(aobject):
             raise
 
         async def _finalize_scheduled() -> None:
+            agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 now = datetime.now(tzutc())
                 kernel_query = (
@@ -742,11 +743,14 @@ class SchedulerDispatcher(aobject):
                     .where(KernelRow.session_id == sess_ctx.id)
                 )
                 await db_sess.execute(kernel_query)
+                if agent_alloc_ctx.agent_id is not None:
+                    agent_ids.append(agent_alloc_ctx.agent_id)
 
                 session_query = (
                     sa.update(SessionRow)
                     .values(
                         scaling_group_name=sgroup_name,
+                        agent_ids=agent_ids,
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
@@ -921,6 +925,7 @@ class SchedulerDispatcher(aobject):
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
+            agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 for binding in kernel_agent_bindings:
                     now = datetime.now(tzutc())
@@ -945,11 +950,14 @@ class SchedulerDispatcher(aobject):
                         .where(KernelRow.session_id == sess_ctx.id)
                     )
                     await db_sess.execute(kernel_query)
+                    if binding.agent_alloc_ctx.agent_id is not None:
+                        agent_ids.append(binding.agent_alloc_ctx.agent_id)
 
                 session_query = (
                     sa.update(SessionRow)
                     .values(
                         scaling_group_name=sgroup_name,
+                        agent_ids=agent_ids,
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
