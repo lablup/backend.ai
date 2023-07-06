@@ -6,9 +6,17 @@ import json
 import logging
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
-from pathlib import Path
-from typing import Awaitable, Callable, Iterator, List, cast
-from uuid import UUID
+from pathlib import Path, PurePosixPath
+from typing import (
+    Any,
+    AsyncContextManager,
+    Awaitable,
+    Callable,
+    Iterator,
+    List,
+    TypedDict,
+    cast,
+)
 
 import attr
 import jwt
@@ -17,12 +25,18 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
 from ..abc import AbstractVolume
 from ..context import Context
-from ..exception import InvalidSubpathError, StorageProxyError, VFolderNotFoundError
-from ..types import VFolderCreationOptions
+from ..exception import (
+    InvalidSubpathError,
+    QuotaScopeNotFoundError,
+    StorageProxyError,
+    VFolderNotFoundError,
+)
+from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -64,7 +78,7 @@ async def get_status(request: web.Request) -> web.Response:
 @ctxmgr
 def handle_fs_errors(
     volume: AbstractVolume,
-    vfid: UUID,
+    vfid: VFolderID,
 ) -> Iterator[None]:
     try:
         yield
@@ -113,12 +127,18 @@ async def get_volumes(request: web.Request) -> web.Response:
 
 
 async def get_hwinfo(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-            },
+    class Params(TypedDict):
+        volume: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "get_hwinfo", params)
@@ -128,33 +148,176 @@ async def get_hwinfo(request: web.Request) -> web.Response:
             return web.json_response(data)
 
 
+async def create_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+        options: QuotaConfig | None
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                    t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "create_quota_scope", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            return web.Response(status=204)
+
+
+async def get_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "get_quota_scope", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            return web.json_response(
+                {
+                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                    "limit_bytes": (
+                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
+                    ),
+                }
+            )
+
+
+async def update_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+        options: QuotaConfig
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                    t.Key("options"): QuotaConfig.as_trafaret(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "update_quota_scope", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            return web.Response(status=204)
+
+
+async def unset_quota(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "unset_quota", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            await volume.quota_model.unset_quota(params["qsid"])
+            return web.Response(status=204)
+
+
 async def create_vfolder(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        options: dict[str, Any] | None  # deprecated
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "create_vfolder", params)
+        assert params["vfid"].quota_scope_id is not None
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            obj_opts = VFolderCreationOptions.as_object(params["options"])
-            await volume.create_vfolder(params["vfid"], obj_opts)
+            try:
+                await volume.create_vfolder(params["vfid"])
+            except QuotaScopeNotFoundError:
+                assert params["vfid"].quota_scope_id
+                if initial_max_size_for_quota_scope := (params["options"] or {}).get(
+                    "initial_max_size_for_quota_scope"
+                ):
+                    options = QuotaConfig(initial_max_size_for_quota_scope)
+                else:
+                    options = None
+                await volume.quota_model.create_quota_scope(
+                    params["vfid"].quota_scope_id, options=options
+                )
+                await volume.create_vfolder(params["vfid"])
             return web.Response(status=204)
 
 
 async def delete_vfolder(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "delete_vfolder", params)
@@ -165,18 +328,30 @@ async def delete_vfolder(request: web.Request) -> web.Response:
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("src_volume"): t.String(),
-                t.Key("src_vfid"): tx.UUID(),
-                t.Key("dst_volume"): t.String() | t.Null,
-                t.Key("dst_vfid"): tx.UUID(),
-                t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
-            },
+    class Params(TypedDict):
+        src_volume: str
+        src_vfid: VFolderID
+        dst_volume: str | None  # deprecated
+        dst_vfid: VFolderID
+        options: dict[str, Any] | None  # deprecated
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("src_volume"): t.String(),
+                    t.Key("src_vfid"): tx.VFolderID(),
+                    t.Key("dst_volume"): t.String() | t.Null,
+                    t.Key("dst_vfid"): tx.VFolderID(),
+                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
+                },
+            ),
         ),
     ) as params:
+        if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
+            raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
         await log_manager_api_entry(log, "clone_vfolder", params)
         ctx: Context = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
@@ -190,14 +365,22 @@ async def clone_vfolder(request: web.Request) -> web.Response:
 
 
 async def get_vfolder_mount(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("subpath", default="."): t.String(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        subpath: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("subpath", default="."): t.String(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "get_container_mount", params)
@@ -237,12 +420,18 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
 
 
 async def get_performance_metric(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-            },
+    class Params(TypedDict):
+        volume: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "get_performance_metric", params)
@@ -261,22 +450,31 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
     Direct file streaming API for internal use, such as retrieving
     task logs from a user vfolder ".logs".
     """
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpath"): tx.PurePath(relative_only=True),
-            },
+
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpath: PurePosixPath
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "fetch_file", params)
         ctx: Context = request.app["ctx"]
         response = web.StreamResponse(status=200)
         response.headers[hdrs.CONTENT_TYPE] = "application/octet-stream"
+        prepared = False
         try:
-            prepared = False
             async with ctx.get_volume(params["volume"]) as volume:
                 with handle_fs_errors(volume, params["vfid"]):
                     async for chunk in volume.read_file(
@@ -298,13 +496,20 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
 
 
 async def get_metadata(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "get_metadata", params)
@@ -316,14 +521,22 @@ async def get_metadata(request: web.Request) -> web.Response:
 
 
 async def set_metadata(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("payload"): t.Bytes(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        payload: bytes
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("payload"): t.Bytes(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "set_metadata", params)
@@ -335,12 +548,18 @@ async def set_metadata(request: web.Request) -> web.Response:
 
 
 async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-            },
+    class Params(TypedDict):
+        volume: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "get_vfolder_fs_usage", params)
@@ -356,13 +575,20 @@ async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
 
 
 async def get_vfolder_usage(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                },
+            ),
         ),
     ) as params:
         try:
@@ -393,13 +619,20 @@ async def status(request: web.Request) -> web.Response:
 
 
 async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                },
+            ),
         ),
     ) as params:
         try:
@@ -420,51 +653,76 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
 
 
 async def get_quota(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | tx.UUID,
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid", default=None): t.Null | tx.VFolderID,
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "get_quota", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            quota = await volume.get_quota(params["vfid"])
-            return web.json_response(quota)
+        return web.Response(
+            status=400,
+            reason="get_quota (for individual vfolder) is a deprecated API",
+        )
 
 
 async def set_quota(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | tx.UUID,
-                t.Key("size_bytes"): tx.BinarySize,
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        size_bytes: BinarySize
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid", default=None): t.Null | tx.VFolderID,
+                    t.Key("size_bytes"): tx.BinarySize,
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "update_quota", params)
-        ctx: Context = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            await volume.set_quota(params["vfid"], params["size_bytes"])
-            return web.Response(status=204)
+        return web.Response(
+            status=400,
+            reason="set_quota (for individual vfolder) is a deprecated API",
+        )
 
 
 async def mkdir(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpath"): tx.PurePath(relative_only=True),
-                t.Key("parents", default=True): t.ToBool,
-                t.Key("exist_ok", default=False): t.ToBool,
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpath: PurePosixPath
+        parents: bool
+        exist_ok: bool
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("parents", default=True): t.ToBool,
+                    t.Key("exist_ok", default=False): t.ToBool,
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "mkdir", params)
@@ -481,14 +739,22 @@ async def mkdir(request: web.Request) -> web.Response:
 
 
 async def list_files(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpath"): tx.PurePath(relative_only=True),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpath: PurePosixPath
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "list_files", params)
@@ -510,6 +776,7 @@ async def list_files(request: web.Request) -> web.Response:
                     async for item in volume.scandir(
                         params["vfid"],
                         params["relpath"],
+                        recursive=False,
                     )
                 ]
         return web.json_response(
@@ -520,16 +787,26 @@ async def list_files(request: web.Request) -> web.Response:
 
 
 async def rename_file(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpath"): tx.PurePath(relative_only=True),
-                t.Key("new_name"): t.String(),
-                t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpath: PurePosixPath
+        new_name: str
+        is_dir: bool
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("new_name"): t.String(),
+                    t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "rename_file", params)
@@ -545,15 +822,24 @@ async def rename_file(request: web.Request) -> web.Response:
 
 
 async def move_file(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("src_relpath"): tx.PurePath(relative_only=True),
-                t.Key("dst_relpath"): tx.PurePath(relative_only=True),
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        src_relpath: PurePosixPath
+        dst_relpath: PurePosixPath
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("src_relpath"): tx.PurePath(relative_only=True),
+                    t.Key("dst_relpath"): tx.PurePath(relative_only=True),
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "move_file", params)
@@ -569,16 +855,26 @@ async def move_file(request: web.Request) -> web.Response:
 
 
 async def create_download_session(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpath"): tx.PurePath(relative_only=True),
-                t.Key("archive", default=False): t.ToBool,
-                t.Key("unmanaged_path", default=None): t.Null | t.String,
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpath: PurePosixPath
+        archive: bool
+        unmanaged_path: str | None
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("archive", default=False): t.ToBool,
+                    t.Key("unmanaged_path", default=None): t.Null | t.String,
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "create_download_session", params)
@@ -603,15 +899,24 @@ async def create_download_session(request: web.Request) -> web.Response:
 
 
 async def create_upload_session(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpath"): tx.PurePath(relative_only=True),
-                t.Key("size"): t.ToInt,
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpath: PurePosixPath
+        size: int
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("size"): t.ToInt,
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "create_upload_session", params)
@@ -640,15 +945,24 @@ async def create_upload_session(request: web.Request) -> web.Response:
 
 
 async def delete_files(request: web.Request) -> web.Response:
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("volume"): t.String(),
-                t.Key("vfid"): tx.UUID(),
-                t.Key("relpaths"): t.List(tx.PurePath(relative_only=True)),
-                t.Key("recursive", default=False): t.ToBool,
-            },
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpaths: list[PurePosixPath]
+        recursive: bool
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpaths"): t.List(tx.PurePath(relative_only=True)),
+                    t.Key("recursive", default=False): t.ToBool,
+                },
+            ),
         ),
     ) as params:
         await log_manager_api_entry(log, "delete_files", params)
@@ -677,6 +991,10 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/", get_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
+    app.router.add_route("POST", "/quota-scope", create_quota_scope)
+    app.router.add_route("GET", "/quota-scope", get_quota_scope)
+    app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
+    app.router.add_route("DELETE", "/quota-scope/quota", unset_quota)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
     app.router.add_route("POST", "/folder/clone", clone_vfolder)

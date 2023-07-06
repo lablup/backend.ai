@@ -1,17 +1,16 @@
-from typing import Any, Mapping, Union
+from typing import Any, Mapping, Type, TypeAlias, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
+from lark.lexer import Token
 
-from . import FieldSpecItem
+from . import FieldSpecItem, JSONFieldItem
 
 __all__ = (
+    "FieldSpecType",
     "FilterableSQLQuery",
     "QueryFilterParser",
 )
-
-
-FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 
 _grammar = r"""
     ?start: expr
@@ -47,39 +46,49 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
+FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
+
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
+    def __init__(self, sa_table: sa.Table, fieldspec: FieldSpecType = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
 
-    def string(self, s):
-        (s,) = s
+    def string(self, token: list[Token]) -> str:
+        s = token[0]
         # SQL-side escaping is handled by SQLAlchemy
         return s[1:-1].replace('\\"', '"')
 
-    def number(self, n):
-        (n,) = n
+    def number(self, token: list[Token]) -> int | float:
+        n = token[0]
         if "." in n:
             return float(n)
         return int(n)
 
     array = list
 
-    def atom(self, a):
-        (a,) = a
+    def atom(self, token: list[Token]) -> Type[sa.sql.elements.SingletonConstant]:
+        a = token[0]
         if a.value == "null":
             return sa.null()
         elif a.value == "true":
             return sa.true()
         elif a.value == "false":
             return sa.false()
+        raise ValueError("Unknown/unsupported atomic token", a.value)
 
     def _get_col(self, col_name: str) -> sa.Column:
         try:
             if self._fieldspec:
-                col = self._sa_table.c[self._fieldspec[col_name][0]]
+                match self._fieldspec[col_name][0]:
+                    case str(column):
+                        col = self._sa_table.c[column]
+                    case JSONFieldItem(_col, _key):
+                        col = self._sa_table.c[_col].op("->>")(_key)
+                    case _:
+                        raise ValueError("Invalid type of field name", col_name)
             else:
                 col = self._sa_table.c[col_name]
             return col
@@ -105,8 +114,8 @@ class QueryFilterTransformer(Transformer):
             val = self._transform_val_leaf(col_name, value)
         return val
 
-    def binary_expr(self, *args):
-        children = args[0]
+    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
+        children: list[Token] = args[0]
         col = self._get_col(children[0].value)
         op = children[1].value
         val = self._transform_val(children[0].value, children[2])
@@ -161,7 +170,7 @@ class QueryFilterTransformer(Transformer):
 
 
 class QueryFilterParser:
-    def __init__(self, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
+    def __init__(self, fieldspec: FieldSpecType = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
 

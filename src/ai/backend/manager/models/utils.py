@@ -352,3 +352,12 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
         new_metadata,
         *[_populate_column(c) for c in table.columns],
     )
+
+
+def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
+    # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
+    return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
+
+
+def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
+    return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
