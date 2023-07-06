@@ -27,6 +27,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -339,6 +340,10 @@ class DockerKernel(AbstractKernel):
         out = raw_out.decode("utf-8")
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
+
+    async def notify_event(self, evdata: AgentEventData):
+        assert self.runner is not None
+        await self.runner.feed_event(evdata)
 
 
 class DockerCodeRunner(AbstractCodeRunner):
