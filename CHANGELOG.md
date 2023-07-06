@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.03.8 (2023-07-06)
+
+### Breaking Changes
+* Bump the manager API version to v7.20230615, as it includes a breaking change for quota management APIs ([#1375](https://github.com/lablup/backend.ai/issues/1375))
+
+### Features
+* Enable to filter and order by agent id when listing sessions. ([#1337](https://github.com/lablup/backend.ai/issues/1337))
+* Add the OOM event and the details of potentially affected processes explicitly to the container logs for easier inspection for both users and admins ([#1373](https://github.com/lablup/backend.ai/issues/1373))
+
+### Fixes
+* Fix `get_fs_usage()` API reporting capacity as usage and usage as capacity on GPFS and Weka backend ([#1376](https://github.com/lablup/backend.ai/issues/1376))
+
+
 ## 23.03.7 (2023-07-04)
 
 ### Features
