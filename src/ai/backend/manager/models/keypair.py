@@ -331,7 +331,7 @@ class KeyPair(graphene.ObjectType):
                 users.c.uuid == association_groups_users.c.user_id,
                 isouter=True,
             )
-            .join(groups, association_groups_users.c.group_id == groups.c.id, isouter=True)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = sa.select([sa.func.count(sa.distinct(keypairs.c.user_id))]).select_from(j)
         if domain_name is not None:
@@ -370,7 +370,7 @@ class KeyPair(graphene.ObjectType):
                 users.c.uuid == association_groups_users.c.user_id,
                 isouter=True,
             )
-            .join(groups, association_groups_users.c.group_id == groups.c.id, isouter=True)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
             sa.select(
