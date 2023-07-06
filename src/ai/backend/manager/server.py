@@ -540,7 +540,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANG_TIMEOUT,
     ) -> None:
         heuristic_weight = 0.4  # NOTE: Shorter than a half(0.5)
-        heuristic_interval = threshold.seconds * heuristic_weight
+        heuristic_interval = threshold.total_seconds() * heuristic_weight
         while True:
             sessions = await _fetch_hanging_sessions(
                 root_ctx.db, status=status, threshold=threshold
