@@ -788,6 +788,7 @@ async def update_vfolder_status(
     engine: ExtendedAsyncSAEngine,
     vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
+    do_log: bool = True,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
     cond = vfolders.c.id.in_(vfolder_ids)
@@ -815,11 +816,12 @@ async def update_vfolder_status(
             await db_session.execute(query)
 
     await execute_with_retry(_update)
-    log.debug(
-        "Successfully update status of vFolders {} to {}",
-        [str(x) for x in vfolder_ids],
-        update_status.name,
-    )
+    if do_log:
+        log.debug(
+            "Successfully update status of vFolders {} to {}",
+            [str(x) for x in vfolder_ids],
+            update_status.name,
+        )
 
 
 async def ensure_host_permission_allowed(
@@ -985,14 +987,9 @@ async def initiate_vfolder_removal(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    async def _update_vfolder_status() -> None:
-        async with db_engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders).values(status=VFolderOperationStatus.DELETE_ONGOING).where(cond)
-            )
-            await db_session.execute(query)
-
-    await execute_with_retry(_update_vfolder_status)
+    await update_vfolder_status(
+        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
+    )
 
     async def _delete():
         for folder_id, host_name in requested_vfolders:
@@ -1016,10 +1013,10 @@ async def initiate_vfolder_removal(
                 await db_session.execute(sa.delete(vfolders).where(cond))
 
         await execute_with_retry(_delete_row)
-        log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+        log.debug("Successfully purged vFolders {}", [str(x) for x in vfolder_ids])
 
     storage_ptask_group.create_task(_delete())
-    log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
+    log.debug("Started purging vFolders {}", [str(x) for x in vfolder_ids])
 
     return vfolder_info_len
 

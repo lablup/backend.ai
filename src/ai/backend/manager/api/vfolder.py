@@ -653,78 +653,6 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     return web.json_response(resp, status=200)
 
 
-@superadmin_required
-@server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            t.Key("id"): t.String,
-        }
-    ),
-)
-async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
-    root_ctx: RootContext = request.app["_root.context"]
-
-    access_key = request["keypair"]["access_key"]
-    user_uuid = request["user"]["uuid"]
-    user_role = request["user"]["role"]
-    domain_name = request["user"]["domain_name"]
-    resource_policy = request["keypair"]["resource_policy"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    folder_id = params["id"]
-    log.info(
-        "VFOLDER.DELETE_BY_ID (email:{}, ak:{}, vf:{})",
-        request["user"]["email"],
-        access_key,
-        folder_id,
-    )
-    async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.id == folder_id),
-        )
-        # FIXME: For now, multiple entries on purge vfolder will raise an error. Will be fixed in 22.06
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.DELETE_BY_ID(folder id:{}, hosts:{}",
-                folder_id,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
-        # query_accesible_vfolders returns list
-        entry = entries[0]
-        # Folder owner OR user who have DELETE permission can delete folder.
-        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot purge the vfolder that is not owned by myself.")
-    folder_host = entry["host"]
-    await ensure_host_permission_allowed(
-        conn,
-        folder_host,
-        allowed_vfolder_types=allowed_vfolder_types,
-        user_uuid=user_uuid,
-        resource_policy=resource_policy,
-        domain_name=domain_name,
-        permission=VFolderHostPermission.DELETE,
-    )
-
-    await update_vfolder_status(
-        root_ctx.db,
-        [entry["id"]],
-        VFolderOperationStatus.DELETE_COMPLETE,
-    )
-    return web.Response(status=204)
-
-
 class ExposedVolumeInfoField(StrEnum):
     percentage = "percentage"
     used_bytes = "used_bytes"
@@ -2259,6 +2187,101 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         return web.json_response({"unshared_emails": params["emails"]}, status=200)
 
 
+async def _delete(
+    root_ctx: RootContext,
+    condition: sa.sql.BinaryExpression,
+    user_uuid: uuid.UUID,
+    user_role: UserRole,
+    domain_name: str,
+    allowed_vfolder_types: Sequence[str],
+    resource_policy: Mapping[str, Any],
+) -> None:
+    async with root_ctx.db.begin() as conn:
+        entries = await query_accessible_vfolders(
+            conn,
+            user_uuid,
+            user_role=user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=condition,
+        )
+        if len(entries) > 1:
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same name.",
+                extra_data=[entry["host"] for entry in entries],
+            )
+        elif len(entries) == 0:
+            raise InvalidAPIParameters("No such vfolder.")
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+        # Folder owner OR user who have DELETE permission can delete folder.
+        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+        folder_host = entry["host"]
+    await ensure_host_permission_allowed(
+        conn,
+        folder_host,
+        allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid=user_uuid,
+        resource_policy=resource_policy,
+        domain_name=domain_name,
+        permission=VFolderHostPermission.DELETE,
+    )
+
+    await update_vfolder_status(
+        root_ctx.db,
+        [entry["id"]],
+        VFolderOperationStatus.DELETE_COMPLETE,
+    )
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("id"): t.String,
+        }
+    ),
+)
+async def delete_by_id(request: web.Request, params: Any) -> web.Response:
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
+    root_ctx: RootContext = request.app["_root.context"]
+
+    access_key = request["keypair"]["access_key"]
+    user_uuid = request["user"]["uuid"]
+    user_role = request["user"]["role"]
+    domain_name = request["user"]["domain_name"]
+    resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    folder_id = params["id"]
+    log.info(
+        "VFOLDER.DELETE_BY_ID (email:{}, ak:{}, vf:{})",
+        request["user"]["email"],
+        access_key,
+        folder_id,
+    )
+    try:
+        await _delete(
+            root_ctx,
+            (vfolders.c.id == folder_id),
+            user_uuid,
+            user_role,
+            domain_name,
+            allowed_vfolder_types,
+            resource_policy,
+        )
+    except TooManyVFoldersFound as e:
+        log.error(
+            "VFOLDER.DELETE_BY_ID(email: {}, folder id:{}, hosts:{}",
+            request["user"]["email"],
+            folder_id,
+            e.extra_data,
+        )
+        raise
+    return web.Response(status=204)
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete_by_name(request: web.Request) -> web.Response:
@@ -2279,61 +2302,24 @@ async def delete_by_name(request: web.Request) -> web.Response:
         access_key,
         folder_name,
     )
-    async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
+    try:
+        await _delete(
+            root_ctx,
+            (vfolders.c.name == folder_name),
             user_uuid,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
+            user_role,
+            domain_name,
+            allowed_vfolder_types,
+            resource_policy,
         )
-        # for entry in entries:
-        #     if entry['name'] == folder_name:
-        #         # Folder owner OR user who have DELETE permission can delete folder.
-        #         if (
-        #             not entry['is_owner']
-        #             and entry['permission'] != VFolderPermission.RW_DELETE
-        #         ):
-        #             raise InvalidAPIParameters(
-        #                 'Cannot delete the vfolder '
-        #                 'that is not owned by myself.')
-        #         break
-        # FIXME: For now, multiple entries on delete vfolder will raise an error. Will be fixed in 22.06
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.DELETE(email:{}, folder name:{}, hosts:{}",
-                request["user"]["email"],
-                folder_name,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise VFolderNotFound(extra_data=folder_name)
-        # query_accesible_vfolders returns list
-        entry = entries[0]
-        folder_host = entry["host"]
-        await ensure_host_permission_allowed(
-            conn,
-            folder_host,
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_uuid,
-            resource_policy=resource_policy,
-            domain_name=domain_name,
-            permission=VFolderHostPermission.DELETE,
+    except TooManyVFoldersFound as e:
+        log.error(
+            "VFOLDER.DELETE(email:{}, folder name:{}, hosts:{}",
+            request["user"]["email"],
+            folder_name,
+            e.extra_data,
         )
-        # Folder owner OR user who have DELETE permission can delete folder.
-        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
-
-    await update_vfolder_status(
-        root_ctx.db,
-        [entry["id"]],
-        VFolderOperationStatus.DELETE_COMPLETE,
-    )
+        raise
     return web.Response(status=204)
 
 
@@ -2400,6 +2386,9 @@ async def purge(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def recover(request: web.Request) -> web.Response:
+    """
+    Recover vfolder from trash bin, by changing status.
+    """
     await ensure_vfolder_status(
         request, VFolderAccessStatus.RECOVERABLE, folder_id_or_name=request.match_info["name"]
     )
@@ -2411,7 +2400,12 @@ async def recover(request: web.Request) -> web.Response:
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-    log.info("VFOLDER.RECOVER (ak:{}, vf:{})", access_key, folder_name)
+    log.info(
+        "VFOLDER.RECOVER (email: {}, ak:{}, vf:{})",
+        request["user"]["email"],
+        access_key,
+        folder_name,
+    )
     async with root_ctx.db.begin() as conn:
         recover_targets = await query_accessible_vfolders(
             conn,
@@ -2424,7 +2418,8 @@ async def recover(request: web.Request) -> web.Response:
         # FIXME: For now, multiple entries on recover vfolder will raise an error.
         if len(recover_targets) > 1:
             log.error(
-                "VFOLDER.RECOVER(folder name:{}, hosts:{}",
+                "VFOLDER.RECOVER(email:{}, folder name:{}, hosts:{}",
+                request["user"]["email"],
                 folder_name,
                 [entry["host"] for entry in recover_targets],
             )
