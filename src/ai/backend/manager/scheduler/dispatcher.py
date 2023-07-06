@@ -949,7 +949,7 @@ class SchedulerDispatcher(aobject):
                                 },
                             ),
                         )
-                        .where(KernelRow.session_id == binding.kernel.id)
+                        .where(KernelRow.id == binding.kernel.id)
                     )
                     await db_sess.execute(kernel_query)
                     if binding.agent_alloc_ctx.agent_id is not None:
