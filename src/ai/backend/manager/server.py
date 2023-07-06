@@ -492,7 +492,7 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
     from typing import TYPE_CHECKING
@@ -749,7 +749,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            hanging_sessions_scanner_ctx,
+            hanging_session_scanner_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
