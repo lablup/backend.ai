@@ -535,7 +535,7 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
     async def _force_terminate_hanging_sessions(
         status: SessionStatus,
         threshold: timedelta,
-        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANGTIME_EXCEEDED,
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANG_TIMEOUT,
     ) -> None:
         while True:
             sessions = await _fetch_hanging_sessions(
