@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.declarative import declarative_base
 
-from ai.backend.manager.models.minilang import JSONFieldItem
+from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.testutils.bootstrap import postgres_container  # noqa
 
@@ -218,14 +218,6 @@ async def test_select_queries(virtual_user_db) -> None:
     test_ret = [("test'er", 50)]  # Note: null values are not matched
     assert test_ret == actual_ret
 
-    # sa_query = parser.append_filter(
-    #     sa.select([users.c.name, users.c.age]).select_from(users),
-    #     'tag ilike "Bb"',
-    # )
-    # actual_ret = list(conn.execute(sa_query))
-    # test_ret = [("tester", 30), ("tester ♪", 20)]
-    # assert test_ret == actual_ret
-
     # invalid syntax
     with pytest.raises(ValueError):
         parser.append_filter(
@@ -300,6 +292,7 @@ async def test_fieldspec(virtual_user_db) -> None:
             "n2": ("full_name", lambda s: s.lower()),
             "t1": ("type", lambda s: UserTypes[s]),
             "hobby": (JSONFieldItem("data", "hobby"), None),
+            "tag": (ArrayFieldItem("tags"), None),
         }
     )
 
@@ -341,6 +334,22 @@ async def test_fieldspec(virtual_user_db) -> None:
     )
     actual_ret = list(await conn.execute(sa_query))
     test_ret = [("tester", 30)]
+    assert test_ret == actual_ret
+
+    sa_query = parser.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        'tag == "bbb"',
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [("tester", 30), ("tester ♪", 20)]
+    assert test_ret == actual_ret
+
+    sa_query = parser.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        'tag like "%b%"',
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [("tester", 30), ("tester ♪", 20)]
     assert test_ret == actual_ret
 
     # non-existent column in fieldspec
