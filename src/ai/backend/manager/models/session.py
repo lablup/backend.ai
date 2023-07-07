@@ -1431,7 +1431,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
-        "agent_ids": ("sessions_agent_ids", None),
+        "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
         "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
         "agents": (ArrayFieldItem("sessions_agent_ids"), None),  # for backward compatibility
         "domain_name": ("sessions_domain_name", None),
