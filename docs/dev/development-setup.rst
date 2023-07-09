@@ -238,7 +238,7 @@ Open yet another terminal for client and run:
 
 .. code-block:: console
 
-   $ export BACKEND_ENDPOINT=http://127.0.0.1:8081/  # change the port number if customized
+   $ export BACKEND_ENDPOINT=http://127.0.0.1:8091/  # change the port number if customized
    $ export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
    $ export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
    $ ./backend.ai config
