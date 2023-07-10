@@ -972,8 +972,8 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models import GroupRow, UserRow
-    from ai.backend.manager.models import association_groups_users as agus
+    from ai.backend.manager.models import ProjectRow, UserRow
+    from ai.backend.manager.models import association_projects_users as apus
 
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
@@ -991,7 +991,7 @@ async def ensure_quota_scope_accessible_by_user(
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
+    query = sa.select(ProjectRow).where(ProjectRow.id == quota_scope.scope_id)
     quota_scope_group = await conn.scalar(query)
     if quota_scope_group:
         match user["role"]:
@@ -1002,10 +1002,10 @@ async def ensure_quota_scope_accessible_by_user(
                     return
             case _:
                 query = (
-                    sa.select([agus.c.group_id])
-                    .select_from(agus)
+                    sa.select([apus.c.group_id])
+                    .select_from(apus)
                     .where(
-                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
+                        (apus.c.group_id == quota_scope.scope_id) & (apus.c.user_id == user["uuid"])
                     )
                 )
                 matched_group_id = await conn.scalar(query)
@@ -1370,7 +1370,7 @@ class QuotaScope(graphene.ObjectType):
         return f"QuotaScope:{self.storage_host_name}/{self.quota_scope_id}"
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
-        from ai.backend.manager.models import GroupRow, UserRow
+        from ai.backend.manager.models import ProjectRow, UserRow
 
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
@@ -1404,9 +1404,9 @@ class QuotaScope(graphene.ObjectType):
                     )
                 else:
                     query = (
-                        sa.select(GroupRow)
-                        .where(GroupRow.id == qsid.scope_id)
-                        .options(selectinload(GroupRow.resource_policy_row))
+                        sa.select(ProjectRow)
+                        .where(ProjectRow.id == qsid.scope_id)
+                        .options(selectinload(ProjectRow.resource_policy_row))
                     )
                 result = await sess.scalar(query)
                 resource_policy_constraint = result.resource_policy_row.max_vfolder_size

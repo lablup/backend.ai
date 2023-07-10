@@ -53,8 +53,8 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
-    GroupRow,
     KernelStatus,
+    ProjectRow,
     UserRole,
     UserRow,
     UserStatus,
@@ -76,7 +76,6 @@ from ..models import (
     kernels,
     keypair_resource_policies,
     keypairs,
-    ProjectRow,
     query_accessible_vfolders,
     query_owned_dotfiles,
     users,
@@ -382,7 +381,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 query = (
                     sa.select(ProjectRow)
                     .select_from(ProjectRow)
-                    .where((ProjectRow.domain_name == domain_name) & (ProjectRow.name == project_id_or_name))
+                    .where(
+                        (ProjectRow.domain_name == domain_name)
+                        & (ProjectRow.name == project_id_or_name)
+                    )
                     .options(selectinload(ProjectRow.resource_policy_row))
                 )
                 project_row = (await sess.scalars(query)).first()
@@ -394,7 +396,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 query = (
                     sa.select(ProjectRow)
                     .where(
-                        (ProjectRow.domain_name == domain_name) & (ProjectRow.id == project_id_or_name)
+                        (ProjectRow.domain_name == domain_name)
+                        & (ProjectRow.id == project_id_or_name)
                     )
                     .options(selectinload(ProjectRow.resource_policy_row))
                 )

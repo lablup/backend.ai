@@ -49,8 +49,8 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
     KernelRow,
-    ProjectRow,
     ProjectResourcePolicyRow,
+    ProjectRow,
     ScalingGroupRow,
     SessionRow,
     UserResourcePolicyRow,
