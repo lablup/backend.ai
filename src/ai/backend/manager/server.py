@@ -96,6 +96,10 @@ VALID_VERSIONS: Final = frozenset(
         "v6.20220615",
         # added config/resource-slots/details, model mgmt & serving APIs
         "v6.20230315",
+        # added quota scopes (per-user/per-project quota configs)
+        # added user & project resource policies
+        # deprecated per-vfolder quota configs (BREAKING)
+        "v7.20230615",
     ]
 )
 LATEST_REV_DATES: Final = {
@@ -105,8 +109,9 @@ LATEST_REV_DATES: Final = {
     4: "20190615",
     5: "20191215",
     6: "20230315",
+    7: "20230615",
 }
-LATEST_API_VERSION: Final = "v6.20230315"
+LATEST_API_VERSION: Final = "v7.20230615"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

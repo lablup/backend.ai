@@ -1,7 +1,10 @@
 {
   "token": {
     "fontFamily": "'Ubuntu', Roboto, sans-serif",
-    "colorPrimary": "#37B076"
+    "colorPrimary": "#37B076",
+    "colorBorder": "#DEE1E7",
+    "colorBorderSecondary": "#E1E1E2"
+    
   },
   "components": {
     "Tag": {

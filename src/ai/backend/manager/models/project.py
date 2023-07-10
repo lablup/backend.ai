@@ -139,6 +139,12 @@ projects = sa.Table(
     sa.Column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     ),
+    sa.Column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("project_resource_policies.name"),
+        nullable=False,
+    ),
 )
 
 
@@ -150,6 +156,7 @@ class ProjectRow(Base):
         "ScalingGroupRow", secondary="sgroups_for_projects", back_populates="projects"
     )
     users = relationship("AssocProjectUserRow", back_populates="project")
+    resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
 
 
 def _build_project_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -230,6 +237,7 @@ class Project(graphene.ObjectType):
     total_resource_slots = graphene.JSONString()
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
+    resource_policy = graphene.String()
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -248,6 +256,7 @@ class Project(graphene.ObjectType):
             total_resource_slots=row["total_resource_slots"].to_json(),
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
+            resource_policy=row["resource_policy"],
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -380,6 +389,7 @@ class ProjectInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
+    resource_policy = graphene.String(required=False, default="default")
 
 
 class ModifyProjectInput(graphene.InputObjectType):
@@ -392,6 +402,7 @@ class ModifyProjectInput(graphene.InputObjectType):
     user_uuids = graphene.List(lambda: graphene.String, required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
+    resource_policy = graphene.String(required=False)
 
 
 class CreateProject(graphene.Mutation):
@@ -428,6 +439,7 @@ class CreateProject(graphene.Mutation):
             "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
             "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
             "integration_id": props.integration_id,
+            "resource_policy": props.resource_policy or "default",
         }
         insert_query = sa.insert(projects).values(data)
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Project)
@@ -470,6 +482,7 @@ class ModifyProject(graphene.Mutation):
         )
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "integration_id")
+        set_if_set(props, data, "resource_policy")
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")

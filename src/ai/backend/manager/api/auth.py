@@ -806,10 +806,14 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             "status_info": "user-signup",
             "role": UserRole.USER,
             "integration_id": None,
+            "resource_policy": "default",
         }
         if user_data_overriden:
             for key, val in user_data_overriden.items():
-                if key in data:  # take only valid fields
+                if (
+                    key in data  # take only valid fields
+                    and key != "resource_policy"  # resource_policy in user_data is for keypair
+                ):
                     data[key] = val
         query = users.insert().values(data)
         result = await conn.execute(query)

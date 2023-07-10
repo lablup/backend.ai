@@ -1456,7 +1456,7 @@ class AgentRegistry:
                         "Options": {},
                     }
                     if mtu:
-                        create_options["Options"] = {"com.docker.network.driver.mtu": mtu}
+                        create_options["Options"] = {"com.docker.network.driver.mtu": str(mtu)}
                     await self.docker.networks.create(create_options)
                 except Exception:
                     log.exception(f"Failed to create an overlay network {network_name}")

@@ -50,8 +50,10 @@ from ai.backend.manager.models import (
     DomainRow,
     KernelRow,
     ProjectRow,
+    ProjectResourcePolicyRow,
     ScalingGroupRow,
     SessionRow,
+    UserResourcePolicyRow,
     UserRow,
     agents,
     domains,
@@ -820,6 +822,8 @@ async def session_info(database_engine):
     session_id = str(uuid.uuid4()).replace("-", "")
     session_creation_id = str(uuid.uuid4()).replace("-", "")
 
+    resource_policy_name = str(uuid.uuid4()).replace("-", "")
+
     async with database_engine.begin_session() as db_sess:
         scaling_group = ScalingGroupRow(
             name=sgroup_name,
@@ -832,11 +836,20 @@ async def session_info(database_engine):
         domain = DomainRow(name=domain_name, total_resource_slots={})
         db_sess.add(domain)
 
+        user_resource_policy = UserResourcePolicyRow(name=resource_policy_name, max_vfolder_size=-1)
+        db_sess.add(user_resource_policy)
+
+        project_resource_policy = ProjectResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_size=-1
+        )
+        db_sess.add(project_resource_policy)
+
         project = ProjectRow(
             id=project_id,
             name=project_name,
             domain_name=domain_name,
             total_resource_slots={},
+            resource_policy=resource_policy_name,
         )
         db_sess.add(project)
 
@@ -846,6 +859,7 @@ async def session_info(database_engine):
             username=f"TestCaseRunner-{postfix}",
             password=user_password,
             domain_name=domain_name,
+            resource_policy=resource_policy_name,
         )
         db_sess.add(user)
 
@@ -883,5 +897,15 @@ async def session_info(database_engine):
         await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
         await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
         await db_sess.execute(sa.delete(ProjectRow).where(ProjectRow.id == project_id))
+        await db_sess.execute(
+            sa.delete(ProjectResourcePolicyRow).where(
+                ProjectResourcePolicyRow.name == resource_policy_name
+            )
+        )
+        await db_sess.execute(
+            sa.delete(UserResourcePolicyRow).where(
+                UserResourcePolicyRow.name == resource_policy_name
+            )
+        )
         await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
         await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))

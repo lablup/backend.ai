@@ -6,7 +6,21 @@
             "is_active": true,
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
-            "allowed_docker_registries": ["cr.backend.ai"]
+            "allowed_docker_registries": [
+                "cr.backend.ai"
+            ]
+        }
+    ],
+    "user_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
+        }
+    ],
+    "project_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_size": -1
         }
     ],
     "projects": [
@@ -16,6 +30,7 @@
             "description": "The default user project",
             "is_active": true,
             "domain_name": "default",
+            "resource_policy": "default",
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {}
         }
@@ -49,6 +64,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "superadmin"
         },
         {
@@ -62,6 +78,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "admin"
         },
         {
@@ -75,6 +92,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "user"
         },
         {
@@ -88,6 +106,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "user"
         },
         {
@@ -101,6 +120,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "resource_policy": "default",
             "role": "monitor"
         }
     ],

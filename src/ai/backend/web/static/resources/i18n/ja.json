@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "エージェントが自分自身をマネージャーに登録できるようにします。 <br/>Backend.AIクラスターが安全な場所で管理されている場合にのみ使用します。",
     "Plugins": "プラグイン",
     "CUDAGPUsupport": "CUDAGPUサポート",
-    "DescCUDAGPUsupport": "NVidia CUDAGPUのサポート。 <br/> Backend.AICUDAプラグインが必要です。",
+    "DescCUDAGPUsupport": "NVIDIA CUDAGPUのサポート。 <br/> Backend.AICUDAプラグインが必要です。",
     "CUDAGPUdisabledByFGPUsupport": "システムがフラクショナルGPUプラグインを使用しているため無効になっています",
     "ROCMGPUsupport": "ROCmGPUサポート",
     "DescROCMGPUsupport": "AMD ROCmGPUのサポート。 <br/> Backend.AIROCmプラグインが必要です。",

@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "允许代理将自己注册到经理。 <br/> 仅当 Backend.AI 集群在安全位置管理时使用。",
     "Plugins": "插件",
     "CUDAGPUsupport": "CUDA GPU 支持",
-    "DescCUDAGPUsupport": "NVidia CUDA GPU 支持。 <br/> 需要 Backend.AI CUDA 插件。",
+    "DescCUDAGPUsupport": "NVIDIA CUDA GPU 支持。 <br/> 需要 Backend.AI CUDA 插件。",
     "CUDAGPUdisabledByFGPUsupport": "已禁用，因为系统使用分数 GPU 插件",
     "ROCMGPUsupport": "ROCm GPU 支持",
     "DescROCMGPUsupport": "AMD ROCm GPU 支持。 <br/> 需要 Backend.AI ROCm 插件。",
