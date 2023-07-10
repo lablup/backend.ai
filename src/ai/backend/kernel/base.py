@@ -763,20 +763,20 @@ class BaseRunner(metaclass=ABCMeta):
         service_path = mounted_service_path
         service_def_folder = mounted_def_folder
 
+        def _copy() -> None:
+            assert copy_dir is not None
+            copy_dir.mkdir(parents=True, exist_ok=True)
+            service_def_folder.mkdir(parents=True, exist_ok=True)
+            if mounted_service_path.is_file():
+                shutil.copy(mounted_service_path, service_path)
+            else:
+                shutil.copytree(mounted_service_path, service_path)
+            for fpath in service_def_file_paths:
+                shutil.copy(fpath, service_def_folder / fpath.name)
+
         if copy_dir is not None:
             service_def_folder = copy_dir / "service-defs"
             service_path = copy_dir / mounted_service_path.name
-
-            def _copy() -> None:
-                assert copy_dir is not None
-                copy_dir.mkdir(parents=True, exist_ok=True)
-                service_def_folder.mkdir(parents=True, exist_ok=True)
-                if mounted_service_path.is_file():
-                    shutil.copy(mounted_service_path, service_path)
-                else:
-                    shutil.copytree(mounted_service_path, service_path)
-                for fpath in service_def_file_paths:
-                    shutil.copy(fpath, service_def_folder / fpath.name)
 
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, _copy)

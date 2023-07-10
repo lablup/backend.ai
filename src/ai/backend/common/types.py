@@ -911,7 +911,7 @@ class VFolderMount(JSONSerializableMixin):
     app_config: MountedAppConfig | None = attrs.field(default=None)
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        val: dict[str, Any] = {
             "name": self.name,
             "vfid": str(self.vfid),
             "vfsubpath": str(self.vfsubpath),
@@ -920,6 +920,9 @@ class VFolderMount(JSONSerializableMixin):
             "mount_perm": self.mount_perm.value,
             "usage_mode": self.usage_mode.value,
         }
+        if self.app_config is not None:
+            val["app_config"] = self.app_config.to_json()
+        return val
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VFolderMount:
@@ -940,8 +943,9 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
                     VFolderUsageMode
                 ),
+                t.Key("app_config", default=None): t.Null | MountedAppConfig.as_trafaret(),
             }
-        )
+        ).allow_extra("*")
 
 
 class VFolderHostPermissionMap(dict, JSONSerializableMixin):
