@@ -797,7 +797,7 @@ class AbstractAgent(
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
                 "addr": f"tcp://{self.local_config['agent']['rpc-listen-addr']}",
-                "public_host": self._get_public_host(),
+                "public_host": str(self._get_public_host()),
                 "resource_slots": res_slots,
                 "version": VERSION,
                 "compute_plugins": {
@@ -2031,9 +2031,7 @@ class AbstractAgent(
                 await self.rescan_resource_usage()
                 raise e
 
-            public_service_ports: List[ServicePort] = [
-                port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
-            ]
+            public_service_ports: List[ServicePort] = self.get_public_service_ports(service_ports)
 
             kernel_creation_info: KernelCreationResult = {
                 "id": KernelId(kernel_id),
@@ -2080,6 +2078,9 @@ class AbstractAgent(
             # The startup command for the batch-type sessions will be executed by the manager
             # upon firing of the "session_started" event.
             return kernel_creation_info
+
+    def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
+        return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
     async def destroy_kernel(

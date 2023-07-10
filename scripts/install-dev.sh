@@ -84,31 +84,31 @@ usage() {
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
-  echo "    (default: 8100)"
+  echo "    (default: 8101)"
   echo ""
   echo "  ${LWHITE}--redis-port PORT${NC}"
   echo "    The port to bind the Redis container service."
-  echo "    (default: 8110)"
+  echo "    (default: 8111)"
   echo ""
   echo "  ${LWHITE}--etcd-port PORT${NC}"
   echo "    The port to bind the etcd container service."
-  echo "    (default: 8120)"
+  echo "    (default: 8121)"
   echo ""
   echo "  ${LWHITE}--webserver-port PORT${NC}"
   echo "    The port to expose the web server."
-  echo "    (default: 8080)"
+  echo "    (default: 8090)"
   echo ""
   echo "  ${LWHITE}--manager-port PORT${NC}"
   echo "    The port to expose the manager API service."
-  echo "    (default: 8081)"
+  echo "    (default: 8091)"
   echo ""
   echo "  ${LWHITE}--agent-rpc-port PORT${NC}"
   echo "    The port for the manager-to-agent RPC calls."
-  echo "    (default: 6001)"
+  echo "    (default: 6011)"
   echo ""
   echo "  ${LWHITE}--agent-watcher-port PORT${NC}"
   echo "    The port for the agent's watcher service."
-  echo "    (default: 6009)"
+  echo "    (default: 6019)"
   echo ""
   echo "  ${LWHITE}--ipc-base-path PATH${NC}"
   echo "    The base path for IPC sockets and shared temporary files."
@@ -750,6 +750,9 @@ configure_backendai() {
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
+
+  # configure agent
+  cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
 
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml

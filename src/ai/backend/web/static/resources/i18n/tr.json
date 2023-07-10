@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Aracının kendisini yöneticiye kaydetmesine izin verin. <br/> Yalnızca Backend.AI kümesi güvenli konumda yönetiliyorsa kullanın.",
     "Plugins": "Eklentiler",
     "CUDAGPUsupport": "CUDA GPU desteği",
-    "DescCUDAGPUsupport": "NVidia CUDA GPU desteği. <br/> Backend.AI CUDA Eklentisi gerektirir.",
+    "DescCUDAGPUsupport": "NVIDIA CUDA GPU desteği. <br/> Backend.AI CUDA Eklentisi gerektirir.",
     "CUDAGPUdisabledByFGPUsupport": "Sistem Kesirli GPU eklentisi kullandığı için devre dışı bırakıldı",
     "ROCMGPUsupport": "ROCm GPU desteği",
     "DescROCMGPUsupport": "AMD ROCm GPU desteği. <br/> Backend.AI ROCm Eklentisi gerektirir.",

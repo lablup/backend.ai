@@ -59,6 +59,7 @@ class RapidFileToolsFSOpModel(BaseFSOpModel):
     def scan_tree(
         self,
         target_path: Path,
+        recursive=False,
     ) -> AsyncIterator[DirEntry]:
         raw_target_path = os.fsencode(target_path)
 

@@ -49,6 +49,7 @@ would be:
    mask_user_info = false
    enable_container_commit = false
    hide_agents = true
+   directory_based_usage = false
 
    [resources]
    open_port_to_public = false

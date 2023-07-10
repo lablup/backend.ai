@@ -25,6 +25,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -346,6 +347,9 @@ class KubernetesKernel(AbstractKernel):
                 log.debug("stream: {}", event)
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
+
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
 
 
 class KubernetesCodeRunner(AbstractCodeRunner):

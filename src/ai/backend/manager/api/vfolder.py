@@ -34,12 +34,15 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountedAppConfig,
+    QuotaScopeID,
+    QuotaScopeType,
     RedisConnectionInfo,
     VFolderHostPermission,
     VFolderHostPermissionMap,
@@ -51,8 +54,10 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
+    GroupRow,
     KernelStatus,
     UserRole,
+    UserRow,
     UserStatus,
     VFolderAccessStatus,
     VFolderCloneInfo,
@@ -67,7 +72,6 @@ from ..models import (
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
-    groups,
     initiate_vfolder_clone,
     initiate_vfolder_removal,
     kernels,
@@ -334,7 +338,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     user_role = request["user"]["role"]
     user_uuid: uuid.UUID = request["user"]["uuid"]
-    resource_policy = request["keypair"]["resource_policy"]
+    keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
     log.info(
@@ -372,34 +376,53 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     group_uuid: uuid.UUID | None = None
 
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
             case str():
                 # Convert the group name to group uuid.
                 query = (
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == domain_name)
-                    .where(groups.c.name == group_id_or_name)
+                    sa.select(GroupRow)
+                    .where(
+                        (GroupRow.domain_name == domain_name) & (GroupRow.name == group_id_or_name)
+                    )
+                    .options(selectinload(GroupRow.resource_policy_row))
                 )
-                _gid = await conn.scalar(query)
+                result = await sess.execute(query)
+                group_row = result.scalar()
+                _gid, max_vfolder_size = (
+                    group_row.id,
+                    group_row.resource_policy_row.max_vfolder_size,
+                )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = _gid
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 query = (
-                    sa.select([groups.c.id])
-                    .select_from(groups)
-                    .where(groups.c.domain_name == domain_name)
-                    .where(groups.c.id == group_id_or_name)
+                    sa.select(GroupRow)
+                    .where(
+                        (GroupRow.domain_name == domain_name) & (GroupRow.id == group_id_or_name)
+                    )
+                    .options(selectinload(GroupRow.resource_policy_row))
                 )
-                _gid = await conn.scalar(query)
+                result = await sess.execute(query)
+                group_row = result.scalar()
+                _gid, max_vfolder_size = (
+                    group_row.id,
+                    group_row.resource_policy_row.max_vfolder_size,
+                )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
             case None:
-                pass
+                query = (
+                    sa.select(UserRow)
+                    .where(UserRow.uuid == user_uuid)
+                    .options(selectinload(UserRow.resource_policy_row))
+                )
+                result = await sess.execute(query)
+                user_row = result.scalar()
+                max_vfolder_size = user_row.resource_policy_row.max_vfolder_size
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
 
@@ -410,34 +433,35 @@ async def create(request: web.Request, params: Any) -> web.Response:
         # Determine the ownership type and the quota scope ID.
         if group_uuid is not None:
             ownership_type = "group"
-            quota_scope_id = group_uuid.hex
+            quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, group_uuid)
             if not request["is_admin"]:
                 raise GenericForbidden("no permission")
         else:
             ownership_type = "user"
-            quota_scope_id = user_uuid.hex
+            quota_scope_id = QuotaScopeID(QuotaScopeType.USER, user_uuid)
         if ownership_type not in allowed_vfolder_types:
             raise InvalidAPIParameters(
                 f"{ownership_type}-owned vfolder is not allowed in this cluster"
             )
 
+    async with root_ctx.db.begin() as conn:
         if not unmanaged_path:
             await ensure_host_permission_allowed(
                 conn,
                 folder_host,
                 allowed_vfolder_types=allowed_vfolder_types,
                 user_uuid=user_uuid,
-                resource_policy=resource_policy,
+                resource_policy=keypair_resource_policy,
                 domain_name=domain_name,
                 group_id=group_uuid,
                 permission=VFolderHostPermission.CREATE,
             )
 
         # Check resource policy's max_vfolder_count
-        if resource_policy["max_vfolder_count"] > 0:
+        if keypair_resource_policy["max_vfolder_count"] > 0:
             query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
             result = await conn.scalar(query)
-            if result >= resource_policy["max_vfolder_count"]:
+            if result >= keypair_resource_policy["max_vfolder_count"]:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
@@ -481,6 +505,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 #     },
                 # ):
                 #     pass
+                options = {}
+                if max_vfolder_size and max_vfolder_size > 0:
+                    options["initial_max_size_for_quota_scope"] = max_vfolder_size
                 async with root_ctx.storage_manager.request(
                     folder_host,
                     "POST",
@@ -488,17 +515,19 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     json={
                         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
                         "vfid": str(vfid),
+                        "options": options,
                     },
                 ):
                     pass
-        except aiohttp.ClientResponseError:
-            raise VFolderCreationFailed
+        except aiohttp.ClientResponseError as e:
+            raise VFolderCreationFailed from e
+
         # TODO: include quota scope ID in the database
         # TODO: include quota scope ID in the API response
         insert_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
-            "quota_scope_id": quota_scope_id,
+            "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
             "last_used": None,
@@ -516,7 +545,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         resp = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
-            "quota_scope_id": quota_scope_id,
+            "quota_scope_id": str(quota_scope_id),
             "host": folder_host,
             "usage_mode": params["usage_mode"].value,
             "permission": params["permission"].value,
@@ -589,7 +618,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                 {
                     "name": entry["name"],
                     "id": entry["id"].hex,
-                    "quota_scope_id": entry["quota_scope_id"],
+                    "quota_scope_id": str(entry["quota_scope_id"]),
                     "host": entry["host"],
                     "status": entry["status"],
                     "usage_mode": entry["usage_mode"].value,
@@ -892,7 +921,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "folder/usage",
         json={
             "volume": volume_name,
-            "vfid": str(row["id"]),
+            "vfid": str(VFolderID.from_row(row)),
         },
     ) as (_, storage_resp):
         usage = await storage_resp.json()
@@ -900,7 +929,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "name": row["name"],
         "id": row["id"].hex,
         "host": row["host"],
-        "quota_scope_id": row["quota_scope_id"],
+        "quota_scope_id": str(row["quota_scope_id"]),
         "status": row["status"],
         "numFiles": usage["file_count"],  # legacy
         "num_files": usage["file_count"],
@@ -932,7 +961,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     )
 )
 async def get_quota(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
+    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
     log.info(
@@ -969,7 +998,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         "volume/quota",
         json={
             "volume": volume_name,
-            "vfid": str(params["id"]),
+            "vfid": str(VFolderID.from_row(vfolder_row)),
         },
     ) as (_, storage_resp):
         storage_reply = await storage_resp.json()
@@ -988,7 +1017,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def update_quota(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
+    vfolder_row = await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
@@ -1044,7 +1073,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         "volume/quota",
         json={
             "volume": volume_name,
-            "vfid": str(params["id"]),
+            "vfid": str(VFolderID.from_row(vfolder_row)),
             "size_bytes": quota,
         },
     ):
@@ -2283,7 +2312,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
 
     await initiate_vfolder_removal(
         root_ctx.db,
-        [VFolderDeletionInfo(entry["id"], folder_host)],
+        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )

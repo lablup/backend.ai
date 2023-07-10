@@ -15,6 +15,7 @@ class AgentBackend(enum.Enum):
     # The list of importable backend names under "ai.backend.agent" pkg namespace.
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
+    DUMMY = "dummy"
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -36,6 +37,12 @@ class Port:
     host: str
     private_port: int
     host_port: int
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class AgentEventData:
+    type: str
+    data: dict[str, Any]
 
 
 class ContainerStatus(str, enum.Enum):
