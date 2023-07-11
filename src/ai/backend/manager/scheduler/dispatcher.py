@@ -722,27 +722,28 @@ class SchedulerDispatcher(aobject):
             agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 now = datetime.now(tzutc())
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=sgroup_name,
-                        status=KernelStatus.SCHEDULED,
-                        status_info="scheduled",
-                        status_data={},
-                        status_changed=now,
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                KernelStatus.SCHEDULED.name: now.isoformat(),
-                            },
-                        ),
+                for kernel in sess_ctx.kernels:
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .values(
+                            agent=agent_alloc_ctx.agent_id,
+                            agent_addr=agent_alloc_ctx.agent_addr,
+                            scaling_group=sgroup_name,
+                            status=KernelStatus.SCHEDULED,
+                            status_info="scheduled",
+                            status_data={},
+                            status_changed=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.SCHEDULED.name: now.isoformat(),
+                                },
+                            ),
+                        )
+                        .where(KernelRow.id == kernel.id)
                     )
-                    .where(KernelRow.session_id == sess_ctx.id)
-                )
-                await db_sess.execute(kernel_query)
+                    await db_sess.execute(kernel_query)
                 if agent_alloc_ctx.agent_id is not None:
                     agent_ids.append(agent_alloc_ctx.agent_id)
 
@@ -947,7 +948,7 @@ class SchedulerDispatcher(aobject):
                                 },
                             ),
                         )
-                        .where(KernelRow.session_id == sess_ctx.id)
+                        .where(KernelRow.id == binding.kernel.id)
                     )
                     await db_sess.execute(kernel_query)
                     if binding.agent_alloc_ctx.agent_id is not None:
