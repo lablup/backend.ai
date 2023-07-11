@@ -1,10 +1,11 @@
-"""service_app_vfolder
+"""add_app_vfolder_type
 
-Revision ID: fdd7c60f3d34
-Revises: d6a02307a057
-Create Date: 2023-05-19 17:10:58.268838
+Revision ID: e5406145e0f7
+Revises: 69c059996cbd
+Create Date: 2023-07-11 16:49:53.158090
 
 """
+import enum
 import textwrap
 
 import sqlalchemy as sa
@@ -13,11 +14,10 @@ from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID, convention
-from ai.backend.manager.models.vfolder import VFolderUsageMode
 
 # revision identifiers, used by Alembic.
-revision = "fdd7c60f3d34"
-down_revision = "d6a02307a057"
+revision = "e5406145e0f7"
+down_revision = "69c059996cbd"
 branch_labels = None
 depends_on = None
 
@@ -25,6 +25,13 @@ enum_name = "vfolderusagemode"
 enum_val = "app"
 
 PAGE_SIZE = 100
+
+
+class VFolderUsageMode(str, enum.Enum):
+    GENERAL = "general"
+    MODEL = "model"
+    DATA = "data"
+    APP = "app"
 
 
 def upgrade():
