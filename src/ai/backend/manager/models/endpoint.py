@@ -79,6 +79,7 @@ class EndpointRow(Base):
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     open_to_public = sa.Column("open_to_public", sa.Boolean, default=False)
+    worker_affinity = sa.Column("worker_affinity", sa.String(length=128), nullable=True)
 
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
     url = sa.Column("url", sa.String(length=1024), unique=True)
@@ -224,6 +225,7 @@ class Endpoint(graphene.ObjectType):
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
+    worker_affinity = graphene.String()
 
     routings = graphene.List(Routing)
 
@@ -256,6 +258,7 @@ class Endpoint(graphene.ObjectType):
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
+            worker_affinity=row.worker_affinity,
             routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
         )
 

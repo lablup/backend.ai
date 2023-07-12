@@ -3307,6 +3307,7 @@ class AgentRegistry:
                     "service_name": endpoint.name,
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
+                    "affinity": endpoint.worker_affinity,
                 },  # TODO: support for multiple inference apps
                 headers={
                     "X-BackendAI-Token": wsproxy_api_token,

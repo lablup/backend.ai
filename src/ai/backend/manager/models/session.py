@@ -657,6 +657,7 @@ class SessionRow(Base):
     # }
     status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
+    worker_affinity = sa.Column("worker_affinity", sa.String(length=128), nullable=True)
 
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
     result = sa.Column(
@@ -1258,6 +1259,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
+    worker_affinity = graphene.String()
 
     # statistics
     num_queries = BigInt()
@@ -1327,6 +1329,7 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
+            "worker_affinity": row.worker_affinity,
             # statistics
             "num_queries": row.num_queries,
         }
