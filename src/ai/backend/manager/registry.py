@@ -3344,6 +3344,16 @@ class AgentRegistry:
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
                 json={
                     "service_name": endpoint.name,
+                    "tags": {
+                        "session": {
+                            "user_uuid": str(endpoint.session_owner),
+                            "group_id": str(endpoint.project),
+                            "domain_name": endpoint.domain,
+                        },
+                        "endpoint": {
+                            "id": endpoint.id,
+                        },
+                    },
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
                 },  # TODO: support for multiple inference apps
@@ -3352,7 +3362,6 @@ class AgentRegistry:
                 },
             ) as resp:
                 endpoint_json = await resp.json()
-                log.debug("resp: {}", endpoint_json)
                 async with self.db.begin_session() as db_sess:
                     query = (
                         sa.update(EndpointRow)
