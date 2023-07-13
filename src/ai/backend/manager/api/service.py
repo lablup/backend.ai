@@ -163,7 +163,7 @@ async def get_info(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["name", "clientSessionToken"])
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
             >> "service_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["desired_session_count", "desiredSessionCount"]): t.Int,
             tx.AliasedKey(["image", "lang"]): t.String,
