@@ -105,7 +105,9 @@ class DRFScheduler(AbstractScheduler):
                 self.per_user_dominant_share[access_key] = dominant_share_from_request
 
             # Choose the agent.
-            chosen_agent = max(possible_agents, key=lambda a: a.available_slots)
+            chosen_agent = max(
+                possible_agents, key=lambda agent: agent.available_slots - agent.occupied_slots
+            )
             return chosen_agent.id
 
         return None

@@ -26,7 +26,7 @@ def key_by_requested_slots(
     # Put back agents with more extra slot types
     # (e.g., accelerators)
     # Also put front agents with exactly required slot types
-    return (-num_extras, agent.available_slots)
+    return (-num_extras, agent.available_slots - agent.occupied_slots)
 
 
 class FIFOSlotScheduler(AbstractScheduler):
