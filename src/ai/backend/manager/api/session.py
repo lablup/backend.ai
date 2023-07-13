@@ -852,19 +852,16 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
         "kernel_host": kernel_host,
         "kernel_port": host_port,
         "session": {
-            "id": session.id,
-            "user_uuid": session.user_uuid,
-            "group_id": session.group_id,
+            "id": str(session.id),
+            "user_uuid": str(session.user_uuid),
+            "group_id": str(session.group_id),
             "access_key": session.access_key,
             "domain_name": session.domain_name,
-        },
-        "endpoint": {
-            "id": session.routing.endpoint,
         },
     }
     if session.routing:
         body["endpoint"] = {
-            "id": session.routing.endpoint,
+            "id": str(session.routing.endpoint),
         }
 
     async with aiohttp.ClientSession() as req:
