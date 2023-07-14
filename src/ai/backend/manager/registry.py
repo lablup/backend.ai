@@ -1106,6 +1106,7 @@ class AgentRegistry:
         }
 
         kernel_data = []
+        session_images: list[str] = []
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
             kernel_id = KernelId(uuid.uuid4())
@@ -1274,6 +1275,12 @@ class AgentRegistry:
                 }
             )
 
+            if image_ref.canonical not in session_images:
+                if kernel["cluster_role"] == DEFAULT_ROLE:
+                    session_images.insert(0, image_ref.canonical)
+                else:
+                    session_images.append(image_ref.canonical)
+        session_data["images"] = session_images
         try:
 
             async def _enqueue() -> None:
