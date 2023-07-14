@@ -70,10 +70,11 @@ from .base import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang import ArrayFieldItem, JSONFieldItem
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -555,6 +556,7 @@ class SessionRow(Base):
         server_default=ClusterMode.SINGLE_NODE.name,
     )
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
+    agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
     kernels = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -580,11 +582,8 @@ class SessionRow(Base):
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
     access_key_row = relationship("KeyPairRow", back_populates="sessions")
 
-    # # if image_id is null, should find a image field from related kernel row.
-    # image_id = ForeignKeyIDColumn("image_id", "images.id")
-    # # `image` column is identical to kernels `image` column.
-    # image = sa.Column("image", sa.String(length=512))
-    # image_row = relationship("ImageRow", back_populates="sessions")
+    # `image` column is identical to kernels `image` column.
+    images = sa.Column("images", sa.ARRAY(sa.String), nullable=True)
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
@@ -1239,6 +1238,7 @@ class ComputeSession(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
@@ -1246,6 +1246,8 @@ class ComputeSession(graphene.ObjectType):
     idle_checks = graphene.JSONString()
 
     # resources
+    agent_ids = graphene.List(lambda: graphene.String)
+    agents = graphene.List(lambda: graphene.String)
     resource_opts = graphene.JSONString()
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
@@ -1272,6 +1274,8 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
+        status_history = row.status_history or {}
+        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
         return {
             # identity
             "id": row.id,
@@ -1282,8 +1286,7 @@ class ComputeSession(graphene.ObjectType):
             "type": row.session_type.name,
             "main_kernel_role": row.main_kernel.role.name,
             # image
-            # "image": row.image_id,
-            "image": row.main_kernel.image,
+            "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
             "registry": row.main_kernel.registry,
             "cluster_template": None,  # TODO: implement
@@ -1304,13 +1307,18 @@ class ComputeSession(graphene.ObjectType):
             "status_changed": row.status_changed,
             "status_info": row.status_info,
             "status_data": row.status_data,
-            "status_history": row.status_history or {},
+            "status_history": status_history,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
+            "scheduled_at": (
+                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
+            ),
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
+            "agent_ids": row.agent_ids,
+            "agents": row.agent_ids,  # for backward compatibility
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
@@ -1415,12 +1423,16 @@ class ComputeSession(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
+        "image": (ArrayFieldItem("sessions_images"), None),
+        "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
+        "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
+        "agents": (ArrayFieldItem("sessions_agent_ids"), None),  # for backward compatibility
         "domain_name": ("sessions_domain_name", None),
-        "group_name": ("groups_name", None),
+        "group_name": ("group_name", None),
         "user_email": ("users_email", None),
         "full_name": ("users_full_name", None),
         "access_key": ("sessions_access_key", None),
@@ -1433,30 +1445,40 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            dtparse,
+        ),
         "startup_command": ("sessions_startup_command", None),
     }
 
-    _queryorder_colmap = {
-        "id": "sessions_id",
-        "type": "sessions_session_type",
-        "name": "sessions_name",
-        # "image": "image",
-        # "architecture": "architecture",
-        "domain_name": "sessions_domain_name",
-        "group_name": "groups_name",
-        "user_email": "users_email",
-        "full_name": "users_full_name",
-        "access_key": "sessions_access_key",
-        "scaling_group": "sessions_scaling_group_name",
-        "cluster_mode": "sessions_cluster_mode",
+    _queryorder_colmap: ColumnMapType = {
+        "id": ("sessions_id", None),
+        "type": ("sessions_session_type", None),
+        "name": ("sessions_name", None),
+        "image": ("sessions_images", None),
+        "agent_ids": ("sessions_agent_ids", None),
+        "agent_id": ("sessions_agent_ids", None),
+        "agents": ("sessions_agent_ids", None),
+        "domain_name": ("sessions_domain_name", None),
+        "group_name": ("group_name", None),
+        "user_email": ("users_email", None),
+        "full_name": ("users_full_name", None),
+        "access_key": ("sessions_access_key", None),
+        "scaling_group": ("sessions_scaling_group_name", None),
+        "cluster_mode": ("sessions_cluster_mode", None),
         # "cluster_template": "cluster_template",
-        "cluster_size": "sessions_cluster_size",
-        "status": "sessions_status",
-        "status_info": "sessions_status_info",
-        "result": "sessions_result",
-        "created_at": "sessions_created_at",
-        "terminated_at": "sessions_terminated_at",
-        "starts_at": "sessions_starts_at",
+        "cluster_size": ("sessions_cluster_size", None),
+        "status": ("sessions_status", None),
+        "status_info": ("sessions_status_info", None),
+        "result": ("sessions_result", None),
+        "created_at": ("sessions_created_at", None),
+        "terminated_at": ("sessions_terminated_at", None),
+        "starts_at": ("sessions_starts_at", None),
+        "scheduled_at": (
+            JSONFieldItem("sessions_status_history", SessionStatus.SCHEDULED.name),
+            None,
+        ),
     }
 
     @classmethod
@@ -1474,10 +1496,13 @@ class ComputeSession(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
+        j = (
+            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id)
+            .join(UserRow, SessionRow.user_uuid == UserRow.uuid)
+            .join(KernelRow, SessionRow.id == KernelRow.session_id)
         )
-        query = sa.select([sa.func.count()]).select_from(j)
+        query = sa.select([sa.func.count(sa.distinct(SessionRow.id))]).select_from(j)
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
         if group_id is not None:
@@ -1513,18 +1538,22 @@ class ComputeSession(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
-        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            UserRow, SessionRow.user_uuid == UserRow.uuid
+        j = (
+            # joins with GroupRow and UserRow do not need to be LEFT OUTER JOIN since those foreign keys are not nullable.
+            sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+                UserRow, SessionRow.user_uuid == UserRow.uuid
+            )
         )
         query = (
             sa.select(
                 SessionRow,
-                GroupRow.name.label("group_name"),
+                agg_to_array(GroupRow.name).label("group_name"),
                 UserRow.email,
                 UserRow.full_name,
             )
             .select_from(j)
-            .options(selectinload(SessionRow.kernels))
+            .options(selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)))
+            .group_by(SessionRow, UserRow.email, UserRow.full_name)
             .limit(limit)
             .offset(offset)
         )

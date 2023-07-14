@@ -114,7 +114,8 @@
     "connectingToCluster": "Backend.AI кластерт холбогдож байна ...",
     "DownloadWebUIApp": "__NOT_TRANSLATED__",
     "IPUEnabled": "__NOT_TRANSLATED__",
-    "ATOMEnabled": "__NOT_TRANSLATED__"
+    "ATOMEnabled": "__NOT_TRANSLATED__",
+    "WarboyEnabled": "__NOT_TRANSLATED__"
   },
   "session": {
     "launcher": {
@@ -366,7 +367,12 @@
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
     "ExpiresAfter": "__NOT_TRANSLATED__",
     "ConnectionExample": "__NOT_TRANSLATED__",
-    "System": "__NOT_TRANSLATED__"
+    "System": "__NOT_TRANSLATED__",
+    "SFTPExtraNotification": "__NOT_TRANSLATED__",
+    "ConnectionNotice": "__NOT_TRANSLATED__",
+    "ReadMore": "__NOT_TRANSLATED__",
+    "Readless": "__NOT_TRANSLATED__",
+    "Readmore": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -1062,7 +1068,7 @@
     "DescAllowAgentSideRegistration": "Агентэд өөрийгөө менежерт бүртгүүлэхийг зөвшөөрөх. <br/> Зөвхөн Backend.AI кластерийг аюулгүй байршилд удирдаж байгаа тохиолдолд л ашиглана уу.",
     "Plugins": "Залгаасууд",
     "CUDAGPUsupport": "CUDA GPU дэмжлэг",
-    "DescCUDAGPUsupport": "NVidia CUDA GPU дэмжлэг. <br/> Backend.AI CUDA залгаас шаарддаг.",
+    "DescCUDAGPUsupport": "NVIDIA CUDA GPU дэмжлэг. <br/> Backend.AI CUDA залгаас шаарддаг.",
     "CUDAGPUdisabledByFGPUsupport": "Систем нь бутархай GPU залгаас ашигладаг тул идэвхгүй болгосон",
     "ROCMGPUsupport": "ROCm GPU дэмжлэг",
     "DescROCMGPUsupport": "AMD ROCm GPU дэмжлэг. <br/> Backend шаардлагатай. AI ROCm залгаас.",
@@ -1112,7 +1118,10 @@
     "ATOMsupport": "__NOT_TRANSLATED__",
     "DescATOMsupport": "__NOT_TRANSLATED__",
     "RequireIPUPlugin": "__NOT_TRANSLATED__",
-    "RequireATOMPlugin": "__NOT_TRANSLATED__"
+    "RequireATOMPlugin": "__NOT_TRANSLATED__",
+    "Warboysupport": "__NOT_TRANSLATED__",
+    "DescWarboysupport": "__NOT_TRANSLATED__",
+    "RequireWarboyPlugin": "__NOT_TRANSLATED__"
   },
   "notification": {
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
