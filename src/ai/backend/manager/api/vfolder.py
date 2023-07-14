@@ -455,12 +455,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 permission=VFolderHostPermission.CREATE,
             )
 
-        # DEPRECATED: Check resource policy's max_vfolder_count
-        # if keypair_resource_policy["max_vfolder_count"] > 0:
-        #     query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
-        #     result = await conn.scalar(query)
-        #     if result >= keypair_resource_policy["max_vfolder_count"]:
-        #         raise InvalidAPIParameters("You cannot create more vfolders.")
+        # Check resource policy's max_vfolder_count
+        if keypair_resource_policy["max_vfolder_count"] > 0:
+            query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
+            result = await conn.scalar(query)
+            if result >= keypair_resource_policy["max_vfolder_count"] and ownership_type == "user":
+                raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
         # max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
