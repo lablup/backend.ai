@@ -238,7 +238,7 @@ Open yet another terminal for client and run:
 
 .. code-block:: console
 
-   $ source ./env-local-admin-api.sh # auto generate in project root if install-dev script was successful.
+   $ source ./env-local-admin-api.sh # generated in project root if install-dev.sh worked correctly.
    $ # source ./env-local-user-api.sh # Choose and use the environment you want.
    $ ./backend.ai config
    $ ./backend.ai run python -c 'print("hello world")'
