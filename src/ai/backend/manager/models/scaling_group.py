@@ -67,12 +67,16 @@ class ScalingGroupOpts(JSONSerializableMixin):
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
+    tied_with_agent: bool = False
+    tied_agent: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
+            "tied_with_agent": self.tied_with_agent,
+            "tied_agent": self.tied_agent,
         }
 
     @classmethod
@@ -89,6 +93,8 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
                 # Each scheduler impl refers an additional "config" key.
                 t.Key("config", default={}): t.Mapping(t.String, t.Any),
+                t.Key("tied_with_agent", default=False): t.Bool,
+                t.Key("tied_agent", default=None): t.Null | t.String,
             }
         ).allow_extra("*")
 

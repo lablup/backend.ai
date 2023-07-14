@@ -619,24 +619,70 @@ class SchedulerDispatcher(aobject):
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent = sess_ctx.main_kernel.agent_row
-            agent_id: AgentId
+            agent_id: AgentId | None = None
             if agent is not None:
                 agent_id = agent.id
             else:
-                # Let the scheduler check the resource availability and decide the target agent
-                cand_agent = scheduler.assign_agent_for_session(
-                    compatible_candidate_agents, sess_ctx
-                )
-                if cand_agent is None:
-                    raise InstanceNotAvailable(
-                        extra_msg=(
-                            "Could not find a contiguous resource region in any agent "
-                            "big enough to host the session "
-                            f"(id: {sess_ctx.id}, resource group: {sess_ctx.scaling_group_name})"
-                        ),
+                async with self.db.begin_session() as db_sess:
+                    sgroup_opts = (
+                        (
+                            (
+                                await db_sess.execute(
+                                    sa.select(ScalingGroupRow.scheduler_opts).where(
+                                        ScalingGroupRow.name == sgroup_name
+                                    )
+                                )
+                            ).first()
+                        ).scheduler_opts
+                    ).to_json()
+
+                    if sgroup_opts.get("tied_with_agent") and sgroup_opts.get("tied_agent"):
+                        architecture, available_slots, occupied_slots = (
+                            await db_sess.execute(
+                                sa.select(
+                                    [
+                                        AgentRow.architecture,
+                                        AgentRow.available_slots,
+                                        AgentRow.occupied_slots,
+                                    ]
+                                ).where(AgentRow.id == sgroup_opts.get("tied_agent"))
+                            )
+                        ).first()
+
+                        if (
+                            architecture == requested_architecture
+                            and sess_ctx.requested_slots < available_slots - occupied_slots
+                        ):
+                            agent_id = AgentId(sgroup_opts.get("tied_agent"))
+
+                if not agent_id:
+                    # Let the scheduler check the resource availability and decide the target agent
+                    cand_agent = scheduler.assign_agent_for_session(
+                        compatible_candidate_agents, sess_ctx
                     )
-                assert cand_agent is not None
-                agent_id = cand_agent
+                    if cand_agent is None:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                "Could not find a contiguous resource region in any agent big"
+                                f" enough to host the session (id: {sess_ctx.id}, resource group:"
+                                f" {sess_ctx.scaling_group_name})"
+                            ),
+                        )
+                    assert cand_agent is not None
+                    agent_id = cand_agent
+
+                    if sgroup_opts.get("tied_with_agent"):
+                        async with self.db.begin_session() as db_sess:
+                            await db_sess.execute(
+                                sa.update(ScalingGroupRow)
+                                .values(
+                                    scheduler_opts=ScalingGroupOpts.from_json(
+                                        {**sgroup_opts, "tied_agent": agent_id}
+                                    )
+                                )
+                                .where(ScalingGroupRow.name == sgroup_name)
+                            )
+
             async with self.db.begin_session() as agent_db_sess:
                 query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
                 available_agent_slots = (await agent_db_sess.execute(query)).scalar()

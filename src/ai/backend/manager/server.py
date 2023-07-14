@@ -625,6 +625,8 @@ def build_root_app(
         "limit": 2048,
         "close_timeout": 30,
         "exception_handler": global_exception_handler,
+        "tied_with_agent": False,
+        "tied_agent": None,
     }
     app["scheduler_opts"] = {
         **default_scheduler_opts,
