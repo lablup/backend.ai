@@ -466,7 +466,7 @@
     "ResourcePolicySuccessfullyCreated": "자원 정책이 성공적으로 생성되었습니다.",
     "ResourcePolicySuccessfullyUpdated": "자원 정책이 성공적으로 수정되었습니다.",
     "ResourcePolicySuccessfullyDeleted": "자원 정책이 성공적으로 삭제되었습니다.",
-    "QuotaDoesNotSupported": "이 스토리지 호스트는 가용량 설정을 지원하지 않습니다.",
+    "QuotaDoesNotSupported": "이 스토리지 백엔드는 가용량 설정을 지원하지 않습니다.",
     "quotaSettings": {
       "QuotaScopeId": "가용량 범위 ID",
       "QuotaSettings": "가용량 설정",
@@ -627,7 +627,8 @@
     "Permission": "권한",
     "StorageStatus": "저장소 상태",
     "Created": "생성됨",
-    "Invited": "공유받음",
+    "Shared": "공유 받음",
+    "Invited": "초대 받음",
     "Capacity": "생성가능 갯수",
     "folders": {
       "Location": "위치",
@@ -751,7 +752,14 @@
       "PermissionModified": "권한이 변경되었습니다"
     },
     "NoStorageDescriptionFound": "별도 설명이 없습니다.",
-    "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다."
+    "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다.",
+    "QuotaPerStorageVolume": "스토리지 볼륨별 가용량",
+    "NumberOfFolders": "폴더 개수",
+    "SelectStorageHost": "호스트를 선택하세요",
+    "Used": "사용됨",
+    "Limit": "제한",
+    "HostDetails": "선택한 스토리지 호스트의 가용량 정보를 보여줍니다.",
+    "ProjectFolder": "프로젝트 폴더"
   },
   "dialog": {
     "warning": {
@@ -1017,7 +1025,9 @@
     "RetriesToSkip": "회",
     "NoGroupToDisplay": "그룹이 없습니다.",
     "AllowedSessionTypes": "허용된 세션 타입",
-    "Domain": "도메인"
+    "Domain": "도메인",
+    "Public": "공개",
+    "PublicStatus": "공개 상태"
   },
   "maintenance": {
     "General": "일반",

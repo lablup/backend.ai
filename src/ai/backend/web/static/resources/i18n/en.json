@@ -473,7 +473,7 @@
     "ResourcePolicySuccessfullyCreated": "Resource Policy successfully created",
     "ResourcePolicySuccessfullyUpdated": "Resource Policy successfully updated",
     "ResourcePolicySuccessfullyDeleted": "Resource Policy successfully deleted",
-    "QuotaDoesNotSupported": "This storage host does not support quota.",
+    "QuotaDoesNotSupported": "This storage backend does not support quota.",
     "quotaSettings": {
       "QuotaScopeId": "Quota Scope ID",
       "QuotaSettings": "Quota Settings",
@@ -633,8 +633,9 @@
     "UsageMode": "Usage Mode",
     "Permission": "Permission",
     "StorageStatus": "Storage Status",
-    "Created": "created",
-    "Invited": "invited",
+    "Created": "Created",
+    "Shared": "Shared",
+    "Invited": "Invited",
     "Capacity": "capacity",
     "folders": {
       "Location": "Location",
@@ -758,7 +759,14 @@
       "PermissionModified": "Permission updated"
     },
     "NoStorageDescriptionFound": "No description.",
-    "DialogModelFolder": "You can serve and manage models."
+    "DialogModelFolder": "You can serve and manage models.",
+    "QuotaPerStorageVolume": "Quota per storage volume",
+    "NumberOfFolders": "Number of folders",
+    "SelectStorageHost": "Select storage host",
+    "Used": "Used",
+    "Limit": "Limit",
+    "HostDetails": "Displays quota information for the selected storage host.",
+    "ProjectFolder": "Project Folder"
   },
   "dialog": {
     "warning": {
@@ -1024,7 +1032,9 @@
     "RetriesToSkip": "Times",
     "NoGroupToDisplay": "NoGroupToDisplay",
     "AllowedSessionTypes": "Allowed session types",
-    "Domain": "Domain"
+    "Domain": "Domain",
+    "Public": "Public",
+    "PublicStatus": "Public Status"
   },
   "maintenance": {
     "General": "General",

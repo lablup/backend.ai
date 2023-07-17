@@ -965,7 +965,9 @@
     "RetriesToSkip": "__NOT_TRANSLATED__",
     "NoGroupToDisplay": "__NOT_TRANSLATED__",
     "AllowedSessionTypes": "__NOT_TRANSLATED__",
-    "Domain": "Домэйн"
+    "Domain": "Домэйн",
+    "Public": "__NOT_TRANSLATED__",
+    "PublicStatus": "__NOT_TRANSLATED__"
   },
   "maintenance": {
     "General": "Ерөнхий",
