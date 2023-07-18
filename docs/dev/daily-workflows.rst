@@ -519,13 +519,17 @@ Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'
 Resolving missing directories error when running Pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block::
+.. code-block:: text
 
    ValueError: Failed to create temporary directory for immutable inputs: No such file or directory (os error 2) at path "/tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/immutable_inputsvIpaoN"
 
 If you encounter errors like above when running daily Pants commands like ``lint``,
 you may manually create the directory one step higher.
-For the above example, run ``mkdir -p /tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/``.
+For the above example, run:
+
+.. code-block:: shell
+
+   mkdir -p /tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/
 
 If this workaround does not work, backup your current working files and
 reinstall by running ``scripts/delete-dev.sh`` and ``scripts/install-dev.sh``
