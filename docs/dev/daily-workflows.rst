@@ -501,17 +501,39 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ pgrep pantsd | xargs kill
-   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
+   $ pgrep pantsd | xargs -r kill
+   $ rm -r /tmp/*-pants/ .pants.d .pids ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
+
+Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'s
+``local_execution_root_dir`` option set by ``install-dev.sh``.
 
 .. warning::
 
    If you have run ``pants`` or the installation script with ``sudo``, some of the above directories
    may be owned by root and running ``pants`` as the user privilege would not work.
    In such cases, remove the directories with ``sudo`` and retry.
+
+Resolving missing directories error when running Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: text
+
+   ValueError: Failed to create temporary directory for immutable inputs: No such file or directory (os error 2) at path "/tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/immutable_inputsvIpaoN"
+
+If you encounter errors like above when running daily Pants commands like ``lint``,
+you may manually create the directory one step higher.
+For the above example, run:
+
+.. code-block:: shell
+
+   mkdir -p /tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/
+
+If this workaround does not work, backup your current working files and
+reinstall by running ``scripts/delete-dev.sh`` and ``scripts/install-dev.sh``
+serially.
 
 Changing or updating the Python runtime for Pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

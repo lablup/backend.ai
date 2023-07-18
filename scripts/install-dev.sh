@@ -144,15 +144,6 @@ show_important_note() {
   echo "${LRED}[NOTE]${NC} $1"
 }
 
-has_python() {
-  "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 0 ]; then
-    echo 0  # ok
-  else
-    echo 1  # missing
-  fi
-}
-
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
@@ -189,19 +180,8 @@ else
 fi
 
 show_info "Checking the bootstrapper Python version..."
-STANDALONE_PYTHON_VERSION="3.11.3"
-STANDALONE_PYTHON_ARCH=$(arch)
-STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
-if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
-  STANDALONE_PYTHON_ARCH="aarch64"
-fi
-bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
-if [ $(has_python "$bpython") -ne 0 ]; then
-  install_static_python
-fi
+source scripts/bootstrap-static-python.sh
 $bpython -c 'import sys;print(sys.version_info)'
-$bpython -m ensurepip --upgrade
-$bpython -m pip --disable-pip-version-check install -q -U tomlkit
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
