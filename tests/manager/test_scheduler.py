@@ -19,6 +19,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -781,6 +782,7 @@ def test_fifo_scheduler(example_agents, example_pending_sessions, example_existi
     agent_id = scheduler.assign_agent_for_session(
         example_agents,
         picked_session,
+        AgentSelectionStrategy.LEGACY,
     )
     assert agent_id == AgentId("i-001")
 
@@ -797,7 +799,9 @@ def test_lifo_scheduler(example_agents, example_pending_sessions, example_existi
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents, picked_session, AgentSelectionStrategy.LEGACY
+    )
     assert agent_id == "i-001"
 
 
@@ -817,7 +821,9 @@ def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
             example_pending_sessions,
             picked_session_id,
         )
-        agent_id = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
+        agent_id = scheduler.assign_agent_for_session(
+            example_mixed_agents, picked_session, AgentSelectionStrategy.LEGACY
+        )
         if idx == 0:
             # example_mixed_agents do not have any agent with ROCM accelerators.
             assert agent_id is None
@@ -952,7 +958,9 @@ def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
         )
         assert picked_session_id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
-        agent_id = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
+        agent_id = scheduler.assign_agent_for_session(
+            example_mixed_agents, picked_session, AgentSelectionStrategy.LEGACY
+        )
         if idx == 2:
             # example_mixed_agents do not have any agent with ROCM accelerators.
             assert agent_id is None
@@ -981,7 +989,9 @@ def test_drf_scheduler(
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents, picked_session, AgentSelectionStrategy.LEGACY
+    )
     assert agent_id == "i-001"
 
 
@@ -997,7 +1007,9 @@ def test_mof_scheduler_first_assign(
     assert picked_session_id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents, picked_session, AgentSelectionStrategy.LEGACY
+    )
     assert agent_id == "i-001"
 
 
@@ -1013,7 +1025,9 @@ def test_mof_scheduler_second_assign(
     assert picked_session_id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents_first_one_assigned, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents_first_one_assigned, picked_session, AgentSelectionStrategy.LEGACY
+    )
     assert agent_id == "i-101"
 
 
@@ -1029,7 +1043,9 @@ def test_mof_scheduler_no_valid_agent(
     assert picked_session_id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents_no_valid, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents_no_valid, picked_session, AgentSelectionStrategy.LEGACY
+    )
     assert agent_id is None
 
 
