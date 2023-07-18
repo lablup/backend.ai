@@ -5,7 +5,7 @@ from typing import List, Optional, Sequence, Tuple
 
 import trafaret as t
 
-from ai.backend.common.types import AgentId, ResourceSlot, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot, SessionId
 
 from ..models import AgentRow, SessionRow
 from .types import AbstractScheduler, KernelInfo
@@ -14,6 +14,7 @@ from .types import AbstractScheduler, KernelInfo
 def key_by_requested_slots(
     agent: AgentRow,
     requested_slots: ResourceSlot,
+    agent_selection_strategy: AgentSelectionStrategy,
 ) -> Tuple[int, ResourceSlot]:
     unused_slot_keys = set()
     for k, v in requested_slots.items():
@@ -23,10 +24,22 @@ def key_by_requested_slots(
     for k, v in agent.available_slots.items():
         if k in unused_slot_keys and v > Decimal(0):
             num_extras += 1
+
+    comparator = None
+
+    match agent_selection_strategy:
+        case AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT:
+            comparator = agent.available_slots - agent.occupied_slots
+        case AgentSelectionStrategy.MINIMUM_RESOURCE_SLOT:
+            comparator = -(agent.available_slots - agent.occupied_slots)
+        case AgentSelectionStrategy.LEGACY:
+            comparator = agent.available_slots
+
     # Put back agents with more extra slot types
     # (e.g., accelerators)
     # Also put front agents with exactly required slot types
-    return (-num_extras, agent.available_slots - agent.occupied_slots)
+    assert comparator is not None, "invalid agent selection strategy"
+    return (-num_extras, comparator)
 
 
 class FIFOSlotScheduler(AbstractScheduler):
@@ -66,6 +79,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         requested_slots: ResourceSlot,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         possible_agents = []
         for agent in agents:
@@ -75,9 +89,10 @@ class FIFOSlotScheduler(AbstractScheduler):
         if possible_agents:
             chosen_agent = max(
                 possible_agents,
-                key=lambda a: key_by_requested_slots(
-                    a,
+                key=lambda agent: key_by_requested_slots(
+                    agent,
                     requested_slots,
+                    agent_selection_strategy,
                 ),
             )
             return chosen_agent.id
@@ -87,20 +102,24 @@ class FIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.requested_slots,
+            agent_selection_strategy,
         )
 
     def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.requested_slots,
+            agent_selection_strategy,
         )
 
 
@@ -120,6 +139,7 @@ class LIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         requested_slots: ResourceSlot,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         possible_agents = []
         for agent in agents:
@@ -129,9 +149,10 @@ class LIFOSlotScheduler(AbstractScheduler):
         if possible_agents:
             chosen_agent = max(
                 possible_agents,
-                key=lambda a: key_by_requested_slots(
-                    a,
+                key=lambda agent: key_by_requested_slots(
+                    agent,
                     requested_slots,
+                    agent_selection_strategy,
                 ),
             )
             return chosen_agent.id
@@ -141,18 +162,22 @@ class LIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.requested_slots,
+            agent_selection_strategy,
         )
 
     def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.requested_slots,
+            agent_selection_strategy,
         )

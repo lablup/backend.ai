@@ -1,13 +1,36 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Tuple
 
 import trafaret as t
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    AgentSelectionStrategy,
+    ResourceSlot,
+    SessionId,
+)
 
 from ..models import AgentRow, SessionRow
 from .types import AbstractScheduler, KernelInfo
+
+
+def key_by_occupied_slots(
+    agent: AgentRow,
+    agent_selection_strategy: AgentSelectionStrategy,
+) -> Tuple[int, ResourceSlot]:
+    comparator = None
+    match agent_selection_strategy:
+        case AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT:
+            comparator = agent.occupied_slots
+        case AgentSelectionStrategy.MINIMUM_RESOURCE_SLOT:
+            comparator = -agent.occupied_slots
+        case AgentSelectionStrategy.LEGACY:
+            comparator = agent.occupied_slots
+
+    assert comparator is not None, "invalid agent selection strategy"
+    return comparator
 
 
 class MOFScheduler(AbstractScheduler):
@@ -29,6 +52,7 @@ class MOFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         access_key: AccessKey,
         requested_slots: ResourceSlot,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         # return min occupied slot agent or None
         return next(
@@ -41,7 +65,7 @@ class MOFScheduler(AbstractScheduler):
                             for agent in agents
                             if ((agent.available_slots - agent.occupied_slots) >= requested_slots)
                         ),
-                        key=lambda a: a.occupied_slots,
+                        key=lambda agent: key_by_occupied_slots(agent, agent_selection_strategy),
                     )
                 )
             ),
@@ -52,20 +76,24 @@ class MOFScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.access_key,
             pending_session.requested_slots,
+            agent_selection_strategy,
         )
 
     def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.access_key,
             pending_kernel.requested_slots,
+            agent_selection_strategy,
         )

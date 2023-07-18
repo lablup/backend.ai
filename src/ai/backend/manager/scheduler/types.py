@@ -29,6 +29,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -428,6 +429,7 @@ class AbstractScheduler(metaclass=ABCMeta):
         self,
         possible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -444,6 +446,7 @@ class AbstractScheduler(metaclass=ABCMeta):
         self,
         possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         """
         Assign an agent for a kernel of the session.

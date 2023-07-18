@@ -1125,3 +1125,9 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class AgentSelectionStrategy(enum.StrEnum):
+    MAXIMUM_RESOURCE_SLOT = "maximum_resource_slot"
+    MINIMUM_RESOURCE_SLOT = "minimum_resource_slot"
+    LEGACY = "legacy"

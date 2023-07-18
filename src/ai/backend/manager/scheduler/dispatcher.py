@@ -606,6 +606,24 @@ class SchedulerDispatcher(aobject):
         compatible_candidate_agents = [
             ag for ag in candidate_agents if ag.architecture == requested_architecture
         ]
+
+        agent_selection_strategy = None
+
+        async with self.db.begin_session() as db_sess:
+            sgroup_opts = (
+                (
+                    (
+                        await db_sess.execute(
+                            sa.select(ScalingGroupRow.scheduler_opts).where(
+                                ScalingGroupRow.name == sgroup_name
+                            )
+                        )
+                    ).first()
+                ).scheduler_opts
+            ).to_json()
+
+            agent_selection_strategy = sgroup_opts.get("agent_selection_strategy")
+
         try:
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
@@ -625,7 +643,7 @@ class SchedulerDispatcher(aobject):
             else:
                 # Let the scheduler check the resource availability and decide the target agent
                 cand_agent = scheduler.assign_agent_for_session(
-                    compatible_candidate_agents, sess_ctx
+                    compatible_candidate_agents, sess_ctx, agent_selection_strategy
                 )
                 if cand_agent is None:
                     raise InstanceNotAvailable(
@@ -789,6 +807,20 @@ class SchedulerDispatcher(aobject):
         agent_query_extra_conds = None
         kernel_agent_bindings: List[KernelAgentBinding] = []
         async with self.db.begin_session() as agent_db_sess:
+            sgroup_opts = (
+                (
+                    (
+                        await agent_db_sess.execute(
+                            sa.select(ScalingGroupRow.scheduler_opts).where(
+                                ScalingGroupRow.name == sgroup_name
+                            )
+                        )
+                    ).first()
+                ).scheduler_opts
+            ).to_json()
+
+            agent_selection_strategy = sgroup_opts.get("agent_selection_strategy")
+
             # This outer transaction is rolled back when any exception occurs inside,
             # including scheduling failures of a kernel.
             # It ensures that occupied_slots are recovered when there are partial
@@ -833,7 +865,7 @@ class SchedulerDispatcher(aobject):
                             )
                         # Let the scheduler check the resource availability and decide the target agent
                         agent_id = scheduler.assign_agent_for_kernel(
-                            compatible_candidate_agents, kernel
+                            compatible_candidate_agents, kernel, agent_selection_strategy
                         )
                         if agent_id is None:
                             raise InstanceNotAvailable(

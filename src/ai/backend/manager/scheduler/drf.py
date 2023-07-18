@@ -3,18 +3,41 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, Mapping, Optional, Sequence, Set, Tuple
 
 import trafaret as t
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    AgentSelectionStrategy,
+    ResourceSlot,
+    SessionId,
+)
 
 from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
 from .types import AbstractScheduler, KernelInfo
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+
+
+def key_by_requested_slots(
+    agent: AgentRow,
+    agent_selection_strategy: AgentSelectionStrategy,
+) -> Tuple[int, ResourceSlot]:
+    comparator = None
+    match agent_selection_strategy:
+        case AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT:
+            comparator = agent.available_slots - agent.occupied_slots
+        case AgentSelectionStrategy.MINIMUM_RESOURCE_SLOT:
+            comparator = -(agent.available_slots - agent.occupied_slots)
+        case AgentSelectionStrategy.LEGACY:
+            comparator = agent.available_slots - agent.occupied_slots
+
+    assert comparator is not None, "invalid agent selection strategy"
+    return comparator
 
 
 class DRFScheduler(AbstractScheduler):
@@ -74,6 +97,7 @@ class DRFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         access_key: AccessKey,
         requested_slots: ResourceSlot,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         # If some predicate checks for a picked session fail,
         # this method is NOT called at all for the picked session.
@@ -106,7 +130,8 @@ class DRFScheduler(AbstractScheduler):
 
             # Choose the agent.
             chosen_agent = max(
-                possible_agents, key=lambda agent: agent.available_slots - agent.occupied_slots
+                possible_agents,
+                key=lambda agent: key_by_requested_slots(agent, agent_selection_strategy),
             )
             return chosen_agent.id
 
@@ -116,20 +141,24 @@ class DRFScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.access_key,
             pending_session.requested_slots,
+            agent_selection_strategy,
         )
 
     def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
+        agent_selection_strategy: AgentSelectionStrategy,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.access_key,
             pending_kernel.requested_slots,
+            agent_selection_strategy,
         )
