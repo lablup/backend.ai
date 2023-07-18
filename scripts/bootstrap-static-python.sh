@@ -33,7 +33,7 @@ install_static_python() {
 STANDALONE_PYTHON_VERSION="3.11.3"
 STANDALONE_PYTHON_ARCH=$(arch)
 export STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
-if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
+if [ "${STANDALONE_PYTHON_ARCH}" = "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"
 fi
 export bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
