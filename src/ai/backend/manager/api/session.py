@@ -378,7 +378,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     t.Dict(
         {
             tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
-            tx.AliasedKey(["name", "clientSessionToken"], default=undefined)
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
@@ -564,7 +564,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["name", "clientSessionToken"])
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
             >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"]): t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
@@ -1062,7 +1062,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["name", "clientSessionToken"])
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
             >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
         }
     ),
