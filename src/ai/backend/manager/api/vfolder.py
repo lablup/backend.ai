@@ -2424,15 +2424,6 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if source_proxy_name != target_proxy_name:
         raise InvalidAPIParameters("proxy name of source and target vfolders must be equal.")
 
-    if row["group"] is not None:
-        ownership_type = "group"
-        if not request["is_admin"]:
-            raise GenericForbidden("no permission")
-    else:
-        ownership_type = "user"
-    if ownership_type not in allowed_vfolder_types:
-        raise InvalidAPIParameters(f"{ownership_type}-owned vfolder is not allowed in this cluster")
-
     async with root_ctx.db.begin() as conn:
         allowed_hosts = await filter_host_allowed_permission(
             conn,
@@ -2457,7 +2448,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         if resource_policy["max_vfolder_count"] > 0:
             query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
             result = await conn.scalar(query)
-            if result >= resource_policy["max_vfolder_count"] and ownership_type == "user":
+            if result >= resource_policy["max_vfolder_count"] and row["group"] is None:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # Prevent creation of vfolder with duplicated name.
