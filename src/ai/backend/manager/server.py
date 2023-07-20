@@ -804,7 +804,10 @@ async def server_main_logwrapper(
 )
 @click.pass_context
 def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+    ctx: click.Context,
+    config_path: Path,
+    log_level: LogSeverity,
+    debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.

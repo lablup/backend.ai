@@ -213,9 +213,14 @@ EDITABLE_WEBUI=0
 # AGENT_WATCHER_PORT="6009"
 
 POSTGRES_PORT="8101"
+PGBOUNCER_PORT="8201"
+DB_NAME="backend"
+DB_USER="postgres"
+DB_PASSWORD="develove"
 REDIS_PORT="8111"
 ETCD_PORT="8121"
 MANAGER_PORT="8091"
+DATASTORE_RPC_PORT="8191"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
@@ -241,6 +246,8 @@ while [ $# -gt 0 ]; do
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
+    --pgbouncer-port)       PGBOUNCER_PORT=$2; shift ;;
+    --pgbouncer-port=*)     PGBOUNCER_PORT="${1#*=}" ;;
     --redis-port)          REDIS_PORT=$2; shift ;;
     --redis-port=*)        REDIS_PORT="${1#*=}" ;;
     --etcd-port)           ETCD_PORT=$2; shift ;;
@@ -649,9 +656,16 @@ setup_environment() {
   fi
   cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRES_PASSWORD=develove/POSTGRES_PASSWORD=${DB_PASSWORD}/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/POSTGRES_DB=backend/POSTGRES_DB=${DB_NAME}/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/8200:6432/${PGBOUNCER_PORT}:6432/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/pgbouncer-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/conf"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/pids"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/logs"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
@@ -693,6 +707,13 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure db-pooler
+  cp configs/db-pooler/halfstack.toml ./db-pooler.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./db-pooler.toml
+  sed_inplace "s/port = 8200/port = ${PGBOUNCER_PORT}/" ./db-pooler.toml
+  sed_inplace "s/port = 8190/port = ${DATASTORE_RPC_PORT}/" ./db-pooler.toml
+  cp configs/db-pooler/halfstack.pgbouncer.ini "${HALFSTACK_VOLUME_PATH}/pgbouncer-data/conf/pgbouncer.ini"
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml
