@@ -603,6 +603,9 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
+    def __neg__(self):
+        return type(self)({k: -v for k, v in self.data.items()})
+
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
