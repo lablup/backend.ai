@@ -5,6 +5,8 @@ from typing import Any, Mapping, Optional, Union
 
 import click
 
+from ..types import undefined
+
 
 class ByteSizeParamType(click.ParamType):
     name = "byte"
@@ -164,5 +166,16 @@ class CommaSeparatedListType(click.ParamType):
                 return arg
             elif isinstance(arg, str):
                 return arg.split(",")
+        except ValueError as e:
+            self.fail(repr(e), param, ctx)
+
+
+class OptionalType(click.ParamType):
+    name = "Optional Type Wrapper"
+
+    def convert(self, value, param, ctx):
+        try:
+            if isinstance(value, (str, int)) or value == undefined:
+                return value
         except ValueError as e:
             self.fail(repr(e), param, ctx)
