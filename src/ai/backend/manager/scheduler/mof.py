@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence
 
 import trafaret as t
 
@@ -14,22 +14,6 @@ from ai.backend.common.types import (
 
 from ..models import AgentRow, SessionRow
 from .types import AbstractScheduler, KernelInfo
-
-
-def key_by_occupied_slots(
-    agent: AgentRow,
-    agent_selection_strategy: AgentSelectionStrategy,
-) -> Tuple[int, ResourceSlot]:
-    comparator = None
-    match agent_selection_strategy:
-        case AgentSelectionStrategy.LEGACY:
-            comparator = agent.occupied_slots
-        case AgentSelectionStrategy.CONCENTRATED:
-            comparator = -agent.occupied_slots
-        case AgentSelectionStrategy.DISPERSED | _:
-            comparator = agent.occupied_slots
-
-    return comparator
 
 
 class MOFScheduler(AbstractScheduler):
@@ -64,7 +48,7 @@ class MOFScheduler(AbstractScheduler):
                             for agent in agents
                             if ((agent.available_slots - agent.occupied_slots) >= requested_slots)
                         ),
-                        key=lambda agent: key_by_occupied_slots(agent, agent_selection_strategy),
+                        key=lambda agent: agent.occupied_slots,
                     )
                 )
             ),
