@@ -295,8 +295,8 @@ async def query_userinfo(
         return await _query_userinfo(
             conn,
             request["user"]["uuid"],
-            request["user"]["role"],
             request["keypair"]["access_key"],
+            request["user"]["role"],
             request["user"]["domain_name"],
             request["keypair"]["resource_policy"],
             params["domain"] or request["user"]["domain_name"],
