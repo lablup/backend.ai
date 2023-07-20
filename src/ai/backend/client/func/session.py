@@ -358,6 +358,7 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
         dependencies: Sequence[str] = None,  # cannot be stored in templates
+        callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: Union[List[str], Undefined] = undefined,
