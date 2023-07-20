@@ -625,7 +625,7 @@ def build_root_app(
         "limit": 2048,
         "close_timeout": 30,
         "exception_handler": global_exception_handler,
-        "agent_selection_strategy": AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT,
+        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }
     app["scheduler_opts"] = {
         **default_scheduler_opts,

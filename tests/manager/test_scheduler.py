@@ -58,7 +58,7 @@ def test_scheduler_configs():
     example_sgroup_opts = ScalingGroupOpts(  # already processed by column trafaret
         allowed_session_types=[SessionTypes.BATCH],
         pending_timeout=timedelta(seconds=86400 * 2),
-        agent_selection_strategy=AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT,
+        agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
         config={
             "extra_config": None,
             "num_retries_to_skip": 5,
@@ -783,7 +783,7 @@ def test_fifo_scheduler(example_agents, example_pending_sessions, example_existi
     agent_id = scheduler.assign_agent_for_session(
         example_agents,
         picked_session,
-        AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT,
+        AgentSelectionStrategy.DISPERSED,
     )
     assert agent_id == AgentId("i-001")
 
@@ -801,7 +801,7 @@ def test_lifo_scheduler(example_agents, example_pending_sessions, example_existi
         picked_session_id,
     )
     agent_id = scheduler.assign_agent_for_session(
-        example_agents, picked_session, AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED
     )
     assert agent_id == "i-001"
 
@@ -823,7 +823,7 @@ def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
             picked_session_id,
         )
         agent_id = scheduler.assign_agent_for_session(
-            example_mixed_agents, picked_session, AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+            example_mixed_agents, picked_session, AgentSelectionStrategy.DISPERSED
         )
         if idx == 0:
             # example_mixed_agents do not have any agent with ROCM accelerators.
@@ -960,7 +960,7 @@ def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
         assert picked_session_id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
         agent_id = scheduler.assign_agent_for_session(
-            example_mixed_agents, picked_session, AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+            example_mixed_agents, picked_session, AgentSelectionStrategy.DISPERSED
         )
         if idx == 2:
             # example_mixed_agents do not have any agent with ROCM accelerators.
@@ -991,7 +991,7 @@ def test_drf_scheduler(
         picked_session_id,
     )
     agent_id = scheduler.assign_agent_for_session(
-        example_agents, picked_session, AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED
     )
     assert agent_id == "i-001"
 
@@ -1009,7 +1009,7 @@ def test_mof_scheduler_first_assign(
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
     agent_id = scheduler.assign_agent_for_session(
-        example_agents, picked_session, AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED
     )
     assert agent_id == "i-001"
 
@@ -1029,7 +1029,7 @@ def test_mof_scheduler_second_assign(
     agent_id = scheduler.assign_agent_for_session(
         example_agents_first_one_assigned,
         picked_session,
-        AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT,
+        AgentSelectionStrategy.DISPERSED,
     )
     assert agent_id == "i-101"
 
@@ -1047,7 +1047,7 @@ def test_mof_scheduler_no_valid_agent(
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
     agent_id = scheduler.assign_agent_for_session(
-        example_agents_no_valid, picked_session, AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+        example_agents_no_valid, picked_session, AgentSelectionStrategy.DISPERSED
     )
     assert agent_id is None
 

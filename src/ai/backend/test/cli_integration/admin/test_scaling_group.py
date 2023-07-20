@@ -63,7 +63,7 @@ def test_add_scaling_group(run: ClientRunnerFunc):
         "allowed_session_types": ["interactive", "batch"],
         "pending_timeout": 0.0,
         "config": {},
-        "agent_selection_strategy": AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT,
+        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }, "Scaling group scheduler options mismatch"
 
 
@@ -112,7 +112,7 @@ def test_update_scaling_group(run: ClientRunnerFunc):
         "allowed_session_types": ["interactive", "batch"],
         "pending_timeout": 0.0,
         "config": {},
-        "agent_selection_strategy": AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT,
+        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }, "Scaling group scheduler options mismatch"
 
 

@@ -67,7 +67,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
-    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
+    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -91,9 +91,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
                 # Each scheduler impl refers an additional "config" key.
                 t.Key("config", default={}): t.Mapping(t.String, t.Any),
-                t.Key(
-                    "agent_selection_strategy", default=AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT
-                ): t.Enum(*[e.value for e in AgentSelectionStrategy]),
+                t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): t.Enum(
+                    *[e.value for e in AgentSelectionStrategy]
+                ),
             }
         ).allow_extra("*")
 

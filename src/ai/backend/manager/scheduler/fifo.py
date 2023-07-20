@@ -28,17 +28,16 @@ def key_by_requested_slots(
     comparator = None
 
     match agent_selection_strategy:
-        case AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT:
-            comparator = agent.available_slots - agent.occupied_slots
-        case AgentSelectionStrategy.MINIMUM_RESOURCE_SLOT:
-            comparator = -(agent.available_slots - agent.occupied_slots)
         case AgentSelectionStrategy.LEGACY:
             comparator = agent.available_slots
+        case AgentSelectionStrategy.CONCENTRATED:
+            comparator = -(agent.available_slots - agent.occupied_slots)
+        case AgentSelectionStrategy.DISPERSED | _:
+            comparator = agent.available_slots - agent.occupied_slots
 
     # Put back agents with more extra slot types
     # (e.g., accelerators)
     # Also put front agents with exactly required slot types
-    assert comparator is not None, "invalid agent selection strategy"
     return (-num_extras, comparator)
 
 

@@ -29,11 +29,11 @@ def key_by_requested_slots(
 ) -> Tuple[int, ResourceSlot]:
     comparator = None
     match agent_selection_strategy:
-        case AgentSelectionStrategy.MAXIMUM_RESOURCE_SLOT:
-            comparator = agent.available_slots - agent.occupied_slots
-        case AgentSelectionStrategy.MINIMUM_RESOURCE_SLOT:
-            comparator = -(agent.available_slots - agent.occupied_slots)
         case AgentSelectionStrategy.LEGACY:
+            comparator = agent.available_slots - agent.occupied_slots
+        case AgentSelectionStrategy.CONCENTRATED:
+            comparator = -(agent.available_slots - agent.occupied_slots)
+        case AgentSelectionStrategy.DISPERSED | _:
             comparator = agent.available_slots - agent.occupied_slots
 
     assert comparator is not None, "invalid agent selection strategy"

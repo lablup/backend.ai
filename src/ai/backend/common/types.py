@@ -1131,6 +1131,6 @@ class AcceleratorMetadata(TypedDict):
 
 
 class AgentSelectionStrategy(enum.StrEnum):
-    MAXIMUM_RESOURCE_SLOT = "maximum_resource_slot"
-    MINIMUM_RESOURCE_SLOT = "minimum_resource_slot"
+    DISPERSED = "dispersed"
+    CONCENTRATED = "concentrated"
     LEGACY = "legacy"
