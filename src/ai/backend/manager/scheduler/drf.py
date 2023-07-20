@@ -36,7 +36,6 @@ def key_by_requested_slots(
         case AgentSelectionStrategy.DISPERSED | _:
             comparator = agent.available_slots - agent.occupied_slots
 
-    assert comparator is not None, "invalid agent selection strategy"
     return comparator
 
 
