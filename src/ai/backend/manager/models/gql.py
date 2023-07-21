@@ -10,7 +10,9 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+    from graphql.execution.executors.asyncio import (
+        AsyncioExecutor,
+    )  # pants: no-infer-dep
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
@@ -463,6 +465,18 @@ class Queries(graphene.ObjectType):
         offset=graphene.Int(required=True),
         filter=graphene.String(),
         order=graphene.String(),
+    )
+
+    vfolder_own_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        group_id=graphene.UUID(),
+        access_key=graphene.String(),  # must be empty for user requests
     )
 
     vfolders = graphene.List(  # legacy non-paginated list
@@ -1380,6 +1394,39 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderPermissionList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_own_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count(
+            info.context,
+            domain_name=domain_name,  # scope
+            group_id=group_id,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scope
+            group_id=group_id,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
