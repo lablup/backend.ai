@@ -135,7 +135,6 @@ class BaseRunner(metaclass=ABCMeta):
     child_env: MutableMapping[str, str]
     subproc: Optional[asyncio.subprocess.Process]
     service_parser: Optional[ServiceParser]
-    mounted_service_parsers: dict[str, ServiceParser]
     runtime_path: Path
 
     services_running: Dict[str, asyncio.subprocess.Process]
@@ -190,8 +189,6 @@ class BaseRunner(metaclass=ABCMeta):
 
         # build status tracker to skip the execute step
         self._build_success = None
-
-        self.mounted_service_parsers = {}
 
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
@@ -683,7 +680,11 @@ class BaseRunner(metaclass=ABCMeta):
                 proc.pid,
                 service_info["port"],
             )
-            result = {"status": "started"}
+            result = {
+                "status": "started",
+                "name": service_info["name"],
+                "port": service_info["port"],
+            }
         except asyncio.CancelledError:
             # This may happen if the service process gets started but it fails to
             # open the port and then terminates (with an error).
@@ -712,17 +713,25 @@ class BaseRunner(metaclass=ABCMeta):
             }
         return result
 
+    async def read_app_config_file(self, mount_path: str) -> Mapping[str, Any]:
+        config_path = Path(mount_path) / "app-config.json"
+
+        def _load():
+            with config_path.open() as f:
+                return json.load(f)
+
+        return await asyncio.get_running_loop().run_in_executor(None, _load)
+
     async def _init_mounted_service(
         self,
         service_name: str,
         service_info: Mapping[str, Any],
-    ) -> ServiceParser:
-        mount_info: dict[str, Any] = service_info["mount_info"]
-        mount_path: str = mount_info["kernel_path"]
-        app_config: dict[str, Any] = mount_info["app_config"]
-        copy_dir: Optional[Path] = (
-            Path(app_config["copy_dir"]) if app_config["copy_dir"] is not None else None
-        )
+    ) -> None:
+        assert self.service_parser is not None
+        mount_path: str = service_info["mount_path"]
+        app_config = await self.read_app_config_file(mount_path)
+        raw_copy_dir: str | None = app_config.get("copy_dir")
+        copy_dir: Optional[Path] = Path(raw_copy_dir) if raw_copy_dir is not None else None
 
         opts: dict[str, Any] = service_info["options"]
         distro = opts["distro"]
@@ -781,80 +790,46 @@ class BaseRunner(metaclass=ABCMeta):
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, _copy)
 
-        service_parser = ServiceParser(
-            {
-                "runtime_path": str(self.runtime_path),
-                "service_path": str(service_path),
-                "port": service_info["port"],
-            }
-        )
-        await service_parser.parse(service_def_folder)
+        await self.service_parser.parse(service_def_folder, service_name)
+        self.service_parser.variables["service_path"] = str(service_path)
+        self.service_parser.variables["port"] = str(service_info["port"])
         log.debug("Loaded new-style service definitions.")
-        return service_parser
 
-    async def _start_mounted_service(self, service_info: Mapping[str, Any]) -> None:
-        mount_info: dict[str, Any] = service_info["mount_info"]
-        mount_path: str = mount_info["kernel_path"]
+    async def start_mounted_service(self, service_info: Mapping[str, Any]) -> None:
+        assert self.service_parser is not None
+        mount_path: str = service_info["mount_path"]
 
-        async with self._service_lock:
-            try:
-                service_name = service_info["name"]
-                if service_name in self.services_running:
-                    result = {"status": "running"}
-                    return
-                if service_name not in self.mounted_service_parsers:
-                    try:
-                        service_parser = await self._init_mounted_service(
-                            service_name, service_info
-                        )
-                    except InvalidServiceDefinition:
-                        result = {
-                            "status": "failed",
-                            "error": (
-                                f"service definition not found, (name: {service_info['name']},"
-                                f" mount_path: {mount_path})"
-                            ),
-                        }
-                        return
-                    self.mounted_service_parsers[service_name] = service_parser
-                else:
-                    service_parser = self.mounted_service_parsers[service_name]
-                service_parser.variables["ports"] = service_info["ports"]
-                cmdargs, env = await service_parser.start_service(
-                    service_info["name"],
-                    self.child_env.keys(),
-                    service_info["options"],
-                )
-                if cmdargs is None:
-                    log.warning("The service {0} is not supported.", service_info["name"])
+        try:
+            service_name = service_info["name"]
+            if service_name in self.services_running:
+                result = {"status": "running"}
+                return
+            if service_name not in self.service_parser.services:
+                try:
+                    await self._init_mounted_service(service_name, service_info)
+                except InvalidServiceDefinition:
                     result = {
                         "status": "failed",
-                        "error": "unsupported service",
+                        "error": (
+                            f"service definition not found, (name: {service_info['name']},"
+                            f" mount_path: {mount_path})"
+                        ),
                     }
                     return
-                log.debug("cmdargs: {0}", cmdargs)
-                log.debug("env: {0}", env)
-                cwd = Path.cwd()
-                service_env = {**self.child_env, **env}
-                if "LD_LIBRARY_PATH" in service_env:
-                    # avoid conflicts with Python binary used by service apps.
-                    service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
-                        "/opt/backend.ai/lib:", ""
-                    )
-                result = await self._run_cmd(cmdargs, cwd, service_env, service_info)
-            except Exception as e:
-                log.exception("start_service: unexpected error")
-                result = {
-                    "status": "failed",
-                    "error": repr(e),
-                }
-            finally:
-                await self.outsock.send_multipart(
-                    [
-                        b"service-result",
-                        json.dumps(result).encode("utf8"),
-                    ]
-                )
+            result = await self._start_service(service_info, do_not_wait=False)
+        except Exception as e:
+            log.exception("start_service: unexpected error")
+            result = {
+                "status": "failed",
+                "error": repr(e),
+            }
+        finally:
+            await self.outsock.send_multipart(
+                [
+                    b"service-result",
+                    json.dumps(result).encode("utf8"),
+                ]
+            )
 
     async def start_model_service(self, model_info):
         assert self.service_parser is not None
@@ -917,7 +892,9 @@ class BaseRunner(metaclass=ABCMeta):
             ]
         )
 
-    async def _start_service(self, service_info, do_not_wait: bool = False) -> dict[str, str]:
+    async def _start_service(
+        self, service_info: Mapping[str, Any], do_not_wait: bool = False
+    ) -> dict[str, str]:
         async with self._service_lock:
             try:
                 if service_info["protocol"] == "preopen":
@@ -1205,7 +1182,7 @@ class BaseRunner(metaclass=ABCMeta):
                     asyncio.create_task(self.start_model_service(data))
                 elif op_type == "start-mounted-service":
                     data = json.loads(text)
-                    asyncio.create_task(self._start_mounted_service(data))
+                    asyncio.create_task(self.start_mounted_service(data))
                 elif op_type == "start-service":  # activate a service port
                     data = json.loads(text)
                     asyncio.create_task(self._start_service_and_feed_result(data))

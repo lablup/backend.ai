@@ -22,6 +22,7 @@ from typing import (
     Literal,
     Mapping,
     NewType,
+    NotRequired,
     Optional,
     Sequence,
     Tuple,
@@ -868,17 +869,53 @@ class VFolderUsageMode(str, enum.Enum):
 
 
 @attrs.define(slots=True)
+class AppMetadata(JSONSerializableMixin):
+    container_ports: list[int]
+    host_ports: list[int]
+    protocol: ServicePortProtocols
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "container_ports": self.container_ports,
+            "host_ports": self.host_ports,
+            "protocol": self.protocol.value,
+        }
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> AppMetadata:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        schema = t.Dict(
+            {
+                t.Key("container_ports"): t.List(t.Int),
+                t.Key("host_ports"): t.List(t.Int),
+                t.Key("protocol"): tx.Enum(ServicePortProtocols),
+            }
+        ).allow_extra("*")
+
+        class Metadata(t.Trafaret):
+            def check_and_return(self, value: Any) -> AppMetadata:
+                return AppMetadata(**schema.check(value))
+
+        return Metadata()
+
+
+@attrs.define(slots=True)
 class MountedAppConfig(JSONSerializableMixin):
     service_name: str
     service_def: Mapping[str, Any]
-    metadata: Mapping[str, str]
+    metadata: AppMetadata
     copy_dir: Optional[PurePosixPath] = None
 
     def to_json(self) -> dict[str, Any]:
         return {
             "service_name": self.service_name,
             "service_def": self.service_def,
-            "metadata": self.metadata,
+            "metadata": self.metadata.to_json(),
             "copy_dir": str(self.copy_dir) if self.copy_dir is not None else None,
         }
 
@@ -893,7 +930,7 @@ class MountedAppConfig(JSONSerializableMixin):
         return t.Dict(
             {
                 t.Key("service_name"): t.String,
-                t.Key("metadata", default={}): t.Dict().allow_extra("*"),
+                t.Key("metadata"): AppMetadata.as_trafaret(),
                 t.Key("service_def", default={}): t.Dict().allow_extra("*"),
                 t.Key("copy_dir", default=None): tx.Path(type="dir") | t.Null,
             }
@@ -909,10 +946,9 @@ class VFolderMount(JSONSerializableMixin):
     kernel_path: PurePosixPath
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
-    app_config: MountedAppConfig | None = attrs.field(default=None)
 
     def to_json(self) -> dict[str, Any]:
-        val: dict[str, Any] = {
+        return {
             "name": self.name,
             "vfid": str(self.vfid),
             "vfsubpath": str(self.vfsubpath),
@@ -921,9 +957,6 @@ class VFolderMount(JSONSerializableMixin):
             "mount_perm": self.mount_perm.value,
             "usage_mode": self.usage_mode.value,
         }
-        if self.app_config is not None:
-            val["app_config"] = self.app_config.to_json()
-        return val
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VFolderMount:
@@ -944,7 +977,6 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
                     VFolderUsageMode
                 ),
-                t.Key("app_config", default=None): t.Null | MountedAppConfig.as_trafaret(),
             }
         ).allow_extra("*")
 
@@ -1027,6 +1059,7 @@ class ServicePort(TypedDict):
     container_ports: Sequence[int]
     host_ports: Sequence[Optional[int]]
     is_inference: bool
+    mount_path: NotRequired[str]
 
 
 ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])

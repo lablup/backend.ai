@@ -40,7 +40,6 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
-    MountedAppConfig,
     QuotaScopeID,
     QuotaScopeType,
     RedisConnectionInfo,
@@ -328,7 +327,6 @@ def vfolder_check_exists(
             ),
             t.Key("quota", default=None): tx.BinarySize | t.Null,
             t.Key("cloneable", default=False): t.Bool,
-            t.Key("app_config", default=None): tx.ToJSONSerializable(MountedAppConfig) | t.Null,
         }
     ),
 )
@@ -540,7 +538,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
-            "app_config": params["app_config"],
         }
         resp = {
             "id": vfid.folder_id.hex,
@@ -1225,7 +1222,6 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
         {
             t.Key("cloneable", default=None): t.Bool | t.Null,
             t.Key("permission", default=None): tx.Enum(VFolderPermission) | t.Null,
-            t.Key("app_config", default=None): tx.ToJSONSerializable(MountedAppConfig) | t.Null,
         }
     )
 )
@@ -1256,13 +1252,6 @@ async def update_vfolder_options(
         updated_fields["cloneable"] = params["cloneable"]
     if params["permission"] is not None and params["permission"] != row["permission"]:
         updated_fields["permission"] = params["permission"]
-    if params["app_config"] is not None:
-        if row["usage_mode"] != VFolderUsageMode.APP:
-            raise InvalidAPIParameters(
-                f"Only APP mode vfolder can be set app_config, not {row['usage_mode']} mode"
-            )["app_config"]
-        if params["app_config"] != row["app_config"]:
-            updated_fields["app_config"] = params["app_config"]
     if not row["is_owner"]:
         raise InvalidAPIParameters(
             "Cannot change the options of a vfolder that is not owned by myself."

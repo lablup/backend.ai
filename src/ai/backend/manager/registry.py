@@ -107,7 +107,6 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
-    VFolderMount,
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
@@ -2634,13 +2633,8 @@ class AgentRegistry:
         session: SessionRow,
         service: str,
         opts: Mapping[str, Any],
+        mount_path: Optional[str] = None,
     ) -> Mapping[str, Any]:
-        vfolder_mounts: list[VFolderMount] = session.vfolder_mounts
-        mount_info: Optional[dict[str, Any]] = None
-        for mount in vfolder_mounts:
-            if mount.app_config is not None and mount.app_config.service_name == service:
-                mount_info = mount.to_json()
-                break
         async with handle_session_exception(self.db, "execute", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2653,7 +2647,7 @@ class AgentRegistry:
                     str(session.main_kernel.id),
                     service,
                     opts,
-                    mount_info,
+                    mount_path,
                 )
 
     async def shutdown_service(

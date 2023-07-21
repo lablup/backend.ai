@@ -757,6 +757,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     app_ctx: PrivateContext = request.app["session.context"]
     access_key: AccessKey = request["keypair"]["access_key"]
     service: str = params["app"]
+    log.info("START_SERVICE (ak:{}, s:{})", access_key, session_name)
     myself = asyncio.current_task()
     assert myself is not None
     try:
@@ -793,6 +794,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
         kernel_host = urlparse(session.main_kernel.agent_addr).hostname
     else:
         kernel_host = session.main_kernel.kernel_host
+    mount_path: str | None = None
     for sport in session.main_kernel.service_ports:
         if sport["name"] == service:
             if sport["is_inference"]:
@@ -815,6 +817,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
                     host_port = sport["host_port"]  # legacy kernels
                 else:
                     host_port = sport["host_ports"][0]
+            mount_path = sport.get("mount_path")
             break
     else:
         raise AppNotFound(f"{session_name}:{service}")
@@ -833,7 +836,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 
     result = await asyncio.shield(
         app_ctx.rpc_ptask_group.create_task(
-            root_ctx.registry.start_service(session, service, opts),
+            root_ctx.registry.start_service(session, service, opts, mount_path),
         ),
     )
     if result["status"] == "failed":

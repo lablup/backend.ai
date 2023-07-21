@@ -19,7 +19,6 @@ from .params import (
     ByteSizeParamCheckType,
     ByteSizeParamType,
     CommaSeparatedKVListParamType,
-    JSONParamType,
 )
 from .pretty import (
     ProgressViewer,
@@ -126,8 +125,7 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-@click.option("--app-config", type=JSONParamType(), help="App type vfolder's configuration.")
-def create(name, host, group, host_path, usage_mode, permission, quota, cloneable, app_config):
+def create(name, host, group, host_path, usage_mode, permission, quota, cloneable):
     """Create a new virtual folder.
 
     \b
@@ -145,7 +143,6 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     permission=permission,
                     quota=quota,
                     cloneable=cloneable,
-                    app_config=app_config,
                 )
             else:
                 result = session.VFolder.create(
@@ -156,7 +153,6 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
                     permission=permission,
                     quota=quota,
                     cloneable=cloneable,
-                    app_config=app_config,
                 )
             print('Virtual folder "{0}" is created.'.format(result["name"]))
         except Exception as e:
@@ -817,8 +813,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
         "If not set, the cloneable property is not changed."
     ),
 )
-@click.option("--app-config", type=JSONParamType(), help="App type vfolder's configuration.")
-def update_options(name, permission, set_cloneable, app_config):
+def update_options(name, permission, set_cloneable):
     """Update an existing virtual folder.
 
     \b
@@ -834,7 +829,6 @@ def update_options(name, permission, set_cloneable, app_config):
                 name,
                 permission=permission,
                 cloneable=set_cloneable,
-                app_config=app_config,
             )
             print_done("Updated.")
         except Exception as e:

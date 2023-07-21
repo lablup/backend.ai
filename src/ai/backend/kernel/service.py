@@ -62,7 +62,7 @@ class ServiceParser:
         self.variables = variables
         self.services = {}
 
-    async def parse(self, path: Path) -> None:
+    async def parse(self, path: Path, service_name: Optional[str] = None) -> None:
         for service_def_file in get_service_def_files(path):
             log.debug(f"loading service-definition from {service_def_file}")
             try:
@@ -80,7 +80,7 @@ class ServiceParser:
                 raise InvalidServiceDefinition(
                     f"malformed JSON in service-def file: {service_def_file.name}"
                 )
-            name = service_def_file.stem
+            name = service_name or service_def_file.stem
             try:
                 self.services[name] = ServiceDefinition(**raw_service_def)
             except TypeError as e:

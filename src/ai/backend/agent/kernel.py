@@ -285,7 +285,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         service: str,
         opts: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        mount_info: Optional[Mapping[str, Any]] = None,
+        mount_path: Optional[str] = None,
     ):
         raise NotImplementedError
 

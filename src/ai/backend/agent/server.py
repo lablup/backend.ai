@@ -535,15 +535,15 @@ class AgentRPCServer(aobject):
         kernel_id: str,
         service: str,
         opts: dict[str, Any],
-        mount_info: Optional[Mapping[str, Any]] = None,
+        mount_path: Optional[str] = None,
     ) -> dict[str, Any]:
         log.info(
-            "rpc::start_service(k:{0}, app:{1}, mounted_app_info:{2})",
+            "rpc::start_service(k:{0}, app:{1}, app_mount_path:{2})",
             kernel_id,
             service,
-            mount_info,
+            mount_path,
         )
-        return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts, mount_info)
+        return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts, mount_path)
 
     @rpc_function
     @collect_error

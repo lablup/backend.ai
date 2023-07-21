@@ -131,7 +131,7 @@ class DockerKernel(AbstractKernel):
         service: str,
         opts: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        mount_info: Optional[Mapping[str, Any]] = None,
+        mount_path: Optional[str] = None,
     ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
@@ -150,7 +150,7 @@ class DockerKernel(AbstractKernel):
             "distro": distro,
             **opts,
         }
-        if mount_info is None:
+        if mount_path is None:
             result = await self.runner.feed_start_service(
                 {
                     "name": service,
@@ -168,7 +168,7 @@ class DockerKernel(AbstractKernel):
                     "ports": sport["container_ports"],
                     "protocol": sport["protocol"],
                     "options": opts,
-                    "mount_info": mount_info,
+                    "mount_path": mount_path,
                 }
             )
         return result

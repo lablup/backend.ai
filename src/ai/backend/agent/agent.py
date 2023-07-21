@@ -108,6 +108,7 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
+    MountedAppConfig,
     MountPermission,
     MountTypes,
     Sentinel,
@@ -364,7 +365,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 Path(vfolder.host_path),
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
-                app_config=vfolder.app_config.to_json() if vfolder.app_config is not None else None,
+                usage_mode=vfolder.usage_mode,
             )
             resource_spec.mounts.append(mount)
 
@@ -1836,27 +1837,28 @@ class AbstractAgent(
                             model_folder.vfid,
                         )
 
-                for mount in resource_spec.mounts:
-                    if mount.app_config is None:
-                        continue
-                    if (
-                        cntr_port := mount.app_config["metadata"].get("container_port")
-                    ) is None or (hport := mount.app_config["metadata"].get("host_port")) is None:
-                        log.warning(
-                            f"Invalid container_port {cntr_port}, or host_port {hport} in metadata"
-                            " of mount.app_config. Skipping."
-                        )
-                        continue
+                app_folders = [
+                    folder for folder in vfolder_mounts if folder.usage_mode == VFolderUsageMode.APP
+                ]
+
+                for folder in app_folders:
+                    app_config = await self.read_app_config_file(folder)
+                    print(f"{app_config = }")
+
+                    cntr_ports = app_config.metadata.container_ports
+                    host_ports = app_config.metadata.host_ports
+
                     service_ports.append(
                         {
-                            "name": mount.app_config["service_name"],
-                            "protocol": ServicePortProtocols.PREOPEN,
-                            "container_ports": (int(cntr_port),),
-                            "host_ports": (int(hport),),
+                            "name": app_config.service_name,
+                            "protocol": app_config.metadata.protocol,
+                            "container_ports": tuple(cntr_ports),
+                            "host_ports": tuple(host_ports),
                             "is_inference": False,
+                            "mount_path": str(folder.kernel_path),
                         }
                     )
-                    exposed_ports.append(int(cntr_port))
+                    exposed_ports.extend(cntr_ports)
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -2082,6 +2084,27 @@ class AbstractAgent(
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
+    async def read_app_config_file(self, folder: VFolderMount) -> MountedAppConfig:
+        config_path = Path(folder.host_path) / "app-config.json"
+
+        def _load():
+            with config_path.open() as f:
+                return json.load(f)
+
+        try:
+            raw_config: dict[str, Any] = await asyncio.get_running_loop().run_in_executor(
+                None, _load
+            )
+        except FileNotFoundError:
+            raise AgentError(
+                f"App config file does not exists on {str(config_path)} (ID {folder.vfid})"
+            )
+        except IOError:
+            raise AgentError(f"Cannot read app config file: {str(config_path)}")
+        except json.JSONDecodeError:
+            raise AgentError(f"malformed JSON in app config file: {str(config_path)}")
+        return MountedAppConfig.from_json(raw_config)
+
     @abstractmethod
     async def destroy_kernel(
         self,
@@ -2302,10 +2325,10 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].interrupt_kernel()
 
     async def start_service(
-        self, kernel_id: KernelId, service: str, opts: dict, mount_info: Optional[Mapping[str, Any]]
+        self, kernel_id: KernelId, service: str, opts: dict, mount_path: Optional[str]
     ):
         return await self.kernel_registry[kernel_id].start_service(
-            service, opts, self.local_config, mount_info
+            service, opts, self.local_config, mount_path
         )
 
     async def shutdown_service(self, kernel_id: KernelId, service: str):

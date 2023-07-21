@@ -40,6 +40,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SlotName,
     SlotTypes,
+    VFolderUsageMode,
 )
 
 # Expose legacy import names for plugins
@@ -447,7 +448,7 @@ class Mount:
     target: Path
     permission: MountPermission = MountPermission.READ_ONLY
     opts: Optional[Mapping[str, Any]] = None
-    app_config: Optional[dict] = None
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
 
     def __str__(self):
         return f"{self.source}:{self.target}:{self.permission.value}"

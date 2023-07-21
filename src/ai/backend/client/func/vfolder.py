@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Dict, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -38,6 +38,7 @@ _default_list_fields = (
     vfolder_fields["permission"],
     vfolder_fields["ownership_type"],
     vfolder_fields["status"],
+    vfolder_fields["usage_mode"],
 )
 
 
@@ -61,7 +62,6 @@ class VFolder(BaseFunction):
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,
-        app_config: Optional[Mapping[str, Any]] = None,
     ):
         rqst = Request("POST", "/folders")
         rqst.set_json(
@@ -74,7 +74,6 @@ class VFolder(BaseFunction):
                 "permission": permission,
                 "quota": quota,
                 "cloneable": cloneable,
-                "app_config": app_config,
             }
         )
         async with rqst.fetch() as resp:
@@ -641,14 +640,12 @@ class VFolder(BaseFunction):
         name: str,
         permission: str = None,
         cloneable: bool = None,
-        app_config: Optional[Mapping[str, Any]] = None,
     ):
         rqst = Request("POST", "/folders/{}/update-options".format(self.name))
         rqst.set_json(
             {
                 "cloneable": cloneable,
                 "permission": permission,
-                "app_config": app_config,
             }
         )
         async with rqst.fetch() as resp:

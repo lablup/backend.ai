@@ -22,7 +22,6 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
-    MountedAppConfig,
     QuotaScopeID,
     QuotaScopeType,
     VFolderHostPermission,
@@ -44,7 +43,6 @@ from .base import (
     Item,
     PaginatedList,
     QuotaScopeIDType,
-    StructuredJSONObjectNullableColumn,
     batch_multiresult,
     metadata,
 )
@@ -186,7 +184,6 @@ vfolders = sa.Table(
         default=VFolderUsageMode.GENERAL,
         nullable=False,
     ),
-    sa.Column("app_config", StructuredJSONObjectNullableColumn(MountedAppConfig), nullable=True),
     sa.Column("permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE),
     sa.Column("max_files", sa.Integer(), default=1000),
     sa.Column("max_size", sa.Integer(), default=None),  # in MBytes
@@ -338,7 +335,6 @@ async def query_accessible_vfolders(
         vfolders.c.cloneable,
         vfolders.c.status,
         vfolders.c.cur_size,
-        vfolders.c.app_config,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -379,7 +375,6 @@ async def query_accessible_vfolders(
                     "cloneable": row.vfolders_cloneable,
                     "status": row.vfolders_status,
                     "cur_size": row.vfolders_cur_size,
-                    "app_config": row.vfolders_app_config,
                 }
             )
 
