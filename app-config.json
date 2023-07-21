@@ -1,5 +1,0 @@
-{
-    "service_name": "code-server",
-    "metadata": {"container_port": "8088", "host_port": "8088"},
-    "service_def": {}
-}
