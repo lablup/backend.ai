@@ -173,13 +173,13 @@ class CommaSeparatedListType(click.ParamType):
 class OptionalType(click.ParamType):
     name = "Optional Type Wrapper"
 
-    def __init__(self, type) -> None:
+    def __init__(self, type_: type) -> None:
         super().__init__()
-        self.type = type
+        self.type_ = type_
 
-    def convert(self, value, param, ctx):
+    def convert(self, value: Any, param, ctx):
         try:
-            if isinstance(value, self.type) or value == undefined:
+            if isinstance(value, self.type_) or value is undefined:
                 return value
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)
