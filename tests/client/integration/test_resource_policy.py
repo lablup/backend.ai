@@ -28,8 +28,6 @@ async def test_manipulate_resource_policy(self):
                 total_resource_slots="{}",
                 max_concurrent_sessions=1,
                 max_containers_per_session=1,
-                max_vfolder_count=1,
-                max_vfolder_size=1,
                 idle_timeout=1,
                 allowed_vfolder_hosts=["local"],
             )
@@ -39,8 +37,6 @@ async def test_manipulate_resource_policy(self):
             assert info["name"] == rpname
             assert info["total_resource_slots"] == "{}"
             assert info["max_concurrent_sessions"] == 1
-            assert info["max_vfolder_count"] == 1
-            assert info["max_vfolder_size"] == 1
             assert info["idle_timeout"] == 1
 
             # Update resource policy
@@ -50,8 +46,6 @@ async def test_manipulate_resource_policy(self):
                 total_resource_slots='{"cpu": "count"}',
                 max_concurrent_sessions=2,
                 max_containers_per_session=2,
-                max_vfolder_count=2,
-                max_vfolder_size=2,
                 idle_timeout=2,
                 allowed_vfolder_hosts=["local"],
             )
@@ -61,8 +55,6 @@ async def test_manipulate_resource_policy(self):
             assert info["name"] == rpname
             assert info["total_resource_slots"] == '{"cpu": "count"}'
             assert info["max_concurrent_sessions"] == 2
-            assert info["max_vfolder_count"] == 2
-            assert info["max_vfolder_size"] == 2
             assert info["idle_timeout"] == 2
 
             # Delete ResourcePolicy
@@ -85,8 +77,6 @@ async def test_user_cannot_create_resource_policy(self, userconfig):
                 total_resource_slots="{}",
                 max_concurrent_sessions=1,
                 max_containers_per_session=1,
-                max_vfolder_count=1,
-                max_vfolder_size=1,
                 idle_timeout=1,
                 allowed_vfolder_hosts=["local"],
             )

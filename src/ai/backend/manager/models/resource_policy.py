@@ -106,8 +106,9 @@ class UserResourcePolicyRow(Base):
     __table__ = user_resource_policies
     users = relationship("UserRow", back_populates="resource_policy_row")
 
-    def __init__(self, name, max_quota_scope_size) -> None:
+    def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
         self.name = name
+        self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
 
 
@@ -125,9 +126,10 @@ class ProjectResourcePolicyRow(Base):
     __table__ = project_resource_policies
     projects = relationship("GroupRow", back_populates="resource_policy_row")
 
-    def __init__(self, name, max_vfolder_size) -> None:
+    def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
         self.name = name
-        self.max_vfolder_size = max_vfolder_size
+        self.max_vfolder_count = max_vfolder_count
+        self.max_quota_scope_size = max_quota_scope_size
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
