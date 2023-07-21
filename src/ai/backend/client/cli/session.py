@@ -549,6 +549,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "-g",
         "--group",
+        metavar="GROUP_NAME",
         type=OptionalType(str),
         default=undefined,
         help=(
