@@ -37,7 +37,6 @@ from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resou
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
-optional_type = OptionalType()
 
 
 @main.group()
@@ -392,7 +391,7 @@ def _create_from_template_cmd(docs: str = None):
         "--name",
         "--client-token",
         metavar="NAME",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help="Specify a human-readable session name. If not set, a random hex string is used.",
     )
@@ -401,7 +400,7 @@ def _create_from_template_cmd(docs: str = None):
         "--owner",
         "--owner-access-key",
         metavar="ACCESS_KEY",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help="Set the owner of the target session explicitly.",
     )
@@ -424,7 +423,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "-i",
         "--image",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help="Set compute_session image to run.",
     )
@@ -432,7 +431,7 @@ def _create_from_template_cmd(docs: str = None):
         "-c",
         "--startup-command",
         metavar="COMMAND",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
     )
@@ -444,7 +443,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--max-wait",
         metavar="SECONDS",
-        type=optional_type,
+        type=OptionalType(int),
         default=undefined,
         help="The maximum duration to wait until the session starts.",
     )
@@ -480,7 +479,7 @@ def _create_from_template_cmd(docs: str = None):
     # extra options
     @click.option(
         "--tag",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help="User-defined tag string to annotate sessions.",
     )
@@ -502,7 +501,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--scaling-group",
         "--sgroup",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help=(
             "The scaling group to execute session. If not specified, "
@@ -525,7 +524,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--cluster-size",
         metavar="NUMBER",
-        type=optional_type,
+        type=OptionalType(int),
         default=undefined,
         help="The size of cluster in number of containers.",
     )
@@ -550,8 +549,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "-g",
         "--group",
-        metavar="GROUP_NAME",
-        type=optional_type,
+        type=OptionalType(str),
         default=undefined,
         help=(
             "Group name where the session is spawned. "
