@@ -126,6 +126,36 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
+    async def paginated_own_list(
+        cls,
+        group: str = None,
+        *,
+        fields: Sequence[FieldSpec] = _default_list_fields,
+        page_offset: int = 0,
+        page_size: int = 20,
+        filter: str = None,
+        order: str = None,
+    ) -> PaginatedResult[dict]:
+        """
+        Fetches the list of own vfolders.
+
+        :param group: Fetch vfolders in a specific group.
+        :param fields: Additional per-vfolder query fields to fetch.
+        """
+        return await fetch_paginated_result(
+            "vfolder_own_list",
+            {
+                "group_id": (group, "UUID"),
+                "filter": (filter, "String"),
+                "order": (order, "String"),
+            },
+            fields,
+            page_offset=page_offset,
+            page_size=page_size,
+        )
+
+    @api_function
+    @classmethod
     async def list_hosts(cls):
         rqst = Request("GET", "/folders/_/hosts")
         async with rqst.fetch() as resp:
@@ -231,7 +261,11 @@ class VFolder(BaseFunction):
                                     ) as pbar:
                                         loop = current_loop()
                                         writer_fut = loop.run_in_executor(
-                                            None, self._write_file, file_path, file_mode, q.sync_q
+                                            None,
+                                            self._write_file,
+                                            file_path,
+                                            file_mode,
+                                            q.sync_q,
                                         )
                                         await asyncio.sleep(0)
                                         max_attempts = 10
@@ -239,7 +273,9 @@ class VFolder(BaseFunction):
                                             try:
                                                 async for attempt in AsyncRetrying(
                                                     wait=wait_exponential(
-                                                        multiplier=0.02, min=0.02, max=5.0
+                                                        multiplier=0.02,
+                                                        min=0.02,
+                                                        max=5.0,
                                                     ),
                                                     stop=stop_after_attempt(max_attempts),
                                                     retry=retry_if_exception_type(TryAgain),

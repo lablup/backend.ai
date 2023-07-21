@@ -11,11 +11,17 @@ from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
+from ai.backend.client.func.vfolder import _default_list_fields
 from ai.backend.client.session import Session
 
 from ..compat import asyncio_run
 from ..session import AsyncSession
-from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
+from .extensions import pass_ctx_obj
+from .params import (
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+)
 from .pretty import (
     ProgressViewer,
     print_done,
@@ -25,6 +31,7 @@ from .pretty import (
     print_wait,
     print_warn,
 )
+from .types import CLIContext
 
 
 @main.group()
@@ -246,9 +253,9 @@ def info(name):
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
     help=(
-        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-        "and networks (e.g., 40 GbE) for the maximum throughput."
+        "Transfer the file with the given chunk size with binary suffixes (e.g.,"
+        ' "16m"). Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD'
+        " RAID) and networks (e.g., 40 GbE) for the maximum throughput."
     ),
 )
 @click.option(
@@ -256,10 +263,9 @@ def info(name):
     type=CommaSeparatedKVListParamType(),
     default=None,
     help=(
-        "Overrides storage proxy address. "
-        'The value must shape like "X1=Y1,X2=Y2...". '
-        "Each Yn address must at least include the IP address "
-        "or the hostname and may include the protocol part and the port number to replace."
+        'Overrides storage proxy address. The value must shape like "X1=Y1,X2=Y2...".'
+        " Each Yn address must at least include the IP address or the hostname and may"
+        " include the protocol part and the port number to replace."
     ),
 )
 def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy):
@@ -306,9 +312,9 @@ def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_pr
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
     help=(
-        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-        "and networks (e.g., 40 GbE) for the maximum throughput."
+        "Transfer the file with the given chunk size with binary suffixes (e.g.,"
+        ' "16m"). Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD'
+        " RAID) and networks (e.g., 40 GbE) for the maximum throughput."
     ),
 )
 @click.option(
@@ -316,10 +322,9 @@ def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_pr
     type=CommaSeparatedKVListParamType(),
     default=None,
     help=(
-        "Overrides storage proxy address. "
-        'The value must shape like "X1=Y1,X2=Y2...". '
-        "Each Yn address must at least include the IP address "
-        "or the hostname and may include the protocol part and the port number to replace."
+        'Overrides storage proxy address. The value must shape like "X1=Y1,X2=Y2...".'
+        " Each Yn address must at least include the IP address or the hostname and may"
+        " include the protocol part and the port number to replace."
     ),
 )
 @click.option(
@@ -399,7 +404,11 @@ def cp(filenames):
     help="Make missing parents of this path as needed",
 )
 @click.option(
-    "-e", "--exist-ok", default=False, is_flag=True, help="Skip an error caused by file not found"
+    "-e",
+    "--exist-ok",
+    default=False,
+    is_flag=True,
+    help="Skip an error caused by file not found",
 )
 def mkdir(name, path, parents, exist_ok):
     """Create an empty directory in the virtual folder.
@@ -760,8 +769,8 @@ def clone(name, target_name, target_host, usage_mode, permission):
                     bgtask.listen_events() as response,
                     ProgressViewer(
                         (
-                            "Cloning the vfolder... "
-                            "(This may take a while depending on its size and number of files!)"
+                            "Cloning the vfolder... (This may take a while depending on"
+                            " its size and number of files!)"
                         ),
                     ) as viewer,
                 ):
@@ -798,7 +807,11 @@ def clone(name, target_name, target_host, usage_mode, permission):
 @vfolder.command()
 @click.argument("name", type=str)
 @click.option(
-    "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
+    "-p",
+    "--permission",
+    type=str,
+    metavar="PERMISSION",
+    help="Folder's innate permission.",
 )
 @click.option(
     "--set-cloneable",
@@ -830,3 +843,99 @@ def update_options(name, permission, set_cloneable):
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@pass_ctx_obj
+@click.option(
+    "-g",
+    "--group",
+    type=str,
+    default=None,
+    help="""\b
+    Filter by group ID.
+
+    \b
+    EXAMPLE
+        --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
+
+    \b
+    """,
+)
+@click.option(
+    "--filter",
+    "filter_",
+    default=None,
+    help="""\b
+    Set the query filter expression.
+
+    \b
+    COLUMNS
+        host, name, created_at, creator,
+        ownership_type (UESR, GROUP),
+        status (READY, PERFORMING, CLONING, DELETING, MOUNTED),
+        permission (READ_ONLY, READ_WRITE, RW_DELETE, OWNER_PERM)
+
+    \b
+    OPERATORS
+        Binary Operators: ==, !=, <, <=, >, >=, is, isnot, like, ilike(case-insensitive), in, contains
+        Condition Operators: &, |
+        Special Symbol: % (wildcard for like and ilike operators)
+
+    \b
+    EXAMPLE QUERIES
+        --filter 'status == "READY" & permission in ["READ_ONLY", "READ_WRITE"]'
+        --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
+        --filter 'creator ilike "%@example.com"'
+
+    \b
+    """,
+)
+@click.option(
+    "--order",
+    default=None,
+    help="""\b
+    Set the query ordering expression.
+
+    \b
+    COLUMNS
+        host, name, created_at, creator, ownership_type, status, permission
+
+    \b
+    OPTIONS
+        ascending order (default): (+)column_name
+        descending order: -column_name
+
+    \b
+    EXAMPLE
+        --order 'host'
+        --order '+host'
+        --order '-created_at'
+
+    \b
+    """,
+)
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", type=int, default=None, help="The page size for pagination.")
+def list_own(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
+    """
+    List own virtual folders.
+    """
+    try:
+        with Session() as session:
+            fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_own_list(
+                group,
+                fields=_default_list_fields,
+                page_offset=pg_offset,
+                page_size=pg_size,
+                filter=filter_,
+                order=order,
+            )
+            ctx.output.print_paginated_list(
+                fetch_func,
+                initial_page_offset=offset,
+                page_size=limit,
+            )
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)
