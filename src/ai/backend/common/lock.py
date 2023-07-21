@@ -35,6 +35,7 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
     def __init__(self, *, lifetime: Optional[float] = None) -> None:
         assert lifetime is None or lifetime >= 0.0
         self._lifetime = lifetime
+        self._watchdog_task: Optional[asyncio.Task] = None
 
     @abc.abstractmethod
     async def __aenter__(self) -> Any:
@@ -43,6 +44,20 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         raise NotImplementedError
+
+    def register_watchdog_task(self, ttl: float) -> None:
+        assert self._watchdog_task is None
+        self._watchdog_task = asyncio.create_task(self._watchdog_timer(ttl=ttl))
+
+    def unregister_watchdog_task(self) -> None:
+        if task := self._watchdog_task:
+            if not task.done() and not task.cancelled():
+                task.cancel()
+        self._watchdog_task = None
+
+    @abc.abstractmethod
+    async def _watchdog_timer(self, ttl: float) -> None:
+        await asyncio.sleep(ttl)
 
 
 class FileLock(AbstractDistributedLock):
@@ -66,7 +81,6 @@ class FileLock(AbstractDistributedLock):
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
         self._remove_when_unlock = remove_when_unlock
-        self._watchdog_task: Optional[asyncio.Task[Any]] = None
 
     @property
     def locked(self) -> bool:
@@ -76,7 +90,7 @@ class FileLock(AbstractDistributedLock):
         if self._file is not None:
             self._debug = False
             self.release()
-            log.debug("file lock implicitly released: {}", self._path)
+            log.debug("{} implicitly released: {}", self.__class__.__name__, self._path)
 
     async def acquire(self) -> None:
         assert self._file is None
@@ -94,25 +108,21 @@ class FileLock(AbstractDistributedLock):
                 with attempt:
                     fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
-                    if self._lifetime is not None:
-                        self._watchdog_task = asyncio.create_task(
-                            self._watchdog_timer(ttl=self._lifetime),
-                        )
+                    if lifetime := self._lifetime:
+                        self.register_watchdog_task(ttl=lifetime)
                     if self._debug:
-                        log.debug("file lock acquired: {}", self._path)
+                        log.debug("{} acquired: {}", self.__class__.__name__, self._path)
         except RetryError:
             raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
 
     def release(self) -> None:
         assert self._file is not None
-        if task := self._watchdog_task:
-            if not task.done():
-                task.cancel()
+        self.unregister_watchdog_task()
         if self._locked:
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug("file lock explicitly released: {}", self._path)
+                log.debug("{} explicitly released: {}", self.__class__.__name__, self._path)
         self._file.close()
         if self._remove_when_unlock:
             try:
@@ -129,14 +139,16 @@ class FileLock(AbstractDistributedLock):
         self.release()
         return None
 
-    async def _watchdog_timer(self, ttl: float):
+    async def _watchdog_timer(self, ttl: float) -> None:
         await asyncio.sleep(ttl)
         if self._locked:
             assert self._file is not None
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug(f"file lock implicitly released by watchdog: {self._path}")
+                log.debug(
+                    "{} implicitly released by watchdog: {}", self.__class__.__name__, self._path
+                )
 
     @property
     def is_locked(self) -> bool:
@@ -189,6 +201,9 @@ class EtcdLock(AbstractDistributedLock):
             log.debug("etcd lock released")
         self._con_mgr = None
         return None
+
+    async def _watchdog_timer(self, ttl: float) -> None:
+        pass
 
 
 class RedisLock(AbstractDistributedLock):
@@ -247,3 +262,6 @@ class RedisLock(AbstractDistributedLock):
             log.debug("RedisLock.__aexit__(): lock released")
 
         return None
+
+    async def _watchdog_timer(self, ttl: float) -> None:
+        pass
