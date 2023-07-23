@@ -1843,7 +1843,6 @@ class AbstractAgent(
 
                 for folder in app_folders:
                     app_config = await self.read_app_config_file(folder)
-                    print(f"{app_config = }")
 
                     cntr_ports = app_config.metadata.container_ports
                     host_ports = app_config.metadata.host_ports
