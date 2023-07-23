@@ -58,6 +58,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     SessionTypes,
+    VFolderID,
 )
 
 from ..config import DEFAULT_CHUNK_SIZE
@@ -377,7 +378,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     t.Dict(
         {
             tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
-            tx.AliasedKey(["name", "clientSessionToken"], default=undefined)
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
@@ -563,7 +564,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["name", "clientSessionToken"])
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
             >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"]): t.String,
             tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
@@ -1061,7 +1062,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["name", "clientSessionToken"])
+            tx.AliasedKey(["name", "session_name", "clientSessionToken"])
             >> "session_name": t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
         }
     ),
@@ -1824,7 +1825,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             "folder/file/fetch",
             json={
                 "volume": volume_name,
-                "vfid": str(log_vfolder["id"]),
+                "vfid": str(VFolderID.from_row(log_vfolder)),
                 "relpath": str(
                     PurePosixPath("task")
                     / kernel_id_str[:2]

@@ -15,9 +15,16 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 100
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -28,7 +35,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
@@ -50,7 +57,9 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -67,9 +76,16 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest-8-cores
     steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 100
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
@@ -80,7 +96,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache-main-1-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -96,7 +112,9 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -113,9 +131,16 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest-8-cores
     steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 100
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -136,7 +161,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache-main-1-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -152,7 +177,9 @@ jobs:
           [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
           BASE_REF="origin/${BASE_REF_SHORT}"
           git remote set-branches origin "$BASE_REF_SHORT"
-          git fetch --no-tags --depth 100 origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -196,7 +223,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v4-scie-pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}

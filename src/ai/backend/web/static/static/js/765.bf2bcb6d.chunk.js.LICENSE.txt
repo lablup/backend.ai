@@ -1,0 +1,21 @@
+/*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/facebook/regenerator/blob/main/LICENSE */
+
+/**
+ * @remix-run/router v1.6.3
+ *
+ * Copyright (c) Remix Software Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE.md file in the root directory of this source tree.
+ *
+ * @license MIT
+ */
+
+/**
+ * Checks if two values are equal. Values may be primitives, arrays, or objects.
+ * Returns true if both arguments have the same keys and values.
+ *
+ * @see http://underscorejs.org
+ * @copyright 2009-2013 Jeremy Ashkenas, DocumentCloud Inc.
+ * @license MIT
+ */

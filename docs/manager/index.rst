@@ -7,3 +7,4 @@ Backend.AI Manager Reference
    common-api/index
    user-api/intro
    admin-api/intro
+   rest-reference/index

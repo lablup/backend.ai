@@ -43,6 +43,7 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
+    "sphinxcontrib.openapi",
     "sphinx_autodoc_typehints",
 ]
 
@@ -166,14 +167,16 @@ latex_engine = "pdflatex"
 latex_elements = {
     "papersize": "a4paper",
     "pointsize": "12pt",
-    "preamble": "\n".join(
-        [
-            "\\usepackage[T1]{fontenc}",
-            "\\usepackage{kotex}",
-            "\\usepackage{dhucs-nanumfont}",
-        ]
-    )
-    + "\n",
+    "preamble": (
+        "\n".join(
+            [
+                "\\usepackage[T1]{fontenc}",
+                "\\usepackage{kotex}",
+                "\\usepackage{dhucs-nanumfont}",
+            ]
+        )
+        + "\n"
+    ),
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }

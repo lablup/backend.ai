@@ -39,6 +39,12 @@ class Port:
     host_port: int
 
 
+@attrs.define(auto_attribs=True, slots=True)
+class AgentEventData:
+    type: str
+    data: dict[str, Any]
+
+
 class ContainerStatus(str, enum.Enum):
     RUNNING = "running"
     RESTARTING = "restarting"
