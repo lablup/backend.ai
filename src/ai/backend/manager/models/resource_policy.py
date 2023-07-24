@@ -407,6 +407,7 @@ class UserResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
+    max_vfolder_count = BigInt()
     max_quota_scope_size = BigInt()
 
     @classmethod
@@ -421,6 +422,7 @@ class UserResourcePolicy(graphene.ObjectType):
             id=f"UserResourcePolicy:{row.name}",
             name=row.name,
             created_at=row.created_at,
+            max_vfolder_count=row.max_vfolder_count,
             max_quota_scope_size=row.max_quota_scope_size,
         )
 
@@ -478,10 +480,12 @@ class UserResourcePolicy(graphene.ObjectType):
 
 
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_count = BigInt(required=True)
     max_quota_scope_size = BigInt(required=True)
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_count = BigInt(required=True)
     max_quota_scope_size = BigInt(required=True)
 
 
@@ -508,7 +512,9 @@ class CreateUserResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> UserResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicyRow(name, props.max_quota_scope_size)
+                row = UserResourcePolicyRow(
+                    name, props.max_vfolder_count, props.max_quota_scope_size
+                )
                 sess.add(row)
                 await sess.flush()
                 query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
@@ -540,6 +546,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
         data: Dict[str, Any] = {}
+        set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         update_query = (
             sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
@@ -576,6 +583,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
+    max_vfolder_count = BigInt()
     max_quota_scope_size = BigInt()
 
     @classmethod
@@ -590,6 +598,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
             id=f"ProjectResourcePolicy:{row.name}",
             name=row.name,
             created_at=row.created_at,
+            max_vfolder_count=row.max_vfolder_count,
             max_quota_scope_size=row.max_quota_scope_size,
         )
 
@@ -647,10 +656,12 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
 
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_count = BigInt(required=True)
     max_quota_scope_size = BigInt(required=True)
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
+    max_vfolder_count = BigInt(required=True)
     max_quota_scope_size = BigInt(required=True)
 
 
@@ -677,7 +688,9 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> ProjectResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicyRow(name, props.max_quota_scope_size)
+                row = ProjectResourcePolicyRow(
+                    name, props.max_vfolder_count, props.max_quota_scope_size
+                )
                 sess.add(row)
                 await sess.flush()
                 query = sa.select(ProjectResourcePolicyRow).where(
@@ -711,6 +724,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
         data: Dict[str, Any] = {}
+        set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         update_query = (
             sa.update(ProjectResourcePolicyRow)
