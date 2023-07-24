@@ -848,21 +848,6 @@ def update_options(name, permission, set_cloneable):
 @vfolder.command()
 @pass_ctx_obj
 @click.option(
-    "-g",
-    "--group",
-    type=str,
-    default=None,
-    help="""\b
-    Filter by group ID.
-
-    \b
-    EXAMPLE
-        --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
-
-    \b
-    """,
-)
-@click.option(
     "--filter",
     "filter_",
     default=None,
@@ -917,14 +902,13 @@ def update_options(name, permission, set_cloneable):
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list_own(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
+def list_own(ctx: CLIContext, filter_, order, offset, limit) -> None:
     """
     List own virtual folders.
     """
     try:
         with Session() as session:
             fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_own_list(
-                group,
                 fields=_default_list_fields,
                 page_offset=pg_offset,
                 page_size=pg_size,

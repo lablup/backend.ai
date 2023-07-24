@@ -475,7 +475,6 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
-        group_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
     )
 
@@ -1404,7 +1403,6 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
@@ -1412,7 +1410,6 @@ class Queries(graphene.ObjectType):
         total_count = await VirtualFolder.load_count(
             info.context,
             domain_name=domain_name,  # scope
-            group_id=group_id,  # scope
             user_id=info.context.user["uuid"],  # scope
             filter=filter,
         )
@@ -1420,8 +1417,7 @@ class Queries(graphene.ObjectType):
             info.context,
             limit,
             offset,
-            domain_name=domain_name,  # scope
-            group_id=group_id,  # scope
+            domain_name=domain_name,  # scopes
             user_id=info.context.user["uuid"],  # scope
             filter=filter,
             order=order,

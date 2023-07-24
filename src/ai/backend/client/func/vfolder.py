@@ -128,7 +128,6 @@ class VFolder(BaseFunction):
     @classmethod
     async def paginated_own_list(
         cls,
-        group: str = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
@@ -145,7 +144,6 @@ class VFolder(BaseFunction):
         return await fetch_paginated_result(
             "vfolder_own_list",
             {
-                "group_id": (group, "UUID"),
                 "filter": (filter, "String"),
                 "order": (order, "String"),
             },
