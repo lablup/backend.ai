@@ -50,7 +50,7 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import KernelRow, SessionRow
+from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -86,8 +86,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     )
                 ),
             )
@@ -301,8 +304,11 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session: SessionRow = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     ),  # noqa
                 ),
             )
@@ -448,8 +454,11 @@ async def stream_proxy(
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     ),
                 )
             )
@@ -632,8 +641,11 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        compute_session = await SessionRow.get_session_with_kernels(
-            session_name, access_key, only_main_kern=True, db_session=db_sess
+        compute_session = await SessionRow.get_session(
+            db_sess,
+            session_name,
+            access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
     service_ports = compute_session.main_kernel.service_ports
     if service_ports is None:
