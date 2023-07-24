@@ -469,6 +469,8 @@ class ComputeSession(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "enqueueOnly": enqueue_only,
             "maxWaitSeconds": max_wait,
+            "dependencies": dependencies,
+            "callbackURL": callback_url,
             "reuseIfExists": not no_reuse,
             "startupCommand": startup_command,
             "owner_access_key": owner_access_key,
