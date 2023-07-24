@@ -179,7 +179,15 @@ class OptionalType(click.ParamType):
 
     def convert(self, value: Any, param, ctx):
         try:
-            if isinstance(value, self.type_) or value is undefined:
+            if value is None or value is undefined:
                 return value
+            else:
+                try:
+                    value = int(value)
+                    self.type_ = int
+                except ValueError:
+                    pass
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)
+        else:
+            return self.type_(value)
