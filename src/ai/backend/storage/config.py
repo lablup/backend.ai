@@ -113,7 +113,7 @@ def load_local_config(config_path: Path, debug: bool = False) -> dict[str, Any]:
         return local_config
     except ConfigurationError as e:
         print(
-            "ConfigurationError: Validation of agent configuration has failed:",
+            "ConfigurationError: Validation of storage-proxy local config has failed:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)

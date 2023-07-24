@@ -496,7 +496,7 @@ def load(config_path: Path = None, debug: bool = False) -> LocalConfig:
         if cfg["manager"]["secret"] is None:
             cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print("Validation of manager configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of manager local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:
