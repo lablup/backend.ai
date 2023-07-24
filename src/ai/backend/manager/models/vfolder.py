@@ -1215,6 +1215,83 @@ class VirtualFolder(graphene.ObjectType):
                 lambda row: row["user"],
             )
 
+    @classmethod
+    async def load_count_invited(
+        cls,
+        graph_ctx: GraphQueryContext,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+    ) -> int:
+        from .user import users
+
+        j = vfolders.join(
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+            isouter=True,
+        ).join(users, vfolders.c.user == users.c.uuid, isouter=True)
+        query = sa.select([sa.func.count()]).select_from(j)
+        query = query.where(vfolders.c.group != user_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice_invited(
+        cls,
+        graph_ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> Sequence[VirtualFolder]:
+        from .group import groups
+        from .user import users
+
+        j = (
+            vfolders.join(
+                vfolder_permissions,
+                vfolders.c.id == vfolder_permissions.c.vfolder,
+                isouter=True,
+            )
+            .join(
+                users,
+                vfolders.c.user == users.c.uuid,
+                isouter=True,
+            )
+            .join(groups, vfolders.c.group == groups.c.id, isouter=True)
+        )
+        query = (
+            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+        )
+        query = query.where(vfolders.c.user != user_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(vfolders.c.created_at.desc())
+        async with graph_ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(graph_ctx, r)) is not None
+            ]
+
 
 class VirtualFolderList(graphene.ObjectType):
     class Meta:

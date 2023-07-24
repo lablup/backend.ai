@@ -478,6 +478,17 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),  # must be empty for user requests
     )
 
+    vfolder_invited_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
     vfolders = graphene.List(  # legacy non-paginated list
         VirtualFolder,
         domain_name=graphene.String(),
@@ -1414,6 +1425,36 @@ class Queries(graphene.ObjectType):
             filter=filter,
         )
         items = await VirtualFolder.load_slice(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_invited_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_invited(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_invited(
             info.context,
             limit,
             offset,
