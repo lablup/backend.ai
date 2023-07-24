@@ -381,10 +381,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             tx.AliasedKey(["name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["type", "sessionType"], default="interactive")
-            >> "session_type": tx.Enum(SessionTypes),
+            tx.AliasedKey(["arch", "architecture"], default=undefined)
+            >> "architecture": t.String | UndefChecker,
+            tx.AliasedKey(["type", "sessionType"], default=undefined)
+            >> "session_type": tx.Enum(SessionTypes) | UndefChecker,
             tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
                 UndefChecker | t.Null | t.String
             ),
