@@ -474,7 +474,7 @@ async def stream_proxy(
         kernel_host = urlparse(kernel.agent_addr).hostname
     else:
         kernel_host = kernel.kernel_host
-    mount_path: str | None = None
+    mount_config: Mapping[str, Any] | None = None
     for sport in kernel.service_ports:
         if sport["name"] == service:
             if params["port"]:
@@ -492,7 +492,8 @@ async def stream_proxy(
                 else:
                     host_port = sport["host_ports"][0]
             dest = (kernel_host, host_port)
-            mount_path = sport.get("mount_path")
+            if (mount_path := sport.get("mount_path")) is not None:
+                mount_config = {"mount_path": mount_path}
             break
     else:
         raise AppNotFound(f"{session_name}:{service}")
@@ -606,7 +607,7 @@ async def stream_proxy(
 
         result = await asyncio.shield(
             rpc_ptask_group.create_task(
-                root_ctx.registry.start_service(session, service, opts, mount_path),
+                root_ctx.registry.start_service(session, service, opts, mount_config),
             ),
         )
         if result["status"] == "failed":

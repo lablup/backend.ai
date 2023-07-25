@@ -18,3 +18,7 @@ class InvalidServiceDefinition(MessageError):
 
 class UnsupportedBaseDistroError(MessageError):
     pass
+
+
+class InvalidServiceName(MessageError):
+    pass

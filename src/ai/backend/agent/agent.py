@@ -348,12 +348,29 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         arch = get_arch_name()
         return arch, matched_distro, matched_libc_style, krunner_volume, krunner_pyver
 
+    async def _mount_app_vfolder(
+        self,
+        vfolder: VFolderMount,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        mount = Mount(
+            MountTypes.BIND,
+            Path(vfolder.host_path),
+            Path(vfolder.kernel_path),
+            MountPermission.READ_ONLY,
+            usage_mode=VFolderUsageMode.APP,
+        )
+        resource_spec.mounts.append(mount)
+
     async def mount_vfolders(
         self,
         vfolders: Sequence[VFolderMount],
         resource_spec: KernelResourceSpec,
     ) -> None:
         for vfolder in vfolders:
+            if vfolder.usage_mode == VFolderUsageMode.APP:
+                await self._mount_app_vfolder(vfolder, resource_spec)
+                continue
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 # Only allow mount of ".logs" directory to prevent expose
                 # internal-only information, such as Docker credentials to user's ".docker" vfolder
@@ -2324,10 +2341,14 @@ class AbstractAgent(
         return await self.kernel_registry[kernel_id].interrupt_kernel()
 
     async def start_service(
-        self, kernel_id: KernelId, service: str, opts: dict, mount_path: Optional[str]
+        self,
+        kernel_id: KernelId,
+        service: str,
+        opts: dict,
+        mount_config: Optional[Mapping[str, Any]],
     ):
         return await self.kernel_registry[kernel_id].start_service(
-            service, opts, self.local_config, mount_path
+            service, opts, self.local_config, mount_config
         )
 
     async def shutdown_service(self, kernel_id: KernelId, service: str):

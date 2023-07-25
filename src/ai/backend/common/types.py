@@ -220,6 +220,8 @@ MetricKey = NewType("MetricKey", str)
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
+AppVersion = NewType("AppVersion", str)
+
 
 class AbstractPermission(str, enum.Enum):
     """

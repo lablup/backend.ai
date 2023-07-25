@@ -2671,7 +2671,7 @@ class AgentRegistry:
         session: SessionRow,
         service: str,
         opts: Mapping[str, Any],
-        mount_path: Optional[str] = None,
+        mount_config: Optional[Mapping[str, Any]] = None,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
             async with RPCContext(
@@ -2685,7 +2685,7 @@ class AgentRegistry:
                     str(session.main_kernel.id),
                     service,
                     opts,
-                    mount_path,
+                    mount_config,
                 )
 
     async def shutdown_service(

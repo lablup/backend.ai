@@ -27,6 +27,7 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Tuple,
     Union,
 )
 
@@ -46,7 +47,8 @@ from .intrinsic import (
 )
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
-from .service import ServiceParser, get_service_def_files
+from .service import ServiceParser
+from .types import CandidateServiceName, ServiceName, ServicePath, ServiceVersion
 from .utils import scan_proc_stats, wait_local_port_open
 
 log = BraceStyleAdapter(logging.getLogger())
@@ -713,8 +715,10 @@ class BaseRunner(metaclass=ABCMeta):
             }
         return result
 
-    async def read_app_config_file(self, mount_path: str) -> Mapping[str, Any]:
-        config_path = Path(mount_path) / "app-config.json"
+    async def read_app_config_file(
+        self, mount_path: Path, app_path: ServicePath
+    ) -> Mapping[str, Any]:
+        config_path = mount_path / "app-config.json"
 
         def _load():
             with config_path.open() as f:
@@ -728,76 +732,87 @@ class BaseRunner(metaclass=ABCMeta):
         service_info: Mapping[str, Any],
     ) -> None:
         assert self.service_parser is not None
-        mount_path: str = service_info["mount_path"]
-        app_config = await self.read_app_config_file(mount_path)
-        raw_copy_dir: str | None = app_config.get("copy_dir")
-        copy_dir: Optional[Path] = Path(raw_copy_dir) if raw_copy_dir is not None else None
+        mount_config: Mapping[str, Any] = service_info["mount_config"]
+        mount_path: Path = Path(mount_config["mount_path"])
+        raw_version = mount_config.get("version")
+        given_version: Optional[ServiceVersion] = (
+            ServiceVersion(raw_version) if raw_version is not None else None
+        )
 
         opts: dict[str, Any] = service_info["options"]
         distro = opts["distro"]
         arch = opts["arch"]
 
-        mounted_def_folder = Path(mount_path) / "service-defs"
+        def filter_by_version(paths: list[Path]) -> list[ServicePath]:
+            """
+            filter by app version.
+            if `given_version` is not None, use filter by `given_version`.
+            else, filter latest app.
+            """
+            service_paths = [ServicePath(mount_path, ServiceName.from_str(p.name)) for p in paths]
+            if given_version is not None:
+                return [p for p in service_paths if p.service_name.version == given_version]
+            filtered: dict[CandidateServiceName, ServicePath] = {}
+            for p in service_paths:
+                key = p.service_name.candidate
+                if (cand := filtered.get(key)) is not None:
+                    if p.service_name.version > cand.service_name.version:
+                        filtered[key] = p
+                else:
+                    filtered[key] = p
+            return list(filtered.values())
 
-        service_def_file_paths = get_service_def_files(mounted_def_folder)
+        def find_versioned_app_name() -> ServiceName:
+            artifacts: dict[str, ServiceName] = {}
+            candidate_paths = list(Path(mount_path).glob(f"{service_name}*{arch}"))
+            for p in filter_by_version(candidate_paths):
+                artifacts[p.service_name.distro] = p.service_name
+            _, candidate = match_distro_data(artifacts, distro)
+            return candidate
 
-        if not mounted_def_folder.is_dir():
-            raise InvalidServiceDefinition(
-                f"Service definition directory not found. (name: {service_info['name']},"
-                f" mount_path: {mount_path})"
-            )
+        picked_service_path = ServicePath(mount_path, find_versioned_app_name())
+        app_config = await self.read_app_config_file(mount_path, picked_service_path)
+        copy_dir: Optional[Path] = None
+        if (raw_copy_dir := app_config.get("copy_dir")) is not None:
+            copy_dir = Path(raw_copy_dir)
 
-        def find_artifacts(pattern: str) -> dict[str, str]:
-            artifacts = {}
-            # search distro and version
-            # e.g) dropbear-ubuntu.22.04.aarch64.bin -> dropbear(-ubuntu.22.04.)aarch64.bin
-            _rx_distro = re.compile(r"\-([a-z]+\d+\.\d+)\.")
-            for p in Path(mount_path).glob(pattern):
-                m = _rx_distro.search(p.name)
-                if m is not None:
-                    artifacts[m.group(1)] = p.name
-            return artifacts
-
-        def find_versioned_app_path(candidate_glob: str) -> Path:
-            candidates = find_artifacts(candidate_glob)
-            # _, candidate = match_distro_data(candidates, distro)
-            for _, cand in candidates.items():
-                candidate = cand
-                break
-            else:
-                raise UnsupportedBaseDistroError(f"distro({distro}) is not supported.")
-            return Path(mount_path, candidate)
-
-        mounted_service_path = find_versioned_app_path(f"{service_name}*{arch}*")
-        service_path = mounted_service_path
-        service_def_folder = mounted_def_folder
-
-        def _copy() -> None:
+        def _copy(path_list: list[Path]) -> None:
             assert copy_dir is not None
             copy_dir.mkdir(parents=True, exist_ok=True)
-            service_def_folder.mkdir(parents=True, exist_ok=True)
-            if mounted_service_path.is_file():
-                shutil.copy(mounted_service_path, service_path)
-            else:
-                shutil.copytree(mounted_service_path, service_path)
-            for fpath in service_def_file_paths:
-                shutil.copy(fpath, service_def_folder / fpath.name)
+            for path in path_list:
+                trg = copy_dir / path.name
+                trg.parent.mkdir(parents=True, exist_ok=True)
+                if path.is_file():
+                    shutil.copy(path, trg)
+                else:
+                    shutil.copytree(path, trg)
 
         if copy_dir is not None:
-            service_def_folder = copy_dir / "service-defs"
-            service_path = copy_dir / mounted_service_path.name
+            copy_list = [
+                str(picked_service_path.service_name),
+                str(picked_service_path.config_file),
+                str(picked_service_path.def_file),
+            ]
 
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, _copy)
+            await loop.run_in_executor(
+                None, _copy, [picked_service_path.parent_path / path for path in copy_list]
+            )
+            picked_service_path.parent_path = copy_dir
 
-        await self.service_parser.parse(service_def_folder, service_name)
-        self.service_parser.variables["service_path"] = str(service_path)
+        await self.service_parser.parse_mounted_app(
+            picked_service_path.def_file, picked_service_path.service_name
+        )
+        self.service_parser.variables["service_path"] = str(
+            picked_service_path.parent_path / str(picked_service_path.service_name)
+        )
         self.service_parser.variables["port"] = str(service_info["port"])
         log.debug("Loaded new-style service definitions.")
 
     async def start_mounted_service(self, service_info: Mapping[str, Any]) -> None:
         assert self.service_parser is not None
-        mount_path: str = service_info["mount_path"]
+        mount_config: Mapping[str, Any] = service_info["mount_config"]
+        mount_path: str = mount_config["mount_path"]
 
         try:
             service_name = service_info["name"]
@@ -1207,7 +1222,7 @@ class BaseRunner(metaclass=ABCMeta):
         await self.shutdown()
 
 
-def match_distro_data(data: Mapping[str, str], distro: str) -> tuple[str, str]:
+def match_distro_data(data: Mapping[str, ServiceName], distro: str) -> Tuple[str, ServiceName]:
     """
     Find the latest or exactly matching entry from krunner_volumes mapping using the given distro
     string expression.
@@ -1218,7 +1233,7 @@ def match_distro_data(data: Mapping[str, str], distro: str) -> tuple[str, str]:
     """
     rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
 
-    def _extract_version(key: str) -> tuple[int, ...]:
+    def _extract_version(key: str) -> Tuple[int, ...]:
         m = rx_ver_suffix.search(key)
         if m is not None:
             return tuple(map(int, m.group(1).split(".")))
@@ -1233,17 +1248,8 @@ def match_distro_data(data: Mapping[str, str], distro: str) -> tuple[str, str]:
         distro_prefix = distro[: -len(m.group(1))]
         distro_ver = tuple(map(int, m.group(1).split(".")))
 
-    # Check if there are static-build krunners first.
-    if distro_prefix == "alpine":
-        libc_flavor = "musl"
-    else:
-        libc_flavor = "gnu"
-    distro_key = f"static-{libc_flavor}"
-    if volume := data.get(distro_key):
-        return distro_key, volume
-
     # Search through the per-distro versions
-    match_list: list[tuple[str, str, tuple[int, ...]]] = [
+    match_list = [
         (distro_key, value, _extract_version(distro_key))
         for distro_key, value in data.items()
         if distro_key.startswith(distro_prefix)
@@ -1257,4 +1263,4 @@ def match_distro_data(data: Mapping[str, str], distro: str) -> tuple[str, str]:
             if distro_ver >= matched_distro_ver:
                 return (distro_key, value)
         return match_list[-1][:-1]  # fallback to the latest of its kind
-    raise UnsupportedBaseDistroError(f"distro({distro}) is not supported.")
+    raise UnsupportedBaseDistroError(distro)

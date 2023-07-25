@@ -182,7 +182,7 @@ class KubernetesKernel(AbstractKernel):
         service: str,
         opts: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        mount_path: Optional[str] = None,
+        mount_path: Optional[Mapping[str, Any]] = None,
     ):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):

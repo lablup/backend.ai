@@ -28,6 +28,7 @@ import attrs
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
 from .logging import BraceStyleAdapter
+from .types import ServiceName
 
 log = BraceStyleAdapter(logging.getLogger())
 
@@ -50,7 +51,7 @@ class ServiceDefinition:
     default_arguments: Mapping[str, Union[None, str, List[str]]] = attrs.Factory(dict)
 
 
-def get_service_def_files(path: Path) -> list[Path]:
+def get_json_files(path: Path) -> list[Path]:
     return list(path.glob("*.json"))
 
 
@@ -62,29 +63,34 @@ class ServiceParser:
         self.variables = variables
         self.services = {}
 
+    def _parse(self, service_def_file: Path, service_name: str) -> None:
+        log.debug(f"loading service-definition from {service_def_file}")
+        try:
+            with open(service_def_file.absolute(), "rb") as fr:
+                raw_service_def = json.load(fr)
+                # translate naming differences
+                if "prestart" in raw_service_def:
+                    raw_service_def["prestart_actions"] = raw_service_def["prestart"]
+                    del raw_service_def["prestart"]
+        except IOError:
+            raise InvalidServiceDefinition(
+                f"could not read the service-def file: {service_def_file.name}"
+            )
+        except json.JSONDecodeError:
+            raise InvalidServiceDefinition(
+                f"malformed JSON in service-def file: {service_def_file.name}"
+            )
+        try:
+            self.services[service_name] = ServiceDefinition(**raw_service_def)
+        except TypeError as e:
+            raise InvalidServiceDefinition(e.args[0][11:])  # lstrip "__init__() "
+
     async def parse(self, path: Path, service_name: Optional[str] = None) -> None:
-        for service_def_file in get_service_def_files(path):
-            log.debug(f"loading service-definition from {service_def_file}")
-            try:
-                with open(service_def_file.absolute(), "rb") as fr:
-                    raw_service_def = json.load(fr)
-                    # translate naming differences
-                    if "prestart" in raw_service_def:
-                        raw_service_def["prestart_actions"] = raw_service_def["prestart"]
-                        del raw_service_def["prestart"]
-            except IOError:
-                raise InvalidServiceDefinition(
-                    f"could not read the service-def file: {service_def_file.name}"
-                )
-            except json.JSONDecodeError:
-                raise InvalidServiceDefinition(
-                    f"malformed JSON in service-def file: {service_def_file.name}"
-                )
-            name = service_name or service_def_file.stem
-            try:
-                self.services[name] = ServiceDefinition(**raw_service_def)
-            except TypeError as e:
-                raise InvalidServiceDefinition(e.args[0][11:])  # lstrip "__init__() "
+        for service_def_file in get_json_files(path):
+            self._parse(service_def_file, service_name or service_def_file.stem)
+
+    async def parse_mounted_app(self, path: Path, picked_service_name: ServiceName) -> None:
+        self._parse(path, picked_service_name.name)
 
     def add_model_service(self, name, model_service_info) -> None:
         service_def = ServiceDefinition(
