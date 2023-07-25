@@ -181,13 +181,6 @@ class OptionalType(click.ParamType):
         try:
             if value is None or value is undefined:
                 return value
-            else:
-                try:
-                    value = int(value)
-                    self.type_ = int
-                except ValueError:
-                    pass
+            return self.type_(value)
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)
-        else:
-            return self.type_(value)
