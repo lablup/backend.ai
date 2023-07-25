@@ -5,6 +5,9 @@ from typing import Any, MutableMapping, NamedTuple, Tuple, Type, Union
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
+    (12, 2),
+    (12, 1),
+    (12, 0),
     (11, 1),
     (11, 0),
     (10, 2),
