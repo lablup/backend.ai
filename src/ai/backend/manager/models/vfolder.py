@@ -834,21 +834,6 @@ async def initiate_vfolder_clone(
     target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 
     async def _clone(reporter: ProgressReporter) -> None:
-        try:
-            async with storage_manager.request(
-                target_proxy,
-                "POST",
-                "folder/create",
-                json={
-                    "volume": target_volume,
-                    "vfid": str(target_folder_id),
-                    # 'options': {'quota': params['quota']},
-                },
-            ):
-                pass
-        except aiohttp.ClientResponseError:
-            raise VFolderOperationFailed(extra_msg=str(target_folder_id.folder_id))
-
         async def _insert_vfolder() -> None:
             async with db_engine.begin_session() as db_session:
                 insert_values = {

@@ -52,6 +52,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, noload, selectinload
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -142,6 +143,7 @@ from .models import (
     AgentStatus,
     EndpointRow,
     ImageRow,
+    KernelLoadingStrategy,
     KernelRole,
     KernelRow,
     KernelStatus,
@@ -544,10 +546,11 @@ class AgentRegistry:
             # NOTE: We can reuse the session IDs of TERMINATED sessions only.
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
             async with self.db.begin_readonly_session() as db_sess:
-                sess = await SessionRow.get_session_with_main_kernel(
+                sess = await SessionRow.get_session(
+                    db_sess,
                     session_name,
                     owner_access_key,
-                    db_session=db_sess,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
             running_image_ref = ImageRef(
                 sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
@@ -719,9 +722,9 @@ class AgentRegistry:
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
             async with self.db.begin_readonly_session() as db_sess:
                 await SessionRow.get_session(
+                    db_sess,
                     session_name,
                     owner_access_key,
-                    db_session=db_sess,
                 )
         except SessionNotFound:
             pass
@@ -1310,9 +1313,9 @@ class AgentRegistry:
                         for dependency_id in dependency_sessions:
                             try:
                                 match_info = await SessionRow.get_session(
+                                    db_sess,
                                     dependency_id,
                                     access_key,
-                                    db_session=db_sess,
                                 )
                             except SessionNotFound:
                                 raise InvalidAPIParameters(
@@ -1645,8 +1648,21 @@ class AgentRegistry:
             new_session_status = await SessionRow.transit_session_status(self.db, session_id)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
-
-            updated_session = await SessionRow.get_session_to_produce_event(self.db, session_id)
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    noload("*"),
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.name,
+                        SessionRow.creation_id,
+                        SessionRow.access_key,
+                    ),
+                )
+            )
+            async with self.db.begin_readonly_session() as db_session:
+                updated_session = (await db_session.scalars(query)).first()
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -2153,7 +2169,29 @@ class AgentRegistry:
             session_id,
             set_error=True,
         ):
-            target_session = await SessionRow.get_session_to_destroy(self.db, session_id)
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    noload("*"),
+                    load_only(SessionRow.creation_id, SessionRow.status),
+                    selectinload(SessionRow.kernels).options(
+                        noload("*"),
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.role,
+                            KernelRow.access_key,
+                            KernelRow.status,
+                            KernelRow.container_id,
+                            KernelRow.cluster_role,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                        ),
+                    ),
+                )
+            )
+            async with self.db.begin_readonly_session() as db_session:
+                target_session = (await db_session.scalars(query)).first()
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -3272,9 +3310,10 @@ class AgentRegistry:
     ) -> None:
         active_routes = [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
 
-        target_sessions = await SessionRow.list_sessions_with_main_kernels(
+        target_sessions = await SessionRow.list_sessions(
+            db_sess,
             [r.session for r in active_routes],
-            db_session=db_sess,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
@@ -3312,6 +3351,16 @@ class AgentRegistry:
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
                 json={
                     "service_name": endpoint.name,
+                    "tags": {
+                        "session": {
+                            "user_uuid": str(endpoint.session_owner),
+                            "group_id": str(endpoint.project),
+                            "domain_name": endpoint.domain,
+                        },
+                        "endpoint": {
+                            "id": endpoint.id,
+                        },
+                    },
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
                 },  # TODO: support for multiple inference apps
@@ -3320,7 +3369,6 @@ class AgentRegistry:
                 },
             ) as resp:
                 endpoint_json = await resp.json()
-                log.debug("resp: {}", endpoint_json)
                 async with self.db.begin_session() as db_sess:
                     query = (
                         sa.update(EndpointRow)
@@ -3456,7 +3504,9 @@ async def handle_destroy_session(
     event: DoTerminateSessionEvent,
 ) -> None:
     async with context.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+        session = await SessionRow.get_session(
+            db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
+        )
     await context.destroy_session(
         session,
         forced=False,
@@ -3481,8 +3531,11 @@ async def invoke_session_callback(
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with context.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess, allow_stale=allow_stale
+            session = await SessionRow.get_session(
+                db_sess,
+                event.session_id,
+                allow_stale=allow_stale,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
     except SessionNotFound:
         return
@@ -3568,8 +3621,8 @@ async def handle_batch_result(
         await SessionRow.set_session_result(context.db, event.session_id, False, event.exit_code)
     async with context.db.begin_session() as db_sess:
         try:
-            session = await SessionRow.get_session_with_kernels(
-                event.session_id, db_session=db_sess
+            session = await SessionRow.get_session(
+                db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
             )
         except SessionNotFound:
             return

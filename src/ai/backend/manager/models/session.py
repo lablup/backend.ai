@@ -97,6 +97,7 @@ __all__ = (
     "ComputeSessionList",
     "InferenceSession",
     "InferenceSessionList",
+    "KernelLoadingStrategy",
 )
 
 
@@ -534,6 +535,12 @@ class SessionOp(str, enum.Enum):
     GET_AGENT_LOGS = "get_logs_from_agent"
 
 
+class KernelLoadingStrategy(str, enum.Enum):
+    ALL_KERNELS = "all"
+    MAIN_KERNEL_ONLY = "main"
+    NONE = "none"
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -827,7 +834,9 @@ class SessionRow(Base):
 
         await execute_with_retry(_update)
 
+    @classmethod
     async def set_session_result(
+        cls,
         db: ExtendedAsyncSAEngine,
         session_id: SessionId,
         success: bool,
@@ -881,9 +890,6 @@ class SessionRow(Base):
             ]
             try:
                 session_id = UUID(str(session_reference))
-            except ValueError:
-                pass
-            else:
                 # Fetch id-based query first
                 query_list = [
                     aiotools.apartial(
@@ -902,6 +908,8 @@ class SessionRow(Base):
                         ),
                         *query_list,
                     ]
+            except ValueError:
+                pass
 
         for fetch_func in query_list:
             rows = await fetch_func(
@@ -920,31 +928,60 @@ class SessionRow(Base):
     @classmethod
     async def get_session(
         cls,
+        db_session: SASession,
         session_name_or_id: Union[str, UUID],
         access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        db_session: SASession,
+        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
+        eager_loading_op: list[Any] = [],
     ) -> SessionRow:
         """
         Retrieve the session information by session's UUID,
         or session's name paired with access_key.
         This will return the information of the session and the sibling kernel(s).
 
-        :param session_name_or_id: session's id or session's name.
+        :param db_session: Database connection to use when fetching row.
+        :param session_name_or_id: Name or ID (UUID) of session to look up.
         :param access_key: Access key used to create session.
-        :param allow_stale: If True, filter "inactive" sessions as well as "active" ones.
-                            If False, filter "active" sessions only.
-        :param for_update: Apply for_update during select query.
-        :param db_session: Database connection for reuse.
+        :param allow_stale: If set to True, filter "inactive" sessions as well as "active" ones.
+                            Otherwise filter "active" sessions only.
+        :param for_update: Apply for_update during executing select query.
+        :param kernel_loading_strategy: Determines JOIN strategy of `kernels` relation when fetching session rows.
+        :param eager_loading_op: Extra loading operators to be passed directly to `match_sessions()` API.
         """
+        match kernel_loading_strategy:
+            case KernelLoadingStrategy.ALL_KERNELS:
+                eager_loading_op.extend(
+                    [
+                        noload("*"),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
+            case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
+                kernel_rel = SessionRow.kernels
+                kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+                eager_loading_op.extend(
+                    [
+                        noload("*"),
+                        selectinload(kernel_rel).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
+
         session_list = await cls.match_sessions(
             db_session,
             session_name_or_id,
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
+            eager_loading_op=eager_loading_op,
         )
         if not session_list:
             raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
@@ -962,89 +999,53 @@ class SessionRow(Base):
         return session_list[0]
 
     @classmethod
-    async def get_session_with_kernels(
+    async def list_sessions(
         cls,
-        session_name_or_id: str | UUID,
-        access_key: Optional[AccessKey] = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        only_main_kern: bool = False,
         db_session: SASession,
-    ) -> SessionRow:
-        kernel_rel = SessionRow.kernels
-        if only_main_kern:
-            kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-        kernel_loading_op = (
-            noload("*"),
-            selectinload(kernel_rel).options(
-                noload("*"),
-                selectinload(KernelRow.agent_row).noload("*"),
-            ),
-        )
-        session_list = await cls.match_sessions(
-            db_session,
-            session_name_or_id,
-            access_key,
-            allow_stale=allow_stale,
-            for_update=for_update,
-            eager_loading_op=kernel_loading_op,
-        )
-        try:
-            return session_list[0]
-        except IndexError:
-            raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
-
-    @classmethod
-    async def list_sessions_with_main_kernels(
-        cls,
         session_ids: list[UUID],
         access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        db_session: SASession,
+        kernel_loading_strategy=KernelLoadingStrategy.NONE,
+        eager_loading_op: list[Any] = [],
     ) -> Iterable[SessionRow]:
-        kernel_rel = SessionRow.kernels
-        kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-        kernel_loading_op = (
-            noload("*"),
-            selectinload(kernel_rel).options(
-                noload("*"),
-                selectinload(KernelRow.agent_row).noload("*"),
-            ),
-        )
+        match kernel_loading_strategy:
+            case KernelLoadingStrategy.ALL_KERNELS:
+                eager_loading_op.extend(
+                    [
+                        noload("*"),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
+            case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
+                kernel_rel = SessionRow.kernels
+                kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+                eager_loading_op.extend(
+                    [
+                        noload("*"),
+                        selectinload(kernel_rel).options(
+                            noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ]
+                )
+
         session_list = await cls.match_sessions(
             db_session,
             session_ids,
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
-            eager_loading_op=kernel_loading_op,
+            eager_loading_op=eager_loading_op,
         )
         try:
             return session_list
         except IndexError:
             raise SessionNotFound(f"Session (ids={session_ids}) does not exist.")
-
-    @classmethod
-    async def get_session_with_main_kernel(
-        cls,
-        session_name_or_id: str | UUID,
-        access_key: Optional[AccessKey] = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        db_session: SASession,
-    ) -> SessionRow:
-        return await cls.get_session_with_kernels(
-            session_name_or_id,
-            access_key,
-            allow_stale=allow_stale,
-            for_update=for_update,
-            only_main_kern=True,
-            db_session=db_session,
-        )
 
     @classmethod
     async def get_session_by_id(
@@ -1096,51 +1097,6 @@ class SessionRow(Base):
         )
         result = await db_sess.execute(query)
         return result.scalars().all()
-
-    @classmethod
-    async def get_session_to_destroy(
-        cls, db: ExtendedAsyncSAEngine, session_id: SessionId
-    ) -> SessionRow:
-        query = (
-            sa.select(SessionRow)
-            .where(SessionRow.id == session_id)
-            .options(
-                noload("*"),
-                load_only(SessionRow.creation_id, SessionRow.status),
-                selectinload(SessionRow.kernels).options(
-                    noload("*"),
-                    load_only(
-                        KernelRow.id,
-                        KernelRow.role,
-                        KernelRow.access_key,
-                        KernelRow.status,
-                        KernelRow.container_id,
-                        KernelRow.cluster_role,
-                        KernelRow.agent,
-                        KernelRow.agent_addr,
-                    ),
-                ),
-            )
-        )
-        async with db.begin_readonly_session() as db_session:
-            return (await db_session.scalars(query)).first()
-
-    @classmethod
-    async def get_session_to_produce_event(
-        cls, db: ExtendedAsyncSAEngine, session_id: SessionId
-    ) -> SessionRow:
-        query = (
-            sa.select(SessionRow)
-            .where(SessionRow.id == session_id)
-            .options(
-                noload("*"),
-                load_only(
-                    SessionRow.id, SessionRow.name, SessionRow.creation_id, SessionRow.access_key
-                ),
-            )
-        )
-        async with db.begin_readonly_session() as db_session:
-            return (await db_session.scalars(query)).first()
 
 
 class SessionDependencyRow(Base):
@@ -1393,8 +1349,10 @@ class ComputeSession(graphene.ObjectType):
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            session: SessionRow = await SessionRow.get_session_with_main_kernel(
-                self.id, db_session=db_sess
+            session: SessionRow = await SessionRow.get_session(
+                db_sess,
+                self.id,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
         commit_status = await graph_ctx.registry.get_commit_status(session)
         return commit_status["status"]
