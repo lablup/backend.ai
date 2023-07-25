@@ -257,7 +257,6 @@ overwritten_param_check = t.Dict(
         t.Key("startup_command", default=None): t.Null | t.String,
         t.Key("bootstrap_script", default=None): t.Null | t.String,
         t.Key("owner_access_key", default=None): t.Null | t.String,
-        tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
         tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
         tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
