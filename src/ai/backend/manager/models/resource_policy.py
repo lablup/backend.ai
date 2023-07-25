@@ -408,6 +408,7 @@ class UserResourcePolicy(graphene.ObjectType):
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
     max_vfolder_count = BigInt()
+    max_vfolder_size = BigInt()  # aliased field
     max_quota_scope_size = BigInt()
 
     @classmethod
@@ -423,6 +424,7 @@ class UserResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_count=row.max_vfolder_count,
+            max_vfolder_size=row.max_quota_scope_size,  # aliased field
             max_quota_scope_size=row.max_quota_scope_size,
         )
 
@@ -584,6 +586,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
     max_vfolder_count = BigInt()
+    max_vfolder_size = BigInt()  # aliased field
     max_quota_scope_size = BigInt()
 
     @classmethod
@@ -599,6 +602,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_count=row.max_vfolder_count,
+            max_vfolder_size=row.max_quota_scope_size,
             max_quota_scope_size=row.max_quota_scope_size,
         )
 
