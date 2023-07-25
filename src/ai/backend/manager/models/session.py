@@ -234,7 +234,6 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     SessionStatus.PREPARING: {
         SessionStatus.PULLING,
         SessionStatus.RUNNING,
-        SessionStatus.RESTARTING,
         SessionStatus.RUNNING_DEGRADED,
         SessionStatus.TERMINATING,
         SessionStatus.TERMINATED,
@@ -243,6 +242,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     },
     SessionStatus.RUNNING: {
         SessionStatus.RESTARTING,
+        SessionStatus.RUNNING_DEGRADED,
         SessionStatus.TERMINATING,
         SessionStatus.TERMINATED,
         SessionStatus.ERROR,
