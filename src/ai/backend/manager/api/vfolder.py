@@ -34,7 +34,7 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
@@ -55,6 +55,8 @@ from ..models import (
     AgentStatus,
     GroupRow,
     KernelStatus,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
     UserRole,
     UserRow,
     UserStatus,
@@ -2435,7 +2437,11 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             query = (
                 sa.select(GroupRow)
                 .where((GroupRow.domain_name == domain_name) & (GroupRow.id == row["group"]))
-                .options(selectinload(GroupRow.resource_policy_row))
+                .options(
+                    selectinload(GroupRow.resource_policy_row).options(
+                        load_only(ProjectResourcePolicyRow.max_vfolder_count)
+                    )
+                )
             )
             result = await sess.execute(query)
             group_row = result.scalar()
@@ -2445,7 +2451,11 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             query = (
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
-                .options(selectinload(UserRow.resource_policy_row))
+                .options(
+                    selectinload(UserRow.resource_policy_row).options(
+                        load_only(UserResourcePolicyRow.max_vfolder_count)
+                    )
+                )
             )
             result = await sess.execute(query)
             user_row = result.scalar()
