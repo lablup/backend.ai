@@ -2431,7 +2431,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
     async with root_ctx.db.begin_session() as sess:
         if row["group"]:
-            log.debug("row[group]:{}", row["group"])
+            log.debug("Cloning VFolder group ID: {}", row["group"])
             query = (
                 sa.select(GroupRow)
                 .where((GroupRow.domain_name == domain_name) & (GroupRow.id == row["group"]))
