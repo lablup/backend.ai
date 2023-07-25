@@ -1217,8 +1217,14 @@ class VirtualFolder(graphene.ObjectType):
             vfolders.c.id == vfolder_permissions.c.vfolder,
             isouter=True,
         ).join(users, vfolders.c.user == users.c.uuid, isouter=True)
-        query = sa.select([sa.func.count()]).select_from(j)
-        query = query.where(vfolders.c.group != user_id)
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(j)
+            .where(
+                (vfolder_permissions.c.user == user_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+            )
+        )
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1258,10 +1264,13 @@ class VirtualFolder(graphene.ObjectType):
         query = (
             sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
             .select_from(j)
+            .where(
+                (vfolder_permissions.c.user == user_id)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+            )
             .limit(limit)
             .offset(offset)
         )
-        query = query.where(vfolders.c.user != user_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
