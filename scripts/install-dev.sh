@@ -574,10 +574,15 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+_INSTALLED_PYENV=0
+
 setup_environment() {
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
-    # TODO: check if .pyenv already exists and is valid
+    if [ -d "$HOME/.pyenv" ]; then
+      eval "$pyenv_init_script"
+      pyenv --version
+    fi
     show_info "Installing pyenv..."
     set -e
     curl https://pyenv.run | sh
@@ -590,7 +595,8 @@ setup_environment() {
     done
     set +e
     eval "$pyenv_init_script"
-    pyenv
+    pyenv --version
+    _INSTALLED_PYENV=1
   else
     eval "$pyenv_init_script"
   fi
@@ -954,6 +960,12 @@ configure_backendai() {
   show_note "How to reset this setup:"
   echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
   echo " "
+  if [ $_INSTALLED_PYENV -eq 1 ]; then
+    show_note "About pyenv installation:"
+    echo "Since we have installed ${BOLD}pyenv${NC} during setup, you should reload the shell to make it working as expected."
+    echo "Run the following command or re-login:"
+    echo "  ${WHITE}exec \$SHELL -l${NC}"
+  fi
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
