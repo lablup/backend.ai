@@ -81,9 +81,11 @@ class CUDADevice(AbstractComputeDevice):
 
     def __str__(self) -> str:
         return (
+            "CUDADevice("
             f"device id: {self.uuid}, model name: {self.model_name}, "
             f"processing unit: {self.processing_units}, memory size: {self.memory_size}, "
             f"numa node: {self.numa_node}, hw location: {self.hw_location}"
+            ")"
         )
 
     def __repr__(self) -> str:
