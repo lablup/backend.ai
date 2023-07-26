@@ -429,25 +429,34 @@ class libcudart(LibraryBase):
     @classmethod
     def load_library(cls):
         system_type = platform.system()
-        if system_type == "Windows":
-            arch = platform.architecture()[0]
-            for major, minor in TARGET_CUDA_VERSIONS:
-                ver = f"{major}{minor}"
-                cudart = _load_library("cudart%s_%d.dll" % (arch[:2], ver))
-                if cudart is not None:
-                    return cudart
-        elif system_type == "Darwin":
-            for major, minor in TARGET_CUDA_VERSIONS:
-                cudart = _load_library("libcudart.%d.%d.dylib" % (major, minor))
-                if cudart is not None:
-                    return cudart
-            return _load_library("libcudart.dylib")
-        else:
-            for major, minor in TARGET_CUDA_VERSIONS:
-                cudart = _load_library("libcudart.so.%d.%d" % (major, minor))
-                if cudart is not None:
-                    return cudart
-            return _load_library("libcudart.so")
+        match system_type:
+            case "Windows":
+                arch = platform.architecture()[0]
+                for major, minor in TARGET_CUDA_VERSIONS:
+                    ver = f"{major}{minor}"
+                    cudart = _load_library("cudart%s_%d.dll" % (arch[:2], ver))
+                    if cudart is not None:
+                        return cudart
+            case "Darwin":
+                for major, _ in TARGET_CUDA_VERSIONS:
+                    cudart = _load_library("libcudart.%d.dylib" % major)
+                    if cudart is not None:
+                        return cudart
+                for major, minor in TARGET_CUDA_VERSIONS:
+                    cudart = _load_library("libcudart.%d.%d.dylib" % (major, minor))
+                    if cudart is not None:
+                        return cudart
+                return _load_library("libcudart.dylib")
+            case _:
+                for major, _ in TARGET_CUDA_VERSIONS:
+                    cudart = _load_library("libcudart.so.%d" % major)
+                    if cudart is not None:
+                        return cudart
+                for major, minor in TARGET_CUDA_VERSIONS:
+                    cudart = _load_library("libcudart.so.%d.%d" % (major, minor))
+                    if cudart is not None:
+                        return cudart
+                return _load_library("libcudart.so")
         return None
 
     @classmethod
