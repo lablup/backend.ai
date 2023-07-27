@@ -904,8 +904,6 @@ class SharedConfig(AbstractConfig):
         """
         Update the roundrobin states using the given architecture key.
         """
-        rr_states_dict: dict[str, dict[str, Any]] = json.loads(
-            await self.get_raw("roundrobin_states") or "{}"
-        )
-        rr_states_dict[architecture] = state.as_dict()
+        rr_states_dict = json.loads(await self.get_raw("roundrobin_states") or "{}")
+        rr_states_dict[architecture] = state.to_json()
         await self.etcd.put("roundrobin_states", json.dumps(rr_states_dict))

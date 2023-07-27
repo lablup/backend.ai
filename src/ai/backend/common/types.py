@@ -1150,12 +1150,25 @@ class VolumeMountableNodeType(enum.StrEnum):
 
 
 @dataclass
-class RoundRobinState:
+class RoundRobinState(JSONSerializableMixin):
     schedulable_group_id: str
     next_index: int
 
-    def as_dict(self) -> dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict(
+            {
+                t.Key("schedulable_group_id"): t.String,
+                t.Key("next_index"): t.Int,
+            }
+        )
 
 
 # Store the states of the round-robin scheduler for each architecture.
