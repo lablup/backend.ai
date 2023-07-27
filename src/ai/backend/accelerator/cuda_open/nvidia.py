@@ -57,6 +57,8 @@ class cudaDeviceProp_v12(ctypes.Structure):
     _fields_ = [
         ("name", ctypes.c_char * 256),
         ("uuid", ctypes.c_byte * 16),  # cudaUUID_t
+        ("luid", ctypes.c_byte * 8),
+        ("luidDeviceNodeMask", ctypes.c_uint),
         ("totalGlobalMem", ctypes.c_size_t),
         ("sharedMemPerBlock", ctypes.c_size_t),
         ("regsPerBlock", ctypes.c_int),
@@ -109,7 +111,7 @@ class cudaDeviceProp_v12(ctypes.Structure):
         ("memoryClockRate", ctypes.c_int),
         ("memoryBusWidth", ctypes.c_int),
         ("l2CacheSize", ctypes.c_int),
-        ("persistingL2CacheMaxSize", ctypes.c_int),  # new in CUDA 11
+        ("persistingL2CacheMaxSize", ctypes.c_int),
         ("maxThreadsPerMultiProcessor", ctypes.c_int),
         ("streamPrioritiesSupported", ctypes.c_int),
         ("globalL1CacheSupported", ctypes.c_int),
@@ -128,7 +130,7 @@ class cudaDeviceProp_v12(ctypes.Structure):
         ("cooperativeMultiDeviceLaunch", ctypes.c_int),
         ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
         ("directManagedMemAccessFromHost", ctypes.c_int),
-        ("accessPolicyMaxWindowSize", ctypes.c_int),  # new in CUDA 11
+        ("accessPolicyMaxWindowSize", ctypes.c_int),
         ("_reserved", ctypes.c_char * 1024),
     ]
 
