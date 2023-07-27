@@ -452,7 +452,7 @@ check_python() {
 }
 
 bootstrap_pants() {
-  pants_local_exec_root=$($bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
   mkdir -p "$pants_local_exec_root"
   $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
@@ -509,6 +509,7 @@ install_editable_webui() {
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
   npm i
+  make compile
   make compile_wsproxy
   cd ../../../..
 }
@@ -525,7 +526,7 @@ $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
 $bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  $bpython scripts/check-docker.py
+  $docker_sudo $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
@@ -573,10 +574,15 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+_INSTALLED_PYENV=0
+
 setup_environment() {
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
-    # TODO: ask if install pyenv
+    if [ -d "$HOME/.pyenv" ]; then
+      eval "$pyenv_init_script"
+      pyenv --version
+    fi
     show_info "Installing pyenv..."
     set -e
     curl https://pyenv.run | sh
@@ -589,7 +595,8 @@ setup_environment() {
     done
     set +e
     eval "$pyenv_init_script"
-    pyenv
+    pyenv --version
+    _INSTALLED_PYENV=1
   else
     eval "$pyenv_init_script"
   fi
@@ -953,6 +960,12 @@ configure_backendai() {
   show_note "How to reset this setup:"
   echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
   echo " "
+  if [ $_INSTALLED_PYENV -eq 1 ]; then
+    show_note "About pyenv installation:"
+    echo "Since we have installed ${BOLD}pyenv${NC} during setup, you should reload the shell to make it working as expected."
+    echo "Run the following command or re-login:"
+    echo "  ${WHITE}exec \$SHELL -l${NC}"
+  fi
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
