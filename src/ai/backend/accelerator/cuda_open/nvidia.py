@@ -1,6 +1,8 @@
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
+from itertools import groupby
+from operator import itemgetter
 from typing import Any, MutableMapping, NamedTuple, Tuple, Type, TypeAlias
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
@@ -463,7 +465,7 @@ class libcudart(LibraryBase):
                     if cudart is not None:
                         return cudart
             case "Darwin":
-                for major, _ in TARGET_CUDA_VERSIONS:
+                for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
                     cudart = _load_library("libcudart.%d.dylib" % major)
                     if cudart is not None:
                         return cudart
@@ -473,7 +475,7 @@ class libcudart(LibraryBase):
                         return cudart
                 return _load_library("libcudart.dylib")
             case _:
-                for major, _ in TARGET_CUDA_VERSIONS:
+                for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
                     cudart = _load_library("libcudart.so.%d" % major)
                     if cudart is not None:
                         return cudart
