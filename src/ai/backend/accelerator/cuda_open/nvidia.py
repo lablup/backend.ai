@@ -1,7 +1,7 @@
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
-from typing import Any, MutableMapping, NamedTuple, Tuple, Type
+from typing import Any, MutableMapping, NamedTuple, Tuple, Type, TypeAlias
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
@@ -400,6 +400,11 @@ class cudaDeviceProp(ctypes.Structure):
     ]
 
 
+cudaDeviceProp_t: TypeAlias = (
+    cudaDeviceProp_v12 | cudaDeviceProp_v11 | cudaDeviceProp_v10 | cudaDeviceProp
+)
+
+
 def _load_library(name):
     try:
         if platform.system() == "Windows":
@@ -495,10 +500,8 @@ class libcudart(LibraryBase):
 
     @classmethod
     def get_device_props(cls, device_idx: int):
-        prop_type: Type[cudaDeviceProp_v12] | Type[cudaDeviceProp_v11] | Type[
-            cudaDeviceProp_v10
-        ] | Type[cudaDeviceProp]
-        props_struct: cudaDeviceProp_v12 | cudaDeviceProp_v11 | cudaDeviceProp_v10 | cudaDeviceProp
+        prop_type: Type[cudaDeviceProp_t]
+        props_struct: cudaDeviceProp_t
         if cls.get_version() >= (12, 0):
             prop_type = cudaDeviceProp_v12
             props_struct = cudaDeviceProp_v12()
