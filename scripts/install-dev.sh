@@ -84,31 +84,31 @@ usage() {
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
-  echo "    (default: 8100)"
+  echo "    (default: 8101)"
   echo ""
   echo "  ${LWHITE}--redis-port PORT${NC}"
   echo "    The port to bind the Redis container service."
-  echo "    (default: 8110)"
+  echo "    (default: 8111)"
   echo ""
   echo "  ${LWHITE}--etcd-port PORT${NC}"
   echo "    The port to bind the etcd container service."
-  echo "    (default: 8120)"
+  echo "    (default: 8121)"
   echo ""
   echo "  ${LWHITE}--webserver-port PORT${NC}"
   echo "    The port to expose the web server."
-  echo "    (default: 8080)"
+  echo "    (default: 8090)"
   echo ""
   echo "  ${LWHITE}--manager-port PORT${NC}"
   echo "    The port to expose the manager API service."
-  echo "    (default: 8081)"
+  echo "    (default: 8091)"
   echo ""
   echo "  ${LWHITE}--agent-rpc-port PORT${NC}"
   echo "    The port for the manager-to-agent RPC calls."
-  echo "    (default: 6001)"
+  echo "    (default: 6011)"
   echo ""
   echo "  ${LWHITE}--agent-watcher-port PORT${NC}"
   echo "    The port for the agent's watcher service."
-  echo "    (default: 6009)"
+  echo "    (default: 6019)"
   echo ""
   echo "  ${LWHITE}--ipc-base-path PATH${NC}"
   echo "    The base path for IPC sockets and shared temporary files."
@@ -142,36 +142,6 @@ show_note() {
 show_important_note() {
   echo " "
   echo "${LRED}[NOTE]${NC} $1"
-}
-
-has_python() {
-  "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 0 ]; then
-    echo 0  # ok
-  else
-    echo 1  # missing
-  fi
-}
-
-install_static_python() {
-  local build_date="20230507"
-  local build_version="${STANDALONE_PYTHON_VERSION}"
-  local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
-  dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
-  checksum_url="${dist_url}.sha256"
-  cwd="$(pwd)"
-  mkdir -p "${STANDALONE_PYTHON_PATH}"
-  cd "${STANDALONE_PYTHON_PATH}"
-  show_info "Downloading and installing static Python (${build_tag}) for bootstrapping..."
-  curl -o dist.tar.gz -L "$dist_url"
-  echo "$(curl -sL $checksum_url) *dist.tar.gz" | shasum -a 256 --check --status
-  if [ $? -ne 0 ]; then
-    echo "Failed to validate the downloaded static build of Python binary!"
-    exit 1
-  fi
-  tar xzf dist.tar.gz && rm dist.tar.gz
-  mv python/* . && rmdir python
-  cd "${cwd}"
 }
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -215,19 +185,8 @@ else
 fi
 
 show_info "Checking the bootstrapper Python version..."
-STANDALONE_PYTHON_VERSION="3.11.3"
-STANDALONE_PYTHON_ARCH=$(arch)
-STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
-if [ "${STANDALONE_PYTHON_ARCH}" == "arm64" ]; then
-  STANDALONE_PYTHON_ARCH="aarch64"
-fi
-bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
-if [ $(has_python "$bpython") -ne 0 ]; then
-  install_static_python
-fi
+source scripts/bootstrap-static-python.sh
 $bpython -c 'import sys;print(sys.version_info)'
-$bpython -m ensurepip --upgrade
-$bpython -m pip --disable-pip-version-check install -q -U tomlkit
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -493,7 +452,7 @@ check_python() {
 }
 
 bootstrap_pants() {
-  pants_local_exec_root=$($bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
   mkdir -p "$pants_local_exec_root"
   $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
@@ -550,6 +509,7 @@ install_editable_webui() {
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
   npm i
+  make compile
   make compile_wsproxy
   cd ../../../..
 }
@@ -566,7 +526,7 @@ $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
 $bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  $bpython scripts/check-docker.py
+  $docker_sudo $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
@@ -614,10 +574,15 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+_INSTALLED_PYENV=0
+
 setup_environment() {
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
-    # TODO: ask if install pyenv
+    if [ -d "$HOME/.pyenv" ]; then
+      eval "$pyenv_init_script"
+      pyenv --version
+    fi
     show_info "Installing pyenv..."
     set -e
     curl https://pyenv.run | sh
@@ -630,7 +595,8 @@ setup_environment() {
     done
     set +e
     eval "$pyenv_init_script"
-    pyenv
+    pyenv --version
+    _INSTALLED_PYENV=1
   else
     eval "$pyenv_init_script"
   fi
@@ -994,6 +960,12 @@ configure_backendai() {
   show_note "How to reset this setup:"
   echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
   echo " "
+  if [ $_INSTALLED_PYENV -eq 1 ]; then
+    show_note "About pyenv installation:"
+    echo "Since we have installed ${BOLD}pyenv${NC} during setup, you should reload the shell to make it working as expected."
+    echo "Run the following command or re-login:"
+    echo "  ${WHITE}exec \$SHELL -l${NC}"
+  fi
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then

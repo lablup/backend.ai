@@ -28,6 +28,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "dellemc-onefs": DellEMCOneFSVolume,
     "weka": WekaVolume,
     "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
+    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
     "cephfs": CephFSVolume,
 }
 
