@@ -880,7 +880,7 @@ def main(
             pprint(cfg)
         cfg["_src"] = cfg_src_path
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 

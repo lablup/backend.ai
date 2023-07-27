@@ -1,18 +1,16 @@
-from typing import Any, Callable, Mapping, Optional, Tuple, Type, Union
+from typing import Any, Mapping, Type, TypeAlias, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
+from . import ArrayFieldItem, FieldSpecItem, JSONFieldItem
+
 __all__ = (
+    "FieldSpecType",
     "FilterableSQLQuery",
     "QueryFilterParser",
-    "FieldSpecItem",
 )
-
-FieldSpecItem = Tuple[str, Optional[Callable[[str], Any]]]
-
-FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 
 _grammar = r"""
     ?start: expr
@@ -48,11 +46,12 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
+FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
+
 
 class QueryFilterTransformer(Transformer):
-    def __init__(
-        self, sa_table: sa.Table, fieldspec: Optional[Mapping[str, FieldSpecItem]] = None
-    ) -> None:
+    def __init__(self, sa_table: sa.Table, fieldspec: FieldSpecType = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
@@ -80,17 +79,7 @@ class QueryFilterTransformer(Transformer):
             return sa.false()
         raise ValueError("Unknown/unsupported atomic token", a.value)
 
-    def _get_col(self, col_name: str) -> sa.Column:
-        try:
-            if self._fieldspec:
-                col = self._sa_table.c[self._fieldspec[col_name][0]]
-            else:
-                col = self._sa_table.c[col_name]
-            return col
-        except KeyError:
-            raise ValueError("Unknown/unsupported field name", col_name)
-
-    def _transform_val_leaf(self, col_name: str, value: Any) -> Any:
+    def _transform_val_leaf(self, col_name: str, op: str, value: Any) -> Any:
         if self._fieldspec:
             try:
                 func = self._fieldspec[col_name][1]
@@ -100,45 +89,79 @@ class QueryFilterTransformer(Transformer):
         else:
             return value
 
-    def _transform_val(self, col_name: str, value: Any) -> Any:
+    def _transform_val(self, col_name: str, op: str, value: Any) -> Any:
         if isinstance(value, Tree):
-            val = self._transform_val(col_name, value.children[0])
+            val = self._transform_val(col_name, op, value.children[0])
         elif isinstance(value, list):
-            val = [self._transform_val(col_name, v) for v in value]
+            val = [self._transform_val(col_name, op, v) for v in value]
         else:
-            val = self._transform_val_leaf(col_name, value)
+            val = self._transform_val_leaf(col_name, op, value)
         return val
 
     def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
         children: list[Token] = args[0]
-        col = self._get_col(children[0].value)
+        col_name = children[0].value
         op = children[1].value
-        val = self._transform_val(children[0].value, children[2])
-        if op == "==":
-            return col == val
-        elif op == "!=":
-            return col != val
-        elif op == ">":
-            return col > val
-        elif op == ">=":
-            return col >= val
-        elif op == "<":
-            return col < val
-        elif op == "<=":
-            return col <= val
-        elif op == "contains":
-            return col.contains(val)
-        elif op == "in":
-            return col.in_(val)
-        elif op == "isnot":
-            return col.isnot(val)
-        elif op == "is":
-            return col.is_(val)
-        elif op == "like":
-            return col.like(val)
-        elif op == "ilike":
-            return col.ilike(val)
-        return args
+        val = self._transform_val(col_name, op, children[2])
+
+        def build_expr(op: str, col, val):
+            match op:
+                case "==":
+                    expr = col == val
+                case "!=":
+                    expr = col != val
+                case ">":
+                    expr = col > val
+                case ">=":
+                    expr = col >= val
+                case "<":
+                    expr = col < val
+                case "<=":
+                    expr = col <= val
+                case "contains":
+                    expr = col.contains(val)
+                case "in":
+                    expr = col.in_(val)
+                case "isnot":
+                    expr = col.isnot(val)
+                case "is":
+                    expr = col.is_(val)
+                case "like":
+                    expr = col.like(val)
+                case "ilike":
+                    expr = col.ilike(val)
+                case _:
+                    expr = args
+            return expr
+
+        try:
+            if self._fieldspec is not None:
+                match self._fieldspec[children[0].value][0]:
+                    case ArrayFieldItem(col_name):
+                        # For array columns, let's apply the expression on every item,
+                        # and select the row if anyone makes the result true.
+                        col = self._sa_table.c[col_name]
+                        unnested_col = sa.func.unnest(col).alias("item")
+                        subq = (
+                            sa.select([sa.column("item")])
+                            .select_from(unnested_col)
+                            .where(build_expr(op, sa.column("item"), val))
+                        )
+                        expr = sa.exists(subq)
+                    case JSONFieldItem(col_name, obj_key):
+                        # For json columns, we additionally indicate the object key
+                        # to retrieve the value used in the expression.
+                        col = self._sa_table.c[col_name].op("->>")(obj_key)
+                        expr = build_expr(op, col, val)
+                    case str(col_name):
+                        col = self._sa_table.c[col_name]
+                        expr = build_expr(op, col, val)
+            else:
+                col = self._sa_table.c[col_name]
+                expr = build_expr(op, col, val)
+        except KeyError:
+            raise ValueError("Unknown/unsupported field name", col_name)
+        return expr
 
     def unary_expr(self, *args):
         children = args[0]
@@ -165,7 +188,7 @@ class QueryFilterTransformer(Transformer):
 
 
 class QueryFilterParser:
-    def __init__(self, fieldspec: Optional[Mapping[str, FieldSpecItem]] = None) -> None:
+    def __init__(self, fieldspec: FieldSpecType = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
 
@@ -191,4 +214,6 @@ class QueryFilterParser:
             where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}")
-        return sa_query.where(where_clause)
+        final_query = sa_query.where(where_clause)
+        assert final_query is not None
+        return final_query

@@ -41,13 +41,13 @@ class WekaQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        config: Optional[QuotaConfig] = None,
+        options: Optional[QuotaConfig] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await aiofiles.os.makedirs(qspath)
         assert self.fs_uid is not None
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -55,7 +55,9 @@ class WekaQuotaModel(BaseQuotaModel):
         qs_relpath = qspath.relative_to(self.mount_path).as_posix()
         if not qs_relpath.startswith("/"):
             qs_relpath = "/" + qs_relpath
-        await self.api_client.set_quota_v1(qs_relpath, inode_id, hard_limit=config.limit_bytes)
+        await self.api_client.set_quota_v1(
+            qs_relpath, inode_id, soft_limit=config.limit_bytes, hard_limit=config.limit_bytes
+        )
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
@@ -151,8 +153,8 @@ class WekaVolume(BaseVolume):
         assert self._fs_uid is not None
         fs = await self.api_client.get_fs(self._fs_uid)
         return CapacityUsage(
-            fs.total_budget,
-            fs.used_total,
+            capacity_bytes=fs.total_budget,
+            used_bytes=fs.used_total,
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:

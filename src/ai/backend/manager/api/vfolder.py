@@ -469,10 +469,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         # ):
         #     params["quota"] = max_vfolder_size
 
-        # Prevent creation of vfolder with duplicated name.
+        # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [vfolders.c.name == params["name"]]
-        if not unmanaged_path:
-            extra_vf_conds.append(vfolders.c.host == folder_host)
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2448,12 +2446,11 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         if resource_policy["max_vfolder_count"] > 0:
             query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
             result = await conn.scalar(query)
-            if result >= resource_policy["max_vfolder_count"]:
+            if result >= resource_policy["max_vfolder_count"] and row["group"] is None:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
-        # Prevent creation of vfolder with duplicated name.
+        # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [vfolders.c.name == params["target_name"]]
-        extra_vf_conds.append(vfolders.c.host == target_folder_host)
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2478,9 +2475,9 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            target_quota_scope_id,
             params["target_name"],
             target_folder_host,
-            target_quota_scope_id,
             params["usage_mode"],
             params["permission"],
             request["user"]["email"],
