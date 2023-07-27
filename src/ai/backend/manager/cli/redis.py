@@ -35,21 +35,30 @@ def ping(cli_ctx: CLIContext) -> None:
                     redis_conn_set.live,
                     lambda r: r.execute_command("PING"),
                 )
+            except Exception:
+                log.exception("REDIS_LIVE_DB is not ok")
+            try:
                 await redis_helper.execute(
                     redis_conn_set.stat,
                     lambda r: r.execute_command("PING"),
                 )
+            except Exception:
+                log.exception("REDIS_STAT_DB is not ok")
+            try:
                 await redis_helper.execute(
                     redis_conn_set.image,
                     lambda r: r.execute_command("PING"),
                 )
+            except Exception:
+                log.exception("REDIS_IMAGE_DB is not ok")
+            try:
                 await redis_helper.execute(
                     redis_conn_set.stream,
                     lambda r: r.execute_command("PING"),
                 )
-                log.info("Redis database is ok")
             except Exception:
-                log.exception("An error occurred.")
+                log.exception("REDIS_STREAM_DB is not ok")
+            log.info("Redis database is ok")
 
     with cli_ctx.logger:
         asyncio.run(_impl())
