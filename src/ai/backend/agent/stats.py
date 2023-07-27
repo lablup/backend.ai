@@ -7,7 +7,6 @@ Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 import asyncio
 import enum
 import logging
-import psutil
 import sys
 import time
 from decimal import Decimal
@@ -28,6 +27,7 @@ from typing import (
 
 import aiodocker
 import attrs
+import psutil
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
@@ -525,16 +525,17 @@ class StatContext:
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             updated_cids: Set[ContainerId] = set()
             for result in results:
-                if isinstance(result, Exception):
-                    if type(result) == psutil.NoSuchProcess:    
-                        log.debug(f"{result}")
-                        pass
-                    else:
+                match result:
+                    case psutil.NoSuchProcess():
+                        log.debug(str(result))
+                        continue
+                    case Exception():
                         log.error(
                             "collect_per_container_process_stat(): gather_process_measures() error",
                             exc_info=result,
                         )
-                    continue
+                    case _:
+                        pass
                 for proc_measure in result:
                     metric_key = proc_measure.key
                     # update per-process metric
