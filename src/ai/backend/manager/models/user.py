@@ -892,10 +892,8 @@ class PurgeUser(graphene.Mutation):
 
             if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
                 raise RuntimeError(
-                    (
-                        "Some of user's virtual folders are mounted to active kernels. "
-                        "Terminate those kernels first."
-                    ),
+                    "Some of user's virtual folders are mounted to active kernels. "
+                    "Terminate those kernels first.",
                 )
             if await cls.user_has_active_kernels(conn, user_uuid):
                 raise RuntimeError("User has some active kernels. Terminate them first.")
