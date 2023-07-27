@@ -33,10 +33,13 @@ class WSProxyVersionQueryParams:
 @aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
 async def query_wsproxy_status(
     wsproxy_addr: str,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     async with aiohttp.ClientSession() as session:
-        async with session.get(wsproxy_addr + "/status") as resp:
-            return await resp.json()
+        try:
+            async with session.get(wsproxy_addr + "/status") as resp:
+                return await resp.json()
+        except aiohttp.ClientConnectorError:
+            return None
 
 
 @auth_required
@@ -94,12 +97,19 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                     wsproxy_version = "v1"
                 else:
                     wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-                    wsproxy_version = wsproxy_status["api_version"]
-                return web.json_response(
-                    {
-                        "wsproxy_version": wsproxy_version,
-                    }
-                )
+                    if not wsproxy_status:
+                        return web.json_response(
+                            {
+                                "wsproxy_version": "INVALID wsproxy_version",
+                            }
+                        )
+                    else:
+                        wsproxy_version = wsproxy_status["api_version"]
+                        return web.json_response(
+                            {
+                                "wsproxy_version": wsproxy_version,
+                            }
+                        )
         else:
             raise ObjectNotFound(object_name="scaling group")
 
