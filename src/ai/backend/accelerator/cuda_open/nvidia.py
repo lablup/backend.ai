@@ -121,6 +121,7 @@ class cudaDeviceProp_v12(ctypes.Structure):
         ("managedMemSupported", ctypes.c_int),
         ("isMultiGpuBoard", ctypes.c_int),
         ("multiGpuBoardGroupID", ctypes.c_int),
+        ("hostNativeAtomicSupported", ctypes.c_int),
         ("singleToDoublePrecisionPerfRatio", ctypes.c_int),
         ("pageableMemoryAccess", ctypes.c_int),
         ("concurrentManagedAccess", ctypes.c_int),
@@ -128,10 +129,27 @@ class cudaDeviceProp_v12(ctypes.Structure):
         ("canUseHostPointerForRegisteredMem", ctypes.c_int),
         ("cooperativeLaunch", ctypes.c_int),
         ("cooperativeMultiDeviceLaunch", ctypes.c_int),
+        ("sharedMemPerBlockOptin", ctypes.c_size_t),
         ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
         ("directManagedMemAccessFromHost", ctypes.c_int),
         ("accessPolicyMaxWindowSize", ctypes.c_int),
-        ("_reserved", ctypes.c_char * 1024),
+        ("accessPolicyMaxWindowSize", ctypes.c_int),
+        ("reservedSharedMemPerBlock", ctypes.c_size_t),
+        ("hostRegisterSupported", ctypes.c_int),  # new in CUDA 12
+        ("sparseCudaArraySupported", ctypes.c_int),  # new in CUDA 12
+        ("hostRegisterReadOnlySupported", ctypes.c_int),  # new in CUDA 12
+        ("timelineSemaphoreInteropSupported", ctypes.c_int),  # new in CUDA 12
+        ("memoryPoolsSupported", ctypes.c_int),  # new in CUDA 12
+        ("gpuDirectRDMASupported", ctypes.c_int),  # new in CUDA 12
+        ("gpuDirectRDMAFlushWritesOptions", ctypes.c_uint),  # new in CUDA 12
+        ("gpuDirectRDMAWritesOrdering", ctypes.c_int),  # new in CUDA 12
+        ("memoryPoolSupportedHandleTypes", ctypes.c_uint),  # new in CUDA 12
+        ("deferredMappingCudaArraySupported", ctypes.c_int),  # new in CUDA 12
+        ("ipcEventSupported", ctypes.c_int),  # new in CUDA 12
+        ("clusterLaunch", ctypes.c_int),  # new in CUDA 12
+        ("unifiedFunctionPointers", ctypes.c_int),  # new in CUDA 12
+        ("reserved2", ctypes.c_int * 2),
+        ("reserved", ctypes.c_int * 61),
     ]
 
 
