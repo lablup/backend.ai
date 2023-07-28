@@ -1003,3 +1003,83 @@ def list_invited(ctx: CLIContext, filter_, order, offset, limit) -> None:
     except Exception as e:
         ctx.output.print_error(e)
         sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@pass_ctx_obj
+@click.option(
+    "--filter",
+    "filter_",
+    default=None,
+    help="""\b
+    Set the query filter expression.
+
+    \b
+    COLUMNS
+        host, name, created_at, creator,
+        ownership_type (UESR, GROUP),
+        status (READY, PERFORMING, CLONING, DELETING, MOUNTED),
+        permission (READ_ONLY, READ_WRITE, RW_DELETE, OWNER_PERM)
+
+    \b
+    OPERATORS
+        Binary Operators: ==, !=, <, <=, >, >=, is, isnot, like, ilike(case-insensitive), in, contains
+        Condition Operators: &, |
+        Special Symbol: % (wildcard for like and ilike operators)
+
+    \b
+    EXAMPLE QUERIES
+        --filter 'status == "READY" & permission in ["READ_ONLY", "READ_WRITE"]'
+        --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
+        --filter 'creator ilike "%@example.com"'
+
+    \b
+    """,
+)
+@click.option(
+    "--order",
+    default=None,
+    help="""\b
+    Set the query ordering expression.
+
+    \b
+    COLUMNS
+        host, name, created_at, creator, ownership_type, status, permission
+
+    \b
+    OPTIONS
+        ascending order (default): (+)column_name
+        descending order: -column_name
+
+    \b
+    EXAMPLE
+        --order 'host'
+        --order '+host'
+        --order '-created_at'
+
+    \b
+    """,
+)
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", type=int, default=None, help="The page size for pagination.")
+def list_project(ctx: CLIContext, filter_, order, offset, limit) -> None:
+    """
+    List project virtual folders.
+    """
+    try:
+        with Session() as session:
+            fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_project_list(
+                fields=_default_list_fields,
+                page_offset=pg_offset,
+                page_size=pg_size,
+                filter=filter_,
+                order=order,
+            )
+            ctx.output.print_paginated_list(
+                fetch_func,
+                initial_page_offset=offset,
+                page_size=limit,
+            )
+    except Exception as e:
+        ctx.output.print_error(e)
+        sys.exit(ExitCode.FAILURE)

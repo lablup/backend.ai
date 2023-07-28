@@ -180,6 +180,33 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
+    async def paginated_project_list(
+        cls,
+        *,
+        fields: Sequence[FieldSpec] = _default_list_fields,
+        page_offset: int = 0,
+        page_size: int = 20,
+        filter: str = None,
+        order: str = None,
+    ) -> PaginatedResult[dict]:
+        """
+        Fetches the list of invited vfolders.
+
+        :param fields: Additional per-vfolder query fields to fetch.
+        """
+        return await fetch_paginated_result(
+            "vfolder_project_list",
+            {
+                "filter": (filter, "String"),
+                "order": (order, "String"),
+            },
+            fields,
+            page_offset=page_offset,
+            page_size=page_size,
+        )
+
+    @api_function
+    @classmethod
     async def list_hosts(cls):
         rqst = Request("GET", "/folders/_/hosts")
         async with rqst.fetch() as resp:
