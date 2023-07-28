@@ -7,6 +7,8 @@ import aiotools
 import pytest
 from redis.asyncio import Redis
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
+from redis.backoff import ExponentialBackoff
+from redis.retry import Retry
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -24,7 +26,8 @@ async def test_connect(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
         url=f"redis://{addr.host}:{addr.port}",
-        socket_timeout=0.5,
+        socket_timeout=2.0,
+        retry=Retry(ExponentialBackoff(), 3),
     )
     await r.ping()
 
