@@ -534,6 +534,7 @@ class StatContext:
                             "collect_per_container_process_stat(): gather_process_measures() error",
                             exc_info=result,
                         )
+                        continue
                     case _:
                         pass
                 for proc_measure in result:
