@@ -71,7 +71,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "pyzmq~=24.0.1",
-//     "redis[hiredis]~=4.5.5",
+//     "redis[hiredis]~=4.6.0",
 //     "rich~=12.2",
 //     "setproctitle~=1.3.2",
 //     "tabulate~=0.8.9",
@@ -856,36 +856,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cfcb20d5784428f31d89889e68b26efeda90f231c3119eef4af8b25ad405c55f",
-              "url": "https://files.pythonhosted.org/packages/3f/a1/83dfdfbb0e8240bc50d0e73dc6bbb47edcfaa495c1b2a584f7cc30d6b8a0/boto3-1.28.12-py3-none-any.whl"
+              "hash": "d06b8f8c962f320fc462503e476c5f5cffd6c9da5e090ca6cc7e9f0e931b2945",
+              "url": "https://files.pythonhosted.org/packages/ce/4c/ded61d276a06360afaf8912b05c9e6124173f86208085edbf3ba234ab9ab/boto3-1.28.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d5ac6599951fdd519ed26c6fe15c41a7aa4021cb9adce33167344f8ce5cdb07b",
-              "url": "https://files.pythonhosted.org/packages/54/1e/05da54a9c1935e9e26e8cfe0b45a5bed2cb6ab0f798ae9c38bad58766245/boto3-1.28.12.tar.gz"
+              "hash": "9523d46698a8dc242707ade5de98bd1d2ba10ee618a7f5a36459bf4704cc7857",
+              "url": "https://files.pythonhosted.org/packages/23/0c/315856f25c423ed594c4a6c490c796bb89a18fffc69311db6d90391b87bf/boto3-1.28.14.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.32.0,>=1.31.12",
+            "botocore<1.32.0,>=1.31.14",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.28.12"
+          "version": "1.28.14"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "86380672151866b5e425636e3ebad74f2b83e7163e36ef5d38d11a04b9cba33b",
-              "url": "https://files.pythonhosted.org/packages/29/22/d3313243e0e09ff421edb249011dbb8093089de76b84b5ec3438f4c868eb/botocore-1.31.12-py3-none-any.whl"
+              "hash": "47818998c1b4528cc98cf61658a28cf2244d06efc898016e390b8e83a06de792",
+              "url": "https://files.pythonhosted.org/packages/73/f0/ad1309cf4583e1b1ea76db26e99961ef236e22deaf2f40a32f9c85339034/botocore-1.31.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7e5db466c762a071bb58c9a39d070f1333ce4f4ba6fdf9820ba21e87bd4c7e29",
-              "url": "https://files.pythonhosted.org/packages/a0/52/27fa7dd194cdf86f5412b623e03e81c249494efcf2d355b6fcc49ce144a5/botocore-1.31.12.tar.gz"
+              "hash": "63d7f27c93cea570a534d245221000731c2279ac2ca9b1e63694d3080b0761b9",
+              "url": "https://files.pythonhosted.org/packages/e7/e3/c662767419b188f47acda8d9c40954b1e7ca44fb0c2ef5bff3f9ec5d05bd/botocore-1.31.14.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -896,7 +896,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.31.12"
+          "version": "1.31.14"
         },
         {
           "artifacts": [
@@ -3236,13 +3236,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "77929bc7f5dab9adf3acba2d3bb7d7658f1e0c2f1cafe7eb36434e751c471119",
-              "url": "https://files.pythonhosted.org/packages/e0/7f/21a09f8c9f5db6f5e24432f7a0f916ca386025d74e4da6d0f5164aa9a78a/redis-4.5.5-py3-none-any.whl"
+              "hash": "e2b03db868160ee4591de3cb90d40ebb50a90dd302138775937f6a42b7ed183c",
+              "url": "https://files.pythonhosted.org/packages/20/2e/409703d645363352a20c944f5d119bdae3eb3034051a53724a7c5fee12b8/redis-4.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "dc87a0bdef6c8bfe1ef1e1c40be7034390c2ae02d92dcd0c7ca1729443899880",
-              "url": "https://files.pythonhosted.org/packages/53/30/128c5599bc3fa61488866be0228326b3e486be34480126f70e572043adf8/redis-4.5.5.tar.gz"
+              "hash": "585dc516b9eb042a619ef0a39c3d7d55fe81bdb4df09a52c9cdde0d07bf1aa7d",
+              "url": "https://files.pythonhosted.org/packages/73/88/63d802c2b18dd9eaa5b846cbf18917c6b2882f20efda398cc16a7500b02c/redis-4.6.0.tar.gz"
             }
           ],
           "project_name": "redis",
@@ -3256,7 +3256,7 @@
             "typing-extensions; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "4.5.5"
+          "version": "4.6.0"
         },
         {
           "artifacts": [
@@ -4437,7 +4437,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "pyzmq~=24.0.1",
-    "redis[hiredis]~=4.5.5",
+    "redis[hiredis]~=4.6.0",
     "rich~=12.2",
     "setproctitle~=1.3.2",
     "tabulate~=0.8.9",
