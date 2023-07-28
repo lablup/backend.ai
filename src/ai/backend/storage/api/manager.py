@@ -34,22 +34,25 @@ async def token_auth_middleware(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> web.StreamResponse:
-    token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
-    if not token:
-        raise web.HTTPForbidden()
-    ctx: Context = request.app["ctx"]
-    if token != ctx.local_config["api"]["manager"]["secret"]:
-        raise web.HTTPForbidden()
+    skip_token_auth = getattr(handler, "skip_token_auth", False)
+    if not skip_token_auth:
+        token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
+        if not token:
+            raise web.HTTPForbidden()
+        ctx: Context = request.app["ctx"]
+        if token != ctx.local_config["api"]["manager"]["secret"]:
+            raise web.HTTPForbidden()
     return await handler(request)
 
 
-def skip_token_check(
+def skip_token_auth(
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
-    setattr(handler, "skip_token_check", True)
+    setattr(handler, "skip_token_auth", True)
     return handler
 
 
+@skip_token_auth
 async def check_status(request: web.Request) -> web.Response:
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_status", params)
@@ -640,6 +643,7 @@ async def init_manager_app(ctx: Context) -> web.Application:
     )
     app["ctx"] = ctx
     app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/folder/create", create_vfolder)
