@@ -28,6 +28,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
+from .. import __version__
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import (
@@ -65,12 +66,14 @@ def skip_token_check(
     return handler
 
 
-async def get_status(request: web.Request) -> web.Response:
+async def check_status(request: web.Request) -> web.Response:
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_status", params)
         return web.json_response(
             {
                 "status": "ok",
+                "type": "maanger-facing",
+                "storage-proxy": __version__,
             },
         )
 
@@ -988,7 +991,7 @@ async def init_manager_app(ctx: Context) -> web.Application:
         ],
     )
     app["ctx"] = ctx
-    app.router.add_route("GET", "/", get_status)
+    app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/quota-scope", create_quota_scope)
