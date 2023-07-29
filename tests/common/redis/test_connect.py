@@ -10,6 +10,12 @@ from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundE
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import BusyLoadingError, ConnectionError, TimeoutError
 from redis.retry import Retry
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -23,15 +29,31 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.asyncio
-async def test_connect(redis_container: tuple[str, HostPortPair]) -> None:
+async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
         url=f"redis://{addr.host}:{addr.port}",
-        socket_timeout=2.0,
-        retry=Retry(ExponentialBackoff(), 3),
+        socket_timeout=10.0,
+        retry=Retry(ExponentialBackoff(), 10),
         retry_on_error=[BusyLoadingError, ConnectionError, TimeoutError],
     )
     await r.ping()
+
+
+@pytest.mark.asyncio
+async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortPair]) -> None:
+    addr = redis_container[1]
+    r = Redis.from_url(
+        url=f"redis://{addr.host}:{addr.port}",
+        socket_timeout=10.0,
+    )
+    async for attempt in AsyncRetrying(
+        wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+        stop=stop_after_attempt(10),
+        retry=retry_if_exception_type((BusyLoadingError, ConnectionError, TimeoutError)),
+    ):
+        with attempt:
+            await r.ping()
 
 
 @pytest.mark.redis
