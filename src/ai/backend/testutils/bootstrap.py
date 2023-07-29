@@ -5,6 +5,7 @@ import fcntl
 import json
 import logging
 import os
+import secrets
 import socket
 import subprocess
 import time
@@ -79,13 +80,14 @@ def wait_health_check(container_id):
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     etcd_allocated_port = 9600 + get_parallel_slot() * 8 + 0
+    random_id = secrets.token_hex(8)
     proc = subprocess.run(
         [
             "docker",
             "run",
             "-d",
             "--name",
-            f"test--etcd-slot-{get_parallel_slot()}",
+            f"test--etcd-slot-{get_parallel_slot()}-{random_id}",
             "-p",
             f"0.0.0.0:{etcd_allocated_port}:2379",
             "-p",
@@ -127,6 +129,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     redis_allocated_port = 9600 + get_parallel_slot() * 8 + 1
+    random_id = secrets.token_hex(8)
     proc = subprocess.run(
         [
             "docker",
@@ -135,7 +138,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             "-u",
             f"{os.getuid()}:{os.getgid()}",
             "--name",
-            f"test--redis-slot-{get_parallel_slot()}",
+            f"test--redis-slot-{get_parallel_slot()}-{random_id}",
             "-p",
             f"0.0.0.0:{redis_allocated_port}:6379",
             # IMPORTANT: We have intentionally omitted the healthcheck here
@@ -174,13 +177,14 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     postgres_allocated_port = 9600 + get_parallel_slot() * 8 + 2
+    random_id = secrets.token_hex(8)
     proc = subprocess.run(
         [
             "docker",
             "run",
             "-d",
             "--name",
-            f"test--postgres-slot-{get_parallel_slot()}",
+            f"test--postgres-slot-{get_parallel_slot()}-{random_id}",
             "-p",
             f"0.0.0.0:{postgres_allocated_port}:5432",
             "-e",
