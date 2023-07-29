@@ -155,6 +155,11 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         try:
             with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
                 s.connect(("127.0.0.1", redis_allocated_port))
+                s.send(b"*2\r\n$4\r\nPING\r\n$5\r\nhello\r\n")
+                reply = s.recv(128, 0)
+                if not reply.startswith(b"$5\r\nhello\r\n"):
+                    time.sleep(0.1)
+                    continue
                 break
         except (ConnectionRefusedError, ConnectionResetError):
             time.sleep(0.1)
