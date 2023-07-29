@@ -106,6 +106,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
+    if not container_id:
+        raise RuntimeError("etcd_container: failed to create container", proc.stderr.decode())
     log.info("spawning etcd container on port %d", etcd_allocated_port)
     wait_health_check(container_id)
     yield container_id, HostPortPair("127.0.0.1", etcd_allocated_port)
@@ -143,6 +145,8 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
+    if not container_id:
+        raise RuntimeError("redis_container: failed to create container", proc.stderr.decode())
     log.info("spawning redis container on port %d", redis_allocated_port)
     while True:
         try:
@@ -194,6 +198,8 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
+    if not container_id:
+        raise RuntimeError("postgres_container: failed to create container", proc.stderr.decode())
     log.info("spawning postgres container on port %d", postgres_allocated_port)
     wait_health_check(container_id)
     yield container_id, HostPortPair("127.0.0.1", postgres_allocated_port)
