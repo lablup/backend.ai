@@ -29,18 +29,6 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.asyncio
-async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPortPair]) -> None:
-    addr = redis_container[1]
-    r = Redis.from_url(
-        url=f"redis://{addr.host}:{addr.port}",
-        socket_timeout=10.0,
-        retry=Retry(ExponentialBackoff(), 10),
-        retry_on_error=[BusyLoadingError, ConnectionError, TimeoutError],
-    )
-    await r.ping()
-
-
-@pytest.mark.asyncio
 async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
@@ -54,6 +42,18 @@ async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortP
     ):
         with attempt:
             await r.ping()
+
+
+@pytest.mark.asyncio
+async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPortPair]) -> None:
+    addr = redis_container[1]
+    r = Redis.from_url(
+        url=f"redis://{addr.host}:{addr.port}",
+        socket_timeout=10.0,
+        retry=Retry(ExponentialBackoff(), 10),
+        retry_on_error=[BusyLoadingError, ConnectionError, TimeoutError],
+    )
+    await r.ping()
 
 
 @pytest.mark.redis
