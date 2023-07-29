@@ -209,76 +209,60 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
 
 SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     SessionStatus.PENDING: {
-        s for s in SessionStatus if s not in (SessionStatus.PENDING, SessionStatus.TERMINATED)
+        SessionStatus.SCHEDULED,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.SCHEDULED: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.SCHEDULED,
-            SessionStatus.PENDING,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.PULLING,
+        SessionStatus.PREPARING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.PULLING: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.PULLING,
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATING,  # cannot destroy PULLING session
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.PREPARING,
+        SessionStatus.RUNNING,
+        SessionStatus.RUNNING_DEGRADED,
+        # SessionStatus.TERMINATING,  # cannot destroy PULLING session by user
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.PREPARING: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.PREPARING,
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.PULLING,
+        SessionStatus.RUNNING,
+        SessionStatus.RUNNING_DEGRADED,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.RUNNING: {
         SessionStatus.RESTARTING,
+        SessionStatus.RUNNING_DEGRADED,
         SessionStatus.TERMINATING,
         SessionStatus.TERMINATED,
         SessionStatus.ERROR,
     },
     SessionStatus.RESTARTING: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.RESTARTING,
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.RUNNING,
+        SessionStatus.RUNNING_DEGRADED,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
     },
     SessionStatus.RUNNING_DEGRADED: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.RUNNING,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
     },
     SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
     SessionStatus.TERMINATED: set(),
-    SessionStatus.ERROR: set(),
+    SessionStatus.ERROR: {SessionStatus.TERMINATED},
     SessionStatus.CANCELLED: set(),
 }
 
