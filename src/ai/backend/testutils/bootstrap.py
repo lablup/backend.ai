@@ -27,6 +27,18 @@ def get_free_port():
         return s.getsockname()[1]
 
 
+def check_if_port_is_clear(host, port):
+    while True:
+        try:
+            s = socket.create_connection((host, port), timeout=0.3)
+        except (ConnectionRefusedError, TimeoutError):
+            break
+        else:
+            time.sleep(0.1)
+            s.close()
+            continue
+
+
 @contextlib.contextmanager
 def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2):
     if not path.exists():
@@ -81,6 +93,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     etcd_allocated_port = 9600 + get_parallel_slot() * 8 + 0
     random_id = secrets.token_hex(8)
+    check_if_port_is_clear("127.0.0.1", etcd_allocated_port)
     proc = subprocess.run(
         [
             "docker",
@@ -129,6 +142,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     redis_allocated_port = 9600 + get_parallel_slot() * 8 + 1
+    check_if_port_is_clear("127.0.0.1", redis_allocated_port)
     random_id = secrets.token_hex(8)
     proc = subprocess.run(
         [
@@ -182,6 +196,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     postgres_allocated_port = 9600 + get_parallel_slot() * 8 + 2
+    check_if_port_is_clear("127.0.0.1", postgres_allocated_port)
     random_id = secrets.token_hex(8)
     proc = subprocess.run(
         [
