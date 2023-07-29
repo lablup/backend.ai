@@ -65,9 +65,9 @@ _default_conn_opts: Mapping[str, Any] = {
     "socket_keepalive_options": _keepalive_options,
     "retry": Retry(ExponentialBackoff(), 10),
     "retry_on_error": [
-        redis.exceptions.BusyLoadingError,
         redis.exceptions.ConnectionError,
         redis.exceptions.TimeoutError,
+        ConnectionRefusedError,
         ConnectionResetError,
     ],
 }
