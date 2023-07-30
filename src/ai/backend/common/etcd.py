@@ -232,7 +232,7 @@ class AsyncEtcd:
 
     async def put_dict(
         self,
-        dict_obj: Mapping[str, str],
+        flattened_dict_obj: Mapping[str, str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Mapping[ConfigScopes, str] = None,
@@ -250,7 +250,7 @@ class AsyncEtcd:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
 
         def _pipe(txn: EtcdTransactionAction):
-            for k, v in dict_obj.items():
+            for k, v in flattened_dict_obj.items():
                 txn.put(self._mangle_key(f"{_slash(scope_prefix)}{k}"), str(v))
 
         async with self.etcd.connect() as communicator:
