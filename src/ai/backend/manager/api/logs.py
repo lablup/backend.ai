@@ -224,10 +224,8 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
     except ValueError:
         lifetime = dt.timedelta(days=90)
         log.warning(
-            (
-                "Failed to parse the error log retention period ({}) read from etcd; "
-                "falling back to 90 days"
-            ),
+            "Failed to parse the error log retention period ({}) read from etcd; "
+            "falling back to 90 days",
             raw_lifetime,
         )
     boundary = datetime.now() - lifetime

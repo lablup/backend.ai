@@ -847,10 +847,8 @@ def privileged_mutation(required_role, target_func=None):
                     if target_domain is None and target_project is None:
                         return cls(
                             False,
-                            (
-                                "misconfigured privileged mutation: "
-                                "both target_domain and target_project missing"
-                            ),
+                            "misconfigured privileged mutation: "
+                            "both target_domain and target_project missing",
                             None,
                         )
                     permit_chains = []

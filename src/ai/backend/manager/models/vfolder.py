@@ -214,17 +214,13 @@ vfolders = sa.Table(
         nullable=False,
     ),
     sa.CheckConstraint(
-        (
-            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-            "(ownership_type = 'project' AND \"project_id\" IS NOT NULL)"
-        ),
+        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+        "(ownership_type = 'project' AND \"project_id\" IS NOT NULL)",
         name="ownership_type_match_with_user_or_project",
     ),
     sa.CheckConstraint(
-        (
-            '("user" IS NULL AND "project_id" IS NOT NULL) OR ("user" IS NOT NULL AND "project_id"'
-            " IS NULL)"
-        ),
+        '("user" IS NULL AND "project_id" IS NOT NULL) OR ("user" IS NOT NULL AND "project_id"'
+        " IS NULL)",
         name="either_one_of_user_or_project",
     ),
 )
@@ -843,21 +839,6 @@ async def initiate_vfolder_clone(
     target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
 
     async def _clone(reporter: ProgressReporter) -> None:
-        try:
-            async with storage_manager.request(
-                target_proxy,
-                "POST",
-                "folder/create",
-                json={
-                    "volume": target_volume,
-                    "vfid": str(target_folder_id),
-                    # 'options': {'quota': params['quota']},
-                },
-            ):
-                pass
-        except aiohttp.ClientResponseError:
-            raise VFolderOperationFailed(extra_msg=str(target_folder_id.folder_id))
-
         async def _insert_vfolder() -> None:
             async with db_engine.begin_session() as db_session:
                 insert_values = {

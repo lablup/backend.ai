@@ -63,20 +63,16 @@ async def _negotiate_api_version(
             server_version = parse_api_version(server_info["version"])
             if server_version > client_version:
                 warnings.warn(
-                    (
-                        "The server API version is higher than the client. "
-                        "Please upgrade the client package."
-                    ),
+                    "The server API version is higher than the client. "
+                    "Please upgrade the client package.",
                     category=APIVersionWarning,
                 )
             if server_version < MIN_API_VERSION:
                 warnings.warn(
-                    (
-                        "The server is too old and does not meet the minimum API version"
-                        f" requirement: v{MIN_API_VERSION[0]}.{MIN_API_VERSION[1]}\nPlease upgrade"
-                        " the server or downgrade/reinstall the client SDK with the same"
-                        " major.minor release of the server."
-                    ),
+                    "The server is too old and does not meet the minimum API version"
+                    f" requirement: v{MIN_API_VERSION[0]}.{MIN_API_VERSION[1]}\nPlease upgrade"
+                    " the server or downgrade/reinstall the client SDK with the same"
+                    " major.minor release of the server.",
                     category=APIVersionWarning,
                 )
             return min(server_version, client_version)

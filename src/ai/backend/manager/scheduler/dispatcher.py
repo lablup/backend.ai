@@ -600,7 +600,7 @@ class SchedulerDispatcher(aobject):
         requested_architectures = set(k.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architectureon single node session",
+                "Cannot assign multiple kernels with different architectures' single node session",
             )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
@@ -610,7 +610,7 @@ class SchedulerDispatcher(aobject):
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        "No agents found to be compatible with the image acrhitecture "
+                        "No agents found to be compatible with the image architecture "
                         f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
                         f"arch: {requested_architecture})"
                     ),
@@ -826,7 +826,7 @@ class SchedulerDispatcher(aobject):
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    "No agents found to be compatible with the image acrhitecture "
+                                    "No agents found to be compatible with the image architecture "
                                     f"(image: {kernel.image_ref}, "
                                     f"arch: {kernel.architecture})"
                                 ),

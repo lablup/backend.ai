@@ -592,11 +592,9 @@ class PurgeProject(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             if await cls.project_vfolder_mounted_to_active_kernels(conn, gid):
                 raise RuntimeError(
-                    (
-                        "Some of virtual folders that belong to this project "
-                        "are currently mounted to active sessions. "
-                        "Terminate them first to proceed removal."
-                    ),
+                    "Some of virtual folders that belong to this project "
+                    "are currently mounted to active sessions. "
+                    "Terminate them first to proceed removal.",
                 )
             if await cls.project_has_active_kernels(conn, gid):
                 raise RuntimeError(

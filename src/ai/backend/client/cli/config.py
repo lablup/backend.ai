@@ -143,6 +143,7 @@ def login():
 
             if not result["authenticated"]:
                 print_fail("Login failed.")
+                print_fail(result["data"]["details"])
                 sys.exit(ExitCode.FAILURE)
             print_done("Login succeeded.")
 
