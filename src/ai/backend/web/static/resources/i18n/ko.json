@@ -117,8 +117,7 @@
     "connectingToCluster": "Backend.AI 클러스터에 연결중...",
     "DownloadWebUIApp": "Backend.AI Web UI 앱 다운로드",
     "IPUEnabled": "IPU NPU 사용중",
-    "ATOMEnabled": "ATOM NPU 사용중",
-    "WarboyEnabled": "Warboy NPU 사용중"
+    "ATOMEnabled": "ATOM NPU 사용중"
   },
   "session": {
     "launcher": {
@@ -279,7 +278,7 @@
     "AllowedClientIps": "허용된 클라이언트 IP",
     "CommaSeparated": "콤마로 구분",
     "TryPreferredPort": "선호 포트",
-    "SFTPDescription": "SSH/SFTP 클라이언트를 통해 빠르고 안정적으로 파일을 업로드할 수 있습니다. 미리 SSH 키페어를 업로드하지 않으셨다면, \"SSH키 다운로드\" 버튼을 클릭하여 SSH 키를 먼저 저장하십시오. 그 키를 이용해서 sftp, scp, rsync 등의 명령을 사용할 수 있습니다. 세션 - 업로드 세션페이지에서 파일 업로드를 위한 세션 리스트를 관리할 수 있습니다.",
+    "SFTPDescription": "SSH/SFTP 클라이언트를 이용해서 접속하세요.",
     "ConnectionInformation": "연결 정보",
     "DownloadSSHKey": "SSH 키 파일 다운로드 (id_container)",
     "VNCconnection": "VNC 연결",
@@ -368,11 +367,7 @@
     "UtilizationThresholdDesc": "연산 세션의 자원 사용량 기준입니다. 연산 세션의 자원 사용량이 일정 시간 동안 설정된 기준값을 넘지 못하면, 그 세션은 자동으로 삭제됩니다. 예를 들어, CUDA 사용률 기준을 1%로 설정했다면, 일정 시간 동안 1% 미만의 CUDA GPU 사용률을 보이는 연산 세션이 삭제됩니다. 값이 설정되지 않는 자원은 자동 삭제 기준에서 제외됩니다.",
     "ExpiresAfter": "남은 시간",
     "ConnectionExample": "접속 예제",
-    "System": "업로드 세션",
-    "SFTPExtraNotification": "개수 제한이 있으므로 다 사용한 후에는 삭제하는 것이 좋습니다. 일정 시간 업로드를 하지 않는 세션은 자동으로 삭제될 수 있습니다.",
-    "ConnectionNotice": "주의",
-    "Readmore": "더 알아보기...",
-    "Readless": "내용 접기"
+    "System": "업로드 세션"
   },
   "button": {
     "Cancel": "취소",
@@ -407,8 +402,7 @@
     "Commit": "커밋하기",
     "Reset": "초기화",
     "OptOut": "비활성화",
-    "Activate": "활성화",
-    "Unset": "초기화"
+    "Activate": "활성화"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -434,56 +428,6 @@
     "NoAvailableLiveStat": "표시할 사용량 없음",
     "Allocation": "할당 정보",
     "DiskPerc": "디스크 %"
-  },
-  "storageHost": {
-    "Resource": "자원",
-    "Control": "제어",
-    "Usage": "사용량",
-    "Total": "전체",
-    "Used": "사용",
-    "Detail": "상세 정보",
-    "QuotaSettings": "가용량 설정",
-    "ForProject": "프로젝트",
-    "ForUser": "사용자",
-    "ResourcePolicy": "자원 정책",
-    "PolicyName": "자원 정책 이름",
-    "ResourcePolicySettings": "자원 정책 설정",
-    "Name": "이름",
-    "MaxFolderSize": "최대 폴더 크기",
-    "SoftLimit": "Soft Limit",
-    "HardLimit": "Hard Limit",
-    "Search": "검색",
-    "VendorOptions": "벤더 옵션",
-    "CannotRead": "읽을 수 없습니다.",
-    "NoConfigs": "설정되지 않았습니다.",
-    "DeleteResourcePolicy": "자원 정책 삭제",
-    "AreYouSureYouWantToDelete": "정말로 지우시겠습니까?",
-    "UnsetResourcePolicy": "자원 정책 초기화",
-    "DoYouWantToUseDefaultValue": "기본 값을 사용하시겠습니까?",
-    "SelectProjectOrUserFirst": "프로젝트 혹은 사용자를 먼저 선택해주세요.",
-    "BeCarefulToSetProjectResourcePolicy": "자원 정책을 변경하면 해당 자원 정책을 사용하고 있는 모든 프로젝트에 영향을 줄 수 있으니 주의 깊게 사용하세요.",
-    "BeCarefulToSetUserResourcePolicy": "자원 정책을 변경하면 해당 자원 정책을 사용하고 있는 모든 사용자에게 영향을 줄 수 있으니, 주의 깊게 사용하세요.",
-    "ResourcePolicySuccessfullyCreated": "자원 정책이 성공적으로 생성되었습니다.",
-    "ResourcePolicySuccessfullyUpdated": "자원 정책이 성공적으로 수정되었습니다.",
-    "ResourcePolicySuccessfullyDeleted": "자원 정책이 성공적으로 삭제되었습니다.",
-    "QuotaDoesNotSupported": "이 스토리지 백엔드는 가용량 설정을 지원하지 않습니다.",
-    "quotaSettings": {
-      "QuotaScopeId": "가용량 범위 ID",
-      "QuotaSettings": "가용량 설정",
-      "Type": "유형",
-      "Host": "호스트",
-      "SelectFirst": "좌측 상단에서 프로젝트 혹은 사용자를 먼저 선택해주세요.",
-      "ClickSettingButton": "가용량 설정값이 없습니다. 가용량을 설정하고 싶다면 아래 버튼을 클릭하세요.",
-      "AddQuotaConfigs": "가용량 설정 추가",
-      "UnsetCustomSettings": "사용자 설정 초기화",
-      "ConfirmUnsetCustomQuota": "정말로 설정을 초기화 하시겠습니까? \n이 사용자 혹은 프로젝트의 가용량은 기본값으로 설정됩니다.",
-      "SelectDomain": "도메인 선택",
-      "SelectProject": "프로젝트 선택",
-      "SelectUser": "사용자 검색 및 선택",
-      "QuotaScopeSuccessfullyUpdated": "할당 범위가 성공적으로 수정되었습니다.",
-      "LessThanResourcePolicy": "Hard limit은 자원 정책보다 작아야 합니다.",
-      "AllowNumberAndDot": "숫자와 .(점)만 입력할 수 있습니다."
-    }
   },
   "general": {
     "cores": "코어",
@@ -627,8 +571,7 @@
     "Permission": "권한",
     "StorageStatus": "저장소 상태",
     "Created": "생성됨",
-    "Shared": "공유 받음",
-    "Invited": "초대 받음",
+    "Invited": "공유받음",
     "Capacity": "생성가능 갯수",
     "folders": {
       "Location": "위치",
@@ -752,14 +695,7 @@
       "PermissionModified": "권한이 변경되었습니다"
     },
     "NoStorageDescriptionFound": "별도 설명이 없습니다.",
-    "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다.",
-    "QuotaPerStorageVolume": "스토리지 볼륨별 가용량",
-    "NumberOfFolders": "폴더 개수",
-    "SelectStorageHost": "호스트를 선택하세요",
-    "Used": "사용됨",
-    "Limit": "제한",
-    "HostDetails": "선택한 스토리지 호스트의 가용량 정보를 보여줍니다.",
-    "ProjectFolder": "프로젝트 폴더"
+    "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다."
   },
   "dialog": {
     "warning": {
@@ -1025,9 +961,7 @@
     "RetriesToSkip": "회",
     "NoGroupToDisplay": "그룹이 없습니다.",
     "AllowedSessionTypes": "허용된 세션 타입",
-    "Domain": "도메인",
-    "Public": "공개",
-    "PublicStatus": "공개 상태"
+    "Domain": "도메인"
   },
   "maintenance": {
     "General": "일반",
@@ -1130,7 +1064,7 @@
     "DescAllowAgentSideRegistration": "매니저에 에이전트 자신을 등록하도록 허용합니다.<br/>Backend.AI 클러스터가 보안환경에서 동작 및 관리되고 있을 때만 사용하세요.",
     "Plugins": "플러그인",
     "CUDAGPUsupport": "CUDA GPU 지원",
-    "DescCUDAGPUsupport": "NVIDIA CUDA GPU 지원을 추가합니다. <br/>Backend.AI CUDA 플러그인이 필요합니다.",
+    "DescCUDAGPUsupport": "NVidia CUDA GPU 지원을 추가합니다. <br/>Backend.AI CUDA 플러그인이 필요합니다.",
     "CUDAGPUdisabledByFGPUsupport": "시스템이 Fractional GPU 플러그인을 사용하고 있어 비활성화되었습니다.",
     "ROCMGPUsupport": "ROCm GPU 지원",
     "DescROCMGPUsupport": "AMD ROCm GPU 지원을 추가합니다. <br/>Backend.AI ROCm 플러그인이 필요합니다.",
@@ -1177,12 +1111,9 @@
     "IPUsupport": "IPU 지원",
     "DescIPUsupport": "GraphCore IPU 가속기를 사용합니다.",
     "ATOMsupport": "ATOM 지원",
-    "DescATOMsupport": "Rebellions ATOM 가속기를 사용합니다.",
+    "DescATOMsupport": "Rebellions ATOM 가속기를을 사용합니다.",
     "RequireIPUPlugin": "Backend.AI IPU 플러그인이 필요합니다.",
-    "RequireATOMPlugin": "Backend.AI ATOM 플러그인이 필요합니다.",
-    "Warboysupport": "Warboy 지원",
-    "DescWarboysupport": "Backend.AI Warboy 플러그인이 필요합니다.",
-    "RequireWarboyPlugin": "Backend.AI Warboy 플러그인이 필요합니다."
+    "RequireATOMPlugin": "Backend.AI ATOM 플러그인이 필요합니다."
   },
   "notification": {
     "SuccessfullyUpdated": "성공적으로 수정되었습니다.",
