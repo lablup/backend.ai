@@ -183,7 +183,8 @@ async def connect_database(
     version_check_db = create_async_engine(url)
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
-        major, minor, *_ = map(int, result.scalar().split("."))
+        version_str = result.scalar()
+        major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
     await version_check_db.dispose()
