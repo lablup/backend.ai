@@ -103,11 +103,16 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                             }
                         )
                     except aiohttp.ClientConnectorError:
-                        return web.HTTPInternalServerError(
+                        log.error(
+                            "scaling group({}) uses INVALID WSProxy address: ({})",
+                            scaling_group_name,
+                            wsproxy_addr,
+                        )
+                        return web.HTTPNotFound(
                             text=json.dumps(
                                 {
-                                    "type": "https://api.backend.ai/probs/internal-server-error",
-                                    "title": "Wsproxy of scaling group is invalid.",
+                                    "type": "https://api.backend.ai/probs/url-not-found",
+                                    "title": "Unknown URL path.",
                                 }
                             ),
                             content_type="application/problem+json",
