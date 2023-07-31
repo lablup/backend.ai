@@ -60,7 +60,10 @@
       "AgentSummary": "__NOT_TRANSLATED__",
       "SetupTotp": "__NOT_TRANSLATED__",
       "TotpActivated": "__NOT_TRANSLATED__",
-      "AIAccelerator": "__NOT_TRANSLATED__"
+      "AIAccelerator": "__NOT_TRANSLATED__",
+      "Serving": "__NOT_TRANSLATED__",
+      "Notifications": "__NOT_TRANSLATED__",
+      "Tasks": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "ТРЕБУЕТСЯ ВХОД",
     "YouAreOffline": "Вы сейчас не в сети",
@@ -616,7 +619,11 @@
       "FolderInfo": "__NOT_TRANSLATED__",
       "OpenAFolder": "__NOT_TRANSLATED__",
       "Status": "__NOT_TRANSLATED__",
-      "Serve": "__NOT_TRANSLATED__"
+      "Serve": "__NOT_TRANSLATED__",
+      "CloneFolder": "__NOT_TRANSLATED__",
+      "LeaveFolder": "__NOT_TRANSLATED__",
+      "ShareFolder": "__NOT_TRANSLATED__",
+      "ModifyPermissions": "__NOT_TRANSLATED__"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -673,7 +680,13 @@
       "EmptyFilesAndFoldersAreNotUploaded": "__NOT_TRANSLATED__",
       "FolderAlreadyExists": "__NOT_TRANSLATED__",
       "NumberOfSFTPSessionsExceededTitle": "__NOT_TRANSLATED__",
-      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__"
+      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__",
+      "Serve": "__NOT_TRANSLATED__",
+      "FolderInfo": "__NOT_TRANSLATED__",
+      "CloneFolder": "__NOT_TRANSLATED__",
+      "Rename": "__NOT_TRANSLATED__",
+      "FolderOptionUpdate": "__NOT_TRANSLATED__",
+      "LeaveFolder": "__NOT_TRANSLATED__"
     },
     "invitation": {
       "EnterEmail": "Введите адрес электронной почты",
