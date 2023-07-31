@@ -1,8 +1,8 @@
 """rename_group_to_project
 
-Revision ID: b4eb4eb9e12d
-Revises: 5fbd368d12a2
-Create Date: 2023-06-13 13:51:33.110035
+Revision ID: 09c16ed01ba7
+Revises: eb9441fcf90a
+Create Date: 2023-07-31 14:33:26.988038
 
 """
 
@@ -19,8 +19,8 @@ from ai.backend.manager.models.base import convention
 from ai.backend.manager.models.vfolder import VFolderOwnershipType, vfolders
 
 # revision identifiers, used by Alembic.
-revision = "b4eb4eb9e12d"
-down_revision = "5fbd368d12a2"
+revision = "09c16ed01ba7"
+down_revision = "eb9441fcf90a"
 branch_labels = None
 depends_on = None
 
@@ -251,22 +251,24 @@ def upgrade():
         conn.execute(text(f"ALTER TYPE {enum_name} ADD VALUE '{n}';"))
     conn.commit()
 
-    vfolder_cnt = conn.execute(
-        sa.select([sa.func.count()])
-        .select_from(vfolders)
-        .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
-    ).scalar()
+    while True:
+        vfolder_query = (
+            sa.select([vfolders.c.id])
+            .select_from(vfolders)
+            .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
+            .order_by(vfolders.c.id)
+            .limit(PAGE_SIZE)
+        )
+        vfolder_ids = [row["id"] for row in conn.execute(vfolder_query).fetchall()]
 
-    for offset in range(0, vfolder_cnt, PAGE_SIZE):
         update_query = (
             sa.update(vfolders)
             .values(ownership_type=VFolderOwnershipType.PROJECT)
-            .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
-            .order_by(vfolders.c.id)
-            .offset(offset)
-            .limit(PAGE_SIZE)
+            .where(vfolders.c.id.in_(vfolder_ids))
         )
-        conn.execute(update_query)
+        result = conn.execute(update_query)
+        if result.rowcount < PAGE_SIZE:
+            break
 
     for n in legacy_names:
         _delete_enum_value(conn, enum_name, n)
@@ -416,22 +418,24 @@ def downgrade():
         conn.execute(text(f"ALTER TYPE {enum_name} ADD VALUE '{n}';"))
     conn.commit()
 
-    vfolder_cnt = conn.execute(
-        sa.select([sa.func.count()])
-        .select_from(vfolders)
-        .where(vfolders.c.ownership_type == LegacyVFolderOwnershipType.GROUP)
-    ).scalar()
+    while True:
+        vfolder_query = (
+            sa.select([vfolders.c.id])
+            .select_from(vfolders)
+            .where(vfolders.c.ownership_type == VFolderOwnershipType.PROJECT)
+            .order_by(vfolders.c.id)
+            .limit(PAGE_SIZE)
+        )
+        vfolder_ids = [row["id"] for row in conn.execute(vfolder_query).fetchall()]
 
-    for offset in range(0, vfolder_cnt, PAGE_SIZE):
         update_query = (
             sa.update(vfolders)
             .values(ownership_type=LegacyVFolderOwnershipType.GROUP)
-            .where(vfolders.c.ownership_type == VFolderOwnershipType.PROJECT)
-            .order_by(vfolders.c.id)
-            .offset(offset)
-            .limit(PAGE_SIZE)
+            .where(vfolders.c.id.in_(vfolder_ids))
         )
-        conn.execute(update_query)
+        result = conn.execute(update_query)
+        if result.rowcount < PAGE_SIZE:
+            break
 
     for n in new_names:
         _delete_enum_value(conn, enum_name, n)
