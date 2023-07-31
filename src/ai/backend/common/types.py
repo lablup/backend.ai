@@ -1133,4 +1133,5 @@ class AcceleratorMetadata(TypedDict):
 class AgentSelectionStrategy(enum.StrEnum):
     DISPERSED = "dispersed"
     CONCENTRATED = "concentrated"
+    # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"

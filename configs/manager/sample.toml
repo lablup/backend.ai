@@ -97,6 +97,9 @@ disabled-plugins = []
 # Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
 hide-agents = false
 
+# The order of agent selection.
+agent-selection-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
 # One of: "asyncio", "uvloop"
 # This changes the event loop backend.
 # uvloop is a fast libuv-based implementation but sometimes has

@@ -91,9 +91,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
                 # Each scheduler impl refers an additional "config" key.
                 t.Key("config", default={}): t.Mapping(t.String, t.Any),
-                t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): t.Enum(
-                    *[e.value for e in AgentSelectionStrategy]
-                ),
+                t.Key(
+                    "agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED
+                ): tx.Enum(AgentSelectionStrategy),
             }
         ).allow_extra("*")
 

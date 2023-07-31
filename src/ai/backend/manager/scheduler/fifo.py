@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 from typing import List, Optional, Sequence, Tuple
 
@@ -15,7 +16,8 @@ def key_by_requested_slots(
     agent: AgentRow,
     requested_slots: ResourceSlot,
     agent_selection_strategy: AgentSelectionStrategy,
-) -> Tuple[int, ResourceSlot]:
+    agent_selection_order: list[str],
+) -> Tuple[int, ...]:
     unused_slot_keys = set()
     for k, v in requested_slots.items():
         if v == Decimal(0):
@@ -25,20 +27,30 @@ def key_by_requested_slots(
         if k in unused_slot_keys and v > Decimal(0):
             num_extras += 1
 
-    comparator = None
+    sorted_agent_selection_order = sorted(
+        requested_slots.data.keys(), key=lambda item: agent_selection_order.index(item)
+    )
+
+    remaining_slots = agent.available_slots - agent.occupied_slots
 
     match agent_selection_strategy:
         case AgentSelectionStrategy.LEGACY:
-            comparator = agent.available_slots
+            comparators = [
+                agent.available_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+            ]
         case AgentSelectionStrategy.CONCENTRATED:
-            comparator = -(agent.available_slots - agent.occupied_slots)
+            comparators = [
+                -remaining_slots.get(key, math.inf) for key in sorted_agent_selection_order
+            ]
         case AgentSelectionStrategy.DISPERSED | _:
-            comparator = agent.available_slots - agent.occupied_slots
+            comparators = [
+                remaining_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+            ]
 
     # Put back agents with more extra slot types
     # (e.g., accelerators)
     # Also put front agents with exactly required slot types
-    return (-num_extras, comparator)
+    return (-num_extras, *comparators)
 
 
 class FIFOSlotScheduler(AbstractScheduler):
@@ -79,6 +91,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         requested_slots: ResourceSlot,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         possible_agents = []
         for agent in agents:
@@ -92,6 +105,7 @@ class FIFOSlotScheduler(AbstractScheduler):
                     agent,
                     requested_slots,
                     agent_selection_strategy,
+                    agent_selection_order,
                 ),
             )
             return chosen_agent.id
@@ -102,11 +116,10 @@ class FIFOSlotScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
-            agents,
-            pending_session.requested_slots,
-            agent_selection_strategy,
+            agents, pending_session.requested_slots, agent_selection_strategy, agent_selection_order
         )
 
     def assign_agent_for_kernel(
@@ -114,11 +127,13 @@ class FIFOSlotScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )
 
 
@@ -139,6 +154,7 @@ class LIFOSlotScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         requested_slots: ResourceSlot,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         possible_agents = []
         for agent in agents:
@@ -152,6 +168,7 @@ class LIFOSlotScheduler(AbstractScheduler):
                     agent,
                     requested_slots,
                     agent_selection_strategy,
+                    agent_selection_order,
                 ),
             )
             return chosen_agent.id
@@ -162,11 +179,13 @@ class LIFOSlotScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )
 
     def assign_agent_for_kernel(
@@ -174,9 +193,11 @@ class LIFOSlotScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )

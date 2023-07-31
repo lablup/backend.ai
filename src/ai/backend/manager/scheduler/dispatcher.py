@@ -624,11 +624,14 @@ class SchedulerDispatcher(aobject):
             if agent is not None:
                 agent_id = agent.id
             else:
+                agent_selection_order = self.local_config["manager"]["agent-selection-order"]
+
                 # Let the scheduler check the resource availability and decide the target agent
                 cand_agent = scheduler.assign_agent_for_session(
                     compatible_candidate_agents,
                     sess_ctx,
                     scheduler.sgroup_opts.agent_selection_strategy,
+                    agent_selection_order,
                 )
                 if cand_agent is None:
                     raise InstanceNotAvailable(
@@ -834,11 +837,17 @@ class SchedulerDispatcher(aobject):
                                     f"arch: {kernel.architecture})"
                                 ),
                             )
+
+                        agent_selection_order = self.local_config["manager"][
+                            "agent-selection-order"
+                        ]
+
                         # Let the scheduler check the resource availability and decide the target agent
                         agent_id = scheduler.assign_agent_for_kernel(
                             compatible_candidate_agents,
                             kernel,
                             scheduler.sgroup_opts.agent_selection_strategy,
+                            agent_selection_order,
                         )
                         if agent_id is None:
                             raise InstanceNotAvailable(

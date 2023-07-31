@@ -36,6 +36,7 @@ class MOFScheduler(AbstractScheduler):
         access_key: AccessKey,
         requested_slots: ResourceSlot,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         # return min occupied slot agent or None
         return next(
@@ -60,12 +61,14 @@ class MOFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.access_key,
             pending_session.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )
 
     def assign_agent_for_kernel(
@@ -73,10 +76,12 @@ class MOFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.access_key,
             pending_kernel.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )

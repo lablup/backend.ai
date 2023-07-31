@@ -26,6 +26,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 def key_by_requested_slots(
     agent: AgentRow,
     agent_selection_strategy: AgentSelectionStrategy,
+    agent_selection_order: list[str],
 ) -> Tuple[int, ResourceSlot]:
     comparator = None
     match agent_selection_strategy:
@@ -97,6 +98,7 @@ class DRFScheduler(AbstractScheduler):
         access_key: AccessKey,
         requested_slots: ResourceSlot,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         # If some predicate checks for a picked session fail,
         # this method is NOT called at all for the picked session.
@@ -130,7 +132,9 @@ class DRFScheduler(AbstractScheduler):
             # Choose the agent.
             chosen_agent = max(
                 possible_agents,
-                key=lambda agent: key_by_requested_slots(agent, agent_selection_strategy),
+                key=lambda agent: key_by_requested_slots(
+                    agent, agent_selection_strategy, agent_selection_order
+                ),
             )
             return chosen_agent.id
 
@@ -141,12 +145,14 @@ class DRFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.access_key,
             pending_session.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )
 
     def assign_agent_for_kernel(
@@ -154,10 +160,12 @@ class DRFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_order: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.access_key,
             pending_kernel.requested_slots,
             agent_selection_strategy,
+            agent_selection_order,
         )
