@@ -786,8 +786,11 @@ configure_backendai() {
   fi
 
   # Virtual folder setup
+  VFOLDER_VERSION="3"
+  VFOLDER_VERSION_TXT="version.txt"
   show_info "Setting up virtual folder..."
   mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
+  echo "${VFOLDER_VERSION}" > "${ROOT_PATH}/${VFOLDER_REL_PATH}/${VFOLDER_VERSION_TXT}"
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
