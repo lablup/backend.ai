@@ -1,3 +1,4 @@
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
@@ -33,13 +34,10 @@ class WSProxyVersionQueryParams:
 @aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
 async def query_wsproxy_status(
     wsproxy_addr: str,
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(wsproxy_addr + "/status") as resp:
-                return await resp.json()
-        except aiohttp.ClientConnectorError:
-            return None
+        async with session.get(wsproxy_addr + "/status") as resp:
+            return await resp.json()
 
 
 @auth_required
@@ -96,19 +94,23 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                 if not wsproxy_addr:
                     wsproxy_version = "v1"
                 else:
-                    wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-                    if not wsproxy_status:
-                        return web.json_response(
-                            {
-                                "wsproxy_version": "INVALID wsproxy_version",
-                            }
-                        )
-                    else:
+                    try:
+                        wsproxy_status = await query_wsproxy_status(wsproxy_addr)
                         wsproxy_version = wsproxy_status["api_version"]
                         return web.json_response(
                             {
                                 "wsproxy_version": wsproxy_version,
                             }
+                        )
+                    except aiohttp.ClientConnectorError:
+                        return web.HTTPInternalServerError(
+                            text=json.dumps(
+                                {
+                                    "type": "https://api.backend.ai/probs/internal-server-error",
+                                    "title": "Wsproxy of scaling group is invalid.",
+                                }
+                            ),
+                            content_type="application/problem+json",
                         )
         else:
             raise ObjectNotFound(object_name="scaling group")
