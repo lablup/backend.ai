@@ -58,7 +58,8 @@ class ExtendedAsyncSAEngine(SAEngine):
             self._generic_txn_count += 1
             if self._generic_txn_count >= self._txn_concurrency_threshold:
                 log.warning(
-                    "The number of concurrent generic transaction ({}) exceeded the threshold {}.",
+                    "The number of concurrent generic transactions ({}) "
+                    "looks too high (warning threshold: {}).",
                     self._generic_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -74,10 +75,8 @@ class ExtendedAsyncSAEngine(SAEngine):
             self._readonly_txn_count += 1
             if self._readonly_txn_count >= self._txn_concurrency_threshold:
                 log.warning(
-                    (
-                        "The number of concurrent read-only transaction ({}) exceeded the"
-                        " threshold {}."
-                    ),
+                    "The number of concurrent read-only transactions ({}) "
+                    "looks too high (warning threshold: {}).",
                     self._readonly_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,

@@ -551,10 +551,8 @@ def run(
         sys.exit(ExitCode.INVALID_ARGUMENT)
     if not files and not code:
         print(
-            (
-                "You should provide the command-line code snippet using "
-                '"-c" option if run without files.'
-            ),
+            "You should provide the command-line code snippet using "
+            '"-c" option if run without files.',
             file=sys.stderr,
         )
         sys.exit(ExitCode.INVALID_ARGUMENT)
