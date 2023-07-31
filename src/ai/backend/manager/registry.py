@@ -944,10 +944,8 @@ class AgentRegistry:
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
-                (
-                    "You cannot create session with more than "
-                    f"{resource_policy['max_containers_per_session']} containers."
-                ),
+                "You cannot create session with more than "
+                f"{resource_policy['max_containers_per_session']} containers.",
             )
 
         async with self.db.begin_readonly() as conn:
@@ -962,11 +960,9 @@ class AgentRegistry:
             )
             if scaling_group is None:
                 log.warning(
-                    (
-                        f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                        "The client did not specify the scaling group for session; "
-                        f"falling back to {checked_scaling_group}"
-                    ),
+                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
+                    "The client did not specify the scaling group for session; "
+                    f"falling back to {checked_scaling_group}",
                 )
 
             use_host_network_query = (
@@ -2134,10 +2130,8 @@ class AgentRegistry:
                 case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
                     if not forced:
                         raise GenericForbidden(
-                            (
-                                "Cannot destroy sessions in scheduled/preparing/terminating/error"
-                                " status"
-                            ),
+                            "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                            " status",
                         )
                     log.warning(
                         "force-terminating session (s:{}, status:{})",
@@ -2187,10 +2181,8 @@ class AgentRegistry:
                         case KernelStatus.SCHEDULED | KernelStatus.PREPARING | KernelStatus.TERMINATING | KernelStatus.ERROR:
                             if not forced:
                                 raise GenericForbidden(
-                                    (
-                                        "Cannot destroy kernels in"
-                                        " scheduled/preparing/terminating/error status"
-                                    ),
+                                    "Cannot destroy kernels in"
+                                    " scheduled/preparing/terminating/error status",
                                 )
                             log.warning(
                                 "force-terminating kernel (k:{}, status:{})",

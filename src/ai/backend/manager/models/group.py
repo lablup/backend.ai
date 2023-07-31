@@ -585,11 +585,9 @@ class PurgeGroup(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             if await cls.group_vfolder_mounted_to_active_kernels(conn, gid):
                 raise RuntimeError(
-                    (
-                        "Some of virtual folders that belong to this group "
-                        "are currently mounted to active sessions. "
-                        "Terminate them first to proceed removal."
-                    ),
+                    "Some of virtual folders that belong to this group "
+                    "are currently mounted to active sessions. "
+                    "Terminate them first to proceed removal.",
                 )
             if await cls.group_has_active_kernels(conn, gid):
                 raise RuntimeError(

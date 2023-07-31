@@ -185,10 +185,8 @@ class FlashBladeVolume(BaseVolume):
                 await proc.wait()
         if not available:
             raise RuntimeError(
-                (
-                    "PureStorage RapidFile Toolkit is not installed. "
-                    "You cannot use the PureStorage backend for the stroage proxy."
-                ),
+                "PureStorage RapidFile Toolkit is not installed. "
+                "You cannot use the PureStorage backend for the stroage proxy.",
             )
         self.purity_client = PurityClient(
             self.config["purity_endpoint"],

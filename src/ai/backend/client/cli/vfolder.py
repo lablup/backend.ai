@@ -759,10 +759,8 @@ def clone(name, target_name, target_host, usage_mode, permission):
                 async with (
                     bgtask.listen_events() as response,
                     ProgressViewer(
-                        (
-                            "Cloning the vfolder... "
-                            "(This may take a while depending on its size and number of files!)"
-                        ),
+                        "Cloning the vfolder... "
+                        "(This may take a while depending on its size and number of files!)",
                     ) as viewer,
                 ):
                     async for ev in response:
@@ -781,10 +779,8 @@ def clone(name, target_name, target_host, usage_mode, permission):
                             )
                         elif ev.event == "bgtask_cancelled":
                             completion_msg_func = lambda: print_warn(
-                                (
-                                    "The operation has been cancelled in the middle. "
-                                    "(This may be due to server shutdown.)"
-                                ),
+                                "The operation has been cancelled in the middle. "
+                                "(This may be due to server shutdown.)",
                             )
             finally:
                 completion_msg_func()

@@ -2109,10 +2109,8 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < len(params["emails"]):
             users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
-                (
-                    "Some users do not belong to folder's group:"
-                    f" {','.join(users_not_in_vfolder_group)}"
-                ),
+                "Some users do not belong to folder's group:"
+                f" {','.join(users_not_in_vfolder_group)}",
                 object_name="user",
             )
 
@@ -2674,10 +2672,8 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
             raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
         except Exception:
             log.exception(
-                (
-                    "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
-                    "unexpected error while reading from watcher (agent:{})"
-                ),
+                "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
+                "unexpected error while reading from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
@@ -2766,10 +2762,8 @@ async def list_mounts(request: web.Request) -> web.Response:
                 raise
             except Exception:
                 log.exception(
-                    (
-                        "VFOLDER.LIST_MOUNTS(u:{}): "
-                        "unexpected error while reading from watcher (agent:{})"
-                    ),
+                    "VFOLDER.LIST_MOUNTS(u:{}): "
+                    "unexpected error while reading from watcher (agent:{})",
                     access_key,
                     agent_id,
                 )
