@@ -399,10 +399,8 @@ class NetAppVolume(BaseVolume):
         if await xcp_fsop_model.check_license():
             return xcp_fsop_model
         log.warning(
-            (
-                "XCP is not installed ('{}') or its license is not active. "
-                "Falling back to BaseFSOpModel which may be slower."
-            ),
+            "XCP is not installed ('{}') or its license is not active. "
+            "Falling back to BaseFSOpModel which may be slower.",
             shlex.join(self.netapp_xcp_cmd),
         )
         return BaseFSOpModel(

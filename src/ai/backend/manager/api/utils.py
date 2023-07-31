@@ -132,10 +132,8 @@ async def get_user_scopes(
         elif request["is_admin"]:
             if request["user"]["domain_name"] != owner_user_domain:
                 raise GenericForbidden(
-                    (
-                        "Domain-admins can perform operations on behalf of "
-                        "other users in the same domain only."
-                    ),
+                    "Domain-admins can perform operations on behalf of "
+                    "other users in the same domain only.",
                 )
             if owner_user_role == UserRole.SUPERADMIN:
                 raise GenericForbidden(

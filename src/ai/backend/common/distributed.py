@@ -15,7 +15,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class GlobalTimer:
-
     """
     Executes the given async function only once in the given interval,
     uniquely among multiple manager instances across multiple nodes.
