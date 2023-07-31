@@ -235,7 +235,7 @@ class CPUPlugin(AbstractComputePlugin):
         per_container_cpu_util = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, cpu_used in zip(container_ids, results):
             if cpu_used is None:
@@ -589,7 +589,7 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_io_scratch_size = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, result in zip(container_ids, results):
             if result is None:
