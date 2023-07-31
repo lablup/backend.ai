@@ -893,10 +893,8 @@ def main(
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            (
-                "ConfigurationError: "
-                "Cannot use link-local or unspecified IP address as the RPC listening host."
-            ),
+            "ConfigurationError: "
+            "Cannot use link-local or unspecified IP address as the RPC listening host.",
             file=sys.stderr,
         )
         raise click.Abort()
@@ -919,11 +917,9 @@ def main(
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    (
-                        "ConfigurationError: "
-                        "/proc/sys/kernel/core_pattern must be an absolute path "
-                        "to enable container coredumps."
-                    ),
+                    "ConfigurationError: "
+                    "/proc/sys/kernel/core_pattern must be an absolute path "
+                    "to enable container coredumps.",
                     file=sys.stderr,
                 )
                 raise click.Abort()
