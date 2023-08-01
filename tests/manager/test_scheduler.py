@@ -45,6 +45,8 @@ from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
 
 ARCH_FOR_TEST = "x86_64"
 
+agent_selection_order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
 
 def test_load_intrinsic():
     default_sgroup_opts = ScalingGroupOpts()
@@ -801,7 +803,7 @@ def test_lifo_scheduler(example_agents, example_pending_sessions, example_existi
         picked_session_id,
     )
     agent_id = scheduler.assign_agent_for_session(
-        example_agents, picked_session, AgentSelectionStrategy.DISPERSED
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED, agent_selection_order
     )
     assert agent_id == "i-001"
 
@@ -823,7 +825,10 @@ def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
             picked_session_id,
         )
         agent_id = scheduler.assign_agent_for_session(
-            example_mixed_agents, picked_session, AgentSelectionStrategy.DISPERSED
+            example_mixed_agents,
+            picked_session,
+            AgentSelectionStrategy.DISPERSED,
+            agent_selection_order,
         )
         if idx == 0:
             # example_mixed_agents do not have any agent with ROCM accelerators.
@@ -960,7 +965,10 @@ def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
         assert picked_session_id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
         agent_id = scheduler.assign_agent_for_session(
-            example_mixed_agents, picked_session, AgentSelectionStrategy.DISPERSED
+            example_mixed_agents,
+            picked_session,
+            AgentSelectionStrategy.DISPERSED,
+            agent_selection_order,
         )
         if idx == 2:
             # example_mixed_agents do not have any agent with ROCM accelerators.
@@ -991,7 +999,7 @@ def test_drf_scheduler(
         picked_session_id,
     )
     agent_id = scheduler.assign_agent_for_session(
-        example_agents, picked_session, AgentSelectionStrategy.DISPERSED
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED, agent_selection_order
     )
     assert agent_id == "i-001"
 
@@ -1009,7 +1017,7 @@ def test_mof_scheduler_first_assign(
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
     agent_id = scheduler.assign_agent_for_session(
-        example_agents, picked_session, AgentSelectionStrategy.DISPERSED
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED, agent_selection_order
     )
     assert agent_id == "i-001"
 
@@ -1030,6 +1038,7 @@ def test_mof_scheduler_second_assign(
         example_agents_first_one_assigned,
         picked_session,
         AgentSelectionStrategy.DISPERSED,
+        agent_selection_order,
     )
     assert agent_id == "i-101"
 
@@ -1047,7 +1056,10 @@ def test_mof_scheduler_no_valid_agent(
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
     agent_id = scheduler.assign_agent_for_session(
-        example_agents_no_valid, picked_session, AgentSelectionStrategy.DISPERSED
+        example_agents_no_valid,
+        picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_order,
     )
     assert agent_id is None
 
