@@ -33,6 +33,8 @@ def key_by_requested_slots(
 
     remaining_slots = agent.available_slots - agent.occupied_slots
 
+    # If the requested slot does not exist in the corresponding agent,
+    # the agent should not be selected, in this case it puts -math.inf for avoiding to being selected.
     match agent_selection_strategy:
         case AgentSelectionStrategy.LEGACY:
             comparators = [
