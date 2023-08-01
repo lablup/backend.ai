@@ -333,7 +333,7 @@ container_registry_iv = t.Dict(
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
         t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): t.Null | tx.StringList | t.List(t.String),
+        t.Key("project", default=None): t.Null | tx.StringList(allow_blank=True) | t.List(t.String),
         t.Key("ssl-verify", default=True): t.ToBool,
     }
 ).allow_extra("*")
@@ -531,7 +531,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
         if cfg["manager"]["secret"] is None:
             cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print("Validation of manager configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of manager local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:

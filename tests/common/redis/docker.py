@@ -18,6 +18,20 @@ from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisCluster
 from .utils import simple_run_cmd
 
 
+async def check_if_port_is_clear(host, port):
+    while True:
+        try:
+            async with asyncio.timeout(0.3):
+                reader, writer = await asyncio.open_connection(host, port)
+        except (ConnectionRefusedError, asyncio.TimeoutError):
+            break
+        else:
+            writer.close()
+            await writer.wait_closed()
+            await asyncio.sleep(0.1)
+            continue
+
+
 class DockerRedisNode(AbstractRedisNode):
     def __init__(self, node_type: str, port: int, container_id: str) -> None:
         self.node_type = node_type
@@ -142,6 +156,9 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             "REDIS_SENTINEL2_PORT": base_port + 4,
             "REDIS_SENTINEL3_PORT": base_port + 5,
         }
+        async with asyncio.TaskGroup() as tg:
+            for port in ports.values():
+                tg.create_task(check_if_port_is_clear("127.0.0.1", port))
         os.environ.update({k: str(v) for k, v in ports.items()})
         os.environ["COMPOSE_PATH"] = str(compose_cfg_dir)
         os.environ["DOCKER_USER"] = f"{os.getuid()}:{os.getgid()}"
