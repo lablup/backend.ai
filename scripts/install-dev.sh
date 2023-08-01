@@ -81,6 +81,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
+  echo "    If you are on the main branch, this will be automatically enabled."
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
@@ -744,9 +745,12 @@ configure_backendai() {
   sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
   sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   # install and configure webui
-  if [ $EDITABLE_WEBUI -eq 1 ]; then
+  if [ $EDITABLE_WEBUI -eq 1 -o "$(git rev-parse --abbrev-ref HEAD)" = "main" ]; then
     install_editable_webui
     sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
+  else
+    webui_version=$(jq -r '.package + " (built at " + .build + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
+    show_note "The currently embedded webui version: $webui_version"
   fi
 
   # configure tester
