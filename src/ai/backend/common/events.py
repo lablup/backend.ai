@@ -100,6 +100,10 @@ class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
     name = "do_prepare"
 
 
+class DoScaleEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_scale"
+
+
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
@@ -200,6 +204,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     IDLE_SESSION_LIFETIME = "idle-session-lifetime"
     IDLE_UTILIZATION = "idle-utilization"
     KILLED_BY_EVENT = "killed-by-event"
+    SERVICE_SCALED_DOWN = "service-scaled-down"
     NEW_CONTAINER_STARTED = "new-container-started"
     PENDING_TIMEOUT = "pending-timeout"
     RESTARTING = "restarting"
@@ -215,6 +220,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     UNKNOWN = "unknown"
     CONTAINER_ERROR = "container-error"
     USER_REQUESTED = "user-requested"
+    NOT_FOUND_IN_MANAGER = "not-found-in-manager"
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:

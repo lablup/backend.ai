@@ -55,6 +55,7 @@ from ai.backend.common.types import (
     EndpointId,
     JSONSerializableMixin,
     KernelId,
+    QuotaScopeID,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
@@ -170,6 +171,24 @@ class EnumValueType(TypeDecorator, SchemaType):
     @property
     def python_type(self):
         return self._enum_class
+
+
+class QuotaScopeIDType(TypeDecorator):
+    """
+    A column type wrapper for string-based quota scope ID.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(64))
+
+    def process_bind_param(self, value: Optional[QuotaScopeID], dialect) -> Optional[str]:
+        return str(value) if value else None
+
+    def process_result_value(self, raw_value: str, dialect) -> QuotaScopeID:
+        return QuotaScopeID.parse(raw_value)
 
 
 class ResourceSlotColumn(TypeDecorator):
@@ -618,7 +637,7 @@ class _SQLBasedGQLObject(Protocol):
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -631,14 +650,18 @@ async def batch_result(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in await db_conn.stream(query):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
 
 async def batch_multiresult(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -651,7 +674,11 @@ async def batch_multiresult(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in await db_conn.stream(query):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -785,6 +812,8 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
+            if kwargs.get("project", None) is not None:
+                kwargs["project"] = group_id
             kwargs[user_key] = user_id
             return await resolve_func(executor, info, *args, **kwargs)
 
@@ -817,10 +846,8 @@ def privileged_mutation(required_role, target_func=None):
                     if target_domain is None and target_group is None:
                         return cls(
                             False,
-                            (
-                                "misconfigured privileged mutation: "
-                                "both target_domain and target_group missing"
-                            ),
+                            "misconfigured privileged mutation: "
+                            "both target_domain and target_group missing",
                             None,
                         )
                     permit_chains = []

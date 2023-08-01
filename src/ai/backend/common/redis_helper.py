@@ -28,6 +28,8 @@ from redis.asyncio.sentinel import (
     SentinelConnectionPool,
     SlaveNotFoundError,
 )
+from redis.backoff import ExponentialBackoff
+from redis.retry import Retry
 
 from .logging import BraceStyleAdapter
 from .types import EtcdRedisConfig, RedisConnectionInfo
@@ -57,10 +59,17 @@ if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
 
 
 _default_conn_opts: Mapping[str, Any] = {
-    "socket_timeout": 3.0,
-    "socket_connect_timeout": 0.3,
+    "socket_timeout": 5.0,
+    "socket_connect_timeout": 2.0,
     "socket_keepalive": True,
     "socket_keepalive_options": _keepalive_options,
+    "retry": Retry(ExponentialBackoff(), 10),
+    "retry_on_error": [
+        redis.exceptions.ConnectionError,
+        redis.exceptions.TimeoutError,
+        ConnectionRefusedError,
+        ConnectionResetError,
+    ],
 }
 
 
@@ -71,12 +80,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 class ConnectionNotAvailable(Exception):
     pass
-
-
-def _calc_delay_exp_backoff(initial_delay: float, retry_count: float, time_limit: float) -> float:
-    if time_limit > 0:
-        return min(initial_delay * (2**retry_count), time_limit / 2)
-    return min(initial_delay * (2**retry_count), 30.0)
 
 
 def _parse_stream_msg_id(msg_id: bytes) -> Tuple[int, int]:
@@ -249,7 +252,8 @@ async def execute(
                         "The func must be a function or a coroutinefunction with no arguments."
                     )
                 if isinstance(aw_or_pipe, Pipeline):
-                    result = await aw_or_pipe.execute()
+                    async with aw_or_pipe:
+                        result = await aw_or_pipe.execute()
                 elif inspect.isawaitable(aw_or_pipe):
                     result = await aw_or_pipe
                 else:
@@ -259,7 +263,8 @@ async def execute(
                     )
                 if isinstance(result, Pipeline):
                     # This happens when func is an async function that returns a pipeline.
-                    result = await result.execute()
+                    async with result:
+                        result = await result.execute()
                 if encoding:
                     if isinstance(result, bytes):
                         return result.decode(encoding)

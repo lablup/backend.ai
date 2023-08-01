@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
-import json
 import logging
 import logging.config
 import os
@@ -22,6 +21,7 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
+    Iterable,
     Literal,
     Mapping,
     Optional,
@@ -47,7 +47,11 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventProducer,
+    KernelLifecycleEventReason,
+    KernelTerminatedEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -348,6 +352,39 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def sync_kernel_registry(
+        self,
+        raw_kernel_session_ids: Iterable[tuple[str, str]],
+    ) -> None:
+        kernel_session_ids = [
+            (KernelId(UUID(raw_kid)), SessionId(UUID(raw_sid)))
+            for raw_kid, raw_sid in raw_kernel_session_ids
+        ]
+        for kid, sid in kernel_session_ids:
+            if kid not in self.agent.kernel_registry:
+                # produce KernelTerminatedEvent
+                await self.agent.produce_event(
+                    KernelTerminatedEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    )
+                )
+
+        kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
+        for kid, kernel in self.agent.kernel_registry.items():
+            if kid not in kernel_ids:
+                # destroy kernel
+                await self.agent.inject_container_lifecycle_event(
+                    kid,
+                    kernel.session_id,
+                    LifecycleEvent.DESTROY,
+                    KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                    suppress_events=True,
+                )
+
+    @rpc_function
+    @collect_error
     async def create_kernels(
         self,
         raw_session_id: str,
@@ -553,23 +590,6 @@ class AgentRPCServer(aobject):
             },
             "watcher": self.local_config["watcher"],
         }
-
-    @rpc_function
-    @collect_error
-    async def get_abusing_report(
-        self,
-        kernel_id,  # type: str
-    ) -> Mapping[str, str] | None:
-        if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
-            report_path = Path(abuse_path, f"report.{kernel_id}.json")
-            if report_path.is_file():
-
-                def _read_file():
-                    with open(report_path, "r") as file:
-                        return json.load(file)
-
-                return await self.loop.run_in_executor(None, _read_file)
-        return None
 
     @rpc_function
     @collect_error
@@ -860,7 +880,7 @@ def main(
             pprint(cfg)
         cfg["_src"] = cfg_src_path
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
@@ -873,10 +893,8 @@ def main(
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            (
-                "ConfigurationError: "
-                "Cannot use link-local or unspecified IP address as the RPC listening host."
-            ),
+            "ConfigurationError: "
+            "Cannot use link-local or unspecified IP address as the RPC listening host.",
             file=sys.stderr,
         )
         raise click.Abort()
@@ -899,11 +917,9 @@ def main(
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    (
-                        "ConfigurationError: "
-                        "/proc/sys/kernel/core_pattern must be an absolute path "
-                        "to enable container coredumps."
-                    ),
+                    "ConfigurationError: "
+                    "/proc/sys/kernel/core_pattern must be an absolute path "
+                    "to enable container coredumps.",
                     file=sys.stderr,
                 )
                 raise click.Abort()

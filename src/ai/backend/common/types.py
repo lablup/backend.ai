@@ -66,7 +66,11 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "VFolderID",
+    "QuotaScopeID",
+    "VFolderUsageMode",
     "VFolderMount",
+    "QuotaConfig",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -290,6 +294,16 @@ class ClusterMode(str, enum.Enum):
 class CommitStatus(str, enum.Enum):
     READY = "ready"
     ONGOING = "ongoing"
+
+
+class AbuseReportValue(str, enum.Enum):
+    DETECTED = "detected"
+    CLEANING = "cleaning"
+
+
+class AbuseReport(TypedDict):
+    kernel: str
+    abuse_report: Optional[str]
 
 
 class MovingStatValue(TypedDict):
@@ -773,14 +787,93 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@attrs.define(slots=True, frozen=True)
+class QuotaScopeID:
+    scope_type: QuotaScopeType
+    scope_id: Any
+
+    @classmethod
+    def parse(cls, raw: str) -> QuotaScopeID:
+        scope_type, _, rest = raw.partition(":")
+        match scope_type:
+            case "project":
+                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
+            case "user":
+                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+
+    def __str__(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return f"{self.scope_type.value}:{str(self.scope_id)}"
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @property
+    def pathname(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return self.scope_id.hex
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+
+class VFolderID:
+    quota_scope_id: QuotaScopeID | None
+    folder_id: uuid.UUID
+
+    @classmethod
+    def from_row(cls, row: Any) -> VFolderID:
+        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+        self.folder_id = folder_id
+        match quota_scope_id:
+            case QuotaScopeID():
+                self.quota_scope_id = quota_scope_id
+            case str():
+                self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
+            case None:
+                self.quota_scope_id = None
+            case _:
+                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
+
+    def __str__(self) -> str:
+        if self.quota_scope_id is None:
+            return self.folder_id.hex
+        return f"{self.quota_scope_id}/{self.folder_id.hex}"
+
+    def __eq__(self, other) -> bool:
+        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
+
+class VFolderUsageMode(str, enum.Enum):
+    """
+    Usage mode of virtual folder.
+
+    GENERAL: normal virtual folder
+    MODEL: virtual folder which provides shared models
+    DATA: virtual folder which provides shared data
+    """
+
+    GENERAL = "general"
+    MODEL = "model"
+    DATA = "data"
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
-    vfid: uuid.UUID
+    vfid: VFolderID
     vfsubpath: PurePosixPath
     host_path: PurePosixPath
     kernel_path: PurePosixPath
     mount_perm: MountPermission
+    usage_mode: VFolderUsageMode
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -790,6 +883,7 @@ class VFolderMount(JSONSerializableMixin):
             "host_path": str(self.host_path),
             "kernel_path": str(self.kernel_path),
             "mount_perm": self.mount_perm.value,
+            "usage_mode": self.usage_mode.value,
         }
 
     @classmethod
@@ -803,11 +897,14 @@ class VFolderMount(JSONSerializableMixin):
         return t.Dict(
             {
                 t.Key("name"): t.String,
-                t.Key("vfid"): tx.UUID,
+                t.Key("vfid"): tx.VFolderID,
                 t.Key("vfsubpath", default="."): tx.PurePath,
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
+                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
+                    VFolderUsageMode
+                ),
             }
         )
 
@@ -839,6 +936,32 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class QuotaConfig:
+    limit_bytes: int
+
+    class Validator(t.Trafaret):
+        def check_and_return(self, value: Any) -> QuotaConfig:
+            validator = t.Dict(
+                {
+                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
+                }
+            )
+            converted = validator.check(value)
+            return QuotaConfig(
+                limit_bytes=converted["limit_bytes"],
+            )
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return cls.Validator()
+
+
+class QuotaScopeType(str, enum.Enum):
+    USER = "user"
+    PROJECT = "project"
 
 
 class ImageRegistry(TypedDict):
@@ -941,7 +1064,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
-    startup_command: str
+    startup_command: Optional[str]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:

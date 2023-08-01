@@ -173,6 +173,11 @@ class AuthorizationFailed(BackendError, web.HTTPUnauthorized):
     error_title = "Credential/signature mismatch."
 
 
+class PasswordExpired(BackendError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/password-expired"
+    error_title = "Password has expired."
+
+
 class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."

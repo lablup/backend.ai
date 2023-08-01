@@ -19,12 +19,13 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -36,6 +37,7 @@ class KubernetesKernel(AbstractKernel):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -48,6 +50,7 @@ class KubernetesKernel(AbstractKernel):
         super().__init__(
             kernel_id,
             session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -195,6 +198,11 @@ class KubernetesKernel(AbstractKernel):
         )
         return result
 
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
+        return result
+
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
@@ -319,6 +327,9 @@ class KubernetesKernel(AbstractKernel):
                 log.debug("stream: {}", event)
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
+
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
 
 
 class KubernetesCodeRunner(AbstractCodeRunner):

@@ -72,8 +72,9 @@ from .base import (
     mapper_registry,
 )
 from .group import groups
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang import JSONFieldItem
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -560,34 +561,41 @@ class KernelRow(Base):
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
 
+    @property
+    def is_private(self) -> bool:
+        return self.role in PRIVATE_KERNEL_ROLES
+
     @staticmethod
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
         from .agent import AgentStatus
 
-        async with db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(KernelRow)
-                .where(KernelRow.id == kern_id)
-                .options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).options(noload("*")),
+        async def _query():
+            async with db.begin_readonly_session() as db_sess:
+                query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kern_id)
+                    .options(
+                        noload("*"),
+                        selectinload(KernelRow.agent_row).options(noload("*")),
+                    )
                 )
-            )
-            result = (await db_sess.execute(query)).scalars().all()
+                result = (await db_sess.execute(query)).scalars().all()
 
-            cand = result
-            if not allow_stale:
-                cand = [
-                    k
-                    for k in result
-                    if (k.status not in DEAD_KERNEL_STATUSES)
-                    and (k.agent_row.status == AgentStatus.ALIVE)
-                ]
-            if not cand:
-                raise SessionNotFound
-            return cand[0]
+                cand = result
+                if not allow_stale:
+                    cand = [
+                        k
+                        for k in result
+                        if (k.status not in DEAD_KERNEL_STATUSES)
+                        and (k.agent_row.status == AgentStatus.ALIVE)
+                    ]
+                if not cand:
+                    raise SessionNotFound
+                return cand[0]
+
+        return await execute_with_retry(_query)
 
     @classmethod
     async def set_kernel_status(
@@ -779,6 +787,7 @@ class ComputeContainer(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
     abusing_report = graphene.JSONString()
 
     # resources
@@ -800,6 +809,7 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
+        status_history = row["status_history"] or {}
         return {
             # identity
             "id": row["id"],
@@ -823,6 +833,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "starts_at": row["starts_at"],
+            "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
@@ -859,9 +870,9 @@ class ComputeContainer(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         if access_key is None:
             return None
-        return await graph_ctx.registry.get_abusing_report(self.id, self.agent, self.agent_addr)
+        return await graph_ctx.registry.get_abusing_report(self.id)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: FieldSpecType = {
         "image": ("image", None),
         "architecture": ("architecture", None),
         "agent": ("agent", None),
@@ -875,22 +886,24 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
+        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), dtparse),
     }
 
-    _queryorder_colmap = {
-        "image": "image",
-        "architecture": "architecture",
-        "agent": "agent",
-        "agent_addr": "agent_addr",
-        "cluster_idx": "cluster_idx",
-        "local_rank": "local_rank",
-        "cluster_role": "cluster_role",
-        "cluster_hostname": "cluster_hostname",
-        "status": "status",
-        "status_info": "status_info",
-        "status_changed": "status_info",
-        "created_at": "created_at",
-        "terminated_at": "terminated_at",
+    _queryorder_colmap: ColumnMapType = {
+        "image": ("image", None),
+        "architecture": ("architecture", None),
+        "agent": ("agent", None),
+        "agent_addr": ("agent_addr", None),
+        "cluster_idx": ("cluster_idx", None),
+        "local_rank": ("local_rank", None),
+        "cluster_role": ("cluster_role", None),
+        "cluster_hostname": ("cluster_hostname", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "status_changed": ("status_info", None),
+        "created_at": ("created_at", None),
+        "terminated_at": ("terminated_at", None),
+        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
     }
 
     @classmethod
@@ -1442,12 +1455,30 @@ async def recalc_concurrency_used(
             ),
         )
         concurrency_used = result.scalar()
+        result = await db_sess.execute(
+            sa.select(sa.func.count())
+            .select_from(KernelRow)
+            .where(
+                (KernelRow.access_key == access_key)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+            ),
+        )
+        sftp_concurrency_used = result.scalar()
         assert isinstance(concurrency_used, int)
+        assert isinstance(sftp_concurrency_used, int)
 
     await redis_helper.execute(
         redis_stat,
         lambda r: r.set(
             f"keypair.concurrency_used.{access_key}",
             concurrency_used,
+        ),
+    )
+    await redis_helper.execute(
+        redis_stat,
+        lambda r: r.set(
+            f"keypair.sftp_concurrency_used.{access_key}",
+            sftp_concurrency_used,
         ),
     )

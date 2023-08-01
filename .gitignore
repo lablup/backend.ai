@@ -78,8 +78,10 @@ ENV/
 
 # IDE/vim
 .idea
-*.swp
-*.swo
+.swp
+.swo
+.*.swp
+.*.swo
 .vscode/
 /.vimrc
 /.nvimrc
@@ -103,11 +105,13 @@ ENV/
 /mock-accelerator.toml
 /.pants.env
 /.pants.bootstrap
+/.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
+/agent.dummy.toml
 
 # Local temp
 /.tmp/
@@ -116,6 +120,7 @@ ENV/
 /vfroot/
 /*.pid
 /scratches/
+logs
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -125,3 +130,7 @@ ENV/
 
 # macOS specific
 .DS_Store
+
+.python-runtime
+
+docs/manager/rest-reference/openapi.json
