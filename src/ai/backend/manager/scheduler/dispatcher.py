@@ -600,7 +600,7 @@ class SchedulerDispatcher(aobject):
         requested_architectures = set(k.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architectureon single node session",
+                "Cannot assign multiple kernels with different architectures' single node session",
             )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
@@ -610,7 +610,7 @@ class SchedulerDispatcher(aobject):
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        "No agents found to be compatible with the image acrhitecture "
+                        "No agents found to be compatible with the image architecture "
                         f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
                         f"arch: {requested_architecture})"
                     ),
@@ -719,38 +719,42 @@ class SchedulerDispatcher(aobject):
             raise
 
         async def _finalize_scheduled() -> None:
+            agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 now = datetime.now(tzutc())
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=sgroup_name,
-                        status=KernelStatus.SCHEDULED,
-                        status_info="scheduled",
-                        status_data={},
-                        status_changed=now,
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                KernelStatus.SCHEDULED.name: now.isoformat(),
-                            },
-                        ),
+                for kernel in sess_ctx.kernels:
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .values(
+                            agent=agent_alloc_ctx.agent_id,
+                            agent_addr=agent_alloc_ctx.agent_addr,
+                            scaling_group=sgroup_name,
+                            status=KernelStatus.SCHEDULED,
+                            status_info="scheduled",
+                            status_data={},
+                            status_changed=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.SCHEDULED.name: now.isoformat(),
+                                },
+                            ),
+                        )
+                        .where(KernelRow.id == kernel.id)
                     )
-                    .where(KernelRow.session_id == sess_ctx.id)
-                )
-                await db_sess.execute(kernel_query)
+                    await db_sess.execute(kernel_query)
+                if agent_alloc_ctx.agent_id is not None:
+                    agent_ids.append(agent_alloc_ctx.agent_id)
 
                 session_query = (
                     sa.update(SessionRow)
                     .values(
                         scaling_group_name=sgroup_name,
+                        agent_ids=agent_ids,
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        # status_changed=now,
                         status_history=sql_json_merge(
                             SessionRow.status_history,
                             (),
@@ -793,7 +797,8 @@ class SchedulerDispatcher(aobject):
             for kernel in sess_ctx.kernels:
                 agent_alloc_ctx: AgentAllocationContext | None = None
                 try:
-                    agent = kernel.agent_row
+                    agent_id: Optional[AgentId] = None
+                    agent: Optional[AgentRow] = kernel.agent_row
                     if agent is not None:
                         # Check the resource availability of the manually designated agent
                         query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent.id)
@@ -812,6 +817,7 @@ class SchedulerDispatcher(aobject):
                                         f"available: {available_agent_slots[key]})."
                                     ),
                                 )
+                        agent_id = agent.id
                     else:
                         # Each kernel may have different images and different architectures
                         compatible_candidate_agents = [
@@ -820,16 +826,16 @@ class SchedulerDispatcher(aobject):
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    "No agents found to be compatible with the image acrhitecture "
+                                    "No agents found to be compatible with the image architecture "
                                     f"(image: {kernel.image_ref}, "
                                     f"arch: {kernel.architecture})"
                                 ),
                             )
                         # Let the scheduler check the resource availability and decide the target agent
-                        agent = scheduler.assign_agent_for_kernel(
+                        agent_id = scheduler.assign_agent_for_kernel(
                             compatible_candidate_agents, kernel
                         )
-                        if agent is None:
+                        if agent_id is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     "Could not find a contiguous resource region in any agent big"
@@ -837,7 +843,7 @@ class SchedulerDispatcher(aobject):
                                     f" resource group: {sess_ctx.scaling_group_name})"
                                 ),
                             )
-                    assert agent is not None
+                    assert agent_id is not None
 
                     async def _reserve() -> None:
                         nonlocal agent_alloc_ctx, candidate_agents
@@ -846,7 +852,7 @@ class SchedulerDispatcher(aobject):
                                 sched_ctx,
                                 agent_db_sess,
                                 sgroup_name,
-                                agent.id,
+                                agent_id,
                                 kernel.requested_slots,
                                 extra_conds=agent_query_extra_conds,
                             )
@@ -920,6 +926,7 @@ class SchedulerDispatcher(aobject):
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
+            agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 for binding in kernel_agent_bindings:
                     now = datetime.now(tzutc())
@@ -941,14 +948,17 @@ class SchedulerDispatcher(aobject):
                                 },
                             ),
                         )
-                        .where(KernelRow.session_id == sess_ctx.id)
+                        .where(KernelRow.id == binding.kernel.id)
                     )
                     await db_sess.execute(kernel_query)
+                    if binding.agent_alloc_ctx.agent_id is not None:
+                        agent_ids.append(binding.agent_alloc_ctx.agent_id)
 
                 session_query = (
                     sa.update(SessionRow)
                     .values(
                         scaling_group_name=sgroup_name,
+                        agent_ids=agent_ids,
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},

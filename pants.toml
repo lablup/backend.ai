@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.16.0rc4"
+pants_version = "2.16.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -49,7 +49,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.11.3"]
+interpreter_constraints = ["CPython==3.11.4"]
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
@@ -86,7 +86,7 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.11.3"]  # don't know why this is required... (maybe a Pants bug?)
+interpreter_constraints = ["CPython==3.11.4"]  # don't know why this is required... (maybe a Pants bug?)
 
 [flake8]
 install_from_resolve = "flake8"

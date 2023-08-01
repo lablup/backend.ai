@@ -72,8 +72,9 @@ from .base import (
     mapper_registry,
 )
 from .group import groups
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang import JSONFieldItem
+from .minilang.ordering import ColumnMapType, QueryOrderParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -800,6 +801,7 @@ class ComputeContainer(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    scheduled_at = GQLDateTime()
     abusing_report = graphene.JSONString()
 
     # resources
@@ -821,6 +823,7 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
+        status_history = row["status_history"] or {}
         return {
             # identity
             "id": row["id"],
@@ -844,6 +847,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "starts_at": row["starts_at"],
+            "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
@@ -882,7 +886,7 @@ class ComputeContainer(graphene.ObjectType):
             return None
         return await graph_ctx.registry.get_abusing_report(self.id)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: FieldSpecType = {
         "image": ("image", None),
         "architecture": ("architecture", None),
         "agent": ("agent", None),
@@ -896,22 +900,24 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
+        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), dtparse),
     }
 
-    _queryorder_colmap = {
-        "image": "image",
-        "architecture": "architecture",
-        "agent": "agent",
-        "agent_addr": "agent_addr",
-        "cluster_idx": "cluster_idx",
-        "local_rank": "local_rank",
-        "cluster_role": "cluster_role",
-        "cluster_hostname": "cluster_hostname",
-        "status": "status",
-        "status_info": "status_info",
-        "status_changed": "status_info",
-        "created_at": "created_at",
-        "terminated_at": "terminated_at",
+    _queryorder_colmap: ColumnMapType = {
+        "image": ("image", None),
+        "architecture": ("architecture", None),
+        "agent": ("agent", None),
+        "agent_addr": ("agent_addr", None),
+        "cluster_idx": ("cluster_idx", None),
+        "local_rank": ("local_rank", None),
+        "cluster_role": ("cluster_role", None),
+        "cluster_hostname": ("cluster_hostname", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "status_changed": ("status_info", None),
+        "created_at": ("created_at", None),
+        "terminated_at": ("terminated_at", None),
+        "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
     }
 
     @classmethod

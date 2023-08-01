@@ -132,10 +132,8 @@ async def get_user_scopes(
         elif request["is_admin"]:
             if request["user"]["domain_name"] != owner_user_domain:
                 raise GenericForbidden(
-                    (
-                        "Domain-admins can perform operations on behalf of "
-                        "other users in the same domain only."
-                    ),
+                    "Domain-admins can perform operations on behalf of "
+                    "other users in the same domain only.",
                 )
             if owner_user_role == UserRole.SUPERADMIN:
                 raise GenericForbidden(
@@ -184,6 +182,8 @@ def check_api_params(
             except t.DataError as e:
                 raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
             return await handler(request, checked_params, *args, **kwargs)
+
+        set_handler_attr(wrapped, "request_scheme", checker)
 
         return wrapped
 

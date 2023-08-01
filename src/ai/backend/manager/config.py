@@ -122,10 +122,9 @@ Alias keys are also URL-quoted in the same way.
      + watcher
        - token: {some-secret}
    + volumes
-     # pre-20.09
-     - _mount: {path-to-mount-root-for-vfolder-partitions}
-     - _default_host: {default-vfolder-partition-name}
-     - _fsprefix: {path-prefix-inside-host-mounts}
+     - _types     # allowed vfolder types
+       + "user"   # enabled if present
+       + "group"  # enabled if present
      # 20.09 and later
      - default_host: "{default-proxy}:{default-volume}"
      + proxies:   # each proxy may provide multiple volumes
@@ -215,14 +214,6 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
-shared_config_defaults = {
-    "volumes/_mount": "/mnt",
-    "volumes/_default_host": "local",
-    "volumes/_fsprefix": "/",
-    "config/api/allow-origins": "*",
-    "config/docker/image/auto_pull": "digest",
-}
-
 current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
 manager_local_config_iv = (
@@ -301,7 +292,7 @@ manager_local_config_iv = (
     .allow_extra("*")
 )
 
-_shdefs: Mapping[str, Any] = {
+_config_defaults: Mapping[str, Any] = {
     "system": {
         "timezone": "UTC",
     },
@@ -314,11 +305,17 @@ _shdefs: Mapping[str, Any] = {
     },
     "docker": {
         "registry": {},
+        "image": {
+            "auto_pull": "digest",
+        },
     },
     "network": {
         "subnet": {
             "agent": "0.0.0.0/0",
             "container": "0.0.0.0/0",
+        },
+        "overlay": {
+            "mtu": "1500",
         },
     },
     "plugins": {
@@ -336,68 +333,79 @@ container_registry_iv = t.Dict(
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
         t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): t.Null | tx.StringList | t.List(t.String),
+        t.Key("project", default=None): t.Null | tx.StringList(allow_blank=True) | t.List(t.String),
         t.Key("ssl-verify", default=True): t.ToBool,
     }
 ).allow_extra("*")
 
 shared_config_iv = t.Dict(
     {
-        t.Key("system", default=_shdefs["system"]): t.Dict(
+        t.Key("system", default=_config_defaults["system"]): t.Dict(
             {
-                t.Key("timezone", default=_shdefs["system"]["timezone"]): tx.TimeZone,
+                t.Key("timezone", default=_config_defaults["system"]["timezone"]): tx.TimeZone,
             }
         ).allow_extra("*"),
-        t.Key("api", default=_shdefs["api"]): t.Dict(
+        t.Key("api", default=_config_defaults["api"]): t.Dict(
             {
-                t.Key("allow-origins", default=_shdefs["api"]["allow-origins"]): t.String,
+                t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
             }
         ).allow_extra("*"),
-        t.Key("redis", default=_shdefs["redis"]): t.Dict(
+        t.Key("redis", default=_config_defaults["redis"]): t.Dict(
             {
-                t.Key("addr", default=_shdefs["redis"]["addr"]): t.Null | tx.HostPortPair,
+                t.Key("addr", default=_config_defaults["redis"]["addr"]): t.Null | tx.HostPortPair,
                 t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
                     tx.HostPortPair
                 ),
                 t.Key("service_name", default=None): t.Null | t.String,
-                t.Key("password", default=_shdefs["redis"]["password"]): t.Null | t.String,
+                t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
             }
         ).allow_extra("*"),
-        t.Key("docker", default=_shdefs["docker"]): t.Dict(
+        t.Key("docker", default=_config_defaults["docker"]): t.Dict(
             {
                 t.Key("registry"): t.Mapping(t.String, container_registry_iv),
-            }
-        ).allow_extra("*"),
-        t.Key("plugins", default=_shdefs["plugins"]): t.Dict(
-            {
-                t.Key("accelerator", default=_shdefs["plugins"]["accelerator"]): t.Mapping(
-                    t.String, t.Mapping(t.String, t.Any)
-                ),
-                t.Key("scheduler", default=_shdefs["plugins"]["scheduler"]): t.Mapping(
-                    t.String, t.Mapping(t.String, t.Any)
-                ),
-            }
-        ).allow_extra("*"),
-        t.Key("network", default=_shdefs["network"]): t.Dict(
-            {
-                t.Key("subnet", default=_shdefs["network"]["subnet"]): t.Dict(
+                t.Key("image", default=_config_defaults["docker"]["image"]): t.Dict(
                     {
-                        t.Key("agent", default=_shdefs["network"]["subnet"]["agent"]): tx.IPNetwork,
                         t.Key(
-                            "container", default=_shdefs["network"]["subnet"]["container"]
+                            "auto_pull", default=_config_defaults["docker"]["image"]["auto_pull"]
+                        ): t.Enum("digest", "tag", "none"),
+                    }
+                ).allow_extra("*"),
+            }
+        ).allow_extra("*"),
+        t.Key("plugins", default=_config_defaults["plugins"]): t.Dict(
+            {
+                t.Key("accelerator", default=_config_defaults["plugins"]["accelerator"]): t.Mapping(
+                    t.String, t.Mapping(t.String, t.Any)
+                ),
+                t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
+                    t.String, t.Mapping(t.String, t.Any)
+                ),
+            }
+        ).allow_extra("*"),
+        t.Key("network", default=_config_defaults["network"]): t.Dict(
+            {
+                t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict(
+                    {
+                        t.Key(
+                            "agent", default=_config_defaults["network"]["subnet"]["agent"]
+                        ): tx.IPNetwork,
+                        t.Key(
+                            "container", default=_config_defaults["network"]["subnet"]["container"]
                         ): tx.IPNetwork,
                     }
                 ).allow_extra("*"),
-                t.Key("overlay", default=None): t.Null | t.Dict(
+                t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null | t.Dict(
                     {
-                        t.Key("mtu", default=1500): t.Int[1:],
+                        t.Key(
+                            "mtu", default=_config_defaults["network"]["overlay"]["mtu"]
+                        ): t.ToInt(gte=1),
                     }
                 ).allow_extra("*"),
             }
         ).allow_extra("*"),
-        t.Key("watcher", default=_shdefs["watcher"]): t.Dict(
+        t.Key("watcher", default=_config_defaults["watcher"]): t.Dict(
             {
-                t.Key("token", default=_shdefs["watcher"]["token"]): t.Null | t.String,
+                t.Key("token", default=_config_defaults["watcher"]["token"]): t.Null | t.String,
             }
         ).allow_extra("*"),
         t.Key("auth", default=None): (
@@ -411,9 +419,26 @@ shared_config_iv = t.Dict(
     }
 ).allow_extra("*")
 
+_volume_defaults: dict[str, Any] = {
+    "_types": {
+        "user": {},
+    },
+}
+
 volume_config_iv = t.Dict(
     {
+        t.Key("_types", default=_volume_defaults["_types"]): t.Dict(
+            {
+                t.Key("user", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
+                    "*"
+                ),
+                t.Key("group", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
+                    "*"
+                ),
+            }
+        ).allow_extra("*"),
         t.Key("default_host"): t.String,
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
         t.Key("proxies"): t.Mapping(
             tx.Slug,
             t.Dict(
@@ -428,7 +453,6 @@ volume_config_iv = t.Dict(
                 }
             ),
         ),
-        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
     }
 ).allow_extra("*")
 
@@ -507,7 +531,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
         if cfg["manager"]["secret"] is None:
             cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print("Validation of manager configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of manager local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:
@@ -559,8 +583,6 @@ class SharedConfig(AbstractConfig):
 
     async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
         value = await self.etcd.get(key)
-        if value is None:
-            value = shared_config_defaults.get(key, None)
         if not allow_null and value is None:
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
@@ -622,8 +644,6 @@ class SharedConfig(AbstractConfig):
             ret = current_vfolder_types.get()
         except LookupError:
             vf_types = await self._get_vfolder_types()
-            if not vf_types:
-                vf_types = {"user": ""}
             ret = list(vf_types.keys())
             current_vfolder_types.set(ret)
         return ret

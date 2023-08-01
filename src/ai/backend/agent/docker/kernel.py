@@ -27,6 +27,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -340,6 +341,10 @@ class DockerKernel(AbstractKernel):
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
+    async def notify_event(self, evdata: AgentEventData):
+        assert self.runner is not None
+        await self.runner.feed_event(evdata)
+
 
 class DockerCodeRunner(AbstractCodeRunner):
     kernel_host: str
@@ -385,7 +390,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
 
     try:
         for item in await docker.images.list():
-            if item["RepoTags"] is None:
+            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
                 continue
             if item["RepoTags"][0] == extractor_image:
                 break

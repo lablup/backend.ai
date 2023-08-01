@@ -52,6 +52,7 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, noload, selectinload
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -142,6 +143,7 @@ from .models import (
     AgentStatus,
     EndpointRow,
     ImageRow,
+    KernelLoadingStrategy,
     KernelRole,
     KernelRow,
     KernelStatus,
@@ -544,10 +546,11 @@ class AgentRegistry:
             # NOTE: We can reuse the session IDs of TERMINATED sessions only.
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
             async with self.db.begin_readonly_session() as db_sess:
-                sess = await SessionRow.get_session_with_main_kernel(
+                sess = await SessionRow.get_session(
+                    db_sess,
                     session_name,
                     owner_access_key,
-                    db_session=db_sess,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
             running_image_ref = ImageRef(
                 sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
@@ -719,9 +722,9 @@ class AgentRegistry:
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
             async with self.db.begin_readonly_session() as db_sess:
                 await SessionRow.get_session(
+                    db_sess,
                     session_name,
                     owner_access_key,
-                    db_session=db_sess,
                 )
         except SessionNotFound:
             pass
@@ -951,10 +954,8 @@ class AgentRegistry:
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
-                (
-                    "You cannot create session with more than "
-                    f"{resource_policy['max_containers_per_session']} containers."
-                ),
+                "You cannot create session with more than "
+                f"{resource_policy['max_containers_per_session']} containers.",
             )
 
         async with self.db.begin_readonly() as conn:
@@ -969,11 +970,9 @@ class AgentRegistry:
             )
             if scaling_group is None:
                 log.warning(
-                    (
-                        f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                        "The client did not specify the scaling group for session; "
-                        f"falling back to {checked_scaling_group}"
-                    ),
+                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
+                    "The client did not specify the scaling group for session; "
+                    f"falling back to {checked_scaling_group}",
                 )
 
             use_host_network_query = (
@@ -1105,6 +1104,7 @@ class AgentRegistry:
         }
 
         kernel_data = []
+        session_images: list[str] = []
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
             kernel_id = KernelId(uuid.uuid4())
@@ -1273,6 +1273,12 @@ class AgentRegistry:
                 }
             )
 
+            if image_ref.canonical not in session_images:
+                if kernel["cluster_role"] == DEFAULT_ROLE:
+                    session_images.insert(0, image_ref.canonical)
+                else:
+                    session_images.append(image_ref.canonical)
+        session_data["images"] = session_images
         try:
 
             async def _enqueue() -> None:
@@ -1303,9 +1309,9 @@ class AgentRegistry:
                         for dependency_id in dependency_sessions:
                             try:
                                 match_info = await SessionRow.get_session(
+                                    db_sess,
                                     dependency_id,
                                     access_key,
-                                    db_session=db_sess,
                                 )
                             except SessionNotFound:
                                 raise InvalidAPIParameters(
@@ -1383,7 +1389,7 @@ class AgentRegistry:
             )
             result = await db_sess.execute(query)
             resource_policy = result.scalars().first()
-        auto_pull = await self.shared_config.get_raw("config/docker/image/auto_pull")
+        auto_pull = self.shared_config["docker"]["image"]["auto_pull"]
 
         # Aggregate image registry information
         keyfunc = lambda item: item.kernel.image_ref
@@ -1443,7 +1449,7 @@ class AgentRegistry:
             elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
                 # Create overlay network for multi-node sessions
                 network_name = f"bai-multinode-{scheduled_session.id}"
-                mtu = await self.shared_config.get_raw("config/network/overlay/mtu")
+                mtu = self.shared_config["network"]["overlay"]["mtu"]
                 try:
                     # Overlay networks can only be created at the Swarm manager.
                     create_options = {
@@ -1456,7 +1462,7 @@ class AgentRegistry:
                         "Options": {},
                     }
                     if mtu:
-                        create_options["Options"] = {"com.docker.network.driver.mtu": mtu}
+                        create_options["Options"] = {"com.docker.network.driver.mtu": str(mtu)}
                     await self.docker.networks.create(create_options)
                 except Exception:
                     log.exception(f"Failed to create an overlay network {network_name}")
@@ -1638,8 +1644,21 @@ class AgentRegistry:
             new_session_status = await SessionRow.transit_session_status(self.db, session_id)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
-
-            updated_session = await SessionRow.get_session_to_produce_event(self.db, session_id)
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    noload("*"),
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.name,
+                        SessionRow.creation_id,
+                        SessionRow.access_key,
+                    ),
+                )
+            )
+            async with self.db.begin_readonly_session() as db_session:
+                updated_session = (await db_session.scalars(query)).first()
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -2146,7 +2165,29 @@ class AgentRegistry:
             session_id,
             set_error=True,
         ):
-            target_session = await SessionRow.get_session_to_destroy(self.db, session_id)
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    noload("*"),
+                    load_only(SessionRow.creation_id, SessionRow.status),
+                    selectinload(SessionRow.kernels).options(
+                        noload("*"),
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.role,
+                            KernelRow.access_key,
+                            KernelRow.status,
+                            KernelRow.container_id,
+                            KernelRow.cluster_role,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                        ),
+                    ),
+                )
+            )
+            async with self.db.begin_readonly_session() as db_session:
+                target_session = (await db_session.scalars(query)).first()
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -2158,10 +2199,8 @@ class AgentRegistry:
                 case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
                     if not forced:
                         raise GenericForbidden(
-                            (
-                                "Cannot destroy sessions in scheduled/preparing/terminating/error"
-                                " status"
-                            ),
+                            "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                            " status",
                         )
                     log.warning(
                         "force-terminating session (s:{}, status:{})",
@@ -2230,10 +2269,8 @@ class AgentRegistry:
                         case KernelStatus.SCHEDULED | KernelStatus.PREPARING | KernelStatus.TERMINATING | KernelStatus.ERROR:
                             if not forced:
                                 raise GenericForbidden(
-                                    (
-                                        "Cannot destroy kernels in"
-                                        " scheduled/preparing/terminating/error status"
-                                    ),
+                                    "Cannot destroy kernels in"
+                                    " scheduled/preparing/terminating/error status",
                                 )
                             log.warning(
                                 "force-terminating kernel (k:{}, status:{})",
@@ -3265,9 +3302,10 @@ class AgentRegistry:
     ) -> None:
         active_routes = [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
 
-        target_sessions = await SessionRow.list_sessions_with_main_kernels(
+        target_sessions = await SessionRow.list_sessions(
+            db_sess,
             [r.session for r in active_routes],
-            db_session=db_sess,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
@@ -3305,6 +3343,16 @@ class AgentRegistry:
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
                 json={
                     "service_name": endpoint.name,
+                    "tags": {
+                        "session": {
+                            "user_uuid": str(endpoint.session_owner),
+                            "group_id": str(endpoint.project),
+                            "domain_name": endpoint.domain,
+                        },
+                        "endpoint": {
+                            "id": endpoint.id,
+                        },
+                    },
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
                 },  # TODO: support for multiple inference apps
@@ -3313,7 +3361,6 @@ class AgentRegistry:
                 },
             ) as resp:
                 endpoint_json = await resp.json()
-                log.debug("resp: {}", endpoint_json)
                 async with self.db.begin_session() as db_sess:
                     query = (
                         sa.update(EndpointRow)
@@ -3449,7 +3496,9 @@ async def handle_destroy_session(
     event: DoTerminateSessionEvent,
 ) -> None:
     async with context.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+        session = await SessionRow.get_session(
+            db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
+        )
     await context.destroy_session(
         session,
         forced=False,
@@ -3474,8 +3523,11 @@ async def invoke_session_callback(
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with context.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess, allow_stale=allow_stale
+            session = await SessionRow.get_session(
+                db_sess,
+                event.session_id,
+                allow_stale=allow_stale,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
     except SessionNotFound:
         return
@@ -3561,8 +3613,8 @@ async def handle_batch_result(
         await SessionRow.set_session_result(context.db, event.session_id, False, event.exit_code)
     async with context.db.begin_session() as db_sess:
         try:
-            session = await SessionRow.get_session_with_kernels(
-                event.session_id, db_session=db_sess
+            session = await SessionRow.get_session(
+                db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
             )
         except SessionNotFound:
             return

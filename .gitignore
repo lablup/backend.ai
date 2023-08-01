@@ -111,6 +111,7 @@ ENV/
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
+/agent.dummy.toml
 
 # Local temp
 /.tmp/
@@ -119,6 +120,7 @@ ENV/
 /vfroot/
 /*.pid
 /scratches/
+logs
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -130,3 +132,5 @@ ENV/
 .DS_Store
 
 .python-runtime
+
+docs/manager/rest-reference/openapi.json

@@ -66,8 +66,11 @@ __all__ = (
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "VFolderID",
+    "QuotaScopeID",
     "VFolderUsageMode",
     "VFolderMount",
+    "QuotaConfig",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -784,6 +787,70 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@attrs.define(slots=True, frozen=True)
+class QuotaScopeID:
+    scope_type: QuotaScopeType
+    scope_id: Any
+
+    @classmethod
+    def parse(cls, raw: str) -> QuotaScopeID:
+        scope_type, _, rest = raw.partition(":")
+        match scope_type:
+            case "project":
+                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
+            case "user":
+                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+
+    def __str__(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return f"{self.scope_type.value}:{str(self.scope_id)}"
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @property
+    def pathname(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return self.scope_id.hex
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+
+class VFolderID:
+    quota_scope_id: QuotaScopeID | None
+    folder_id: uuid.UUID
+
+    @classmethod
+    def from_row(cls, row: Any) -> VFolderID:
+        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+        self.folder_id = folder_id
+        match quota_scope_id:
+            case QuotaScopeID():
+                self.quota_scope_id = quota_scope_id
+            case str():
+                self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
+            case None:
+                self.quota_scope_id = None
+            case _:
+                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
+
+    def __str__(self) -> str:
+        if self.quota_scope_id is None:
+            return self.folder_id.hex
+        return f"{self.quota_scope_id}/{self.folder_id.hex}"
+
+    def __eq__(self, other) -> bool:
+        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
+
 class VFolderUsageMode(str, enum.Enum):
     """
     Usage mode of virtual folder.
@@ -801,7 +868,7 @@ class VFolderUsageMode(str, enum.Enum):
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
-    vfid: uuid.UUID
+    vfid: VFolderID
     vfsubpath: PurePosixPath
     host_path: PurePosixPath
     kernel_path: PurePosixPath
@@ -830,7 +897,7 @@ class VFolderMount(JSONSerializableMixin):
         return t.Dict(
             {
                 t.Key("name"): t.String,
-                t.Key("vfid"): tx.UUID,
+                t.Key("vfid"): tx.VFolderID,
                 t.Key("vfsubpath", default="."): tx.PurePath,
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
@@ -869,6 +936,32 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class QuotaConfig:
+    limit_bytes: int
+
+    class Validator(t.Trafaret):
+        def check_and_return(self, value: Any) -> QuotaConfig:
+            validator = t.Dict(
+                {
+                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
+                }
+            )
+            converted = validator.check(value)
+            return QuotaConfig(
+                limit_bytes=converted["limit_bytes"],
+            )
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return cls.Validator()
+
+
+class QuotaScopeType(str, enum.Enum):
+    USER = "user"
+    PROJECT = "project"
 
 
 class ImageRegistry(TypedDict):
