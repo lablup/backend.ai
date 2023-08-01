@@ -53,14 +53,14 @@ FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
 
 def enum_field_getter(enum_cls: Type[Enum]) -> Callable[[str], Enum]:
     def get_enum(value: str) -> Enum:
-        try:
-            return enum_cls[value]
-        except KeyError:
+        for enum_name in (value, value.upper()):
             try:
-                return enum_cls(value)
-            except ValueError:
-                enum_names = ", ".join([e.value for e in enum_cls])
-                raise ValueError(f"expected one of `{enum_names}`, got `{value}`")
+                return enum_cls[enum_name]
+            except KeyError:
+                continue
+        else:
+            enum_names = ", ".join([e.name for e in enum_cls])
+            raise ValueError(f"expected one of `{enum_names}` or lower names; got `{value}`")
 
     return get_enum
 
