@@ -81,6 +81,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
+  echo "    If you are on the main branch, this will be automatically enabled."
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
@@ -744,9 +745,13 @@ configure_backendai() {
   sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
   sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   # install and configure webui
-  if [ $EDITABLE_WEBUI -eq 1 ]; then
+  if [ $EDITABLE_WEBUI -eq 1 -o "$(git rev-parse --abbrev-ref HEAD)" = "main" ]; then
     install_editable_webui
+    EDITABLE_WEBUI=1  # ensure printing the guide at the end
     sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
+  else
+    webui_version=$(jq -r '.package + " (built at " + .build + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
+    show_note "The currently embedded webui version: $webui_version"
   fi
 
   # configure tester
@@ -918,7 +923,7 @@ configure_backendai() {
   echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
   show_note "How to run Backend.AI storage-proxy:"
   echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
-  show_note "How to run Backend.AI web server (for ID/Password login):"
+  show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
   echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
   show_note "How to run your first code:"
   echo "> ${WHITE}./backend.ai --help${NC}"
@@ -940,6 +945,7 @@ configure_backendai() {
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
     echo "(Terminal 3)"
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
+    echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_note "Manual configuration for the client accessible hostname in various proxies"
   echo " "
