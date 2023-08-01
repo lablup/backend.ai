@@ -37,7 +37,8 @@ def key_by_requested_slots(
     agent_selection_order: list[str],
 ) -> list[int]:
     sorted_agent_selection_order = sorted(
-        agent.available_slots, key=lambda item: get_slot_index(item, agent_selection_order)
+        agent.available_slots.data.keys(),
+        key=lambda item: get_slot_index(item, agent_selection_order),
     )
 
     remaining_slots = agent.available_slots - agent.occupied_slots
