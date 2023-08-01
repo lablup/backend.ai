@@ -130,7 +130,7 @@ show_error() {
 
 show_warning() {
   echo " "
-  echo "${YELLOW}[ERROR]${NC} ${LYELLOW}$1${NC}"
+  echo "${LRED}[WARN]${NC} ${LYELLOW}$1${NC}"
 }
 
 show_info() {
@@ -145,41 +145,42 @@ show_note() {
 
 show_important_note() {
   echo " "
-  echo "${LRED}[NOTE]${NC} $1"
+  echo "${LRED}[NOTE]${NC} ${LYELLOW}$1${NC}"
 }
 
 show_guide() {
   show_note "Check out the default API keypairs and account credentials for local development and testing:"
-  echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
-  echo "> ${WHITE}cat env-local-admin-session.sh${NC}"
-  echo "> ${WHITE}cat env-local-domainadmin-api.sh${NC}"
-  echo "> ${WHITE}cat env-local-domainadmin-session.sh${NC}"
-  echo "> ${WHITE}cat env-local-user-api.sh${NC}"
-  echo "> ${WHITE}cat env-local-user-session.sh${NC}"
+  echo "  > ${WHITE}cat env-local-admin-api.sh${NC}"
+  echo "  > ${WHITE}cat env-local-admin-session.sh${NC}"
+  echo "  > ${WHITE}cat env-local-domainadmin-api.sh${NC}"
+  echo "  > ${WHITE}cat env-local-domainadmin-session.sh${NC}"
+  echo "  > ${WHITE}cat env-local-user-api.sh${NC}"
+  echo "  > ${WHITE}cat env-local-user-session.sh${NC}"
   show_note "To apply the client config, source one of the configs like:"
-  echo "> ${WHITE}source env-local-user-session.sh${NC}"
-  show_important_note "You should change your default admin API keypairs for production environment!"
+  echo "  > ${WHITE}source env-local-user-session.sh${NC}"
+  show_important_note "You should change your default admin API keypairs in any public/production setups!"
   show_note "How to run Backend.AI manager:"
-  echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
+  echo "  > ${WHITE}./backend.ai mgr start-server --debug${NC}"
   show_note "How to run Backend.AI agent:"
-  echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
+  echo "  > ${WHITE}./backend.ai ag start-server --debug${NC}"
   show_note "How to run Backend.AI storage-proxy:"
-  echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
+  echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
   show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
-  echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
-  show_note "How to run your first code:"
-  echo "> ${WHITE}./backend.ai --help${NC}"
-  echo "> ${WHITE}source env-local-admin-api.sh${NC}"
-  echo "> ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
-  echo " "
-  show_note "How to run docker-compose:"
+  echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
+  echo "  to prevent misbehavior of the client used inside the web server.${NC}"
+  show_info "How to run your first code:"
+  echo "  > ${WHITE}./backend.ai --help${NC}"
+  echo "  > ${WHITE}source env-local-admin-api.sh${NC}"
+  echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
+  show_info "How to run docker-compose:"
   if [ ! -z "$docker_sudo" ]; then
     echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
   else
     echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
   fi
   if [ $EDITABLE_WEBUI -eq 1 ]; then
-    show_note "How to run the editable checkout of webui:"
+    show_info "How to run the editable checkout of webui:"
     echo "(Terminal 1)"
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
     echo "(Terminal 2)"
@@ -188,7 +189,7 @@ show_guide() {
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
-  show_note "Manual configuration for the client accessible hostname in various proxies"
+  show_info "Manual configuration for the client accessible hostname in various proxies"
   echo " "
   echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
   echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
@@ -207,11 +208,12 @@ show_guide() {
   echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
   echo "and where /etc/hosts in the web browser host contains:"
   echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
-  show_note "How to reset this setup:"
+  show_info "How to reset this setup:"
   echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
+  echo "  ${LRED}This will delete all your database!${NC}"
   echo " "
   if [ $_INSTALLED_PYENV -eq 1 ]; then
-    show_note "About pyenv installation:"
+    show_info "About pyenv installation:"
     echo "Since we have installed ${BOLD}pyenv${NC} during setup, you should reload the shell to make it working as expected."
     echo "Run the following command or re-login:"
     echo "  ${WHITE}exec \$SHELL -l${NC}"
