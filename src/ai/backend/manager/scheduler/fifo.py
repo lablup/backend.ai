@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import math
+import sys
 from decimal import Decimal
 from typing import List, Optional, Sequence, Tuple
 
@@ -10,6 +10,13 @@ from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlo
 
 from ..models import AgentRow, SessionRow
 from .types import AbstractScheduler, KernelInfo
+
+
+def get_slot_index(slotname: str, agent_selection_order: list[str]) -> int:
+    try:
+        return agent_selection_order.index(slotname)
+    except ValueError:
+        return sys.maxsize
 
 
 def key_by_requested_slots(
@@ -28,25 +35,25 @@ def key_by_requested_slots(
             num_extras += 1
 
     sorted_agent_selection_order = sorted(
-        requested_slots.data.keys(), key=lambda item: agent_selection_order.index(item)
+        requested_slots.data.keys(), key=lambda item: get_slot_index(item, agent_selection_order)
     )
 
     remaining_slots = agent.available_slots - agent.occupied_slots
 
     # If the requested slot does not exist in the corresponding agent,
-    # the agent should not be selected, in this case it puts -math.inf for avoiding to being selected.
+    # the agent should not be selected, in this case it puts -sys.maxsize for avoiding to being selected.
     match agent_selection_strategy:
         case AgentSelectionStrategy.LEGACY:
             comparators = [
-                agent.available_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+                agent.available_slots.get(key, -sys.maxsize) for key in sorted_agent_selection_order
             ]
         case AgentSelectionStrategy.CONCENTRATED:
             comparators = [
-                -remaining_slots.get(key, math.inf) for key in sorted_agent_selection_order
+                -remaining_slots.get(key, sys.maxsize) for key in sorted_agent_selection_order
             ]
         case AgentSelectionStrategy.DISPERSED | _:
             comparators = [
-                remaining_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+                remaining_slots.get(key, -sys.maxsize) for key in sorted_agent_selection_order
             ]
 
     # Put back agents with more extra slot types

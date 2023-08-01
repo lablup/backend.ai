@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import math
+import sys
 from collections import defaultdict
 from decimal import Decimal
 from typing import Any, Dict, Mapping, Optional, Sequence, Set
@@ -24,13 +24,20 @@ from .types import AbstractScheduler, KernelInfo
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
+def get_slot_index(slotname: str, agent_selection_order: list[str]) -> int:
+    try:
+        return agent_selection_order.index(slotname)
+    except ValueError:
+        return sys.maxsize
+
+
 def key_by_requested_slots(
     agent: AgentRow,
     agent_selection_strategy: AgentSelectionStrategy,
     agent_selection_order: list[str],
-) -> list[int | float]:
+) -> list[int]:
     sorted_agent_selection_order = sorted(
-        agent.available_slots, key=lambda item: agent_selection_order.index(item)
+        agent.available_slots, key=lambda item: get_slot_index(item, agent_selection_order)
     )
 
     remaining_slots = agent.available_slots - agent.occupied_slots
@@ -40,15 +47,15 @@ def key_by_requested_slots(
     match agent_selection_strategy:
         case AgentSelectionStrategy.LEGACY:
             comparators = [
-                agent.available_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+                agent.available_slots.get(key, -sys.maxsize) for key in sorted_agent_selection_order
             ]
         case AgentSelectionStrategy.CONCENTRATED:
             comparators = [
-                -remaining_slots.get(key, math.inf) for key in sorted_agent_selection_order
+                -remaining_slots.get(key, sys.maxsize) for key in sorted_agent_selection_order
             ]
         case AgentSelectionStrategy.DISPERSED | _:
             comparators = [
-                remaining_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+                remaining_slots.get(key, -sys.maxsize) for key in sorted_agent_selection_order
             ]
 
     # Put back agents with more extra slot types
