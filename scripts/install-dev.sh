@@ -592,7 +592,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
 if [ $SHOW_GUIDE -eq 1 ]; then
   show_guide
-  exit 1
+  exit 0
 fi
 
 # Check prerequisites
