@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 import trafaret as t
 
@@ -27,17 +28,33 @@ def key_by_requested_slots(
     agent: AgentRow,
     agent_selection_strategy: AgentSelectionStrategy,
     agent_selection_order: list[str],
-) -> Tuple[int, ResourceSlot]:
-    comparator = None
+) -> List[int | float]:
+    sorted_agent_selection_order = sorted(
+        agent.available_slots, key=lambda item: agent_selection_order.index(item)
+    )
+
+    remaining_slots = agent.available_slots - agent.occupied_slots
+
+    # If the requested slot does not exist in the corresponding agent,
+    # the agent should not be selected, in this case it puts -math.inf for avoiding to being selected.
     match agent_selection_strategy:
         case AgentSelectionStrategy.LEGACY:
-            comparator = agent.available_slots - agent.occupied_slots
+            comparators = [
+                agent.available_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+            ]
         case AgentSelectionStrategy.CONCENTRATED:
-            comparator = -(agent.available_slots - agent.occupied_slots)
+            comparators = [
+                -remaining_slots.get(key, math.inf) for key in sorted_agent_selection_order
+            ]
         case AgentSelectionStrategy.DISPERSED | _:
-            comparator = agent.available_slots - agent.occupied_slots
+            comparators = [
+                remaining_slots.get(key, -math.inf) for key in sorted_agent_selection_order
+            ]
 
-    return comparator
+    # Put back agents with more extra slot types
+    # (e.g., accelerators)
+    # Also put front agents with exactly required slot types
+    return comparators
 
 
 class DRFScheduler(AbstractScheduler):
