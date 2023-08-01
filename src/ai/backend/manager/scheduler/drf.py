@@ -4,7 +4,7 @@ import logging
 import math
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, Mapping, Optional, Sequence, Set
 
 import trafaret as t
 
@@ -28,7 +28,7 @@ def key_by_requested_slots(
     agent: AgentRow,
     agent_selection_strategy: AgentSelectionStrategy,
     agent_selection_order: list[str],
-) -> List[int | float]:
+) -> list[int | float]:
     sorted_agent_selection_order = sorted(
         agent.available_slots, key=lambda item: agent_selection_order.index(item)
     )
