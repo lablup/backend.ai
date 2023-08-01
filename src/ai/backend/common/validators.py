@@ -665,7 +665,7 @@ class URL(t.Trafaret):
                         "The given value does not have the scheme (protocol) part", value=value
                     )
         except Exception as e:
-            self._failure(f"{e}", value=value)
+            self._failure(repr(e), value=value)
         else:
             return parsed_url
 
