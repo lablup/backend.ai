@@ -158,7 +158,6 @@ show_guide() {
   echo "> ${WHITE}cat env-local-user-session.sh${NC}"
   show_note "To apply the client config, source one of the configs like:"
   echo "> ${WHITE}source env-local-user-session.sh${NC}"
-  echo " "
   show_important_note "You should change your default admin API keypairs for production environment!"
   show_note "How to run Backend.AI manager:"
   echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
