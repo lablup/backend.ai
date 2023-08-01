@@ -783,9 +783,7 @@ def test_fifo_scheduler(example_agents, example_pending_sessions, example_existi
         picked_session_id,
     )
     agent_id = scheduler.assign_agent_for_session(
-        example_agents,
-        picked_session,
-        AgentSelectionStrategy.DISPERSED,
+        example_agents, picked_session, AgentSelectionStrategy.DISPERSED, agent_selection_order
     )
     assert agent_id == AgentId("i-001")
 
