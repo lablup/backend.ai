@@ -327,7 +327,10 @@ _config_defaults: Mapping[str, Any] = {
         "token": None,
     },
     "session": {
-        "hang-tolerance-threshold": {},
+        "hang-tolerance": {
+            "threshold": {},
+            "max-interval": 3600,
+        },
     },
 }
 
@@ -342,12 +345,26 @@ container_registry_iv = t.Dict(
     }
 ).allow_extra("*")
 
-session_hang_tolerance_threshold_iv = t.Dict(
+session_hang_tolerance_iv = t.Dict(
     {
-        t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
-        t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
-    }
-).ignore_extra("*")
+        t.Key(
+            "threshold", default=_config_defaults["session"]["hang-tolerance"]["threshold"]
+        ): t.Dict(
+            {
+                t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
+                t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
+            }
+        ).ignore_extra(
+            "*"
+        ),
+        t.Key(
+            "max-interval", default=_config_defaults["session"]["hang-tolerance"]["max-interval"]
+        ): t.Float[
+            1.0:  # type: ignore
+        ],
+    },
+)
+
 
 shared_config_iv = t.Dict(
     {
@@ -429,7 +446,9 @@ shared_config_iv = t.Dict(
         ),
         t.Key("session", default=_config_defaults["session"]): t.Dict(
             {
-                t.Key("hang-tolerance-threshold"): session_hang_tolerance_threshold_iv,
+                t.Key(
+                    "hang-tolerance", default=_config_defaults["session"]["hang-tolerance"]
+                ): session_hang_tolerance_iv,
             },
         ).allow_extra("*"),
     }

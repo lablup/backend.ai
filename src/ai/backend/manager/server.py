@@ -507,7 +507,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     from dateutil.tz import tzutc
     from sqlalchemy.orm import load_only, noload
 
-    from .config import session_hang_tolerance_threshold_iv
+    from .config import session_hang_tolerance_iv
     from .models.session import SessionStatus
 
     if TYPE_CHECKING:
@@ -516,7 +516,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     async def _fetch_hanging_sessions(
         db: ExtendedAsyncSAEngine,
         status: SessionStatus,
-        threshold: timedelta,
+        threshold: relativedelta | timedelta,
     ) -> tuple[SessionRow, ...]:
         query = (
             sa.select(SessionRow)
@@ -541,13 +541,11 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     async def _force_terminate_hanging_sessions(
         status: SessionStatus,
-        threshold: timedelta,
+        threshold: relativedelta | timedelta,
         interval: float,
     ) -> None:
         try:
-            sessions = await _fetch_hanging_sessions(
-                root_ctx.db, status=status, threshold=threshold
-            )
+            sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -575,31 +573,27 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                     exc_info=result_or_exception,
                 )
 
-    hang_tolerance_threshold_dict = session_hang_tolerance_threshold_iv.check(
-        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance-threshold")
+    session_hang_tolerance = session_hang_tolerance_iv.check(
+        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
 
     session_force_termination_tasks = []
     heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
-    for status, threshold in hang_tolerance_threshold_dict.items():
+    max_interval = float(session_hang_tolerance["max-interval"])
+    threshold: relativedelta | timedelta
+    for status, threshold in session_hang_tolerance["threshold"].items():
         try:
             session_status = SessionStatus[status]
         except KeyError:
             continue
-
-        if isinstance(threshold, relativedelta):  # months, years
-            if months := threshold.months:
-                threshold = timedelta(seconds=months * 30 * 24 * 60 * 60)
-            elif years := threshold.years:
-                threshold = timedelta(seconds=years * 365 * 24 * 60 * 60)
-            else:
-                log.warning("Skipping {}:{}...", status, threshold)
-                continue
-
+        if isinstance(threshold, relativedelta):  # years, months
+            interval = max_interval
+        else:  # timedelta
+            interval = min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
         session_force_termination_tasks.append(
             aiotools.create_timer(
                 functools.partial(_force_terminate_hanging_sessions, session_status, threshold),
-                threshold.total_seconds() * heuristic_interval_weight,
+                interval,
             )
         )
 

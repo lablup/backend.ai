@@ -124,11 +124,6 @@ importer-image = "lablup/importer:manylinux2010"
 # via the port number of this base port number + pidx.
 # aiomonitor-port = 48100
 
-# The maximum time allowed for sessions to be hung on the status and not proceed.
-# e.g. { "PREPARING" = "1h" } means a session will be force-terminated
-#      if it stays in the status "PREPARING" for more than an hour.
-# session-hang-tolerance-threshold = { "PREPARING" = "1h", "TERMINATING" = "30m" }
-
 
 [docker-registry]
 # Enable or disable SSL certificate verification when accessing Docker registries.

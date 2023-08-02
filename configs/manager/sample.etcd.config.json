@@ -37,9 +37,12 @@
     "token": "some-random-long-string"
   },
   "session": {
-    "hang-tolerance-threshold": {
-      "PREPARING": "1h",
-      "TERMINATING": "30m"
+    "hang-tolerance": {
+      "threshold": {
+        "PREPARING": "1h",
+        "TERMINATING": "30m"
+      },
+      "max-interval": 3600
     }
   },
   "plugins": {
