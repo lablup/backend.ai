@@ -1996,7 +1996,7 @@ class AgentRegistry:
             async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
                 # occupied_slots per agent.
-                query = (
+                session_query = (
                     sa.select(SessionRow)
                     .where(
                         (
@@ -2015,7 +2015,7 @@ class AgentRegistry:
                         ),
                     )
                 )
-                async for session_row in await db_sess.stream_scalars():
+                async for session_row in await db_sess.stream_scalars(session_query):
                     for kernel in session_row.kernels:
                         if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             occupied_slots_per_agent[kernel.agent] += ResourceSlot(
@@ -2031,21 +2031,25 @@ class AgentRegistry:
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
-                    for aid, slots in occupied_slots_per_agent.items():
-                        query = (
+                    await db_sess.execute(
+                        (
                             sa.update(AgentRow)
-                            .values(occupied_slots=slots)
-                            .where(AgentRow.id == aid)
-                        )
-                        await db_sess.execute(query)
-                    # Update all other agents to have empty occupied_slots.
-                    query = (
-                        sa.update(AgentRow)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                            .where(AgentRow.id == sa.bindparam("agent_id"))
+                            .values(occupied_slots=sa.bindparam("occupied_slots"))
+                        ),
+                        [
+                            {"agent_id": aid, "occupied_slots": slots}
+                            for aid, slots in occupied_slots_per_agent.items()
+                        ],
                     )
-                    await db_sess.execute(query)
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .values(occupied_slots=ResourceSlot({}))
+                            .where(AgentRow.status == AgentStatus.ALIVE)
+                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                        )
+                    )
                 else:
                     query = (
                         sa.update(AgentRow)
