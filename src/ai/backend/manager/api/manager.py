@@ -6,7 +6,7 @@ import functools
 import json
 import logging
 import socket
-from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple, cast
 
 import aiohttp_cors
 import attrs
@@ -245,6 +245,25 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
     return web.Response(status=204)
 
 
+@superadmin_required
+async def scheduler_healthcheck(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    raw_date = request.headers.get("Date")
+    if not raw_date:
+        raw_date = request.headers.get("X-BackendAI-Date", request.headers.get("X-Sorna-Date"))
+    if not raw_date:
+        raise GenericBadRequest
+    data = cast(dict, await root_ctx.shared_config.etcd.get_prefix("manager/scheduler"))
+    await root_ctx.event_producer.produce_event(DoScheduleEvent())
+    if len(data) == 0:
+        ret = {"event_name": "", "last_execution_time": "", "resource_group": ""}
+    else:
+        server_time = cast(str, data.get("last_execution_time"))
+        data.update({"last_execution_time": server_time[:-6] + raw_date[-6:]})
+        ret = data
+    return web.json_response(ret)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     status_watch_task: asyncio.Task
@@ -277,6 +296,7 @@ def create_app(
     cors.add(announcement_resource.add_route("GET", get_announcement))
     cors.add(announcement_resource.add_route("POST", update_announcement))
     cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
+    cors.add(app.router.add_route("GET", "/scheduler/ping", scheduler_healthcheck))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     return app, []

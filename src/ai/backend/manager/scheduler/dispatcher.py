@@ -231,6 +231,11 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
+        scheduler_status: dict[str, Any] = {
+            "event_name": event.__class__.name,
+            "last_execution_time": datetime.now(tzutc()).isoformat(),
+        }
+        await self.shared_config.etcd.put_prefix("manager/scheduler", scheduler_status)
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -258,6 +263,9 @@ class SchedulerDispatcher(aobject):
                         await self._schedule_in_sgroup(
                             sched_ctx,
                             sgroup_name,
+                        )
+                        await self.shared_config.etcd.put(
+                            "manager/scheduler/resource_group", sgroup_name
                         )
                     except InstanceNotAvailable as e:
                         # Proceed to the next scaling group and come back later.
