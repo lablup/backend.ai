@@ -630,7 +630,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
                 if agent_count != params["cluster_size"]:
                     raise InvalidAPIParameters(
                         "For multi-node cluster sessions, the number of manually assigned"
-                        " agents must be same to the clsuter size. Note that you may specify"
+                        " agents must be same to the cluster size. Note that you may specify"
                         " duplicate agents in the list.",
                     )
             else:
