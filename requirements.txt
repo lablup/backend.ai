@@ -48,7 +48,7 @@ passlib[bcrypt]>=1.7.4
 pexpect~=4.8
 psutil~=5.9.1
 pycryptodome>=3.14.1
-pydantic==2.0
+pydantic~=2.1.0
 python-dateutil>=2.8
 python-dotenv~=0.20.0
 python-json-logger>=2.0.1
