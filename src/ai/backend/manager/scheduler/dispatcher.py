@@ -591,7 +591,9 @@ class SchedulerDispatcher(aobject):
             log.debug(log_fmt + "no-available-instances", *log_args)
 
             await self._rollback_predicate_mutations(sched_ctx, sess_ctx.access_key)
-            await SessionMutation.update_schedule_failure(self.db_ctx, sess_ctx.id, sched_failure)
+            await SessionMutation.update_instance_not_available(
+                self.db_ctx, sess_ctx.id, sched_failure
+            )
             raise
         except Exception as e:
             log.exception(
@@ -685,10 +687,10 @@ class SchedulerDispatcher(aobject):
                                     f" resource group: {sess_ctx.scaling_group_name})"
                                 ),
                             )
-                    assert agent_id is not None
 
                     async def _reserve() -> None:
                         nonlocal agent_alloc_ctx, candidate_agents
+                        assert agent_id is not None
                         async with agent_db_sess.begin_nested():
                             agent_alloc_ctx = await _reserve_agent(
                                 sched_ctx,
@@ -711,7 +713,7 @@ class SchedulerDispatcher(aobject):
                         sched_ctx,
                         sess_ctx.access_key,
                     )
-                    await SessionMutation.update_schedule_failure(
+                    await SessionMutation.update_instance_not_available(
                         self.db_ctx, sess_ctx.id, sched_failure
                     )
                     raise
@@ -1084,7 +1086,7 @@ async def _reserve_agent(
     sched_ctx: SchedulingContext,
     db_sess: SASession,
     scaling_group: str,
-    agent_id: Optional[AgentId],
+    agent_id: AgentId,
     requested_slots: ResourceSlot,
     extra_conds: Any = None,
 ) -> AgentAllocationContext:

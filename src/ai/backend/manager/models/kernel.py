@@ -81,7 +81,6 @@ from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
-    from ..schemas.kernel import KernelMutationArgs
     from .gql import GraphQueryContext
 
 __all__ = (
@@ -548,17 +547,21 @@ kernels = sa.Table(
 )
 
 
-def _parse_data_to_update_status(
-    args: KernelMutationArgs,
+def parse_data_to_update_status(
+    status: KernelStatus | None = None,
+    status_data: Mapping[str, Any] | None = None,
+    status_info: str | None = None,
+    last_stat: Mapping[str, Any] | None = None,
     status_changed_at: datetime | None = None,
 ) -> dict[str, Any]:
-    now = status_changed_at or datetime.now(tzutc())
-    data = args.value_dict
-
-    if (status := args.status) is not None:
+    if status_changed_at is None:
+        now = datetime.now(tzutc())
+    else:
+        now = status_changed_at
+    data = {}
+    if status is not None:
         data = {
             "status": status,
-            "status_changed": now,
             "status_history": sql_json_merge(
                 KernelRow.status_history,
                 (),
@@ -567,8 +570,14 @@ def _parse_data_to_update_status(
                 },
             ),
         }
-        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
-            data["terminated_at"] = now
+    if status_data is not None:
+        data["status_data"] = status_data
+    if status_info is not None:
+        data["status_info"] = status_info
+    if last_stat is not None:
+        data["last_stat"] = last_stat
+    if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+        data["terminated_at"] = now
     return data
 
 
@@ -806,10 +815,14 @@ class KernelRow(Base):
     async def set_status_by_session_id(
         db: ExtendedAsyncSAEngine,
         session_ids: Sequence[SessionId],
-        update_args: KernelMutationArgs,
+        status: KernelStatus | None = None,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | None = None,
         status_changed_at: datetime | None = None,
     ) -> list[KernelId] | None:
-        data = _parse_data_to_update_status(update_args, status_changed_at)
+        data = parse_data_to_update_status(
+            status, status_data, status_info, status_changed_at=status_changed_at
+        )
 
         query = sa.update(KernelRow).values(**data).where(KernelRow.session_id.in_(session_ids))
 
@@ -823,10 +836,19 @@ class KernelRow(Base):
     async def set_status_by_kernel_id(
         db: ExtendedAsyncSAEngine,
         kernel_ids: Sequence[KernelId],
-        update_args: KernelMutationArgs,
+        status: KernelStatus | None = None,
+        status_info: str | None = None,
+        last_stat: Mapping[str, Any] | None = None,
+        status_data: Mapping[str, Any] | None = None,
         status_changed_at: datetime | None = None,
     ) -> None:
-        data = _parse_data_to_update_status(update_args, status_changed_at)
+        data = parse_data_to_update_status(
+            status,
+            status_data,
+            status_info,
+            last_stat,
+            status_changed_at=status_changed_at,
+        )
 
         async def _update() -> None:
             async with db.begin_session() as db_sess:

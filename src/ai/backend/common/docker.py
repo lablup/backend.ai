@@ -24,6 +24,8 @@ import aiohttp
 import trafaret as t
 import yarl
 from packaging import version
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import core_schema
 
 from . import validators as tx
 from .arch import arch_name_aliases
@@ -424,6 +426,17 @@ class ImageRef:
 
         return ret
 
+    @classmethod
+    def from_full_str(cls, value: str) -> "ImageRef":
+        arch = value.partition("::")[-1]
+        if not arch:
+            return cls(value)
+        return cls(value, architecture=arch)
+
+    @property
+    def full_str(self) -> str:
+        return f"{self.registry}/{self.name}:{self.tag}::{self.architecture}"
+
     @property
     def canonical(self) -> str:
         # e.g., registry.docker.io/lablup/kernel-python:3.6-ubuntu
@@ -511,3 +524,21 @@ class ImageRef:
                     if parsed_version_self != parsed_version_other:
                         return parsed_version_self < parsed_version_other
         return len(ptagset_self) > len(ptagset_other)
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: Type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        assert source is ImageRef
+
+        def _to_str(value: ImageRef) -> str:
+            return value.full_str
+
+        return core_schema.no_info_after_validator_function(
+            cls.from_full_str,
+            core_schema.any_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                _to_str,
+                info_arg=False,
+            ),
+        )

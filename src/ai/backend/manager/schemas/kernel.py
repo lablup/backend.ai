@@ -4,8 +4,9 @@ from datetime import datetime
 from typing import Any, AsyncGenerator, Mapping, Sequence
 from uuid import UUID
 
+import sqlalchemy as sa
 from dateutil.tz import tzutc
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
@@ -14,9 +15,6 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    ContainerId,
-    DeviceModelInfo,
-    DeviceName,
     KernelId,
     ResourceSlot,
     ServicePort,
@@ -27,17 +25,22 @@ from ai.backend.common.types import (
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models.kernel import PRIVATE_KERNEL_ROLES, KernelRole, KernelRow, KernelStatus
-from ..models.utils import sql_json_merge
+from ..models.kernel import (
+    PRIVATE_KERNEL_ROLES,
+    KernelRole,
+    KernelRow,
+    KernelStatus,
+    parse_data_to_update_status,
+)
+from ..models.utils import execute_with_retry, sql_json_merge
 from .base import (
+    BaseCreationSchema,
     BaseQuerySchema,
-    BaseSchema,
-    ToNullableFields,
 )
 from .context import DBContext
 
 
-class Kernel(BaseSchema):
+class Kernel(BaseCreationSchema):
     id: KernelId
     session_id: SessionId
     session_creation_id: str
@@ -132,16 +135,19 @@ class Kernel(BaseSchema):
     last_stat: dict | None
 
 
-class KernelQuery(Kernel, metaclass=ToNullableFields):
+class CreatedKernel(BaseQuerySchema):
+    status: KernelStatus
+    service_ports: list[dict]
+    role: KernelRole
+    cluster_role: str
+
+    @property
+    def is_private(self) -> bool:
+        return self.role in PRIVATE_KERNEL_ROLES
+
     @property
     def is_main(self) -> bool:
         return self.cluster_role == DEFAULT_ROLE
-
-
-class CreatedKernel(BaseQuerySchema):
-    status: KernelStatus
-    service_ports: dict
-    role: KernelRole
 
     @staticmethod
     async def to_respond(db: DBContext, session_id: SessionId) -> list[CreatedKernel]:
@@ -235,41 +241,77 @@ class KernelResource(BaseQuerySchema):
             yield [KernelResource.from_orm(row) for row in rows]
 
 
-class KernelMutationArgs(BaseModel):
-    status: KernelStatus | None = None
-    status_data: Mapping[str, Any] | None = None
-    status_info: str | KernelLifecycleEventReason | None = None
-    occupied_slots: ResourceSlot | None = None
-    scaling_group: str | None = None
-    container_id: ContainerId | None = None
-    attached_devices: Mapping[DeviceName, list[DeviceModelInfo]] | None = None
-    kernel_host: str | None = None
-    repl_in_port: str | None = None
-    repl_out_port: str | None = None
-    stdin_port: str | None = None  # legacy
-    stdout_port: str | None = None  # legacy
-    service_ports: Sequence[ServicePort] | None = None
-    agent: AgentId | None = None
-    agent_addr: str | None = None
-    last_stat: dict | None = None
-
-    @property
-    def value_dict(self) -> dict[str, Any]:
-        return self.dict(exclude_unset=True, exclude_none=True)
-
-
 class KernelMutation:
+    @staticmethod
+    async def mark_cancelled(
+        db: DBContext,
+        session_ids: Sequence[SessionId],
+        reason: str = "pending-timeout",
+        status_data: Mapping[str, Any] | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        now = status_changed_at or datetime.now(tzutc())
+        await KernelRow.set_status_by_session_id(
+            db.sa_engine,
+            session_ids,
+            KernelStatus.CANCELLED,
+            reason,
+            status_data,
+            status_changed_at=now,
+        )
+
+    @staticmethod
+    async def finalize_scheduled(
+        db: DBContext,
+        kernel_id: KernelId,
+        agent_id: AgentId,
+        agent_addr: str,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        now = status_changed_at or datetime.now(tzutc())
+        data = {
+            **parse_data_to_update_status(KernelStatus.SCHEDULED, status_changed_at=now),
+            "agent": agent_id,
+            "agent_addr": agent_addr,
+        }
+
+        async def _update() -> None:
+            async with db.sa_engine.begin_session() as db_sess:
+                query = sa.update(KernelRow).values(**data).where(KernelRow.id == kernel_id)
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update)
+
+    @staticmethod
+    async def mark_preparing(
+        db: DBContext,
+        session_ids: Sequence[SessionId],
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        now = status_changed_at or datetime.now(tzutc())
+        await KernelRow.set_status_by_session_id(
+            db.sa_engine, session_ids, KernelStatus.PREPARING, status_changed_at=now
+        )
+
+    @staticmethod
+    async def mark_restarting(
+        db: DBContext,
+        session_id: SessionId,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        now = status_changed_at or datetime.now(tzutc())
+        await KernelRow.set_status_by_session_id(
+            db.sa_engine, (session_id,), KernelStatus.RESTARTING, status_changed_at=now
+        )
+
     @staticmethod
     async def update_failure(db: DBContext, kernel_ids: Sequence[KernelId], ex: Exception) -> None:
         now = datetime.now(tzutc())
-        arg = KernelMutationArgs(
-            status=KernelStatus.ERROR,
-            status_info=f"other-error ({ex!r})",
-        )
         await KernelRow.set_status_by_kernel_id(
             db.sa_engine,
             kernel_ids,
-            arg,
+            status=KernelStatus.ERROR,
+            status_info=f"other-error ({ex!r})",
             status_changed_at=now,
         )
 
@@ -278,44 +320,46 @@ class KernelMutation:
         db: DBContext,
         kernel_id: KernelId,
         reason: KernelLifecycleEventReason,
-        arg: KernelMutationArgs | None = None,
     ) -> None:
         now = datetime.now(tzutc())
-        update_arg = arg or KernelMutationArgs(
-            status=KernelStatus.TERMINATING,
-            status_info=reason,
-            status_data={
-                "kernel": {"exit_code": None},
-                "session": {"status": "terminating"},
-            },
+        status = KernelStatus.TERMINATING
+        status_info = reason
+        status_data = {
+            "kernel": {"exit_code": None},
+            "session": {"status": "terminating"},
+        }
+        await KernelRow.set_status_by_kernel_id(
+            db.sa_engine,
+            (kernel_id,),
+            status,
+            status_info,
+            status_data=status_data,
+            status_changed_at=now,
         )
-        await KernelRow.set_status_by_kernel_id(db.sa_engine, (kernel_id,), update_arg, now)
 
     @staticmethod
     async def mark_terminated(
         db: DBContext,
         kernel_id: KernelId,
         reason: str | KernelLifecycleEventReason,
-        arg: KernelMutationArgs | None = None,
     ) -> None:
         now = datetime.now(tzutc())
         kern_stat = await redis_helper.execute(
             db.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )
-        update_arg = arg or KernelMutationArgs(
-            status=KernelStatus.TERMINATED,
-            status_info=reason,
-            last_stat=msgpack.unpackb(kern_stat),
+        status = KernelStatus.TERMINATING
+        status_info = reason
+        last_stat = msgpack.unpackb(kern_stat)
+        await KernelRow.set_status_by_kernel_id(
+            db.sa_engine, (kernel_id,), status, status_info, last_stat, status_changed_at=now
         )
-        await KernelRow.set_status_by_kernel_id(db.sa_engine, (kernel_id,), update_arg, now)
 
     @staticmethod
     async def handle_terminated(
         db: DBContext,
         kernel_id: KernelId,
         reason: str | KernelLifecycleEventReason,
-        arg: KernelMutationArgs | None = None,
         exit_code: int | None = None,
     ) -> AgentId | None:
         kernel = await KernelRow.get_kernel_to_update_status(db.sa_engine, (kernel_id,))
@@ -331,17 +375,22 @@ class KernelMutation:
             db.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )
-        update_arg = arg or KernelMutationArgs(
-            status=KernelStatus.TERMINATED,
-            status_info=reason,
-            status_data=sql_json_merge(
-                KernelRow.status_data,
-                ("kernel",),
-                {"exit_code": exit_code},
-            ),
-            last_stat=msgpack.unpackb(kern_stat),
+        status = KernelStatus.TERMINATED
+        status_info = reason
+        status_data = sql_json_merge(
+            KernelRow.status_data,
+            ("kernel",),
+            {"exit_code": exit_code},
         )
-        await KernelRow.set_status_by_kernel_id(db.sa_engine, (kernel_id,), update_arg, now)
+        await KernelRow.set_status_by_kernel_id(
+            db.sa_engine,
+            (kernel_id,),
+            status,
+            status_info,
+            last_stat=msgpack.unpackb(kern_stat),
+            status_data=status_data,
+            status_changed_at=now,
+        )
         await recalc_concurrency_used(db, kernel.access_key)
         return kernel.agent
 
@@ -350,16 +399,41 @@ class KernelMutation:
         cls,
         db: DBContext,
         kernel_id: KernelId,
-        update_arg: KernelMutationArgs,
+        *,
+        occupied_slots: ResourceSlot,
+        container_id: str,
+        attached_devices: dict[str, Any],
+        kernel_host: str,
+        repl_in_port: int,
+        repl_out_port: int,
+        stdin_port: int,
+        stdout_port: int,
+        service_ports: list[ServicePort],
     ) -> bool:
-        from ..models.kernel import KernelRow
-
-        update_arg.status = KernelStatus.RUNNING
-        if not (await KernelRow.is_transitable(db.sa_engine, kernel_id, update_arg.status)):
+        candidate_status = KernelStatus.RUNNING
+        if not (await KernelRow.is_transitable(db.sa_engine, kernel_id, candidate_status)):
             # TODO: log or raise error
             return False
 
-        await KernelRow.set_status_by_kernel_id(db.sa_engine, (kernel_id,), update_arg)
+        data = {
+            **parse_data_to_update_status(candidate_status),
+            "occupied_slots": occupied_slots,
+            "container_id": container_id,
+            "attached_devices": attached_devices,
+            "kernel_host": kernel_host,
+            "repl_in_port": repl_in_port,
+            "repl_out_port": repl_out_port,
+            "stdin_port": stdin_port,
+            "stdout_port": stdout_port,
+            "service_ports": service_ports,
+        }
+
+        async def _update() -> None:
+            async with db.sa_engine.begin_session() as db_sess:
+                query = sa.update(KernelRow).values(**data).where(KernelRow.id == kernel_id)
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update)
         return True
 
 

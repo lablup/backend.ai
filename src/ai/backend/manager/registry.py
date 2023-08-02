@@ -174,7 +174,7 @@ from .models.utils import (
     sql_json_merge,
 )
 from .schemas.context import DBContext
-from .schemas.kernel import CreatedKernel, KernelMutation, KernelMutationArgs, KernelResource
+from .schemas.kernel import CreatedKernel, KernelMutation, KernelResource
 from .schemas.session import SessionMutation
 from .types import UserScope
 
@@ -674,7 +674,7 @@ class AgentRegistry:
                 else:
                     await asyncio.sleep(0.5)
                     kernel_queries = await CreatedKernel.to_respond(self.db_ctx, session_id)
-                    row = [kernel for kernel in kernel_queries if kernel.role == DEFAULT_ROLE][0]
+                    row = [kernel for kernel in kernel_queries if kernel.is_main][0]
                     if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
                         for item in row.service_ports:
@@ -1603,13 +1603,12 @@ class AgentRegistry:
             actual_allocs = self.convert_resource_spec_to_resource_slot(
                 created_info["resource_spec"]["allocations"]
             )
-            new_status = KernelStatus.RUNNING
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
 
-            args = KernelMutationArgs(
-                status=new_status,
+            kernel_did_update = await KernelMutation.finalize_running(
+                self.db_ctx,
+                kernel_id,
                 occupied_slots=actual_allocs,
-                scaling_group=created_info["scaling_group"],
                 container_id=created_info["container_id"],
                 attached_devices=created_info.get("attached_devices", {}),
                 kernel_host=kernel_host,
@@ -1619,15 +1618,14 @@ class AgentRegistry:
                 stdout_port=created_info["stdout_port"],
                 service_ports=service_ports,
             )
-            kernel_did_update = await KernelMutation.finalize_running(self.db_ctx, kernel_id, args)
             if not kernel_did_update:
                 return
 
-            session = await SessionMutation.transit_status(self.db_ctx, session_id)
-            if session is None:
+            determined_session = await SessionMutation.transit_status(self.db_ctx, session_id)
+            if determined_session is None:
                 # TODO: log or raise error
                 return
-            updated_session = session
+            updated_session = determined_session
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -1663,23 +1661,7 @@ class AgentRegistry:
         is_local = image_info["is_local"]
         resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
         auto_pull = image_info["auto_pull"]
-        assert agent_alloc_ctx.agent_id is not None
         assert scheduled_session.id is not None
-
-        async def _update_kernel() -> None:
-            async with self.db.begin_session() as db_sess:
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .where(KernelRow.id.in_([binding.kernel.id for binding in items]))
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=agent_alloc_ctx.scaling_group,
-                    )
-                )
-                await db_sess.execute(kernel_query)
-
-        await execute_with_retry(_update_kernel)
 
         async with RPCContext(
             agent_alloc_ctx.agent_id,

@@ -879,6 +879,7 @@ class SessionRow(Base):
             .options(
                 noload("*"),
                 load_only(
+                    SessionRow.status,
                     SessionRow.id,
                     SessionRow.creation_id,
                     SessionRow.name,
@@ -945,7 +946,7 @@ class SessionRow(Base):
         if with_kernels:
             stmt = stmt.options(noload("*"), selectinload(SessionRow.kernels).noload("*"))
         async with db.begin_readonly_session() as db_sess:
-            return await db_sess.scalars(stmt)
+            return (await db_sess.scalars(stmt)).all()
 
     @staticmethod
     async def get_pending_session_by_id(

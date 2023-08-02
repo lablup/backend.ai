@@ -37,6 +37,8 @@ import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import core_schema
 from redis.asyncio import Redis
 
 from .exception import InvalidIpAddressValue
@@ -771,6 +773,24 @@ class ResourceSlot(UserDict):
     def to_json(self) -> Mapping[str, str]:
         return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: Type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        assert source is ResourceSlot
+
+        def _to_json(value: ResourceSlot) -> Mapping[str, str]:
+            return value.to_json()
+
+        return core_schema.no_info_after_validator_function(
+            cls.from_json,
+            core_schema.dict_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                _to_json,
+                info_arg=False,
+            ),
+        )
+
 
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
@@ -906,6 +926,24 @@ class VFolderMount(JSONSerializableMixin):
                     VFolderUsageMode
                 ),
             }
+        )
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: Type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        assert source is VFolderMount
+
+        def _to_json(value: VFolderMount) -> Mapping[str, str]:
+            return value.to_json()
+
+        return core_schema.no_info_after_validator_function(
+            cls.from_json,
+            core_schema.any_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                _to_json,
+                info_arg=False,
+            ),
         )
 
 

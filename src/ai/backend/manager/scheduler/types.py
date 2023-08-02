@@ -60,7 +60,7 @@ def merge_resource(
 
 @attrs.define(auto_attribs=True, slots=True)
 class AgentAllocationContext:
-    agent_id: Optional[AgentId]
+    agent_id: AgentId
     agent_addr: str
     scaling_group: str
 

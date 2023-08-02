@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from uuid import UUID
 
 from dateutil.tz import tzutc
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.types import (
     AccessKey,
@@ -18,22 +18,26 @@ from ai.backend.common.types import (
 )
 
 from ..exceptions import convert_to_status_data
-from ..models.session import SessionStatus
+from ..models.session import (
+    SESSION_STATUS_TRANSITION_MAP,
+    SessionRow,
+    SessionStatus,
+    determine_session_status,
+)
+from ..models.utils import sql_json_increment, sql_json_merge
 from .base import (
+    BaseCreationSchema,
     BaseQuerySchema,
-    BaseSchema,
-    ToNullableFields,
 )
 from .context import DBContext
-from .kernel import KernelMutationArgs, KernelQuery, PendingKernel, PickedKernel, ScheduledKernel
+from .kernel import KernelMutation, PendingKernel, PickedKernel, ScheduledKernel
 
 if TYPE_CHECKING:
     from ..api.exceptions import InstanceNotAvailable
-    from ..models.session import SessionRow
     from ..scheduler.types import KernelAgentBinding
 
 
-class Session(BaseSchema):
+class Session(BaseCreationSchema):
     id: SessionId
     creation_id: str
     name: str
@@ -105,33 +109,6 @@ class Session(BaseSchema):
     # Resource metrics measured upon termination
     num_queries: int = 0
     last_stat: dict
-
-
-class SessionWithKernels(BaseQuerySchema):
-    id: SessionId
-    kernels: list[KernelQuery]
-
-    @property
-    def main_kernel(self) -> KernelQuery:
-        kerns = tuple(kern for kern in self.kernels if kern.is_main)
-        if len(kerns) > 1:
-            raise RuntimeError(
-                f"Session (id: {self.id}) has more than 1 main kernel.",
-            )
-        if len(kerns) == 0:
-            raise RuntimeError(
-                f"Session (id: {self.id}) has no main kernel.",
-            )
-        return kerns[0]
-
-
-class SessionQuery(Session, metaclass=ToNullableFields):
-    @classmethod
-    async def by_status(cls, db: DBContext, status: SessionStatus) -> list[SessionQuery]:
-        from ..models.session import SessionRow
-
-        rows = await SessionRow.get_session_by_status(db.sa_engine, status, with_kernels=True)
-        return [SessionQuery.from_orm(row) for row in rows]
 
 
 class PendingSession(BaseQuerySchema):
@@ -242,22 +219,6 @@ class ScheduledSession(BaseQuerySchema):
         return kerns[0]
 
 
-class SessionCreation(Session):
-    id: SessionId | None  # type: ignore[assignment]
-
-
-class SessionMutationArgs(BaseModel):
-    status: SessionStatus | None = None
-    status_data: Mapping[str, Any] | None = None
-    status_info: str | None = None
-    occupying_slots: ResourceSlot | None = None
-    scaling_group: str | None = None
-
-    @property
-    def value_dict(self) -> dict[str, Any]:
-        return self.dict(exclude_unset=True, exclude_none=True)
-
-
 class SessionMutation:
     @staticmethod
     async def cancel_sessions(
@@ -265,32 +226,21 @@ class SessionMutation:
         session_ids: Sequence[SessionId],
         reason: str = "pending-timeout",
         exc: Exception | None = None,
+        *,
         is_debug: bool = False,
     ) -> None:
-        from ..models.kernel import KernelRow, KernelStatus
-        from ..models.session import SessionRow
-
         now = datetime.now(tzutc())
-        if exc is not None:
-            exc_data = convert_to_status_data(exc, is_debug)
+        exc_data = convert_to_status_data(exc, is_debug) if exc is not None else None
         await SessionRow.set_status(
             db.sa_engine,
             session_ids,
             SessionStatus.CANCELLED,
-            status_data={**exc_data},
+            status_data=exc_data,
             status_changed_at=now,
             reason=reason,
         )
-        args = KernelMutationArgs(
-            status=KernelStatus.CANCELLED,
-            status_info=reason,
-            status_data=exc_data,
-        )
-        await KernelRow.set_status_by_session_id(
-            db.sa_engine,
-            session_ids,
-            args,
-            status_changed_at=now,
+        await KernelMutation.mark_cancelled(
+            db, session_ids, reason, status_data=exc_data, status_changed_at=now
         )
 
     @staticmethod
@@ -298,14 +248,10 @@ class SessionMutation:
         db: DBContext,
         session_ids: Sequence[SessionId],
     ) -> None:
-        from ..models.session import SessionRow
-
-        now = datetime.now(tzutc())
         await SessionRow.set_status(
             db.sa_engine,
             session_ids,
             SessionStatus.TERMINATING,
-            status_changed_at=now,
         )
 
     @staticmethod
@@ -315,10 +261,6 @@ class SessionMutation:
         status_data: dict[str, Any],
         status_info: str = "predicate-checks-failed",
     ) -> None:
-        from ..models.session import SessionRow
-        from ..models.utils import sql_json_increment
-
-        now = datetime.now(tzutc())
         await SessionRow.set_status(
             db.sa_engine,
             (session_id,),
@@ -328,7 +270,6 @@ class SessionMutation:
                 parent_updates=status_data,
             ),
             reason=status_info,
-            status_changed_at=now,
         )
 
     @staticmethod
@@ -337,41 +278,23 @@ class SessionMutation:
         session_ids: Sequence[SessionId],
         status_data: Mapping[str, Any],
     ) -> None:
-        from ..models.kernel import KernelRow
-        from ..models.session import SessionRow
-        from ..models.utils import sql_json_merge
-
         await SessionRow.set_status(
             db.sa_engine,
             session_ids,
-            status_data=sql_json_merge(
-                KernelRow.status_data,
-                ("scheduler",),
-                obj=status_data,
-            ),
-        )
-        args = KernelMutationArgs(
             status_data=sql_json_merge(
                 SessionRow.status_data,
                 ("scheduler",),
                 obj=status_data,
             ),
         )
-        await KernelRow.set_status_by_session_id(
-            db.sa_engine,
-            session_ids,
-            args,
-        )
 
     @staticmethod
-    async def update_schedule_failure(
+    async def update_instance_not_available(
         db: DBContext,
         session_id: SessionId,
         exc: InstanceNotAvailable,
     ) -> None:
-        from ..models.session import SessionRow
-        from ..models.utils import sql_json_increment
-
+        now = datetime.now(tzutc())
         await SessionRow.set_status(
             db.sa_engine,
             (session_id,),
@@ -380,10 +303,11 @@ class SessionMutation:
                 SessionRow.status_data,
                 ("scheduler", "retries"),
                 parent_updates={
-                    "last_try": datetime.now(tzutc()).isoformat(),
+                    "last_try": now.isoformat(),
                     "msg": exc.extra_msg,
                 },
             ),
+            status_changed_at=now,
         )
 
     @staticmethod
@@ -393,8 +317,6 @@ class SessionMutation:
         exc: Exception,
         is_debug: bool = False,
     ) -> None:
-        from ..models.session import SessionRow
-
         exc_data = convert_to_status_data(exc, is_debug)
         await SessionRow.set_status(
             db.sa_engine,
@@ -409,25 +331,13 @@ class SessionMutation:
         session_id: SessionId,
         kernel_agent_bindings: Sequence[KernelAgentBinding],
     ) -> None:
-        from ..models.kernel import KernelRow, KernelStatus
-        from ..models.session import SessionRow
-
         now = datetime.now(tzutc())
         for binding in kernel_agent_bindings:
             kernel = binding.kernel
             agent_id = binding.agent_alloc_ctx.agent_id
             agent_addr = binding.agent_alloc_ctx.agent_addr
-            args = KernelMutationArgs(
-                status=KernelStatus.SCHEDULED,
-                agent=agent_id,
-                agent_addr=agent_addr,
-            )
-            await KernelRow.set_status_by_kernel_id(
-                db.sa_engine,
-                (kernel.id,),
-                args,
-                status_changed_at=now,
-            )
+            assert agent_id is not None
+            await KernelMutation.finalize_scheduled(db, kernel.id, agent_id, agent_addr, now)
         await SessionRow.set_status(
             db.sa_engine,
             (session_id,),
@@ -438,9 +348,6 @@ class SessionMutation:
 
     @staticmethod
     async def mark_preparing(db: DBContext, session_ids: Sequence[SessionId]) -> None:
-        from ..models.kernel import KernelRow, KernelStatus
-        from ..models.session import SessionRow
-
         now = datetime.now(tzutc())
         await SessionRow.set_status(
             db.sa_engine,
@@ -448,19 +355,10 @@ class SessionMutation:
             SessionStatus.PREPARING,
             status_changed_at=now,
         )
-        args = KernelMutationArgs(status=KernelStatus.PREPARING)
-        await KernelRow.set_status_by_session_id(
-            db.sa_engine,
-            session_ids,
-            args,
-            status_changed_at=now,
-        )
+        await KernelMutation.mark_preparing(db, session_ids, now)
 
     @staticmethod
     async def mark_restarting(db: DBContext, session_id: SessionId) -> None:
-        from ..models.kernel import KernelRow, KernelStatus
-        from ..models.session import SessionRow
-
         now = datetime.now(tzutc())
         await SessionRow.set_status(
             db.sa_engine,
@@ -468,24 +366,10 @@ class SessionMutation:
             SessionStatus.RESTARTING,
             status_changed_at=now,
         )
-        args = KernelMutationArgs(status=KernelStatus.RESTARTING)
-        await KernelRow.set_status_by_session_id(
-            db.sa_engine,
-            (session_id,),
-            args,
-            status_changed_at=now,
-        )
+        await KernelMutation.mark_restarting(db, session_id, now)
 
     @classmethod
     async def transit_status(cls, db: DBContext, session_id: SessionId) -> SessionRow | None:
-        from ..models.session import (
-            SESSION_STATUS_TRANSITION_MAP,
-            SessionRow,
-            determine_session_status,
-        )
-
-        now = datetime.now(tzutc())
-
         session = await SessionRow.get_session_to_determine_status(db.sa_engine, session_id)
         determined_status = determine_session_status(session.kernels)
         if determined_status not in SESSION_STATUS_TRANSITION_MAP[session.status]:
@@ -495,10 +379,6 @@ class SessionMutation:
             db.sa_engine,
             (session_id,),
             determined_status,
-            status_changed_at=now,
         )
-        return session
-
-
-class SessionCreationSchema(Session):
-    pass
+        async with db.sa_engine.begin_readonly_session() as db_sess:
+            return await SessionRow.get_session_by_id(db_sess, session_id)
