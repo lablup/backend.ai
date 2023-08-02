@@ -542,47 +542,45 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     async def _force_terminate_hanging_sessions(
         status: SessionStatus,
         threshold: timedelta,
+        interval: float,
     ) -> None:
-        heuristic_weight = 0.4  # NOTE: Shorter than a half(0.5)
-        heuristic_interval = threshold.total_seconds() * heuristic_weight
-        while True:
-            try:
-                sessions = await _fetch_hanging_sessions(
-                    root_ctx.db, status=status, threshold=threshold
-                )
-            except Exception as e:
-                log.error(e)
-                await asyncio.sleep(10)
-                continue
-
-            log.debug(f"{len(sessions)} {status.name} sessions found.")
-
-            results_and_exceptions = await asyncio.gather(
-                *[
-                    asyncio.create_task(
-                        root_ctx.registry.destroy_session(
-                            session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
-                        ),
-                    )
-                    for session in sessions
-                ],
-                return_exceptions=True,
+        try:
+            sessions = await _fetch_hanging_sessions(
+                root_ctx.db, status=status, threshold=threshold
             )
-            for result_or_exception in results_and_exceptions:
-                if isinstance(result_or_exception, (BaseException, Exception)):
-                    log.error(
-                        "hanging session force-termination error: {}",
-                        repr(result_or_exception),
-                        exc_info=result_or_exception,
-                    )
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            log.error("fetching hanging sessions error: {}", repr(e), exc_info=e)
+            return
 
-            await asyncio.sleep(heuristic_interval)
+        log.debug(f"{len(sessions)} {status.name} sessions found.")
+
+        results_and_exceptions = await asyncio.gather(
+            *[
+                asyncio.create_task(
+                    root_ctx.registry.destroy_session(
+                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
+                    ),
+                )
+                for session in sessions
+            ],
+            return_exceptions=True,
+        )
+        for result_or_exception in results_and_exceptions:
+            if isinstance(result_or_exception, (BaseException, Exception)):
+                log.error(
+                    "hanging session force-termination error: {}",
+                    repr(result_or_exception),
+                    exc_info=result_or_exception,
+                )
 
     hang_tolerance_threshold_dict = session_hang_tolerance_threshold_iv.check(
         await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance-threshold")
     )
 
     session_force_termination_tasks = []
+    heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
     for status, threshold in hang_tolerance_threshold_dict.items():
         try:
             session_status = SessionStatus[status]
@@ -599,8 +597,9 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 continue
 
         session_force_termination_tasks.append(
-            asyncio.create_task(
-                _force_terminate_hanging_sessions(status=session_status, threshold=threshold)
+            aiotools.create_timer(
+                functools.partial(_force_terminate_hanging_sessions, session_status, threshold),
+                threshold.total_seconds() * heuristic_interval_weight,
             )
         )
 
