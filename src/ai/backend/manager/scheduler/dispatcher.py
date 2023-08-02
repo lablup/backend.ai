@@ -557,6 +557,8 @@ class SchedulerDispatcher(aobject):
                     ),
                 )
 
+            agent_selection_order = self.local_config["manager"]["agent-selection-order"]
+
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
                 await self._schedule_single_node_session(
                     sched_ctx,
@@ -564,6 +566,7 @@ class SchedulerDispatcher(aobject):
                     sgroup_name,
                     candidate_agents,
                     schedulable_sess,
+                    agent_selection_order,
                     check_results,
                 )
             elif schedulable_sess.cluster_mode == ClusterMode.MULTI_NODE:
@@ -573,6 +576,7 @@ class SchedulerDispatcher(aobject):
                     sgroup_name,
                     candidate_agents,
                     schedulable_sess,
+                    agent_selection_order,
                     check_results,
                 )
             else:
@@ -590,6 +594,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
+        agent_selection_order: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
@@ -624,8 +629,6 @@ class SchedulerDispatcher(aobject):
             if agent is not None:
                 agent_id = agent.id
             else:
-                agent_selection_order = self.local_config["manager"]["agent-selection-order"]
-
                 # Let the scheduler check the resource availability and decide the target agent
                 cand_agent = scheduler.assign_agent_for_session(
                     compatible_candidate_agents,
@@ -785,6 +788,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
+        agent_selection_order: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
@@ -837,10 +841,6 @@ class SchedulerDispatcher(aobject):
                                     f"arch: {kernel.architecture})"
                                 ),
                             )
-
-                        agent_selection_order = self.local_config["manager"][
-                            "agent-selection-order"
-                        ]
 
                         # Let the scheduler check the resource availability and decide the target agent
                         agent_id = scheduler.assign_agent_for_kernel(

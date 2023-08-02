@@ -1136,9 +1136,7 @@ async def test_manually_assign_agent_available(
     example_pending_sessions,
 ):
     mock_local_config = MagicMock()
-    mock_local_config["manager"]["agent-selection-order"] = MagicMock(
-        return_value=agent_selection_order
-    )
+
     (
         registry,
         mock_dbconn,
@@ -1173,6 +1171,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_order,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
@@ -1186,6 +1185,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_order,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
@@ -1206,6 +1206,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_order,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
@@ -1227,6 +1228,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_order,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
