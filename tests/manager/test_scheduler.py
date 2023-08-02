@@ -1136,7 +1136,9 @@ async def test_manually_assign_agent_available(
     example_pending_sessions,
 ):
     mock_local_config = MagicMock()
-    mock_local_config["manager"]["agent-selection-order"] = agent_selection_order
+    mock_local_config["manager"]["agent-selection-order"] = MagicMock(
+        return_value=agent_selection_order
+    )
     (
         registry,
         mock_dbconn,
