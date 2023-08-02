@@ -570,7 +570,11 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             )
             for result_or_exception in results_and_exceptions:
                 if isinstance(result_or_exception, (BaseException, Exception)):
-                    log.error(result_or_exception)
+                    log.error(
+                        "hanging session force-termination error: {}",
+                        repr(result_or_exception),
+                        exc_info=result_or_exception,
+                    )
 
             await asyncio.sleep(heuristic_interval)
 
