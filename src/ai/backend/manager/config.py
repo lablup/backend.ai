@@ -329,7 +329,6 @@ _config_defaults: Mapping[str, Any] = {
     "session": {
         "hang-tolerance": {
             "threshold": {},
-            "max-interval": 3600,
         },
     },
 }
@@ -357,11 +356,6 @@ session_hang_tolerance_iv = t.Dict(
         ).ignore_extra(
             "*"
         ),
-        t.Key(
-            "max-interval", default=_config_defaults["session"]["hang-tolerance"]["max-interval"]
-        ): t.Float[
-            1.0:  # type: ignore
-        ],
     },
 )
 

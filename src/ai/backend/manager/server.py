@@ -579,7 +579,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     session_force_termination_tasks = []
     heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
-    max_interval = float(session_hang_tolerance["max-interval"])
+    max_interval = timedelta(hours=1).total_seconds()
     threshold: relativedelta | timedelta
     for status, threshold in session_hang_tolerance["threshold"].items():
         try:
