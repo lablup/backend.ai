@@ -547,7 +547,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         try:
             sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
         except asyncio.CancelledError:
-            pass
+            raise
         except Exception as e:
             log.error("fetching hanging sessions error: {}", repr(e), exc_info=e)
             return
