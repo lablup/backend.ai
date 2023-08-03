@@ -46,7 +46,6 @@ class SessionData(TypedDict, total=False):
 
 
 class Session(MutableMapping[str, Any]):
-
     """Session dict-like object."""
 
     def __init__(
