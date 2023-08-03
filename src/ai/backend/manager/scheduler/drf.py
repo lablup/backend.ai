@@ -24,21 +24,32 @@ from .types import AbstractScheduler, KernelInfo
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
-def get_slot_index(slotname: str, agent_selection_order: list[str]) -> int:
+def get_slot_index(slotname: str, agent_selection_resource_priority: list[str]) -> int:
     try:
-        return agent_selection_order.index(slotname)
+        return agent_selection_resource_priority.index(slotname)
     except ValueError:
         return sys.maxsize
 
 
-def key_by_requested_slots(
+def key_by_remaining_slots(
     agent: AgentRow,
+    requested_slots: ResourceSlot,
     agent_selection_strategy: AgentSelectionStrategy,
-    agent_selection_order: list[str],
-) -> list[int]:
-    sorted_agent_selection_order = sorted(
-        agent.available_slots.data.keys(),
-        key=lambda item: get_slot_index(item, agent_selection_order),
+    agent_selection_resource_priority: list[str],
+) -> list[Decimal]:
+    for requested_slot_key in sorted(requested_slots.data.keys(), reverse=True):
+        first = requested_slot_key.split(".")[0]
+        if (
+            requested_slot_key not in agent_selection_resource_priority
+            and first in agent_selection_resource_priority
+        ):
+            agent_selection_resource_priority.insert(
+                agent_selection_resource_priority.index(first) + 1, requested_slot_key
+            )
+
+    resource_priorities = sorted(
+        requested_slots.data.keys(),
+        key=lambda item: get_slot_index(item, agent_selection_resource_priority),
     )
 
     remaining_slots = agent.available_slots - agent.occupied_slots
@@ -48,16 +59,12 @@ def key_by_requested_slots(
     match agent_selection_strategy:
         case AgentSelectionStrategy.LEGACY:
             comparators = [
-                agent.available_slots.get(key, -sys.maxsize) for key in sorted_agent_selection_order
+                agent.available_slots.get(key, -sys.maxsize) for key in resource_priorities
             ]
         case AgentSelectionStrategy.CONCENTRATED:
-            comparators = [
-                -remaining_slots.get(key, sys.maxsize) for key in sorted_agent_selection_order
-            ]
+            comparators = [-remaining_slots.get(key, sys.maxsize) for key in resource_priorities]
         case AgentSelectionStrategy.DISPERSED | _:
-            comparators = [
-                remaining_slots.get(key, -sys.maxsize) for key in sorted_agent_selection_order
-            ]
+            comparators = [remaining_slots.get(key, -sys.maxsize) for key in resource_priorities]
 
     # Put back agents with more extra slot types
     # (e.g., accelerators)
@@ -123,7 +130,7 @@ class DRFScheduler(AbstractScheduler):
         access_key: AccessKey,
         requested_slots: ResourceSlot,
         agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_order: list[str],
+        agent_selection_resource_priority: list[str],
     ) -> Optional[AgentId]:
         # If some predicate checks for a picked session fail,
         # this method is NOT called at all for the picked session.
@@ -157,8 +164,11 @@ class DRFScheduler(AbstractScheduler):
             # Choose the agent.
             chosen_agent = max(
                 possible_agents,
-                key=lambda agent: key_by_requested_slots(
-                    agent, agent_selection_strategy, agent_selection_order
+                key=lambda agent: key_by_remaining_slots(
+                    agent,
+                    requested_slots,
+                    agent_selection_strategy,
+                    agent_selection_resource_priority,
                 ),
             )
             return chosen_agent.id
@@ -170,14 +180,14 @@ class DRFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_order: list[str],
+        agent_selection_resource_priority: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_session.access_key,
             pending_session.requested_slots,
             agent_selection_strategy,
-            agent_selection_order,
+            agent_selection_resource_priority,
         )
 
     def assign_agent_for_kernel(
@@ -185,12 +195,12 @@ class DRFScheduler(AbstractScheduler):
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_order: list[str],
+        agent_selection_resource_priority: list[str],
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
             pending_kernel.access_key,
             pending_kernel.requested_slots,
             agent_selection_strategy,
-            agent_selection_order,
+            agent_selection_resource_priority,
         )

@@ -98,7 +98,7 @@ disabled-plugins = []
 hide-agents = false
 
 # The order of agent selection.
-agent-selection-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 # One of: "asyncio", "uvloop"
 # This changes the event loop backend.

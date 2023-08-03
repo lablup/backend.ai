@@ -557,7 +557,9 @@ class SchedulerDispatcher(aobject):
                     ),
                 )
 
-            agent_selection_order = self.local_config["manager"]["agent-selection-order"]
+            agent_selection_resource_priority = self.local_config["manager"][
+                "agent-selection-resource-priority"
+            ]
 
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
                 await self._schedule_single_node_session(
@@ -566,7 +568,7 @@ class SchedulerDispatcher(aobject):
                     sgroup_name,
                     candidate_agents,
                     schedulable_sess,
-                    agent_selection_order,
+                    agent_selection_resource_priority,
                     check_results,
                 )
             elif schedulable_sess.cluster_mode == ClusterMode.MULTI_NODE:
@@ -576,7 +578,7 @@ class SchedulerDispatcher(aobject):
                     sgroup_name,
                     candidate_agents,
                     schedulable_sess,
-                    agent_selection_order,
+                    agent_selection_resource_priority,
                     check_results,
                 )
             else:
@@ -594,7 +596,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_order: list[str],
+        agent_selection_resource_priority: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
@@ -634,7 +636,7 @@ class SchedulerDispatcher(aobject):
                     compatible_candidate_agents,
                     sess_ctx,
                     scheduler.sgroup_opts.agent_selection_strategy,
-                    agent_selection_order,
+                    agent_selection_resource_priority,
                 )
                 if cand_agent is None:
                     raise InstanceNotAvailable(
@@ -788,7 +790,7 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_order: list[str],
+        agent_selection_resource_priority: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
@@ -847,7 +849,7 @@ class SchedulerDispatcher(aobject):
                             compatible_candidate_agents,
                             kernel,
                             scheduler.sgroup_opts.agent_selection_strategy,
-                            agent_selection_order,
+                            agent_selection_resource_priority,
                         )
                         if agent_id is None:
                             raise InstanceNotAvailable(
