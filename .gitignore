@@ -63,6 +63,7 @@ docs/_build/
 
 # pyenv
 .python-version
+.python-runtime
 
 # celery beat schedule file
 celerybeat-schedule
@@ -83,10 +84,11 @@ ENV/
 .*.swp
 .*.swo
 .vscode/
+.vim/
 /.vimrc
 /.nvimrc
 /.exrc
-.vim/
+.ripgreprc
 
 # Pants
 /.pants.d/
@@ -118,6 +120,7 @@ ENV/
 /vfroot/
 /*.pid
 /scratches/
+logs/
 
 # Additional clones for editable components
 /src/ai/backend/webui/
