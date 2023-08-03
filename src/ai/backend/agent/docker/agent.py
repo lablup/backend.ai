@@ -1522,10 +1522,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             if evdata is None:
                                 # Break out to the outermost loop when the connection is closed
                                 log.info(
-                                    (
-                                        "monitor_docker_events(): "
-                                        "restarting aiodocker event subscriber"
-                                    ),
+                                    "monitor_docker_events(): "
+                                    "restarting aiodocker event subscriber",
                                 )
                                 break
                             if evdata["Type"] != "container":
