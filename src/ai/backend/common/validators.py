@@ -660,11 +660,8 @@ class URL(t.Trafaret):
         try:
             parsed_url = yarl.URL(value)
             if self.scheme_required:
-                if parsed_url.scheme == "":
-                    self._failure(
-                        "The given value does not have the scheme (protocol) part", value=value
-                    )
-        except Exception as e:
+                parsed_url.origin()
+        except (ValueError, TypeError) as e:
             self._failure(repr(e), value=value)
         else:
             return parsed_url
