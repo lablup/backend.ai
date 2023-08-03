@@ -596,7 +596,7 @@ class FetchContextManager:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n" "\u279c {!r}".format(e)
+                msg = "API endpoint response error.\n\u279c {!r}".format(e)
                 await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
             finally:
@@ -737,7 +737,7 @@ class WebSocketContextManager:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n" "\u279c {!r}".format(e)
+                msg = "API endpoint response error.\n\u279c {!r}".format(e)
                 raise BackendClientError(msg) from e
             else:
                 break
@@ -899,7 +899,7 @@ class SSEContextManager:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n" "\u279c {!r}".format(e)
+                msg = "API endpoint response error.\n\u279c {!r}".format(e)
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()

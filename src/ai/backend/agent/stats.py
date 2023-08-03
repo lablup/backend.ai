@@ -260,7 +260,7 @@ class Metric:
                     )
                 )
                 if (self.capacity is not None and self.capacity.is_normal() and self.capacity > 0)
-                else None
+                else "0.00"
             ),
             "unit_hint": self.unit_hint,
             **{
@@ -309,7 +309,7 @@ class StatContext:
         last = self._timestamps.get(timestamp_key, None)
         self._timestamps[timestamp_key] = now
         if last is None:
-            return now, float("NaN")
+            return now, 0.0
         return now, now - last
 
     async def collect_node_stat(self):
@@ -484,6 +484,10 @@ class StatContext:
 
         Intended to be used by the agent.
         """
+        # FIXME: support Docker Desktop backend (#1230)
+        if sys.platform == "darwin":
+            return
+
         async with self._lock:
             pid_map = {}
             pids = []

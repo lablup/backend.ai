@@ -5,6 +5,7 @@ from .formatters import (
     ContainerListFormatter,
     DependencyListFormatter,
     GroupListFormatter,
+    InlineRoutingFormatter,
     KernelStatFormatter,
     SubFieldOutputFormatter,
     mibytes_output_formatter,
@@ -116,6 +117,7 @@ keypair_fields = FieldSet(
             alt_name="full_name",
             formatter=SubFieldOutputFormatter("full_name"),
         ),
+        FieldSpec("projects"),
         FieldSpec("access_key"),
         FieldSpec("secret_key"),
         FieldSpec("is_active"),
@@ -154,6 +156,7 @@ scaling_group_fields = FieldSet(
         FieldSpec("name"),
         FieldSpec("description"),
         FieldSpec("is_active"),
+        FieldSpec("is_public"),
         FieldSpec("created_at"),
         FieldSpec("driver"),
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
@@ -179,6 +182,7 @@ session_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("group_name", "Project/Group"),
         FieldSpec("group_id"),
+        FieldSpec("agent_ids"),
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
@@ -191,6 +195,7 @@ session_fields = FieldSet(
         FieldSpec("created_at"),
         FieldSpec("terminated_at"),
         FieldSpec("starts_at"),
+        FieldSpec("scheduled_at"),
         FieldSpec("startup_command"),
         FieldSpec("result"),
         FieldSpec("resoucre_opts", formatter=nested_dict_formatter),
@@ -308,13 +313,42 @@ permission_fields = FieldSet(
 
 service_fields = FieldSet(
     [
-        FieldSpec("model_id"),
-        FieldSpec("model_version"),
-        FieldSpec("image_ref"),
-        FieldSpec("project"),
-        FieldSpec("resource_opts", formatter=nested_dict_formatter),
         FieldSpec("endpoint_id"),
-        FieldSpec("service_id"),
-        FieldSpec("service_name"),
+        FieldSpec("image"),
+        FieldSpec("domain"),
+        FieldSpec("project"),
+        FieldSpec("resource_group"),
+        FieldSpec("resource_slots", formatter=nested_dict_formatter),
+        FieldSpec("url"),
+        FieldSpec("model"),
+        FieldSpec("model_mount_destiation"),
+        FieldSpec("created_user"),
+        FieldSpec("session_owner"),
+        FieldSpec("tag"),
+        FieldSpec("startup_command"),
+        FieldSpec("bootstrap_script"),
+        FieldSpec("callback_url"),
+        FieldSpec("environ", formatter=nested_dict_formatter),
+        FieldSpec("name"),
+        FieldSpec("resource_opts", formatter=nested_dict_formatter),
+        FieldSpec("desired_session_count"),
+        FieldSpec("cluster_mode"),
+        FieldSpec("cluster_size"),
+        FieldSpec("open_to_public"),
+        FieldSpec(
+            "routings { routing_id session status traffic_ratio }",
+            formatter=InlineRoutingFormatter(),
+        ),
+    ]
+)
+
+
+routing_fields = FieldSet(
+    [
+        FieldSpec("routing_id"),
+        FieldSpec("status"),
+        FieldSpec("endpoint"),
+        FieldSpec("session"),
+        FieldSpec("traffic_ratio"),
     ]
 )

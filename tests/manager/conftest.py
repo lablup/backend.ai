@@ -50,8 +50,10 @@ from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
     KernelRow,
+    ProjectResourcePolicyRow,
     ScalingGroupRow,
     SessionRow,
+    UserResourcePolicyRow,
     UserRow,
     agents,
     domains,
@@ -348,8 +350,7 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
-    alembic_config_template = textwrap.dedent(
-        """
+    alembic_config_template = textwrap.dedent("""
     [alembic]
     script_location = ai.backend.manager.models:alembic
     sqlalchemy.url = {sqlalchemy_url:s}
@@ -375,8 +376,7 @@ def database(request, local_config, test_db):
 
     [formatter_simple]
     format = [%(name)s] %(message)s
-    """
-    ).strip()
+    """).strip()
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
@@ -750,6 +750,7 @@ class DummyEtcd:
 
 @pytest.fixture
 async def registry_ctx(mocker):
+    mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
     mock_shared_config.update_resource_slots = AsyncMock()
     mock_shared_config.etcd = None
@@ -783,6 +784,7 @@ async def registry_ctx(mocker):
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
+        local_config=mock_local_config,
         shared_config=mock_shared_config,
         db=mock_db,
         redis_stat=mock_redis_stat,
@@ -820,6 +822,8 @@ async def session_info(database_engine):
     session_id = str(uuid.uuid4()).replace("-", "")
     session_creation_id = str(uuid.uuid4()).replace("-", "")
 
+    resource_policy_name = str(uuid.uuid4()).replace("-", "")
+
     async with database_engine.begin_session() as db_sess:
         scaling_group = ScalingGroupRow(
             name=sgroup_name,
@@ -832,11 +836,20 @@ async def session_info(database_engine):
         domain = DomainRow(name=domain_name, total_resource_slots={})
         db_sess.add(domain)
 
+        user_resource_policy = UserResourcePolicyRow(name=resource_policy_name, max_vfolder_size=-1)
+        db_sess.add(user_resource_policy)
+
+        project_resource_policy = ProjectResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_size=-1
+        )
+        db_sess.add(project_resource_policy)
+
         group = GroupRow(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
             total_resource_slots={},
+            resource_policy=resource_policy_name,
         )
         db_sess.add(group)
 
@@ -846,6 +859,7 @@ async def session_info(database_engine):
             username=f"TestCaseRunner-{postfix}",
             password=user_password,
             domain_name=domain_name,
+            resource_policy=resource_policy_name,
         )
         db_sess.add(user)
 
@@ -883,5 +897,15 @@ async def session_info(database_engine):
         await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
         await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
         await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+        await db_sess.execute(
+            sa.delete(ProjectResourcePolicyRow).where(
+                ProjectResourcePolicyRow.name == resource_policy_name
+            )
+        )
+        await db_sess.execute(
+            sa.delete(UserResourcePolicyRow).where(
+                UserResourcePolicyRow.name == resource_policy_name
+            )
+        )
         await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
         await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))

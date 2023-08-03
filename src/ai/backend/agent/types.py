@@ -8,13 +8,14 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.common.events import KernelLifecycleEventReason
-from ai.backend.common.types import ContainerId, KernelId, MountTypes
+from ai.backend.common.types import ContainerId, KernelId, MountTypes, SessionId
 
 
 class AgentBackend(enum.Enum):
     # The list of importable backend names under "ai.backend.agent" pkg namespace.
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
+    DUMMY = "dummy"
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -36,6 +37,12 @@ class Port:
     host: str
     private_port: int
     host_port: int
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class AgentEventData:
+    type: str
+    data: dict[str, Any]
 
 
 class ContainerStatus(str, enum.Enum):
@@ -66,6 +73,7 @@ class LifecycleEvent(int, enum.Enum):
 @attrs.define(auto_attribs=True, slots=True)
 class ContainerLifecycleEvent:
     kernel_id: KernelId
+    session_id: SessionId
     container_id: Optional[ContainerId]
     event: LifecycleEvent
     reason: KernelLifecycleEventReason
@@ -79,7 +87,7 @@ class ContainerLifecycleEvent:
         else:
             cid = "unknown"
         return (
-            f"LifecycleEvent("
+            "LifecycleEvent("
             f"{self.event.name}, "
             f"k:{self.kernel_id}, "
             f"c:{cid}, "

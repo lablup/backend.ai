@@ -38,10 +38,11 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, ServicePort, aobject
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
+from .types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -153,7 +154,9 @@ class NextResult(TypedDict, total=False):
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
     agent_config: Mapping[str, Any]
+    session_id: SessionId
     kernel_id: KernelId
+    agent_id: AgentId
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
@@ -173,6 +176,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -184,6 +189,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.agent_id = agent_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
@@ -200,7 +207,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     async def init(self) -> None:
         log.debug(
-            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): " "starting new runner",
+            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,
             default_api_version,
             default_client_features,
@@ -274,6 +281,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def start_model_service(self, model_service):
+        raise NotImplementedError
+
+    @abstractmethod
     async def shutdown_service(self, service):
         raise NotImplementedError
 
@@ -303,6 +314,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     @abstractmethod
     async def list_files(self, path: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def notify_event(self, evdata: AgentEventData):
         raise NotImplementedError
 
     async def execute(
@@ -361,6 +376,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
+    model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     output_queue: Optional[asyncio.Queue[ResultRecord]]
@@ -397,6 +413,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -427,6 +444,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["output_sock"]
         del props["completion_queue"]
         del props["service_queue"]
+        del props["model_service_queue"]
         del props["service_apps_info_queue"]
         del props["status_queue"]
         del props["output_queue"]
@@ -447,6 +465,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.output_sock = self.zctx.socket(zmq.PULL)
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
+        self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -546,6 +565,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"input", text.encode("utf8")])
 
+    async def feed_event(self, evdata: AgentEventData):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        data = {
+            "type": evdata.type,
+            "data": evdata.data,
+        }
+        await self.input_sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
+
     async def feed_interrupt(self):
         if self.input_sock.closed:
             raise asyncio.CancelledError
@@ -581,6 +609,31 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return json.loads(result)
         except asyncio.CancelledError:
             return []
+
+    async def feed_start_model_service(self, model_info):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        await self.input_sock.send_multipart(
+            [
+                b"start-model-service",
+                json.dumps(model_info).encode("utf8"),
+            ]
+        )
+        if health_check_info := model_info.get("service", {}).get("health_check"):
+            timeout_seconds = (
+                health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
+            )
+        else:
+            timeout_seconds = 10
+        try:
+            async with timeout(timeout_seconds):
+                result = await self.model_service_queue.get()
+            self.model_service_queue.task_done()
+            return json.loads(result)
+        except asyncio.CancelledError:
+            return {"status": "failed", "error": "cancelled"}
+        except asyncio.TimeoutError:
+            return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
         if self.input_sock.closed:
@@ -778,7 +831,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning("Execution timeout detected on kernel " f"{self.kernel_id}")
+            log.warning(f"Execution timeout detected on kernel {self.kernel_id}")
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
@@ -868,6 +921,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                         await self.completion_queue.put(msg_data)
                     elif msg_type == b"service-result":
                         await self.service_queue.put(msg_data)
+                    elif msg_type == b"model-service-result":
+                        await self.model_service_queue.put(msg_data)
                     elif msg_type == b"apps-result":
                         await self.service_apps_info_queue.put(msg_data)
                     elif msg_type == b"stdout":

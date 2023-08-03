@@ -73,8 +73,10 @@ def list_allowed_types():
     "host_path",
     type=bool,
     is_flag=True,
-    help="Treats HOST as a mount point of unmanaged virtual folder. "
-    "This option can only be used by Admin or Superadmin.",
+    help=(
+        "Treats HOST as a mount point of unmanaged virtual folder. "
+        "This option can only be used by Admin or Superadmin."
+    ),
 )
 @click.option(
     "-m",
@@ -82,9 +84,11 @@ def list_allowed_types():
     metavar="USAGE_MODE",
     type=str,
     default="general",
-    help='Purpose of the folder. Normal folders are usually set to "general". '
-    'Available options: "general", "data" (provides data to users), '
-    'and "model" (provides pre-trained models).',
+    help=(
+        'Purpose of the folder. Normal folders are usually set to "general". '
+        'Available options: "general", "data" (provides data to users), '
+        'and "model" (provides pre-trained models).'
+    ),
 )
 @click.option(
     "-p",
@@ -92,9 +96,11 @@ def list_allowed_types():
     metavar="PERMISSION",
     type=str,
     default="rw",
-    help="Folder's innate permission. "
-    'Group folders can be shared as read-only by setting this option to "ro". '
-    "Invited folders override this setting by its own invitation permission. ",
+    help=(
+        "Folder's innate permission. "
+        'Group folders can be shared as read-only by setting this option to "ro". '
+        "Invited folders override this setting by its own invitation permission. "
+    ),
 )
 @click.option(
     "-q",
@@ -102,9 +108,11 @@ def list_allowed_types():
     metavar="QUOTA",
     type=ByteSizeParamCheckType(),
     default="0",
-    help="Quota of the virtual folder. "
-    "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
-    "Default is maximum amount possible.",
+    help=(
+        "Quota of the virtual folder. "
+        "(Use 'm' for megabytes, 'g' for gigabytes, and etc.) "
+        "Default is maximum amount possible."
+    ),
 )
 @click.option(
     "--cloneable",
@@ -222,27 +230,39 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="The local parent directory which contains the file to be uploaded. "
-    "[default: current working directory]",
+    help=(
+        "The local parent directory which contains the file to be uploaded. "
+        "[default: current working directory]"
+    ),
+)
+@click.option(
+    "-r",
+    "--recursive",
+    is_flag=True,
+    help="Upload the given directory recursively.",
 )
 @click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
-    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-    "and networks (e.g., 40 GbE) for the maximum throughput.",
+    help=(
+        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+        "and networks (e.g., 40 GbE) for the maximum throughput."
+    ),
 )
 @click.option(
     "--override-storage-proxy",
     type=CommaSeparatedKVListParamType(),
     default=None,
-    help="Overrides storage proxy address. "
-    'The value must shape like "X1=Y1,X2=Y2...". '
-    "Each Yn address must at least include the IP address "
-    "or the hostname and may include the protocol part and the port number to replace.",
+    help=(
+        "Overrides storage proxy address. "
+        'The value must shape like "X1=Y1,X2=Y2...". '
+        "Each Yn address must at least include the IP address "
+        "or the hostname and may include the protocol part and the port number to replace."
+    ),
 )
-def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
+def upload(name, filenames, base_dir, recursive, chunk_size, override_storage_proxy):
     """
     TUS Upload a file to the virtual folder from the current working directory.
     The files with the same names will be overwritten.
@@ -256,6 +276,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
             session.VFolder(name).upload(
                 filenames,
                 basedir=base_dir,
+                recursive=recursive,
                 chunk_size=chunk_size,
                 show_progress=True,
                 address_map=override_storage_proxy
@@ -275,25 +296,31 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="The local parent directory which will contain the downloaded file.  "
-    "[default: current working directory]",
+    help=(
+        "The local parent directory which will contain the downloaded file.  "
+        "[default: current working directory]"
+    ),
 )
 @click.option(
     "--chunk-size",
     type=ByteSizeParamType(),
     default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
-    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
-    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
-    "and networks (e.g., 40 GbE) for the maximum throughput.",
+    help=(
+        'Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+        "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+        "and networks (e.g., 40 GbE) for the maximum throughput."
+    ),
 )
 @click.option(
     "--override-storage-proxy",
     type=CommaSeparatedKVListParamType(),
     default=None,
-    help="Overrides storage proxy address. "
-    'The value must shape like "X1=Y1,X2=Y2...". '
-    "Each Yn address must at least include the IP address "
-    "or the hostname and may include the protocol part and the port number to replace.",
+    help=(
+        "Overrides storage proxy address. "
+        'The value must shape like "X1=Y1,X2=Y2...". '
+        "Each Yn address must at least include the IP address "
+        "or the hostname and may include the protocol part and the port number to replace."
+    ),
 )
 @click.option(
     "--max-retries",
@@ -685,7 +712,7 @@ def leave(name, shared_user_uuid):
     metavar="USAGE_MODE",
     type=str,
     default="general",
-    help="Purpose of the cloned virtual folder. " "Default value is 'general'.",
+    help="Purpose of the cloned virtual folder. Default value is 'general'.",
 )
 @click.option(
     "-p",
@@ -693,7 +720,7 @@ def leave(name, shared_user_uuid):
     metavar="PERMISSION",
     type=str,
     default="rw",
-    help="Cloned virtual folder's permission. " "Default value is 'rw'.",
+    help="Cloned virtual folder's permission. Default value is 'rw'.",
 )
 def clone(name, target_name, target_host, usage_mode, permission):
     """Clone a virtual folder.
@@ -773,8 +800,10 @@ def clone(name, target_name, target_host, usage_mode, permission):
     "--set-cloneable",
     type=bool,
     metavar="BOOLEXPR",
-    help="A boolean-interpretable string whether a virtual folder can be cloned. "
-    "If not set, the cloneable property is not changed.",
+    help=(
+        "A boolean-interpretable string whether a virtual folder can be cloned. "
+        "If not set, the cloneable property is not changed."
+    ),
 )
 def update_options(name, permission, set_cloneable):
     """Update an existing virtual folder.

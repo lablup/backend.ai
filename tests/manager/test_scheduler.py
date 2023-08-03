@@ -341,7 +341,6 @@ common_image = ImageRow(
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     domain_name="default",
     group_id=example_group_id,
-    resource_opts={},
     vfolder_mounts=[],
     environ={},
     bootstrap_script=None,
@@ -402,7 +401,6 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("2.0"),
@@ -452,7 +450,6 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("1.0"),
@@ -502,7 +499,6 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("0.4"),
@@ -528,7 +524,6 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("0.3"),
@@ -554,7 +549,6 @@ def example_pending_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("0.3"),
@@ -611,7 +605,6 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("1.0"),
@@ -637,7 +630,6 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("2.0"),
@@ -684,7 +676,6 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("1.0"),
@@ -731,7 +722,6 @@ def example_existing_sessions():
                     architecture=common_image_ref.architecture,
                     registry=common_image_ref.registry,
                     image=common_image_ref.name,
-                    resource_opts={},
                     requested_slots=ResourceSlot(
                         {
                             "cpu": Decimal("4.0"),

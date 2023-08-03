@@ -13,6 +13,7 @@ from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
 
+from ..config import container_registry_iv
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
 from .types import CORSOptions, WebMiddleware
@@ -151,9 +152,7 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("key"): t.String,
-            t.Key("value"): (
-                t.String(allow_blank=True) | t.Mapping(t.String(allow_blank=True), t.Any)
-            ),
+            t.Key("value"): container_registry_iv.check,
         }
     )
 )
