@@ -1220,13 +1220,11 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        from .user import users
-
         j = vfolders.join(
             vfolder_permissions,
             vfolders.c.id == vfolder_permissions.c.vfolder,
             isouter=True,
-        ).join(users, vfolders.c.user == users.c.uuid, isouter=True)
+        )
         query = (
             sa.select([sa.func.count()])
             .select_from(j)
@@ -1254,7 +1252,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
-    ) -> Sequence[VirtualFolder]:
+    ) -> list[VirtualFolder]:
         from .group import groups
         from .user import users
 
@@ -1262,7 +1260,6 @@ class VirtualFolder(graphene.ObjectType):
             vfolders.join(
                 vfolder_permissions,
                 vfolders.c.id == vfolder_permissions.c.vfolder,
-                isouter=True,
             )
             .join(
                 users,
@@ -1309,10 +1306,8 @@ class VirtualFolder(graphene.ObjectType):
         from ai.backend.manager.models import association_groups_users as agus
 
         from .group import groups
-        from .user import users
 
-        j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-        query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_id)
+        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
 
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
@@ -1341,14 +1336,13 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
-    ) -> Sequence[VirtualFolder]:
+    ) -> list[VirtualFolder]:
         from ai.backend.manager.models import association_groups_users as agus
 
         from .group import groups
         from .user import users
 
-        j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-        query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_id)
+        query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
         grps = result.fetchall()
@@ -1455,7 +1449,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
-    ) -> Sequence[VirtualFolderPermission]:
+    ) -> list[VirtualFolderPermission]:
         from .user import users
 
         j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
