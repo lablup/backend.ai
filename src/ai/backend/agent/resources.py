@@ -162,10 +162,8 @@ class KernelResourceSpec:
                             alloc = Decimal(raw_alloc)
                     except KeyError as e:
                         log.warning(
-                            (
-                                "A previously launched container has "
-                                "unknown slot type: {}. Ignoring it."
-                            ),
+                            "A previously launched container has "
+                            "unknown slot type: {}. Ignoring it.",
                             e.args[0],
                         )
                         continue
