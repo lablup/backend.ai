@@ -1358,7 +1358,13 @@ class VirtualFolder(graphene.ObjectType):
         group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
+            sa.select(
+                [
+                    vfolders,
+                    vfolders.c.group.label("users_email"),
+                    groups.c.name.label("groups_name"),
+                ]
+            )
             .select_from(j)
             .where(vfolders.c.group.in_(group_ids))
             .limit(limit)
