@@ -1,4 +1,3 @@
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
@@ -11,7 +10,7 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ObjectNotFound
+from ai.backend.manager.api.exceptions import ObjectNotFound, URLNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..models import query_allowed_sgroups
@@ -108,15 +107,7 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                             scaling_group_name,
                             wsproxy_addr,
                         )
-                        return web.HTTPNotFound(
-                            text=json.dumps(
-                                {
-                                    "type": "https://api.backend.ai/probs/url-not-found",
-                                    "title": "Unknown URL path.",
-                                }
-                            ),
-                            content_type="application/problem+json",
-                        )
+                        return URLNotFound()
         else:
             raise ObjectNotFound(object_name="scaling group")
 
