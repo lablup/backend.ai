@@ -103,7 +103,7 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                         )
                     except aiohttp.ClientConnectorError:
                         log.error(
-                            "scaling group({}) uses INVALID WSProxy address: ({})",
+                            "Failed to query the wsproxy {1} configured for sg:{0}",
                             scaling_group_name,
                             wsproxy_addr,
                         )
