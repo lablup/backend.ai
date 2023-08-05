@@ -28,6 +28,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
+from .. import __version__
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import (
@@ -47,8 +48,8 @@ async def token_auth_middleware(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> web.StreamResponse:
-    skip_token_check = getattr(handler, "skip_token_check", False)
-    if not skip_token_check:
+    skip_token_auth = getattr(handler, "skip_token_auth", False)
+    if not skip_token_auth:
         token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
         if not token:
             raise web.HTTPForbidden()
@@ -58,19 +59,22 @@ async def token_auth_middleware(
     return await handler(request)
 
 
-def skip_token_check(
+def skip_token_auth(
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
-    setattr(handler, "skip_token_check", True)
+    setattr(handler, "skip_token_auth", True)
     return handler
 
 
-async def get_status(request: web.Request) -> web.Response:
+@skip_token_auth
+async def check_status(request: web.Request) -> web.Response:
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_status", params)
         return web.json_response(
             {
                 "status": "ok",
+                "type": "maanger-facing",
+                "storage-proxy": __version__,
             },
         )
 
@@ -609,15 +613,6 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
             )
 
 
-@skip_token_check
-async def status(request: web.Request) -> web.Response:
-    return web.json_response(
-        {
-            "status": "ok",
-        },
-    )
-
-
 async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -988,7 +983,8 @@ async def init_manager_app(ctx: Context) -> web.Application:
         ],
     )
     app["ctx"] = ctx
-    app.router.add_route("GET", "/", get_status)
+    app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/quota-scope", create_quota_scope)
@@ -1015,5 +1011,4 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
-    app.router.add_route("GET", "/status", status)
     return app

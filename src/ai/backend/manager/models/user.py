@@ -40,7 +40,7 @@ from .base import (
     simple_db_mutate_returning_item,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
 from .utils import ExtendedAsyncSAEngine
 
@@ -293,12 +293,12 @@ class User(graphene.ObjectType):
         "full_name": ("full_name", None),
         "description": ("description", None),
         "is_active": ("is_active", None),
-        "status": ("status", lambda s: UserStatus[s]),
+        "status": ("status", enum_field_getter(UserStatus)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
-        "role": ("role", lambda s: UserRole[s]),
+        "role": ("role", enum_field_getter(UserRole)),
         "resource_policy": ("domain_name", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
@@ -892,10 +892,8 @@ class PurgeUser(graphene.Mutation):
 
             if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
                 raise RuntimeError(
-                    (
-                        "Some of user's virtual folders are mounted to active kernels. "
-                        "Terminate those kernels first."
-                    ),
+                    "Some of user's virtual folders are mounted to active kernels. "
+                    "Terminate those kernels first.",
                 )
             if await cls.user_has_active_kernels(conn, user_uuid):
                 raise RuntimeError("User has some active kernels. Terminate them first.")

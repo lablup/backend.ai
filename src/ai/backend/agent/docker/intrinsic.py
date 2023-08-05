@@ -249,7 +249,7 @@ class CPUPlugin(AbstractComputePlugin):
         per_container_cpu_util = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, cpu_used in zip(container_ids, results):
             if cpu_used is None:
@@ -281,7 +281,7 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[ProcessMeasurement]:
         async def psutil_impl(pid: int) -> Optional[Decimal]:
             try:
-                p = await asyncio.get_running_loop().run_in_executor(None, psutil.Process, pid)
+                p = psutil.Process(pid)
             except psutil.NoSuchProcess:
                 log.warning("psutil cannot found process {0}", pid)
             else:
@@ -308,7 +308,7 @@ class CPUPlugin(AbstractComputePlugin):
                         cid_pids_map[cid] = []
                     cid_pids_map[cid].append(pid)
                 for cid, pids in cid_pids_map.items():
-                    api_tasks.append(asyncio.ensure_future(api_impl(cid, pids)))
+                    api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
                 results = []
                 for chunk in chunked_results:
@@ -316,7 +316,7 @@ class CPUPlugin(AbstractComputePlugin):
             case _:
                 psutil_tasks = []
                 for pid, _ in pid_map_list:
-                    psutil_tasks.append(asyncio.ensure_future(psutil_impl(pid)))
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, cid), cpu_used in zip(pid_map_list, results):
@@ -705,7 +705,7 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_io_scratch_size = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, result in zip(container_ids, results):
             if result is None:
@@ -800,7 +800,7 @@ class MemoryPlugin(AbstractComputePlugin):
                         cid_pids_map[cid] = []
                     cid_pids_map[cid].append(pid)
                 for cid, pids in cid_pids_map.items():
-                    api_tasks.append(asyncio.ensure_future(api_impl(cid, pids)))
+                    api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
                 results = []
                 for chunk in chunked_results:
@@ -808,7 +808,7 @@ class MemoryPlugin(AbstractComputePlugin):
             case _:
                 psutil_tasks = []
                 for pid, _ in pid_map_list:
-                    psutil_tasks.append(asyncio.ensure_future(psutil_impl(pid)))
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, _), result in zip(pid_map_list, results):

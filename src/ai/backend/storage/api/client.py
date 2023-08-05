@@ -31,6 +31,7 @@ from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderID
 
+from .. import __version__
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import InvalidAPIParameters
@@ -87,6 +88,28 @@ upload_token_data_iv = t.Dict(
 ).allow_extra(
     "*",
 )  # allow JWT-intrinsic keys
+
+
+async def check_status(request: web.Request) -> web.StreamResponse:
+    class Params(TypedDict):
+        pass
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict({}),
+            read_from=CheckParamSource.QUERY,
+        ),
+    ) as _:
+        return web.json_response(
+            status=200,
+            data={
+                "status": "ok",
+                "type": "client-facing",
+                "storage-proxy": __version__,
+            },
+        )
 
 
 async def download(request: web.Request) -> web.StreamResponse:
@@ -414,6 +437,8 @@ async def init_client_app(ctx: Context) -> web.Application:
         ),
     }
     cors = aiohttp_cors.setup(app, defaults=cors_options)
+    r = cors.add(app.router.add_resource("/"))
+    r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
     r = app.router.add_resource("/upload")  # tus handlers handle CORS by themselves
