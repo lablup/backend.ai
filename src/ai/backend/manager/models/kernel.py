@@ -379,7 +379,7 @@ kernels = sa.Table(
     KernelIDColumn(),
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
-    # Otherwise, it refers the kernel ID of the main contaienr of the belonged multi-container session.
+    # Otherwise, it refers the kernel ID of the main container of the belonged multi-container session.
     sa.Column(
         "session_id",
         SessionIDColumnType,
