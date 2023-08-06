@@ -29,16 +29,16 @@ $ pip install -U \
 >     -r requirements.txt
 ```
 
+## Building API Reference JSON file
+```console
+$ ./py -m ai.backend.manager.openapi docs/manager/rest-reference/openapi.json
+```
+This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
+Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
+
 ## Building HTML document
 
 > 📌 NOTE: Please ensure that you are inside the `docs` directory and the virtualenv is activated.
-
-### Building API Reference JSON file
-```console
-$ python -m ai.backend.manager.openapi manager/rest-reference/openapi.json
-```
-
-Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
 
 ### Make the html version
 
