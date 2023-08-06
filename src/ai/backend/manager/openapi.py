@@ -248,21 +248,27 @@ async def generate_openapi(output_path: Path) -> None:
             parameters = []
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
+                preconds = []
                 handler_attrs = getattr(route.handler, "_backend_attrs")
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"TokenAuth": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):
-                    description.append(f"{auth_scope} privilege required.")
+                    preconds.append(f"{auth_scope.capitalize()} privilege required.")
                 if manager_status := handler_attrs.get("required_server_statuses"):
                     if len(manager_status) > 0:
-                        description.append(
-                            f"Manager should be in {list(manager_status)[0].value} status."
+                        preconds.append(
+                            f"Manager status required: {list(manager_status)[0].value.upper()}"
                         )
                     else:
-                        description.append(
-                            "Manager should be in one of "
-                            f"{','.join([e.value for e in manager_status])} statuses."
+                        preconds.append(
+                            "Manager status required: one of "
+                            f"{', '.join([e.value.upper() for e in manager_status])}"
                         )
+                if preconds:
+                    description.append("\n**Preconditions:**")
+                    for item in preconds:
+                        description.append(f"* {item}")
+                    description.append("")
                 if request_scheme := handler_attrs.get("request_scheme"):
                     parsed_definition = parse_traferet_definition(request_scheme)
                     if method == "GET" or method == "DELETE":
