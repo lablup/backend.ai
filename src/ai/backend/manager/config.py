@@ -325,7 +325,9 @@ container_registry_iv = t.Dict(
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
         t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): t.Null | tx.StringList | t.List(t.String),
+        t.Key("project", default=None): t.Null | tx.StringList(
+            allow_blank=True, empty_str_as_empty_list=True
+        ),
         t.Key("ssl-verify", default=True): t.ToBool,
     }
 ).allow_extra("*")
