@@ -238,7 +238,7 @@ async def generate_openapi(output_path: Path) -> None:
 
             description = []
             if route.handler.__doc__:
-                description.append(textwrap.dedent(route.handler.__doc__.strip()))
+                description.append(textwrap.dedent(route.handler.__doc__))
 
             route_def = {
                 "operationId": operation_id,
