@@ -1,4 +1,5 @@
 import asyncio
+import importlib
 import inspect
 import json
 from collections import defaultdict
@@ -6,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
+import aiohttp_cors
 import click
 import trafaret as t
 from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
@@ -15,9 +17,8 @@ import ai.backend.common.validators as tx
 from ai.backend.manager import __version__
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
-from ai.backend.manager.config import LocalConfig
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
-from ai.backend.manager.server import build_root_app, global_subapp_pkgs
+from ai.backend.manager.server import global_subapp_pkgs
 
 
 class ParseError(Exception):
@@ -192,11 +193,11 @@ def parse_traferet_definition(root: t.Dict) -> list[dict]:
 
 
 async def generate_openapi(output_path: Path) -> None:
-    root_app = build_root_app(
-        1,
-        LocalConfig({}),
-        subapp_pkgs=global_subapp_pkgs,
-    )
+    cors_options = {
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=False, expose_headers="*", allow_headers="*"
+        ),
+    }
 
     openapi: dict[str, Any] = {
         "openapi": "3.0.0",
@@ -213,8 +214,9 @@ async def generate_openapi(output_path: Path) -> None:
         "paths": defaultdict(lambda: {}),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
-    apps = [root_app, *root_app._subapps]
-    for app in apps:
+    for subapp in global_subapp_pkgs:
+        pkg = importlib.import_module("ai.backend.manager.api" + subapp)
+        app, _ = pkg.create_app(cors_options)
         prefix = app.get("prefix", "root")
         for route in app.router.routes():
             resource = route.resource
@@ -228,6 +230,7 @@ async def generate_openapi(output_path: Path) -> None:
                 continue
 
             operation_id = f"{prefix}.{route.handler.__name__}"
+            print(f"parsing {operation_id}")
             operation_id_mapping[operation_id] += 1
             if (operation_id_count := operation_id_mapping[operation_id]) > 1:
                 operation_id += f".{operation_id_count}"
