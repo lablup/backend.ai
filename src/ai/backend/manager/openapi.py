@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import inspect
 import json
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -223,7 +224,7 @@ async def generate_openapi(output_path: Path) -> None:
             if not resource:
                 continue
 
-            path = resource.canonical
+            path = "/" + ("" if prefix == "root" else prefix) + resource.canonical
             method = route.method
 
             if method == "OPTIONS":
@@ -237,7 +238,7 @@ async def generate_openapi(output_path: Path) -> None:
 
             description = []
             if route.handler.__doc__:
-                description.append(route.handler.__doc__.strip())
+                description.append(textwrap.dedent(route.handler.__doc__.strip()))
 
             route_def = {
                 "operationId": operation_id,
