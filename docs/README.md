@@ -33,6 +33,13 @@ $ pip install -U \
 
 > 📌 NOTE: Please ensure that you are inside the `docs` directory and the virtualenv is activated.
 
+### Building API Reference JSON file
+```console
+$ python -m ai.backend.manager.openapi manager/rest-reference/openapi.json
+```
+
+Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
+
 ### Make the html version
 
 ```console
