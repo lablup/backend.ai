@@ -269,6 +269,7 @@ def create_app(
     app = web.Application()
     app["api_versions"] = (2, 3, 4)
     app["manager.context"] = PrivateContext()
+    app["prefix"] = "manager"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     status_resource = cors.add(app.router.add_resource("/status"))
     cors.add(status_resource.add_route("GET", fetch_manager_status))

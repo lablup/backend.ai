@@ -141,15 +141,17 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
 
        For example, reading "some/key1" will fetch all of the following keys:
 
-          some/key1
-          some/key1/field1
-          some/key1/field2
-          some/key12
-          some/key12/field1
-          some/key12/field2
+       .. code-block:: text
 
-       To avoid this issue, it is strongly recommended to use dedicated CRUD APIs
-       instead of relying on the etcd raw access APIs.
+           some/key1
+           some/key1/field1
+           some/key1/field2
+           some/key12
+           some/key12/field1
+           some/key12/field2
+
+       **To avoid this issue, developers must use dedicated CRUD APIs
+       instead of relying on the etcd raw access APIs whenever possible.**
     """
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
@@ -229,15 +231,17 @@ async def delete_config(request: web.Request, params: Any) -> web.Response:
 
        For example, deleting "some/key1" will DELETE all of the following keys:
 
-          some/key1
-          some/key1/field1
-          some/key1/field2
-          some/key12
-          some/key12/field1
-          some/key12/field2
+       .. code-block:: text
 
-       To avoid this issue, it is strongly recommended to use dedicated CRUD APIs
-       instead of relying on the etcd raw access APIs.
+           some/key1
+           some/key1/field1
+           some/key1/field2
+           some/key12
+           some/key12/field1
+           some/key12/field2
+
+       **To avoid this issue, developers must use dedicated CRUD APIs
+       instead of relying on the etcd raw access APIs whenever possible.**
     """
     root_ctx: RootContext = request.app["_root.context"]
     log.info(

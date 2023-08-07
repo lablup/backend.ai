@@ -1,11 +1,14 @@
 import asyncio
+import importlib
 import inspect
 import json
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 import aiofiles
+import aiohttp_cors
 import click
 import trafaret as t
 from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
@@ -15,9 +18,8 @@ import ai.backend.common.validators as tx
 from ai.backend.manager import __version__
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
-from ai.backend.manager.config import LocalConfig
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
-from ai.backend.manager.server import build_root_app, global_subapp_pkgs
+from ai.backend.manager.server import global_subapp_pkgs
 
 
 class ParseError(Exception):
@@ -192,11 +194,11 @@ def parse_traferet_definition(root: t.Dict) -> list[dict]:
 
 
 async def generate_openapi(output_path: Path) -> None:
-    root_app = build_root_app(
-        1,
-        LocalConfig({}),
-        subapp_pkgs=global_subapp_pkgs,
-    )
+    cors_options = {
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=False, expose_headers="*", allow_headers="*"
+        ),
+    }
 
     openapi: dict[str, Any] = {
         "openapi": "3.0.0",
@@ -213,28 +215,30 @@ async def generate_openapi(output_path: Path) -> None:
         "paths": defaultdict(lambda: {}),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
-    apps = [root_app, *root_app._subapps]
-    for app in apps:
+    for subapp in global_subapp_pkgs:
+        pkg = importlib.import_module("ai.backend.manager.api" + subapp)
+        app, _ = pkg.create_app(cors_options)
         prefix = app.get("prefix", "root")
         for route in app.router.routes():
             resource = route.resource
             if not resource:
                 continue
 
-            path = resource.canonical
+            path = "/" + ("" if prefix == "root" else prefix) + resource.canonical
             method = route.method
 
             if method == "OPTIONS":
                 continue
 
             operation_id = f"{prefix}.{route.handler.__name__}"
+            print(f"parsing {operation_id}")
             operation_id_mapping[operation_id] += 1
             if (operation_id_count := operation_id_mapping[operation_id]) > 1:
                 operation_id += f".{operation_id_count}"
 
             description = []
             if route.handler.__doc__:
-                description.append(route.handler.__doc__.strip())
+                description.append(textwrap.dedent(route.handler.__doc__))
 
             route_def = {
                 "operationId": operation_id,
@@ -244,21 +248,27 @@ async def generate_openapi(output_path: Path) -> None:
             parameters = []
             parameters.extend(get_path_parameters(resource))
             if hasattr(route.handler, "_backend_attrs"):
+                preconds = []
                 handler_attrs = getattr(route.handler, "_backend_attrs")
                 if handler_attrs.get("auth_required"):
                     route_def["security"] = [{"TokenAuth": []}]
                 if auth_scope := handler_attrs.get("auth_scope"):
-                    description.append(f"{auth_scope} privilege required.")
+                    preconds.append(f"{auth_scope.capitalize()} privilege required.")
                 if manager_status := handler_attrs.get("required_server_statuses"):
                     if len(manager_status) > 0:
-                        description.append(
-                            f"Manager should be in {list(manager_status)[0].value} status."
+                        preconds.append(
+                            f"Manager status required: {list(manager_status)[0].value.upper()}"
                         )
                     else:
-                        description.append(
-                            "Manager should be in one of "
-                            f"{','.join([e.value for e in manager_status])} statuses."
+                        preconds.append(
+                            "Manager status required: one of "
+                            f"{', '.join([e.value.upper() for e in manager_status])}"
                         )
+                if preconds:
+                    description.append("\n**Preconditions:**")
+                    for item in preconds:
+                        description.append(f"* {item}")
+                    description.append("")
                 if request_scheme := handler_attrs.get("request_scheme"):
                     parsed_definition = parse_traferet_definition(request_scheme)
                     if method == "GET" or method == "DELETE":
