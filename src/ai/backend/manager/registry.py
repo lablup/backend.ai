@@ -3366,7 +3366,7 @@ class AgentRegistry:
                             "domain_name": endpoint.domain,
                         },
                         "endpoint": {
-                            "id": endpoint.id,
+                            "id": str(endpoint.id),
                         },
                     },
                     "apps": inference_apps,
@@ -3569,12 +3569,12 @@ async def invoke_session_callback(
                             await db_sess.delete(endpoint)
                             try:
                                 await context.delete_appproxy_endpoint(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         else:
                             try:
                                 await context.update_appproxy_endpoint_routes(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
                     else:
@@ -3593,7 +3593,7 @@ async def invoke_session_callback(
                             await db_sess.execute(query)
                             try:
                                 await context.update_appproxy_endpoint_routes(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
 
             await execute_with_retry(_update)

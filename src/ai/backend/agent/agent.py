@@ -1784,24 +1784,26 @@ class AbstractAgent(
                         model_definition_path = Path(
                             model_folder.host_path / "model-definition.yaml"
                         )
-                        if not model_definition_path.is_file():
-                            raise AgentError(
-                                "Model definition file (model-definition.yml or"
-                                " model-definition.yaml) does not exist on vFolder {} (ID {})",
-                                model_folder.name,
-                                model_folder.vfid,
-                            )
+                    if not model_definition_path.is_file():
+                        raise AgentError(
+                            "Model definition file (model-definition.yml or"
+                            " model-definition.yaml) does not exist on vFolder {} (ID {})",
+                            model_folder.name,
+                            model_folder.vfid,
+                        )
                     try:
                         model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
                             None, model_definition_path.read_text
                         )
-                    except FileNotFoundError:
+                    except FileNotFoundError as e:
                         raise AgentError(
-                            "Model definition file (model-definition.yml) does not exist on"
+                            "Model definition file (model-definition.yml) does not exist under"
                             " vFolder {} (ID {})",
                             model_folder.name,
                             model_folder.vfid,
-                        )
+                        ) from e
+                    except yaml.error.YAMLError as e:
+                        raise AgentError(f"Invalid YAML syntax: {e}") from e
                     try:
                         model_definition = model_definition_iv.check(
                             yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
@@ -1820,12 +1822,12 @@ class AbstractAgent(
                                         "is_inference": True,
                                     }
                                 )
-                    except DataError:
+                    except DataError as e:
                         raise AgentError(
-                            "Failed to read model definition from vFolder {} (ID {})",
+                            "Failed to validate model definition from vFolder {} (ID {})",
                             model_folder.name,
                             model_folder.vfid,
-                        )
+                        ) from e
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(

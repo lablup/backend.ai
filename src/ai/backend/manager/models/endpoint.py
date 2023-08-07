@@ -239,7 +239,7 @@ class Endpoint(graphene.ObjectType):
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
-            resource_slots=row.resource_slots,
+            resource_slots=row.resource_slots.to_json(),
             url=row.url,
             model=row.model,
             model_mount_destiation=row.model_mount_destiation,
