@@ -389,6 +389,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
     try:
         async with api_session:
+            request_headers = extra_config_headers.check(request.headers)
             request_api_version = request.headers.get("X-BackendAI-Version", None)
             fill_forwarding_hdrs_to_api_session(request, api_session)
             api_rqst = Request(
@@ -399,6 +400,25 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
+            if proxy_path == "pipeline":
+                aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
+                if not (sso_token := request.headers.get("X-BackendAI-SSO")):
+                    jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
+                    now = datetime.now(tz=timezone(timedelta(hours=9)))
+                    claims = {
+                        # Registered claims
+                        "exp": now + timedelta(hours=1),
+                        "iss": "Backend.AI Webserver",
+                        "iat": now,
+                        # Private claims
+                        "aiohttp_session": aiohttp_session,
+                        "access_key": api_session.config.access_key,
+                        # "secret_key": api_session.config.secret_key,
+                    }
+                    sso_token = jwt.encode(claims, key=jwt_secret, algorithm="HS256")
+                api_rqst.headers["X-BackendAI-SSO"] = sso_token
+                if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
+                    api_rqst.headers["X-BackendAI-SessionID"] = session_id
             async with api_rqst.connect_websocket() as up_conn:
                 down_conn = web.WebSocketResponse()
                 await down_conn.prepare(request)
