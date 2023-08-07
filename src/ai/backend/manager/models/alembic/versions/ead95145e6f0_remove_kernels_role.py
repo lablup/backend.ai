@@ -1,11 +1,10 @@
-"""add role column on kernels table
+"""remove kernels.role
 
-Revision ID: bedd92de93af
-Revises: 3efd66393bd0, 10c58e701d87
-Create Date: 2023-04-24 11:57:53.111968
+Revision ID: ead95145e6f0
+Revises: eb9441fcf90a
+Create Date: 2023-08-07 14:48:01.346306
 
 """
-
 import enum
 
 import sqlalchemy as sa
@@ -14,11 +13,11 @@ from sqlalchemy import cast
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.functions import coalesce
 
-from ai.backend.manager.models.base import EnumType, IDColumn, convention
+from ai.backend.manager.models.base import EnumType, IDColumn, SessionIDColumnType, convention
 
 # revision identifiers, used by Alembic.
-revision = "bedd92de93af"
-down_revision = ("3efd66393bd0", "10c58e701d87")
+revision = "ead95145e6f0"
+down_revision = "eb9441fcf90a"
 branch_labels = None
 depends_on = None
 
@@ -34,10 +33,25 @@ kernelrole = postgresql.ENUM(*kernelrole_choices, name="kernelrole")
 
 metadata = sa.MetaData(naming_convention=convention)
 
+sessions = sa.Table(
+    "sessions",
+    metadata,
+    IDColumn(),
+    sa.Column("is_system_session", sa.Boolean(), default=False, nullable=False),
+)
+
 kernels = sa.Table(
     "kernels",
     metadata,
     IDColumn(),
+    sa.Column(
+        "session_id",
+        SessionIDColumnType,
+        sa.ForeignKey("sessions.id"),
+        unique=False,
+        index=True,
+        nullable=False,
+    ),
     sa.Column(
         "role",
         EnumType(KernelRole),
@@ -46,7 +60,10 @@ kernels = sa.Table(
         nullable=False,
         index=True,
     ),
+    sa.Column("image", sa.String(length=512)),
+    sa.Column("is_system_kernel", sa.Boolean(), default=False, nullable=False),
 )
+
 images = sa.Table(
     "images",
     metadata,
@@ -56,6 +73,38 @@ images = sa.Table(
 
 
 def upgrade():
+    op.add_column(
+        "sessions",
+        sa.Column(
+            "is_system_session", sa.Boolean(), default=False, server_default="0", nullable=False
+        ),
+    )
+    op.add_column(
+        "kernels",
+        sa.Column(
+            "is_system_kernel", sa.Boolean(), default=False, server_default="0", nullable=False
+        ),
+    )
+
+    conn = op.get_bind()
+    query = (
+        kernels.update()
+        .values({"is_system_kernel": True})
+        .where(kernels.c.role == KernelRole.SYSTEM)
+    )
+    conn.execute(query)
+
+    query = (
+        sessions.update()
+        .values({"is_system_session": True})
+        .where((sessions.c.id == kernels.c.session_id) & (kernels.c.is_system_kernel == True))
+    )
+    conn.execute(query)
+
+    op.drop_column("kernels", "role")
+
+
+def downgrade():
     connection = op.get_bind()
     kernelrole.create(connection)
     op.add_column("kernels", sa.Column("role", EnumType(KernelRole), nullable=True))
@@ -109,7 +158,5 @@ def upgrade():
 
     op.alter_column("kernels", column_name="role", nullable=False)
 
-
-def downgrade():
-    op.drop_column("kernels", "role")
-    kernelrole.drop(op.get_bind())
+    op.drop_column("sessions", "is_system_session")
+    op.drop_column("kernels", "is_system_kernel")

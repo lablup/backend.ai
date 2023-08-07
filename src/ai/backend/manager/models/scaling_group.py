@@ -99,6 +99,8 @@ scaling_groups = sa.Table(
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, index=True, default=True),
+    # is_public: indicates if the scaling group should be used to schedule normal, user-triggered sessions
+    # if set to false, agents controlled by this scaling group won't host any interactive or batch sessions
     sa.Column(
         "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
     ),

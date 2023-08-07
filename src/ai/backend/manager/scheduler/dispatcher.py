@@ -417,7 +417,7 @@ class SchedulerDispatcher(aobject):
                         ("dependencies", check_dependencies(db_sess, sched_ctx, sess_ctx)),
                         ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
                     ]
-                    if not sess_ctx.is_private:
+                    if not sess_ctx.is_system_session:
                         predicates += [
                             (
                                 "keypair_resource_limit",
@@ -499,7 +499,7 @@ class SchedulerDispatcher(aobject):
                             .where(SessionRow.id == sess_ctx.id)
                         )
                         await db_sess.execute(query)
-                        if sess_ctx.is_private:
+                        if sess_ctx.is_system_session:
                             await _apply_cancellation(db_sess, [sess_ctx.id])
                             await self.event_producer.produce_event(
                                 SessionCancelledEvent(

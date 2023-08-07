@@ -31,6 +31,7 @@ from sqlalchemy.orm import load_only, noload, relationship, selectinload
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    ImageRole,
     KernelId,
     ResourceSlot,
     SessionId,
@@ -587,6 +588,7 @@ class SessionRow(Base):
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
     use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
+    is_system_session = sa.Column("is_system_session", sa.Boolean(), default=False, nullable=False)
 
     # Lifecycle
     timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
@@ -699,10 +701,6 @@ class SessionRow(Base):
     @property
     def resource_opts(self) -> dict[str, Any]:
         return {kern.cluster_hostname: kern.resource_opts for kern in self.kernels}
-
-    @property
-    def is_private(self) -> bool:
-        return any([kernel.is_private for kernel in self.kernels])
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
@@ -1148,6 +1146,7 @@ class ComputeSession(graphene.ObjectType):
     tag = graphene.String()
     name = graphene.String()
     type = graphene.String()
+    is_system_session = graphene.Boolean()
     main_kernel_role = graphene.String()
 
     # image
@@ -1224,7 +1223,8 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
-            "main_kernel_role": row.main_kernel.role.name,
+            "is_system_session": row.is_system_session,
+            "main_kernel_role": ImageRole.SYSTEM if row.is_system_session else "",  # deprecated
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,

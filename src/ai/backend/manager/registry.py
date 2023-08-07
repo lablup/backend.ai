@@ -99,6 +99,7 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
+    ImageRole,
     KernelEnqueueingConfig,
     KernelId,
     RedisConnectionInfo,
@@ -138,7 +139,6 @@ from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    PRIVATE_KERNEL_ROLES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
@@ -146,7 +146,6 @@ from .models import (
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
-    KernelRole,
     KernelRow,
     KernelStatus,
     KeyPairResourcePolicyRow,
@@ -605,9 +604,8 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
-        public_sgroup_only = True
-        if _role_str := image_row.labels.get("ai.backend.role"):
-            public_sgroup_only = KernelRole(_role_str) not in PRIVATE_KERNEL_ROLES
+        image_role = ImageRole(image_row.labels.get("ai.backend.role", "COMPUTE"))
+
         if dry_run:
             return {}
         try:
@@ -643,7 +641,8 @@ class AgentRegistry:
                         agent_list=config["agent_list"],
                         dependency_sessions=[SessionId(d) for d in dependencies],
                         callback_url=callback_url,
-                        public_sgroup_only=public_sgroup_only,
+                        use_public_sgroup_only=(image_role != ImageRole.SYSTEM),
+                        image_role=image_role,
                         endpoint_id=endpoint_id,
                         traffic_ratio=traffic_ratio,
                     )
@@ -860,6 +859,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         session_tag=tag,
+                        image_role=ImageRole(image_row.labels.get("ai.backend.role", "COMPUTE")),
                     ),
                 )
             )
@@ -931,7 +931,7 @@ class AgentRegistry:
         resource_policy: dict,
         *,
         user_scope: UserScope,
-        public_sgroup_only: bool = True,
+        use_public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
         session_tag: Optional[str] = None,
@@ -942,6 +942,7 @@ class AgentRegistry:
         callback_url: Optional[URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
+        image_role: ImageRole = ImageRole.COMPUTE,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
 
@@ -968,7 +969,7 @@ class AgentRegistry:
                 access_key,
                 user_scope.domain_name,
                 user_scope.group_id,
-                public_sgroup_only,
+                use_public_sgroup_only,
             )
             if scaling_group is None:
                 log.warning(
@@ -1072,6 +1073,7 @@ class AgentRegistry:
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
+            "is_system_session": image_role == ImageRole.SYSTEM,
         }
 
         kernel_shared_data = {
@@ -1103,6 +1105,7 @@ class AgentRegistry:
             "stdout_port": 0,
             "preopen_ports": sa.bindparam("preopen_ports"),
             "use_host_network": use_host_network,
+            "is_system_kernel": image_role == ImageRole.SYSTEM,
         }
 
         kernel_data = []
@@ -1264,7 +1267,6 @@ class AgentRegistry:
                     # "image_id": image_row.id,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
-                    "role": KernelRole(image_row.labels.get("ai.backend.role", KernelRole.COMPUTE)),
                     "startup_command": kernel.get("startup_command"),
                     "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
@@ -1855,7 +1857,7 @@ class AgentRegistry:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.access_key == access_key)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                    & (not KernelRow.is_system_kernel),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1878,7 +1880,7 @@ class AgentRegistry:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.domain_name == domain_name)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                    & (not KernelRow.is_system_kernel),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -1902,7 +1904,7 @@ class AgentRegistry:
                 query = sa.select(KernelRow.occupied_slots).where(
                     (KernelRow.group_id == group_id)
                     & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                    & (not KernelRow.is_system_kernel),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
@@ -2011,7 +2013,11 @@ class AgentRegistry:
                     .options(
                         load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
                         selectinload(SessionRow.kernels).options(
-                            load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
+                            load_only(
+                                KernelRow.agent,
+                                KernelRow.is_system_kernel,
+                                KernelRow.occupied_slots,
+                            )
                         ),
                     )
                 )
@@ -2022,7 +2028,7 @@ class AgentRegistry:
                                 kernel.occupied_slots
                             )
                         if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
-                            if kernel.role in PRIVATE_KERNEL_ROLES:
+                            if session_row.is_system_session:
                                 sftp_concurrency_used_per_key[session_row.access_key].add(
                                     session_row.id
                                 )
@@ -2191,7 +2197,7 @@ class AgentRegistry:
                         noload("*"),
                         load_only(
                             KernelRow.id,
-                            KernelRow.role,
+                            KernelRow.is_system_kernel,
                             KernelRow.access_key,
                             KernelRow.status,
                             KernelRow.container_id,
@@ -2328,7 +2334,7 @@ class AgentRegistry:
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
-                                if kernel.is_private:
+                                if kernel.is_system_kernel:
                                     kp_key = "keypair.sftp_concurrency_used"
                                 else:
                                     kp_key = "keypair.concurrency_used"
@@ -2373,7 +2379,7 @@ class AgentRegistry:
                             if kernel.cluster_role == DEFAULT_ROLE:
                                 # The main session is terminated;
                                 # decrement the user's concurrency counter
-                                if kernel.is_private:
+                                if kernel.is_system_kernel:
                                     kp_key = "keypair.sftp_concurrency_used"
                                 else:
                                     kp_key = "keypair.concurrency_used"
@@ -3687,7 +3693,7 @@ async def check_scaling_group(
     access_key: AccessKey,
     domain_name: str,
     group_id: Union[uuid.UUID, str],
-    public_sgroup_only: bool = False,
+    use_public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.
     # If scaling_group is not provided, it will be selected as the first one among
@@ -3698,7 +3704,7 @@ async def check_scaling_group(
         group_id,
         access_key,
     )
-    if public_sgroup_only:
+    if use_public_sgroup_only:
         candidates = [sgroup for sgroup in candidates if sgroup["is_public"]]
     if not candidates:
         raise ScalingGroupNotFound("You have no scaling groups allowed to use.")

@@ -10,7 +10,10 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ObjectNotFound, ServerMisconfiguredError
+from ai.backend.manager.api.exceptions import (
+    ScalingGroupNotFound,
+    ServerMisconfiguredError,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..models import query_allowed_sgroups
@@ -84,14 +87,20 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
-    log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
+    log.info(
+        "SGROUPS.WSPROXY_VERSION(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name
+    )
     async with root_ctx.db.begin_readonly() as conn:
         sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name or "", access_key)
         for sgroup in sgroups:
             if sgroup["name"] == scaling_group_name:
                 wsproxy_addr = sgroup["wsproxy_addr"]
                 if not wsproxy_addr:
-                    wsproxy_version = "v1"
+                    return web.json_response(
+                        {
+                            "wsproxy_version": "v1",
+                        }
+                    )
                 else:
                     try:
                         wsproxy_status = await query_wsproxy_status(wsproxy_addr)
@@ -109,7 +118,7 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                         )
                         return ServerMisconfiguredError()
         else:
-            raise ObjectNotFound(object_name="scaling group")
+            raise ScalingGroupNotFound
 
 
 async def init(app: web.Application) -> None:

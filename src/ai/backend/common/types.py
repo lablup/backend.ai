@@ -80,6 +80,7 @@ __all__ = (
     "check_typed_dict",
     "EtcdRedisConfig",
     "RedisConnectionInfo",
+    "ImageRole",
 )
 
 if TYPE_CHECKING:
@@ -1125,3 +1126,9 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class ImageRole(enum.Enum):
+    INFERENCE = "INFERENCE"
+    COMPUTE = "COMPUTE"
+    SYSTEM = "SYSTEM"
