@@ -1965,6 +1965,7 @@ def create_app(
     app.on_shutdown.append(shutdown)
     app["api_versions"] = (1, 2, 3, 4)
     app["session.context"] = PrivateContext()
+    app["prefix"] = "session"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", create_from_params))
     cors.add(app.router.add_route("POST", "/_/create", create_from_params))
