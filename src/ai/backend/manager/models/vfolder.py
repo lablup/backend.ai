@@ -1020,13 +1020,19 @@ class VirtualFolder(graphene.ObjectType):
     def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
         if row is None:
             return None
+
+        try:
+            user_email = row["users_email"]
+        except BaseException:
+            user_email = None
+
         return cls(
             id=row["id"],
             host=row["host"],
             quota_scope_id=row["quota_scope_id"],
             name=row["name"],
             user=row["user"],
-            user_email=row["users_email"],
+            user_email=user_email,
             group=row["group"],
             group_name=row["groups_name"],
             creator=row["creator"],
@@ -1361,7 +1367,6 @@ class VirtualFolder(graphene.ObjectType):
             sa.select(
                 [
                     vfolders,
-                    vfolders.c.group.label("users_email"),
                     groups.c.name.label("groups_name"),
                 ]
             )
