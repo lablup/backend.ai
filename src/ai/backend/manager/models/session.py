@@ -72,7 +72,7 @@ from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
-from .minilang.queryfilter import FieldSpecType, QueryFilterParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
 
@@ -1537,7 +1537,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
-        "type": ("sessions_session_type", lambda s: SessionTypes[s]),
+        "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1551,9 +1551,9 @@ class ComputeSession(graphene.ObjectType):
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
         "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", lambda s: SessionStatus[s]),
+        "status": ("sessions_status", enum_field_getter(SessionStatus)),
         "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", lambda s: SessionResult[s]),
+        "result": ("sessions_result", enum_field_getter(SessionResult)),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),

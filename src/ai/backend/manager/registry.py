@@ -137,8 +137,10 @@ from .defs import (
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     PRIVATE_KERNEL_ROLES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
     EndpointRow,
@@ -1911,49 +1913,75 @@ class AgentRegistry:
             set
         )  # key: access_key, value: set of session_id
 
-        occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-            lambda: ResourceSlot({"cpu": 0, "mem": 0})
-        )
-
-        async for kernel_resources in KernelResource.stream_by_statuses(
-            self.db_ctx, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
-        ):
-            for kernel in kernel_resources:
-                occupied_slots_per_agent[kernel.agent] += kernel.occupied_slots
-
-        async for kernel_resources in KernelResource.stream_by_statuses(
-            self.db_ctx, USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
-        ):
-            for kernel in kernel_resources:
-                if kernel.role in PRIVATE_KERNEL_ROLES:
-                    sftp_concurrency_used_per_key[kernel.access_key].add(kernel.session_id)
-                else:
-                    concurrency_used_per_key[kernel.access_key].add(kernel.session_id)
-
         async def _recalc() -> None:
-            async with self.db.begin() as conn:
+            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
+                lambda: ResourceSlot({"cpu": 0, "mem": 0})
+            )
+
+            async with self.db.begin_session() as db_sess:
+                # Query running containers and calculate concurrency_used per AK and
+                # occupied_slots per agent.
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(
+                        (
+                            SessionRow.status.in_(
+                                {
+                                    *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                                    *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                                }
+                            )
+                        )
+                    )
+                    .options(
+                        load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
+                        selectinload(SessionRow.kernels).options(
+                            load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
+                        ),
+                    )
+                )
+                async for session_row in await db_sess.stream_scalars(session_query):
+                    for kernel in session_row.kernels:
+                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                            occupied_slots_per_agent[kernel.agent] += ResourceSlot(
+                                kernel.occupied_slots
+                            )
+                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                            if kernel.role in PRIVATE_KERNEL_ROLES:
+                                sftp_concurrency_used_per_key[session_row.access_key].add(
+                                    session_row.id
+                                )
+                            else:
+                                concurrency_used_per_key[session_row.access_key].add(session_row.id)
+
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
-                    for aid, slots in occupied_slots_per_agent.items():
-                        query = (
-                            sa.update(agents).values(occupied_slots=slots).where(agents.c.id == aid)
-                        )
-                        await conn.execute(query)
-                    # Update all other agents to have empty occupied_slots.
-                    query = (
-                        sa.update(agents)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(agents.c.status == AgentStatus.ALIVE)
-                        .where(sa.not_(agents.c.id.in_(occupied_slots_per_agent.keys())))
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .where(AgentRow.id == sa.bindparam("agent_id"))
+                            .values(occupied_slots=sa.bindparam("occupied_slots"))
+                        ),
+                        [
+                            {"agent_id": aid, "occupied_slots": slots}
+                            for aid, slots in occupied_slots_per_agent.items()
+                        ],
                     )
-                    await conn.execute(query)
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .values(occupied_slots=ResourceSlot({}))
+                            .where(AgentRow.status == AgentStatus.ALIVE)
+                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                        )
+                    )
                 else:
                     query = (
-                        sa.update(agents)
+                        sa.update(AgentRow)
                         .values(occupied_slots=ResourceSlot({}))
-                        .where(agents.c.status == AgentStatus.ALIVE)
+                        .where(AgentRow.status == AgentStatus.ALIVE)
                     )
-                    await conn.execute(query)
+                    await db_sess.execute(query)
 
         await execute_with_retry(_recalc)
 
@@ -1987,7 +2015,7 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        if do_fullscan:
+        if do_fullscan or not concurrency_used_per_key:
             await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
