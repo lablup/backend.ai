@@ -519,7 +519,7 @@ class SessionOp(str, enum.Enum):
     GET_AGENT_LOGS = "get_logs_from_agent"
 
 
-def _parse_data_to_update_status(
+def parse_data_to_update_status(
     status: SessionStatus | None = None,
     status_data: Mapping[str, Any] | None = None,
     reason: str | None = None,
@@ -859,7 +859,7 @@ class SessionRow(Base):
         reason: Optional[str] = None,
         status_changed_at: Optional[datetime] = None,
     ) -> None:
-        data = _parse_data_to_update_status(status, status_data, reason, status_changed_at)
+        data = parse_data_to_update_status(status, status_data, reason, status_changed_at)
 
         async def _update() -> None:
             async with db.begin_session() as db_sess:

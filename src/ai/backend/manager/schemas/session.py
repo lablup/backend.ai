@@ -4,8 +4,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from uuid import UUID
 
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 from pydantic import Field
+from sqlalchemy.orm import load_only, noload, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
@@ -18,11 +20,13 @@ from ai.backend.common.types import (
 )
 
 from ..exceptions import convert_to_status_data
+from ..models.kernel import KernelRow
 from ..models.session import (
     SESSION_STATUS_TRANSITION_MAP,
     SessionRow,
     SessionStatus,
     determine_session_status,
+    parse_data_to_update_status,
 )
 from ..models.utils import sql_json_increment, sql_json_merge
 from .base import (
@@ -370,15 +374,37 @@ class SessionMutation:
 
     @classmethod
     async def transit_status(cls, db: DBContext, session_id: SessionId) -> SessionRow | None:
-        session = await SessionRow.get_session_to_determine_status(db.sa_engine, session_id)
-        determined_status = determine_session_status(session.kernels)
-        if determined_status not in SESSION_STATUS_TRANSITION_MAP[session.status]:
-            return None
-
-        await SessionRow.set_status(
-            db.sa_engine,
-            (session_id,),
-            determined_status,
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.id == session_id)
+            .options(
+                noload("*"),
+                load_only(
+                    SessionRow.status,
+                    SessionRow.id,
+                    SessionRow.creation_id,
+                    SessionRow.name,
+                    SessionRow.access_key,
+                ),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"),
+                    load_only(
+                        KernelRow.status,
+                        KernelRow.cluster_role,
+                    ),
+                ),
+            )
         )
-        async with db.sa_engine.begin_readonly_session() as db_sess:
-            return await SessionRow.get_session_by_id(db_sess, session_id)
+
+        async with db.sa_engine.begin_session() as db_sess:
+            session: SessionRow = (await db_sess.scalars(stmt)).first()
+            determined_status = determine_session_status(session.kernels)
+            if determined_status not in SESSION_STATUS_TRANSITION_MAP[session.status]:
+                return None
+
+            data = parse_data_to_update_status(determined_status)
+
+            for key, val in data.items():
+                setattr(session, key, val)
+
+        return session
