@@ -1029,7 +1029,7 @@ class VirtualFolder(graphene.ObjectType):
             user=row["user"],
             user_email=row["users_email"] if "users_email" in row else None,
             group=row["group"],
-            group_name=row["groups_name"],
+            group_name=row["groups_name"] if "groups_name" in row else None,
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
@@ -1226,7 +1226,6 @@ class VirtualFolder(graphene.ObjectType):
         j = vfolders.join(
             vfolder_permissions,
             vfolders.c.id == vfolder_permissions.c.vfolder,
-            isouter=True,
         )
         query = (
             sa.select([sa.func.count()])
@@ -1258,23 +1257,18 @@ class VirtualFolder(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> list[VirtualFolder]:
-        from .group import groups
         from .user import users
 
-        j = (
-            vfolders.join(
-                vfolder_permissions,
-                vfolders.c.id == vfolder_permissions.c.vfolder,
-            )
-            .join(
-                users,
-                vfolders.c.user == users.c.uuid,
-                isouter=True,
-            )
-            .join(groups, vfolders.c.group == groups.c.id, isouter=True)
+        j = vfolders.join(
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+        ).join(
+            users,
+            vfolders.c.user == users.c.uuid,
+            isouter=True,
         )
         query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
+            sa.select([vfolders, users.c.email])
             .select_from(j)
             .where(
                 (vfolder_permissions.c.user == user_id)
