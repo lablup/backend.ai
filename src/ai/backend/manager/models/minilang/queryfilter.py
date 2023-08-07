@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Type, TypeAlias, Union
+import enum
+from typing import Any, Callable, Mapping, Type, TypeAlias, TypeVar, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -48,6 +49,21 @@ _parser = Lark(
 
 FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
+T_Enum = TypeVar("T_Enum", bound=enum.Enum)
+
+
+def enum_field_getter(enum_cls: Type[T_Enum]) -> Callable[[str], T_Enum]:
+    def get_enum(value: str) -> T_Enum:
+        for enum_name in (value, value.upper()):
+            try:
+                return enum_cls[enum_name]
+            except KeyError:
+                continue
+        else:
+            enum_names = ", ".join([e.name for e in enum_cls])
+            raise ValueError(f"expected one of `{enum_names}` or lower names; got `{value}`")
+
+    return get_enum
 
 
 class QueryFilterTransformer(Transformer):

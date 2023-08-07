@@ -47,7 +47,7 @@ from .base import (
     metadata,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
@@ -212,10 +212,8 @@ vfolders = sa.Table(
         nullable=False,
     ),
     sa.CheckConstraint(
-        (
-            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-            "(ownership_type = 'group' AND \"group\" IS NOT NULL)"
-        ),
+        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
         name="ownership_type_match_with_user_or_group",
     ),
     sa.CheckConstraint(
@@ -1061,15 +1059,27 @@ class VirtualFolder(graphene.ObjectType):
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "unmanaged_path": ("vfolders_unmanaged_path", None),
-        "usage_mode": ("vfolders_usage_mode", lambda s: VFolderUsageMode[s]),
-        "permission": ("vfolders_permission", lambda s: VFolderPermission[s]),
-        "ownership_type": ("vfolders_ownership_type", lambda s: VFolderOwnershipType[s]),
+        "usage_mode": (
+            "vfolders_usage_mode",
+            enum_field_getter(VFolderUsageMode),
+        ),
+        "permission": (
+            "vfolders_permission",
+            enum_field_getter(VFolderPermission),
+        ),
+        "ownership_type": (
+            "vfolders_ownership_type",
+            enum_field_getter(VFolderOwnershipType),
+        ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
         "created_at": ("vfolders_created_at", dtparse),
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
-        "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
+        "status": (
+            "vfolders_status",
+            enum_field_getter(VFolderOperationStatus),
+        ),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -1231,7 +1241,7 @@ class VirtualFolderPermission(graphene.ObjectType):
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "permission": ("vfolder_permissions_permission", lambda s: VFolderPermission[s]),
+        "permission": ("vfolder_permissions_permission", enum_field_getter(VFolderPermission)),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),
         "user": ("vfolder_permissions_user", None),

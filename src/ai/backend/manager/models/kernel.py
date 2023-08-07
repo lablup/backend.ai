@@ -74,7 +74,7 @@ from .base import (
 from .group import groups
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
-from .minilang.queryfilter import FieldSpecType, QueryFilterParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -379,7 +379,7 @@ kernels = sa.Table(
     KernelIDColumn(),
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
-    # Otherwise, it refers the kernel ID of the main contaienr of the belonged multi-container session.
+    # Otherwise, it refers the kernel ID of the main container of the belonged multi-container session.
     sa.Column(
         "session_id",
         SessionIDColumnType,
@@ -881,7 +881,7 @@ class ComputeContainer(graphene.ObjectType):
         "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
-        "status": ("status", lambda s: KernelStatus[s]),
+        "status": ("status", enum_field_getter(KernelStatus)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),

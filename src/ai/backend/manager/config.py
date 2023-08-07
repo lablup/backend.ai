@@ -205,6 +205,7 @@ from ai.backend.common.types import (
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
+from .models.session import SessionStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -325,6 +326,11 @@ _config_defaults: Mapping[str, Any] = {
     "watcher": {
         "token": None,
     },
+    "session": {
+        "hang-tolerance": {
+            "threshold": {},
+        },
+    },
 }
 
 container_registry_iv = t.Dict(
@@ -333,10 +339,26 @@ container_registry_iv = t.Dict(
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
         t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): t.Null | tx.StringList | t.List(t.String),
+        t.Key("project", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
         t.Key("ssl-verify", default=True): t.ToBool,
     }
 ).allow_extra("*")
+
+session_hang_tolerance_iv = t.Dict(
+    {
+        t.Key(
+            "threshold", default=_config_defaults["session"]["hang-tolerance"]["threshold"]
+        ): t.Dict(
+            {
+                t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
+                t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
+            }
+        ).ignore_extra(
+            "*"
+        ),
+    },
+)
+
 
 shared_config_iv = t.Dict(
     {
@@ -416,6 +438,13 @@ shared_config_iv = t.Dict(
             ).allow_extra("*")
             | t.Null
         ),
+        t.Key("session", default=_config_defaults["session"]): t.Dict(
+            {
+                t.Key(
+                    "hang-tolerance", default=_config_defaults["session"]["hang-tolerance"]
+                ): session_hang_tolerance_iv,
+            },
+        ).allow_extra("*"),
     }
 ).allow_extra("*")
 

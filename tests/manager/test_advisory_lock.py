@@ -34,10 +34,8 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
         rows = result.fetchall()
         print(rows)
         result = await conn.exec_driver_sql(
-            (
-                "SELECT objid, granted FROM pg_locks "
-                "WHERE locktype = 'advisory' AND objid = 42 AND granted = 't';"
-            ),
+            "SELECT objid, granted FROM pg_locks "
+            "WHERE locktype = 'advisory' AND objid = 42 AND granted = 't';",
         )
         rows = result.fetchall()
         assert len(rows) == 1
@@ -60,10 +58,8 @@ async def test_lock(database_engine: ExtendedAsyncSAEngine) -> None:
     # Check all tasks have unlocked.
     async with database_engine.connect() as conn:
         result = await conn.exec_driver_sql(
-            (
-                "SELECT objid, granted, pid FROM pg_locks "
-                "WHERE locktype = 'advisory' AND objid = 42 AND granted = 't';"
-            ),
+            "SELECT objid, granted, pid FROM pg_locks "
+            "WHERE locktype = 'advisory' AND objid = 42 AND granted = 't';",
         )
         rows = result.fetchall()
         print(rows)
