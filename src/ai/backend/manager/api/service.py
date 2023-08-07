@@ -237,6 +237,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
 
+        if not sgroup["wsproxy_api_token"]:
+            raise ServiceUnavailable("Scaling group not ready to start model service")
+
         params["config"]["scaling_group"] = checked_scaling_group
 
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
