@@ -1,0 +1,1 @@
+Attach the `X-BackendAI-SessionID` and `X-BackendAI-SSO` headers to the pipeline websocket proxy handler.
