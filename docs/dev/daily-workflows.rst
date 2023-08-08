@@ -467,7 +467,20 @@ Writing documentation
      >     --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
      >     --find-links=https://dist.backend.ai/pypi/simple/hiredis \
      >     --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
-     >     -r docs/requirements.txt
+     >     -r requirements.txt
+
+* You can build an API reference JSON file:
+
+  .. code-block:: console
+
+     $ ../py -m ai.backend.manager.openapi ./manager/rest-reference/openapi.json
+
+.. warning::
+
+   This script must be executed on behalf of the virtual environment
+   managed by pants, not by the venv for the sphinx.
+   Generated OpenAPI JSON file will be
+   located at under manager/rest-reference/openapi.json.
 
 * You can build the docs as follows:
 
@@ -479,10 +492,9 @@ Writing documentation
 
   .. code-block:: console
 
-     $ cd docs
      $ python -m http.server --directory=_build/html
 
-(TODO: Use Pants' own Sphinx support when `pantsbuild/pants#15512 <https://github.com/pantsbuild/pants/pull/15512>`_ is released.)
+(TODO: Use Pants' own Sphinx support when `pantsbuild/pants#18456 <https://github.com/pantsbuild/pants/issues/18456#issuecomment-1466964634>`_ is resolved.)
 
 
 Advanced Topics
