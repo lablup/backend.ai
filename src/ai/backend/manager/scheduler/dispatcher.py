@@ -587,6 +587,11 @@ class SchedulerDispatcher(aobject):
                     agent_id,
                     sess_ctx.requested_slots,
                 )
+                await SessionMutation.finalize_scheduled(
+                    self.db_ctx,
+                    sess_ctx.id,
+                    [KernelAgentBinding(sess_ctx.main_kernel, agent_alloc_ctx, set())],
+                )
         except InstanceNotAvailable as sched_failure:
             log.debug(log_fmt + "no-available-instances", *log_args)
 
@@ -606,15 +611,10 @@ class SchedulerDispatcher(aobject):
                 self.db_ctx.sa_engine, sess_ctx.id, e, self.local_config["debug"]["enabled"]
             )
             raise
-
-        await SessionMutation.finalize_scheduled(
-            self.db_ctx,
-            sess_ctx.id,
-            [KernelAgentBinding(sess_ctx.main_kernel, agent_alloc_ctx, set())],
-        )
-        await self.registry.event_producer.produce_event(
-            SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
-        )
+        else:
+            await self.registry.event_producer.produce_event(
+                SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
+            )
 
     async def _schedule_multi_node_session(
         self,
