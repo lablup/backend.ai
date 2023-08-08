@@ -26,7 +26,6 @@ from ..models.session import (
     SessionRow,
     SessionStatus,
     determine_session_status,
-    parse_data_to_update_status,
 )
 from ..models.utils import sql_json_increment, sql_json_merge
 from .base import (
@@ -402,9 +401,6 @@ class SessionMutation:
             if determined_status not in SESSION_STATUS_TRANSITION_MAP[session.status]:
                 return None
 
-            data = parse_data_to_update_status(determined_status)
-
-            for key, val in data.items():
-                setattr(session, key, val)
+            session.set_status_through_orm(determined_status)
 
         return session

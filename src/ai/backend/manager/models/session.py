@@ -868,6 +868,33 @@ class SessionRow(Base):
 
         await execute_with_retry(_update)
 
+    def set_status_through_orm(
+        self,
+        status: SessionStatus | None = None,
+        status_data: Mapping[str, Any] | None = None,
+        reason: str | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        if status_changed_at is None:
+            now = datetime.now(tzutc())
+        else:
+            now = status_changed_at
+        if status is not None:
+            self.status = status
+            self.status_history = sql_json_merge(
+                SessionRow.status_history,
+                (),
+                {
+                    status.name: datetime.now(tzutc()).isoformat(),
+                },
+            )
+        if status_data is not None:
+            self.status_data = status_data
+        if reason is not None:
+            self.status_info = reason
+        if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+            self.terminated_at = now
+
     @staticmethod
     async def get_session_to_determine_status(
         db: ExtendedAsyncSAEngine,
