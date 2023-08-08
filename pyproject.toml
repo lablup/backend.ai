@@ -72,10 +72,12 @@ implicit_optional = true  # FIXME: remove after adding https://github.com/haunts
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.10.9/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.11.4/bin/python"
+disable_error_code = ["typeddict-unknown-key"]
 
 [tool.black]
 line-length = 100
+preview = true
 
 [tool.isort]
 profile = "black"

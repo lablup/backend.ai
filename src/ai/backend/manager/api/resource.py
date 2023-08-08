@@ -9,7 +9,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Tuple
 
 import aiohttp
 import aiohttp_cors
@@ -76,7 +76,7 @@ async def list_presets(request: web.Request) -> web.Response:
         # if scaling_group is not None:
         #     query = query.where(resource_presets.c.scaling_group == scaling_group)
         resp: MutableMapping[str, Any] = {"presets": []}
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
             resp["presets"].append(
                 {
@@ -217,7 +217,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 & (SessionRow.scaling_group_name.in_(sgroup_names)),
             )
         )
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
@@ -230,7 +230,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             )
         )
         agent_slots = []
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             remaining = row["available_slots"] - row["occupied_slots"]
             remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
             sgroup_remaining += remaining
@@ -250,7 +250,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 
         # Fetch all resource presets in the current scaling group.
         query = sa.select([resource_presets]).select_from(resource_presets)
-        async for row in (await conn.stream(query)):
+        async for row in await conn.stream(query):
             # Check if there are any agent that can allocate each preset.
             allocatable = False
             preset_slots = row["resource_slots"].normalize_slots(ignore_unknown=True)
@@ -262,9 +262,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 {
                     "name": row["name"],
                     "resource_slots": preset_slots.to_json(),
-                    "shared_memory": str(row["shared_memory"])
-                    if row["shared_memory"] is not None
-                    else None,
+                    "shared_memory": (
+                        str(row["shared_memory"]) if row["shared_memory"] is not None else None
+                    ),
                     "allocatable": allocatable,
                 }
             )
@@ -429,7 +429,7 @@ async def get_container_stats_for_period(
             "mem_used": int(nmget(last_stat, "mem.capacity", 0)),
             "shared_memory": int(nmget(row.resource_opts, "shmem", 0)),
             "disk_allocated": 0,  # TODO: disk quota limit
-            "disk_used": (int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))),
+            "disk_used": int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
             "io_read": int(nmget(last_stat, "io_read.current", 0)),
             "io_write": int(nmget(last_stat, "io_write.current", 0)),
             "used_time": used_time,
@@ -584,12 +584,20 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     """
     # Get all or user kernels for the last month from DB.
     time_window = 900  # 15 min
+    stat_length = 2880  # 15 * 4 * 24 * 30
     now = datetime.now(tzutc())
     start_date = now - timedelta(days=30)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([kernels])
+            sa.select(
+                [
+                    kernels.c.id,
+                    kernels.c.created_at,
+                    kernels.c.terminated_at,
+                    kernels.c.occupied_slots,
+                ]
+            )
             .select_from(kernels)
             .where(
                 (kernels.c.terminated_at >= start_date)
@@ -603,76 +611,87 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         rows = result.fetchall()
 
     # Build time-series of time-binned stats.
-    now_ts = now.timestamp()
     start_date_ts = start_date.timestamp()
-    ts = start_date_ts
-    tseries = []
-    # Iterate over each time window.
-    while ts < now_ts:
-        # Initialize the time-binned stats.
-        num_sessions = 0
-        cpu_allocated = 0
-        mem_allocated = 0
-        gpu_allocated = Decimal(0)
-        io_read_bytes = 0
-        io_write_bytes = 0
-        disk_used = 0
-        # Accumulate stats for containers overlapping with this time window.
-        for row in rows:
-            if (
-                ts + time_window <= row.created_at.timestamp()
-                or ts >= row.terminated_at.timestamp()
-            ):
-                continue
-            num_sessions += 1
-            cpu_allocated += int(row.occupied_slots.get("cpu", 0))
-            mem_allocated += int(row.occupied_slots.get("mem", 0))
-            if "cuda.devices" in row.occupied_slots:
-                gpu_allocated += int(row.occupied_slots["cuda.devices"])
-            if "cuda.shares" in row.occupied_slots:
-                gpu_allocated += Decimal(row.occupied_slots["cuda.shares"])
-            raw_stat = await redis_helper.execute(
-                root_ctx.redis_stat, lambda r: r.get(str(row["id"]))
-            )
-            if raw_stat:
-                last_stat = msgpack.unpackb(raw_stat)
-                io_read_bytes += int(nmget(last_stat, "io_read.current", 0))
-                io_write_bytes += int(nmget(last_stat, "io_write.current", 0))
-                disk_used += int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))
-        stat = {
-            "date": ts,
+    time_series_list: list[dict[str, Any]] = [
+        {
+            "date": start_date_ts + (idx * time_window),
             "num_sessions": {
-                "value": num_sessions,
+                "value": 0,
                 "unit_hint": "count",
             },
             "cpu_allocated": {
-                "value": cpu_allocated,
+                "value": 0,
                 "unit_hint": "count",
             },
             "mem_allocated": {
-                "value": mem_allocated,
+                "value": 0,
                 "unit_hint": "bytes",
             },
             "gpu_allocated": {
-                "value": float(gpu_allocated),
+                "value": 0,
                 "unit_hint": "count",
             },
             "io_read_bytes": {
-                "value": io_read_bytes,
+                "value": 0,
                 "unit_hint": "bytes",
             },
             "io_write_bytes": {
-                "value": io_write_bytes,
+                "value": 0,
                 "unit_hint": "bytes",
             },
             "disk_used": {
-                "value ": disk_used,
+                "value": 0,
                 "unit_hint": "bytes",
             },
         }
-        tseries.append(stat)
-        ts += time_window
-    return tseries
+        for idx in range(stat_length)
+    ]
+
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
+        pipe = r.pipeline()
+        for row in rows:
+            await pipe.get(str(row["id"]))
+        return pipe
+
+    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+
+    for row, raw_stat in zip(rows, raw_stats):
+        if raw_stat is not None:
+            last_stat = msgpack.unpackb(raw_stat)
+            io_read_byte = int(nmget(last_stat, "io_read.current", 0))
+            io_write_byte = int(nmget(last_stat, "io_write.current", 0))
+            disk_used = int(nmget(last_stat, "io_scratch_size.stats.max", 0, "/"))
+        else:
+            io_read_byte = 0
+            io_write_byte = 0
+            disk_used = 0
+
+        occupied_slots: Mapping[str, Any] = row.occupied_slots
+        kernel_created_at: float = row.created_at.timestamp()
+        kernel_terminated_at: float = row.terminated_at.timestamp()
+        cpu_value = int(occupied_slots.get("cpu", 0))
+        mem_value = int(occupied_slots.get("mem", 0))
+        cuda_device_value = int(occupied_slots.get("cuda.devices", 0))
+        cuda_share_value = Decimal(occupied_slots.get("cuda.shares", 0))
+
+        start_index = int((kernel_created_at - start_date_ts) // time_window)
+        end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
+        if start_index < 0:
+            start_index = 0
+        for time_series in time_series_list[start_index:end_index]:
+            time_series["num_sessions"]["value"] += 1
+            time_series["cpu_allocated"]["value"] += cpu_value
+            time_series["mem_allocated"]["value"] += mem_value
+            time_series["gpu_allocated"]["value"] += cuda_device_value
+            time_series["gpu_allocated"]["value"] += cuda_share_value
+            time_series["io_read_bytes"]["value"] += io_read_byte
+            time_series["io_write_bytes"]["value"] += io_write_byte
+            time_series["disk_used"]["value"] += disk_used
+
+    # Change Decimal type to float to serialize to JSON
+    for time_series in time_series_list:
+        time_series["gpu_allocated"]["value"] = float(time_series["gpu_allocated"]["value"])
+    return time_series_list
 
 
 @server_status_required(READ_ALLOWED)
@@ -833,6 +852,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4,)
+    app["prefix"] = "resource"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))

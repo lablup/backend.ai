@@ -249,7 +249,7 @@ class CPUPlugin(AbstractComputePlugin):
         per_container_cpu_util = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, cpu_used in zip(container_ids, results):
             if cpu_used is None:
@@ -281,7 +281,7 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[ProcessMeasurement]:
         async def psutil_impl(pid: int) -> Optional[Decimal]:
             try:
-                p = await asyncio.get_running_loop().run_in_executor(None, psutil.Process, pid)
+                p = psutil.Process(pid)
             except psutil.NoSuchProcess:
                 log.warning("psutil cannot found process {0}", pid)
             else:
@@ -308,7 +308,7 @@ class CPUPlugin(AbstractComputePlugin):
                         cid_pids_map[cid] = []
                     cid_pids_map[cid].append(pid)
                 for cid, pids in cid_pids_map.items():
-                    api_tasks.append(asyncio.ensure_future(api_impl(cid, pids)))
+                    api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
                 results = []
                 for chunk in chunked_results:
@@ -316,7 +316,7 @@ class CPUPlugin(AbstractComputePlugin):
             case _:
                 psutil_tasks = []
                 for pid, _ in pid_map_list:
-                    psutil_tasks.append(asyncio.ensure_future(psutil_impl(pid)))
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, cid), cpu_used in zip(pid_map_list, results):
@@ -583,7 +583,13 @@ class MemoryPlugin(AbstractComputePlugin):
                 match version:
                     case "1":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
-                        io_stats = (io_path / "blkio.throttle.io_service_bytes").read_text()
+
+                        for line in (mem_path / "memory.stat").read_text().splitlines():
+                            key, value = line.split(" ")
+                            if key == "total_inactive_file":
+                                mem_cur_bytes -= int(value)
+                                break
+
                         # example data:
                         #   8:0 Read 13918208
                         #   8:0 Write 0
@@ -591,7 +597,9 @@ class MemoryPlugin(AbstractComputePlugin):
                         #   8:0 Async 13918208
                         #   8:0 Total 13918208
                         #   Total 13918208
-                        for line in io_stats.splitlines():
+                        for line in (
+                            (io_path / "blkio.throttle.io_service_bytes").read_text().splitlines()
+                        ):
                             if line.startswith("Total "):
                                 continue
                             dev, op, nbytes = line.strip().split()
@@ -601,11 +609,17 @@ class MemoryPlugin(AbstractComputePlugin):
                                 io_write_bytes += int(nbytes)
                     case "2":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
-                        lines = (io_path / "io.stat").read_text().splitlines()
+
+                        for line in (mem_path / "memory.stat").read_text().splitlines():
+                            key, value = line.split(" ")
+                            if key == "inactive_file":
+                                mem_cur_bytes -= int(value)
+                                break
+
                         # example data:
                         # 8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
                         # 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
-                        for line in lines:
+                        for line in (io_path / "io.stat").read_text().splitlines():
                             for io_stat in line.split()[1:]:
                                 stat, value = io_stat.split("=")
                                 if stat == "rbytes":
@@ -691,7 +705,7 @@ class MemoryPlugin(AbstractComputePlugin):
         per_container_io_scratch_size = {}
         tasks = []
         for cid in container_ids:
-            tasks.append(asyncio.ensure_future(impl(cid)))
+            tasks.append(asyncio.create_task(impl(cid)))
         results = await asyncio.gather(*tasks)
         for cid, result in zip(container_ids, results):
             if result is None:
@@ -786,7 +800,7 @@ class MemoryPlugin(AbstractComputePlugin):
                         cid_pids_map[cid] = []
                     cid_pids_map[cid].append(pid)
                 for cid, pids in cid_pids_map.items():
-                    api_tasks.append(asyncio.ensure_future(api_impl(cid, pids)))
+                    api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
                 results = []
                 for chunk in chunked_results:
@@ -794,7 +808,7 @@ class MemoryPlugin(AbstractComputePlugin):
             case _:
                 psutil_tasks = []
                 for pid, _ in pid_map_list:
-                    psutil_tasks.append(asyncio.ensure_future(psutil_impl(pid)))
+                    psutil_tasks.append(asyncio.create_task(psutil_impl(pid)))
                 results = await asyncio.gather(*psutil_tasks)
 
         for (pid, _), result in zip(pid_map_list, results):

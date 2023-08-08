@@ -66,11 +66,6 @@ REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
 
 
-# Redis database IDs used for plugins
-class PluginDatabaseID(enum.IntEnum):
-    SESSION_EVENT = 1
-
-
 # The unique identifiers for distributed locks.
 # To be used with PostgreSQL advisory locks, the values are defined as integers.
 class LockID(enum.IntEnum):
@@ -79,5 +74,6 @@ class LockID(enum.IntEnum):
     LOCKID_PREPARE = 92
     LOCKID_SCHEDULE_TIMER = 191
     LOCKID_PREPARE_TIMER = 192
+    LOCKID_SCALE_TIMER = 193
     LOCKID_LOG_CLEANUP_TIMER = 195
     LOCKID_IDLE_CHECK_TIMER = 196

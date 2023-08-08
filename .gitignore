@@ -63,6 +63,7 @@ docs/_build/
 
 # pyenv
 .python-version
+.python-runtime
 
 # celery beat schedule file
 celerybeat-schedule
@@ -78,13 +79,16 @@ ENV/
 
 # IDE/vim
 .idea
-*.swp
-*.swo
+.swp
+.swo
+.*.swp
+.*.swo
 .vscode/
+.vim/
 /.vimrc
 /.nvimrc
 /.exrc
-.vim/
+.ripgreprc
 
 # Pants
 /.pants.d/
@@ -100,13 +104,16 @@ ENV/
 /storage-proxy.toml
 /webserver.conf
 /cuda-mock.toml
+/mock-accelerator.toml
 /.pants.env
 /.pants.bootstrap
+/.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
+/agent.dummy.toml
 
 # Local temp
 /.tmp/
@@ -115,6 +122,7 @@ ENV/
 /vfroot/
 /*.pid
 /scratches/
+logs/
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -124,3 +132,7 @@ ENV/
 
 # macOS specific
 .DS_Store
+._.DS_Store
+
+# Generated files
+docs/manager/rest-reference/openapi.json

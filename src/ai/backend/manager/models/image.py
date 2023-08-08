@@ -569,7 +569,7 @@ class Image(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars.all()]
+            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
 
     @classmethod
     async def batch_load_by_image_ref(

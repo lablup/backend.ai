@@ -206,6 +206,7 @@ class GPFSAPIClient:
                 f"/filesystems/{fs_name}/filesets/{fileset_name}/quotas?{query}",
             )
             data = await response.json()
+            log.debug("response: {}", data)
         return [GPFSQuota.from_dict(quota_info) for quota_info in data["quotas"]]
 
     @error_handler
@@ -213,13 +214,9 @@ class GPFSAPIClient:
         self,
         fs_name: str,
         fileset_name: str,
-        limit: BinarySize,
+        limit_bytes: int,
     ) -> None:
-        ss = str(limit)
-        if ss.endswith("bytes"):
-            limit_str = ss.replace("bytes", "B")
-        limit_str = ss.replace(" ", "").replace("iB", "")
-
+        limit_str = str(limit_bytes)
         body = {
             "operationType": "setQuota",
             "quotaType": GPFSQuotaType.FILESET,
@@ -227,7 +224,6 @@ class GPFSAPIClient:
             "blockSoftLimit": limit_str,
             "blockHardLimit": limit_str,
         }
-
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,

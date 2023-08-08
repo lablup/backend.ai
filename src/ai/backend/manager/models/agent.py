@@ -13,7 +13,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.expression import true
+from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
@@ -33,8 +33,8 @@ from .base import (
 from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .keypair import keypairs
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .scaling_group import query_allowed_sgroups
 from .user import UserRole, users
 
@@ -83,11 +83,19 @@ agents = sa.Table(
     sa.Column("available_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("addr", sa.String(length=128), nullable=False),
+    sa.Column("public_host", sa.String(length=256), nullable=True),
     sa.Column("first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("version", sa.String(length=64), nullable=False),
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
+    sa.Column(
+        "auto_terminate_abusing_kernel",
+        sa.Boolean(),
+        nullable=False,
+        server_default=false(),
+        default=False,
+    ),
 )
 
 
@@ -130,6 +138,7 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
+    auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
 
     # Legacy fields
@@ -170,6 +179,7 @@ class Agent(graphene.ObjectType):
             lost_at=row["lost_at"],
             version=row["version"],
             compute_plugins=row["compute_plugins"],
+            auto_terminate_abusing_kernel=row["auto_terminate_abusing_kernel"],
             # legacy fields
             mem_slots=BinarySize.from_str(row["available_slots"]["mem"]) // mega,
             cpu_slots=row["available_slots"]["cpu"],
@@ -222,15 +232,16 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
-    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
-        if self.status != AgentStatus.ALIVE.name:
-            return None
-        graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        return {
+            "agent": {
+                "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,
+            },
+        }
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", lambda s: AgentStatus[s]),
+        "status": ("status", enum_field_getter(AgentStatus)),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -241,18 +252,18 @@ class Agent(graphene.ObjectType):
         "version": ("version", None),
     }
 
-    _queryorder_colmap = {
-        "id": "id",
-        "status": "status",
-        "status_changed": "status_changed",
-        "region": "region",
-        "scaling_group": "scaling_group",
-        "schedulable": "schedulable",
-        "first_contact": "first_contact",
-        "lost_at": "lost_at",
-        "version": "version",
-        "available_slots": "available_slots",
-        "occupied_slots": "occupied_slots",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "status": ("status", None),
+        "status_changed": ("status_changed", None),
+        "region": ("region", None),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulable", None),
+        "first_contact": ("first_contact", None),
+        "lost_at": ("lost_at", None),
+        "version": ("version", None),
+        "available_slots": ("available_slots", None),
+        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -454,20 +465,20 @@ class AgentSummary(graphene.ObjectType):
             architecture=row["architecture"],
         )
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", lambda s: AgentStatus[s]),
+        "status": ("status", enum_field_getter(AgentStatus)),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulabe", None),
     }
 
-    _queryorder_colmap = {
-        "id": "id",
-        "status": "status",
-        "scaling_group": "scaling_group",
-        "schedulable": "schedulable",
-        "available_slots": "available_slots",
-        "occupied_slots": "occupied_slots",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "status": ("status", None),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulable", None),
+        "available_slots": ("available_slots", None),
+        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
