@@ -1243,12 +1243,12 @@ class VirtualFolder(graphene.ObjectType):
     async def batch_load_by_id(
         cls,
         graph_ctx: GraphQueryContext,
-        ids: Sequence[str],
+        ids: list[str],
         *,
         user_uuid: uuid.UUID,
         user_role: UserRole | None,
         domain_name: str | None,
-    ) -> Sequence[VirtualFolder | None]:
+    ) -> list[VirtualFolder | None]:
         vfolders = []
         async with graph_ctx.db.begin_readonly() as conn:
             for vid in ids:
