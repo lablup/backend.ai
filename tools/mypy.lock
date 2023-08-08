@@ -9,7 +9,7 @@
 //     "CPython==3.11.4"
 //   ],
 //   "generated_with_requirements": [
-//     "mypy==1.3.0"
+//     "mypy==1.4.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -31,33 +31,33 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a8763e72d5d9574d45ce5881962bc8e9046bf7b375b0abf031f3e6811732a897",
-              "url": "https://files.pythonhosted.org/packages/e3/f7/1fed3b24abb75f244fa6bc60ea03cd9d3d8ad225a4cfda7533042fe6d831/mypy-1.3.0-py3-none-any.whl"
+              "hash": "45d32cec14e7b97af848bddd97d85ea4f0db4d5a149ed9676caa4eb2f7402bb4",
+              "url": "https://files.pythonhosted.org/packages/3d/9a/e13addb8d652cb068f835ac2746d9d42f85b730092f581bb17e2059c28f1/mypy-1.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6e33bb8b2613614a33dff70565f4c803f889ebd2f859466e42b46e1df76018dd",
-              "url": "https://files.pythonhosted.org/packages/25/c7/4735f81858a727e170279144600881fe3299aa7589ed585af6b788ea4556/mypy-1.3.0-cp311-cp311-macosx_10_9_x86_64.whl"
+              "hash": "8207b7105829eca6f3d774f64a904190bb2231de91b8b186d21ffd98005f14a7",
+              "url": "https://files.pythonhosted.org/packages/66/f4/60739a2d336f3adf5628e7c9b920d16e8af6dc078550d615e4ba2a1d7759/mypy-1.4.1-cp311-cp311-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7d23370d2a6b7a71dc65d1266f9a34e4cde9e8e21511322415db4b26f46f6b8c",
-              "url": "https://files.pythonhosted.org/packages/6a/d0/4681d84878cecfd911752016ab30566366f6de7296fdc977b746eb68bf45/mypy-1.3.0-cp311-cp311-macosx_11_0_arm64.whl"
+              "hash": "141dedfdbfe8a04142881ff30ce6e6653c9685b354876b12e4fe6c78598b45e2",
+              "url": "https://files.pythonhosted.org/packages/73/72/dfc0b46e6905eafd598e7c48c0c4f2e232647e4e36547425c64e6c850495/mypy-1.4.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6e42d29e324cdda61daaec2336c42512e59c7c375340bd202efa1fe0f7b8f8ca",
-              "url": "https://files.pythonhosted.org/packages/6a/d9/48de5203f4b6287a98fadcc47072b1bc69e3faaa39cba59a3a600b05a42c/mypy-1.3.0-cp311-cp311-musllinux_1_1_x86_64.whl"
+              "hash": "98324ec3ecf12296e6422939e54763faedbfcc502ea4a4c38502082711867258",
+              "url": "https://files.pythonhosted.org/packages/92/58/ccc0b714ecbd1a64b34d8ce1c38763ff6431de1d82551904ecc3711fbe05/mypy-1.4.1-cp311-cp311-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "658fe7b674769a0770d4b26cb4d6f005e88a442fe82446f020be8e5f5efb2fae",
-              "url": "https://files.pythonhosted.org/packages/88/0e/646696eb8fe7658b752009a495054a0214ae8e659e9cbcde8181f16ae999/mypy-1.3.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "7549fbf655e5825d787bbc9ecf6028731973f78088fbca3a1f4145c39ef09462",
+              "url": "https://files.pythonhosted.org/packages/94/01/e34e37a044325af4d4af9825c15e8a0d26d89b5a9624b4d0908449d3411b/mypy-1.4.1-cp311-cp311-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e1f4d16e296f5135624b34e8fb741eb0eadedca90862405b1f1fde2040b9bd11",
-              "url": "https://files.pythonhosted.org/packages/f9/88/3bfe07521fb9e74b449cbc4367434067ec70bfd8a24c652fa3e0f9597389/mypy-1.3.0.tar.gz"
+              "hash": "9bbcd9ab8ea1f2e1c8031c21445b511442cc45c89951e49bbf852cbb70755b1b",
+              "url": "https://files.pythonhosted.org/packages/b3/28/d8a8233ff167d06108e53b7aefb4a8d7350adbbf9d7abd980f17fdb7a3a6/mypy-1.4.1.tar.gz"
             }
           ],
           "project_name": "mypy",
@@ -69,10 +69,10 @@
             "tomli>=1.1.0; python_version < \"3.11\"",
             "typed-ast<2,>=1.4.0; extra == \"python2\"",
             "typed-ast<2,>=1.4.0; python_version < \"3.8\"",
-            "typing-extensions>=3.10"
+            "typing-extensions>=4.1.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.3.0"
+          "version": "1.4.1"
         },
         {
           "artifacts": [
@@ -119,7 +119,7 @@
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "mypy==1.3.0"
+    "mypy==1.4.1"
   ],
   "requires_python": [
     "==3.11.4"
