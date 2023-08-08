@@ -11,7 +11,6 @@ import ssl
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -37,13 +36,15 @@ from setproctitle import setproctitle
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
+from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
     BackendError,
@@ -53,20 +54,13 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.manager import ManagerStatus
 from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
-from .idle import init_idle_checkers
-from .models.storage import StorageSessionManager
-from .models.utils import connect_database
-from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-from .plugin.webapp import WebappPluginContext
-from .registry import AgentRegistry
-from .scheduler.dispatcher import SchedulerDispatcher
+from .models import SessionRow
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -101,6 +95,12 @@ VALID_VERSIONS: Final = frozenset(
         "v6.20220315",
         # added payload encryption / decryption on selected transfer
         "v6.20220615",
+        # added config/resource-slots/details, model mgmt & serving APIs
+        "v6.20230315",
+        # added quota scopes (per-user/per-project quota configs)
+        # added user & project resource policies
+        # deprecated per-vfolder quota configs (BREAKING)
+        "v7.20230615",
     ]
 )
 LATEST_REV_DATES: Final = {
@@ -109,11 +109,12 @@ LATEST_REV_DATES: Final = {
     3: "20181215",
     4: "20190615",
     5: "20191215",
-    6: "20220615",
+    6: "20230315",
+    7: "20230615",
 }
-LATEST_API_VERSION: Final = "v6.20220615"
+LATEST_API_VERSION: Final = "v7.20230615"
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PUBLIC_INTERFACES: Final = [
     "pidx",
@@ -136,6 +137,29 @@ PUBLIC_INTERFACES: Final = [
 ]
 
 public_interface_objs: MutableMapping[str, Any] = {}
+
+global_subapp_pkgs: Final[list[str]] = [
+    ".acl",
+    ".etcd",
+    ".events",
+    ".auth",
+    ".ratelimit",
+    ".vfolder",
+    ".admin",
+    ".service",
+    ".session",
+    ".stream",
+    ".manager",
+    ".resource",
+    ".scaling_group",
+    ".cluster_template",
+    ".session_template",
+    ".image",
+    ".userconfig",
+    ".domainconfig",
+    ".groupconfig",
+    ".logs",
+]
 
 
 async def hello(request: web.Request) -> web.Response:
@@ -259,9 +283,14 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
+    from .plugin.webapp import WebappPluginContext
+
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    await plugin_ctx.init()
+    await plugin_ctx.init(
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
     root_ctx.webapp_plugin_ctx = plugin_ctx
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if root_ctx.pidx == 0:
@@ -327,6 +356,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.utils import connect_database
+
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
@@ -358,6 +389,8 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .idle import init_idle_checkers
+
     root_ctx.idle_checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.shared_config,
@@ -372,6 +405,8 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.storage import StorageSessionManager
+
     raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
     config = volume_config_iv.check(raw_vol_config)
     root_ctx.storage_manager = StorageSessionManager(config)
@@ -383,7 +418,10 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
-    await ctx.init()
+    await ctx.init(
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
     hook_result = await ctx.dispatch(
         "ACTIVATE_MANAGER",
         (),
@@ -397,7 +435,10 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .registry import AgentRegistry
+
     root_ctx.registry = AgentRegistry(
+        root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.db,
         root_ctx.redis_stat,
@@ -407,6 +448,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        debug=root_ctx.local_config["debug"]["enabled"],
     )
     await root_ctx.registry.init()
     yield
@@ -415,6 +457,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .scheduler.dispatcher import SchedulerDispatcher
+
     sched_dispatcher = await SchedulerDispatcher.new(
         root_ctx.local_config,
         root_ctx.shared_config,
@@ -429,12 +473,17 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+
     ectx = ManagerErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     init_success = False
     try:
-        await ectx.init(context={"_root.context": root_ctx})
-        await sctx.init()
+        await ectx.init(
+            context={"_root.context": root_ctx},
+            allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        )
+        await sctx.init(allowlist=root_ctx.local_config["manager"]["allowed-plugins"])
     except Exception:
         log.error("Failed to initialize monitoring plugins")
     else:
@@ -445,6 +494,116 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if init_success:
         await sctx.cleanup()
         await ectx.cleanup()
+
+
+@actxmgr
+async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from contextlib import suppress
+    from datetime import timedelta
+    from typing import TYPE_CHECKING
+
+    import sqlalchemy as sa
+    from dateutil.relativedelta import relativedelta
+    from dateutil.tz import tzutc
+    from sqlalchemy.orm import load_only, noload
+
+    from .config import session_hang_tolerance_iv
+    from .models.session import SessionStatus
+
+    if TYPE_CHECKING:
+        from .models.utils import ExtendedAsyncSAEngine
+
+    async def _fetch_hanging_sessions(
+        db: ExtendedAsyncSAEngine,
+        status: SessionStatus,
+        threshold: relativedelta | timedelta,
+    ) -> tuple[SessionRow, ...]:
+        query = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == status)
+            .where(
+                (
+                    datetime.now(tz=tzutc())
+                    - SessionRow.status_history[status.name].astext.cast(
+                        sa.types.DateTime(timezone=True)
+                    )
+                )
+                > threshold
+            )
+            .options(
+                noload("*"),
+                load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
+            )
+        )
+        async with db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.fetchall()
+
+    async def _force_terminate_hanging_sessions(
+        status: SessionStatus,
+        threshold: relativedelta | timedelta,
+        interval: float,
+    ) -> None:
+        try:
+            sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.error("fetching hanging sessions error: {}", repr(e), exc_info=e)
+            return
+
+        log.debug(f"{len(sessions)} {status.name} sessions found.")
+
+        results_and_exceptions = await asyncio.gather(
+            *[
+                asyncio.create_task(
+                    root_ctx.registry.destroy_session(
+                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
+                    ),
+                )
+                for session in sessions
+            ],
+            return_exceptions=True,
+        )
+        for result_or_exception in results_and_exceptions:
+            if isinstance(result_or_exception, (BaseException, Exception)):
+                log.error(
+                    "hanging session force-termination error: {}",
+                    repr(result_or_exception),
+                    exc_info=result_or_exception,
+                )
+
+    session_hang_tolerance = session_hang_tolerance_iv.check(
+        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
+    )
+
+    session_force_termination_tasks = []
+    heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
+    max_interval = timedelta(hours=1).total_seconds()
+    threshold: relativedelta | timedelta
+    for status, threshold in session_hang_tolerance["threshold"].items():
+        try:
+            session_status = SessionStatus[status]
+        except KeyError:
+            continue
+        if isinstance(threshold, relativedelta):  # years, months
+            interval = max_interval
+        else:  # timedelta
+            interval = min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
+        session_force_termination_tasks.append(
+            aiotools.create_timer(
+                functools.partial(_force_terminate_hanging_sessions, session_status, threshold),
+                interval,
+            )
+        )
+
+    yield
+
+    for task in session_force_termination_tasks:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 class background_task_ctx:
@@ -496,7 +655,9 @@ def _init_subapp(
 
     # We must copy the public interface prior to all user-defined startup signal handlers.
     subapp.on_startup.insert(0, _set_root_ctx)
-    prefix = subapp.get("prefix", pkg_name.split(".")[-1].replace("_", "-"))
+    if "prefix" not in subapp:
+        subapp["prefix"] = pkg_name.split(".")[-1].replace("_", "-")
+    prefix = subapp["prefix"]
     root_app.add_subapp("/" + prefix, subapp)
     root_app.middlewares.extend(global_middlewares)
 
@@ -596,6 +757,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
+            hanging_session_scanner_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -643,42 +805,32 @@ async def server_main(
     pidx: int,
     _args: List[Any],
 ) -> AsyncIterator[None]:
-    subapp_pkgs = [
-        ".etcd",
-        ".events",
-        ".auth",
-        ".ratelimit",
-        ".vfolder",
-        ".admin",
-        ".session",
-        ".stream",
-        ".manager",
-        ".resource",
-        ".scaling_group",
-        ".cluster_template",
-        ".session_template",
-        ".image",
-        ".userconfig",
-        ".domainconfig",
-        ".groupconfig",
-        ".logs",
-    ]
-    root_app = build_root_app(pidx, _args[0], subapp_pkgs=subapp_pkgs)
+    root_app = build_root_app(pidx, _args[0], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
-    # Port is set by config (default=50001).
+    # Port is set by config (default=50100 + pidx).
+    loop.set_debug(root_ctx.local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
         port=root_ctx.local_config["manager"]["aiomonitor-port"] + pidx,
         console_enabled=False,
+        hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
-    m.start()
+    # Add some useful console_locals for ease of debugging
+    m.console_locals["root_app"] = root_app
+    m.console_locals["root_ctx"] = root_ctx
+    aiomon_started = False
+    try:
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     # Plugin webapps should be loaded before runner.setup(),
     # which freezes on_startup event.
-    with closing(m):
+    try:
         async with (
             shared_config_ctx(root_ctx),
             webapp_plugin_ctx(root_app),
@@ -720,6 +872,9 @@ async def server_main(
             finally:
                 log.info("shutting down...")
                 await runner.cleanup()
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @actxmgr
@@ -751,15 +906,27 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
+def main(
+    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> None:
     """
     Start the manager service as a foreground process.
     """
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
-    cfg = load_config(config_path, debug)
+    cfg = load_config(config_path, log_level.value)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

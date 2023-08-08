@@ -192,7 +192,7 @@ msgstr ""
 #: 95cd0735a0cb479bb20ff3d89edc7a72
 msgid ""
 "```console $ sed -i'' -e 's!^sqlalchemy.url = .*$!sqlalchemy.url = "
-"postgresql://{DBUSER}:{DBPASS}@{DBHOST}:{DBPORT}/backend!' alembic.ini ```"
+"postgresql+asyncpg://{DBUSER}:{DBPASS}@{DBHOST}:{DBPORT}/backend!' alembic.ini ```"
 msgstr ""
 
 #: ../../install/_archive/prepare-database-for-manager.md:90

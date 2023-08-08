@@ -1,10 +1,10 @@
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import keypair_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = "KeypairResourcePolicy"
 
@@ -47,22 +47,20 @@ class KeypairResourcePolicy(BaseFunction):
         cls,
         name: str,
         default_for_unspecified: int,
-        total_resource_slots: int,
+        total_resource_slots: str,
         max_session_lifetime: int,
         max_concurrent_sessions: int,
         max_containers_per_session: int,
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
-        allowed_vfolder_hosts: Sequence[str],
-        fields: Iterable[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = ("name",)
         q = (
             "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
             + "  create_keypair_resource_policy(name: $name, props: $input) {"
@@ -70,7 +68,10 @@ class KeypairResourcePolicy(BaseFunction):
             "  }"
             "}"
         )
-        q = q.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(
+            fields, keypair_resource_policy_fields, (keypair_resource_policy_fields["name"],)
+        )
+        q = q.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -94,14 +95,14 @@ class KeypairResourcePolicy(BaseFunction):
         cls,
         name: str,
         default_for_unspecified: int,
-        total_resource_slots: int,
         max_session_lifetime: int,
         max_concurrent_sessions: int,
         max_containers_per_session: int,
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
-        allowed_vfolder_hosts: Sequence[str],
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
     ) -> dict:
         """
         Updates an existing keypair resource policy with the given options.
@@ -109,10 +110,7 @@ class KeypairResourcePolicy(BaseFunction):
         """
         q = (
             "mutation($name: String!, $input: ModifyKeyPairResourcePolicyInput!) {"
-            + "  modify_keypair_resource_policy(name: $name, props: $input) {"
-            "    ok msg"
-            "  }"
-            "}"
+            + "  modify_keypair_resource_policy(name: $name, props: $input) {    ok msg  }}"
         )
         variables = {
             "name": name,
@@ -139,10 +137,8 @@ class KeypairResourcePolicy(BaseFunction):
         You need an admin privilege for this operation.
         """
         q = (
-            "mutation($name: String!) {" + "  delete_keypair_resource_policy(name: $name) {"
-            "    ok msg"
-            "  }"
-            "}"
+            "mutation($name: String!) {"
+            + "  delete_keypair_resource_policy(name: $name) {    ok msg  }}"
         )
         variables = {
             "name": name,
@@ -160,7 +156,7 @@ class KeypairResourcePolicy(BaseFunction):
         Lists the keypair resource policies.
         You need an admin privilege for this operation.
         """
-        q = "query {" "  keypair_resource_policies {" "    $fields" "  }" "}"
+        q = "query {  keypair_resource_policies {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q)
         return data["keypair_resource_policies"]
@@ -178,13 +174,7 @@ class KeypairResourcePolicy(BaseFunction):
 
         .. versionadded:: 19.03
         """
-        q = (
-            "query($name: String) {"
-            "  keypair_resource_policy(name: $name) {"
-            "    $fields"
-            "  }"
-            "}"
-        )
+        q = "query($name: String) {  keypair_resource_policy(name: $name) {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,

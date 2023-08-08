@@ -14,7 +14,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class PersistentServiceContainer:
@@ -60,8 +60,8 @@ class PersistentServiceContainer:
                     raise
         if c["Config"].get("Labels", {}).get("ai.backend.system", "0") != "1":
             raise RuntimeError(
-                f"An existing container named \"{c['Name'].lstrip('/')}\" is not a system container "
-                f"spawned by Backend.AI. Please check and remove it."
+                f"An existing container named \"{c['Name'].lstrip('/')}\" is not a system container"
+                " spawned by Backend.AI. Please check and remove it."
             )
         return (
             int(c["Config"].get("Labels", {}).get("ai.backend.version", "0")),
@@ -158,12 +158,12 @@ class PersistentServiceContainer:
                     and "/tmp/backend.ai/ipc" in err_msg
                 ):
                     raise InitializationError(
-                        f"Could not create persistent service container '{self.container_name}' "
-                        f"because it cannot access /tmp/backend.ai/ipc directory. "
-                        f"This may occur when Docker is installed with Snap or the agent is configured "
-                        f"to use a private tmp directory. "
-                        f"To resolve, explicitly configure the 'ipc-base-path' option in agent.toml to "
-                        f"indicate a directory under $HOME or a non-virtualized directory.",
+                        f"Could not create persistent service container '{self.container_name}'"
+                        " because it cannot access /tmp/backend.ai/ipc directory. This may"
+                        " occur when Docker is installed with Snap or the agent is configured"
+                        " to use a private tmp directory. To resolve, explicitly configure the"
+                        " 'ipc-base-path' option in agent.toml to indicate a directory under"
+                        " $HOME or a non-virtualized directory.",
                     )
                 else:
                     raise

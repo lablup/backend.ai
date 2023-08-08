@@ -2,7 +2,6 @@ import json
 import sys
 
 import click
-from tqdm import tqdm
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.image import _default_list_fields_admin
@@ -11,7 +10,7 @@ from ai.backend.client.session import Session
 from ...compat import asyncio_run
 from ...session import AsyncSession
 from ..extensions import pass_ctx_obj
-from ..pretty import print_done, print_error, print_fail, print_warn
+from ..pretty import ProgressViewer, print_done, print_error, print_fail, print_warn
 from ..types import CLIContext
 
 # from ai.backend.client.output.fields import image_fields
@@ -47,7 +46,7 @@ def list(ctx: CLIContext, operation: bool) -> None:
     "--registry",
     type=str,
     default=None,
-    help='The name (usually hostname or "lablup") ' "of the Docker registry configured.",
+    help='The name (usually hostname or "lablup") of the Docker registry configured.',
 )
 def rescan(registry: str) -> None:
     """
@@ -69,23 +68,26 @@ def rescan(registry: str) -> None:
             bgtask = session.BackgroundTask(bgtask_id)
             try:
                 completion_msg_func = lambda: print_done("Finished registry scanning.")
-                with tqdm(unit="image") as pbar:
-                    async with bgtask.listen_events() as response:
-                        async for ev in response:
-                            data = json.loads(ev.data)
-                            if ev.event == "bgtask_updated":
+                async with (
+                    bgtask.listen_events() as response,
+                    ProgressViewer("Scanning the registry...") as viewer,
+                ):
+                    async for ev in response:
+                        data = json.loads(ev.data)
+                        if ev.event == "bgtask_updated":
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm(unit="images")
+                            else:
                                 pbar.total = data["total_progress"]
                                 pbar.write(data["message"])
                                 pbar.update(data["current_progress"] - pbar.n)
-                            elif ev.event == "bgtask_failed":
-                                error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
-                                    f"Error occurred: {error_msg}"
-                                )
-                            elif ev.event == "bgtask_cancelled":
-                                completion_msg_func = lambda: print_warn(
-                                    "Registry scanning has been " "cancelled in the middle."
-                                )
+                        elif ev.event == "bgtask_failed":
+                            error_msg = data["message"]
+                            completion_msg_func = lambda: print_fail(f"Error occurred: {error_msg}")
+                        elif ev.event == "bgtask_cancelled":
+                            completion_msg_func = lambda: print_warn(
+                                "Registry scanning has been cancelled in the middle."
+                            )
             finally:
                 completion_msg_func()
 

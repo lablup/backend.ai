@@ -34,9 +34,12 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
+    DeviceId,
     DeviceName,
     ImageRegistry,
     KernelCreationConfig,
@@ -44,6 +47,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    SessionId,
     SlotName,
     VFolderMount,
     current_resource_slots,
@@ -53,7 +57,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel, KernelFeatures
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, Port
+from ..types import Container, ContainerStatus, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -69,7 +73,7 @@ from .kube_object import (
 )
 from .resources import detect_resources
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.kubernetes.agent"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -89,6 +93,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[str, ComputerContext],
@@ -96,7 +102,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         static_pvc_name: str,
         restarting: bool = False,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
 
         self.scratch_dir = scratch_dir
@@ -198,6 +212,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 bash_profile_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
                 )
+                zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
                 vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
                 tmux_conf_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf")
@@ -210,6 +225,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 shutil.copy(font_italic_path.resolve(), jupyter_custom_dir / "roboto-italic.ttf")
                 shutil.copy(bashrc_path.resolve(), self.work_dir / ".bashrc")
                 shutil.copy(bash_profile_path.resolve(), self.work_dir / ".bash_profile")
+                shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
 
@@ -236,7 +252,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
@@ -391,6 +407,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         #     await computer.generate_docker_args(self.docker, device_alloc))
         # TODO: add support for accelerator allocation
         pass
+
+    async def generate_accelerator_mounts(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> List[MountInfo]:
+        return []
 
     async def generate_deployment_object(
         self,
@@ -549,6 +572,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         kernel_obj = KubernetesKernel(
             self.kernel_id,
+            self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -612,7 +637,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         ):
             rollback_functions: List[Optional[functools.partial]] = []
 
-            for (rollup_function, future_rollback_function) in functions:
+            for rollup_function, future_rollback_function in functions:
                 try:
                     if rollup_function:
                         await rollup_function()
@@ -792,7 +817,8 @@ class KubernetesAgent(
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    f'Scratch type {self.local_config["container"]["scratch-type"]} is not supported',
+                    f'Scratch type {self.local_config["container"]["scratch-type"]} is not'
+                    " supported",
                 )
 
             try:
@@ -870,16 +896,16 @@ class KubernetesAgent(
             # Additional check to filter out real worker pods only?
 
             async def _fetch_container_info(pod: Any):
-                kernel_id: Union[str, None] = "(unknown)"
+                kernel_id: Union[KernelId, str, None] = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
-                    if kernel_id is None:
+                    if kernel_id is None or kernel_id not in self.kernel_registry:
                         return
                     # Is it okay to assume that only one container resides per pod?
                     if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
                         result.append(
                             (
-                                KernelId(uuid.UUID(kernel_id)),
+                                kernel_id,
                                 await container_from_pod(pod),
                             ),
                         )
@@ -919,12 +945,16 @@ class KubernetesAgent(
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
         return KubernetesKernelCreationContext(
             kernel_id,
+            session_id,
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
@@ -968,17 +998,11 @@ class KubernetesAgent(
             scratch_dir = self.local_config["container"]["scratch-root"] / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
-    async def create_overlay_network(self, network_name: str) -> None:
-        return await super().create_overlay_network(network_name)
-
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        return await super().destroy_overlay_network(network_name)
-
     async def create_local_network(self, network_name: str) -> None:
-        return await super().create_local_network(network_name)
+        raise NotImplementedError
 
     async def destroy_local_network(self, network_name: str) -> None:
-        return await super().destroy_local_network(network_name)
+        raise NotImplementedError
 
     async def restart_kernel__load_config(
         self,
@@ -1009,9 +1033,11 @@ class KubernetesAgent(
         )
 
 
-async def get_kernel_id_from_deployment(pod: Any) -> Optional[str]:
+async def get_kernel_id_from_deployment(pod: Any) -> Optional[KernelId]:
     # TODO: create function which extracts kernel id from pod object
-    return pod.get("metadata", {}).get("name")
+    if (kernel_id := pod.get("metadata", {}).get("name")) is not None:
+        return KernelId(uuid.UUID(kernel_id))
+    return None
 
 
 async def container_from_pod(pod: Any) -> Container:

@@ -18,6 +18,7 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
@@ -269,7 +270,7 @@ def prepare_mount_arg(
     "--name",
     "--client-token",
     metavar="NAME",
-    help="Specify a human-readable session name. " "If not set, a random hex string is used.",
+    help="Specify a human-readable session name. If not set, a random hex string is used.",
 )
 # job scheduling options
 @click.option(
@@ -322,8 +323,10 @@ def prepare_mount_arg(
     metavar="PATH",
     type=click.Path(),
     default=None,
-    help="Base directory path of uploaded files. "
-    "All uploaded files must reside inside this directory.",
+    help=(
+        "Base directory path of uploaded files. "
+        "All uploaded files must reside inside this directory."
+    ),
 )
 # execution environment
 @click.option(
@@ -345,13 +348,13 @@ def prepare_mount_arg(
 @click.option(
     "--rm",
     is_flag=True,
-    help="Terminate the session immediately after running " "the given code or files",
+    help="Terminate the session immediately after running the given code or files",
 )
 @click.option(
     "-s",
     "--stats",
     is_flag=True,
-    help="Show resource usage statistics after termination " '(only works if "--rm" is given)',
+    help='Show resource usage statistics after termination (only works if "--rm" is given)',
 )
 @click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
 @click.option(
@@ -399,20 +402,24 @@ def prepare_mount_arg(
     metavar="NAME[=PATH]",
     type=str,
     multiple=True,
-    help="User-owned virtual folder names to mount. "
-    "If path is not provided, virtual folder will be mounted under /home/work. "
-    "When the target path is relative, it is placed under /home/work "
-    "with auto-created parent directories if any. "
-    "Absolute paths are mounted as-is, but it is prohibited to "
-    "override the predefined Linux system directories.",
+    help=(
+        "User-owned virtual folder names to mount. "
+        "If path is not provided, virtual folder will be mounted under /home/work. "
+        "When the target path is relative, it is placed under /home/work "
+        "with auto-created parent directories if any. "
+        "Absolute paths are mounted as-is, but it is prohibited to "
+        "override the predefined Linux system directories."
+    ),
 )
 @click.option(
     "--scaling-group",
     "--sgroup",
     type=str,
     default=None,
-    help="The scaling group to execute session. If not specified, "
-    "all available scaling groups are included in the scheduling.",
+    help=(
+        "The scaling group to execute session. If not specified, "
+        "all available scaling groups are included in the scheduling."
+    ),
 )
 @click.option(
     "-r",
@@ -421,7 +428,7 @@ def prepare_mount_arg(
     metavar="KEY=VAL",
     type=str,
     multiple=True,
-    help="Set computation resources " "(e.g: -r cpu=2 -r mem=256 -r cuda.device=1)",
+    help="Set computation resources (e.g: -r cpu=2 -r mem=256 -r cuda.device=1)",
 )
 @click.option(
     "--cluster-size",
@@ -442,7 +449,16 @@ def prepare_mount_arg(
     metavar="KEY=VAL",
     type=str,
     multiple=True,
-    help="Resource options for creating compute session. " "(e.g: shmem=64m)",
+    help="Resource options for creating compute session. (e.g: shmem=64m)",
+)
+@click.option(
+    "--arch",
+    "--architecture",
+    "architecture",
+    metavar="ARCH_NAME",
+    type=str,
+    default=DEFAULT_IMAGE_ARCH,
+    help="Architecture of the image to use.",
 )
 # resource grouping
 @click.option(
@@ -450,25 +466,31 @@ def prepare_mount_arg(
     "--domain",
     metavar="DOMAIN_NAME",
     default=None,
-    help="Domain name where the session will be spawned. "
-    "If not specified, config's domain name will be used.",
+    help=(
+        "Domain name where the session will be spawned. "
+        "If not specified, config's domain name will be used."
+    ),
 )
 @click.option(
     "-g",
     "--group",
     metavar="GROUP_NAME",
     default=None,
-    help="Group name where the session is spawned. "
-    "User should be a member of the group to execute the code.",
+    help=(
+        "Group name where the session is spawned. "
+        "User should be a member of the group to execute the code."
+    ),
 )
 @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
 @click.option(
     "--assign-agent",
     default=None,
     type=list_expr,
-    help="Show mapping list of tuple which mapped containers with agent. "
-    "When user role is Super Admin. "
-    "(e.g., --assign-agent agent_id_1,agent_id_2,...)",
+    help=(
+        "Show mapping list of tuple which mapped containers with agent. "
+        "When user role is Super Admin. "
+        "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
+    ),
 )
 def run(
     image,
@@ -502,6 +524,7 @@ def run(
     cluster_size,
     cluster_mode,
     resource_opts,
+    architecture,
     domain,
     group,
     preopen,
@@ -514,7 +537,7 @@ def run(
 
     \b
     IMAGE: The name (and version/platform tags appended after a colon) of session
-          runtime or programming language.')
+           runtime or programming language.
     FILES: The code file(s). Can be added multiple times.
     """
     if quiet:
@@ -524,9 +547,7 @@ def run(
         vprint_wait = print_wait
         vprint_done = print_done
     if files and code:
-        print(
-            "You can run only either source files or command-line " "code snippet.", file=sys.stderr
-        )
+        print("You can run only either source files or command-line code snippet.", file=sys.stderr)
         sys.exit(ExitCode.INVALID_ARGUMENT)
     if not files and not code:
         print(
@@ -589,7 +610,7 @@ def run(
     if is_multi:
         if max_parallel <= 0:
             print(
-                "The number maximum parallel sessions must be " "a positive integer.",
+                "The number maximum parallel sessions must be a positive integer.",
                 file=sys.stderr,
             )
             sys.exit(ExitCode.INVALID_ARGUMENT)
@@ -621,6 +642,7 @@ def run(
                 group_name=group,
                 scaling_group=scaling_group,
                 tag=tag,
+                architecture=architecture,
             )
         except Exception as e:
             print_error(e)
@@ -681,7 +703,7 @@ def run(
                     )
             if terminal:
                 raise NotImplementedError(
-                    "Terminal access is not supported in " "the legacy synchronous mode."
+                    "Terminal access is not supported in the legacy synchronous mode."
                 )
             if code:
                 exec_loop_sync(
@@ -726,6 +748,7 @@ def run(
                 scaling_group=scaling_group,
                 bootstrap_script=bootstrap_script.read() if bootstrap_script is not None else None,
                 tag=tag,
+                architecture=architecture,
                 preopen_ports=preopen_ports,
                 assign_agent=assigned_agent_list,
             )

@@ -134,8 +134,16 @@ def login():
     with Session() as session:
         try:
             result = session.Auth.login(user_id, password)
+            if (
+                not result["authenticated"]
+                and result.get("data", {}).get("details") == "OTP not provided"
+            ):
+                otp = input("One-time Password: ")
+                result = session.Auth.login(user_id, password, otp=otp.strip())
+
             if not result["authenticated"]:
                 print_fail("Login failed.")
+                print_fail(result["data"]["details"])
                 sys.exit(ExitCode.FAILURE)
             print_done("Login succeeded.")
 
@@ -186,6 +194,31 @@ def update_password(old_password, new_password, new_password2):
     with Session() as session:
         try:
             session.Auth.update_password(old_password, new_password, new_password2)
+            print_done("Password updated.")
+        except Exception as e:
+            print_error(e)
+
+
+@main.command()
+@click.argument("domain", metavar="USER_ID")
+@click.argument("user_id", metavar="USER_ID")
+@click.argument("current_password", metavar="CURRENT_PASSWORD")
+@click.argument("new_password", metavar="NEW_PASSWORD")
+def update_password_no_auth(domain, user_id, current_password, new_password):
+    """
+    Update user's password. This is used to update `EXPIRED` password only.
+    """
+    with Session() as session:
+        try:
+            config = get_config()
+            if config.endpoint_type == "session":
+                session.Auth.update_password_no_auth_in_session(
+                    user_id, current_password, new_password
+                )
+            else:
+                session.Auth.update_password_no_auth(
+                    domain, user_id, current_password, new_password
+                )
             print_done("Password updated.")
         except Exception as e:
             print_error(e)

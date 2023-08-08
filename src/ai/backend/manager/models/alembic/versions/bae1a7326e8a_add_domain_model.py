@@ -10,6 +10,7 @@ import textwrap
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import ResourceSlotColumn, convention
 
@@ -65,16 +66,14 @@ def upgrade():
         query = sa.insert(domains).values(
             name="default", description="Default domain", is_active=True, total_resource_slots="{}"
         )
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             INSERT INTO domains (name, description, is_active, total_resource_slots)
-            VALUES ('default', 'Default domain', True, '{}'::jsonb);"""
-        )
-        connection.execute(query)
+            VALUES ('default', 'Default domain', True, '{}'::jsonb);""")
+        connection.execute(text(query))
 
     # Fill in users' domain_name field.
     query = "UPDATE users SET domain_name = 'default' WHERE email != 'admin@lablup.com';"
-    connection.execute(query)
+    connection.execute(text(query))
 
 
 def downgrade():

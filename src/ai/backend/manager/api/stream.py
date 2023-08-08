@@ -34,8 +34,8 @@ from urllib.parse import urlparse
 import aiohttp
 import aiohttp_cors
 import aiotools
-import attr
-import grpc
+import attrs
+import grpc  # pants: no-infer-dep
 import trafaret as t
 import zmq
 import zmq.asyncio
@@ -50,7 +50,7 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import kernels
+from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -69,7 +69,7 @@ if TYPE_CHECKING:
     from ..config import SharedConfig
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @server_status_required(READ_ALLOWED)
@@ -83,19 +83,26 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     access_key = request["keypair"]["access_key"]
     api_version = request["api_version"]
     try:
-        compute_session = await asyncio.shield(
-            database_ptask_group.create_task(
-                root_ctx.registry.get_session(session_name, access_key)
-            ),
-        )
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await asyncio.shield(
+                database_ptask_group.create_task(
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                    )
+                ),
+            )
     except SessionNotFound:
         raise
     log.info("STREAM_PTY(ak:{0}, s:{1})", access_key, session_name)
-    stream_key = compute_session["id"]
+    compute_session: KernelRow = session.main_kernel
+    stream_key = compute_session.id
 
     await asyncio.shield(
         database_ptask_group.create_task(
-            root_ctx.registry.increment_session_usage(session_name, access_key),
+            root_ctx.registry.increment_session_usage(session),
         )
     )
     ws = web.WebSocketResponse(max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"])
@@ -106,7 +113,9 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     app_ctx.stream_pty_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_pty_handlers[stream_key].discard(myself))
 
-    async def connect_streams(compute_session) -> Tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
+    async def connect_streams(
+        compute_session: KernelRow,
+    ) -> Tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
         # TODO: refactor as custom row/table method
         if compute_session.kernel_host is None:
             kernel_host = urlparse(compute_session.agent_addr).hostname
@@ -145,15 +154,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                             # when socks[0] is closed, re-initiate the connection.
                             app_ctx.stream_stdin_socks[stream_key].discard(socks[0])
                             socks[1].close()
-                            kernel = await asyncio.shield(
-                                database_ptask_group.create_task(
-                                    root_ctx.registry.get_session(
-                                        session_name,
-                                        access_key,
-                                    ),
-                                ),
-                            )
-                            stdin_sock, stdout_sock = await connect_streams(kernel)
+                            stdin_sock, stdout_sock = await connect_streams(compute_session)
                             socks[0] = stdin_sock
                             socks[1] = stdout_sock
                             app_ctx.stream_stdin_socks[stream_key].add(socks[0])
@@ -164,15 +165,14 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                     else:
                         await asyncio.shield(
                             database_ptask_group.create_task(
-                                root_ctx.registry.increment_session_usage(session_name, access_key),
+                                root_ctx.registry.increment_session_usage(session),
                             ),
                         )
                         run_id = secrets.token_hex(8)
                         if data["type"] == "resize":
                             code = f"%resize {data['rows']} {data['cols']}"
                             await root_ctx.registry.execute(
-                                session_name,
-                                access_key,
+                                session,
                                 api_version,
                                 run_id,
                                 "query",
@@ -182,8 +182,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                             )
                         elif data["type"] == "ping":
                             await root_ctx.registry.execute(
-                                session_name,
-                                access_key,
+                                session,
                                 api_version,
                                 run_id,
                                 "query",
@@ -200,9 +199,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                                 await asyncio.shield(
                                     database_ptask_group.create_task(
                                         root_ctx.registry.restart_session(
-                                            run_id,
-                                            session_name,
-                                            access_key,
+                                            session,
                                         ),
                                     ),
                                 )
@@ -302,18 +299,24 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     api_version = request["api_version"]
     log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
     try:
-        compute_session = await asyncio.shield(
-            database_ptask_group.create_task(
-                registry.get_session(session_name, access_key),  # noqa
-            ),
-        )
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session: SessionRow = await asyncio.shield(
+                database_ptask_group.create_task(
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                    ),  # noqa
+                ),
+            )
     except SessionNotFound:
         raise
-    stream_key = compute_session["id"]
+    stream_key = session.main_kernel.id
 
     await asyncio.shield(
         database_ptask_group.create_task(
-            registry.increment_session_usage(session_name, access_key),
+            registry.increment_session_usage(session),
         )
     )
     ws = web.WebSocketResponse(max_msg_size=local_config["manager"]["max-wsmsg-size"])
@@ -341,13 +344,13 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
         while True:
             # TODO: rewrite agent and kernel-runner for unbuffered streaming.
             raw_result = await registry.execute(
-                session_name, access_key, api_version, run_id, mode, code, opts, flush_timeout=0.2
+                session, api_version, run_id, mode, code, opts, flush_timeout=0.2
             )
             if ws.closed:
                 log.debug("STREAM_EXECUTE: client disconnected (interrupted)")
                 await asyncio.shield(
                     rpc_ptask_group.create_task(
-                        registry.interrupt_session(session_name, access_key),
+                        registry.interrupt_session(session),
                     )
                 )
                 break
@@ -401,8 +404,10 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             await ws.send_json(
                 {
                     "status": "server-restarting",
-                    "msg": "The API server is going to restart for maintenance. "
-                    "Please connect again with the same run ID.",
+                    "msg": (
+                        "The API server is going to restart for maintenance. "
+                        "Please connect again with the same run ID."
+                    ),
                 }
             )
         raise
@@ -444,22 +449,30 @@ async def stream_proxy(
     myself = asyncio.current_task()
     assert myself is not None
     try:
-        kernel = await asyncio.shield(
-            database_ptask_group.create_task(
-                root_ctx.registry.get_session(session_name, access_key),
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await asyncio.shield(
+                database_ptask_group.create_task(
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+                    ),
+                )
             )
-        )
     except (SessionNotFound, TooManySessionsMatched):
         raise
-    stream_key = kernel["id"]
+    kernel: KernelRow = session.main_kernel
+    kernel_id = kernel.id
+    stream_key = kernel_id
     stream_id = uuid.uuid4().hex
     app_ctx.stream_proxy_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_proxy_handlers[stream_key].discard(myself))
-    if kernel["kernel_host"] is None:
-        kernel_host = urlparse(kernel["agent_addr"]).hostname
+    if kernel.kernel_host is None:
+        kernel_host = urlparse(kernel.agent_addr).hostname
     else:
-        kernel_host = kernel["kernel_host"]
-    for sport in kernel["service_ports"]:
+        kernel_host = kernel.kernel_host
+    for sport in kernel.service_ports:
         if sport["name"] == service:
             if params["port"]:
                 # using one of the primary/secondary ports of the app
@@ -500,16 +513,14 @@ async def stream_proxy(
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
     redis_live = root_ctx.redis_live
-    conn_tracker_key = f"session.{kernel['id']}.active_app_connections"
-    conn_tracker_val = f"{kernel['id']}:{service}:{stream_id}"
+    conn_tracker_key = f"session.{kernel_id}.active_app_connections"
+    conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
-    _conn_tracker_script = textwrap.dedent(
-        """
+    _conn_tracker_script = textwrap.dedent("""
         local now = redis.call('TIME')
         now = now[1] + (now[2] / (10^6))
         redis.call('ZADD', KEYS[1], now, ARGV[1])
-    """
-    )
+    """)
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
@@ -530,11 +541,9 @@ async def stream_proxy(
             )
         )
 
-    down_cb = apartial(refresh_cb, kernel["id"])
-    up_cb = apartial(refresh_cb, kernel["id"])
-    ping_cb = apartial(refresh_cb, kernel["id"])
-
-    kernel_id = kernel["id"]
+    down_cb = apartial(refresh_cb, kernel_id)
+    up_cb = apartial(refresh_cb, kernel_id)
+    ping_cb = apartial(refresh_cb, kernel_id)
 
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
@@ -581,7 +590,7 @@ async def stream_proxy(
         )
         await asyncio.shield(
             database_ptask_group.create_task(
-                root_ctx.registry.increment_session_usage(session_name, access_key),
+                root_ctx.registry.increment_session_usage(session),
             )
         )
 
@@ -593,7 +602,7 @@ async def stream_proxy(
 
         result = await asyncio.shield(
             rpc_ptask_group.create_task(
-                root_ctx.registry.start_service(session_name, access_key, service, opts),
+                root_ctx.registry.start_service(session, service, opts),
             ),
         )
         if result["status"] == "failed":
@@ -629,11 +638,18 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
     root_ctx: RootContext = request.app["_root.context"]
-    compute_session = await root_ctx.registry.get_session(session_name, access_key)
-    if compute_session["service_ports"] is None:
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        compute_session = await SessionRow.get_session(
+            db_sess,
+            session_name,
+            access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
+    service_ports = compute_session.main_kernel.service_ports
+    if service_ports is None:
         return web.json_response([])
     resp = []
-    for item in compute_session["service_ports"]:
+    for item in service_ports:
         response_dict = {
             "name": item["name"],
             "protocol": item["protocol"],
@@ -657,15 +673,15 @@ async def handle_kernel_terminating(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["stream.context"]
     try:
-        kernel = await root_ctx.registry.get_kernel(
+        kernel = await KernelRow.get_kernel(
+            root_ctx.db,
             event.kernel_id,
-            (kernels.c.cluster_role, kernels.c.status),
             allow_stale=True,
         )
     except SessionNotFound:
         return
-    if kernel["cluster_role"] == DEFAULT_ROLE:
-        stream_key = kernel["id"]
+    if kernel.cluster_role == DEFAULT_ROLE:
+        stream_key = kernel.id
         cancelled_tasks = []
         for sock in app_ctx.stream_stdin_socks[stream_key]:
             sock.close()
@@ -695,7 +711,8 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn(
-                        "stream_conn_tracker_gc(): error while connecting to Etcd server, retrying..."
+                        "stream_conn_tracker_gc(): error while connecting to Etcd server,"
+                        " retrying..."
                     )
                 else:
                     raise e
@@ -734,7 +751,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
         pass
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     stream_pty_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
     stream_execute_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]

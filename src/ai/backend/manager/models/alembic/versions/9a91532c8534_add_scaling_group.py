@@ -8,6 +8,7 @@ Create Date: 2019-07-25 22:32:25.974046
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 import ai.backend.manager.models.base
 
@@ -141,12 +142,14 @@ def upgrade():
         'fifo',
         '{}'::jsonb
     );
+    """
+    connection = op.get_bind()
+    connection.execute(text(query))
+    query = """
     INSERT INTO sgroups_for_domains
     VALUES ('default', 'default');
     """
-    connection = op.get_bind()
-    connection.execute(query)
-
+    connection.execute(text(query))
     op.add_column(
         "agents",
         sa.Column("scaling_group", sa.String(length=64), server_default="default", nullable=False),

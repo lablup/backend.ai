@@ -21,9 +21,10 @@ def upgrade():
         "kernels",
         ["access_key", "sess_id"],
         unique=True,
-        postgresql_where=sa.text("kernels.status != 'TERMINATED' and " "kernels.role = 'master'"),
+        postgresql_where=sa.text("kernels.status != 'TERMINATED' and kernels.role = 'master'"),
     )
 
 
 def downgrade():
-    op.drop_index(op.f("ix_kernels_unique_sess_token"), table_name="kernels")
+    # op.drop_index(op.f("ix_kernels_unique_sess_token"), table_name="kernels")
+    pass

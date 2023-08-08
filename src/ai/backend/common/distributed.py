@@ -11,11 +11,10 @@ if TYPE_CHECKING:
     from .lock import AbstractDistributedLock
 
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class GlobalTimer:
-
     """
     Executes the given async function only once in the given interval,
     uniquely among multiple manager instances across multiple nodes.

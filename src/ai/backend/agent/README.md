@@ -16,7 +16,7 @@ The Backend.AI Agent is a small daemon that does:
       information of the agent daemon and manipulation of the agent's systemd service
   - `helpers`: A utility package that is available as `ai.backend.helpers` *inside* Python-based containers
   - `kernel`: Language-specific runtimes (mostly ipykernel client adaptor) which run *inside* containers
-  - `runner`: Auxiliary components (usually self-contained binaries) mounted *inside* contaienrs
+  - `runner`: Auxiliary components (usually self-contained binaries) mounted *inside* containers
 
 
 ## Installation
@@ -80,7 +80,6 @@ so that `sysctl` could set the `net.netfilter.nf_conntrack_*` values.
 
 #### Prerequisites
 
-* `libsnappy-dev` or `snappy-devel` system package depending on your distro
 * Python 3.6 or higher with [pyenv](https://github.com/pyenv/pyenv)
 and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommneded)
 * Docker 18.03 or later with docker-compose (18.09 or later is recommended)

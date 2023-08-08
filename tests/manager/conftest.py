@@ -45,10 +45,18 @@ from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config import LocalConfig, SharedConfig
 from ai.backend.manager.config import load as load_config
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
+    DomainRow,
+    GroupRow,
+    KernelRow,
+    ProjectResourcePolicyRow,
+    ScalingGroupRow,
+    SessionRow,
+    UserResourcePolicyRow,
+    UserRow,
     agents,
     domains,
-    groups,
     kernels,
     keypairs,
     scaling_groups,
@@ -56,6 +64,7 @@ from ai.backend.manager.models import (
     vfolders,
 )
 from ai.backend.manager.models.base import pgsql_connect_opts, populate_fixture
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
@@ -165,6 +174,8 @@ def local_config(
                 "name": test_db,
                 "user": "postgres",
                 "password": "develove",
+                "pool-size": 8,
+                "max-overflow": 64,
             },
             "manager": {
                 "id": f"i-{test_id}",
@@ -172,6 +183,8 @@ def local_config(
                 "distributed-lock": "filelock",
                 "ipc-base-path": ipc_base_path,
                 "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+                "allowed-plugins": set(),
+                "disabled-plugins": set(),
             },
             "debug": {
                 "enabled": False,
@@ -291,7 +304,7 @@ def database(request, local_config, test_db):
     db_user = local_config["db"]["user"]
     db_pass = local_config["db"]["password"]
 
-    # Create database using low-level psycopg2 API.
+    # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
     if db_pass:
         db_url = f"postgresql+asyncpg://{urlquote(db_user)}:{urlquote(db_pass)}@{db_addr}/testing"
@@ -337,8 +350,7 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
-    alembic_config_template = textwrap.dedent(
-        """
+    alembic_config_template = textwrap.dedent("""
     [alembic]
     script_location = ai.backend.manager.models:alembic
     sqlalchemy.url = {sqlalchemy_url:s}
@@ -364,15 +376,14 @@ def database(request, local_config, test_db):
 
     [formatter_simple]
     format = [%(name)s] %(message)s
-    """
-    ).strip()
+    """).strip()
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
         logger=init_logger(local_config, nested=True),
         local_config=local_config,
     )
-    sqlalchemy_url = f"postgresql://{db_user}:{db_pass}@{db_addr}/{test_db}"
+    sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
             sqlalchemy_url=sqlalchemy_url,
@@ -632,6 +643,7 @@ def get_headers(app, default_keypair):
         method,
         url,
         req_bytes,
+        allowed_ip="10.10.10.10",  # Same with fixture
         ctype="application/json",
         hash_type="sha256",
         api_version="v5.20191215",
@@ -645,6 +657,7 @@ def get_headers(app, default_keypair):
             "Content-Type": ctype,
             "Content-Length": str(len(req_bytes)),
             "X-BackendAI-Version": api_version,
+            "X-Forwarded-For": allowed_ip,
         }
         if api_version >= "v4.20181215":
             req_bytes = b""
@@ -737,20 +750,28 @@ class DummyEtcd:
 
 @pytest.fixture
 async def registry_ctx(mocker):
+    mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
     mock_shared_config.update_resource_slots = AsyncMock()
     mock_shared_config.etcd = None
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
+    mock_dbsess = MagicMock()
     mock_dbconn_ctx = MagicMock()
+    mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
+    mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
     mock_dbconn_ctx.__aenter__ = AsyncMock(return_value=mock_dbconn)
     mock_dbconn_ctx.__aexit__ = AsyncMock()
+    mock_dbsess_ctx.__aenter__ = AsyncMock(return_value=mock_dbsess)
+    mock_dbsess_ctx.__aexit__ = AsyncMock()
     mock_dbconn.execute = AsyncMock(return_value=mock_dbresult)
     mock_dbconn.begin = MagicMock(return_value=mock_dbconn_ctx)
+    mock_dbsess.execute = AsyncMock(return_value=mock_dbresult)
+    mock_dbsess.begin_session = AsyncMock(return_value=mock_dbsess_ctx)
     mock_redis_stat = MagicMock()
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
@@ -763,6 +784,7 @@ async def registry_ctx(mocker):
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
+        local_config=mock_local_config,
         shared_config=mock_shared_config,
         db=mock_db,
         redis_stat=mock_redis_stat,
@@ -778,6 +800,7 @@ async def registry_ctx(mocker):
         yield (
             registry,
             mock_dbconn,
+            mock_dbsess,
             mock_dbresult,
             mock_shared_config,
             mock_event_dispatcher,
@@ -790,59 +813,99 @@ async def registry_ctx(mocker):
 @pytest.fixture(scope="function")
 async def session_info(database_engine):
     user_uuid = str(uuid.uuid4()).replace("-", "")
+    user_password = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]
     domain_name = str(uuid.uuid4()).split("-")[0]
     group_id = str(uuid.uuid4()).replace("-", "")
     group_name = str(uuid.uuid4()).split("-")[0]
+    sgroup_name = str(uuid.uuid4()).split("-")[0]
     session_id = str(uuid.uuid4()).replace("-", "")
+    session_creation_id = str(uuid.uuid4()).replace("-", "")
 
-    async with database_engine.begin() as conn:
-        await conn.execute(
-            users.insert().values(
-                {
-                    "uuid": user_uuid,
-                    "username": f"TestCaseRunner-{postfix}",
-                    "email": f"tc.runner-{postfix}@lablup.com",
-                }
-            )
-        )
-        await conn.execute(
-            domains.insert().values(
-                {
-                    "name": domain_name,
-                    "total_resource_slots": {},
-                }
-            )
-        )
-        await conn.execute(
-            groups.insert().values(
-                {
-                    "id": group_id,
-                    "name": group_name,
-                    "domain_name": domain_name,
-                    "total_resource_slots": {},
-                }
-            )
-        )
-        await conn.execute(
-            kernels.insert().values(
-                {
-                    "session_id": session_id,
-                    "domain_name": domain_name,
-                    "group_id": group_id,
-                    "user_uuid": user_uuid,
-                    "occupied_slots": {},
-                    "repl_in_port": 0,
-                    "repl_out_port": 0,
-                    "stdin_port": 0,
-                    "stdout_port": 0,
-                }
-            )
-        )
+    resource_policy_name = str(uuid.uuid4()).replace("-", "")
 
-        yield session_id, conn
+    async with database_engine.begin_session() as db_sess:
+        scaling_group = ScalingGroupRow(
+            name=sgroup_name,
+            driver="test",
+            scheduler="test",
+            scheduler_opts=ScalingGroupOpts(),
+        )
+        db_sess.add(scaling_group)
 
-        await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
-        await conn.execute(groups.delete().where(groups.c.id == group_id))
-        await conn.execute(domains.delete().where(domains.c.name == domain_name))
-        await conn.execute(users.delete().where(users.c.uuid == user_uuid))
+        domain = DomainRow(name=domain_name, total_resource_slots={})
+        db_sess.add(domain)
+
+        user_resource_policy = UserResourcePolicyRow(name=resource_policy_name, max_vfolder_size=-1)
+        db_sess.add(user_resource_policy)
+
+        project_resource_policy = ProjectResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_size=-1
+        )
+        db_sess.add(project_resource_policy)
+
+        group = GroupRow(
+            id=group_id,
+            name=group_name,
+            domain_name=domain_name,
+            total_resource_slots={},
+            resource_policy=resource_policy_name,
+        )
+        db_sess.add(group)
+
+        user = UserRow(
+            uuid=user_uuid,
+            email=f"tc.runner-{postfix}@lablup.com",
+            username=f"TestCaseRunner-{postfix}",
+            password=user_password,
+            domain_name=domain_name,
+            resource_policy=resource_policy_name,
+        )
+        db_sess.add(user)
+
+        sess = SessionRow(
+            id=session_id,
+            creation_id=session_creation_id,
+            cluster_size=1,
+            domain_name=domain_name,
+            scaling_group_name=sgroup_name,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            vfolder_mounts={},
+        )
+        db_sess.add(sess)
+
+        kern = KernelRow(
+            session_id=session_id,
+            domain_name=domain_name,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            cluster_role=DEFAULT_ROLE,
+            occupied_slots={},
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+            vfolder_mounts={},
+        )
+        db_sess.add(kern)
+
+        await db_sess.commit()
+        yield session_id, db_sess
+
+        await db_sess.execute(sa.delete(KernelRow).where(KernelRow.session_id == session_id))
+        await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
+        await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+        await db_sess.execute(
+            sa.delete(ProjectResourcePolicyRow).where(
+                ProjectResourcePolicyRow.name == resource_policy_name
+            )
+        )
+        await db_sess.execute(
+            sa.delete(UserResourcePolicyRow).where(
+                UserResourcePolicyRow.name == resource_policy_name
+            )
+        )
+        await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))

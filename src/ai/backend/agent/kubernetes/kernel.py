@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import lzma
+import os
 import re
 import shutil
 import textwrap
@@ -18,22 +19,25 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.common.utils import current_loop
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernel(AbstractKernel):
-
     deployment_name: str
 
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -45,6 +49,8 @@ class KubernetesKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -62,7 +68,6 @@ class KubernetesKernel(AbstractKernel):
     async def create_code_runner(
         self, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
-
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
             log.error("Scaling failed! Response body: {0}", scale)
@@ -193,6 +198,11 @@ class KubernetesKernel(AbstractKernel):
         )
         return result
 
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
+        return result
+
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
@@ -201,6 +211,15 @@ class KubernetesKernel(AbstractKernel):
         assert self.runner is not None
         result = await self.runner.feed_service_apps()
         return result
+
+    async def check_duplicate_commit(self, kernel_id, subdir):
+        log.error("Committing in Kubernetes is not supported yet.")
+        raise NotImplementedError
+
+    async def commit(self, kernel_id, subdir, filename):
+        # TODO: Implement container commit on Kubernetes kernel.
+        log.error("Committing in Kubernetes is not supported yet.")
+        raise NotImplementedError
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
@@ -251,22 +270,25 @@ class KubernetesKernel(AbstractKernel):
 
         return None
 
+    async def download_single(self, filepath: str):
+        # TODO: Implement download single file operations with pure Kubernetes API
+        log.error("download_single() in the k8s backend is not supported yet.")
+        raise NotImplementedError
+
     async def list_files(self, container_path: str):
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -287,8 +309,7 @@ class KubernetesKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
         async with watch.Watch().stream(
@@ -307,9 +328,11 @@ class KubernetesKernel(AbstractKernel):
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
+
 
 class KubernetesCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int
@@ -479,8 +502,8 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
 
     all_distros = []
     entry_prefix = "backendai_krunner_v10"
-    for entrypoint in pkg_resources.iter_entry_points(entry_prefix):
-        log.debug("loading krunner pkg: {}", entrypoint.module_name)
+    for entrypoint in scan_entrypoints(entry_prefix):
+        log.debug("loading krunner pkg: {}", entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (

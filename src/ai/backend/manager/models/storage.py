@@ -18,15 +18,14 @@ from typing import (
     Tuple,
     TypedDict,
 )
-from uuid import UUID
 
 import aiohttp
-import attr
+import attrs
 import graphene
 import yarl
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata
+from ai.backend.common.types import HardwareMetadata, VFolderID
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
@@ -42,15 +41,16 @@ __all__ = (
     "StorageVolume",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class StorageProxyInfo:
     session: aiohttp.ClientSession
     secret: str
     client_api_url: yarl.URL
     manager_api_url: yarl.URL
+    sftp_scaling_groups: list[str]
 
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
@@ -67,11 +67,12 @@ class VolumeInfo(TypedDict):
 
 
 class StorageSessionManager:
-
     _proxies: Mapping[str, StorageProxyInfo]
+    _exposed_volume_info: List[str]
 
     def __init__(self, storage_config: Mapping[str, Any]) -> None:
         self.config = storage_config
+        self._exposed_volume_info = self.config["exposed_volume_info"]
         self._proxies = {}
         for proxy_name, proxy_config in self.config["proxies"].items():
             connector = aiohttp.TCPConnector(ssl=proxy_config["ssl_verify"])
@@ -81,6 +82,7 @@ class StorageSessionManager:
                 secret=proxy_config["secret"],
                 client_api_url=yarl.URL(proxy_config["client_api"]),
                 manager_api_url=yarl.URL(proxy_config["manager_api"]),
+                sftp_scaling_groups=proxy_config["sftp_scaling_groups"],
             )
 
     async def aclose(self) -> None:
@@ -121,10 +123,15 @@ class StorageSessionManager:
         _ctx_volumes_cache.set(results)
         return results
 
+    async def get_sftp_scaling_groups(self, proxy_name: str) -> List[str]:
+        if proxy_name not in self._proxies:
+            raise IndexError(f"proxy {proxy_name} does not exist")
+        return self._proxies[proxy_name].sftp_scaling_groups or []
+
     async def get_mount_path(
         self,
         vfolder_host: str,
-        vfolder_id: UUID,
+        vfolder_id: VFolderID,
         subpath: PurePosixPath = PurePosixPath("."),
     ) -> str:
         async with self.request(
@@ -173,8 +180,10 @@ class StorageSessionManager:
                 except aiohttp.ClientResponseError:
                     # when the response body is not JSON, just raise with status info.
                     raise VFolderOperationFailed(
-                        extra_msg=f"Storage proxy responded with "
-                        f"{client_resp.status} {client_resp.reason}",
+                        extra_msg=(
+                            "Storage proxy responded with "
+                            f"{client_resp.status} {client_resp.reason}"
+                        ),
                         extra_data=None,
                     )
                 except VFolderOperationFailed as e:

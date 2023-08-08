@@ -9,7 +9,7 @@ import socket
 from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple
 
 import aiohttp_cors
-import attr
+import attrs
 import graphene
 import sqlalchemy as sa
 import trafaret as t
@@ -33,14 +33,14 @@ from .exceptions import (
     ServiceUnavailable,
 )
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
+from .utils import check_api_params, set_handler_attr
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class SchedulerOps(enum.Enum):
@@ -60,6 +60,9 @@ def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
                 msg = f"Server is not in the required status: {allowed_status}"
                 raise ServiceUnavailable(msg)
             return await handler(request, *args, **kwargs)
+
+        set_handler_attr(wrapped, "server_status_required", True)
+        set_handler_attr(wrapped, "required_server_statuses", allowed_status)
 
         return wrapped
 
@@ -146,7 +149,7 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("status"): tx.Enum(ManagerStatus, use_name=True),
+            t.Key("status"): tx.Enum(ManagerStatus),
             t.Key("force_kill", default=False): t.ToBool,
         }
     )
@@ -159,7 +162,6 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
         params["force_kill"],
     )
     try:
-        params = await request.json()
         status = params["status"]
         force_kill = params["force_kill"]
     except json.JSONDecodeError:
@@ -243,7 +245,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
     return web.Response(status=204)
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     status_watch_task: asyncio.Task
 
@@ -267,6 +269,7 @@ def create_app(
     app = web.Application()
     app["api_versions"] = (2, 3, 4)
     app["manager.context"] = PrivateContext()
+    app["prefix"] = "manager"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     status_resource = cors.add(app.router.add_resource("/status"))
     cors.add(status_resource.add_route("GET", fetch_manager_status))

@@ -1,0 +1,222 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.09\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.3\n"
+
+#: ../../user/install-user-programs.rst:5 44d1c6ad67ff4ce38efa90ed1058ef40
+msgid "Install User Programs in Session Containers"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:7 914c77c9cc2947878d3640e1bf64236b
+msgid ""
+"Sometimes you need new programs or libraries that are not installed in "
+"your environment. If so, you can install the new program into your "
+"environment."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:9 f0e983c3dfa4430c9a859879a65a07af
+msgid ""
+"NOTE: Newly installed programs are not environment dependent. It is "
+"installed in the user directory."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:12 5afc7d1741a94f3c840040eff7c025bb
+msgid "Install packages with linuxbrew"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:14 00170be63628476880c1108ebe99ce51
+msgid ""
+"If you are a macOS user and a researcher or developer who occasionally "
+"installs unix programs, you may be familiar with `homebrew "
+"<https://brew.sh>`. You can install new programs using linuxbrew in "
+"Backend.AI."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:17 47f49071668947d6bb924e56b1219e68
+msgid "Creating a user linuxbrew directory"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:19 0407f407af544426b9767fe3c8008845
+msgid ""
+"Directories that begin with a dot are automatically mounted when the "
+"session starts. Create a linuxbrew directory that will be automatically "
+"mounted so that programs you install with linuxbrew can be used in all "
+"sessions."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:21 c47cbe3eb14c4500bbb9aed9a50ae2cd
+msgid "Create .linuxbrew in the Storage section."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:23
+#: ../../user/install-user-programs.rst:114 46d7a1426ec645b89cc36cc07c3e847c
+#: 53c6610e6f974860a7c34f870a05fcc0
+msgid "With CLI:"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:29
+#: ../../user/install-user-programs.rst:122 6f43392ecef9420da4c6e08aee5f6d95
+#: c3736dcba80943b19cbec4afccb516cd
+msgid "Let’s check if they are created correctly."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:35
+#: ../../user/install-user-programs.rst:128 07052888e2104fd0ae1a61891d5092e5
+#: 3ca53fbbdeed41afbadc916fe44fae44
+msgid "Also, you can create a directory using GUI console with same name."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:39 96e91ec6ced14a0da663753d488e66e2
+msgid "Installing linuxbrew"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:42 7742ce49ce6c45faa3e89f1d0021800a
+msgid ""
+"Start a new session for installation. Choose your environment and "
+"allocate the necessary resources. Generally, you don't need to allocate a"
+" lot of resources, but if you need to compile or install a GPU-dependent "
+"library, you need to adjust the resource allocation to your needs."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:44 fd107aff867c4d88a724fb4e34b38353
+msgid "In general, 1 CPU / 4GB RAM is enough."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:52 4da45c714eb54f529f03510e4709e695
+msgid "Testing linuxbrew"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:54 88c3da7567d54549ac6d12ac134f3e23
+msgid ""
+"Enter the brew command to verify that linuxbrew is installed. In general,"
+" to use ``linuxbrew`` you need to add the path where ``linuxbrew`` is "
+"installed to the PATH variable."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:56 70b4ecbde1824014845248bf43146d32
+msgid ""
+"Enter the following command to temporarily add the path and verify that "
+"it is installed correctly."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:64 098b229326d2428ea923b565797687ce
+msgid "Setting linuxbrew environment variables automatically"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:66 a3d4482e151d46ce8b296b14f0023cc3
+msgid ""
+"To correctly reference the binaries and libraries installed by linuxbrew,"
+" add the configuration to ``.bashrc``. You can add settings from the "
+"settings tab."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:69
+#: ../../user/install-user-programs.rst:142 a7b3d9e21ccf40d9884abe0d81ac29a2
+#: e74448646ad14dc2b856ebf004903b3b
+msgid "Example: Installing and testing htop"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:71
+#: ../../user/install-user-programs.rst:144 8065177883d94d72a98c48780370b692
+#: 9731593637bf43869200dfd8833e2c48
+msgid ""
+"To test the program installation, let's install a program called "
+"``htop``. ``htop`` is a program that extends the top command, allowing "
+"you to monitor the running computing environment in a variety of ways."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:73
+#: ../../user/install-user-programs.rst:146 8f46637209f846fcb0887f1e4d111ee1
+#: 97cb6aaffb614a9daa3522c91579b141
+msgid "Let's install it with the following command:"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:80
+#: ../../user/install-user-programs.rst:152 4eb30e62776d4de7af68895ab241fea5
+#: b89c6e6a30504f6dbd290c15dd8141b3
+msgid ""
+"If there are any libraries needed for the ``htop`` program, they will be "
+"installed automatically."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:82
+#: ../../user/install-user-programs.rst:154 1d3f6d6eee29417481bd6f9d6df0182a
+#: 51a2e10fd76847b688b6939410da8668
+msgid "Now let's run:"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:89
+#: ../../user/install-user-programs.rst:160 673fddcf0d994fba88ae890346223a73
+#: cb5f5d0ba81c4d209c54bca42fdd5dc5
+msgid "From the run screen, you can press q to return to the terminal."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:91 da18349e24d54b13874f23cf3defc20e
+msgid "1.6 Deleting the linuxbrew Environment"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:93 41465a8a84b84887a88740fd7127ee43
+msgid ""
+"To reset all programs installed with linuxbrew, just delete everything in"
+" the .linuxbrew directory."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:95 7af0bbdaffd24fec8be9f4cf3da0609f
+msgid ""
+"Note: If you want to remove a program by selecting it, use the ``brew "
+"uninstall [PROGRAM_NAME]`` command."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:103 93d707db079944bf9311c92161fd8364
+msgid "Install packages with miniconda"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:105 e8577cc943e14da9af7b193e0515f550
+msgid ""
+"Some environments support miniconda. In this case, you can use `miniconda"
+" <https://docs.conda.io/projects/conda/en/latest/user-guide/install/>` to"
+" install the packages you want."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:108 fd47e33a4997423a81fd6fcb7f5e498b
+msgid "Creating a user miniconda-required directory"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:110 bfcfbc90d99f47868c90251508a85951
+msgid ""
+"Directories that begin with a dot are automatically mounted when the "
+"session starts. Create a ``.conda``, ``.continuum`` directory that will "
+"be automatically mounted so that programs you install with miniconda can "
+"be used in all sessions."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:112 4bc0adaae5034ecfb9be81be710f65e0
+msgid "Create ``.conda``, ``.continuum`` in the Storage section."
+msgstr ""
+
+#: ../../user/install-user-programs.rst:132 24de5558a34145eeb4eab954cb924fbd
+msgid "miniconda test"
+msgstr ""
+
+#: ../../user/install-user-programs.rst:134 5a9ca4ee4b9448c0baae26f67557c6eb
+msgid ""
+"Make sure you have miniconda installed in your environment. Package "
+"installation using miniconda is only available if miniconda is "
+"preinstalled in your environment."
+msgstr ""
+

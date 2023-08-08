@@ -7,26 +7,27 @@ import pwd
 import ssl
 import sys
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pprint
 from typing import Any, AsyncIterator, Sequence
 
+import aiomonitor
 import aiotools
 import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import config
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.config import ConfigurationError, override_key
 from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
 from .api.client import init_client_app
 from .api.manager import init_manager_app
-from .config import local_config_iv
+from .config import load_local_config, load_shared_config
 from .context import Context
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.storage.server"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @aiotools.server
@@ -43,6 +44,12 @@ async def server_main_logwrapper(loop, pidx, _args):
             yield
 
 
+async def check_migration(ctx: Context):
+    from .migration import check_latest
+
+    await check_latest(ctx)
+
+
 @aiotools.server
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -50,81 +57,91 @@ async def server_main(
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
     local_config = _args[0]
-
-    etcd_credentials = None
-    if local_config["etcd"]["user"]:
-        etcd_credentials = {
-            "user": local_config["etcd"]["user"],
-            "password": local_config["etcd"]["password"],
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
-    }
-    etcd = AsyncEtcd(
-        local_config["etcd"]["addr"],
-        local_config["etcd"]["namespace"],
-        scope_prefix_map,
-        credentials=etcd_credentials,
+    loop.set_debug(local_config["debug"]["asyncio"])
+    m = aiomonitor.Monitor(
+        loop,
+        port=local_config["storage-proxy"]["aiomonitor-port"] + pidx,
+        console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
-    ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
-    client_api_app = await init_client_app(ctx)
-    manager_api_app = await init_manager_app(ctx)
-
-    client_ssl_ctx = None
-    manager_ssl_ctx = None
-    if local_config["api"]["client"]["ssl-enabled"]:
-        client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        client_ssl_ctx.load_cert_chain(
-            str(local_config["api"]["client"]["ssl-cert"]),
-            str(local_config["api"]["client"]["ssl-privkey"]),
-        )
-    if local_config["api"]["manager"]["ssl-enabled"]:
-        manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        manager_ssl_ctx.load_cert_chain(
-            str(local_config["api"]["manager"]["ssl-cert"]),
-            str(local_config["api"]["manager"]["ssl-privkey"]),
-        )
-    client_api_runner = web.AppRunner(client_api_app)
-    manager_api_runner = web.AppRunner(manager_api_app)
-    await client_api_runner.setup()
-    await manager_api_runner.setup()
-    client_service_addr = local_config["api"]["client"]["service-addr"]
-    manager_service_addr = local_config["api"]["manager"]["service-addr"]
-    client_api_site = web.TCPSite(
-        client_api_runner,
-        str(client_service_addr.host),
-        client_service_addr.port,
-        backlog=1024,
-        reuse_port=True,
-        ssl_context=client_ssl_ctx,
-    )
-    manager_api_site = web.TCPSite(
-        manager_api_runner,
-        str(manager_service_addr.host),
-        manager_service_addr.port,
-        backlog=1024,
-        reuse_port=True,
-        ssl_context=manager_ssl_ctx,
-    )
-    await client_api_site.start()
-    await manager_api_site.start()
-    if os.geteuid() == 0:
-        uid = local_config["storage-proxy"]["user"]
-        gid = local_config["storage-proxy"]["group"]
-        os.setgroups(
-            [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
-        )
-        os.setgid(gid)
-        os.setuid(uid)
-        log.info("Changed process uid:gid to {}:{}", uid, gid)
-    log.info("Started service.")
+    m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
+    m.console_locals["local_config"] = local_config
+    aiomon_started = False
     try:
-        yield
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+
+    try:
+        etcd = load_shared_config(local_config)
+        ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
+        m.console_locals["ctx"] = ctx
+        client_api_app = await init_client_app(ctx)
+        manager_api_app = await init_manager_app(ctx)
+        m.console_locals["client_api_app"] = client_api_app
+        m.console_locals["manager_api_app"] = manager_api_app
+
+        if pidx == 0:
+            await check_migration(ctx)
+
+        client_ssl_ctx = None
+        manager_ssl_ctx = None
+        if local_config["api"]["client"]["ssl-enabled"]:
+            client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            client_ssl_ctx.load_cert_chain(
+                str(local_config["api"]["client"]["ssl-cert"]),
+                str(local_config["api"]["client"]["ssl-privkey"]),
+            )
+        if local_config["api"]["manager"]["ssl-enabled"]:
+            manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            manager_ssl_ctx.load_cert_chain(
+                str(local_config["api"]["manager"]["ssl-cert"]),
+                str(local_config["api"]["manager"]["ssl-privkey"]),
+            )
+        client_api_runner = web.AppRunner(client_api_app)
+        manager_api_runner = web.AppRunner(manager_api_app)
+        await client_api_runner.setup()
+        await manager_api_runner.setup()
+        client_service_addr = local_config["api"]["client"]["service-addr"]
+        manager_service_addr = local_config["api"]["manager"]["service-addr"]
+        client_api_site = web.TCPSite(
+            client_api_runner,
+            str(client_service_addr.host),
+            client_service_addr.port,
+            backlog=1024,
+            reuse_port=True,
+            ssl_context=client_ssl_ctx,
+        )
+        manager_api_site = web.TCPSite(
+            manager_api_runner,
+            str(manager_service_addr.host),
+            manager_service_addr.port,
+            backlog=1024,
+            reuse_port=True,
+            ssl_context=manager_ssl_ctx,
+        )
+        await client_api_site.start()
+        await manager_api_site.start()
+        if os.geteuid() == 0:
+            uid = local_config["storage-proxy"]["user"]
+            gid = local_config["storage-proxy"]["group"]
+            os.setgroups(
+                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+            )
+            os.setgid(gid)
+            os.setuid(uid)
+            log.info("Changed process uid:gid to {}:{}", uid, gid)
+        log.info("Started service.")
+        try:
+            yield
+        finally:
+            log.info("Shutting down...")
+            await manager_api_runner.cleanup()
+            await client_api_runner.cleanup()
     finally:
-        log.info("Shutting down...")
-        await manager_api_runner.cleanup()
-        await client_api_runner.cleanup()
+        if aiomon_started:
+            m.close()
 
 
 @click.group(invoke_without_command=True)
@@ -134,51 +151,48 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. "
-    "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)",
+    help=(
+        "The config file path. "
+        "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)"
+    ),
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, debug):
-    # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")
-
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+def main(
+    cli_ctx,
+    config_path: Path,
+    log_level: LogSeverity,
+    debug: bool = False,
+) -> int:
     if debug:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
     try:
-        local_config = config.check(raw_cfg, local_config_iv)
-        local_config["_src"] = cfg_src_path
-    except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of agent configuration has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
+        local_config = load_local_config(config_path, debug=debug)
+    except ConfigurationError:
         raise click.Abort()
-
-    if local_config["debug"]["enabled"]:
-        config.override_key(local_config, ("logging", "level"), "DEBUG")
-        config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
-
-    # if os.getuid() != 0:
-    #     print('Storage agent can only be run as root', file=sys.stderr)
-    #     raise click.Abort()
+    override_key(local_config, ("logging", "level"), log_level.name)
+    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
     multiprocessing.set_start_method("spawn")
 
     if cli_ctx.invoked_subcommand is None:
         local_config["storage-proxy"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
         log_sockpath = Path(
-            f"/tmp/backend.ai/ipc/storage-proxy-logger-{os.getpid()}.sock",
+            ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
