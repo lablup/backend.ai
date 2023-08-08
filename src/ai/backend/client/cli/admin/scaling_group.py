@@ -94,8 +94,8 @@ def list(ctx: CLIContext) -> None:
 @click.option(
     "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
 )
-@click.option("--wsproxy_addr", type=str, default="", help="Set app proxy address.")
-@click.option("--wsproxy_api_token", type=str, default="", help="Set app proxy API token.")
+@click.option("--wsproxy-addr", type=str, default="", help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default="", help="Set app proxy API token.")
 def add(
     ctx: CLIContext,
     name,
@@ -153,7 +153,7 @@ def add(
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-@click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
+@click.option("-d", "--description", type=str, default="", help="Description of new scaling group.")
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
 @click.option(
     "-p",
@@ -178,8 +178,8 @@ def add(
 @click.option(
     "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
 )
-@click.option("--wsproxy_addr", type=str, default="", help="Set app proxy address.")
-@click.option("--wsproxy_api_token", type=str, default="", help="Set app proxy API token.")
+@click.option("--wsproxy-addr", type=str, default="", help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default="", help="Set app proxy API token.")
 def update(
     ctx: CLIContext,
     name,
