@@ -94,8 +94,8 @@ def list(ctx: CLIContext) -> None:
 @click.option(
     "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
 )
-@click.option("--wsproxy-addr", type=str, default="", help="Set app proxy address.")
-@click.option("--wsproxy-api-token", type=str, default="", help="Set app proxy API token.")
+@click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
 def add(
     ctx: CLIContext,
     name,
@@ -178,8 +178,8 @@ def add(
 @click.option(
     "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
 )
-@click.option("--wsproxy-addr", type=str, default="", help="Set app proxy address.")
-@click.option("--wsproxy-api-token", type=str, default="", help="Set app proxy API token.")
+@click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
 def update(
     ctx: CLIContext,
     name,
