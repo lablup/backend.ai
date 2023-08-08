@@ -192,15 +192,19 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
 @click.option(
     "--need-password-change",
     is_flag=True,
-    help="Flag indicate that user needs to change password. "
-    "Useful when admin manually create password.",
+    help=(
+        "Flag indicate that user needs to change password. "
+        "Useful when admin manually create password."
+    ),
 )
 @click.option(
     "--allowed-ip",
     type=list_expr,
     default=None,
-    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
-    '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)',
+    help=(
+        "Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
+        '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
+    ),
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
 def add(
@@ -280,15 +284,19 @@ def add(
 @click.option(
     "--need-password-change",
     is_flag=True,
-    help="Flag indicate that user needs to change password. "
-    "Useful when admin manually create password.",
+    help=(
+        "Flag indicate that user needs to change password. "
+        "Useful when admin manually create password."
+    ),
 )
 @click.option(
     "--allowed-ip",
     type=list_expr,
     default=None,
-    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
-    '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)',
+    help=(
+        "Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
+        '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
+    ),
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
 def update(
@@ -388,9 +396,11 @@ def delete(ctx: CLIContext, email):
     "--purge-shared-vfolders",
     is_flag=True,
     default=False,
-    help="Delete user's all virtual folders. "
-    "If False, shared folders will not be deleted "
-    "and migrated the ownership to the requested admin.",
+    help=(
+        "Delete user's all virtual folders. "
+        "If False, shared folders will not be deleted "
+        "and migrated the ownership to the requested admin."
+    ),
 )
 def purge(ctx: CLIContext, email, purge_shared_vfolders):
     """

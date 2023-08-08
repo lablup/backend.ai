@@ -16,8 +16,8 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 22.09 and earlier
+## 23.03 and earlier
 
 Please refer the following per-package changelogs.
 
-* [Unified changelog for the core components](https://github.com/lablup/backend.ai/blob/22.09/CHANGELOG.md)
+* [Unified changelog for the core components](https://github.com/lablup/backend.ai/blob/23.03/CHANGELOG.md)

@@ -50,7 +50,7 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import KernelRow, SessionRow
+from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -86,8 +86,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     )
                 ),
             )
@@ -299,8 +302,11 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session: SessionRow = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     ),  # noqa
                 ),
             )
@@ -398,8 +404,10 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
             await ws.send_json(
                 {
                     "status": "server-restarting",
-                    "msg": "The API server is going to restart for maintenance. "
-                    "Please connect again with the same run ID.",
+                    "msg": (
+                        "The API server is going to restart for maintenance. "
+                        "Please connect again with the same run ID."
+                    ),
                 }
             )
         raise
@@ -444,8 +452,11 @@ async def stream_proxy(
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     ),
                 )
             )
@@ -505,13 +516,11 @@ async def stream_proxy(
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
     conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
-    _conn_tracker_script = textwrap.dedent(
-        """
+    _conn_tracker_script = textwrap.dedent("""
         local now = redis.call('TIME')
         now = now[1] + (now[2] / (10^6))
         redis.call('ZADD', KEYS[1], now, ARGV[1])
-    """
-    )
+    """)
 
     async def refresh_cb(kernel_id: str, data: bytes) -> None:
         await asyncio.shield(
@@ -630,8 +639,11 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        compute_session = await SessionRow.get_session_with_kernels(
-            session_name, access_key, only_main_kern=True, db_session=db_sess
+        compute_session = await SessionRow.get_session(
+            db_sess,
+            session_name,
+            access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
     service_ports = compute_session.main_kernel.service_ports
     if service_ports is None:
@@ -699,7 +711,8 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn(
-                        "stream_conn_tracker_gc(): error while connecting to Etcd server, retrying..."
+                        "stream_conn_tracker_gc(): error while connecting to Etcd server,"
+                        " retrying..."
                     )
                 else:
                     raise e

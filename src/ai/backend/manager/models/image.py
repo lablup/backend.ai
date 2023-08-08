@@ -569,7 +569,7 @@ class Image(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars.all()]
+            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -660,7 +660,6 @@ class Image(graphene.ObjectType):
 
 
 class PreloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -682,7 +681,6 @@ class PreloadImage(graphene.Mutation):
 
 
 class UnloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -704,7 +702,6 @@ class UnloadImage(graphene.Mutation):
 
 
 class RescanImages(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -734,7 +731,6 @@ class RescanImages(graphene.Mutation):
 
 
 class ForgetImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -766,7 +762,6 @@ class ForgetImage(graphene.Mutation):
 
 
 class AliasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -802,7 +797,6 @@ class AliasImage(graphene.Mutation):
 
 
 class DealiasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -833,7 +827,6 @@ class DealiasImage(graphene.Mutation):
 
 
 class ClearImages(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -882,7 +875,6 @@ class ModifyImageInput(graphene.InputObjectType):
 
 
 class ModifyImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

@@ -21,12 +21,13 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -39,6 +40,8 @@ class DockerKernel(AbstractKernel):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -50,6 +53,8 @@ class DockerKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -126,6 +131,11 @@ class DockerKernel(AbstractKernel):
         )
         return result
 
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
+        return result
+
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
@@ -141,7 +151,7 @@ class DockerKernel(AbstractKernel):
         lock_path = commit_path / "lock" / str(kernel_id)
         return commit_path, lock_path
 
-    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str):
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         _, lock_path = self._get_commit_path(kernel_id, subdir)
         if lock_path.exists():
             return CommitStatus.ONGOING
@@ -284,16 +294,14 @@ class DockerKernel(AbstractKernel):
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -314,8 +322,7 @@ class DockerKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
         proc = await asyncio.create_subprocess_exec(
             *[
                 "docker",
@@ -334,9 +341,12 @@ class DockerKernel(AbstractKernel):
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
+    async def notify_event(self, evdata: AgentEventData):
+        assert self.runner is not None
+        await self.runner.feed_event(evdata)
+
 
 class DockerCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int
@@ -380,7 +390,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
 
     try:
         for item in await docker.images.list():
-            if item["RepoTags"] is None:
+            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
                 continue
             if item["RepoTags"][0] == extractor_image:
                 break
@@ -523,9 +533,12 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                 "Cmd": [
                     "/bin/sh",
                     "-c",
-                    "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
-                    "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
+                    (
+                        "ctr -n services.linuxkit t kill --exec-id metaproxy docker;ctr -n"
+                        " services.linuxkit t exec --exec-id metaproxy docker"
+                        " /host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port"
+                        f" {server_port}"
+                    ),
                 ],
                 "HostConfig": {
                     "PidMode": "host",

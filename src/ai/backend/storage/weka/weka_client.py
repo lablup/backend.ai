@@ -320,8 +320,8 @@ class WekaAPIClient:
         self,
         path: str,
         inode_id: int,
-        hard_limit: Optional[BinarySize] = None,
-        soft_limit: Optional[BinarySize] = None,
+        hard_limit: Optional[int] = None,
+        soft_limit: Optional[int] = None,
     ) -> None:
         """
         Sets quota using undocumented V1 API. Should be considered deprecated
@@ -339,9 +339,9 @@ class WekaAPIClient:
         }
 
         if soft_limit is not None:
-            body["params"]["soft_limit_bytes"] = int(soft_limit)
+            body["params"]["soft_limit_bytes"] = soft_limit
         if hard_limit is not None:
-            body["params"]["hard_limit_bytes"] = int(hard_limit)
+            body["params"]["hard_limit_bytes"] = hard_limit
 
         async with aiohttp.ClientSession() as sess:
             await sess.post(
