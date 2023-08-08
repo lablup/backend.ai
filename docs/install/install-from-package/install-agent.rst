@@ -71,7 +71,11 @@ would be:
    scaling-group = "default"
    pid-file = "/home/bai/agent/agent.pid"
    event-loop = "uvloop"
-   # allow-compute-plugins = "ai.backend.accelerator.cuda_open"
+   ipc-base-path = "/tmp/backend.ai/ipc"
+   var-base-path = "/home/bai/agent/var/lib/backend.ai"
+   # allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]
+   # block-compute-plugins = []
+   image-commit-path = "/home/bai/agent/tmp/backend.ai/commit/"
 
    [container]
    port-range = [30000, 31000]
@@ -96,6 +100,13 @@ would be:
    level = "INFO"
    drivers = ["console", "file"]
 
+   [logging.pkg-ns]
+   "" = "WARNING"
+   "aiodocker" = "INFO"
+   "aiotools" = "INFO"
+   "aiohttp" = "INFO"
+   "ai.backend" = "INFO"
+
    [logging.console]
    colored = true
    format = "verbose"
@@ -106,17 +117,12 @@ would be:
    backup-count = 10
    rotation-size = "10M"
 
-   [logging.pkg-ns]
-   "" = "WARNING"
-   "aiodocker" = "INFO"
-   "aiotools" = "INFO"
-   "aiohttp" = "INFO"
-   "ai.backend" = "INFO"
-
    [resource]
    reserved-cpu = 1
    reserved-mem = "1G"
    reserved-disk = "8G"
+   allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+   affinity-policy = "INTERLEAVED"
 
    [debug]
    enabled = false

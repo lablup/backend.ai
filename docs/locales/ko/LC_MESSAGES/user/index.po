@@ -20,5 +20,5 @@ msgstr ""
 
 #: ../../user/index.rst:2 26ad872b09c04a349469e3cb3371bf5e
 msgid "User Guides"
-msgstr ""
+msgstr "사용자 가이드"
 
