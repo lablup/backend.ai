@@ -1226,6 +1226,10 @@ class VirtualFolder(graphene.ObjectType):
         j = vfolders.join(
             vfolder_permissions,
             vfolders.c.id == vfolder_permissions.c.vfolder,
+        ).join(
+            users,
+            vfolders.c.user == users.c.uuid,
+            isouter=True,
         )
         query = (
             sa.select([sa.func.count()])
@@ -1307,7 +1311,6 @@ class VirtualFolder(graphene.ObjectType):
         from ai.backend.manager.models import association_groups_users as agus
 
         from .group import groups
-        from .user import users
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
 
@@ -1316,11 +1319,11 @@ class VirtualFolder(graphene.ObjectType):
 
         grps = result.fetchall()
         group_ids = [g.group_id for g in grps]
-        j = vfolders.join(groups, vfolders.c.group == groups.c.id)
+        j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
         query = sa.select([sa.func.count()]).select_from(j).where(vfolders.c.group.in_(group_ids))
 
         if domain_name is not None:
-            query = query.where(users.c.domain_name == domain_name)
+            query = query.where(groups.c.domain_name == domain_name)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -1344,7 +1347,6 @@ class VirtualFolder(graphene.ObjectType):
         from ai.backend.manager.models import association_groups_users as agus
 
         from .group import groups
-        from .user import users
 
         query = sa.select([agus.c.group_id]).select_from(agus).where(agus.c.user_id == user_id)
         async with graph_ctx.db.begin_readonly() as conn:
@@ -1365,7 +1367,7 @@ class VirtualFolder(graphene.ObjectType):
             .offset(offset)
         )
         if domain_name is not None:
-            query = query.where(users.c.domain_name == domain_name)
+            query = query.where(groups.c.domain_name == domain_name)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
