@@ -1228,8 +1228,7 @@ class VirtualFolder(graphene.ObjectType):
             vfolders.c.id == vfolder_permissions.c.vfolder,
         ).join(
             users,
-            vfolders.c.user == users.c.uuid,
-            isouter=True,
+            vfolder_permissions.c.user == users.c.uuid,
         )
         query = (
             sa.select([sa.func.count()])
@@ -1268,8 +1267,7 @@ class VirtualFolder(graphene.ObjectType):
             vfolders.c.id == vfolder_permissions.c.vfolder,
         ).join(
             users,
-            vfolders.c.user == users.c.uuid,
-            isouter=True,
+            vfolder_permissions.c.user == users.c.uuid,
         )
         query = (
             sa.select([vfolders, users.c.email])
