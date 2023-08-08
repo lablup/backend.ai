@@ -1,5 +1,5 @@
 # SOME DESCRIPTIVE TITLE.
-# Copyright (C) 2015-2022, Lablup Inc.
+# Copyright (C) 2015-2023, Lablup Inc.
 # This file is distributed under the same license as the Backend.AI
 # Documentation package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
