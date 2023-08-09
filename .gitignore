@@ -63,6 +63,7 @@ docs/_build/
 
 # pyenv
 .python-version
+.python-runtime
 
 # celery beat schedule file
 celerybeat-schedule
@@ -83,10 +84,11 @@ ENV/
 .*.swp
 .*.swo
 .vscode/
+.vim/
 /.vimrc
 /.nvimrc
 /.exrc
-.vim/
+.ripgreprc
 
 # Pants
 /.pants.d/
@@ -120,7 +122,7 @@ ENV/
 /vfroot/
 /*.pid
 /scratches/
-logs
+logs/
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -130,7 +132,7 @@ logs
 
 # macOS specific
 .DS_Store
+._.DS_Store
 
-.python-runtime
-
+# Generated files
 docs/manager/rest-reference/openapi.json

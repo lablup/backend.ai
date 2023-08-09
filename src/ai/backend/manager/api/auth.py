@@ -425,7 +425,7 @@ async def check_password_age(
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
-    Fetches user information and sets up keypair, uesr, and is_authorized
+    Fetches user information and sets up keypair, user, and is_authorized
     attributes.
     """
     # This is a global middleware: request.app is the root app.

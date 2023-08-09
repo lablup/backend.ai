@@ -72,7 +72,7 @@ from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
-from .minilang.queryfilter import FieldSpecType, QueryFilterParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
 
@@ -209,76 +209,60 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
 
 SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     SessionStatus.PENDING: {
-        s for s in SessionStatus if s not in (SessionStatus.PENDING, SessionStatus.TERMINATED)
+        SessionStatus.SCHEDULED,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.SCHEDULED: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.SCHEDULED,
-            SessionStatus.PENDING,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.PULLING,
+        SessionStatus.PREPARING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.PULLING: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.PULLING,
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATING,  # cannot destroy PULLING session
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.PREPARING,
+        SessionStatus.RUNNING,
+        SessionStatus.RUNNING_DEGRADED,
+        # SessionStatus.TERMINATING,  # cannot destroy PULLING session by user
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.PREPARING: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.PREPARING,
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.PULLING,
+        SessionStatus.RUNNING,
+        SessionStatus.RUNNING_DEGRADED,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
     },
     SessionStatus.RUNNING: {
         SessionStatus.RESTARTING,
+        SessionStatus.RUNNING_DEGRADED,
         SessionStatus.TERMINATING,
         SessionStatus.TERMINATED,
         SessionStatus.ERROR,
     },
     SessionStatus.RESTARTING: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.RESTARTING,
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.RUNNING,
+        SessionStatus.RUNNING_DEGRADED,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
     },
     SessionStatus.RUNNING_DEGRADED: {
-        s
-        for s in SessionStatus
-        if s
-        not in (
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.TERMINATED,
-            SessionStatus.CANCELLED,
-        )
+        SessionStatus.RUNNING,
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.ERROR,
     },
     SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
     SessionStatus.TERMINATED: set(),
-    SessionStatus.ERROR: set(),
+    SessionStatus.ERROR: {SessionStatus.TERMINATED},
     SessionStatus.CANCELLED: set(),
 }
 
@@ -1383,7 +1367,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),
-        "type": ("sessions_session_type", lambda s: SessionTypes[s]),
+        "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1397,9 +1381,9 @@ class ComputeSession(graphene.ObjectType):
         "scaling_group": ("sessions_scaling_group_name", None),
         "cluster_mode": ("sessions_cluster_mode", lambda s: ClusterMode[s]),
         "cluster_size": ("sessions_cluster_size", None),
-        "status": ("sessions_status", lambda s: SessionStatus[s]),
+        "status": ("sessions_status", enum_field_getter(SessionStatus)),
         "status_info": ("sessions_status_info", None),
-        "result": ("sessions_result", lambda s: SessionResult[s]),
+        "result": ("sessions_result", enum_field_getter(SessionResult)),
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),

@@ -647,8 +647,6 @@ if jwt_available:
 
 
 class URL(t.Trafaret):
-    rx_scheme = re.compile(r"^[-a-z0-9]+://")
-
     def __init__(
         self,
         *,
@@ -657,19 +655,16 @@ class URL(t.Trafaret):
         self.scheme_required = scheme_required
 
     def check_and_return(self, value: Any) -> yarl.URL:
-        if not isinstance(value, (str, bytes)):
-            self._failure("A URL must be a unicode string or a byte sequence", value=value)
         if isinstance(value, bytes):
             value = value.decode("utf-8")
-        if self.scheme_required:
-            if not self.rx_scheme.match(value):
-                self._failure(
-                    "The given value does not have the scheme (protocol) part", value=value
-                )
         try:
-            return yarl.URL(value)
-        except ValueError as e:
-            self._failure(f"cannot convert the given value to URL (error: {e!r})", value=value)
+            parsed_url = yarl.URL(value)
+            if self.scheme_required:
+                parsed_url.origin()
+        except (ValueError, TypeError) as e:
+            self._failure(repr(e), value=value)
+        else:
+            return parsed_url
 
 
 class ToSet(t.Trafaret):
