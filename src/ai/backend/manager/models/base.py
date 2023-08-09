@@ -208,9 +208,9 @@ class ResourceSlotColumn(TypeDecorator):
             return value.to_json()
         return value
 
-    def process_result_value(self, raw_value: Dict[str, str], dialect) -> ResourceSlot:
+    def process_result_value(self, raw_value: Dict[str, str], dialect) -> ResourceSlot | None:
         if raw_value is None:
-            return ResourceSlot()
+            return None
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get("mem")
