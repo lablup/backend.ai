@@ -493,7 +493,9 @@ class SchedulerDispatcher(aobject):
                     hook_name = ""
 
             if hook_result.status == PASSED:
-                passed_predicates.append({"name": hook_name})
+                if hook_result.src_plugin:
+                    # Append result only when plugin exists.
+                    passed_predicates.append({"name": hook_name})
             else:
                 failed_predicates.append(
                     {
