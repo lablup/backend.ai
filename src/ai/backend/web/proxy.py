@@ -382,7 +382,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         else:
             endpoint = endpoint.with_scheme("ws")
             log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
-        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
+        api_session = await asyncio.shield(get_api_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
