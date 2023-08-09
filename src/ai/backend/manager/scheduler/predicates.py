@@ -4,6 +4,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
@@ -17,6 +18,7 @@ from ..models import (
     KeyPairRow,
     SessionDependencyRow,
     SessionRow,
+    SessionStatus,
 )
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
@@ -255,10 +257,34 @@ async def check_pending_session_limit(
     result = True
     failure_msgs = []
 
-    pending_sessions = await SessionRow.get_pending_sessions_to_check_predicate(
-        db_sess, sess_ctx.access_key
+    query = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.access_key == sess_ctx.access_key)
+            & (SessionRow.status == SessionStatus.PENDING)
+        )
+        .options(noload("*"), load_only(SessionRow.requested_slots))
     )
-    policy = await KeyPairResourcePolicyRow.get_pending_session_policy(db_sess, sess_ctx.access_key)
+    pending_sessions: list[SessionRow] = (await db_sess.scalars(query)).all()
+
+    j = sa.join(
+        KeyPairResourcePolicyRow,
+        KeyPairRow,
+        KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+    )
+    policy_stmt = (
+        sa.select(KeyPairResourcePolicyRow)
+        .select_from(j)
+        .where(KeyPairRow.access_key == sess_ctx.access_key)
+        .options(
+            noload("*"),
+            load_only(
+                KeyPairResourcePolicyRow.max_pending_session_count,
+                KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+            ),
+        )
+    )
+    policy: KeyPairResourcePolicyRow = (await db_sess.scalars(policy_stmt)).first()
 
     pending_count_limit: int | None = policy.max_pending_session_count
     if pending_count_limit is not None:
