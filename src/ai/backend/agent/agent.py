@@ -2295,6 +2295,9 @@ class AbstractAgent(
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
 
+    async def ping_kernel(self, kernel_id: KernelId):
+        return await self.kernel_registry[kernel_id].ping()
+
     async def save_last_registry(self, force=False) -> None:
         now = time.monotonic()
         if (not force) and (now <= self.last_registry_written_time + 60):
