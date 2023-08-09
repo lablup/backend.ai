@@ -2588,7 +2588,7 @@ class AgentRegistry:
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
-                log.exception("unexpected-error in _restart_kerenl()")
+                log.exception("unexpected-error in _restart_kernel()")
 
         restart_coros = []
         for kernel in kernel_list:
