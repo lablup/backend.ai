@@ -852,6 +852,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (4,)
+    app["prefix"] = "resource"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
