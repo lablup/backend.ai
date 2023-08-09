@@ -1281,7 +1281,6 @@ class AgentRegistry:
                 else:
                     session_images.append(image_ref.canonical)
         session_data["images"] = session_images
-
         try:
 
             async def _enqueue() -> None:
