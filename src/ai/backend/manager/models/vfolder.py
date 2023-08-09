@@ -79,7 +79,7 @@ __all__: Sequence[str] = (
     "UnsetQuotaScope",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
-    "initiate_vfolder_removal",
+    "initiate_vfolder_purge",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
@@ -956,7 +956,7 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
-async def initiate_vfolder_removal(
+async def initiate_vfolder_purge(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,

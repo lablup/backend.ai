@@ -73,7 +73,7 @@ from ..models import (
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     initiate_vfolder_clone,
-    initiate_vfolder_removal,
+    initiate_vfolder_purge,
     kernels,
     keypair_resource_policies,
     keypairs,
@@ -2226,7 +2226,7 @@ async def _delete(
 
     await update_vfolder_status(
         root_ctx.db,
-        [entry["id"]],
+        (entry["id"],),
         VFolderOperationStatus.DELETE_COMPLETE,
     )
 
@@ -2370,7 +2370,7 @@ async def purge(request: web.Request) -> web.Response:
     folder_host = entry["host"]
     # fs-level deletion may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
-    await initiate_vfolder_removal(
+    await initiate_vfolder_purge(
         root_ctx.db,
         [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         root_ctx.storage_manager,
@@ -2441,10 +2441,9 @@ async def recover(request: web.Request) -> web.Response:
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot recover the vfolder that is not owned by myself.")
 
-    folder_id = entry["id"]
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
-    await update_vfolder_status(root_ctx.db, folder_id, VFolderOperationStatus.READY)
+    await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
     return web.Response(status=204)
 
 
