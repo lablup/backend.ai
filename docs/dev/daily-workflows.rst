@@ -204,7 +204,7 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
 For example, flake8's executable path is
-``dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8``.
+``dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8``.
 
 Currently we have the following Python tools to configure in this way:
 
@@ -246,8 +246,14 @@ Currently we have the following Python tools to configure in this way:
 
 * ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
-VSCode
-~~~~~~
+VSCode (before 2023 July)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
+
+Set the extra package search path in the Python/Pylance extension like:
+
+* ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
 
 Set the following keys in the workspace settings:
 
@@ -258,6 +264,27 @@ Set the following keys in the workspace settings:
 * ``black``: ``python.formatting.blackPath``
 
 * ``isort``: ``python.sortImports.path``
+
+.. warning::
+
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
+   and manually update the Python interpreter path and mypy executable path configurations.
+
+VSCode (after 2023 July)
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
+
+Set the extra package search path in the Python/Pylance extension like:
+
+* ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+
+After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
+you should configure the following fields for each tool extension:
+
+* ``{tool}.interpreter = "dist/export/python/virtualenvs/{tool}/3.11.4/bin/python3"``
+
+* ``{tool}.importStrategy = "fromEnvironment"``
 
 .. warning::
 
@@ -285,10 +312,10 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/isort/3.11.3/bin/isort'  " requires absolute path
-   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.3/bin/black'  " requires absolute path
-   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8'
-   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.3/bin/mypy'
+   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/isort/3.11.4/bin/isort'  " requires absolute path
+   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
+   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
    let g:ale_fixers = {'python': ['isort', 'black']}
    let g:ale_fix_on_save = 1
 
@@ -303,14 +330,14 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.3/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.4/bin/python",
      "python.formatting.provider": "black",
-     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.3/bin/black",
-     "python.sortImports.path": "dist/export/python/virtualenvs/isort/3.11.3/bin/isort",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.4/bin/black",
+     "python.sortImports.path": "dist/export/python/virtualenvs/isort/3.11.4/bin/isort",
      "python.linting.mypyEnabled": true,
      "python.linting.flake8Enabled": true,
-     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.3/bin/mypy",
-     "python.linting.flake8Path": "dist/export/python/virtualenvs/flake8/3.11.3/bin/flake8"
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
+     "python.linting.flake8Path": "dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8"
    }
 
 
@@ -501,17 +528,39 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ pgrep pantsd | xargs kill
-   $ rm -r .tmp/immutable* .pants.d .pids ~/.cache/pants
+   $ pgrep pantsd | xargs -r kill
+   $ rm -r /tmp/*-pants/ .pants.d .pids ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
+
+Note that you may find out the concrete path inside ``/tmp`` from ``.pants.rc``'s
+``local_execution_root_dir`` option set by ``install-dev.sh``.
 
 .. warning::
 
    If you have run ``pants`` or the installation script with ``sudo``, some of the above directories
    may be owned by root and running ``pants`` as the user privilege would not work.
    In such cases, remove the directories with ``sudo`` and retry.
+
+Resolving missing directories error when running Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: text
+
+   ValueError: Failed to create temporary directory for immutable inputs: No such file or directory (os error 2) at path "/tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/immutable_inputsvIpaoN"
+
+If you encounter errors like above when running daily Pants commands like ``lint``,
+you may manually create the directory one step higher.
+For the above example, run:
+
+.. code-block:: shell
+
+   mkdir -p /tmp/bai-dev-PN4fpRLB2u2xL.j6-pants/
+
+If this workaround does not work, backup your current working files and
+reinstall by running ``scripts/delete-dev.sh`` and ``scripts/install-dev.sh``
+serially.
 
 Changing or updating the Python runtime for Pants
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -484,10 +484,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
         # ):
         #     params["quota"] = max_vfolder_size
 
-        # Prevent creation of vfolder with duplicated name.
+        # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [vfolders.c.name == params["name"]]
-        if not unmanaged_path:
-            extra_vf_conds.append(vfolders.c.host == folder_host)
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2070,10 +2068,8 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < len(params["emails"]):
             users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
-                (
-                    "Some users do not belong to folder's group:"
-                    f" {','.join(users_not_in_vfolder_group)}"
-                ),
+                "Some users do not belong to folder's group:"
+                f" {','.join(users_not_in_vfolder_group)}",
                 object_name="user",
             )
 
@@ -2594,12 +2590,11 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
                 (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
             )
             result = await conn.scalar(query)
-            if result >= resource_policy["max_vfolder_count"]:
+            if result >= resource_policy["max_vfolder_count"] and row["group"] is None:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
-        # Prevent creation of vfolder with duplicated name.
+        # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [vfolders.c.name == params["target_name"]]
-        extra_vf_conds.append(vfolders.c.host == target_folder_host)
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2624,9 +2619,9 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            target_quota_scope_id,
             params["target_name"],
             target_folder_host,
-            target_quota_scope_id,
             params["usage_mode"],
             params["permission"],
             request["user"]["email"],
@@ -2823,10 +2818,8 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
             raise BackendAgentError("TIMEOUT", "Could not fetch fstab data from agent")
         except Exception:
             log.exception(
-                (
-                    "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
-                    "unexpected error while reading from watcher (agent:{})"
-                ),
+                "VFOLDER.GET_FSTAB_CONTENTS(u:{}): "
+                "unexpected error while reading from watcher (agent:{})",
                 access_key,
                 params["agent_id"],
             )
@@ -2915,10 +2908,8 @@ async def list_mounts(request: web.Request) -> web.Response:
                 raise
             except Exception:
                 log.exception(
-                    (
-                        "VFOLDER.LIST_MOUNTS(u:{}): "
-                        "unexpected error while reading from watcher (agent:{})"
-                    ),
+                    "VFOLDER.LIST_MOUNTS(u:{}): "
+                    "unexpected error while reading from watcher (agent:{})",
                     access_key,
                     agent_id,
                 )
