@@ -1,6 +1,6 @@
 import json
 import textwrap
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping, Optional, Sequence
 
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.output.types import FieldSpec
@@ -127,8 +127,8 @@ class ScalingGroup(BaseFunction):
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
         use_host_network: bool = False,
-        wsproxy_addr: str = None,
-        wsproxy_api_token: str = None,
+        wsproxy_addr: Optional[str] = None,
+        wsproxy_api_token: Optional[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -176,8 +176,8 @@ class ScalingGroup(BaseFunction):
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
         use_host_network: bool = False,
-        wsproxy_addr: str = None,
-        wsproxy_api_token: str = None,
+        wsproxy_addr: Optional[str] = None,
+        wsproxy_api_token: Optional[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
