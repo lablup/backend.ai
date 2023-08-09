@@ -307,6 +307,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     slot_name,
                     str(alloc),
                     str(total_allocatable),
+                    allocation,
                 )
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
@@ -360,6 +361,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                         slot_name,
                         str(requested_alloc),
                         str(total_allocatable),
+                        allocation,
                     )
 
                 sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
@@ -381,6 +383,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                         slot_name,
                         str(requested_alloc),
                         str(total_allocatable),
+                        allocation,
                     )
                 initial_diffs = distribute(remaining_alloc, nonzero_devs)
                 diffs = {
@@ -532,6 +535,7 @@ class FractionAllocMap(AbstractAllocMap):
                     slot_name,
                     str(alloc),
                     str(total_allocatable),
+                    allocation,
                 )
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
@@ -656,6 +660,7 @@ class FractionAllocMap(AbstractAllocMap):
                     slot_name,
                     str(alloc),
                     str(total_allocatable),
+                    allocation,
                 )
 
             # allocate resources

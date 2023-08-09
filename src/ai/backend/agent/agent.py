@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import os
 import pickle
+import pprint
 import re
 import shutil
 import signal
@@ -73,6 +75,7 @@ from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     EventProducer,
     ExecutionCancelledEvent,
@@ -126,7 +129,7 @@ from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
 from .config import model_definition_iv
-from .exception import AgentError, ContainerCreationError, ResourceError
+from .exception import AgentError, ContainerCreationError, InsufficientResource, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -1701,6 +1704,80 @@ class AbstractAgent(
                             affinity_hint = AffinityHint(
                                 hint_devices, self.affinity_map, affinity_hint.policy
                             )
+                        except InsufficientResource as e:
+                            await self.produce_event(
+                                DoAgentResourceCheckEvent(
+                                    ctx.agent_id,
+                                )
+                            )
+                            plugin_alloc_map: MutableMapping[
+                                DeviceName,
+                                MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]],
+                            ] = {
+                                dev: dict(self.computers[dev].alloc_map.allocations)
+                                for dev in ordered_dev_names
+                            }
+                            original_plugin_alloc_map = copy.deepcopy(plugin_alloc_map)
+                            for device_name, device_dict in plugin_alloc_map.items():
+                                for temp_slot_name, slot_dict in device_dict.items():
+                                    if temp_slot_name in e.args[5]:
+                                        for device_id in slot_dict.keys():
+                                            if device_id in e.args[5][temp_slot_name]:
+                                                plugin_alloc_map[device_name][temp_slot_name][
+                                                    device_id
+                                                ] += e.args[5][temp_slot_name][device_id]
+
+                            occupied_slots_from_kernel: dict[SlotName, Decimal] = {}
+
+                            def _kernel_resource_spec_read(filename):
+                                with open(filename, "r") as f:
+                                    resource_spec = KernelResourceSpec.read_from_file(f)
+                                return resource_spec
+
+                            async with self.registry_lock:
+                                for kernel_id in self.kernel_registry.keys():
+                                    scratch_dir = (
+                                        self.local_config["container"]["scratch-root"]
+                                        / str(kernel_id)
+                                    ).resolve()
+                                    kernel_resource_spec = await self.loop.run_in_executor(
+                                        None,
+                                        _kernel_resource_spec_read,
+                                        scratch_dir / "config" / "resource.txt",
+                                    )
+                                    if kernel_resource_spec is None:
+                                        continue
+                                    else:
+                                        for i in kernel_resource_spec.slots.keys():
+                                            if i in occupied_slots_from_kernel:
+                                                occupied_slots_from_kernel[i] = Decimal(
+                                                    occupied_slots_from_kernel[i]
+                                                ) + Decimal(kernel_resource_spec.slots[i])
+                                            else:
+                                                occupied_slots_from_kernel[i] = Decimal(
+                                                    kernel_resource_spec.slots[i]
+                                                )
+
+                            log.error(
+                                "resource allocation failed (InsufficientResource)\n{0}\nwith"
+                                " context tag: {1}\nat allocating {2} {3}\ntotal allocatable"
+                                " amount:"
+                                " {4}\n-----------------------------------------------\n(before"
+                                " allocation) compute plugin alloc map:\n"
+                                " {5}\n-----------------------------------------------\n(error"
+                                " during allocation) occupied slots from compute plugin alloc"
+                                " map:\n{6}\n-----------------------------------------------\noccupied"
+                                " slots from kernel resources: {7}",
+                                e.args[0],
+                                e.args[1],
+                                e.args[2],
+                                e.args[3],
+                                e.args[4],
+                                pprint.pformat(original_plugin_alloc_map),
+                                pprint.pformat(plugin_alloc_map),
+                                occupied_slots_from_kernel,
+                            )
+                            raise
                         except ResourceError as e:
                             log.info(
                                 "resource allocation failed ({}): {} of {}\n(alloc map: {})",
