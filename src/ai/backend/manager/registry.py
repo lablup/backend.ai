@@ -1282,21 +1282,6 @@ class AgentRegistry:
                     session_images.append(image_ref.canonical)
         session_data["images"] = session_images
 
-        hook_result = await self.hook_plugin_ctx.dispatch(
-            "PRE_ENQUEUE_SESSION_POST_CONFIG_CHECK",
-            (
-                self.db,
-                session_id,
-                session_name,
-                access_key,
-                user_scope.user_uuid,
-                session_requested_slots,
-            ),
-            return_when=ALL_COMPLETED,
-        )
-        if hook_result.status != PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
         try:
 
             async def _enqueue() -> None:

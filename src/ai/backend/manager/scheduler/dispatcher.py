@@ -44,6 +44,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -470,6 +471,36 @@ class SchedulerDispatcher(aobject):
                         }
                     )
                     has_failure = True
+
+            async def _check_predicates_hook() -> HookResult:
+                async with self.db.begin_session() as db_sess:
+                    return await self.registry.hook_plugin_ctx.dispatch(
+                        "PREDICATE",
+                        (
+                            db_sess,
+                            sched_ctx,
+                            sess_ctx,
+                        ),
+                    )
+
+            hook_result = await execute_with_retry(_check_predicates_hook)
+            match hook_result.src_plugin:
+                case str():
+                    hook_name = hook_result.src_plugin
+                case list():
+                    hook_name = f"({', '.join(hook_result.src_plugin)})"
+                case _:
+                    hook_name = ""
+
+            if hook_result.status == PASSED:
+                passed_predicates.append({"name": hook_name})
+            else:
+                failed_predicates.append(
+                    {
+                        "name": hook_name,
+                        "msg": hook_result.reason or "",
+                    }
+                )
 
             status_update_data = {
                 "last_try": datetime.now(tzutc()).isoformat(),
