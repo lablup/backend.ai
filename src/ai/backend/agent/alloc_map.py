@@ -533,7 +533,6 @@ class FractionAllocMap(AbstractAllocMap):
                     str(alloc),
                     str(total_allocatable),
                 )
-            slot_allocation = {}
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
                 allocatable = self.device_slots[dev_id].amount - current_alloc
@@ -665,7 +664,6 @@ class FractionAllocMap(AbstractAllocMap):
                 <= self.device_slots[sorted_dev_allocs[0][0]].amount - sorted_dev_allocs[0][1]
             ):
                 # if remaining_alloc fits in one device
-                slot_allocation = {}
                 for dev_id, current_alloc in sorted_dev_allocs[::-1]:
                     allocatable = self.device_slots[dev_id].amount - current_alloc
                     if remaining_alloc <= allocatable:
