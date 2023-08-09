@@ -13,7 +13,6 @@ from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
 
-from ..config import container_registry_iv
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
 from .types import CORSOptions, WebMiddleware
@@ -131,6 +130,29 @@ async def get_docker_registries(request: web.Request) -> web.Response:
     )
 )
 async def get_config(request: web.Request, params: Any) -> web.Response:
+    """
+    A raw access API to read key-value pairs from the etcd.
+
+    .. warning::
+
+       When reading the keys with ``prefix=True``, it uses a simple string-prefix
+       matching over the flattened keys (with the delimiter "/").  Thus, it may
+       return additional keys that you may not want.
+
+       For example, reading "some/key1" will fetch all of the following keys:
+
+       .. code-block:: text
+
+           some/key1
+           some/key1/field1
+           some/key1/field2
+           some/key12
+           some/key12/field1
+           some/key12/field2
+
+       **To avoid this issue, developers must use dedicated CRUD APIs
+       instead of relying on the etcd raw access APIs whenever possible.**
+    """
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
         "ETCD.GET_CONFIG (ak:{}, key:{}, prefix:{})",
@@ -152,11 +174,14 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("key"): t.String,
-            t.Key("value"): container_registry_iv.check,
+            t.Key("value"): t.Any,
         }
     )
 )
 async def set_config(request: web.Request, params: Any) -> web.Response:
+    """
+    A raw access API to write key-value pairs into the etcd.
+    """
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
         "ETCD.SET_CONFIG (ak:{}, key:{}, val:{})",
@@ -195,6 +220,29 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def delete_config(request: web.Request, params: Any) -> web.Response:
+    """
+    A raw access API to delete key-value pairs from the etcd.
+
+    .. warning::
+
+       When deleting the keys with ``prefix=True``, it uses a simple string-prefix
+       matching over the flattened keys (with the delimiter "/"). This may result in
+       unexpected deletion of sibling keys.
+
+       For example, deleting "some/key1" will DELETE all of the following keys:
+
+       .. code-block:: text
+
+           some/key1
+           some/key1/field1
+           some/key1/field2
+           some/key12
+           some/key12/field1
+           some/key12/field2
+
+       **To avoid this issue, developers must use dedicated CRUD APIs
+       instead of relying on the etcd raw access APIs whenever possible.**
+    """
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
         "ETCD.DELETE_CONFIG (ak:{}, key:{}, prefix:{})",
