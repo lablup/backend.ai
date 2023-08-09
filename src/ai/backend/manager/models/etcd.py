@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Mapping, Sequence
 
 import graphene
 import trafaret as t
 
-from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..api.exceptions import InvalidAPIParameters, ObjectNotFound
+from ..config import container_registry_iv
 from . import UserRole
 from .base import privileged_mutation
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))  # type: ignore[name-defined]
+log = BraceStyleAdapter(
+    logging.getLogger("ai.backend.manager.models.kernel")
+)  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
     "ContainerRegistry",
@@ -28,17 +30,6 @@ __all__: Sequence[str] = (
 
 ETCD_CONTAINER_REGISTRY_KEY = "config/docker/registry"
 ETCD_CONTAINER_REGISTRY_CONFIG = {"username", "password", "project", "type", "ssl-verify"}
-
-container_registry_iv = t.Dict(
-    {
-        t.Key(""): tx.URL,
-        t.Key("type", default="docker"): t.String,
-        t.Key("username", default=None): t.Null | t.String,
-        t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
-        t.Key("ssl-verify", default=True): t.ToBool,
-    }
-).allow_extra("*")
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
@@ -70,7 +61,7 @@ class ContainerRegistry(graphene.ObjectType):
     config = graphene.Field(ContainerRegistryConfig)
 
     @classmethod
-    def from_row(cls, hostname: str, config: Mapping[str, str | None | Any]) -> ContainerRegistry:
+    def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
         return cls(
             hostname=hostname,
             config=ContainerRegistryConfig(
@@ -94,16 +85,10 @@ class ContainerRegistry(graphene.ObjectType):
         )
         raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
         registries = t.Mapping(t.String, container_registry_iv).check(raw_registries)
-
-        for _, value in registries.items():
-            if value["project"][0] == "[]":
-                value["project"].pop()
         return [cls.from_row(hostname, config) for hostname, config in registries.items()]
 
     @classmethod
-    async def load_registry(
-        cls, graph_ctx: GraphQueryContext, hostname: str
-    ) -> ContainerRegistry | None:
+    async def load_registry(cls, graph_ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
         log.info(
             "ETCD.LOAD_CONTAINER_REGISTRY (ak:{}, key:{}, hostname:{})",
             graph_ctx.access_key,
@@ -116,14 +101,12 @@ class ContainerRegistry(graphene.ObjectType):
         }
         if raw_registry[""] is None:
             raise ObjectNotFound(object_name=f"registry: {hostname}")
+
         for value in ETCD_CONTAINER_REGISTRY_CONFIG:
             raw_registry[value] = await graph_ctx.shared_config.etcd.get(
                 f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/{value}"
             )
         registry = container_registry_iv.check(raw_registry)
-
-        if registry["project"][0] == "[]":
-            registry["project"].pop()
         return cls.from_row(hostname, registry)
 
 
@@ -155,8 +138,8 @@ class CreateContainerRegistry(graphene.Mutation):
             "username": props.username,
             "password": props.password,
         }
-        valid_config = container_registry_iv.check(raw_config)
-        config = {key: value for key, value in valid_config.items() if value is not None}
+        container_registry_iv.check(raw_config)
+        config = {key: value for key, value in raw_config.items() if value is not None}
 
         log.info(
             "ETCD.CREATE_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
@@ -187,10 +170,6 @@ class CreateContainerRegistry(graphene.Mutation):
 
 
 class ModifyContainerRegistry(graphene.Mutation):
-    """
-    CreateContainerRegistry class and ModifyContainerRegistry class share the same logic.
-    """
-
     allowed_roles = (UserRole.SUPERADMIN,)
     result = graphene.String()
 
@@ -207,6 +186,12 @@ class ModifyContainerRegistry(graphene.Mutation):
         cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
     ) -> ModifyContainerRegistry:
         graph_ctx: GraphQueryContext = info.context
+        if (
+            await graph_ctx.shared_config.etcd.get(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+            is None
+        ):
+            raise ObjectNotFound(object_name=f"registry: {hostname}")
+
         raw_config = {
             "": props.url,
             "type": props.container_type,
@@ -214,8 +199,8 @@ class ModifyContainerRegistry(graphene.Mutation):
             "username": props.username,
             "password": props.password,
         }
-        valid_config = container_registry_iv.check(raw_config)
-        config = {key: value for key, value in valid_config.items() if value is not None}
+        container_registry_iv.check(raw_config)
+        config = {key: value for key, value in raw_config.items() if value is not None}
 
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
@@ -264,6 +249,11 @@ class DeleteContainerRegistry(graphene.Mutation):
         hostname: str,
     ) -> DeleteContainerRegistry:
         graph_ctx: GraphQueryContext = info.context
+        if (
+            await graph_ctx.shared_config.etcd.get(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+            is None
+        ):
+            raise ObjectNotFound(object_name=f"registry: {hostname}")
         log.info(
             "ETCD.DELETE_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{})",
             graph_ctx.access_key,
