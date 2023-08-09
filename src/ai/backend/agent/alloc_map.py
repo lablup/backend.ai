@@ -284,9 +284,9 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-        allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
+        allocation: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
-            slot_allocation: dict[DeviceId, Decimal] = {}
+            slot_allocation: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if log_alloc_map:
                 log.debug("DiscretePropertyAllocMap(FILL): allocating {} {}", slot_name, alloc)
@@ -474,7 +474,7 @@ class FractionAllocMap(AbstractAllocMap):
         )
         actual_alloc_map: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]] = {}
         for slot_name, alloc in calculated_alloc_map.items():
-            actual_alloc: MutableMapping[DeviceId, Decimal] = {}
+            actual_alloc: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
             for dev_id, val in alloc.items():
                 self.allocations[slot_name][dev_id] = round_down(
                     self.allocations[slot_name][dev_id], self.quantum_size
@@ -499,9 +499,9 @@ class FractionAllocMap(AbstractAllocMap):
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
-        allocation = {}
+        allocation: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
-            slot_allocation: MutableMapping[DeviceId, Decimal] = {}
+            slot_allocation: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
 
             # fill up starting from the most free devices
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
@@ -607,7 +607,7 @@ class FractionAllocMap(AbstractAllocMap):
             remaining_alloc: Decimal,
             slot_name: str,
         ) -> MutableMapping[DeviceId, Decimal]:
-            slot_allocation: MutableMapping[DeviceId, Decimal] = {}
+            slot_allocation: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
             n_devices = len(dev_allocs)
             idx = n_devices - 1  # check from the device with smallest allocatable resource
             while n_devices > 0:
@@ -627,9 +627,9 @@ class FractionAllocMap(AbstractAllocMap):
             return slot_allocation
 
         min_memory = min_memory.quantize(self.digits)
-        allocation = {}
+        allocation: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
-            slot_allocation: MutableMapping[DeviceId, Decimal] = {}
+            slot_allocation: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
             remaining_alloc = Decimal(alloc).normalize()
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
 
