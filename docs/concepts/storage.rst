@@ -15,6 +15,7 @@ If the shared vfolder has limited the permission to read-only, then the user may
 Virtual folders are mounted into compute session containers at ``/home/work/{name}`` so that user programs have access to the virtual folder contents like a local directory.
 The mounted path inside containers may be customized (e.g., ``/workspace``) for compatibility with existing scripts and codes.
 Currently it is not possible to unmount or delete a vfolder when there are any running session connected to it.
+For cluster sessions having multiple kernels (containers), the connected vfolders are mounted to all kernels using the same location and the permission.
 
 For a multi-node setup, the storage volume mounts must be synchronized across all Agent nodes and the Storage Proxy node(s) using the same mount path (e.g., ``/mnt`` or ``/vfroot``).
 For a single-node setup, you may simply use an empty local directory, like our ``install-dev.sh`` script (`link <https://github.com/lablup/backend.ai/blob/main/scripts/install-dev.sh>`_) does.
@@ -25,14 +26,19 @@ This allows a flexible permission sharing between users and projects, while keep
 User-owned vfolders
 ^^^^^^^^^^^^^^^^^^^
 
-The users may create their own (one or more) virtual folders to store data files, libraries, and program codes.
-Each vfolder (virtual folder) is created under a designated storage mount (called "vfolder hosts").
+The users may create their own one or more virtual folders to store data files, libraries, and program codes.
+The superadmins may limit the maximum number of vfolders owned by a user.
 
 Project-owned vfolders
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The project admins and superadmins may create a vfolder that is automatically shared to all members of the project,
 with a specific read-only or read-write permission.
+
+.. note::
+
+   If allowed, users and projects may create and access vfolders in multiple different storage volumes,
+   but the vfolder names must be unique in all storage volumes, for each user and project.
 
 VFolder invitations and permissions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -46,12 +52,20 @@ Volume-level permissions
 The superadmin may set additional action privileges to each storage volume,
 such as whether to allow or block mounting the vfolders in compute sessions, cloning the vfolders, etc.
 
+Auto-mount vfolders
+^^^^^^^^^^^^^^^^^^^
+
+If the user-owned vfolder's name starts with a dot, it is automatically mounted at ``/home/work`` for all sessions created by the user.
+A good usecase is ``.config`` and ``.local`` directories to keep your local configurations and user-installed packages (e.g., ``pip install --user``) persistent across all your sessions.
+
+
 Quota scopes
 ~~~~~~~~~~~~
 
 .. versionadded:: 23.03
 
-Quota scopes implement per-user and per-project storage space limits.
+Quota scopes implement per-user and per-project storage usage limits.
+Currently it only provides the hard limits specified in bytes.
 There are two main schemes to set up this feature.
 
 Storage with per-directory quota
