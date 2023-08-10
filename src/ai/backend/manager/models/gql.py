@@ -10,7 +10,6 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 from .etcd import (
-    ContainerRegistries,
     ContainerRegistry,
     CreateContainerRegistry,
     DeleteContainerRegistry,
@@ -584,7 +583,7 @@ class Queries(graphene.ObjectType):
 
     container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
 
-    container_registries = graphene.Field(ContainerRegistries)
+    container_registries = graphene.List(ContainerRegistry)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -1734,10 +1733,9 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         domain_name: Optional[str] = None,
         access_key: AccessKey = None,
-    ) -> ContainerRegistries:
+    ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
-        registries = await ContainerRegistry.load_all(ctx)
-        return ContainerRegistries(registries)
+        return await ContainerRegistry.load_all(ctx)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
