@@ -29,7 +29,6 @@ __all__: Sequence[str] = (
 )
 
 ETCD_CONTAINER_REGISTRY_KEY = "config/docker/registry"
-ETCD_CONTAINER_REGISTRY_CONFIG = {"username", "password", "project", "type", "ssl-verify"}
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
