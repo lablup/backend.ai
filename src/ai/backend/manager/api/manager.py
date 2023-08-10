@@ -17,13 +17,13 @@ from aiohttp import web
 from aiotools import aclosing
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events import DoScheduleEvent
+from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEvent
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
-from . import ManagerStatus
+from . import ManagerStatus, SchedulerEvent
 from .auth import superadmin_required
 from .exceptions import (
     GenericBadRequest,
@@ -246,6 +246,26 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
 
 
 @superadmin_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("event"): tx.Enum(SchedulerEvent),
+        }
+    )
+)
+async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    match params["event"]:
+        case SchedulerEvent.SCHEDULE:
+            await root_ctx.event_producer.produce_event(DoScheduleEvent())
+        case SchedulerEvent.PREPARE:
+            await root_ctx.event_producer.produce_event(DoPrepareEvent())
+        case SchedulerEvent.SCALE:
+            await root_ctx.event_producer.produce_event(DoScaleEvent())
+    return web.Response(status=204)
+
+
+@superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     manager_id = root_ctx.local_config["manager"]["id"]
@@ -289,6 +309,7 @@ def create_app(
     cors.add(announcement_resource.add_route("GET", get_announcement))
     cors.add(announcement_resource.add_route("POST", update_announcement))
     cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
+    cors.add(app.router.add_route("POST", "/scheduler/trigger", scheduler_trigger))
     cors.add(app.router.add_route("GET", "/scheduler/ping", scheduler_healthcheck))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
