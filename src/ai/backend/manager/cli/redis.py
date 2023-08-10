@@ -5,9 +5,11 @@ import logging
 from typing import TYPE_CHECKING
 
 import click
+import redis
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.cli.context import redis_ctx
 
 if TYPE_CHECKING:
@@ -21,6 +23,13 @@ def cli() -> None:
     pass
 
 
+async def _ping(redis_conn: RedisConnectionInfo) -> None:
+    try:
+        await redis_helper.execute(redis_conn, lambda r: r.execute_command("PING"))
+    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+        log.exception(f"ping(): Redis ping failed: {e}")
+
+
 @cli.command()
 @click.pass_obj
 def ping(cli_ctx: CLIContext) -> None:
@@ -30,38 +39,11 @@ def ping(cli_ctx: CLIContext) -> None:
 
     async def _impl():
         async with redis_ctx(cli_ctx) as redis_conn_set:
-            try:
-                await redis_helper.execute(
-                    redis_conn_set.live,
-                    lambda r: r.execute_command("PING"),
-                )
-                log.info("REDIS_LIVE_DB is ok")
-            except Exception:
-                log.exception("REDIS_LIVE_DB is not ok")
-            try:
-                await redis_helper.execute(
-                    redis_conn_set.stat,
-                    lambda r: r.execute_command("PING"),
-                )
-                log.info("REDIS_STAT_DB is ok")
-            except Exception:
-                log.exception("REDIS_STAT_DB is not ok")
-            try:
-                await redis_helper.execute(
-                    redis_conn_set.image,
-                    lambda r: r.execute_command("PING"),
-                )
-                log.info("REDIS_IMAGE_DB is ok")
-            except Exception:
-                log.exception("REDIS_IMAGE_DB is not ok")
-            try:
-                await redis_helper.execute(
-                    redis_conn_set.stream,
-                    lambda r: r.execute_command("PING"),
-                )
-                log.info("REDIS_STREAM_DB is ok")
-            except Exception:
-                log.exception("REDIS_STREAM_DB is not ok")
+            await _ping(redis_conn_set.live)
+            await _ping(redis_conn_set.stat)
+            await _ping(redis_conn_set.image)
+            await _ping(redis_conn_set.stream)
+            log.info("Redis is healthy")
 
     with cli_ctx.logger:
         asyncio.run(_impl())
