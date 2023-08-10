@@ -59,13 +59,14 @@ Without any plugin, only the intrinsic ``cpu`` and ``mem`` resource slots are av
 
 Each compute plugin may declare one or more resource slots.
 The plugin is invoked upon startup of the agent to get the list of devices and the resource slots to report.
+Administrators can inspect the per-agent accelerator details provided by the compute plugins in the control panel.
 
 The most well-known compute plugin is ``cuda_open``, which is included in the open source version.
 It declares ``cuda.device`` resource slot that represents each NVIDIA GPU as one unit.
 
 There is a special compute plugin to simulate non-existent devices: ``mock``.
 Developers may put a local configuration to declare an arbitrary set of devices and resource slots to test the schedulers and the frontend.
-They are useful to develop integrations with new hardware devices before you get the actual devices on your hands.
+It is useful to develop integrations with new hardware devices before you get the actual devices on your hands.
 
 .. _concept-resource-group:
 Resource groups

@@ -19,6 +19,7 @@ In the :doc:`development setup </dev/development-setup>`, all these components r
 .. toctree::
    :maxdepth: 4
 
+   services
    computing
    resources
    users
