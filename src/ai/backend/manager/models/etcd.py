@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(
-    logging.getLogger("ai.backend.manager.models.kernel")
+    logging.getLogger("ai.backend.manager.models.etcd")
 )  # type: ignore[name-defined]
 
 __all__: Sequence[str] = (
