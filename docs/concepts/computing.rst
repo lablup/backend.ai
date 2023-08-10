@@ -106,17 +106,27 @@ TODO: two-level scheduler architecture diagram
 
    :ref:`concept-resource-group`
 
-Session selection policy
-~~~~~~~~~~~~~~~~~~~~~~~~
+Session selection strategy
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Heuristic FIFO
 ^^^^^^^^^^^^^^
 
+The default session selection strategy is the heuristic FIFO.
+It mostly works like a FIFO queue to select the oldest pending session,
+but offers an option to enable a head-of-line (HoL) blocking avoidance logic.
+
+The HoL blocking problem happens when the oldest pending session requires too much resources so that it cannot be scheduled
+while other subsequent pending sessions fit within the available cluster resources.
+There exist pending sessions that can be started but they never have chances until the oldest pending session ("blocker") is either cancelled or more running sessions terminate and release more cluster resources.
+
+When enabled, the HoL blocking avoidance logic keeps track of the retry count of scheduling attempts of each pending session and pushes back the pending sessions whose retry counts exceed a certain threshold.
+
 Dominant resource fairness (DRF)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Agent selection policy
-~~~~~~~~~~~~~~~~~~~~~~
+Agent selection strategy
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Concentrated
 ^^^^^^^^^^^^
