@@ -255,7 +255,7 @@ async def scheduler_healthcheck(request: web.Request) -> web.Response:
         raise GenericBadRequest
     data = cast(dict, await root_ctx.shared_config.etcd.get_prefix("manager/scheduler"))
     await root_ctx.event_producer.produce_event(DoScheduleEvent())
-    if len(data) == 0:
+    if not data:
         ret = {"event_name": "", "last_execution_time": "", "resource_group": ""}
     else:
         server_time = cast(str, data.get("last_execution_time"))
