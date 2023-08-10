@@ -246,50 +246,56 @@ Currently we have the following Python tools to configure in this way:
 
 * ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
-VSCode (before 2023 July)
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
-
-Set the extra package search path in the Python/Pylance extension like:
-
-* ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
-
-Set the following keys in the workspace settings:
-
-* ``flake8``: ``python.linting.flake8Path``
-
-* ``mypy``: ``python.linting.mypyPath``
-
-* ``black``: ``python.formatting.blackPath``
-
-* ``isort``: ``python.sortImports.path``
-
 .. warning::
 
    When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
-   and manually update the Python interpreter path and mypy executable path configurations.
+   and manually update the Python interpreter path and mypy executable path configurations in the IDE/editors and ``pyproject.toml``.
 
-VSCode (after 2023 July)
-~~~~~~~~~~~~~~~~~~~~~~~~
+VSCode
+~~~~~~
 
-Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
+Set the workspace settings for your Python/Pylance extension for code navigation:
 
-Set the extra package search path in the Python/Pylance extension like:
+.. list-table::
+   :header-rows: 1
 
-* ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+   * - Setting ID
+     - Example value
+   * - ``python.analysis.autoSearchPaths``
+     - true
+   * - ``python.analysis.extraPaths``
+     - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
 
-After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
-you should configure the following fields for each tool extension:
+Set the following keys in the workspace settings to enable Python tools:
 
-* ``{tool}.interpreter = "dist/export/python/virtualenvs/{tool}/3.11.4/bin/python3"``
+.. list-table::
+   :header-rows: 1
 
-* ``{tool}.importStrategy = "fromEnvironment"``
+   * - Setting ID
+     - Example value
+   * - ``python.linting.flake8Path``
+     - ``"dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8"``
+   * - ``python.linting.mypyPath``
+     - ``"dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy"``
+   * - ``python.formatting.blackPath``
+     - ``"dist/export/python/virtualenvs/black/3.11.4/bin/black"``
+   * - ``python.sortImports.path``
+     - ``"dist/export/python/virtualenvs/isort/3.11.4/bin/isort"``
 
-.. warning::
+.. note:: **Changed in July 2023**
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
-   and manually update the Python interpreter path and mypy executable path configurations.
+   After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
+   you should configure the following fields for each tool extension instead:
+
+   .. list-table::
+      :header-rows: 1
+
+      * - Setting ID
+        - Example value
+      * - ``{tool}.interpreter``
+        - ``["dist/export/python/virtualenvs/{tool}/3.11.4/bin/python3"]``
+      * - ``{tool}.importStrategy``
+        - ``"fromEnvironment"``
 
 Vim/NeoVim
 ~~~~~~~~~~
