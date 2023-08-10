@@ -144,7 +144,7 @@ class AsyncEtcd:
     async def close(self):
         pass  # for backward compatibility
 
-    def flatten(self, prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str:Any]:
+    def flatten(self, prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str, Any]:
         raw_dict = {}
         for k, v in inner_dict.items():
             if k == "":
