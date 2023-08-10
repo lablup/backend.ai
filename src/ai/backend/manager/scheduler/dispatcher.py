@@ -231,7 +231,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
-        scheduler_status: dict[str, Any] = {
+        scheduler_status: dict[str, str] = {
             "event_name": event.__class__.name,
             "last_execution_time": datetime.now(tzutc()).isoformat(),
         }
