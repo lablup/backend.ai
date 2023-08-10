@@ -616,6 +616,11 @@ class SharedConfig(AbstractConfig):
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
 
+    async def get_container_registry(self):
+        key_prefix = "config/docker/registry"
+        registries = await self.etcd.get_prefix_dict(key_prefix)
+        return t.Mapping(t.String, container_registry_iv).check(registries)
+
     async def register_myself(self) -> None:
         instance_id = await get_instance_id()
         manager_info = {
