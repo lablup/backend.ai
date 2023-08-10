@@ -8,34 +8,43 @@ Virtual folders
 ~~~~~~~~~~~~~~~
 :raw-html-m2r:`<span style="background-color:#ffdba9;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
 
-.. _vfolder-concept-diagram:
-.. figure:: vfolder-concept.svg
+Backend.AI abstracts network storages as a set of "virtual folders" (aka "vfolders"), which provides a persistent file storage to users and projects.
 
-   A conceptual diagram of virtual folders when using two NFS servers as vfolder hosts
-
-As shown in :numref:`vfolder-concept-diagram`, Backend.AI abstracts network storages as "virtual folder", which provides a cloud-like private file storage to individual users.
-The users may create their own (one or more) virtual folders to store data files, libraries, and program codes.
-Each vfolder (virtual folder) is created under a designated storage mount (called "vfolder hosts").
+When creating a new session, users may connect vfolders to it with read-only or read-write permissions.
+If the shared vfolder has limited the permission to read-only, then the user may connect it with the read-only permission only.
 Virtual folders are mounted into compute session containers at ``/home/work/{name}`` so that user programs have access to the virtual folder contents like a local directory.
-As of Backend.AI v18.12, users may also share their own virtual folders with other users in differentiated permissions such as read-only and read-write.
+The mounted path inside containers may be customized (e.g., ``/workspace``) for compatibility with existing scripts and codes.
+Currently it is not possible to unmount or delete a vfolder when there are any running session connected to it.
 
-A Backend.AI cluster setup may use any filesystem that provides a local mount point at each node (including the manager and agents) given that the filesystem contents are synchronized across all nodes.
-The only requirement is that the local mount-point must be same across all cluster nodes (e.g., ``/mnt/vfroot/mynfs``).
-Common setups may use a centralized network storage (served via NFS or SMB), but for more scalability, one might want to use distributed file systems such as CephFS and GlusterFS, or Alluxio that provides fast in-memory cache while backed by another storage server/service such as AWS S3.
+For a multi-node setup, the storage volume mounts must be synchronized across all Agent nodes and the Storage Proxy node(s) using the same mount path (e.g., ``/mnt`` or ``/vfroot``).
+For a single-node setup, you may simply use an empty local directory, like our ``install-dev.sh`` script (`link <https://github.com/lablup/backend.ai/blob/main/scripts/install-dev.sh>`_) does.
 
-For a single-node setup, you may simply use an empty local directory.
+From the perspective of the storage, all vfolders from different Backend.AI users and projects share a single same UID and GID.
+This allows a flexible permission sharing between users and projects, while keeping the Linux ownership of the files and directories consistent when they are accessed by multiple different Backend.AI users.
 
 User-owned vfolders
 ^^^^^^^^^^^^^^^^^^^
 
+The users may create their own (one or more) virtual folders to store data files, libraries, and program codes.
+Each vfolder (virtual folder) is created under a designated storage mount (called "vfolder hosts").
+
 Project-owned vfolders
 ^^^^^^^^^^^^^^^^^^^^^^
+
+The project admins and superadmins may create a vfolder that is automatically shared to all members of the project,
+with a specific read-only or read-write permission.
 
 VFolder invitations and permissions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Users and project administrators may invite other users to collaborate on a vfolder.
+Once the invitee accepts the request, he/she gets the designated read-only or read-write permission on the shared vfolder.
+
 Volume-level permissions
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+The superadmin may set additional action privileges to each storage volume,
+such as whether to allow or block mounting the vfolders in compute sessions, cloning the vfolders, etc.
 
 Quota scopes
 ~~~~~~~~~~~~
@@ -55,7 +64,7 @@ Storage with per-directory quota
 
    Quota scopes and vfolders with storage solutions supporting per-directry quota
 
-For each storage volume, each user and project has their own dedicated quota scope directories.
+For each storage volume, each user and project has their own dedicated quota scope directories as shown in :numref:`vfolder-dir-quota`.
 The storage solution must support per-directory quota, at least for a single-level (like NetApp's QTree).
 We recommend this configuration for filesystems like CephFS, Weka.io, or custom-built storage servers using ZFS or XFS where Backend.AI Storage Proxy can be installed directly onto the storage servers.
 
@@ -72,10 +81,15 @@ Storage with per-volume quota
 Unfortunately, there are many cases that we cannot rely on per-directory quota support in storage solutions,
 due to limitation of the underlying filesystem implementation or having no direct access to the storage vendor APIs.
 
-For this case, we assign dedicated storage volumes to each user and project in this scheme,
+For this case, we may assign dedicated storage volumes to each user and project like :numref:`vfolder-volume-quota`,
 which *naturally* limits the space usage by the volume size.
+Another option is not to configure quota limits, but we don't recommend this option in production setups.
 
 The shortcoming is that we may need to frequently mount/unmount the network volumes when we create or remove users and projects, which may cause unexpected system failures due to stale file descriptors.
+
+.. note::
+
+   For shared vfolders, the quota usage is accounted for the original owner of the vfolder, either a user or a project.
 
 .. warning::
 
