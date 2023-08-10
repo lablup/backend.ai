@@ -40,6 +40,14 @@ Volume-level permissions
 Quota scopes
 ~~~~~~~~~~~~
 
+.. versionadded:: 23.03
+
+Quota scopes implement per-user and per-project storage space limits.
+There are two main schemes to set up this feature.
+
+Storage with per-directory quota
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. _vfolder-dir-quota:
 .. figure:: vfolder-dir-quota.svg
    :width: 80%
@@ -47,9 +55,29 @@ Quota scopes
 
    Quota scopes and vfolders with storage solutions supporting per-directry quota
 
+For each storage volume, each user and project has their own dedicated quota scope directories.
+The storage solution must support per-directory quota, at least for a single-level (like NetApp's QTree).
+We recommend this configuration for filesystems like CephFS, Weka.io, or custom-built storage servers using ZFS or XFS where Backend.AI Storage Proxy can be installed directly onto the storage servers.
+
+Storage with per-volume quota
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. _vfolder-volume-quota:
 .. figure:: vfolder-volume-quota.svg
    :width: 72%
    :align: center
 
    Quota scopes and vfolders with storage solutions supporting per-volume quota
+
+Unfortunately, there are many cases that we cannot rely on per-directory quota support in storage solutions,
+due to limitation of the underlying filesystem implementation or having no direct access to the storage vendor APIs.
+
+For this case, we assign dedicated storage volumes to each user and project in this scheme,
+which *naturally* limits the space usage by the volume size.
+
+The shortcoming is that we may need to frequently mount/unmount the network volumes when we create or remove users and projects, which may cause unexpected system failures due to stale file descriptors.
+
+.. warning::
+
+   For both schemes, the administrator should take care of the storage solution's system limits such as the maximum number of volumes and quota sets
+   because such limits may impose a hidden limit to the maximum number of users and projects in Backend.AI.
