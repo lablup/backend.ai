@@ -1,6 +1,10 @@
 .. role:: raw-html-m2r(raw)
    :format: html
 
+.. |br| raw:: html
+
+   <br>
+
 Computing
 =========
 
@@ -32,7 +36,7 @@ while the "main1" kernel is allowed to access all other kernels via a private ne
 
 .. seealso::
 
-   :ref:`concept-inter-container-networking`
+   :ref:`concept-cluster-networking`
 
 Session templates
 -----------------
@@ -44,6 +48,41 @@ Session types
 -------------
 
 There are several classes of sessions for different purposes having different features.
+
+.. list-table:: Features by the session type
+   :header-rows: 1
+   :stub-columns: 1
+
+   * - Feature
+     - Compute |br| (Interactive)
+     - Compute |br| (Batch)
+     - Inference
+     - System
+   * - Code execution
+     - ✓
+     - ✗
+     - ✗
+     - ✗
+   * - Service port
+     - ✓
+     - ✓
+     - ✓
+     - ✓
+   * - Dependencies
+     - ✗
+     - ✓
+     - ✗
+     - ✗
+   * - Session result
+     - ✗
+     - ✓
+     - ✗
+     - ✗
+   * - Clustering
+     - ✓
+     - ✓
+     - ✓
+     - ✓
 
 Compute Session
 ~~~~~~~~~~~~~~~
