@@ -55,7 +55,7 @@ such as whether to allow or block mounting the vfolders in compute sessions, clo
 Auto-mount vfolders
 ^^^^^^^^^^^^^^^^^^^
 
-If the user-owned vfolder's name starts with a dot, it is automatically mounted at ``/home/work`` for all sessions created by the user.
+If a user-owned vfolder's name starts with a dot, it is automatically mounted at ``/home/work`` for all sessions created by the user.
 A good usecase is ``.config`` and ``.local`` directories to keep your local configurations and user-installed packages (e.g., ``pip install --user``) persistent across all your sessions.
 
 
@@ -65,7 +65,7 @@ Quota scopes
 .. versionadded:: 23.03
 
 Quota scopes implement per-user and per-project storage usage limits.
-Currently it only provides the hard limits specified in bytes.
+Currently it supports the hard limits specified in bytes.
 There are two main schemes to set up this feature.
 
 Storage with per-directory quota
