@@ -28,7 +28,11 @@ All kernels are given unique hostnames like "main1", "sub1", "sub2", ..., and "s
 A non-cluster session has one "main1" kernel only.
 
 All interactions with a session are routed to its "main1" kernel,
-while the "main1" kernel is allowed to access all other kernels via a private network (see **Cluster Networking**).
+while the "main1" kernel is allowed to access all other kernels via a private network.
+
+.. seealso::
+
+   :ref:`concept-inter-container-networking`
 
 Session templates
 -----------------
@@ -88,6 +92,7 @@ System Session
 
 SFTP access
 
+.. _concept-scheduler:
 Scheduling
 ----------
 
@@ -96,6 +101,10 @@ Backend.AI keeps track of sessions using a state-machine to represent the variou
 TODO: session/kernel state diagram
 
 TODO: two-level scheduler architecture diagram
+
+.. seealso::
+
+   :ref:`concept-resource-group`
 
 Session selection policy
 ~~~~~~~~~~~~~~~~~~~~~~~~

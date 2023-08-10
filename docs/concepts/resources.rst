@@ -63,9 +63,18 @@ The plugin is invoked upon startup of the agent to get the list of devices and t
 The most well-known compute plugin is ``cuda_open``, which is included in the open source version.
 It declares ``cuda.device`` resource slot that represents each NVIDIA GPU as one unit.
 
-There is special compute plugins to simulate non-existent devices: ``mock``.
+There is a special compute plugin to simulate non-existent devices: ``mock``.
 Developers may put a local configuration to declare an arbitrary set of devices and resource slots to test the schedulers and the frontend.
 They are useful to develop integrations with new hardware devices before you get the actual devices on your hands.
 
+.. _concept-resource-group:
 Resource groups
 ---------------
+
+Resource group is a logical group of the Agents with independent schedulers.
+Each agent belongs to a single resource group only.
+It self-reports which resource group to join when sending the heartbeat messages, but the specified resource group must exist in prior.
+
+.. seealso::
+
+   :ref:`concept-scheduler`
