@@ -157,7 +157,7 @@ class ModifyContainerRegistry(graphene.Mutation):
         lambda id, **kwargs: (None, id),
     )
     async def mutate(
-        cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
+        cls, root, info: graphene.ResolveInfo, hostname: str, props: ModifyContainerRegistryInput
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
         if await ctx.shared_config.etcd.get(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}") is None:
