@@ -7,6 +7,7 @@ Here we describe the key concepts that are required to understand and follow thi
 
 .. _server-arch-diagram:
 .. figure:: server-architecture.svg
+   :align: center
 
    The diagram of a typical multi-node Backend.AI server architecture
 

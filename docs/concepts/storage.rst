@@ -39,3 +39,17 @@ Volume-level permissions
 
 Quota scopes
 ~~~~~~~~~~~~
+
+.. _vfolder-dir-quota:
+.. figure:: vfolder-dir-quota.svg
+   :width: 80%
+   :align: center
+
+   Quota scopes and vfolders with storage solutions supporting per-directry quota
+
+.. _vfolder-volume-quota:
+.. figure:: vfolder-volume-quota.svg
+   :width: 72%
+   :align: center
+
+   Quota scopes and vfolders with storage solutions supporting per-volume quota
