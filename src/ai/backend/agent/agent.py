@@ -66,6 +66,7 @@ from tenacity import (
 from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -125,7 +126,6 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
-from .config import model_definition_iv
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -1787,9 +1787,8 @@ class AbstractAgent(
                     if not model_definition_path.is_file():
                         raise AgentError(
                             "Model definition file (model-definition.yml or"
-                            " model-definition.yaml) does not exist on vFolder {} (ID {})",
-                            model_folder.name,
-                            model_folder.vfid,
+                            " model-definition.yaml) does not exist under vFolder"
+                            f" {model_folder.name} (ID {model_folder.vfid})",
                         )
                     try:
                         model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
@@ -1798,12 +1797,8 @@ class AbstractAgent(
                     except FileNotFoundError as e:
                         raise AgentError(
                             "Model definition file (model-definition.yml) does not exist under"
-                            " vFolder {} (ID {})",
-                            model_folder.name,
-                            model_folder.vfid,
+                            f" vFolder {model_folder.name} (ID {model_folder.vfid})",
                         ) from e
-                    except yaml.error.YAMLError as e:
-                        raise AgentError(f"Invalid YAML syntax: {e}") from e
                     try:
                         model_definition = model_definition_iv.check(
                             yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
@@ -1824,10 +1819,11 @@ class AbstractAgent(
                                 )
                     except DataError as e:
                         raise AgentError(
-                            "Failed to validate model definition from vFolder {} (ID {})",
-                            model_folder.name,
-                            model_folder.vfid,
+                            "Failed to validate model definition from vFolder"
+                            f" {model_folder.name} (ID {model_folder.vfid})",
                         ) from e
+                    except yaml.error.YAMLError as e:
+                        raise AgentError(f"Invalid YAML syntax: {e}") from e
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -1941,7 +1937,7 @@ class AbstractAgent(
                         KernelLifecycleEventReason.UNKNOWN,
                         container_id=ContainerId(cid),
                     )
-                    raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
+                    raise AgentError(f"Kernel failed to create container (k:{str(ctx.kernel_id)})")
                 except Exception:
                     log.warning(
                         "Kernel failed to create container (k:{}). Kernel is going to be"
@@ -1994,57 +1990,70 @@ class AbstractAgent(
                     self._pending_creation_tasks[kernel_id].remove(current_task)
                     if not self._pending_creation_tasks[kernel_id]:
                         del self._pending_creation_tasks[kernel_id]
-            except Exception as e:
-                await self.rescan_resource_usage()
-                raise e
 
-            public_service_ports: List[ServicePort] = self.get_public_service_ports(service_ports)
+                public_service_ports: List[ServicePort] = self.get_public_service_ports(
+                    service_ports
+                )
 
-            kernel_creation_info: KernelCreationResult = {
-                "id": KernelId(kernel_id),
-                "kernel_host": str(kernel_obj["kernel_host"]),
-                "repl_in_port": kernel_obj["repl_in_port"],
-                "repl_out_port": kernel_obj["repl_out_port"],
-                "stdin_port": kernel_obj["stdin_port"],  # legacy
-                "stdout_port": kernel_obj["stdout_port"],  # legacy
-                "service_ports": public_service_ports,
-                "container_id": kernel_obj["container_id"],
-                "resource_spec": attrs.asdict(resource_spec),
-                "scaling_group": kernel_config["scaling_group"],
-                "agent_addr": kernel_config["agent_addr"],
-                "attached_devices": attached_devices,
-            }
+                kernel_creation_info: KernelCreationResult = {
+                    "id": KernelId(kernel_id),
+                    "kernel_host": str(kernel_obj["kernel_host"]),
+                    "repl_in_port": kernel_obj["repl_in_port"],
+                    "repl_out_port": kernel_obj["repl_out_port"],
+                    "stdin_port": kernel_obj["stdin_port"],  # legacy
+                    "stdout_port": kernel_obj["stdout_port"],  # legacy
+                    "service_ports": public_service_ports,
+                    "container_id": kernel_obj["container_id"],
+                    "resource_spec": attrs.asdict(resource_spec),
+                    "scaling_group": kernel_config["scaling_group"],
+                    "agent_addr": kernel_config["agent_addr"],
+                    "attached_devices": attached_devices,
+                }
 
-            if model_definition:
-                for model in model_definition["models"]:
-                    log.debug("starting model service of model {}", model)
-                    await kernel_obj.start_model_service(model)
+                if model_definition:
+                    for model in model_definition["models"]:
+                        log.debug("starting model service of model {}", model["name"])
+                        result = await kernel_obj.start_model_service(model)
+                        if result["status"] == "failed":
+                            await self.destroy_kernel(
+                                KernelId(kernel_id), container_data["container_id"]
+                            )
+                            raise AgentError(
+                                f"Failed to start service of model {model['name']}:"
+                                f" {result.get('error', 'unknown error')}"
+                            )
 
-            # Finally we are done.
-            await self.produce_event(
-                KernelStartedEvent(
-                    kernel_id,
-                    session_id,
-                    creation_info={
-                        **kernel_creation_info,
-                        "id": str(KernelId(kernel_id)),
-                        "container_id": str(kernel_obj["container_id"]),
-                    },
-                ),
-            )
-
-            if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
-                self._ongoing_exec_batch_tasks.add(
-                    asyncio.create_task(
-                        self.execute_batch(
-                            session_id, kernel_id, kernel_config["startup_command"] or ""
-                        ),
+                # Finally we are done.
+                await self.produce_event(
+                    KernelStartedEvent(
+                        kernel_id,
+                        session_id,
+                        creation_info={
+                            **kernel_creation_info,
+                            "id": str(KernelId(kernel_id)),
+                            "container_id": str(kernel_obj["container_id"]),
+                        },
                     ),
                 )
 
-            # The startup command for the batch-type sessions will be executed by the manager
-            # upon firing of the "session_started" event.
-            return kernel_creation_info
+                if (
+                    kernel_config["session_type"] == "batch"
+                    and kernel_config["cluster_role"] == "main"
+                ):
+                    self._ongoing_exec_batch_tasks.add(
+                        asyncio.create_task(
+                            self.execute_batch(
+                                session_id, kernel_id, kernel_config["startup_command"] or ""
+                            ),
+                        ),
+                    )
+
+                # The startup command for the batch-type sessions will be executed by the manager
+                # upon firing of the "session_started" event.
+                return kernel_creation_info
+            except Exception as e:
+                await self.rescan_resource_usage()
+                raise e
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]

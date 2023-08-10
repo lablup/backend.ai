@@ -107,6 +107,7 @@ class RoutingRow(Base):
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
         load_endpoint=False,
+        include_failed_routes=False,
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -123,6 +124,8 @@ class RoutingRow(Base):
             query = query.filter(RoutingRow.domain == domain)
         if user_uuid:
             query = query.filter(RoutingRow.session_owner == user_uuid)
+        if not include_failed_routes:
+            query = query.filter(RoutingRow.status != RouteStatus.FAILED_TO_START)
         result = await db_sess.execute(query)
         rows = result.scalars().all()
         return rows

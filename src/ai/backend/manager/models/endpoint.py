@@ -12,11 +12,12 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 
 from ..api.exceptions import EndpointNotFound
 from .base import GUID, Base, EndpointIDColumn, Item, PaginatedList, ResourceSlotColumn, URLColumn
 from .image import ImageRow
-from .routing import Routing
+from .routing import RouteStatus, Routing
 
 if TYPE_CHECKING:
     pass  # from .gql import GraphQueryContext
@@ -93,6 +94,8 @@ class EndpointRow(Base):
     cluster_size = sa.Column(
         "cluster_size", sa.Integer, nullable=False, default=1, server_default="1"
     )
+
+    retries = sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
@@ -226,6 +229,10 @@ class Endpoint(graphene.ObjectType):
     open_to_public = graphene.Boolean()
 
     routings = graphene.List(Routing)
+    retries = graphene.Int()
+    status = graphene.String()
+
+    errors = graphene.JSONString()
 
     @classmethod
     async def from_row(
@@ -256,6 +263,7 @@ class Endpoint(graphene.ObjectType):
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
+            retries=row.retries,
             routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
         )
 
@@ -272,9 +280,9 @@ class Endpoint(graphene.ObjectType):
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
-            query = query.where(Endpoint.domain == domain_name)
+            query = query.where(EndpointRow.domain == domain_name)
         if user_uuid is not None:
-            query = query.where(Endpoint.session_owner == user_uuid)
+            query = query.where(EndpointRow.session_owner == user_uuid)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
@@ -302,9 +310,9 @@ class Endpoint(graphene.ObjectType):
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
-            query = query.where(Endpoint.domain == domain_name)
+            query = query.where(EndpointRow.domain == domain_name)
         if user_uuid is not None:
-            query = query.where(Endpoint.session_owner == user_uuid)
+            query = query.where(EndpointRow.session_owner == user_uuid)
         """
         if filter is not None:
             parser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -359,6 +367,34 @@ class Endpoint(graphene.ObjectType):
         except NoResultFound:
             raise EndpointNotFound
         return await Endpoint.from_row(ctx, row)
+
+    async def resolve_status(self, info: graphene.ResolveInfo) -> str:
+        if self.retries > SERVICE_MAX_RETRIES:
+            return "UNHEALTHY"
+        if len(self.routings) == 0:
+            return "READY"
+        if self.desired_session_count == -1:
+            return "DESTROYING"
+        if (
+            len([r for r in self.routings if r.status == RouteStatus.HEALTHY])
+            == self.desired_session_count
+        ):
+            return "HEALTHY"
+        return "PROVISIONING"
+
+    async def resolve_errors(self, info: graphene.ResolveInfo) -> Any:
+        from .session import SessionRow
+
+        ctx = info.context
+        async with ctx.db.begin_readonly_session() as db_sess:
+            error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START]
+            query = sa.select(SessionRow).where(
+                SessionRow.id.in_([r.session for r in error_routes])
+            )
+            result = await db_sess.execute(query)
+            error_sessions = result.scalars().all()
+
+            return error_sessions
 
 
 class EndpointList(graphene.ObjectType):

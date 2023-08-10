@@ -77,3 +77,6 @@ class LockID(enum.IntEnum):
     LOCKID_SCALE_TIMER = 193
     LOCKID_LOG_CLEANUP_TIMER = 195
     LOCKID_IDLE_CHECK_TIMER = 196
+
+
+SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
