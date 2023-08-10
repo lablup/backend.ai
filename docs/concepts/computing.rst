@@ -118,9 +118,10 @@ but offers an option to enable a head-of-line (HoL) blocking avoidance logic.
 
 The HoL blocking problem happens when the oldest pending session requires too much resources so that it cannot be scheduled
 while other subsequent pending sessions fit within the available cluster resources.
-There exist pending sessions that can be started but they never have chances until the oldest pending session ("blocker") is either cancelled or more running sessions terminate and release more cluster resources.
+Those subsequent pending sessions that can be started never have chances until the oldest pending session ("blocker") is either cancelled or more running sessions terminate and release more cluster resources.
 
 When enabled, the HoL blocking avoidance logic keeps track of the retry count of scheduling attempts of each pending session and pushes back the pending sessions whose retry counts exceed a certain threshold.
+This option should be explicitly enabled by the administrators or during installation.
 
 Dominant resource fairness (DRF)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

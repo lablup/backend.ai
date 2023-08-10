@@ -1,6 +1,9 @@
 .. role:: raw-html-m2r(raw)
    :format: html
 
+Service Components
+------------------
+
 Public-facing services
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -37,8 +40,21 @@ FastTrack
 ^^^^^^^^^
 
 
+Resource controller
+~~~~~~~~~~~~~~~~~~~
+
+Agent
+^^^^^
+
+
 Internal services
 ~~~~~~~~~~~~~~~~~
+
+Event bus
+^^^^^^^^^
+:raw-html-m2r:`<span style="background-color:#ffbbb1;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
+
+Backend.AI uses Redis to keep track of various real-time information and notify system events to other service components.
 
 Forklift
 ^^^^^^^^
