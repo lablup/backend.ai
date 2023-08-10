@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING, Mapping, Sequence
 
 import graphene
-import trafaret as t
 
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -22,7 +21,6 @@ log = BraceStyleAdapter(
 
 __all__: Sequence[str] = (
     "ContainerRegistry",
-    "ContainerRegistries",
     "CreateContainerRegistry",
     "ModifyContainerRegistry",
     "DeleteContainerRegistry",
@@ -33,7 +31,7 @@ ETCD_CONTAINER_REGISTRY_KEY = "config/docker/registry"
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
-    container_type = graphene.String(required=True)
+    registry_type = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -41,7 +39,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
-    container_type = graphene.String(required=True)
+    registry_type = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -49,7 +47,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
-    container_type = graphene.String(required=True)
+    registry_type = graphene.String(required=True)
     project = graphene.List(lambda: graphene.String)
     username = graphene.String()
     password = graphene.String()
@@ -65,7 +63,7 @@ class ContainerRegistry(graphene.ObjectType):
             hostname=hostname,
             config=ContainerRegistryConfig(
                 url=config.get(""),
-                container_type=config.get("type"),
+                registry_type=config.get("type"),
                 project=config.get("project", None),
                 username=config.get("username", None),
                 password=config.get("password", None),
@@ -82,8 +80,7 @@ class ContainerRegistry(graphene.ObjectType):
             ctx.access_key,
             ETCD_CONTAINER_REGISTRY_KEY,
         )
-        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
-        registries = t.Mapping(t.String, container_registry_iv).check(raw_registries)
+        registries = await ctx.shared_config.get_container_registry()
         return [cls.from_row(hostname, config) for hostname, config in registries.items()]
 
     @classmethod
@@ -94,18 +91,12 @@ class ContainerRegistry(graphene.ObjectType):
             ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
         )
-
-        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
+        registries = await ctx.shared_config.get_container_registry()
         try:
-            raw_registry = raw_registries[hostname]
+            registry = registries[hostname]
         except KeyError:
             raise ObjectNotFound(object_name=f"registry: {hostname}")
-        registry = container_registry_iv.check(raw_registry)
         return cls.from_row(hostname, registry)
-
-
-class ContainerRegistries(graphene.ObjectType):
-    items = graphene.List(ContainerRegistry, required=True)
 
 
 class CreateContainerRegistry(graphene.Mutation):
@@ -127,7 +118,7 @@ class CreateContainerRegistry(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         raw_config = {
             "": props.url,
-            "type": props.container_type,
+            "type": props.registry_type,
             "project": props.project,
             "username": props.username,
             "password": props.password,
@@ -142,20 +133,9 @@ class CreateContainerRegistry(graphene.Mutation):
             hostname,
             config,
         )
-        updates = {}
-
-        def flatten(o):
-            for k, v in o.items():
-                if k == "":
-                    inner_prefix = f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}"
-                else:
-                    inner_prefix = f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/{k}"
-                if isinstance(v, Mapping):
-                    flatten(v)
-                else:
-                    updates[inner_prefix] = v
-
-        flatten(config)
+        updates = ctx.shared_config.etcd.flatten(
+            f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}", config
+        )
         # TODO: chunk support if there are too many keys
         if len(updates) > 16:
             raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
@@ -178,14 +158,14 @@ class ModifyContainerRegistry(graphene.Mutation):
     )
     async def mutate(
         cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
-    ) -> CreateContainerRegistry:
+    ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
         if await ctx.shared_config.etcd.get(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}") is None:
             raise ObjectNotFound(object_name=f"registry: {hostname}")
 
         raw_config = {
             "": props.url,
-            "type": props.container_type,
+            "type": props.registry_type,
             "project": props.project,
             "username": props.username,
             "password": props.password,
@@ -200,20 +180,9 @@ class ModifyContainerRegistry(graphene.Mutation):
             hostname,
             config,
         )
-        updates = {}
-
-        def flatten(o):
-            for k, v in o.items():
-                if k == "":
-                    inner_prefix = f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}"
-                else:
-                    inner_prefix = f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/{k}"
-                if isinstance(v, Mapping):
-                    flatten(v)
-                else:
-                    updates[inner_prefix] = v
-
-        flatten(config)
+        updates = ctx.shared_config.etcd.flatten(
+            f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}", config
+        )
         # TODO: chunk support if there are too many keys
         if len(updates) > 16:
             raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
@@ -240,8 +209,7 @@ class DeleteContainerRegistry(graphene.Mutation):
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
-        registries = t.Mapping(t.String, container_registry_iv).check(raw_registries)
+        registries = await ctx.shared_config.get_container_registry()
         try:
             del registries[hostname]
         except KeyError:
