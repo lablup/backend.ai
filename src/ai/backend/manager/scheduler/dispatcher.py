@@ -231,11 +231,14 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
-        scheduler_status: dict[str, str] = {
-            "event_name": event.__class__.name,
-            "last_execution_time": datetime.now(tzutc()).isoformat(),
-        }
-        await self.shared_config.etcd.put_prefix("manager/scheduler", scheduler_status)
+        manager_id = self.local_config["manager"]["id"]
+        await self.shared_config.etcd.put_prefix(
+            f"manager/{manager_id}/schedule",
+            {
+                "trigger-event": event.__class__.name,
+                "execution-time": datetime.now(tzutc()).isoformat(),
+            },
+        )
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -264,8 +267,12 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self.shared_config.etcd.put(
-                            "manager/scheduler/resource_group", sgroup_name
+                        await self.shared_config.etcd.put_prefix(
+                            f"manager/{manager_id}/schedule",
+                            {
+                                "resource-group": sgroup_name,
+                                "finish-time": datetime.now(tzutc()).isoformat(),
+                            },
                         )
                     except InstanceNotAvailable as e:
                         # Proceed to the next scaling group and come back later.
@@ -1000,6 +1007,14 @@ class SchedulerDispatcher(aobject):
 
         Session status transition: SCHEDULED -> PREPARING
         """
+        manager_id = self.local_config["manager"]["id"]
+        await self.shared_config.etcd.put_prefix(
+            f"manager/{manager_id}/prepare",
+            {
+                "trigger-event": event.__class__.name,
+                "execution-time": datetime.now(tzutc()).isoformat(),
+            },
+        )
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             self.registry,
@@ -1084,7 +1099,14 @@ class SchedulerDispatcher(aobject):
                                 scheduled_session,
                             )
                         )
-
+                        await self.shared_config.etcd.put(
+                            f"manager/{manager_id}/prepare/resource-group",
+                            scheduled_session.scaling_group_name,
+                        )
+            await self.shared_config.etcd.put(
+                f"manager/{manager_id}/prepare/finish-time",
+                datetime.now(tzutc()).isoformat(),
+            )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
@@ -1104,6 +1126,14 @@ class SchedulerDispatcher(aobject):
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by this method
+        manager_id = self.local_config["manager"]["id"]
+        await self.shared_config.etcd.put_prefix(
+            f"manager/{manager_id}/scale",
+            {
+                "trigger-event": event.__class__.name,
+                "execution-time": datetime.now(tzutc()).isoformat(),
+            },
+        )
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         async with self.db.begin_readonly_session() as session:
@@ -1168,11 +1198,15 @@ class SchedulerDispatcher(aobject):
             result = await db_session.execute(query)
             target_sessions_to_destory = result.scalars().all()
         # TODO: Update logic to not to wait for sessions to actually terminate
+        await self.shared_config.etcd.put(f"manager/{manager_id}/scale/action", "down")
         for session in target_sessions_to_destory:
             await self.registry.destroy_session(
                 session,
                 forced=False,
                 reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+            )
+            await self.shared_config.etcd.put(
+                f"manager/{manager_id}/scale/endpoint-name", session.routing.endpoint_row.name
             )
 
         user_ids = tuple(
@@ -1211,9 +1245,12 @@ class SchedulerDispatcher(aobject):
             keypair_resource_policy_name_policy_mapping = {
                 row.name: row for row in result.fetchall()
             }
-
+        await self.shared_config.etcd.put(f"manager/{manager_id}/scale/action", "up")
         for endpoint, expand_count in endpoints_to_expand.items():
             log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
+            await self.shared_config.etcd.put(
+                f"manager/{manager_id}/scale/endpoint-nmae", endpoint.name
+            )
             async with self.db.begin_readonly() as conn:
                 _, group_id, resource_policy = await query_userinfo(
                     conn,
@@ -1265,6 +1302,10 @@ class SchedulerDispatcher(aobject):
                 except Exception:
                     # TODO: Handle
                     log.exception("error while creating session:")
+        await self.shared_config.etcd.put(
+            f"manager/{manager_id}/scale/finish-time",
+            datetime.now(tzutc()).isoformat(),
+        )
 
     async def start_session(
         self,

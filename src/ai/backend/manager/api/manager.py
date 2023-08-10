@@ -6,7 +6,7 @@ import functools
 import json
 import logging
 import socket
-from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple, cast
+from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple
 
 import aiohttp_cors
 import attrs
@@ -248,20 +248,13 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
 @superadmin_required
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    raw_date = request.headers.get("Date")
-    if not raw_date:
-        raw_date = request.headers.get("X-BackendAI-Date", request.headers.get("X-Sorna-Date"))
-    if not raw_date:
-        raise GenericBadRequest
-    data = cast(dict, await root_ctx.shared_config.etcd.get_prefix("manager/scheduler"))
+    manager_id = root_ctx.local_config["manager"]["id"]
+    data = dict(await root_ctx.shared_config.etcd.get_prefix(f"manager/{manager_id}"))
     await root_ctx.event_producer.produce_event(DoScheduleEvent())
     if not data:
-        ret = {"event_name": "", "last_execution_time": "", "resource_group": ""}
+        return web.json_response({manager_id: "empty"})
     else:
-        server_time = cast(str, data.get("last_execution_time"))
-        data.update({"last_execution_time": server_time[:-6] + raw_date[-6:]})
-        ret = data
-    return web.json_response(ret)
+        return web.json_response(data)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
