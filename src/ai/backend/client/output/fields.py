@@ -163,6 +163,8 @@ scaling_group_fields = FieldSet(
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
         FieldSpec("use_host_network"),
+        FieldSpec("wsproxy_addr"),
+        FieldSpec("wsproxy_api_token"),
     ]
 )
 
@@ -182,6 +184,7 @@ session_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("group_name", "Project/Group"),
         FieldSpec("group_id"),
+        FieldSpec("agent_ids"),
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
