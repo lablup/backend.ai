@@ -80,7 +80,7 @@ class ContainerRegistry(graphene.ObjectType):
             ctx.access_key,
             ETCD_CONTAINER_REGISTRY_KEY,
         )
-        registries = await ctx.shared_config.get_container_registry()
+        registries = await ctx.shared_config.get_container_registry(ETCD_CONTAINER_REGISTRY_KEY)
         return [cls.from_row(hostname, config) for hostname, config in registries.items()]
 
     @classmethod
@@ -91,7 +91,7 @@ class ContainerRegistry(graphene.ObjectType):
             ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
         )
-        registries = await ctx.shared_config.get_container_registry()
+        registries = await ctx.shared_config.get_container_registry(ETCD_CONTAINER_REGISTRY_KEY)
         try:
             registry = registries[hostname]
         except KeyError:
@@ -209,7 +209,7 @@ class DeleteContainerRegistry(graphene.Mutation):
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        registries = await ctx.shared_config.get_container_registry()
+        registries = await ctx.shared_config.get_container_registry(ETCD_CONTAINER_REGISTRY_KEY)
         try:
             del registries[hostname]
         except KeyError:

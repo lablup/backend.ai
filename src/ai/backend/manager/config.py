@@ -182,7 +182,7 @@ from collections import UserDict
 from contextvars import ContextVar
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
+from typing import Any, Awaitable, Callable, Dict, Final, List, Mapping, Optional, Sequence
 
 import aiotools
 import click
@@ -616,8 +616,7 @@ class SharedConfig(AbstractConfig):
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
 
-    async def get_container_registry(self):
-        key_prefix = "config/docker/registry"
+    async def get_container_registry(self, key_prefix: str) -> Dict[str, Dict[str, Any]]:
         registries = await self.etcd.get_prefix_dict(key_prefix)
         return t.Mapping(t.String, container_registry_iv).check(registries)
 
