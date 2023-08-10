@@ -15,7 +15,6 @@ import functools
 import logging
 from collections import ChainMap, namedtuple
 from typing import (
-    Any,
     AsyncGenerator,
     AsyncIterator,
     Callable,
@@ -144,19 +143,6 @@ class AsyncEtcd:
     async def close(self):
         pass  # for backward compatibility
 
-    def flatten(self, prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str, Any]:
-        raw_dict = {}
-        for k, v in inner_dict.items():
-            if k == "":
-                flattened_key = prefix
-            else:
-                flattened_key = prefix + "/" + quote(k)
-            if isinstance(v, dict):
-                self.flatten(flattened_key, v)
-            else:
-                raw_dict[flattened_key] = v
-        return raw_dict
-
     def _mangle_key(self, k: str) -> str:
         if k.startswith("/"):
             k = k[1:]
@@ -222,7 +208,20 @@ class AsyncEtcd:
         :return:
         """
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-        flattened_dict: NestedStrKeyedDict = self.flatten(key, cast(NestedStrKeyedDict, dict_obj))
+        flattened_dict: NestedStrKeyedDict = {}
+
+        def _flatten(prefix: str, inner_dict: NestedStrKeyedDict) -> None:
+            for k, v in inner_dict.items():
+                if k == "":
+                    flattened_key = prefix
+                else:
+                    flattened_key = prefix + "/" + quote(k)
+                if isinstance(v, dict):
+                    _flatten(flattened_key, v)
+                else:
+                    flattened_dict[flattened_key] = v
+
+        _flatten(key, cast(NestedStrKeyedDict, dict_obj))
 
         def _txn(action: EtcdTransactionAction):
             for k, v in flattened_dict.items():

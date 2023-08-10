@@ -48,7 +48,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
     registry_type = graphene.String(required=True)
-    project = graphene.List(lambda: graphene.String)
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
 
@@ -125,7 +125,6 @@ class CreateContainerRegistry(graphene.Mutation):
         }
         container_registry_iv.check(raw_config)
         config = {key: value for key, value in raw_config.items() if value is not None}
-
         log.info(
             "ETCD.CREATE_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
             ctx.access_key,
@@ -133,9 +132,7 @@ class CreateContainerRegistry(graphene.Mutation):
             hostname,
             config,
         )
-        updates = ctx.shared_config.etcd.flatten(
-            f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}", config
-        )
+        updates = ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
         # TODO: chunk support if there are too many keys
         if len(updates) > 16:
             raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
@@ -162,7 +159,6 @@ class ModifyContainerRegistry(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         if await ctx.shared_config.etcd.get(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}") is None:
             raise ObjectNotFound(object_name=f"registry: {hostname}")
-
         raw_config = {
             "": props.url,
             "type": props.registry_type,
@@ -172,7 +168,6 @@ class ModifyContainerRegistry(graphene.Mutation):
         }
         container_registry_iv.check(raw_config)
         config = {key: value for key, value in raw_config.items() if value is not None}
-
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
             ctx.access_key,
@@ -180,9 +175,7 @@ class ModifyContainerRegistry(graphene.Mutation):
             hostname,
             config,
         )
-        updates = ctx.shared_config.etcd.flatten(
-            f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}", config
-        )
+        updates = ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
         # TODO: chunk support if there are too many keys
         if len(updates) > 16:
             raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
@@ -209,7 +202,8 @@ class DeleteContainerRegistry(graphene.Mutation):
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        registries = await ctx.shared_config.get_container_registry(ETCD_CONTAINER_REGISTRY_KEY)
+        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
+        registries = dict(raw_registries)
         try:
             del registries[hostname]
         except KeyError:
@@ -221,5 +215,8 @@ class DeleteContainerRegistry(graphene.Mutation):
             hostname,
         )
         await ctx.shared_config.etcd.delete_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
-        await ctx.shared_config.etcd.put_prefix(ETCD_CONTAINER_REGISTRY_KEY, registries)
+        updates = {}
+        for k, v in registries.items():
+            updates.update(ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, k, v))
+        await ctx.shared_config.etcd.put_dict(updates)
         return cls(result="ok")

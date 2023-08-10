@@ -610,6 +610,19 @@ class SharedConfig(AbstractConfig):
         # Just treat it lke an opaque object.
         return hash(id(self))
 
+    def flatten(self, key_prefix, hostname, inner_dict):
+        raw_dict = {}
+        for k, v in inner_dict.items():
+            if k == "":
+                inner_prefix = f"{key_prefix}/{hostname}"
+            else:
+                inner_prefix = f"{key_prefix}/{hostname}/{k}"
+            if isinstance(v, Mapping):
+                raw_dict[inner_prefix] = self.flatten(key_prefix, hostname, v)
+            else:
+                raw_dict[inner_prefix] = v
+        return raw_dict
+
     async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
         value = await self.etcd.get(key)
         if not allow_null and value is None:
