@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
 
 import graphene
 
@@ -215,7 +215,7 @@ class DeleteContainerRegistry(graphene.Mutation):
             hostname,
         )
         await ctx.shared_config.etcd.delete_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
-        updates = {}
+        updates: Dict[str, Any] = {}
         for k, v in registries.items():
             updates.update(ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, k, v))
         await ctx.shared_config.etcd.put_dict(updates)

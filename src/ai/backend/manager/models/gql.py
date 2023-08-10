@@ -1722,7 +1722,7 @@ class Queries(graphene.ObjectType):
         hostname: str,
         domain_name: Optional[str] = None,
         access_key: AccessKey = None,
-    ):
+    ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_registry(ctx, hostname)
 
