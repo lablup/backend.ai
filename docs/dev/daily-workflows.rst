@@ -249,6 +249,9 @@ Currently we have the following Python tools to configure in this way:
 VSCode (before 2023 July)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Install `the official Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_
+and `the Ruff extension <https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff>`_.
+
 Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
 
 Set the extra package search path in the Python/Pylance extension like:
@@ -257,13 +260,9 @@ Set the extra package search path in the Python/Pylance extension like:
 
 Set the following keys in the workspace settings:
 
-* ``flake8``: ``python.linting.flake8Path``
-
 * ``mypy``: ``python.linting.mypyPath``
 
 * ``black``: ``python.formatting.blackPath``
-
-* ``isort``: ``python.sortImports.path``
 
 .. warning::
 
@@ -273,6 +272,9 @@ Set the following keys in the workspace settings:
 VSCode (after 2023 July)
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+Install `the official Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_
+and `the Ruff extension <https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff>`_.
+
 Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
 
 Set the extra package search path in the Python/Pylance extension like:
@@ -280,7 +282,7 @@ Set the extra package search path in the Python/Pylance extension like:
 * ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
 
 After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
-you should configure the following fields for each tool extension:
+you should configure the following fields for each tool extension (including Ruff, Black, and Mypy):
 
 * ``{tool}.interpreter = "dist/export/python/virtualenvs/{tool}/3.11.4/bin/python3"``
 
@@ -312,17 +314,17 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/isort/3.11.4/bin/isort'  " requires absolute path
    let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
-   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8'
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
-   let g:ale_fixers = {'python': ['isort', 'black']}
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff'
+   let g:ale_fixers = {'python': ['black', 'ruff']}
    let g:ale_fix_on_save = 1
 
-When using CoC, run ``:CocInstall coc-pyright`` and ``:CocLocalConfig`` after opening a file
+When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
 in the local working copy to initialize PyRight functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
 just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_):
+To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``.
 
 .. code-block:: json
 
@@ -330,14 +332,16 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
+     "ruff.enabled": true,
+     "ruff.autoFixOnSave": true,
+     "ruff.useDetectRuffCommand": false,
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
      "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.4/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.4/bin/black",
-     "python.sortImports.path": "dist/export/python/virtualenvs/isort/3.11.4/bin/isort",
      "python.linting.mypyEnabled": true,
-     "python.linting.flake8Enabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
-     "python.linting.flake8Path": "dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8"
    }
 
 
