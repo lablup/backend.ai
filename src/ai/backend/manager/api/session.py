@@ -44,7 +44,8 @@ from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
