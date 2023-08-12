@@ -317,7 +317,8 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
    let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
    let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff'
-   let g:ale_fixers = {'python': ['black', 'ruff']}
+   let g:ale_linters = { "python": ['ruff', 'black', 'mypy'] }
+   let g:ale_fixers = {'python': ['ruff', 'black']}
    let g:ale_fix_on_save = 1
 
 When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
