@@ -3,10 +3,15 @@ python_requirements(
     source="pytest-requirements.txt",
     resolve="pytest",
 )
+# python_requirements(
+#     name="reqs-flake8",
+#     source="flake8-requirements.txt",
+#     resolve="flake8",
+# )
 python_requirements(
-    name="reqs-flake8",
-    source="flake8-requirements.txt",
-    resolve="flake8",
+    name="reqs-ruff",
+    source="ruff-requirements.txt",
+    resolve="ruff",
 )
 python_requirements(
     name="reqs-black",

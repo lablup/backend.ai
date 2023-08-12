@@ -66,6 +66,10 @@ filterwarnings = [
 ]
 asyncio_mode = "auto"
 
+[tool.ruff]
+line-length = 100
+ignore = ["E203","E731","E501"]
+
 [tool.mypy]
 ignore_missing_imports = true
 implicit_optional = true  # FIXME: remove after adding https://github.com/hauntsaninja/no_implicit_optional to fmt
