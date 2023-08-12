@@ -4,7 +4,6 @@ pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
-    "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
     "pants.backend.experimental.python.lint.ruff",
@@ -64,7 +63,6 @@ python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
 black = "tools/black.lock"
 ruff = "tools/ruff.lock"
-isort = "tools/isort.lock"
 pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
 mypy = "tools/mypy.lock"
@@ -90,9 +88,6 @@ interpreter_constraints = ["CPython==3.11.4"]  # don't know why this is required
 
 [ruff]
 install_from_resolve = "ruff"
-
-[isort]
-install_from_resolve = "isort"
 
 [pytest]
 install_from_resolve = "pytest"
