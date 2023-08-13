@@ -716,9 +716,9 @@ setup_environment() {
     --resolve=python-default \
     --resolve=python-kernel \
     --resolve=pants-plugins \
-    --resolve=flake8 \
+    --resolve=towncrier \
+    --resolve=ruff \
     --resolve=mypy \
-    --resolve=isort \
     --resolve=black
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.

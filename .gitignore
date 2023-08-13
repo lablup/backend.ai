@@ -89,6 +89,7 @@ ENV/
 /.nvimrc
 /.exrc
 .ripgreprc
+.neoconf.json
 
 # Pants
 /.pants.d/

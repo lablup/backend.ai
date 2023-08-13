@@ -6,7 +6,6 @@ Create Date: 2023-07-06 13:51:52.098587
 
 """
 from collections import defaultdict
-from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
