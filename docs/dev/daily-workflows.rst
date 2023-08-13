@@ -347,10 +347,17 @@ To configure it, put the following vimscript as ``.exrc`` in the working copy ro
 
 .. code-block:: vim
 
+   function! OrganizeAndFormat()
+       CocCommand ruff.executeOrganizeImports
+       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
+       sleep 50m  " to avoid races
+       call CocAction('format')
+       sleep 50m
+   endfunction
+
    augroup autofix
        autocmd!
-       autocmd BufWritePre *.py CocCommand ruff.executeOrganizeImports | call CocAction("format")
-       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
+       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | write | endif
    augroup END
 
 Switching between branches
