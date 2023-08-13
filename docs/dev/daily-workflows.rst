@@ -251,13 +251,17 @@ Set the workspace settings for the Python extension for code navigation and auto
    :header-rows: 1
 
    * - Setting ID
-     - Example value
+     - Recommended value
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
      - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+   * - ``python.analysis.importFormat``
+     - ``"relative"``
+   * - ``editor.formatOnSave``
+     - ``true``
 
-Set the following keys in the workspace settings to enable Python tools:
+Set the following keys in the workspace settings to configure Python tools:
 
 .. list-table::
    :header-rows: 1
