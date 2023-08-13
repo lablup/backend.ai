@@ -357,7 +357,7 @@ To configure it, put the following vimscript as ``.exrc`` in the working copy ro
 
    augroup autofix
        autocmd!
-       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | write | endif
+       autocmd BufWritePre *.py if &modified | call OrganizeAndFormat() | endif
    augroup END
 
 Switching between branches
