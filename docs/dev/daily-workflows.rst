@@ -95,12 +95,17 @@ targets only changed
 Running formatters
 ------------------
 
-If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+If you encounter failure from ``ruff``, you may run the following to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ pants fix ::
+
+If you encounter failure from ``black``, you may run the following to automatically fix the code style issues.
 
 .. code-block:: console
 
    $ pants fmt ::
-   $ pants fmt src/ai/backend/common::
 
 Running unit tests
 ------------------
@@ -203,23 +208,15 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
-For example, flake8's executable path is
-``dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8``.
+For example, ruff's executable path is
+``dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
-* ``flake8``: Validates PEP-8 coding style
+* ``ruff``: Provides a fast linting (combining pylint, flake8, and isort)
+  and formatting (auto-fix for some linting rules and isort)
 
-  .. info::
-
-     Due to limitation of Pants, ``./pants export --resolve=flake8`` only creates a venv
-     for the Python version of the ``python-default`` resolve, while the
-     ``pants-plugins`` resolve uses Python 3.9.x.
-     ``./pants lint`` correctly uses both Python versions because it can infer
-     existence of multiple resolve partitions from the entire sourec tree, but
-     this is not the case for ``./pants export``.
-
-* ``mypy``: Validates the type annotations
+* ``mypy``: Validates the type annotations and performs a static analysis
 
 * ``black``: Validates and reformats all Python codes by reconstructing it from AST,
   just like ``gofmt``.
@@ -236,66 +233,59 @@ Currently we have the following Python tools to configure in this way:
      and ``# fmt: on`` comments, though this is strongly discouraged except when
      manual formatting gives better readability, such as numpy matrix declarations.
 
-* ``isort``: Validates and reorders import statements in a fixed order depending on
-  the categories of imported packages (such as bulitins, first-parties, and
-  third-parties), the alphabetical order, and whether it uses ``from`` or not.
-
 * ``pytest``: The unit test runner framework.
 
 * ``coverage-py``: Generates reports about which source lines were visited during execution of a pytest session.
 
 * ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
-.. warning::
-
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
-   and manually update the Python interpreter path and mypy executable path configurations in the IDE/editors and ``pyproject.toml``.
-
 VSCode
 ~~~~~~
 
-Set the workspace settings for your Python/Pylance extension for code navigation:
+Install the following extensions:
+
+   * Python (``ms-python.python``)
+   * Pylance (``ms-python.vscode-pylance``) (optional but recommended)
+   * Black (``ms-python.black-formatter``)
+   * Mypy (``ms-python.mypy-type-checker``)
+   * Ruff (``charliermarsh.ruff``)
+
+Set the workspace settings for the Python extension for code navigation and auto-completion:
 
 .. list-table::
    :header-rows: 1
 
    * - Setting ID
-     - Example value
+     - Recommended value
    * - ``python.analysis.autoSearchPaths``
      - true
    * - ``python.analysis.extraPaths``
      - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+   * - ``python.analysis.importFormat``
+     - ``"relative"``
+   * - ``editor.formatOnSave``
+     - ``true``
 
-Set the following keys in the workspace settings to enable Python tools:
+Set the following keys in the workspace settings to configure Python tools:
 
 .. list-table::
    :header-rows: 1
 
    * - Setting ID
      - Example value
-   * - ``python.linting.flake8Path``
-     - ``"dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8"``
-   * - ``python.linting.mypyPath``
-     - ``"dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy"``
-   * - ``python.formatting.blackPath``
-     - ``"dist/export/python/virtualenvs/black/3.11.4/bin/black"``
-   * - ``python.sortImports.path``
-     - ``"dist/export/python/virtualenvs/isort/3.11.4/bin/isort"``
+   * - ``{mypy-type-checker,black-formatter}.interpreter``
+     - ``["dist/export/python/virtualenvs/{mypy,black}/3.11.4/bin/python"]``
+   * - ``{mypy-type-checker,black-formatter}.importStrategy``
+     - ``"fromEnvironment"``
+   * - ``ruff.interpreter``
+     - ``["dist/export/python/virtualenvs/black/3.11.4/bin/python"]``
+   * - ``ruff.path``
+     - ``["dist/export/python/virtualenvs/black/3.11.4/bin/ruff"]``
 
 .. note:: **Changed in July 2023**
 
    After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
-   you should configure the following fields for each tool extension instead:
-
-   .. list-table::
-      :header-rows: 1
-
-      * - Setting ID
-        - Example value
-      * - ``{tool}.interpreter``
-        - ``["dist/export/python/virtualenvs/{tool}/3.11.4/bin/python3"]``
-      * - ``{tool}.importStrategy``
-        - ``"fromEnvironment"``
+   we no longer recommend to configure ``python.linting.*Path`` and ``python.formatting.*Path`` keys.
 
 Vim/NeoVim
 ~~~~~~~~~~
@@ -318,17 +308,18 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/isort/3.11.4/bin/isort'  " requires absolute path
    let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/black/3.11.4/bin/black'  " requires absolute path
-   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8'
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy'
-   let g:ale_fixers = {'python': ['isort', 'black']}
+   let g:ale_python_ruff_executable = s:cwd . '/dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff'
+   let g:ale_linters = { "python": ['ruff', 'black', 'mypy'] }
+   let g:ale_fixers = {'python': ['ruff', 'black']}
    let g:ale_fix_on_save = 1
 
-When using CoC, run ``:CocInstall coc-pyright`` and ``:CocLocalConfig`` after opening a file
+When using CoC, run ``:CocInstall coc-pyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
 in the local working copy to initialize PyRight functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
 just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_):
+To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.installServer``.
 
 .. code-block:: json
 
@@ -336,14 +327,16 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
+     "ruff.enabled": true,
+     "ruff.autoFixOnSave": false,  # Use code actions to fix individual errors
+     "ruff.useDetectRuffCommand": false,
+     "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
+     "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
      "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.11.4/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/black/3.11.4/bin/black",
-     "python.sortImports.path": "dist/export/python/virtualenvs/isort/3.11.4/bin/isort",
      "python.linting.mypyEnabled": true,
-     "python.linting.flake8Enabled": true,
      "python.linting.mypyPath": "dist/export/python/virtualenvs/mypy/3.11.4/bin/mypy",
-     "python.linting.flake8Path": "dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8"
    }
 
 
