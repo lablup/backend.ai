@@ -81,6 +81,7 @@ ignore = ["E203","E731","E501"]
 
 [tool.ruff.isort]
 known-first-party = ["ai.backend"]
+known-local-folder = ["src"]
 split-on-trailing-comma = true
 
 [tool.ruff.per-file-ignores]
