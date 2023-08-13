@@ -349,7 +349,8 @@ To configure it, put the following vimscript as ``.exrc`` in the working copy ro
 
    augroup autofix
        autocmd!
-       autocmd BufWritePre *.py call CocAction("format") | CocCommand ruff.executeAutofix
+       autocmd BufWritePre *.py CocCommand ruff.executeOrganizeImports | call CocAction("format")
+       " Optionally you may apply "ruff.executeAutofix" to apply all possible fixes.
    augroup END
 
 Switching between branches
