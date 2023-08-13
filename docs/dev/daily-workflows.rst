@@ -95,12 +95,17 @@ targets only changed
 Running formatters
 ------------------
 
-If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+If you encounter failure from ``ruff``, you may run the following to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ pants fix ::
+
+If you encounter failure from ``black``, you may run the following to automatically fix the code style issues.
 
 .. code-block:: console
 
    $ pants fmt ::
-   $ pants fmt src/ai/backend/common::
 
 Running unit tests
 ------------------
