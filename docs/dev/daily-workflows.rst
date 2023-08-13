@@ -203,23 +203,15 @@ you should also configure ``PYTHONPATH`` to include the repository root's ``src`
 
 For linters and formatters, configure the tool executable paths to indicate
 ``dist/export/python/virtualenvs/RESOLVE_NAME/PYTHON_VERSION/bin/EXECUTABLE``.
-For example, flake8's executable path is
-``dist/export/python/virtualenvs/flake8/3.11.4/bin/flake8``.
+For example, ruff's executable path is
+``dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff``.
 
 Currently we have the following Python tools to configure in this way:
 
-* ``flake8``: Validates PEP-8 coding style
+* ``ruff``: Provides a fast linting (combining pylint, flake8, and isort)
+  and formatting (auto-fix for some linting rules and isort)
 
-  .. info::
-
-     Due to limitation of Pants, ``./pants export --resolve=flake8`` only creates a venv
-     for the Python version of the ``python-default`` resolve, while the
-     ``pants-plugins`` resolve uses Python 3.9.x.
-     ``./pants lint`` correctly uses both Python versions because it can infer
-     existence of multiple resolve partitions from the entire sourec tree, but
-     this is not the case for ``./pants export``.
-
-* ``mypy``: Validates the type annotations
+* ``mypy``: Validates the type annotations and performs a static analysis
 
 * ``black``: Validates and reformats all Python codes by reconstructing it from AST,
   just like ``gofmt``.
@@ -236,62 +228,55 @@ Currently we have the following Python tools to configure in this way:
      and ``# fmt: on`` comments, though this is strongly discouraged except when
      manual formatting gives better readability, such as numpy matrix declarations.
 
-* ``isort``: Validates and reorders import statements in a fixed order depending on
-  the categories of imported packages (such as bulitins, first-parties, and
-  third-parties), the alphabetical order, and whether it uses ``from`` or not.
-
 * ``pytest``: The unit test runner framework.
 
 * ``coverage-py``: Generates reports about which source lines were visited during execution of a pytest session.
 
 * ``towncrier``: Generates the changelog from news fragments in the ``changes`` directory when making a new release.
 
-VSCode (before 2023 July)
-~~~~~~~~~~~~~~~~~~~~~~~~~
+VSCode
+~~~~~~
 
-Install `the official Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_
-and `the Ruff extension <https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff>`_.
+Install the following extensions:
 
-Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
+   * Python (``ms-python.python``)
+   * Pylance (``ms-python.vscode-pylance``) (optional but recommended)
+   * Black (``ms-python.black-formatter``)
+   * Mypy (``ms-python.mypy-type-checker``)
+   * Ruff (``charliermarsh.ruff``)
 
-Set the extra package search path in the Python/Pylance extension like:
+Set the workspace settings for the Python extension for code navigation and auto-completion:
 
-* ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
+.. list-table::
+   :header-rows: 1
 
-Set the following keys in the workspace settings:
+   * - Setting ID
+     - Example value
+   * - ``python.analysis.autoSearchPaths``
+     - true
+   * - ``python.analysis.extraPaths``
+     - ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
 
-* ``mypy``: ``python.linting.mypyPath``
+Set the following keys in the workspace settings to enable Python tools:
 
-* ``black``: ``python.formatting.blackPath``
+.. list-table::
+   :header-rows: 1
 
-.. warning::
+   * - Setting ID
+     - Example value
+   * - ``{mypy-type-checker,black-formatter}.interpreter``
+     - ``["dist/export/python/virtualenvs/{mypy,black}/3.11.4/bin/python"]``
+   * - ``{mypy-type-checker,black-formatter}.importStrategy``
+     - ``"fromEnvironment"``
+   * - ``ruff.interpreter``
+     - ``["dist/export/python/virtualenvs/black/3.11.4/bin/python"]``
+   * - ``ruff.path``
+     - ``["dist/export/python/virtualenvs/black/3.11.4/bin/ruff"]``
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
-   and manually update the Python interpreter path and mypy executable path configurations.
+.. note:: **Changed in July 2023**
 
-VSCode (after 2023 July)
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install `the official Python extension <https://marketplace.visualstudio.com/items?itemName=ms-python.python>`_
-and `the Ruff extension <https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff>`_.
-
-Enable ``python.analysis.autoSearchPaths`` (true) for inclusion of the ``src`` directory.
-
-Set the extra package search path in the Python/Pylance extension like:
-
-* ``python.analysis.extraPaths``: ``["dist/export/python/virtualenvs/python-default/3.11.4/lib/python3.11/site-packages"]``
-
-After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
-you should configure the following fields for each tool extension (including Ruff, Black, and Mypy):
-
-* ``{tool}.interpreter = "dist/export/python/virtualenvs/{tool}/3.11.4/bin/python3"``
-
-* ``{tool}.importStrategy = "fromEnvironment"``
-
-.. warning::
-
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``pants export``
-   and manually update the Python interpreter path and mypy executable path configurations.
+   After applying `the VSCode Python Tool migration <https://github.com/microsoft/vscode-python/wiki/Migration-to-Python-Tools-Extensions>`_,
+   we no longer recommend to configure ``python.linting.*Path`` and ``python.formatting.*Path`` keys.
 
 Vim/NeoVim
 ~~~~~~~~~~
@@ -334,7 +319,7 @@ To activate Ruff (a Python linter and fixer), run ``:CocCommand ruff.builtin.ins
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
      "ruff.enabled": true,
-     "ruff.autoFixOnSave": true,
+     "ruff.autoFixOnSave": false,  # Use code actions to fix individual errors
      "ruff.useDetectRuffCommand": false,
      "ruff.builtin.pythonPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/python",
      "ruff.serverPath": "dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff-lsp",
