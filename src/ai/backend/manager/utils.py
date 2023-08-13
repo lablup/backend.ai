@@ -8,15 +8,13 @@ from ai.backend.common.types import AccessKey
 
 from .models import (
     UserRole,
-)
-from .models import association_groups_users as agus
-from .models import (
     domains,
     groups,
     keypair_resource_policies,
     keypairs,
     users,
 )
+from .models import association_groups_users as agus
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(
