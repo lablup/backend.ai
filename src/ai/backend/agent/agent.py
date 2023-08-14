@@ -1710,9 +1710,9 @@ class AbstractAgent(
                                     ctx.agent_id,
                                 )
                             )
-                            plugin_alloc_map: MutableMapping[
+                            plugin_alloc_map: dict[
                                 DeviceName,
-                                MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]],
+                                dict[SlotName, MutableMapping[DeviceId, Decimal]],
                             ] = {
                                 dev: dict(self.computers[dev].alloc_map.allocations)
                                 for dev in ordered_dev_names
