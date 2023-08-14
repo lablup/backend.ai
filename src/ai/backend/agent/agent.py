@@ -1759,14 +1759,14 @@ class AbstractAgent(
                                     if kernel_resource_spec is None:
                                         continue
                                     else:
-                                        for i in kernel_resource_spec.slots.keys():
-                                            if i in occupied_slots_from_kernel:
-                                                occupied_slots_from_kernel[i] = Decimal(
-                                                    occupied_slots_from_kernel[i]
-                                                ) + Decimal(kernel_resource_spec.slots[i])
+                                        for slot_name in kernel_resource_spec.slots.keys():
+                                            if slot_name in occupied_slots_from_kernel:
+                                                occupied_slots_from_kernel[slot_name] = Decimal(
+                                                    occupied_slots_from_kernel[slot_name]
+                                                ) + Decimal(kernel_resource_spec.slots[slot_name])
                                             else:
-                                                occupied_slots_from_kernel[i] = Decimal(
-                                                    kernel_resource_spec.slots[i]
+                                                occupied_slots_from_kernel[slot_name] = Decimal(
+                                                    kernel_resource_spec.slots[slot_name]
                                                 )
 
                             log.error(
