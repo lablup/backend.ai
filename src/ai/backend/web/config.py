@@ -122,7 +122,7 @@ config_iv = t.Dict(
                 t.Key("login_block_time", default=1200): t.ToInt,  # seconds (default: 20 min)
                 t.Key("login_allowed_fail_count", default=10): t.ToInt,
                 t.Key("auto_logout", default=False): t.ToBool,
-                t.Key("max_count_for_pre_opened_port", default=10): t.ToInt,
+                t.Key("max_count_for_preopen_port", default=10): t.ToInt,
             }
         ).allow_extra("*"),
         t.Key("license", default=license_defs): t.Dict(
