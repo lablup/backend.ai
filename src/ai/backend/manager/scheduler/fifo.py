@@ -6,7 +6,12 @@ from typing import List, Optional, Sequence, Tuple
 
 import trafaret as t
 
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, ResourceSlot, SessionId
+from ai.backend.common.types import (
+    AgentId,
+    AgentSelectionStrategy,
+    ResourceSlot,
+    SessionId,
+)
 
 from ..models import AgentRow, SessionRow
 from .types import AbstractScheduler, KernelInfo
@@ -35,13 +40,13 @@ def key_by_remaining_slots(
             num_extras += 1
 
     for requested_slot_key in sorted(requested_slots.data.keys(), reverse=True):
-        first = requested_slot_key.split(".")[0]
+        device_name = requested_slot_key.split(".")[0]
         if (
             requested_slot_key not in agent_selection_resource_priority
-            and first in agent_selection_resource_priority
+            and device_name in agent_selection_resource_priority
         ):
             agent_selection_resource_priority.insert(
-                agent_selection_resource_priority.index(first) + 1, requested_slot_key
+                agent_selection_resource_priority.index(device_name) + 1, requested_slot_key
             )
 
     resource_priorities = sorted(
