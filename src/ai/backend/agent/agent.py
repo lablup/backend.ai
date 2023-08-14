@@ -1180,11 +1180,9 @@ class AbstractAgent(
                         )
                     except Exception:
                         log.warning(
-                            (
-                                "rescan_resoucre_usage(k:{}): "
-                                "failed to read kernel resource info; "
-                                "maybe already terminated"
-                            ),
+                            "rescan_resoucre_usage(k:{}): "
+                            "failed to read kernel resource info; "
+                            "maybe already terminated",
                             kernel_id,
                         )
 
@@ -1624,10 +1622,8 @@ class AbstractAgent(
             if agent_architecture != ctx.image_ref.architecture:
                 # disable running different architecture's image
                 raise AgentError(
-                    (
-                        f"cannot run {ctx.image_ref.architecture} image on"
-                        f" {agent_architecture} machine"
-                    ),
+                    f"cannot run {ctx.image_ref.architecture} image on"
+                    f" {agent_architecture} machine",
                 )
 
             # Check if we need to pull the container image
@@ -1790,10 +1786,8 @@ class AbstractAgent(
                         )
                         if not model_definition_path.is_file():
                             raise AgentError(
-                                (
-                                    "Model definition file (model-definition.yml or"
-                                    " model-definition.yaml) does not exist on vFolder {} (ID {})"
-                                ),
+                                "Model definition file (model-definition.yml or"
+                                " model-definition.yaml) does not exist on vFolder {} (ID {})",
                                 model_folder.name,
                                 model_folder.vfid,
                             )
@@ -1803,10 +1797,8 @@ class AbstractAgent(
                         )
                     except FileNotFoundError:
                         raise AgentError(
-                            (
-                                "Model definition file (model-definition.yml) does not exist on"
-                                " vFolder {} (ID {})"
-                            ),
+                            "Model definition file (model-definition.yml) does not exist on"
+                            " vFolder {} (ID {})",
                             model_folder.name,
                             model_folder.vfid,
                         )
@@ -1933,10 +1925,8 @@ class AbstractAgent(
                     )
                 except ContainerCreationError as e:
                     log.warning(
-                        (
-                            "Kernel failed to create container (k:{}). Kernel is going to be"
-                            " destroyed."
-                        ),
+                        "Kernel failed to create container (k:{}). Kernel is going to be"
+                        " destroyed.",
                         ctx.kernel_id,
                     )
                     cid = e.container_id
@@ -1952,10 +1942,8 @@ class AbstractAgent(
                     raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
                 except Exception:
                     log.warning(
-                        (
-                            "Kernel failed to create container (k:{}). Kernel is going to be"
-                            " unregistered."
-                        ),
+                        "Kernel failed to create container (k:{}). Kernel is going to be"
+                        " unregistered.",
                         kernel_id,
                     )
                     async with self.registry_lock:

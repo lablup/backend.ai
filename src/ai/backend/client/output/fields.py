@@ -163,6 +163,8 @@ scaling_group_fields = FieldSet(
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
         FieldSpec("use_host_network"),
+        FieldSpec("wsproxy_addr"),
+        FieldSpec("wsproxy_api_token"),
     ]
 )
 
