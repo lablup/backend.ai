@@ -525,10 +525,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
             fill_forwarding_hdrs_to_api_session(request, api_session)
             # Instead of email and password, token will be used for user auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            extra_args = {
-                **rqst_data,
-                auth_token_name: auth_token
-            }
+            extra_args = {**rqst_data, auth_token_name: auth_token}
             token = await api_session.User.authorize(
                 "fake-email", "fake-pwd", extra_args=extra_args
             )
