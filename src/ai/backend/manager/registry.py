@@ -3562,7 +3562,7 @@ async def invoke_session_callback(
                         route.status = RouteStatus.FAILED_TO_START
                         endpoint.retries += 1
                         await db_sess.commit()
-                    if isinstance(event, SessionTerminatedEvent):
+                    elif isinstance(event, SessionTerminatedEvent):
                         await db_sess.delete(route)
                         if (
                             len(endpoint.routings) == 1
@@ -3597,25 +3597,32 @@ async def invoke_session_callback(
                                 await context.update_appproxy_endpoint_routes(db_sess, endpoint)
                             except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-                        query = sa.select([sa.func.count("*")]).where(
-                            (RoutingRow.endpoint == endpoint.id)
-                            & (RoutingRow.status == RouteStatus.HEALTHY)
-                        )
-                        healthy_routes = await db_sess.scalar(query)
-                        if endpoint.desired_session_count == healthy_routes:
-                            query = (
-                                sa.update(EndpointRow)
-                                .where(EndpointRow.id == endpoint.id)
-                                .values({"retries": 0})
-                            )
-                            await db_sess.execute(query)
-                            query = sa.delete(RoutingRow).where(
-                                (RoutingRow.endpoint == endpoint.id)
-                                & (RoutingRow.status == RouteStatus.FAILED_TO_START)
-                            )
-                            await db_sess.execute(query)
+                        await db_sess.commit()
 
             await execute_with_retry(_update)
+
+            async def _clear_error() -> None:
+                async with context.db.begin_session() as db_sess:
+                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                    query = sa.select([sa.func.count("*")]).where(
+                        (RoutingRow.endpoint == route.endpoint_row.id)
+                        & (RoutingRow.status == RouteStatus.HEALTHY)
+                    )
+                    healthy_routes = await db_sess.scalar(query)
+                    if route.endpoint_row.desired_session_count == healthy_routes:
+                        query = (
+                            sa.update(EndpointRow)
+                            .where(EndpointRow.id == route.endpoint_row.id)
+                            .values({"retries": 0})
+                        )
+                        await db_sess.execute(query)
+                        query = sa.delete(RoutingRow).where(
+                            (RoutingRow.endpoint == route.endpoint_row.id)
+                            & (RoutingRow.status == RouteStatus.FAILED_TO_START)
+                        )
+                        await db_sess.execute(query)
+
+            await execute_with_retry(_clear_error)
     except Exception:
         log.exception("error while updating route status:")
 
