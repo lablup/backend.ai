@@ -1711,22 +1711,33 @@ class AbstractAgent(
                                 )
                             )
                             plugin_alloc_map: dict[
-                                DeviceName,
-                                dict[SlotName, MutableMapping[DeviceId, Decimal]],
-                            ] = {
-                                dev: dict(self.computers[dev].alloc_map.allocations)
-                                for dev in ordered_dev_names
-                            }
-                            original_plugin_alloc_map = copy.deepcopy(plugin_alloc_map)
-                            for device_name, device_dict in plugin_alloc_map.items():
-                                for temp_slot_name, slot_dict in device_dict.items():
-                                    if temp_slot_name in e.args[5]:
-                                        for device_id in slot_dict.keys():
-                                            if device_id in e.args[5][temp_slot_name]:
-                                                plugin_alloc_map[device_name][temp_slot_name][
-                                                    device_id
-                                                ] += e.args[5][temp_slot_name][device_id]
+                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
+                            ] = {}
+                            original_plugin_alloc_map: dict[
+                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
+                            ] = {}
+                            for dev in ordered_dev_names:
+                                plugin_alloc_map[dev] = dict(
+                                    self.computers[dev].alloc_map.allocations
+                                )
+                                if dev != dev_name:
+                                    original_plugin_alloc_map[dev] = dict(
+                                        self.computers[dev].alloc_map.allocations
+                                    )
+                                else:
+                                    original_plugin_alloc_map[dev] = copy.deepcopy(
+                                        dict(self.computers[dev].alloc_map.allocations)
+                                    )
 
+                            for desired_slot_name, desired_slot_dict in e.args[5].items():
+                                for desired_device_id in desired_slot_dict.keys():
+                                    if (
+                                        desired_device_id
+                                        in plugin_alloc_map[dev_name][desired_slot_name].keys()
+                                    ):
+                                        plugin_alloc_map[dev_name][desired_slot_name][
+                                            desired_device_id
+                                        ] += desired_slot_dict[desired_device_id]
                             occupied_slots_from_kernel: dict[SlotName, Decimal] = {}
 
                             def _kernel_resource_spec_read(filename):
