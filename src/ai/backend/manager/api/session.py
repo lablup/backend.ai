@@ -1863,11 +1863,11 @@ async def get_status_history(request: web.Request, params: Any) -> web.Response:
     resp: dict[str, Mapping] = {"result": {}}
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        compute_session = await SessionRow.get_session_with_main_kernel(
+        compute_session = await SessionRow.get_session(
+            db_sess,
             session_name,
             owner_access_key,
-            allow_stale=True,
-            db_session=db_sess,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         resp["result"] = compute_session.status_history
 
