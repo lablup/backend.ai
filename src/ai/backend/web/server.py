@@ -487,9 +487,12 @@ async def token_login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
 
-    # Check if auth token is delivered through cookie.
+    # Check if auth token is delivered via request body or cookie.
+    rqst_data = await request.json()
     auth_token_name = config["api"]["auth_token_name"]
-    auth_token = request.cookies.get(auth_token_name)
+    auth_token = rqst_data.get(auth_token_name)
+    if not auth_token:
+        auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
         return web.HTTPBadRequest(
             text=json.dumps(
@@ -520,9 +523,11 @@ async def token_login_handler(request: web.Request) -> web.Response:
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            # Instead of email and password, cookie token will be used for auth.
+            # Instead of email and password, token will be used for user auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            token = await api_session.User.authorize("fake-email", "fake-pwd")
+            extra_args = {auth_token_name: auth_token}
+            extra_args.update(rqst_data)
+            token = await api_session.User.authorize("fake-email", "fake-pwd", extra_args=extra_args)
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],
