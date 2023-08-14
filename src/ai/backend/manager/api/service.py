@@ -453,7 +453,9 @@ async def sync(request: web.Request) -> web.Response:
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     async with root_ctx.db.begin_session() as db_sess:
-        await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+        await root_ctx.registry.update_appproxy_endpoint_routes(
+            db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+        )
     return web.json_response({"success": True}, status=200)
 
 
@@ -541,7 +543,9 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
         await db_sess.execute(query)
         endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         try:
-            await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+            await root_ctx.registry.update_appproxy_endpoint_routes(
+                db_sess, endpoint, [r for r in endpoint.routes if r.status == RouteStatus.HEALTHY]
+            )
         except aiohttp.ClientError as e:
             log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
         return web.json_response({"success": True})

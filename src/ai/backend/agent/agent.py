@@ -81,6 +81,8 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelHealthCheckFailedEvent,
+    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -2012,16 +2014,9 @@ class AbstractAgent(
 
                 if model_definition:
                     for model in model_definition["models"]:
-                        log.debug("starting model service of model {}", model["name"])
-                        result = await kernel_obj.start_model_service(model)
-                        if result["status"] == "failed":
-                            await self.destroy_kernel(
-                                KernelId(kernel_id), container_data["container_id"]
-                            )
-                            raise AgentError(
-                                f"Failed to start service of model {model['name']}:"
-                                f" {result.get('error', 'unknown error')}"
-                            )
+                        asyncio.create_task(
+                            self.start_and_monitor_model_service_initial_health(kernel_obj, model)
+                        )
 
                 # Finally we are done.
                 await self.produce_event(
@@ -2054,6 +2049,26 @@ class AbstractAgent(
             except Exception as e:
                 await self.rescan_resource_usage()
                 raise e
+
+    async def start_and_monitor_model_service_initial_health(
+        self,
+        kernel_obj: KernelObjectType,
+        model: Any,
+    ) -> None:
+        log.debug("starting model service of model {}", model["name"])
+        result = await kernel_obj.start_model_service(model)
+        if result["status"] == "failed":
+            await self.event_producer.produce_event(
+                KernelHealthCheckFailedEvent(
+                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                )
+            )
+        else:
+            await self.event_producer.produce_event(
+                KernelHealthyEvent(
+                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                )
+            )
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]

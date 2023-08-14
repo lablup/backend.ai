@@ -201,6 +201,17 @@ class EndpointRow(Base):
         return result.scalars().all()
 
 
+class InferenceSessionError(graphene.ObjectType):
+    class InferenceSessionErrorInfo(graphene.ObjectType):
+        src = graphene.String(required=True)
+        name = graphene.String(required=True)
+        repr = graphene.String(required=True)
+
+    session_id = graphene.UUID(required=True)
+
+    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -232,7 +243,7 @@ class Endpoint(graphene.ObjectType):
     retries = graphene.Int()
     status = graphene.String()
 
-    errors = graphene.JSONString()
+    errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
 
     @classmethod
     async def from_row(
@@ -376,7 +387,7 @@ class Endpoint(graphene.ObjectType):
         if self.desired_session_count == -1:
             return "DESTROYING"
         if (
-            len([r for r in self.routings if r.status == RouteStatus.HEALTHY])
+            len([r for r in self.routings if r.status == RouteStatus.HEALTHY.name])
             == self.desired_session_count
         ):
             return "HEALTHY"
@@ -387,14 +398,35 @@ class Endpoint(graphene.ObjectType):
 
         ctx = info.context
         async with ctx.db.begin_readonly_session() as db_sess:
-            error_routes = [r for r in self.routings if r.status == RouteStatus.FAILED_TO_START]
+            error_routes = [
+                r for r in self.routings if r.status == RouteStatus.FAILED_TO_START.name
+            ]
             query = sa.select(SessionRow).where(
                 SessionRow.id.in_([r.session for r in error_routes])
             )
             result = await db_sess.execute(query)
             error_sessions = result.scalars().all()
 
-            return error_sessions
+            errors_by_session = []
+            for sess in error_sessions:
+                if "error" not in sess.status_data:
+                    continue
+                if sess.status_data["error"]["name"] == "MultiAgentError":
+                    errors = sess.status_data["error"]["collection"]
+                else:
+                    errors = [sess.status_data["error"]]
+                errors_by_session.append(
+                    InferenceSessionError(
+                        session_id=sess.id,
+                        errors=[
+                            InferenceSessionError.InferenceSessionErrorInfo(
+                                src=e["src"], name=e["name"], repr=e["repr"]
+                            )
+                            for e in errors
+                        ],
+                    )
+                )
+            return errors_by_session
 
 
 class EndpointList(graphene.ObjectType):
