@@ -333,7 +333,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
 
         for slot_name, requested_alloc in requested_slots.items():
-            new_alloc: dict[DeviceId, Decimal] = {}
+            new_alloc: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
             remaining_alloc = int(Decimal(requested_alloc))
             if log_alloc_map:
                 log.debug(
