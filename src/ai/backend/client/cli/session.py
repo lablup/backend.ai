@@ -21,6 +21,8 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
 from ..compat import asyncio_run
@@ -937,8 +939,9 @@ def logs(session_id):
 
 
 @session.command("status-history")
+@pass_ctx_obj
 @click.argument("session_id", metavar="SESSID")
-def status_history(session_id):
+def status_history(ctx: CLIContext, session_id):
     """
     Shows the status transition history of the compute session.
 
@@ -950,15 +953,31 @@ def status_history(session_id):
         kernel = session.ComputeSession(session_id)
         try:
             status_history = kernel.get_status_history().get("result")
-            print_info(f"status_history: {status_history}")
-            if (preparing := status_history.get("preparing")) is None:
+
+            print()
+            ctx.output.print_item(
+                status_history,
+                [
+                    FieldSpec("PENDING"),
+                    FieldSpec("SCHEDULED"),
+                    FieldSpec("PREPARING"),
+                    FieldSpec("RUNNING"),
+                    FieldSpec("RUNNING_DEGRADED"),
+                    FieldSpec("RESTARTING"),
+                    FieldSpec("TERMINATING"),
+                    FieldSpec("TERMINATED"),
+                    FieldSpec("ERROR"),
+                ],
+            )
+
+            if (preparing := status_history.get("PREPARING")) is None:
                 result = {
                     "result": {
                         "seconds": 0,
                         "microseconds": 0,
                     },
                 }
-            elif (terminated := status_history.get("terminated")) is None:
+            elif (terminated := status_history.get("TERMINATED")) is None:
                 alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
                 result = {
                     "result": {
