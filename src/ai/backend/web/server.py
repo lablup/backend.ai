@@ -527,7 +527,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             extra_args = {auth_token_name: auth_token}
             extra_args.update(rqst_data)
-            token = await api_session.User.authorize("fake-email", "fake-pwd", extra_args=extra_args)
+            token = await api_session.User.authorize(
+                "fake-email", "fake-pwd", extra_args=extra_args
+            )
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],
