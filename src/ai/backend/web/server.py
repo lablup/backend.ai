@@ -488,7 +488,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         )
 
     # Check if auth token is delivered via request body or cookie.
-    rqst_data = await request.json()
+    rqst_data: dict[str, Any] = await request.json()
     auth_token_name = config["api"]["auth_token_name"]
     auth_token = rqst_data.get(auth_token_name)
     if not auth_token:
