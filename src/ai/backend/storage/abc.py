@@ -49,6 +49,7 @@ class AbstractQuotaModel(metaclass=ABCMeta):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Creates a new quota scope.
