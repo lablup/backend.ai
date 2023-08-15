@@ -25,9 +25,9 @@ DEFAULT_VOLUME_NAME: Final = "defualt"
 
 kmanila_request_params = t.Dict(
     {
-        t.Key("user_id"): t.String(),
-        t.Key("password"): t.String(),
-        t.Key("volume_name"): t.String(),
+        t.Key("user_id", default=None): t.Null | t.String(),
+        t.Key("password", default=None): t.Null | t.String(),
+        t.Key("volume_name", default=None): t.Null | t.String(),
     }
 ).allow_extra("*")
 
@@ -44,6 +44,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         default_user_id: str,
         default_user_password: str,
         default_project_id: Optional[str],
+        default_netword_id: Optional[str],
         max_poll_count: int,
     ) -> None:
         super().__init__(mount_path)
@@ -54,6 +55,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         self.default_user_id = default_user_id
         self.default_user_password = default_user_password
         self.default_project_id = default_project_id
+        self.default_netword_id = default_netword_id
         self.max_poll_count = max_poll_count
 
     async def _get_auth_info(self, user_info: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +121,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         options: Optional[QuotaConfig],
         auth_info: dict[str, Any],
         *,
-        name: Optional[str] = None,
+        name: str,
     ) -> str:
         if (
             volume_id := await self.created_volume_id(session, quota_scope_id, auth_info)
@@ -129,8 +131,8 @@ class KManilaQuotaModel(BaseQuotaModel):
         request_body = {
             "share": {
                 "share_proto": "nfs",
-                "share_network_id": "b0ee0908-dafd-46a0-b122-d558e7ea3d9f",
-                "name": name or DEFAULT_VOLUME_NAME,
+                "share_network_id": self.default_netword_id,
+                "name": name,
                 "is_public": False,
                 "size": options.limit_bytes if options is not None else DEFAULT_VOLUME_SIZE,
                 "availability_zone": "DX-DCN-CJ",
@@ -209,14 +211,15 @@ class KManilaQuotaModel(BaseQuotaModel):
         options: Optional[QuotaConfig] = None,
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
-        user_info = {
-            "user_id": self.default_user_id,
-            "password": self.default_user_password,
-        }
         if extra_args is not None:
             kmanila_request_params.check(extra_args)
-            user_info["user_id"] = extra_args["user_id"]
-            user_info["password"] = extra_args["password"]
+        else:
+            extra_args = {}
+        user_info = {
+            "user_id": extra_args.get("user_id") or self.default_user_id,
+            "password": extra_args.get("password") or self.default_user_password,
+        }
+        volume_name = extra_args.get("volume_name") or DEFAULT_VOLUME_NAME
 
         auth_info = await self._get_auth_info(user_info)
         headers = {
@@ -224,7 +227,9 @@ class KManilaQuotaModel(BaseQuotaModel):
             "Content-Type": "application/json",
         }
         async with aiohttp.ClientSession(base_url=self.api_base_url, headers=headers) as sess:
-            volume_id = await self._create_volume(sess, quota_scope_id, options, auth_info)
+            volume_id = await self._create_volume(
+                sess, quota_scope_id, options, auth_info, name=volume_name
+            )
             is_newly_created = await self._create_access_control(
                 sess, quota_scope_id, volume_id, auth_info
             )
@@ -249,5 +254,6 @@ class KManilaFSVolume(BaseVolume):
             default_user_id=self.config["user_id"],
             default_user_password=self.config["user_password"],
             default_project_id=self.config.get("project_id"),
+            default_netword_id=self.config.get("netword_id"),
             max_poll_count=max_poll_count,
         )

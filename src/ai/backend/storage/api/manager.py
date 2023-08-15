@@ -176,12 +176,9 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            if (extra_args := params.get("extra_args")) is not None:
-                await volume.quota_model.create_quota_scope(
-                    params["qsid"], params["options"], extra_args
-                )
-            else:
-                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.create_quota_scope(
+                params["qsid"], params["options"], params.get("extra_args")
+            )
             return web.Response(status=204)
 
 
