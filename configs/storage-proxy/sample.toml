@@ -189,7 +189,7 @@ path = "/vfroot/kmanila"
 
 
 [volume.kmanila.options]
-api_base_url = "https://api.ucloudbiz.olleh.com/d1"
+api_base_url = ""
 agent_addrs = []
 access_to = ""
 access_level = "rw"
