@@ -74,6 +74,7 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
+    EventDispatcher,
     EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
@@ -93,6 +94,7 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    REDIS_STREAM_DB,
     AbuseReportValue,
     AcceleratorMetadata,
     AgentId,
@@ -599,8 +601,14 @@ class AbstractAgent(
 
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
-            db=4,
+            db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
+        )
+        self.event_dispatcher = await EventDispatcher.new(
+            self.local_config["redis"],
+            db=REDIS_STREAM_DB,
+            log_events=self.local_config["debug"]["log-events"],
+            node_id=self.local_config["agent"]["id"],
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)

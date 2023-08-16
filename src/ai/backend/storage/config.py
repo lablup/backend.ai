@@ -94,6 +94,7 @@ local_config_iv = (
                     t.Key("enabled", default=False): t.ToBool,
                     t.Key("asyncio", default=False): t.ToBool,
                     t.Key("enhanced-aiomonitor-task-info", default=False): t.ToBool,
+                    t.Key("log-events", default=False): t.ToBool,
                 },
             ).allow_extra("*"),
         },

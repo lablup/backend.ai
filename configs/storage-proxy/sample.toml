@@ -74,6 +74,9 @@ asyncio = false
 # Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
 enhanced-aiomonitor-task-info = false
 
+# Enable logging events from EventProducer and EventDispatcher
+log-events = true
+
 
 [logging]
 # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"

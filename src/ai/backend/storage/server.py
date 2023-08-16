@@ -17,8 +17,12 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common.config import ConfigurationError, override_key
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.types import REDIS_STREAM_DB, LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
@@ -75,7 +79,24 @@ async def server_main(
 
     try:
         etcd = load_shared_config(local_config)
-        ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
+        event_producer = await EventProducer.new(
+            local_config["redis"],
+            db=REDIS_STREAM_DB,
+            log_events=local_config["debug"]["log-events"],
+        )
+        event_dispatcher = await EventDispatcher.new(
+            local_config["redis"],
+            db=REDIS_STREAM_DB,
+            log_events=local_config["debug"]["log-events"],
+            node_id=local_config["storage-proxy"]["node-id"],
+        )
+        ctx = Context(
+            pid=os.getpid(),
+            local_config=local_config,
+            etcd=etcd,
+            event_producer=event_producer,
+            event_dispatcher=event_dispatcher,
+        )
         m.console_locals["ctx"] = ctx
         client_api_app = await init_client_app(ctx)
         manager_api_app = await init_manager_app(ctx)

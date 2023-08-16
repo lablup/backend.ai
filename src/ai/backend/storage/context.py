@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
@@ -33,7 +37,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
 }
 
 
-class Context:
+class BaseContext:
     __slots__ = ("pid", "etcd", "local_config", "dsn")
 
     pid: int
@@ -74,3 +78,24 @@ class Context:
             yield volume_obj
         finally:
             await volume_obj.shutdown()
+
+
+class Context(BaseContext):
+    __slots__ = ("pid", "etcd", "local_config", "dsn", "event_producer", "event_dispatcher")
+
+    event_producer: EventProducer
+    event_dispatcher: EventDispatcher
+
+    def __init__(
+        self,
+        pid: int,
+        local_config: Mapping[str, Any],
+        etcd: AsyncEtcd,
+        event_producer: EventProducer,
+        event_dispatcher: EventDispatcher,
+        *,
+        dsn: str | None = None,
+    ) -> None:
+        super().__init__(pid, local_config, etcd, dsn=dsn)
+        self.event_producer = event_producer
+        self.event_dispatcher = event_dispatcher
