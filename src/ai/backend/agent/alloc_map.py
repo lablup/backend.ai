@@ -285,27 +285,29 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
-        for slot_name, alloc in requested_slots.items():
+        for slot_name, requested_alloc in requested_slots.items():
             slot_allocation: dict[DeviceId, Decimal] = {}
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if log_alloc_map:
-                log.debug("DiscretePropertyAllocMap(FILL): allocating {} {}", slot_name, alloc)
+                log.debug(
+                    "DiscretePropertyAllocMap(FILL): allocating {} {}", slot_name, requested_alloc
+                )
                 log.debug("DiscretePropertyAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
 
             total_allocatable = int(0)
-            remaining_alloc = Decimal(alloc).normalize()
+            remaining_alloc = Decimal(requested_alloc).normalize()
 
             # fill up starting from the most free devices
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
                 assert slot_name == self.device_slots[dev_id].slot_name
                 total_allocatable += int(self.device_slots[dev_id].amount - current_alloc)
-            if total_allocatable < alloc:
+            if total_allocatable < requested_alloc:
                 raise InsufficientResource(
                     "DiscretePropertyAllocMap: insufficient allocatable amount!",
                     context_tag,
                     slot_name,
-                    str(alloc),
+                    str(requested_alloc),
                     str(total_allocatable),
                     allocation,
                 )
