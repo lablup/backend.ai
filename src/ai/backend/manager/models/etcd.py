@@ -7,7 +7,7 @@ import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..api.exceptions import InvalidAPIParameters, ObjectNotFound
+from ..api.exceptions import ObjectNotFound
 from ..config import container_registry_iv
 from . import UserRole
 from .base import privileged_mutation, set_if_set
@@ -129,9 +129,6 @@ class CreateContainerRegistry(graphene.Mutation):
             config,
         )
         updates = ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
-        # TODO: chunk support if there are too many keys
-        if len(updates) > 16:
-            raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
         await ctx.shared_config.etcd.put_dict(updates)
         return cls(result="ok")
 
@@ -168,9 +165,6 @@ class ModifyContainerRegistry(graphene.Mutation):
             config,
         )
         updates = ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
-        # TODO: chunk support if there are too many keys
-        if len(updates) > 16:
-            raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
         await ctx.shared_config.etcd.put_dict(updates)
         return cls(result="ok")
 
