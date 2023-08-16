@@ -44,7 +44,8 @@ from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -481,29 +482,25 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     elif template["spec"]["session_type"] == "inference":
         param_from_template["session_type"] = SessionTypes.INFERENCE
 
-    # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
-    # Check https://github.com/python/mypy/issues/7316
-    # TODO: remove `NOQA` when flake8 supports Python 3.8 and walrus operator
-    # Check https://gitlab.com/pycqa/flake8/issues/599
-    if tag := template["metadata"].get("tag"):  # noqa
+    if tag := template["metadata"].get("tag"):
         param_from_template["tag"] = tag
-    if runtime_opt := template["spec"]["kernel"]["run"]:  # noqa
-        if bootstrap := runtime_opt["bootstrap"]:  # noqa
+    if runtime_opt := template["spec"]["kernel"]["run"]:
+        if bootstrap := runtime_opt["bootstrap"]:
             param_from_template["bootstrap_script"] = bootstrap
-        if startup := runtime_opt["startup_command"]:  # noqa
+        if startup := runtime_opt["startup_command"]:
             param_from_template["startup_command"] = startup
 
     config_from_template: MutableMapping[Any, Any] = {}
-    if scaling_group := template["spec"].get("scaling_group"):  # noqa
+    if scaling_group := template["spec"].get("scaling_group"):
         config_from_template["scaling_group"] = scaling_group
-    if mounts := template["spec"].get("mounts"):  # noqa
+    if mounts := template["spec"].get("mounts"):
         config_from_template["mounts"] = list(mounts.keys())
         config_from_template["mount_map"] = {
             key: value for (key, value) in mounts.items() if len(value) > 0
         }
-    if environ := template["spec"]["kernel"].get("environ"):  # noqa
+    if environ := template["spec"]["kernel"].get("environ"):
         config_from_template["environ"] = environ
-    if resources := template["spec"].get("resources"):  # noqa
+    if resources := template["spec"].get("resources"):
         config_from_template["resources"] = resources
     if "agent_list" in template["spec"]:
         config_from_template["agent_list"] = template["spec"]["agent_list"]
@@ -531,23 +528,23 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     log.debug("Updated param: {0}", params)
 
-    if git := template["spec"]["kernel"]["git"]:  # noqa
-        if _dest := git.get("dest_dir"):  # noqa
+    if git := template["spec"]["kernel"]["git"]:
+        if _dest := git.get("dest_dir"):
             target = _dest
         else:
             target = git["repository"].split("/")[-1]
 
         cmd_builder = "git clone "
-        if credential := git.get("credential"):  # noqa
+        if credential := git.get("credential"):
             proto, url = git["repository"].split("://")
             cmd_builder += f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
         else:
             cmd_builder += git["repository"]
-        if branch := git.get("branch"):  # noqa
+        if branch := git.get("branch"):
             cmd_builder += f" -b {branch}"
         cmd_builder += f" {target}\n"
 
-        if commit := git.get("commit"):  # noqa
+        if commit := git.get("commit"):
             cmd_builder = "CWD=$(pwd)\n" + cmd_builder
             cmd_builder += f"cd {target}\n"
             cmd_builder += f"git checkout {commit}\n"
