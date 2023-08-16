@@ -607,7 +607,7 @@ class SharedConfig(AbstractConfig):
 
     def __hash__(self) -> int:
         # When used as a key in dicts, we don't care our contents.
-        # Just treat it lke an opaque object.
+        # Just treat it like an opaque object.
         return hash(id(self))
 
     def flatten(self, key_prefix: str, hostname: str, inner_dict) -> Mapping[str, Any]:
