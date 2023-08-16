@@ -70,6 +70,7 @@ class Context:
             local_config=self.local_config,
             mount_path=Path(volume_config["path"]),
             options=volume_config["options"] or {},
+            etcd=self.etcd,
         )
         await volume_obj.init()
         try:

@@ -8,6 +8,7 @@ from typing import Any, FrozenSet, Mapping, Optional
 
 import aiofiles.os
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 
@@ -100,9 +101,10 @@ class WekaVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, options=options)
+        super().__init__(local_config, mount_path, etcd=etcd, options=options)
         ssl_verify = self.config.get("weka_verify_ssl", False)
         self.api_client = WekaAPIClient(
             self.config["weka_endpoint"],

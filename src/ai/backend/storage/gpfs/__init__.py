@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
@@ -113,9 +114,10 @@ class GPFSVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, options=options)
+        super().__init__(local_config, mount_path, etcd=etcd, options=options)
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
         self.api_client = GPFSAPIClient(
             self.config["gpfs_endpoint"],

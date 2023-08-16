@@ -1,18 +1,19 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypedDict
 
 import aiohttp
 import trafaret as t
 from yarl import URL
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 
 from ..abc import AbstractQuotaModel
 from ..exception import ExecutionError, ExternalError
-from ..types import Optional, QuotaConfig
+from ..types import QuotaConfig
 from ..vfs import BaseQuotaModel, BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -20,48 +21,53 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 DEFAULT_MAX_POLL_COUNT: Final = 20
 DEFAULT_VOLUME_SIZE: Final = 1000
-DEFAULT_VOLUME_NAME: Final = "defualt"
+QUOTA_VOLUME_ID_MAP_KEY: Final = "kmanila/volumes"
 
 
 kmanila_request_params = t.Dict(
     {
-        t.Key("user_id", default=None): t.Null | t.String(),
-        t.Key("password", default=None): t.Null | t.String(),
-        t.Key("volume_name", default=None): t.Null | t.String(),
+        t.Key("volume_name"): t.String(),
     }
 ).allow_extra("*")
+
+
+class QuotaVolumeMap(TypedDict):
+    volume_id: str
+    volume_name: str
 
 
 class KManilaQuotaModel(BaseQuotaModel):
     def __init__(
         self,
         mount_path: Path,
+        etcd: AsyncEtcd,
         api_base_url: URL,
         agent_addrs: list[str],
         *,
         access_to: str,
         access_level: str,
-        default_user_id: str,
-        default_user_password: str,
-        default_project_id: Optional[str],
-        default_netword_id: Optional[str],
+        kmanila_requestor_id: str,
+        kmanila_requestor_pwd: str,
+        default_project_id: str | None,
+        default_netword_id: str | None,
         max_poll_count: int,
     ) -> None:
         super().__init__(mount_path)
+        self.etcd = etcd
         self.api_base_url = api_base_url
         self.agent_addrs = agent_addrs
         self.access_to = access_to
         self.access_level = access_level
-        self.default_user_id = default_user_id
-        self.default_user_password = default_user_password
+        self.kmanila_requestor_id = kmanila_requestor_id
+        self.kmanila_requestor_pwd = kmanila_requestor_pwd
         self.default_project_id = default_project_id
         self.default_netword_id = default_netword_id
         self.max_poll_count = max_poll_count
 
-    async def _get_auth_info(self, user_info: dict[str, Any]) -> dict[str, Any]:
+    async def _get_auth_info(self, user_id: QuotaScopeID) -> dict[str, Any]:
         async with aiohttp.ClientSession() as sess:
-            user_id = user_info["user_id"]
-            password = user_info["password"]
+            rqst_id = self.kmanila_requestor_id
+            rqst_pwd = self.kmanila_requestor_pwd
             request_body = {
                 "auth": {
                     "identity": {
@@ -69,15 +75,15 @@ class KManilaQuotaModel(BaseQuotaModel):
                         "password": {
                             "user": {
                                 "domain": {"id": "default"},
-                                "name": user_info["user_id"],
-                                "password": password,
+                                "name": rqst_id,
+                                "password": rqst_pwd,
                             }
                         },
                     },
                     "scope": {
                         "project": {
                             "domain": {"id": "default"},
-                            "name": user_info["user_id"],
+                            "name": rqst_id,
                         }
                     },
                 }
@@ -89,8 +95,7 @@ class KManilaQuotaModel(BaseQuotaModel):
                 token = resp.headers.get("X-Subject-Token")
                 if token is None:
                     status_code = resp.status
-                    log.exception(f"Token not found. (code: {status_code}, user: {user_id})")
-                    raise ExecutionError(f"Token not found. {status_code = }, {user_id = }")
+                    raise ExecutionError(f"Token not found. {status_code = }, {rqst_id = }")
                 if self.default_project_id is None:
                     data: dict[str, Any] = await resp.json()
                     project_id = data["token"]["project"]["id"]
@@ -98,34 +103,47 @@ class KManilaQuotaModel(BaseQuotaModel):
                     project_id = self.default_project_id
                 return {"project_id": project_id, "auth_token": token}
 
-    async def created_volume_id(
+    async def get_user_volume_id(self, quota_scope_id: QuotaScopeID) -> str | None:
+        user_vol = await self.etcd.get_prefix(
+            f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}"
+        )
+        if not user_vol:
+            return None
+        return str(user_vol["volume_id"])
+
+    async def put_user_volume_id(self, quota_scope_id: QuotaScopeID, data: QuotaVolumeMap) -> None:
+        await self.etcd.put_prefix(f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}", data)  # type: ignore[arg-type]
+
+    async def get_volume_id(
         self,
         session: aiohttp.ClientSession,
         quota_scope_id: QuotaScopeID,
         auth_info: dict[str, Any],
-    ) -> Optional[str]:
+        *,
+        do_hard_check: bool = True,
+    ) -> str | None:
+        if (vol_id := await self.get_user_volume_id(quota_scope_id)) is not None:
+            if not do_hard_check:
+                return vol_id
         project_id = auth_info["project_id"]
-        async with session.get(f"/d3/adm/manila/v2/{project_id}/shares/detail") as resp:
+        async with session.get(f"/d3/adm/manila/v2/{project_id}/shares/{vol_id}") as resp:
             if resp.status == 200:
-                volume_list = (await resp.json())["shares"]
-                for vol in volume_list:
-                    return vol["id"]
-                return None
-            else:
+                volume_info = (await resp.json())["share"]
+                return volume_info["id"]
+            elif resp.status // 100 == 5:
                 raise ExternalError("Cannot get data from API server")
+        return None
 
     async def _create_volume(
         self,
         session: aiohttp.ClientSession,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig],
+        options: QuotaConfig | None,
         auth_info: dict[str, Any],
         *,
         name: str,
     ) -> str:
-        if (
-            volume_id := await self.created_volume_id(session, quota_scope_id, auth_info)
-        ) is not None:
+        if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is not None:
             return volume_id
         project_id = auth_info["project_id"]
         request_body = {
@@ -153,8 +171,11 @@ class KManilaQuotaModel(BaseQuotaModel):
         while True:
             log.debug(f"Poll if the volume has been created, {trial = }")
             if (
-                volume_id := await self.created_volume_id(session, quota_scope_id, project_id)
+                volume_id := await self.get_volume_id(session, quota_scope_id, project_id)
             ) is not None:
+                await self.put_user_volume_id(
+                    quota_scope_id, QuotaVolumeMap(volume_id=volume_id, volume_name=name)
+                )
                 return volume_id
             await asyncio.sleep(1)
             trial += 1
@@ -210,20 +231,13 @@ class KManilaQuotaModel(BaseQuotaModel):
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
-        options: Optional[QuotaConfig] = None,
-        extra_args: Optional[dict[str, Any]] = None,
+        options: QuotaConfig | None = None,
+        extra_args: dict[str, Any] | None = None,
     ) -> None:
-        if extra_args is not None:
-            kmanila_request_params.check(extra_args)
-        else:
-            extra_args = {}
-        user_info = {
-            "user_id": extra_args.get("user_id") or self.default_user_id,
-            "password": extra_args.get("password") or self.default_user_password,
-        }
-        volume_name = extra_args.get("volume_name") or DEFAULT_VOLUME_NAME
+        volume_info: dict[str, str] = kmanila_request_params.check(extra_args)
+        volume_name = volume_info["volume_name"]
 
-        auth_info = await self._get_auth_info(user_info)
+        auth_info = await self._get_auth_info(quota_scope_id)
         headers = {
             "X-Auth-Token": auth_info["auth_token"],
             "Content-Type": "application/json",
@@ -249,12 +263,13 @@ class KManilaFSVolume(BaseVolume):
         )
         return KManilaQuotaModel(
             self.mount_path,
+            self.etcd,
             URL(self.config["api_base_url"]),
             self.config["agent_addrs"],
             access_to=self.config["access_to"],
             access_level=access_level,
-            default_user_id=self.config["user_id"],
-            default_user_password=self.config["user_password"],
+            kmanila_requestor_id=self.config["user_id"],
+            kmanila_requestor_pwd=self.config["user_password"],
             default_project_id=self.config.get("project_id"),
             default_netword_id=self.config.get("netword_id"),
             max_poll_count=max_poll_count,
