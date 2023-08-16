@@ -4,10 +4,9 @@ pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
-    "pants.backend.python.lint.flake8",
-    "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
+    "pants.backend.experimental.python.lint.ruff",
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
@@ -49,7 +48,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.11.3"]
+interpreter_constraints = ["CPython==3.11.4"]
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
@@ -63,8 +62,7 @@ python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
 black = "tools/black.lock"
-flake8 = "tools/flake8.lock"
-isort = "tools/isort.lock"
+ruff = "tools/ruff.lock"
 pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
 mypy = "tools/mypy.lock"
@@ -86,13 +84,10 @@ towncrier = "tools/towncrier.lock"
 
 [black]
 install_from_resolve = "black"
-interpreter_constraints = ["CPython==3.11.3"]  # don't know why this is required... (maybe a Pants bug?)
+interpreter_constraints = ["CPython==3.11.4"]  # don't know why this is required... (maybe a Pants bug?)
 
-[flake8]
-install_from_resolve = "flake8"
-
-[isort]
-install_from_resolve = "isort"
+[ruff]
+install_from_resolve = "ruff"
 
 [pytest]
 install_from_resolve = "pytest"

@@ -495,11 +495,13 @@ def test_time_duration_negative():
 
 def test_url():
     iv = tx.URL()
+    aws_ecr_url = "https://123456789012.dkr.ecr.us-east-1.amazonaws.com/my-container-repo"
     with pytest.raises(t.DataError):
         iv.check("")
     with pytest.raises(t.DataError):
         iv.check("example.com")
     assert iv.check("https://example.com") == yarl.URL("https://example.com")
+    assert iv.check(aws_ecr_url) == yarl.URL(aws_ecr_url)
     iv = tx.URL(scheme_required=False)
     assert iv.check("example.com") == yarl.URL("example.com")
 

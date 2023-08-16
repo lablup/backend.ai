@@ -50,7 +50,7 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import KernelRow, SessionRow
+from ..models import KernelLoadingStrategy, KernelRow, SessionRow
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -86,8 +86,11 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     )
                 ),
             )
@@ -203,11 +206,9 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                                 socks[0].close()
                             else:
                                 log.warning(
-                                    (
-                                        "stream_stdin({0}): "
-                                        "duplicate kernel restart request; "
-                                        "ignoring it."
-                                    ),
+                                    "stream_stdin({0}): "
+                                    "duplicate kernel restart request; "
+                                    "ignoring it.",
                                     stream_key,
                                 )
                 elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -301,8 +302,11 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session: SessionRow = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     ),  # noqa
                 ),
             )
@@ -448,8 +452,11 @@ async def stream_proxy(
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
-                    SessionRow.get_session_with_kernels(
-                        session_name, access_key, only_main_kern=True, db_session=db_sess
+                    SessionRow.get_session(
+                        db_sess,
+                        session_name,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                     ),
                 )
             )
@@ -632,8 +639,11 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        compute_session = await SessionRow.get_session_with_kernels(
-            session_name, access_key, only_main_kern=True, db_session=db_sess
+        compute_session = await SessionRow.get_session(
+            db_sess,
+            session_name,
+            access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
     service_ports = compute_session.main_kernel.service_ports
     if service_ports is None:
@@ -728,10 +738,8 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
                     )
                     log.debug(
-                        (
-                            f"conn_tracker: gc {session_id} "
-                            f"removed/remaining = {removed_count}/{remaining_count}"
-                        ),
+                        f"conn_tracker: gc {session_id} "
+                        f"removed/remaining = {removed_count}/{remaining_count}",
                     )
                     if prev_remaining_count > 0 and remaining_count == 0:
                         await root_ctx.idle_checker_host.update_app_streaming_status(

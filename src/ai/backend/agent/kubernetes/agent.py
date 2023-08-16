@@ -817,10 +817,8 @@ class KubernetesAgent(
                 new_pv.label("backend.ai/backend-ai-scratch-volume", "hostPath")
             else:
                 raise NotImplementedError(
-                    (
-                        f'Scratch type {self.local_config["container"]["scratch-type"]} is not'
-                        " supported"
-                    ),
+                    f'Scratch type {self.local_config["container"]["scratch-type"]} is not'
+                    " supported",
                 )
 
             try:
