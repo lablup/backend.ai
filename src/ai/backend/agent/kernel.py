@@ -517,8 +517,6 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def ping(self) -> dict[str, float] | None:
         try:
             return await self.feed_and_get_status()
-        except asyncio.CancelledError:
-            return None
         except Exception:
             log.exception("AbstractCodeRunner.ping(): unexpected error")
             return None
