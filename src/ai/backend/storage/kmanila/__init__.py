@@ -84,7 +84,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             }
             headers = {"Content-Type": "application/json", "Accept": "application/json"}
             async with sess.post(
-                self.api_base_url / "identity/auth/tokens", headers=headers, json=request_body
+                self.api_base_url / "d3/identity/auth/tokens", headers=headers, json=request_body
             ) as resp:
                 token = resp.headers.get("X-Subject-Token")
                 if token is None:
@@ -105,7 +105,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info: dict[str, Any],
     ) -> Optional[str]:
         project_id = auth_info["project_id"]
-        async with session.get(f"nas/{project_id}/shares/detail") as resp:
+        async with session.get(f"/d3/adm/manila/v2/{project_id}/shares/detail") as resp:
             if resp.status == 200:
                 volume_list = (await resp.json())["shares"]
                 for vol in volume_list:
@@ -139,7 +139,9 @@ class KManilaQuotaModel(BaseQuotaModel):
                 "share_type": "SSD",
             }
         }
-        async with session.post(url=f"nas/{project_id}/shares", json=request_body) as resp:
+        async with session.post(
+            url=f"/d3/adm/manila/v2/{project_id}/shares", json=request_body
+        ) as resp:
             if resp.status not in (200, 201, 204):
                 raise ExternalError(
                     f"Got invalid status code when post data to API server. {resp.status = }"
@@ -168,7 +170,7 @@ class KManilaQuotaModel(BaseQuotaModel):
     ) -> bool:
         project_id = auth_info["project_id"]
         async with session.post(
-            url=f"nas/{project_id}/shares/{volume_id}/action",
+            url=f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action",
             json={
                 "os-access_list": None,
             },
@@ -191,7 +193,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             }
         }
         async with session.post(
-            f"nas/{project_id}/shares/{volume_id}/action",
+            f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action",
             json=request_data,
         ) as resp:
             return True
