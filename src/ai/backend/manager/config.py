@@ -610,7 +610,7 @@ class SharedConfig(AbstractConfig):
         # Just treat it lke an opaque object.
         return hash(id(self))
 
-    def flatten(self, key_prefix, hostname, inner_dict) -> Mapping[str, Any]:
+    def flatten(self, key_prefix: str, hostname: str, inner_dict) -> Mapping[str, Any]:
         raw_dict = {}
         for k, v in inner_dict.items():
             if k == "":
