@@ -1729,7 +1729,7 @@ class AbstractAgent(
                                         dict(self.computers[dev].alloc_map.allocations)
                                     )
 
-                            for desired_slot_name, desired_slot_dict in e.args[5].items():
+                            for desired_slot_name, desired_slot_dict in e.allocation.items():
                                 for desired_device_id in desired_slot_dict.keys():
                                     if (
                                         desired_device_id
@@ -1768,27 +1768,33 @@ class AbstractAgent(
                                                 occupied_slots_from_kernel[slot_name] = Decimal(
                                                     kernel_resource_spec.slots[slot_name]
                                                 )
-
+                            # fmt: off
                             log.error(
-                                "resource allocation failed (InsufficientResource)\n{0}\nwith"
-                                " context tag: {1}\nat allocating {2} {3}\ntotal allocatable"
-                                " amount:"
-                                " {4}\n-----------------------------------------------\n(before"
-                                " allocation) compute plugin alloc map:\n"
-                                " {5}\n-----------------------------------------------\n(error"
-                                " during allocation) occupied slots from compute plugin alloc"
-                                " map:\n{6}\n-----------------------------------------------\noccupied"
-                                " slots from kernel resources: {7}",
-                                e.args[0],
-                                e.args[1],
-                                e.args[2],
-                                e.args[3],
-                                e.args[4],
+                                "resource allocation failed (InsufficientResource)\n"
+                                "{0}\n"
+                                "with context tag: {1}\n"
+                                "at allocating {2} {3}\n"
+                                "total allocatable amount: {4}\n"
+                                "-----------------------------------------------\n"
+                                "(before allocation) compute plugin alloc map:\n"
+                                " {5}\n"
+                                "-----------------------------------------------\n"
+                                "(error during allocation) occupied slots from "
+                                "compute plugin alloc map:\n"
+                                " {6}\n"
+                                "-----------------------------------------------\n"
+                                "occupied slots from kernel resources: {7}",
+                                e.error_title,
+                                e.context_tag,
+                                e.slot_name,
+                                e.requested_alloc,
+                                e.total_allocatable,
                                 pprint.pformat(original_plugin_alloc_map),
                                 pprint.pformat(plugin_alloc_map),
                                 occupied_slots_from_kernel,
                             )
                             raise
+                            # fmt: on
                         except ResourceError as e:
                             log.info(
                                 "resource allocation failed ({}): {} of {}\n(alloc map: {})",

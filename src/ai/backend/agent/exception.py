@@ -1,3 +1,10 @@
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Optional
+
+from ..common.types import DeviceId, SlotName
+
+
 class InitializationError(Exception):
     """
     Errors during agent initialization and compute plugin setup
@@ -26,8 +33,27 @@ class NotMultipleOfQuantum(InvalidResourceArgument):
     pass
 
 
+@dataclass
 class InsufficientResource(ResourceError):
-    pass
+    error_title: str
+    context_tag: Optional[str]
+    slot_name: SlotName
+    requested_alloc: str
+    total_allocatable: str
+    allocation: dict[SlotName, dict[DeviceId, Decimal]]
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (
+                self.error_title,
+                self.context_tag,
+                self.slot_name,
+                self.requested_alloc,
+                self.total_allocatable,
+                self.allocation,
+            ),
+        )
 
 
 class UnsupportedBaseDistroError(RuntimeError):
