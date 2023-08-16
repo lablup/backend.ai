@@ -20,17 +20,17 @@ if TYPE_CHECKING:
         AccessKey,
         AgentId,
         RedisConnectionInfo,
+        SessionId,
         SlotName,
         SlotTypes,
-        SessionId,
     )
 
     from ..api.manager import ManagerStatus
     from ..config import LocalConfig, SharedConfig
-    from ..registry import AgentRegistry
-    from ..models.utils import ExtendedAsyncSAEngine
-    from .storage import StorageSessionManager
     from ..idle import IdleCheckerHost
+    from ..models.utils import ExtendedAsyncSAEngine
+    from ..registry import AgentRegistry
+    from .storage import StorageSessionManager
 
 from ..api.exceptions import (
     ImageNotFound,
