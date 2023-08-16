@@ -470,7 +470,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     param_from_template = {
         "image": template["spec"]["kernel"]["image"],
-        "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
+        "architecture": template["spec"]["kernel"]["architecture"],
     }
     if "domain_name" in template_info:
         param_from_template["domain"] = template_info["domain_name"]
