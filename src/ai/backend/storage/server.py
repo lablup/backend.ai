@@ -16,7 +16,7 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.config import ConfigurationError, override_key
+from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
 from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
@@ -79,6 +79,11 @@ async def server_main(
 
     try:
         etcd = load_shared_config(local_config)
+        local_config["redis"] = redis_config_iv.check(
+            await etcd.get_prefix("config/redis"),
+        )
+        log.info("configured redis_addr: {0}", local_config["redis"]["addr"])
+
         event_producer = await EventProducer.new(
             local_config["redis"],
             db=REDIS_STREAM_DB,
@@ -160,6 +165,8 @@ async def server_main(
             log.info("Shutting down...")
             await manager_api_runner.cleanup()
             await client_api_runner.cleanup()
+            await event_producer.close()
+            await event_dispatcher.close()
     finally:
         if aiomon_started:
             m.close()

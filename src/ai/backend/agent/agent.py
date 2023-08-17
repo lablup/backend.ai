@@ -705,6 +705,7 @@ class AbstractAgent(
 
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
+        await self.event_dispatcher.close()
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
 
