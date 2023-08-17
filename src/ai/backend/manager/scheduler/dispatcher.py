@@ -1249,7 +1249,7 @@ class SchedulerDispatcher(aobject):
         for endpoint, expand_count in endpoints_to_expand.items():
             log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
             await self.shared_config.etcd.put(
-                f"manager/{manager_id}/scale/endpoint-nmae", endpoint.name
+                f"manager/{manager_id}/scale/endpoint-name", endpoint.name
             )
             async with self.db.begin_readonly() as conn:
                 _, group_id, resource_policy = await query_userinfo(
