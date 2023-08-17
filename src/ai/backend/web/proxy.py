@@ -210,7 +210,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                     now = datetime.now().astimezone()
                     claims = {
                         # Registered claims
-                        "exp": now + timedelta(hours=1),
+                        "exp": now + timedelta(days=1),
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
@@ -407,7 +407,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
                     now = datetime.now().astimezone()
                     claims = {
                         # Registered claims
-                        "exp": now + timedelta(hours=1),
+                        "exp": now + timedelta(days=1),
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
