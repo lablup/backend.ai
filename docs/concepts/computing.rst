@@ -84,14 +84,11 @@ There are several classes of sessions for different purposes having different fe
      - ✓
      - ✓
 
-Compute Session
-~~~~~~~~~~~~~~~
-
 Compute session is the most generic form of session to host computations.
 It has two operation modes: *interactive* and *batch*.
 
 Interactive compute session
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Interactive compute sessions are used to run various interactive applications and development tools,
 such as Jupyter Notebooks, web-based terminals, and etc.
@@ -109,7 +106,7 @@ Code execution
 TODO: execution API state diagram
 
 Batch compute session
-^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~
 
 Batch compute sessions are used to host a "run-to-completion" script with a finite execution time.
 It has two result states: SUCCESS or FAILED, which is defined by whether the main program's exit code is zero or not.
@@ -119,14 +116,14 @@ Dependencies between compute sessions
 
 Pipelining
 
-Inference Session
+Inference session
 ~~~~~~~~~~~~~~~~~
 
 Service endpoint and routing
 
 Auto-scaling
 
-System Session
+System session
 ~~~~~~~~~~~~~~
 
 SFTP access
