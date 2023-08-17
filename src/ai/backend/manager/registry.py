@@ -2560,7 +2560,7 @@ class AgentRegistry:
                     keepalive_timeout=self.rpc_keepalive_timeout,
                 ) as rpc:
                     updated_config: Dict[str, Any] = {
-                        # TODO: support resacling of sub-containers
+                        # TODO: support rescaling of sub-containers
                     }
                     kernel_info = await rpc.call.restart_kernel(
                         str(kernel.session_id),
