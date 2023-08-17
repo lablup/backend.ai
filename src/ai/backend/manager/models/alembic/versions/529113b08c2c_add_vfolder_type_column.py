@@ -114,10 +114,8 @@ def upgrade():
     op.create_check_constraint(
         "ownership_type_match_with_user_or_group",
         "vfolders",
-        (
-            "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-            "(ownership_type = 'group' AND \"group\" IS NOT NULL)"
-        ),
+        "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
+        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
     )
     op.create_check_constraint(
         "either_one_of_user_or_group",

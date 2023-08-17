@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.11.3"
+//     "CPython==3.11.4"
 //   ],
 //   "generated_with_requirements": [
 //     "async_timeout~=4.0",
@@ -237,13 +237,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d4201af84559bc8c70cead287e1ab94aeef3c512848dde077b7684b54d67730d",
-              "url": "https://files.pythonhosted.org/packages/41/1e/92a67f333b9335f04ce409799c030dcfb291712658b9d9d13997f7c91e5a/jupyter_core-5.3.0-py3-none-any.whl"
+              "hash": "ae9036db959a71ec1cac33081eeb040a79e681f08ab68b0883e9a676c7a90dce",
+              "url": "https://files.pythonhosted.org/packages/8c/e0/3f9061c5e99a03612510f892647b15a91f910c5275b7b77c6c72edae1494/jupyter_core-5.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6db75be0c83edbf1b7c9f91ec266a9a24ef945da630f3120e1a0046dc13713fc",
-              "url": "https://files.pythonhosted.org/packages/9a/d3/b80e7179e9615f5a7f055edc55eb665fa2534f11a4599349db3bab6fdeb5/jupyter_core-5.3.0.tar.gz"
+              "hash": "5ba5c7938a7f97a6b0481463f7ff0dbac7c15ba48cf46fa4035ca6e838aa1aba",
+              "url": "https://files.pythonhosted.org/packages/9e/53/f27bd74ceaa672a1ce17b4b2bee93c0742ca00cb9f540ec4fa60cf7319b5/jupyter_core-5.3.1.tar.gz"
             }
           ],
           "project_name": "jupyter-core",
@@ -263,7 +263,7 @@
             "traitlets>=5.3"
           ],
           "requires_python": ">=3.8",
-          "version": "5.3.0"
+          "version": "5.3.1"
         },
         {
           "artifacts": [
@@ -345,30 +345,30 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e2378146f1964972c03c085bb5662ae80b2b8c06226c54b2ff4aa9483e8a13a5",
-              "url": "https://files.pythonhosted.org/packages/89/7e/c6ff9ddcf93b9b36c90d88111c4db354afab7f9a58c7ac3257fa717f1268/platformdirs-3.5.1-py3-none-any.whl"
+              "hash": "ad8291ae0ae5072f66c16945166cb11c63394c7a3ad1b1bc9828ca3162da8c2f",
+              "url": "https://files.pythonhosted.org/packages/6d/a7/47b7088a28c8fe5775eb15281bf44d39facdbe4bc011a95ccb89390c2db9/platformdirs-3.9.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "412dae91f52a6f84830f39a8078cecd0e866cb72294a5c66808e74d5e88d251f",
-              "url": "https://files.pythonhosted.org/packages/9c/0e/ae9ef1049d4b5697e79250c4b2e72796e4152228e67733389868229c92bb/platformdirs-3.5.1.tar.gz"
+              "hash": "1b42b450ad933e981d56e59f1b97495428c9bd60698baab9f3eb3d00d5822421",
+              "url": "https://files.pythonhosted.org/packages/a1/70/c1d14c0c58d975f06a449a403fac69d3c9c6e8ae2a529f387d77c29c2e56/platformdirs-3.9.1.tar.gz"
             }
           ],
           "project_name": "platformdirs",
           "requires_dists": [
             "appdirs==1.4.4; extra == \"test\"",
             "covdefaults>=2.3; extra == \"test\"",
-            "furo>=2023.3.27; extra == \"docs\"",
+            "furo>=2023.5.20; extra == \"docs\"",
             "proselint>=0.13; extra == \"docs\"",
-            "pytest-cov>=4; extra == \"test\"",
+            "pytest-cov>=4.1; extra == \"test\"",
             "pytest-mock>=3.10; extra == \"test\"",
             "pytest>=7.3.1; extra == \"test\"",
             "sphinx-autodoc-typehints!=1.23.4,>=1.23; extra == \"docs\"",
-            "sphinx>=6.2.1; extra == \"docs\"",
-            "typing-extensions>=4.5; python_version < \"3.8\""
+            "sphinx>=7.0.1; extra == \"docs\"",
+            "typing-extensions>=4.6.3; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.5.1"
+          "version": "3.9.1"
         },
         {
           "artifacts": [
@@ -583,19 +583,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3a8b36f13dd5fdc5d1b16fe317f5668545de77fa0b8e02006381fd49d731ab98",
-              "url": "https://files.pythonhosted.org/packages/38/60/300ad6f93adca578bf05d5f6cd1d854b7d140bebe2f9829561aa9977d9f3/typing_extensions-4.6.2-py3-none-any.whl"
+              "hash": "440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36",
+              "url": "https://files.pythonhosted.org/packages/ec/6b/63cc3df74987c36fe26157ee12e09e8f9db4de771e0f3404263117e75b95/typing_extensions-4.7.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "06006244c70ac8ee83fa8282cb188f697b8db25bc8b4df07be1873c43897060c",
-              "url": "https://files.pythonhosted.org/packages/be/fc/3d12393d634fcb31d5f4231c28feaf4ead225124ba08021046317d5f450d/typing_extensions-4.6.2.tar.gz"
+              "hash": "b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2",
+              "url": "https://files.pythonhosted.org/packages/3c/8b/0111dd7d6c1478bf83baa1cab85c686426c7a6274119aceb2bd9d35395ad/typing_extensions-4.7.1.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "4.6.2"
+          "version": "4.7.1"
         },
         {
           "artifacts": [
@@ -680,7 +680,7 @@
     "uvloop~=0.17"
   ],
   "requires_python": [
-    "==3.11.3"
+    "==3.11.4"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

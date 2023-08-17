@@ -8,15 +8,13 @@ from ai.backend.common.types import AccessKey
 
 from .models import (
     UserRole,
-)
-from .models import association_groups_users as agus
-from .models import (
     domains,
     groups,
     keypair_resource_policies,
     keypairs,
     users,
 )
+from .models import association_groups_users as agus
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(
@@ -30,10 +28,8 @@ def check_if_requester_is_eligible_to_act_as_target_user(
     elif requester_role == UserRole.ADMIN:
         if requester_domain != target_domain:
             raise RuntimeError(
-                (
-                    "Domain-admins can perform operations on behalf of "
-                    "other users in the same domain only."
-                ),
+                "Domain-admins can perform operations on behalf of "
+                "other users in the same domain only.",
             )
         if target_role == UserRole.SUPERADMIN:
             raise RuntimeError(
