@@ -278,9 +278,9 @@ Set the following keys in the workspace settings to configure Python tools:
    * - ``{mypy-type-checker,black-formatter}.importStrategy``
      - ``"fromEnvironment"``
    * - ``ruff.interpreter``
-     - ``["dist/export/python/virtualenvs/black/3.11.4/bin/python"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/python"]``
    * - ``ruff.path``
-     - ``["dist/export/python/virtualenvs/black/3.11.4/bin/ruff"]``
+     - ``["dist/export/python/virtualenvs/ruff/3.11.4/bin/ruff"]``
 
 .. note:: **Changed in July 2023**
 
