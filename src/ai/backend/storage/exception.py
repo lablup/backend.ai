@@ -33,6 +33,10 @@ class QuotaScopeNotFoundError(StorageProxyError, HTTPNotFound):
     pass
 
 
+class QuotaScopeAlreadyExists(StorageProxyError):
+    pass
+
+
 class InvalidSubpathError(StorageProxyError):
     pass
 

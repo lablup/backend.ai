@@ -9,8 +9,10 @@ import secrets
 import socket
 import uuid
 from collections import defaultdict
+from pathlib import Path
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -27,6 +29,7 @@ from typing import (
     cast,
 )
 
+import aiofiles
 import attrs
 from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
@@ -36,6 +39,7 @@ from redis.asyncio import ConnectionPool
 from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
+from .exception import VolumeMountFailed
 from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
@@ -46,6 +50,10 @@ from .types import (
     SessionId,
     aobject,
 )
+from .utils import Fstab
+
+if TYPE_CHECKING:
+    from .etcd import AsyncEtcd
 
 __all__ = (
     "AbstractEvent",
@@ -549,6 +557,116 @@ class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
 
 class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VolumeCreated(AbstractEvent):
+    name = "volume_created"
+
+    mount_path: str = attrs.field()
+
+    fs_location: str = attrs.field()
+    fs_type: str = attrs.field(default="nfs")
+    cmd_options: list[str] | None = attrs.field(default=None)
+    scaling_group: str | None = attrs.field(default=None)
+
+    # if `edit_fstab` is False, `fstab_path` is ignored
+    # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
+    edit_fstab: bool = attrs.field(default=False)
+    fstab_path: str | None = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.mount_path,
+            self.fs_location,
+            self.fs_type,
+            self.cmd_options,
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            mount_path=value[0],
+            scaling_group=value[1],
+            edit_fstab=value[2],
+            fstab_path=value[3],
+            fs_location=value[4],
+            fs_type=value[5],
+            cmd_options=value[6],
+        )
+
+    async def mount(self, config_server: AsyncEtcd) -> None:
+        mount_prefix = await config_server.get("volumes/_mount")
+        if mount_prefix is None:
+            mount_prefix = "/mnt"
+        mountpoint = Path(mount_prefix) / self.mount_path
+        mountpoint.mkdir(exist_ok=True)
+        options: str | None = None
+        if self.cmd_options is not None:
+            options = " ".join(self.cmd_options)
+            cmd = [
+                "sudo",
+                "mount",
+                "-t",
+                self.fs_type,
+                "-o",
+                options,
+                self.fs_location,
+                str(mountpoint),
+            ]
+        else:
+            cmd = ["sudo", "mount", "-t", self.fs_type, self.fs_location, str(mountpoint)]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        raw_out, raw_err = await proc.communicate()
+        raw_out.decode("utf8")
+        err = raw_err.decode("utf8")
+        await proc.wait()
+        if err:
+            log.error("Mount error: " + err)
+            raise VolumeMountFailed(f"Failed to mount {self.mount_path} on {mount_prefix}")
+        log.info(f"Mounted {self.mount_path} on {mount_prefix}")
+        if self.edit_fstab:
+            fstab_path = self.fstab_path or "/etc/fstab"
+            async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+                fstab = Fstab(fp)
+                await fstab.add(
+                    self.fs_location,
+                    str(mountpoint),
+                    self.fs_type,
+                    options,
+                )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VolumeDeleted(AbstractEvent):
+    name = "volume_deleted"
+
+    mount_path: str = attrs.field()
+    scaling_group: str | None = attrs.field(default=None)
+
+    # if `edit_fstab` is False, `fstab_path` is ignored
+    # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
+    edit_fstab: bool = attrs.field(default=False)
+    fstab_path: str | None = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.mount_path,
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            mount_path=value[0], scaling_group=value[1], edit_fstab=value[2], fstab_path=value[3]
+        )
 
 
 class RedisConnectorFunc(Protocol):

@@ -47,6 +47,7 @@ from typing import (
 )
 from uuid import UUID
 
+import aiofiles
 import aiotools
 import attrs
 import pkg_resources
@@ -92,6 +93,8 @@ from ai.backend.common.events import (
     KernelTerminatedEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
+    VolumeCreated,
+    VolumeDeleted,
 )
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
@@ -125,7 +128,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop
+from ai.backend.common.utils import Fstab, cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -675,6 +678,11 @@ class AbstractAgent(
 
         # Notify the gateway.
         await self.produce_event(AgentStartedEvent(reason="self-started"))
+
+        # passive events
+        evd = self.event_dispatcher
+        evd.subscribe(VolumeCreated, self, handle_volume_mount, name="ag.volume.created")
+        evd.subscribe(VolumeDeleted, self, handle_volume_unmount, name="ag.volume.deleted")
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         """
@@ -2347,3 +2355,55 @@ class AbstractAgent(
                 os.remove(var_base_path / last_registry_file)
             except FileNotFoundError:
                 pass
+
+
+async def handle_volume_mount(
+    context: AbstractAgent,
+    source: AgentId,
+    event: VolumeCreated,
+) -> None:
+    config = context.etcd
+    mount_prefix = await config.get("volumes/_mount")
+    if mount_prefix is None:
+        mount_prefix = "/mnt"
+    mountpoint = Path(mount_prefix) / event.mount_path
+    mountpoint.mkdir(exist_ok=True)
+    options: str | None = None
+    if event.cmd_options is not None:
+        options = " ".join(event.cmd_options)
+        cmd = [
+            "sudo",
+            "mount",
+            "-t",
+            event.fs_type,
+            "-o",
+            options,
+            event.fs_location,
+            str(mountpoint),
+        ]
+    else:
+        cmd = ["sudo", "mount", "-t", event.fs_type, event.fs_location, str(mountpoint)]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    raw_out, raw_err = await proc.communicate()
+    raw_out.decode("utf8")
+    err = raw_err.decode("utf8")
+    await proc.wait()
+    if err:
+        log.error("Mount error: " + err)
+        raise AgentError(f"Failed to mount {event.mount_path} on {mount_prefix}")
+    log.info(f"Mounted {event.mount_path} on {mount_prefix}")
+    if event.edit_fstab:
+        fstab_path = event.fstab_path or "/etc/fstab"
+        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+            fstab = Fstab(fp)
+            await fstab.add(event.fs_location, str(mountpoint), event.fs_type, options)
+
+
+async def handle_volume_unmount(
+    context: AbstractAgent,
+    source: AgentId,
+    event: VolumeDeleted,
+) -> None:
+    pass

@@ -12,7 +12,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 
 from ..abc import AbstractQuotaModel
-from ..exception import ExecutionError, ExternalError
+from ..exception import ExecutionError, ExternalError, QuotaScopeAlreadyExists
 from ..types import QuotaConfig
 from ..vfs import BaseQuotaModel, BaseVolume
 
@@ -198,6 +198,9 @@ class KManilaQuotaModel(BaseQuotaModel):
     ) -> bool:
         """
         Should create a new access control for all newly created volumes.
+
+        If the access control of the volume exists, returns False.
+        if the access control does not exists, create it and returns True.
         """
 
         project_id = auth_info["project_id"]
@@ -248,7 +251,11 @@ class KManilaQuotaModel(BaseQuotaModel):
             volume_id = await self._create_volume(
                 sess, quota_scope_id, options, auth_info, name=volume_name
             )
-            await self._create_access_control(sess, quota_scope_id, volume_id, auth_info)
+            is_newly_created = await self._create_access_control(
+                sess, quota_scope_id, volume_id, auth_info
+            )
+            if not is_newly_created:
+                raise QuotaScopeAlreadyExists
 
 
 class KManilaFSVolume(BaseVolume):

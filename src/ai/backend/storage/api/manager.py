@@ -25,8 +25,9 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.events import VolumeCreated, VolumeDeleted
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, QuotaScopeID
+from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
 from .. import __version__
@@ -34,6 +35,7 @@ from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import (
     InvalidSubpathError,
+    QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
     VFolderNotFoundError,
@@ -177,9 +179,27 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.quota_model.create_quota_scope(
-                params["qsid"], params["options"], params.get("extra_args")
-            )
+            try:
+                await volume.quota_model.create_quota_scope(
+                    params["qsid"], params["options"], params.get("extra_args")
+                )
+            except QuotaScopeAlreadyExists:
+                pass
+            else:
+                extra_args = params["extra_args"]
+                if extra_args is not None:
+                    volume_name = extra_args["volume_name"]
+                else:
+                    volume_name = "default"
+                await ctx.event_producer.produce_event(
+                    VolumeCreated(
+                        mount_path=volume_name,
+                        fs_location="????",
+                        fs_type="nfs",
+                        edit_fstab=True,
+                        fstab_path="???",
+                    )
+                )
             return web.Response(status=204)
 
 
@@ -1016,4 +1036,26 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+
+    # passive events
+    evd = ctx.event_dispatcher
+    evd.subscribe(VolumeCreated, ctx, handle_volume_mount, name="storage.volume.created")
+    evd.subscribe(VolumeDeleted, ctx, handle_volume_unmount, name="storage.volume.deleted")
     return app
+
+
+async def handle_volume_mount(
+    context: Context,
+    source: AgentId,
+    event: VolumeCreated,
+) -> None:
+    config = context.etcd
+    await event.mount(config)
+
+
+async def handle_volume_unmount(
+    context: Context,
+    source: AgentId,
+    event: VolumeDeleted,
+) -> None:
+    pass
