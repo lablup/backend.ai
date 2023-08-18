@@ -57,6 +57,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -134,7 +135,6 @@ from .defs import (
     DEFAULT_IMAGE_ARCH,
     DEFAULT_ROLE,
     INTRINSIC_SLOTS,
-    REDIS_STREAM_DB,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
