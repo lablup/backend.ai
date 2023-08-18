@@ -16,6 +16,7 @@ from .cephfs import CephFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
+from .kmanila import KManilaFSVolume
 from .netapp import NetAppVolume
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
@@ -34,6 +35,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
     "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
     "cephfs": CephFSVolume,
+    "kmanila": KManilaFSVolume,
 }
 
 
@@ -72,6 +74,7 @@ class BaseContext:
             local_config=self.local_config,
             mount_path=Path(volume_config["path"]),
             options=volume_config["options"] or {},
+            etcd=self.etcd,
         )
         await volume_obj.init()
         try:
