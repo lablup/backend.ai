@@ -246,11 +246,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             volume_id = await self._create_volume(
                 sess, quota_scope_id, options, auth_info, name=volume_name
             )
-            is_newly_created = await self._create_access_control(
-                sess, quota_scope_id, volume_id, auth_info
-            )
-            if is_newly_created:
-                await self._mount_volumes_to_agents()
+            await self._create_access_control(sess, quota_scope_id, volume_id, auth_info)
 
 
 class KManilaFSVolume(BaseVolume):
