@@ -36,9 +36,8 @@ from yarl import URL
 
 from .auth import generate_signature
 from .exceptions import BackendAPIError, BackendClientError
-from .session import AsyncSession, BaseSession
+from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
-from .session import api_session
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
