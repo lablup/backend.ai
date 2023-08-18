@@ -1173,6 +1173,7 @@ class AbstractAgent(
     async def get_free_image_disk(self) -> int | float:
         """
         Get free disk for images.
+        The unit of disk size is GiB.
         """
 
     async def check_free_image_disk(self, image_ref: ImageRef) -> None:

@@ -26,6 +26,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
@@ -979,6 +980,16 @@ class ImageConfig(TypedDict):
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
+
+
+class ImageMutationTaskResponse(TypedDict):
+    bgtask_id: str
+    image_ref: str
+    architecture: str
+
+
+# key: image canonical, value: image mutation response
+ImageTaskResponse: TypeAlias = dict[str, ImageMutationTaskResponse]
 
 
 class ServicePort(TypedDict):

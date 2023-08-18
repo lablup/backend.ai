@@ -99,6 +99,7 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
+    ImageTaskResponse,
     KernelEnqueueingConfig,
     KernelId,
     RedisConnectionInfo,
@@ -1354,25 +1355,27 @@ class AgentRegistry:
         agent_addr: str,
         image_maps: Sequence[dict[str, Any]],
         force: bool = False,
-    ) -> dict[str, Any]:
+    ) -> ImageTaskResponse:
         async with RPCContext(
             agent_id,
             agent_addr,
             invoke_timeout=None,
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            return await rpc.call.pull_image(image_maps, force)
+            resp: dict[str, Any] = await rpc.call.pull_image(image_maps, force)
+            return cast(ImageTaskResponse, resp)
 
     async def remove_image(
         self, agent_id: AgentId, agent_addr: str, image_maps: Sequence[dict[str, Any]]
-    ) -> dict[str, Any]:
+    ) -> ImageTaskResponse:
         async with RPCContext(
             agent_id,
             agent_addr,
             invoke_timeout=None,
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
-            return await rpc.call.remove_image(image_maps)
+            resp: dict[str, Any] = await rpc.call.remove_image(image_maps)
+            return cast(ImageTaskResponse, resp)
 
     async def start_session(
         self,

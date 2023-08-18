@@ -32,7 +32,7 @@ from ai.backend.common.docker import ImageRef, get_registry_info
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.common.types import BinarySize, ImageAlias, ImageTaskResponse, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry import get_container_registry
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
@@ -732,7 +732,7 @@ class PreloadImage(graphene.Mutation):
             for agent in agents:
                 await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
 
-        tasks = {}
+        tasks: ImageTaskResponse = {}
         for agent in agents:
             results = await ctx.registry.pull_image(agent.id, agent.addr, images, force=force)
             tasks.update(results)
@@ -784,10 +784,10 @@ class UnloadImage(graphene.Mutation):
                 for ref in references
             ]
 
-        tasks = {}
+        tasks: ImageTaskResponse = {}
         for agent in agents:
-            result = await ctx.registry.remove_image(agent.id, agent.addr, images)
-            tasks.update(result)
+            results = await ctx.registry.remove_image(agent.id, agent.addr, images)
+            tasks.update(results)
 
         return UnloadImage(ok=True, msg="", tasks=tasks)
 
