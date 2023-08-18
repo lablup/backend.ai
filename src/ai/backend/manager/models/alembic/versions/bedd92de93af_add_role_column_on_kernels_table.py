@@ -37,7 +37,7 @@ def upgrade():
         # `order_by` is not necessary, but helpful to display the currently processing kernels.
         query = (
             sa.select([kernels.c.id])
-            .where(kernels.c.role == None)
+            .where(kernels.c.role is None)
             .order_by(kernels.c.id)
             .limit(batch_size)
         )
