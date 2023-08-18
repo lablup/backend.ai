@@ -150,21 +150,32 @@ class ModifyContainerRegistry(graphene.Mutation):
         cls, root, info: graphene.ResolveInfo, hostname: str, props: ModifyContainerRegistryInput
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
-        if await ctx.shared_config.etcd.get(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}") is None:
+        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
+        registries = dict(raw_registries)
+        try:
+            del registries[hostname]
+        except KeyError:
             raise ObjectNotFound(object_name=f"registry: {hostname}")
-        config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
-        set_if_set(props, config, "project")
-        set_if_set(props, config, "username")
-        set_if_set(props, config, "password")
-        container_registry_iv.check(config)
+        await ctx.shared_config.etcd.delete_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+
+        updated_config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
+        set_if_set(props, updated_config, "project")
+        set_if_set(props, updated_config, "username")
+        set_if_set(props, updated_config, "password")
+        container_registry_iv.check(updated_config)
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
             ctx.access_key,
             ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
-            config,
+            updated_config,
         )
-        updates = ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
+        updates: Dict[str, Any] = {}
+        updates.update(
+            ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, updated_config)
+        )
+        for hostname, config in registries.items():
+            updates.update(ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config))
         await ctx.shared_config.etcd.put_dict(updates)
         return cls(result="ok")
 
