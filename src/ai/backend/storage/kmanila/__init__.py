@@ -219,15 +219,6 @@ class KManilaQuotaModel(BaseQuotaModel):
         ) as resp:
             return True
 
-    async def _mount_volumes_to_agents(self) -> None:
-        # Do mount request to GPU nodes through ssh
-        def _build_ssh_cmd(agent_addr: str) -> list[str]:
-            return ["ssh", agent_addr]
-
-        for agent_addr in self.agent_addrs:
-            cmds = _build_ssh_cmd(agent_addr)
-            await asyncio.create_subprocess_exec(*cmds)
-
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
