@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Final, TypedDict
+from typing import Any, Final, NewType, TypedDict, cast
 
 import aiohttp
 import trafaret as t
@@ -30,6 +30,8 @@ kmanila_request_params = t.Dict(
     }
 ).allow_extra("*")
 
+VolumeId = NewType("VolumeId", str)
+
 
 class QuotaVolumeMap(TypedDict):
     volume_id: str
@@ -49,7 +51,9 @@ class KManilaQuotaModel(BaseQuotaModel):
         kmanila_requestor_id: str,
         kmanila_requestor_pwd: str,
         default_project_id: str | None,
-        default_netword_id: str | None,
+        default_network_id: str | None,
+        availability_zone: str,
+        share_type: str,
         max_poll_count: int,
     ) -> None:
         super().__init__(mount_path)
@@ -61,7 +65,9 @@ class KManilaQuotaModel(BaseQuotaModel):
         self.kmanila_requestor_id = kmanila_requestor_id
         self.kmanila_requestor_pwd = kmanila_requestor_pwd
         self.default_project_id = default_project_id
-        self.default_netword_id = default_netword_id
+        self.default_network_id = default_network_id
+        self.availability_zone = availability_zone
+        self.share_type = share_type
         self.max_poll_count = max_poll_count
 
     async def _get_auth_info(self, user_id: QuotaScopeID) -> dict[str, Any]:
@@ -88,7 +94,7 @@ class KManilaQuotaModel(BaseQuotaModel):
                     },
                 }
             }
-            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            headers = {"Accept": "application/json"}
             async with sess.post(
                 self.api_base_url / "d3/identity/auth/tokens", headers=headers, json=request_body
             ) as resp:
@@ -112,7 +118,9 @@ class KManilaQuotaModel(BaseQuotaModel):
         return str(user_vol["volume_id"])
 
     async def put_user_volume_id(self, quota_scope_id: QuotaScopeID, data: QuotaVolumeMap) -> None:
-        await self.etcd.put_prefix(f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}", data)  # type: ignore[arg-type]
+        await self.etcd.put_prefix(
+            f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}", cast(dict, data)
+        )
 
     async def get_volume_id(
         self,
@@ -121,15 +129,15 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info: dict[str, Any],
         *,
         do_hard_check: bool = True,
-    ) -> str | None:
+    ) -> VolumeId | None:
         if (vol_id := await self.get_user_volume_id(quota_scope_id)) is not None:
             if not do_hard_check:
-                return vol_id
+                return VolumeId(vol_id)
         project_id = auth_info["project_id"]
         async with session.get(f"/d3/adm/manila/v2/{project_id}/shares/{vol_id}") as resp:
             if resp.status == 200:
                 volume_info = (await resp.json())["share"]
-                return volume_info["id"]
+                return VolumeId(volume_info["id"])
             elif resp.status // 100 == 5:
                 raise ExternalError("Cannot get data from API server")
         return None
@@ -142,19 +150,19 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info: dict[str, Any],
         *,
         name: str,
-    ) -> str:
+    ) -> VolumeId:
         if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is not None:
             return volume_id
         project_id = auth_info["project_id"]
         request_body = {
             "share": {
                 "share_proto": "nfs",
-                "share_network_id": self.default_netword_id,
+                "share_network_id": self.default_network_id,
                 "name": name,
                 "is_public": False,
                 "size": options.limit_bytes if options is not None else DEFAULT_VOLUME_SIZE,
-                "availability_zone": "DX-DCN-CJ",
-                "share_type": "SSD",
+                "availability_zone": self.availability_zone,
+                "share_type": self.share_type,
             }
         }
         async with session.post(
@@ -164,7 +172,6 @@ class KManilaQuotaModel(BaseQuotaModel):
                 raise ExternalError(
                     f"Got invalid status code when post data to API server. {resp.status = }"
                 )
-            await asyncio.sleep(0)
 
         # Poll creation complete
         trial = 1
@@ -189,6 +196,10 @@ class KManilaQuotaModel(BaseQuotaModel):
         volume_id: str,
         auth_info: dict[str, Any],
     ) -> bool:
+        """
+        Should create a new access control for all newly created volumes.
+        """
+
         project_id = auth_info["project_id"]
         async with session.post(
             url=f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action",
@@ -258,6 +269,8 @@ class KManilaFSVolume(BaseVolume):
             kmanila_requestor_id=self.config["user_id"],
             kmanila_requestor_pwd=self.config["user_password"],
             default_project_id=self.config.get("project_id"),
-            default_netword_id=self.config.get("netword_id"),
+            default_network_id=self.config.get("network_id"),
+            availability_zone=self.config["availability_zone"],
+            share_type=self.config["share_type"],
             max_poll_count=max_poll_count,
         )
