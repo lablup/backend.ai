@@ -67,6 +67,7 @@ from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -97,7 +98,6 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
-    REDIS_STREAM_DB,
     AbuseReportValue,
     AcceleratorMetadata,
     AgentId,

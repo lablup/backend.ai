@@ -17,12 +17,13 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
 from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import REDIS_STREAM_DB, LogSeverity
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION

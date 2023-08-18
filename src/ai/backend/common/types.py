@@ -17,7 +17,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Final,
     Generic,
     List,
     Literal,
@@ -1126,12 +1125,3 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
-
-
-# Redis database IDs depending on purposes
-REDIS_STAT_DB: Final = 0
-REDIS_RLIM_DB: Final = 1
-REDIS_LIVE_DB: Final = 2
-REDIS_IMAGE_DB: Final = 3
-REDIS_STREAM_DB: Final = 4
-REDIS_STREAM_LOCK: Final = 5
