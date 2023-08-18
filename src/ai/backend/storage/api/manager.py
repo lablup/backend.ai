@@ -14,6 +14,7 @@ from typing import (
     Callable,
     Iterator,
     List,
+    NotRequired,
     TypedDict,
     cast,
 )
@@ -157,6 +158,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         volume: str
         qsid: QuotaScopeID
         options: QuotaConfig | None
+        extra_args: NotRequired[dict[str, Any]]
 
     async with cast(
         AsyncContextManager[Params],
@@ -167,6 +169,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("qsid"): tx.QuotaScopeID(),
                     t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
+                    t.Key("extra_args", default=None): t.Null | t.Dict,
                 },
             ),
         ),
@@ -174,7 +177,9 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.create_quota_scope(
+                params["qsid"], params["options"], params.get("extra_args")
+            )
             return web.Response(status=204)
 
 

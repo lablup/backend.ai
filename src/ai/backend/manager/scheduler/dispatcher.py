@@ -58,7 +58,7 @@ from ai.backend.manager.utils import query_userinfo
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
-from ..defs import LockID
+from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..models import (
     AgentStatus,
     EndpointRow,
@@ -804,6 +804,7 @@ class SchedulerDispatcher(aobject):
         # Altering inference sessions should only be done by this method
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
+        endpoints_to_remove: set[EndpointRow] = set()
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
         # endpoints_to_flush = [
@@ -815,17 +816,24 @@ class SchedulerDispatcher(aobject):
         #     query = sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoints_to_flush))
         #     await session.execute(query)
         for endpoint in endpoints:
+            non_error_routings = [
+                r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
+            ]
             desired_session_count = endpoint.desired_session_count
             if desired_session_count < 0:
                 desired_session_count = 0
-            if len(endpoint.routings) > desired_session_count:
+                if len(endpoint.routings) == 0:
+                    endpoints_to_remove.add(endpoint)
+                    continue
+
+            if len(non_error_routings) > desired_session_count:
                 # We need to scale down!
-                destroy_count = len(endpoint.routings) - desired_session_count
+                destroy_count = len(non_error_routings) - desired_session_count
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
-                            for route in endpoint.routings
+                            for route in non_error_routings
                             if (
                                 route.status != RouteStatus.PROVISIONING
                                 and route.status != RouteStatus.TERMINATING
@@ -837,17 +845,19 @@ class SchedulerDispatcher(aobject):
                 log.debug(
                     "Shrinking {} from {} to {}",
                     endpoint.name,
-                    len(endpoint.routings),
+                    len(non_error_routings),
                     endpoint.desired_session_count,
                 )
-            elif len(endpoint.routings) < desired_session_count:
+            elif len(non_error_routings) < desired_session_count:
+                if endpoint.retries > SERVICE_MAX_RETRIES:
+                    continue
                 # We need to scale up!
-                create_count = desired_session_count - len(endpoint.routings)
+                create_count = desired_session_count - len(non_error_routings)
                 endpoints_to_expand[endpoint] = create_count
                 log.debug(
                     "Expanding {} from {} to {}",
                     endpoint.name,
-                    len(endpoint.routings),
+                    len(non_error_routings),
                     endpoint.desired_session_count,
                 )
 
@@ -963,6 +973,12 @@ class SchedulerDispatcher(aobject):
                 except Exception:
                     # TODO: Handle
                     log.exception("error while creating session:")
+
+        async with self.db.begin_session() as sess:
+            query = sa.delete(EndpointRow).where(
+                EndpointRow.id.in_([e.id for e in endpoints_to_remove])
+            )
+            await sess.execute(query)
 
     async def start_session(
         self,

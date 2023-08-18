@@ -672,7 +672,7 @@ class ModifyUser(graphene.Mutation):
         if data.get("password") is not None:
             data["password_changed_at"] = sa.func.now()
 
-        user_update_data: Dict[str, Any]
+        user_update_data: Dict[str, Any] = {}
         prev_domain_name: str
         prev_role: UserRole
 

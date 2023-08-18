@@ -22,7 +22,7 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 
 from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
-from .context import Context
+from .context import BaseContext
 from .types import VFolderID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -51,7 +51,7 @@ class VFolderMigrationStatus(enum.StrEnum):
     COMPLETE = "complete"
 
 
-async def check_latest(ctx: Context) -> list[VolumeUpgradeInfo]:
+async def check_latest(ctx: BaseContext) -> list[VolumeUpgradeInfo]:
     volumes_to_upgrade: list[VolumeUpgradeInfo] = []
     volume_infos = ctx.list_volumes()
     for name, info in volume_infos.items():
@@ -88,7 +88,7 @@ async def connect_database(dsn: str) -> AsyncIterator[asyncpg.Connection]:
 
 
 async def upgrade_2_to_3(
-    ctx: Context,
+    ctx: BaseContext,
     volume: AbstractVolume,
     outfile: str,
     report_path: Optional[Path] = None,
@@ -220,7 +220,7 @@ async def check_and_upgrade(
     force_scan_folder_size: bool = False,
 ):
     etcd = load_shared_config(local_config)
-    ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd, dsn=dsn)
+    ctx = BaseContext(pid=os.getpid(), local_config=local_config, etcd=etcd, dsn=dsn)
     volumes_to_upgrade = await check_latest(ctx)
     for upgrade_info in volumes_to_upgrade:
         handler = upgrade_handlers[upgrade_info.target_version]

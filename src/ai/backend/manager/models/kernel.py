@@ -1011,6 +1011,7 @@ class ComputeContainer(graphene.ObjectType):
     occupied_slots = graphene.JSONString()
     live_stat = graphene.JSONString()
     last_stat = graphene.JSONString()
+    preopen_ports = graphene.List(lambda: graphene.Int, required=False)
 
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
@@ -1053,6 +1054,7 @@ class ComputeContainer(graphene.ObjectType):
             "agent_addr": row["agent_addr"] if not hide_agents else None,
             "container_id": row["container_id"] if not hide_agents else None,
             "resource_opts": row["resource_opts"],
+            "preopen_ports": row["preopen_ports"],
             # statistics
             # last_stat is resolved by Graphene (resolve_last_stat method)
         }
