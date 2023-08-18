@@ -137,8 +137,10 @@ from .defs import (
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     PRIVATE_KERNEL_ROLES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
     EndpointRow,
@@ -954,10 +956,8 @@ class AgentRegistry:
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
-                (
-                    "You cannot create session with more than "
-                    f"{resource_policy['max_containers_per_session']} containers."
-                ),
+                "You cannot create session with more than "
+                f"{resource_policy['max_containers_per_session']} containers.",
             )
 
         async with self.db.begin_readonly() as conn:
@@ -972,11 +972,9 @@ class AgentRegistry:
             )
             if scaling_group is None:
                 log.warning(
-                    (
-                        f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                        "The client did not specify the scaling group for session; "
-                        f"falling back to {checked_scaling_group}"
-                    ),
+                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
+                    "The client did not specify the scaling group for session; "
+                    f"falling back to {checked_scaling_group}",
                 )
 
             use_host_network_query = (
@@ -1994,57 +1992,71 @@ class AgentRegistry:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
-            async with self.db.begin() as conn:
+
+            async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
                 # occupied_slots per agent.
-                query = (
-                    sa.select([kernels.c.access_key, kernels.c.agent, kernels.c.occupied_slots])
-                    .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    .order_by(sa.asc(kernels.c.access_key))
-                )
-                async for row in await conn.stream(query):
-                    occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
-                query = (
-                    sa.select(
-                        [
-                            kernels.c.access_key,
-                            kernels.c.session_id,
-                            kernels.c.agent,
-                            kernels.c.occupied_slots,
-                            kernels.c.role,
-                        ]
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(
+                        (
+                            SessionRow.status.in_(
+                                {
+                                    *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                                    *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                                }
+                            )
+                        )
                     )
-                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    .order_by(sa.asc(kernels.c.access_key))
+                    .options(
+                        load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
+                        selectinload(SessionRow.kernels).options(
+                            load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
+                        ),
+                    )
                 )
-                async for row in await conn.stream(query):
-                    if row.role in PRIVATE_KERNEL_ROLES:
-                        sftp_concurrency_used_per_key[row.access_key].add(row.session_id)
-                    else:
-                        concurrency_used_per_key[row.access_key].add(row.session_id)
+                async for session_row in await db_sess.stream_scalars(session_query):
+                    for kernel in session_row.kernels:
+                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                            occupied_slots_per_agent[kernel.agent] += ResourceSlot(
+                                kernel.occupied_slots
+                            )
+                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                            if kernel.role in PRIVATE_KERNEL_ROLES:
+                                sftp_concurrency_used_per_key[session_row.access_key].add(
+                                    session_row.id
+                                )
+                            else:
+                                concurrency_used_per_key[session_row.access_key].add(session_row.id)
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
-                    for aid, slots in occupied_slots_per_agent.items():
-                        query = (
-                            sa.update(agents).values(occupied_slots=slots).where(agents.c.id == aid)
-                        )
-                        await conn.execute(query)
-                    # Update all other agents to have empty occupied_slots.
-                    query = (
-                        sa.update(agents)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(agents.c.status == AgentStatus.ALIVE)
-                        .where(sa.not_(agents.c.id.in_(occupied_slots_per_agent.keys())))
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .where(AgentRow.id == sa.bindparam("agent_id"))
+                            .values(occupied_slots=sa.bindparam("occupied_slots"))
+                        ),
+                        [
+                            {"agent_id": aid, "occupied_slots": slots}
+                            for aid, slots in occupied_slots_per_agent.items()
+                        ],
                     )
-                    await conn.execute(query)
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .values(occupied_slots=ResourceSlot({}))
+                            .where(AgentRow.status == AgentStatus.ALIVE)
+                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                        )
+                    )
                 else:
                     query = (
-                        sa.update(agents)
+                        sa.update(AgentRow)
                         .values(occupied_slots=ResourceSlot({}))
-                        .where(agents.c.status == AgentStatus.ALIVE)
+                        .where(AgentRow.status == AgentStatus.ALIVE)
                     )
-                    await conn.execute(query)
+                    await db_sess.execute(query)
 
         await execute_with_retry(_recalc)
 
@@ -2078,7 +2090,7 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        if do_fullscan:
+        if do_fullscan or not concurrency_used_per_key:
             await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
@@ -2203,10 +2215,8 @@ class AgentRegistry:
                 case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
                     if not forced:
                         raise GenericForbidden(
-                            (
-                                "Cannot destroy sessions in scheduled/preparing/terminating/error"
-                                " status"
-                            ),
+                            "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                            " status",
                         )
                     log.warning(
                         "force-terminating session (s:{}, status:{})",
@@ -2275,10 +2285,8 @@ class AgentRegistry:
                         case KernelStatus.SCHEDULED | KernelStatus.PREPARING | KernelStatus.TERMINATING | KernelStatus.ERROR:
                             if not forced:
                                 raise GenericForbidden(
-                                    (
-                                        "Cannot destroy kernels in"
-                                        " scheduled/preparing/terminating/error status"
-                                    ),
+                                    "Cannot destroy kernels in"
+                                    " scheduled/preparing/terminating/error status",
                                 )
                             log.warning(
                                 "force-terminating kernel (k:{}, status:{})",

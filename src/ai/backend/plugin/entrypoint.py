@@ -41,10 +41,8 @@ def scan_entrypoints(
                 continue
             else:
                 raise RuntimeError(
-                    (
-                        f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
-                        f"from {existing_entrypoint.value} and {entrypoint.value}"
-                    ),
+                    f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
+                    f"from {existing_entrypoint.value} and {entrypoint.value}",
                 )
         existing_names[entrypoint.name] = entrypoint
         yield entrypoint

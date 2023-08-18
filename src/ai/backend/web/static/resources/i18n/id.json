@@ -114,8 +114,7 @@
     "connectingToCluster": "Menghubungkan ke Cluster Backend.AI...",
     "DownloadWebUIApp": "__NOT_TRANSLATED__",
     "IPUEnabled": "__NOT_TRANSLATED__",
-    "ATOMEnabled": "__NOT_TRANSLATED__",
-    "WarboyEnabled": "__NOT_TRANSLATED__"
+    "ATOMEnabled": "__NOT_TRANSLATED__"
   },
   "session": {
     "launcher": {
@@ -367,12 +366,7 @@
     "UtilizationThresholdDesc": "__NOT_TRANSLATED__",
     "ExpiresAfter": "__NOT_TRANSLATED__",
     "ConnectionExample": "__NOT_TRANSLATED__",
-    "System": "__NOT_TRANSLATED__",
-    "SFTPExtraNotification": "__NOT_TRANSLATED__",
-    "ConnectionNotice": "__NOT_TRANSLATED__",
-    "ReadMore": "__NOT_TRANSLATED__",
-    "Readless": "__NOT_TRANSLATED__",
-    "Readmore": "__NOT_TRANSLATED__"
+    "System": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Batalkan",
@@ -965,9 +959,7 @@
     "RetriesToSkip": "__NOT_TRANSLATED__",
     "NoGroupToDisplay": "__NOT_TRANSLATED__",
     "AllowedSessionTypes": "__NOT_TRANSLATED__",
-    "Domain": "Domain",
-    "Public": "__NOT_TRANSLATED__",
-    "PublicStatus": "__NOT_TRANSLATED__"
+    "Domain": "Domain"
   },
   "maintenance": {
     "General": "Umum",
@@ -1070,7 +1062,7 @@
     "DescAllowAgentSideRegistration": "Izinkan agen untuk mendaftarkan dirinya ke manajer. <br/>Gunakan hanya jika klaster Backend.AI dikelola di lokasi yang aman.",
     "Plugins": "Plugin",
     "CUDAGPUsupport": "Dukungan GPU CUDA",
-    "DescCUDAGPUsupport": "Dukungan GPU NVIDIA CUDA. <br/>Membutuhkan Plugin CUDA Backend.AI.",
+    "DescCUDAGPUsupport": "Dukungan GPU NVidia CUDA. <br/>Membutuhkan Plugin CUDA Backend.AI.",
     "CUDAGPUdisabledByFGPUsupport": "Dinonaktifkan karena sistem menggunakan plugin GPU Pecahan",
     "ROCMGPUsupport": "Dukungan GPU ROCm",
     "DescROCMGPUsupport": "Dukungan AMD ROCm GPU. <br/>Membutuhkan Plugin Backend.AI ROCm.",
@@ -1120,10 +1112,7 @@
     "ATOMsupport": "__NOT_TRANSLATED__",
     "DescATOMsupport": "__NOT_TRANSLATED__",
     "RequireIPUPlugin": "__NOT_TRANSLATED__",
-    "RequireATOMPlugin": "__NOT_TRANSLATED__",
-    "Warboysupport": "__NOT_TRANSLATED__",
-    "DescWarboysupport": "__NOT_TRANSLATED__",
-    "RequireWarboyPlugin": "__NOT_TRANSLATED__"
+    "RequireATOMPlugin": "__NOT_TRANSLATED__"
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",

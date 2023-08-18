@@ -44,7 +44,8 @@ from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -297,8 +298,8 @@ async def query_userinfo(
         return await _query_userinfo(
             conn,
             request["user"]["uuid"],
-            request["user"]["role"],
             request["keypair"]["access_key"],
+            request["user"]["role"],
             request["user"]["domain_name"],
             request["keypair"]["resource_policy"],
             params["domain"] or request["user"]["domain_name"],
@@ -383,10 +384,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["type", "sessionType"], default="interactive")
-            >> "session_type": tx.Enum(SessionTypes),
+            tx.AliasedKey(["arch", "architecture"], default=undefined)
+            >> "architecture": t.String | UndefChecker,
+            tx.AliasedKey(["type", "sessionType"], default=undefined)
+            >> "session_type": tx.Enum(SessionTypes) | UndefChecker,
             tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
                 UndefChecker | t.Null | t.String
             ),
@@ -469,7 +470,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     param_from_template = {
         "image": template["spec"]["kernel"]["image"],
-        "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
+        "architecture": template["spec"]["kernel"]["architecture"],
     }
     if "domain_name" in template_info:
         param_from_template["domain"] = template_info["domain_name"]
@@ -482,29 +483,25 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     elif template["spec"]["session_type"] == "inference":
         param_from_template["session_type"] = SessionTypes.INFERENCE
 
-    # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
-    # Check https://github.com/python/mypy/issues/7316
-    # TODO: remove `NOQA` when flake8 supports Python 3.8 and walrus operator
-    # Check https://gitlab.com/pycqa/flake8/issues/599
-    if tag := template["metadata"].get("tag"):  # noqa
+    if tag := template["metadata"].get("tag"):
         param_from_template["tag"] = tag
-    if runtime_opt := template["spec"]["kernel"]["run"]:  # noqa
-        if bootstrap := runtime_opt["bootstrap"]:  # noqa
+    if runtime_opt := template["spec"]["kernel"]["run"]:
+        if bootstrap := runtime_opt["bootstrap"]:
             param_from_template["bootstrap_script"] = bootstrap
-        if startup := runtime_opt["startup_command"]:  # noqa
+        if startup := runtime_opt["startup_command"]:
             param_from_template["startup_command"] = startup
 
     config_from_template: MutableMapping[Any, Any] = {}
-    if scaling_group := template["spec"].get("scaling_group"):  # noqa
+    if scaling_group := template["spec"].get("scaling_group"):
         config_from_template["scaling_group"] = scaling_group
-    if mounts := template["spec"].get("mounts"):  # noqa
+    if mounts := template["spec"].get("mounts"):
         config_from_template["mounts"] = list(mounts.keys())
         config_from_template["mount_map"] = {
             key: value for (key, value) in mounts.items() if len(value) > 0
         }
-    if environ := template["spec"]["kernel"].get("environ"):  # noqa
+    if environ := template["spec"]["kernel"].get("environ"):
         config_from_template["environ"] = environ
-    if resources := template["spec"].get("resources"):  # noqa
+    if resources := template["spec"].get("resources"):
         config_from_template["resources"] = resources
     if "agent_list" in template["spec"]:
         config_from_template["agent_list"] = template["spec"]["agent_list"]
@@ -532,23 +529,23 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     log.debug("Updated param: {0}", params)
 
-    if git := template["spec"]["kernel"]["git"]:  # noqa
-        if _dest := git.get("dest_dir"):  # noqa
+    if git := template["spec"]["kernel"]["git"]:
+        if _dest := git.get("dest_dir"):
             target = _dest
         else:
             target = git["repository"].split("/")[-1]
 
         cmd_builder = "git clone "
-        if credential := git.get("credential"):  # noqa
+        if credential := git.get("credential"):
             proto, url = git["repository"].split("://")
             cmd_builder += f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
         else:
             cmd_builder += git["repository"]
-        if branch := git.get("branch"):  # noqa
+        if branch := git.get("branch"):
             cmd_builder += f" -b {branch}"
         cmd_builder += f" {target}\n"
 
-        if commit := git.get("commit"):  # noqa
+        if commit := git.get("commit"):
             cmd_builder = "CWD=$(pwd)\n" + cmd_builder
             cmd_builder += f"cd {target}\n"
             cmd_builder += f"git checkout {commit}\n"
@@ -629,19 +626,15 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             if params["cluster_mode"] == "multi-node":
                 if agent_count != params["cluster_size"]:
                     raise InvalidAPIParameters(
-                        (
-                            "For multi-node cluster sessions, the number of manually assigned"
-                            " agents must be same to the clsuter size. Note that you may specify"
-                            " duplicate agents in the list."
-                        ),
+                        "For multi-node cluster sessions, the number of manually assigned"
+                        " agents must be same to the cluster size. Note that you may specify"
+                        " duplicate agents in the list.",
                     )
             else:
                 if agent_count != 1:
                     raise InvalidAPIParameters(
-                        (
-                            "For non-cluster sessions and single-node cluster sessions, "
-                            "you may specify only one manually assigned agent."
-                        ),
+                        "For non-cluster sessions and single-node cluster sessions, "
+                        "you may specify only one manually assigned agent.",
                     )
     return await _create(request, params)
 
@@ -1969,6 +1962,7 @@ def create_app(
     app.on_shutdown.append(shutdown)
     app["api_versions"] = (1, 2, 3, 4)
     app["session.context"] = PrivateContext()
+    app["prefix"] = "session"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", create_from_params))
     cors.add(app.router.add_route("POST", "/_/create", create_from_params))

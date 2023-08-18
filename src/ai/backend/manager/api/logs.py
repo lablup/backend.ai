@@ -20,9 +20,8 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
 from ..defs import REDIS_LIVE_DB, LockID
-from ..models import UserRole
+from ..models import UserRole, error_logs, groups
 from ..models import association_groups_users as agus
-from ..models import error_logs, groups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -224,10 +223,8 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
     except ValueError:
         lifetime = dt.timedelta(days=90)
         log.warning(
-            (
-                "Failed to parse the error log retention period ({}) read from etcd; "
-                "falling back to 90 days"
-            ),
+            "Failed to parse the error log retention period ({}) read from etcd; "
+            "falling back to 90 days",
             raw_lifetime,
         )
     boundary = datetime.now() - lifetime

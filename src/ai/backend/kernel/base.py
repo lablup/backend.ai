@@ -830,10 +830,8 @@ class BaseRunner(metaclass=ABCMeta):
             kernel_id = os.environ["BACKENDAI_KERNEL_ID"]
             kernel_id_hex = uuid.UUID(kernel_id).hex
             log_path = Path(
-                (
-                    "/home/work/.logs/task/"
-                    f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log"
-                ),
+                "/home/work/.logs/task/"
+                f"{kernel_id_hex[:2]}/{kernel_id_hex[2:4]}/{kernel_id_hex[4:]}.log",
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)
         else:
