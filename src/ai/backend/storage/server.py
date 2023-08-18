@@ -79,22 +79,28 @@ async def server_main(
 
     try:
         etcd = load_shared_config(local_config)
-        local_config["redis"] = redis_config_iv.check(
-            await etcd.get_prefix("config/redis"),
-        )
-        log.info("configured redis_addr: {0}", local_config["redis"]["addr"])
+        try:
+            redis_config = redis_config_iv.check(
+                await etcd.get_prefix("config/redis"),
+            )
+            log.info(f"PID: {pidx} - configured redis_addr: {redis_config['addr']}")
+        except Exception as e:
+            log.exception("Unable to read config from etcd")
+            raise e
 
         event_producer = await EventProducer.new(
-            local_config["redis"],
+            redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
+        log.info(f"PID: {pidx} - Event producer created. (addr: {redis_config['addr']})")
         event_dispatcher = await EventDispatcher.new(
-            local_config["redis"],
+            redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
         )
+        log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
         ctx = Context(
             pid=os.getpid(),
             local_config=local_config,
