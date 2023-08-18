@@ -10,7 +10,7 @@ import textwrap
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import ENUM, JSONB
+from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID, convention
