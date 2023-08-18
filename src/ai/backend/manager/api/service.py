@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.client.config import DEFAULT_CHUNK_SIZE
 from ai.backend.common import validators as tx
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
@@ -25,7 +24,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
 from ai.backend.manager.registry import check_scaling_group
 
-from ..defs import DEFAULT_IMAGE_ARCH
+from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
 from ..models import (
     ImageRow,
     SessionRow,

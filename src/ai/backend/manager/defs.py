@@ -20,6 +20,9 @@ arch_name_aliases: Final = arch_name_aliases_
 DEFAULT_IMAGE_ARCH: Final = DEFAULT_IMAGE_ARCH_
 MANAGER_ARCH: Final = CURRENT_ARCH
 
+# The default chunk size used for streaming network traffic
+DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
+
 # The default container role name for multi-container sessions
 DEFAULT_ROLE: Final = "main"
 
