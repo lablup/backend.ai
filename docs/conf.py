@@ -61,9 +61,9 @@ source_suffix = [".rst", ".md"]
 master_doc = "index"
 
 # General information about the project.
-from datetime import datetime
+from datetime import date
 project = "Backend.AI Documentation"
-copyright = "2015-" + datetime.today().strftime('%Y') + ", Lablup Inc."
+copyright = f"2015-{date.today().year}, Lablup Inc."
 author = "Lablup Inc."
 
 # The version info for the project you're documenting, acts as replacement for
