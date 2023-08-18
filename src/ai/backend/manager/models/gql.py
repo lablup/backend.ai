@@ -17,7 +17,9 @@ from .etcd import (
 )
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+    from graphql.execution.executors.asyncio import (
+        AsyncioExecutor,
+    )
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
@@ -474,6 +476,39 @@ class Queries(graphene.ObjectType):
         offset=graphene.Int(required=True),
         filter=graphene.String(),
         order=graphene.String(),
+    )
+
+    vfolder_own_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    vfolder_invited_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    vfolder_project_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
     )
 
     vfolders = graphene.List(  # legacy non-paginated list
@@ -1395,6 +1430,96 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderPermissionList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_own_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_invited_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_invited(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_invited(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_project_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_project(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_project(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
