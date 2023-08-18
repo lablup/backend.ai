@@ -294,6 +294,7 @@ class ScalingGroup(graphene.ObjectType):
     is_public = graphene.Boolean()
     created_at = GQLDateTime()
     wsproxy_addr = graphene.String()
+    wsproxy_api_token = graphene.String()
     driver = graphene.String()
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
@@ -315,6 +316,7 @@ class ScalingGroup(graphene.ObjectType):
             is_public=row["is_public"],
             created_at=row["created_at"],
             wsproxy_addr=row["wsproxy_addr"],
+            wsproxy_api_token=row["wsproxy_api_token"],
             driver=row["driver"],
             driver_opts=row["driver_opts"],
             scheduler=row["scheduler"],
@@ -471,6 +473,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False, default=True)
     is_public = graphene.Boolean(required=False, default=True)
     wsproxy_addr = graphene.String(required=False)
+    wsproxy_api_token = graphene.String(required=False)
     driver = graphene.String(required=True)
     driver_opts = graphene.JSONString(required=False, default={})
     scheduler = graphene.String(required=True)
@@ -483,6 +486,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False)
     is_public = graphene.Boolean(required=False)
     wsproxy_addr = graphene.String(required=False)
+    wsproxy_api_token = graphene.String(required=False)
     driver = graphene.String(required=False)
     driver_opts = graphene.JSONString(required=False)
     scheduler = graphene.String(required=False)
@@ -515,6 +519,7 @@ class CreateScalingGroup(graphene.Mutation):
             "is_active": bool(props.is_active),
             "is_public": bool(props.is_public),
             "wsproxy_addr": props.wsproxy_addr,
+            "wsproxy_api_token": props.wsproxy_api_token,
             "driver": props.driver,
             "driver_opts": props.driver_opts,
             "scheduler": props.scheduler,
@@ -554,6 +559,7 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(props, data, "is_public")
         set_if_set(props, data, "driver")
         set_if_set(props, data, "wsproxy_addr")
+        set_if_set(props, data, "wsproxy_api_token")
         set_if_set(props, data, "driver_opts")
         set_if_set(props, data, "scheduler")
         set_if_set(

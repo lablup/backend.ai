@@ -103,11 +103,6 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                     try:
                         wsproxy_status = await query_wsproxy_status(wsproxy_addr)
                         wsproxy_version = wsproxy_status["api_version"]
-                        return web.json_response(
-                            {
-                                "wsproxy_version": wsproxy_version,
-                            }
-                        )
                     except aiohttp.ClientConnectorError:
                         log.error(
                             "Failed to query the wsproxy {1} configured for sg:{0}",
@@ -115,6 +110,11 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                             wsproxy_addr,
                         )
                         return ServerMisconfiguredError()
+                return web.json_response(
+                    {
+                        "wsproxy_version": wsproxy_version,
+                    }
+                )
         else:
             raise ObjectNotFound(object_name="scaling group")
 

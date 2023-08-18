@@ -11,9 +11,14 @@ from ai.backend.common import msgpack
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models import MAXIMUM_DOTFILE_SIZE
+from ..models import (
+    MAXIMUM_DOTFILE_SIZE,
+    projects,
+    query_project_domain,
+    query_project_dotfiles,
+    verify_dotfile_name,
+)
 from ..models import association_projects_users as apus
-from ..models import projects, query_project_domain, query_project_dotfiles, verify_dotfile_name
 from .auth import admin_required, auth_required
 from .exceptions import (
     DotfileAlreadyExists,

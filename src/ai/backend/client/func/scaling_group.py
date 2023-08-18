@@ -1,6 +1,6 @@
 import json
 import textwrap
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping, Optional, Sequence
 
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.output.types import FieldSpec
@@ -20,6 +20,8 @@ _default_list_fields = (
     scaling_group_fields["driver"],
     scaling_group_fields["scheduler"],
     scaling_group_fields["use_host_network"],
+    scaling_group_fields["wsproxy_addr"],
+    scaling_group_fields["wsproxy_api_token"],
 )
 
 _default_detail_fields = (
@@ -33,6 +35,8 @@ _default_detail_fields = (
     scaling_group_fields["scheduler"],
     scaling_group_fields["scheduler_opts"],
     scaling_group_fields["use_host_network"],
+    scaling_group_fields["wsproxy_addr"],
+    scaling_group_fields["wsproxy_api_token"],
 )
 
 
@@ -123,6 +127,8 @@ class ScalingGroup(BaseFunction):
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
         use_host_network: bool = False,
+        wsproxy_addr: Optional[str] = None,
+        wsproxy_api_token: Optional[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -150,6 +156,8 @@ class ScalingGroup(BaseFunction):
                 "scheduler": scheduler,
                 "scheduler_opts": json.dumps(scheduler_opts),
                 "use_host_network": use_host_network,
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": wsproxy_api_token,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -168,6 +176,8 @@ class ScalingGroup(BaseFunction):
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
         use_host_network: bool = False,
+        wsproxy_addr: Optional[str] = None,
+        wsproxy_api_token: Optional[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -195,6 +205,8 @@ class ScalingGroup(BaseFunction):
                 "scheduler": scheduler,
                 "scheduler_opts": None if scheduler_opts is None else json.dumps(scheduler_opts),
                 "use_host_network": use_host_network,
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": wsproxy_api_token,
             },
         }
         data = await api_session.get().Admin._query(query, variables)

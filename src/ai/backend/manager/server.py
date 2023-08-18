@@ -55,9 +55,8 @@ from .api.exceptions import (
     URLNotFound,
 )
 from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
-from .config import LocalConfig, SharedConfig
+from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
-from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .models import SessionRow

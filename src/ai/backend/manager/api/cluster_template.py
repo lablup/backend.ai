@@ -15,9 +15,6 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..models import (
     TemplateType,
     UserRole,
-)
-from ..models import association_projects_users as apus
-from ..models import (
     domains,
     keypairs,
     projects,
@@ -25,6 +22,7 @@ from ..models import (
     session_templates,
     users,
 )
+from ..models import association_projects_users as apus
 from ..models.session_template import check_cluster_template
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
