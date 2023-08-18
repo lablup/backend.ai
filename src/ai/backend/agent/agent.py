@@ -67,6 +67,7 @@ from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -75,6 +76,7 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
+    EventDispatcher,
     EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
@@ -601,8 +603,14 @@ class AbstractAgent(
 
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
-            db=4,
+            db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
+        )
+        self.event_dispatcher = await EventDispatcher.new(
+            self.local_config["redis"],
+            db=REDIS_STREAM_DB,
+            log_events=self.local_config["debug"]["log-events"],
+            node_id=self.local_config["agent"]["id"],
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
@@ -699,6 +707,7 @@ class AbstractAgent(
 
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
+        await self.event_dispatcher.close()
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
 
