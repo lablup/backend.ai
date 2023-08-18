@@ -572,7 +572,7 @@ class FetchContextManager:
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
         retry_count = 0
-        raw_resp = None
+        raw_resp: Optional[_RequestContextManager] = None
         while True:
             try:
                 retry_count += 1
