@@ -1,10 +1,11 @@
-"""change_kernel_requested_slot_not_nullable
+"""kernel_requested_slots_to_not_nullable
 
-Revision ID: d6a9f9b137e8
-Revises: eb9441fcf90a
-Create Date: 2023-08-10 10:40:01.977335
+Revision ID: a353c28b0a87
+Revises: ae7d4cd92aa7
+Create Date: 2023-08-19 00:16:47.353372
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -12,10 +13,11 @@ from sqlalchemy.dialects import postgresql as pgsql
 from ai.backend.manager.models.base import GUID, mapper_registry
 
 # revision identifiers, used by Alembic.
-revision = "d6a9f9b137e8"
-down_revision = "eb9441fcf90a"
+revision = "a353c28b0a87"
+down_revision = "ae7d4cd92aa7"
 branch_labels = None
 depends_on = None
+
 
 BATCH_SIZE = 100
 
