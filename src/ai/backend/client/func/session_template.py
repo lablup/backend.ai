@@ -32,7 +32,8 @@ class SessionTemplate(BaseFunction):
         rqst.set_json(body)
         async with rqst.fetch() as resp:
             response = await resp.json()
-            return cls(response["id"], owner_access_key=owner_access_key)
+            template_id = ", ".join(data["id"] for data in response)
+            return cls(template_id, owner_access_key=owner_access_key)
 
     @api_function
     @classmethod

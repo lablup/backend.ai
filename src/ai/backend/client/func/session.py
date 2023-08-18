@@ -358,6 +358,7 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
         dependencies: Sequence[str] = None,  # cannot be stored in templates
+        callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: Union[List[str], Undefined] = undefined,
@@ -468,6 +469,8 @@ class ComputeSession(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "enqueueOnly": enqueue_only,
             "maxWaitSeconds": max_wait,
+            "dependencies": dependencies,
+            "callbackURL": callback_url,
             "reuseIfExists": not no_reuse,
             "startupCommand": startup_command,
             "owner_access_key": owner_access_key,

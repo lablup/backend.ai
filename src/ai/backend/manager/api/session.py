@@ -298,8 +298,8 @@ async def query_userinfo(
         return await _query_userinfo(
             conn,
             request["user"]["uuid"],
-            request["user"]["role"],
             request["keypair"]["access_key"],
+            request["user"]["role"],
             request["user"]["domain_name"],
             request["keypair"]["resource_policy"],
             params["domain"] or request["user"]["domain_name"],
@@ -384,10 +384,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["type", "sessionType"], default="interactive")
-            >> "session_type": tx.Enum(SessionTypes),
+            tx.AliasedKey(["arch", "architecture"], default=undefined)
+            >> "architecture": t.String | UndefChecker,
+            tx.AliasedKey(["type", "sessionType"], default=undefined)
+            >> "session_type": tx.Enum(SessionTypes) | UndefChecker,
             tx.AliasedKey(
                 ["project", "projectName", "project_name", "group", "groupName", "group_name"],
                 default=undefined,
@@ -473,7 +473,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     param_from_template = {
         "image": template["spec"]["kernel"]["image"],
-        "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
+        "architecture": template["spec"]["kernel"]["architecture"],
     }
     if "domain_name" in template_info:
         param_from_template["domain"] = template_info["domain_name"]
