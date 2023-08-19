@@ -180,8 +180,10 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             try:
+                extra_args = params["extra_args"] or {}
+                extra_args["event_producer"] = ctx.event_producer
                 await volume.quota_model.create_quota_scope(
-                    params["qsid"], params["options"], params.get("extra_args")
+                    params["qsid"], params["options"], extra_args
                 )
             except QuotaScopeAlreadyExists:
                 return web.Response(status=409)

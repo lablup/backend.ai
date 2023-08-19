@@ -8,6 +8,7 @@ import trafaret as t
 from yarl import URL
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventProducer, VolumeCreated
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 
@@ -46,6 +47,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         api_base_url: URL,
         agent_addrs: list[str],
         *,
+        fs_location_prefix: str,
         access_to: str,
         access_level: str,
         kmanila_requestor_id: str,
@@ -60,6 +62,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         self.etcd = etcd
         self.api_base_url = api_base_url
         self.agent_addrs = agent_addrs
+        self.fs_location_prefix = fs_location_prefix
         self.access_to = access_to
         self.access_level = access_level
         self.kmanila_requestor_id = kmanila_requestor_id
@@ -109,13 +112,13 @@ class KManilaQuotaModel(BaseQuotaModel):
                     project_id = self.default_project_id
                 return {"project_id": project_id, "auth_token": token}
 
-    async def get_user_volume_id(self, quota_scope_id: QuotaScopeID) -> str | None:
+    async def get_user_volume_id(self, quota_scope_id: QuotaScopeID) -> VolumeId | None:
         user_vol = await self.etcd.get_prefix(
             f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}"
         )
         if not user_vol:
             return None
-        return str(user_vol["volume_id"])
+        return VolumeId(str(user_vol["volume_id"]))
 
     async def put_user_volume_id(self, quota_scope_id: QuotaScopeID, data: QuotaVolumeMap) -> None:
         await self.etcd.put_prefix(
@@ -132,7 +135,7 @@ class KManilaQuotaModel(BaseQuotaModel):
     ) -> VolumeId | None:
         if (vol_id := await self.get_user_volume_id(quota_scope_id)) is not None:
             if not do_hard_check:
-                return VolumeId(vol_id)
+                return vol_id
         project_id = auth_info["project_id"]
         async with session.get(f"/d3/adm/manila/v2/{project_id}/shares/{vol_id}") as resp:
             if resp.status == 200:
@@ -239,8 +242,9 @@ class KManilaQuotaModel(BaseQuotaModel):
         options: QuotaConfig | None = None,
         extra_args: dict[str, Any] | None = None,
     ) -> None:
-        volume_info: dict[str, str] = kmanila_request_params.check(extra_args)
-        volume_name = volume_info["volume_name"]
+        _extra_args: dict[str, Any] = kmanila_request_params.check(extra_args)
+        volume_name: str = _extra_args["volume_name"]
+        event_producer: EventProducer = _extra_args["event_producer"]
 
         auth_info = await self._get_auth_info(quota_scope_id)
         headers = {
@@ -257,6 +261,15 @@ class KManilaQuotaModel(BaseQuotaModel):
             if not is_newly_created:
                 raise QuotaScopeAlreadyExists
 
+        await event_producer.produce_event(
+            VolumeCreated(
+                mount_path=str(self.mount_path / quota_scope_id.pathname),
+                fs_location=f"172.25.172.88:/share_{volume_id}",
+                fs_type="nfs",
+                edit_fstab=True,
+            )
+        )
+
 
 class KManilaFSVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
@@ -271,6 +284,7 @@ class KManilaFSVolume(BaseVolume):
             self.etcd,
             URL(self.config["api_base_url"]),
             self.config["agent_addrs"],
+            fs_location_prefix=self.config["fs_location_prefix"],
             access_to=self.config["access_to"],
             access_level=access_level,
             kmanila_requestor_id=self.config["user_id"],
