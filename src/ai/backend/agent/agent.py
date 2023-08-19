@@ -47,7 +47,6 @@ from typing import (
 )
 from uuid import UUID
 
-import aiofiles
 import aiotools
 import attrs
 import pkg_resources
@@ -128,7 +127,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import Fstab, cancel_tasks, current_loop
+from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -2362,43 +2361,8 @@ async def handle_volume_mount(
     source: AgentId,
     event: VolumeCreated,
 ) -> None:
-    config = context.etcd
-    mount_prefix = await config.get("volumes/_mount")
-    if mount_prefix is None:
-        mount_prefix = "/mnt"
-    mountpoint = Path(mount_prefix) / event.mount_path
-    mountpoint.mkdir(exist_ok=True)
-    options: str | None = None
-    if event.cmd_options is not None:
-        options = " ".join(event.cmd_options)
-        cmd = [
-            "sudo",
-            "mount",
-            "-t",
-            event.fs_type,
-            "-o",
-            options,
-            event.fs_location,
-            str(mountpoint),
-        ]
-    else:
-        cmd = ["sudo", "mount", "-t", event.fs_type, event.fs_location, str(mountpoint)]
-    proc = await asyncio.create_subprocess_exec(
-        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
-    raw_out, raw_err = await proc.communicate()
-    raw_out.decode("utf8")
-    err = raw_err.decode("utf8")
-    await proc.wait()
-    if err:
-        log.error("Mount error: " + err)
-        raise AgentError(f"Failed to mount {event.mount_path} on {mount_prefix}")
-    log.info(f"Mounted {event.mount_path} on {mount_prefix}")
-    if event.edit_fstab:
-        fstab_path = event.fstab_path or "/etc/fstab"
-        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
-            fstab = Fstab(fp)
-            await fstab.add(event.fs_location, str(mountpoint), event.fs_type, options)
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    await event.mount(mount_prefix)
 
 
 async def handle_volume_unmount(

@@ -184,22 +184,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     params["qsid"], params["options"], params.get("extra_args")
                 )
             except QuotaScopeAlreadyExists:
-                pass
-            else:
-                extra_args = params["extra_args"]
-                if extra_args is not None:
-                    volume_name = extra_args["volume_name"]
-                else:
-                    volume_name = "default"
-                await ctx.event_producer.produce_event(
-                    VolumeCreated(
-                        mount_path=volume_name,
-                        fs_location="????",
-                        fs_type="nfs",
-                        edit_fstab=True,
-                        fstab_path="???",
-                    )
-                )
+                return web.Response(status=409)
             return web.Response(status=204)
 
 
@@ -1049,8 +1034,8 @@ async def handle_volume_mount(
     source: AgentId,
     event: VolumeCreated,
 ) -> None:
-    config = context.etcd
-    await event.mount(config)
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    await event.mount(mount_prefix)
 
 
 async def handle_volume_unmount(
