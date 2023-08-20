@@ -192,13 +192,13 @@ path = "/vfroot/kmanila"
 
 
 [volume.kmanila.options]
-api_base_url = ""
-agent_addrs = []
-access_to = ""
-access_level = "rw"
-user_id = ""
-user_password = ""
-project_id = ""
-network_id = ""
-availability_zone = ""
-share_type = ""
+kmanila_api_base_url = ""
+kmanila_agent_addrs = []
+kmanila_access_to = ""
+kmanila_access_level = "rw"
+kmanila_user_id = ""
+kmanila_user_password = ""
+kmanila_project_id = ""
+kmanila_network_id = ""
+kmanila_availability_zone = ""
+kmanila_share_type = ""

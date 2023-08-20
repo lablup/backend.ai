@@ -253,7 +253,7 @@ class KManilaQuotaModel(BaseQuotaModel):
 
 class KManilaFSVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
-        access_level = self.config.get("access_level", "rw")
+        access_level = self.config.get("kmanila_access_level", "rw")
         max_poll_count = (
             int(self.config.get("max_poll_count"))  # type: ignore[arg-type]
             if self.config.get("max_poll_count")
@@ -262,15 +262,15 @@ class KManilaFSVolume(BaseVolume):
         return KManilaQuotaModel(
             self.mount_path,
             self.etcd,
-            URL(self.config["api_base_url"]),
-            self.config["agent_addrs"],
-            access_to=self.config["access_to"],
+            URL(self.config["kmanila_api_base_url"]),
+            self.config["kmanila_agent_addrs"],
+            access_to=self.config["kmanila_access_to"],
             access_level=access_level,
-            kmanila_requestor_id=self.config["user_id"],
-            kmanila_requestor_pwd=self.config["user_password"],
-            default_project_id=self.config.get("project_id"),
-            default_network_id=self.config.get("network_id"),
-            availability_zone=self.config["availability_zone"],
-            share_type=self.config["share_type"],
+            kmanila_requestor_id=self.config["kmanila_user_id"],
+            kmanila_requestor_pwd=self.config["kmanila_user_password"],
+            default_project_id=self.config.get("kmanila_project_id"),
+            default_network_id=self.config.get("kmanila_network_id"),
+            availability_zone=self.config["kmanila_availability_zone"],
+            share_type=self.config["kmanila_share_type"],
             max_poll_count=max_poll_count,
         )
