@@ -43,7 +43,7 @@ show_error() {
 
 show_warning() {
   echo " "
-  echo "${YELLOW}[ERROR]${NC} ${LYELLOW}$1${NC}"
+  echo "${YELLOW}[WARN]${NC} ${LYELLOW}$1${NC}"
 }
 
 show_info() {

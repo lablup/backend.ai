@@ -94,6 +94,7 @@ local_config_iv = (
                     t.Key("enabled", default=False): t.ToBool,
                     t.Key("asyncio", default=False): t.ToBool,
                     t.Key("enhanced-aiomonitor-task-info", default=False): t.ToBool,
+                    t.Key("log-events", default=False): t.ToBool,
                 },
             ).allow_extra("*"),
         },
@@ -121,7 +122,7 @@ def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str
         return local_config
     except ConfigurationError as e:
         print(
-            "ConfigurationError: Validation of agent configuration has failed:",
+            "ConfigurationError: Validation of storage-proxy local config has failed:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)

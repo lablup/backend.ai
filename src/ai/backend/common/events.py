@@ -200,6 +200,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     EXEC_TIMEOUT = "exec-timeout"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
+    HANG_TIMEOUT = "hang-timeout"
     IDLE_TIMEOUT = "idle-timeout"
     IDLE_SESSION_LIFETIME = "idle-session-lifetime"
     IDLE_UTILIZATION = "idle-utilization"
@@ -299,6 +300,14 @@ class KernelStartedEvent(KernelCreationEventArgs, AbstractEvent):
 
 class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
+
+
+class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_healthy"
+
+
+class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_health_check_failed"
 
 
 @attrs.define(slots=True, frozen=True)

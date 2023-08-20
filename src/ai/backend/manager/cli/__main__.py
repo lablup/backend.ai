@@ -106,10 +106,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         )
         if not candidate_container_names:
             click.echo(
-                (
-                    "Could not find the halfstack postgres container. "
-                    "Please set the container name explicitly."
-                ),
+                "Could not find the halfstack postgres container. "
+                "Please set the container name explicitly.",
                 err=True,
             )
             sys.exit(ExitCode.FAILURE)
