@@ -16,7 +16,12 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.config import ConfigurationError, override_key
+from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -75,7 +80,35 @@ async def server_main(
 
     try:
         etcd = load_shared_config(local_config)
-        ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
+        try:
+            redis_config = redis_config_iv.check(
+                await etcd.get_prefix("config/redis"),
+            )
+            log.info(f"PID: {pidx} - configured redis_addr: {redis_config['addr']}")
+        except Exception as e:
+            log.exception("Unable to read config from etcd")
+            raise e
+
+        event_producer = await EventProducer.new(
+            redis_config,
+            db=REDIS_STREAM_DB,
+            log_events=local_config["debug"]["log-events"],
+        )
+        log.info(f"PID: {pidx} - Event producer created. (addr: {redis_config['addr']})")
+        event_dispatcher = await EventDispatcher.new(
+            redis_config,
+            db=REDIS_STREAM_DB,
+            log_events=local_config["debug"]["log-events"],
+            node_id=local_config["storage-proxy"]["node-id"],
+        )
+        log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
+        ctx = Context(
+            pid=os.getpid(),
+            local_config=local_config,
+            etcd=etcd,
+            event_producer=event_producer,
+            event_dispatcher=event_dispatcher,
+        )
         m.console_locals["ctx"] = ctx
         client_api_app = await init_client_app(ctx)
         manager_api_app = await init_manager_app(ctx)
@@ -139,6 +172,8 @@ async def server_main(
             log.info("Shutting down...")
             await manager_api_runner.cleanup()
             await client_api_runner.cleanup()
+            await event_producer.close()
+            await event_dispatcher.close()
     finally:
         if aiomon_started:
             m.close()
