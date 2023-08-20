@@ -5,6 +5,7 @@
       "WelcomeMessage_2": " .",
       "Summary": "Summary",
       "Sessions": "Sessions",
+      "Serving": "Serving",
       "Import&Run": "Import & Run",
       "Data&Storage": "Data & Storage",
       "Pipeline": "Pipeline (Beta)",
@@ -39,6 +40,7 @@
       "InvalidPasswordMessage": "At least 1 alphabet, 1 number and 1 special character is required with at least 8 chars.",
       "NewPasswordMismatch": "Two new passwords do not match.",
       "PasswordMismatch": "Password mismatch",
+      "PleaseConfirmYourPassword": "Please confirm your password",
       "PasswordUpdated": "Password is successfully updated.",
       "FullnameUpdated": "Full name is successfully updated.",
       "TermsOfService": "Terms of Service",
@@ -63,7 +65,9 @@
       "AIAccelerator": "AI Accelerator",
       "YouMushChangeYourPassword": "It is recommended to periodically change your password for security reasons. Since a certain amount of time has passed since you last changed your password, you must change it in order to continue using the service.",
       "CurrentPassword": "Current Password",
-      "NewPasswordCannotBeSame": "Please enter a password that is different from your current password."
+      "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",
+      "Notifications": "Notifications",
+      "Tasks": "Tasks"
     },
     "LOGINREQUIRED": "LOGIN REQUIRED",
     "YouAreOffline": "You are now offline",
@@ -83,7 +87,10 @@
     "TotpRemoved": "Successfully disabled 2FA",
     "TotpSetupCompleted": "Enabled 2FA",
     "InvalidTotpCode": "Invalid OTP",
-    "ConfirmTotpRemovalBody": "Are you sure to opt out from using two-factor authentication?"
+    "ConfirmTotpRemovalBody": "Are you sure to opt out from using two-factor authentication?",
+    "TotpSetupNotAvailable": "Two-factor authentication cannot be set up.",
+    "RemoveTotpSetupCompleted": "Disabled 2FA",
+    "TurnOffTotp": "Turn off two-factor authentication"
   },
   "summary": {
     "Dashboard": "Dashboard",
@@ -151,7 +158,8 @@
       "SessionStartTime": "Session Starts: ",
       "ResetStartTime": "Please reset the start time.",
       "InfiniteTime": "Infinite",
-      "SetEnvironmentVariable": "Set Environment Variable (optional)",
+      "SetEnvironmentVariable": "Environment Variable (optional)",
+      "SetPreopenPorts": "Preopen Ports (optional)",
       "Config": "Config",
       "ChooseEnvironment": "Choose Environment",
       "Version": "Version",
@@ -205,6 +213,7 @@
       "NoFolderMounted": "No storage folder is mounted",
       "NoAvailableFolderToMount": "There's no available folder to mount.",
       "NoEnvConfigured": "No additional environment variable is configured",
+      "NoPreOpenPortsConfigured": "No additional preopen ports configured",
       "HomeDirectoryDeletionDialog": "The home directory in the session is automatically deleted when the session ends.",
       "LaunchConfirmationDialog": "To keep your code and data, or share it with other collaborators, simply create a storage folder in the data & storage sidebar, then mount that folder when you start the resource and keep it there.",
       "Launch": "Launch",
@@ -260,7 +269,15 @@
       "InferenceMode": "Inference",
       "ImageDoesNotProvideModelPath": "Container image does not provide model path. It should be modified.",
       "AIAccelerator": "AI Accelerator",
-      "DescAIAccelerator": "<p>AI accelerators (GPUs or NPUs) are well-suited for the matrix/vector computations involved in machine learning. AI accelerators speed up training / inference algorithms by orders of magnitude, reducing running times from weeks to days.</p>"
+      "DescAIAccelerator": "<p>AI accelerators (GPUs or NPUs) are well-suited for the matrix/vector computations involved in machine learning. AI accelerators speed up training / inference algorithms by orders of magnitude, reducing running times from weeks to days.</p>",
+      "PreOpenPortTitle": "Preopen Ports",
+      "NotePreOpenPort": "These ports are the container internal ports.",
+      "DescSetPreOpenPort": "'Preopen Ports' refers to a specific <span style='color:var(--paper-red-400);'>internal container port</span> that allows incoming connections from external devices or computers on a network device or computer.",
+      "PortsTitleWithRange": "Port value (between 1024 ~ 65535)",
+      "PrePortConfigWillDisappear": "Any unsaved preopen ports will be disappeared.",
+      "PreOpenPortConfigurationDone": "Preopen ports configured successfully.",
+      "PreOpenPortPanelTitle": "Preopen ports to set (optional)",
+      "PreOpenPortRange": "Preopen ports are only available from 1024 to 65535."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -379,11 +396,47 @@
     "UtilizationThresholdDesc": "Threshold criteria of each compute resource. When one or more resource of a compute session does not exceed the configured threshold criteria for a certain time, the session will be garbage collected (terminated). For example, if you set 1% of CUDA utilization threshold, compute sessions that show less than 1% CUDA GPU utilization, for a certain duration of time, will be destroyed. Resources with empty values are excluded from the garbage collection criteria.",
     "ConnectionExample": "Connection Example",
     "ConnectionNotice": "Notice",
-    "System": "Upload Sessions"
+    "System": "Upload Sessions",
+    "SessionType": "SessionType"
+  },
+  "modelService": {
+    "Running": "Running",
+    "Finished": "Finished",
+    "Others": "Others",
+    "Services": "Services",
+    "StartNewServing": "Start new serving",
+    "ServiceName": "Service Name",
+    "OpenToPublic": "Open To Public",
+    "DesiredRoutingCount": "Desired Routing Count",
+    "DesiredSessionCount": "Desired Session Count",
+    "EndpointName": "Endpoint Name",
+    "EndpointId": "Endpoint ID",
+    "Controls": "Controls",
+    "Status": "Status",
+    "RoutingsCount": "Routings Count",
+    "Active/Total": "Active/Total",
+    "Public": "Public",
+    "EditModelService": "Edit Model Service",
+    "OnlyAllowsNonNegativeIntegers": "Only allows non-negative integers",
+    "RoutingInfo": "Routing Info",
+    "ServiceInfo": "Service Info",
+    "StartService": "Start Service",
+    "SessionOwner": "Session Owner",
+    "ServiceEndpoint": "Service Endpoint",
+    "NoServiceEndpoint": "No Service Endpoint",
+    "RoutesInfo": "Routes Info",
+    "RouteId": "Route ID",
+    "SessionId": "Session ID",
+    "TrafficRatio": "Traffic Ratio",
+    "YouAreAboutToTerminate": "You are about to terminate ",
+    "ClearErrors": "Clear error and retry",
+    "ServingRouteErrorModalTitle": "Serving Route Error",
+    "FailedToStartService": "Failed to create service."
   },
   "button": {
     "Cancel": "Cancel",
     "Okay": "Okay",
+    "OK": "OK",
     "Create": "Create",
     "View": "View",
     "Edit": "Edit",
@@ -554,6 +607,7 @@
     "Status": "Status",
     "Name": "Name",
     "UserDetail": "User Detail",
+    "ModifyUserDetail": "Modify User Detail",
     "DescRequirePasswordChange": "Require password change?",
     "Association": "Association",
     "Domain": "Domain",
@@ -684,7 +738,11 @@
       "FolderUsing": "Using",
       "FolderQuota": "Capacity",
       "MaxFolderQuota": "Max Folder Quota",
-      "Serve": "Serve"
+      "Serve": "Model serving",
+      "CloneFolder": "Clone folder",
+      "LeaveFolder": "Leave folder",
+      "ShareFolder": "Share folder",
+      "ModifyPermissions": "Modify permissions"
     },
     "explorer": {
       "Delete": "Delete",
@@ -741,7 +799,13 @@
       "StartingSSH/SFTPSession": "Starting SFTP session...",
       "EmptyFilesAndFoldersAreNotUploaded": "Empty files and empty folders are not uploaded",
       "NumberOfSFTPSessionsExceededTitle": "Reached limit of running upload session count",
-      "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session."
+      "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session.",
+      "Serve": "Serve",
+      "FolderInfo": "Folder information",
+      "CloneFolder": "Clone this folder",
+      "Rename": "Rename folder",
+      "FolderOptionUpdate": "Update folder options",
+      "LeaveFolder": "Leave a folder"
     },
     "invitation": {
       "EnterEmail": "Enter email address",
@@ -1442,6 +1506,9 @@
     "512": "(<= 512)",
     "1024": "(<= 1024)",
     "2048": "(<= 2048)"
+  },
+  "inputLimit": {
+    "4to64chars": "(4~64 chars)"
   },
   "explorer": {
     "ValueRequired": "ValueRequired",

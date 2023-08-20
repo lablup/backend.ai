@@ -106,10 +106,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         )
         if not candidate_container_names:
             click.echo(
-                (
-                    "Could not find the halfstack postgres container. "
-                    "Please set the container name explicitly."
-                ),
+                "Could not find the halfstack postgres container. "
+                "Please set the container name explicitly.",
                 err=True,
             )
             sys.exit(ExitCode.FAILURE)
@@ -311,6 +309,11 @@ def gql():
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")
 def image():
     """Command set for managing images."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
+def redis():
+    """Command set for putting/getting data to/from redis."""
 
 
 if __name__ == "__main__":

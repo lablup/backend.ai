@@ -8,6 +8,7 @@ from pathlib import Path
 import aiodocker
 import pytest
 
+from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import LocalLogger
@@ -98,6 +99,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         ),
         "plugins": {},
     }
+    cfg = agent_local_config_iv.check(cfg)
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()

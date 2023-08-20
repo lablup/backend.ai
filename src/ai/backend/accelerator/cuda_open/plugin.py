@@ -79,6 +79,18 @@ class CUDADevice(AbstractComputeDevice):
         self.model_name = model_name
         self.uuid = uuid
 
+    def __str__(self) -> str:
+        return (
+            "CUDADevice("
+            f"device_id: {self.uuid}, model_name: {self.model_name}, "
+            f"processing_unit: {self.processing_units}, memory_size: {self.memory_size}, "
+            f"numa_node: {self.numa_node}, hw_location: {self.hw_location}"
+            ")"
+        )
+
+    def __repr__(self) -> str:
+        return str(self)
+
 
 class CUDAPlugin(AbstractComputePlugin):
     config_watch_enabled = False

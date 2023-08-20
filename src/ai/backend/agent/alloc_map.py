@@ -462,10 +462,8 @@ class FractionAllocMap(AbstractAllocMap):
             for slot_name_b in requested_slots.keys():
                 if self.check_exclusive(slot_name_a, slot_name_b):
                     raise InvalidResourceCombination(
-                        (
-                            f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
-                            " time."
-                        ),
+                        f"Slots {slot_name_a} and {slot_name_b} cannot be allocated at the same"
+                        " time.",
                     )
 
         calculated_alloc_map = self._allocate_impl[self.allocation_strategy](
@@ -484,12 +482,10 @@ class FractionAllocMap(AbstractAllocMap):
                 actual_alloc[dev_id] = round_down(val, self.quantum_size)
             if sum(actual_alloc.values()) == 0 and requested_slots[slot_name] > 0:
                 raise NotMultipleOfQuantum(
-                    (
-                        f"Requested resource amount for {slot_name} is"
-                        f" {requested_slots[slot_name]} but actual calculated amount is zero. This"
-                        " can happen if user requests resource amount smaller than target device's"
-                        " quantum size."
-                    ),
+                    f"Requested resource amount for {slot_name} is"
+                    f" {requested_slots[slot_name]} but actual calculated amount is zero. This"
+                    " can happen if user requests resource amount smaller than target device's"
+                    " quantum size.",
                 )
             actual_alloc_map[slot_name] = actual_alloc
 
