@@ -264,7 +264,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         await event_producer.produce_event(
             VolumeCreated(
                 mount_path=str(self.mount_path / quota_scope_id.pathname),
-                fs_location=f"172.25.172.88:/share_{volume_id}",
+                fs_location=f"{self.fs_location_prefix}/share_{volume_id}",
                 fs_type="nfs",
                 edit_fstab=True,
             )
