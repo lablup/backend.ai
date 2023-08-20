@@ -372,9 +372,7 @@ async def prepare_krunner_env_impl(
         .read_text()
         .strip()
     )
-    krunner_folder_name = (
-        f"backendai-krunner.v{current_version}.{arch}.{distro}"
-    )
+    krunner_folder_name = f"backendai-krunner.v{current_version}.{arch}.{distro}"
     target_path = Path(root_path) / krunner_folder_name
     extractor_image = "backendai-krunner-extractor:latest"
 
