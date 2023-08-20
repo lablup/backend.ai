@@ -168,9 +168,7 @@ class KManilaQuotaModel(BaseQuotaModel):
                 "share_type": self.share_type,
             }
         }
-        async with session.post(
-            url=f"/d3/adm/manila/v2/{project_id}/shares", json=request_body
-        ) as resp:
+        async with session.post(url=f"/{project_id}/shares", json=request_body) as resp:
             if resp.status not in (200, 201, 204):
                 raise ExternalError(
                     f"Got invalid status code when post data to API server. {resp.status = }"
@@ -208,7 +206,7 @@ class KManilaQuotaModel(BaseQuotaModel):
 
         project_id = auth_info["project_id"]
         async with session.post(
-            url=f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action",
+            url=f"/{project_id}/shares/{volume_id}/action",
             json={
                 "os-access_list": None,
             },
@@ -231,7 +229,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             }
         }
         async with session.post(
-            f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action",
+            f"/{project_id}/shares/{volume_id}/action",
             json=request_data,
         ) as resp:
             return True
@@ -263,7 +261,7 @@ class KManilaQuotaModel(BaseQuotaModel):
 
         await event_producer.produce_event(
             VolumeCreated(
-                mount_path=str(self.mount_path / quota_scope_id.pathname),
+                mount_path=str(self.mangle_qspath(quota_scope_id)),
                 fs_location=f"{self.fs_location_prefix}:/share_{volume_id}",
                 fs_type="nfs",
                 edit_fstab=True,
