@@ -31,7 +31,7 @@ from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
 from . import events
-from .params import CommaSeparatedListType
+from .params import CommaSeparatedListType, OptionalType
 from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
 from .ssh import container_ssh_ctx
@@ -232,8 +232,8 @@ def _create_cmd(docs: str = None):
         default=None,
         type=list_expr,
         help=(
-            "Show mapping list of tuple which mapped containers with agent. "
-            "When user role is Super Admin. "
+            "Assign the session to specific agents. "
+            "This option is only applicable when the user role is Super Admin. "
             "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
         ),
     )
@@ -391,6 +391,7 @@ def _create_from_template_cmd(docs: str = None):
         "--name",
         "--client-token",
         metavar="NAME",
+        type=OptionalType(str),
         default=undefined,
         help="Specify a human-readable session name. If not set, a random hex string is used.",
     )
@@ -399,6 +400,7 @@ def _create_from_template_cmd(docs: str = None):
         "--owner",
         "--owner-access-key",
         metavar="ACCESS_KEY",
+        type=OptionalType(str),
         default=undefined,
         help="Set the owner of the target session explicitly.",
     )
@@ -418,11 +420,18 @@ def _create_from_template_cmd(docs: str = None):
         default=None,
         help="Let session to be started at a specific or relative time.",
     )
-    @click.option("-i", "--image", default=undefined, help="Set compute_session image to run.")
+    @click.option(
+        "-i",
+        "--image",
+        type=OptionalType(str),
+        default=undefined,
+        help="Set compute_session image to run.",
+    )
     @click.option(
         "-c",
         "--startup-command",
         metavar="COMMAND",
+        type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
     )
@@ -434,7 +443,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--max-wait",
         metavar="SECONDS",
-        type=int,
+        type=OptionalType(int),
         default=undefined,
         help="The maximum duration to wait until the session starts.",
     )
@@ -469,7 +478,10 @@ def _create_from_template_cmd(docs: str = None):
     )
     # extra options
     @click.option(
-        "--tag", type=str, default=undefined, help="User-defined tag string to annotate sessions."
+        "--tag",
+        type=OptionalType(str),
+        default=undefined,
+        help="User-defined tag string to annotate sessions.",
     )
     # resource spec
     @click.option(
@@ -489,7 +501,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--scaling-group",
         "--sgroup",
-        type=str,
+        type=OptionalType(str),
         default=undefined,
         help=(
             "The scaling group to execute session. If not specified, "
@@ -512,7 +524,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--cluster-size",
         metavar="NUMBER",
-        type=int,
+        type=OptionalType(int),
         default=undefined,
         help="The size of cluster in number of containers.",
     )
@@ -538,7 +550,8 @@ def _create_from_template_cmd(docs: str = None):
         "-g",
         "--group",
         metavar="GROUP_NAME",
-        default=None,
+        type=OptionalType(str),
+        default=undefined,
         help=(
             "Group name where the session is spawned. "
             "User should be a member of the group to execute the code."

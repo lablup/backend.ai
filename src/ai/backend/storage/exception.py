@@ -13,6 +13,10 @@ class ExecutionError(StorageProxyError):
     pass
 
 
+class ExternalError(StorageProxyError):
+    pass
+
+
 class NotEmptyError(StorageProxyError):
     pass
 
