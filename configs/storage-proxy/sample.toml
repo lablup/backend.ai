@@ -1,6 +1,6 @@
 [etcd]
 namespace = "local"                         # env: BACKEND_NAMESPACE
-addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
+addr = { host = "127.0.0.1", port = 8121 }  # env: BACKEND_ETCD_ADDR (host:port)
 user = ""                                   # env: BACKEND_ETCD_USER
 password = ""				    # env: BACKEND_ETCD_PASSWORD
 
