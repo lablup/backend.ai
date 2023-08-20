@@ -5,6 +5,7 @@
       "WelcomeMessage_2": "님",
       "Summary": "요약",
       "Sessions": "세션",
+      "Serving": "모델 서빙",
       "Import&Run": "가져오기 & 실행",
       "Data&Storage": "데이터 & 폴더",
       "AgentSummary": "자원 요약",
@@ -39,6 +40,7 @@
       "InvalidPasswordMessage": "영문자, 숫자, 특수 문자를 하나 이상 포함해서 8자 이상 입력하세요",
       "NewPasswordMismatch": "새로 입력한 두 비밀번호가 일치하지 않습니다.",
       "PasswordMismatch": "비밀번호가 일치하지 않습니다",
+      "PleaseConfirmYourPassword": "비밀번호를 확인해주세요.",
       "PasswordUpdated": "비밀번호가 성공적으로 갱신되었습니다.",
       "FullnameUpdated": "사용자 이름이 성공적으로 갱신되었습니다.",
       "TermsOfService": "약관",
@@ -63,7 +65,9 @@
       "AIAccelerator": "AI 가속기",
       "YouMushChangeYourPassword": "보안을 위해 비밀번호를 주기적으로 변경하는 것이 좋습니다. 비밀번호를 변경한 지 일정 시간이 지났으므로, 서비스를 계속 이용하려면 비밀번호를 변경해야 합니다.",
       "CurrentPassword": "현재 비밀번호",
-      "NewPasswordCannotBeSame": "기존 비밀번호와 다른 새 비밀번호를 입력해주세요."
+      "NewPasswordCannotBeSame": "기존 비밀번호와 다른 새 비밀번호를 입력해주세요.",
+      "Notifications": "알림",
+      "Tasks": "작업"
     },
     "LOGINREQUIRED": "로그인이 필요합니다",
     "YouAreOffline": "오프라인 상태가 되었습니다",
@@ -110,7 +114,7 @@
     "Announcement": "공지",
     "SystemResources": "시스템 자원",
     "CurrentVersion": "현재 버전",
-    "NoAnnouncement": "표시 할 안내문이 없습니다.",
+    "NoAnnouncement": "표시할 안내문이 없습니다.",
     "NoInvitations": "초대 받은 폴더가 없습니다.",
     "AcceptSharedVFolder": "다음 폴더에 대한 공유를 받습니다. 공유 받은 폴더 명: ",
     "DeclineSharedVFolder": "다음 폴더에 대한 초대를 거부하였습니다. 거부한 폴더 명: ",
@@ -140,6 +144,7 @@
       "StartUpCommand": "세션 시작시 실행할 명령",
       "SessionStartTime": "세션 시작 시간: ",
       "SetEnvironmentVariable": "환경 변수 설정 (옵션)",
+      "SetPreopenPorts": "사전 개방 포트 설정 (옵션)",
       "ResetStartTime": "세션 시작 시간을 다시 설정해주세요.",
       "InfiniteTime": "미정",
       "Config": "설정",
@@ -194,6 +199,7 @@
       "NoAvailableFolderToMount": "마운트 할 수 있는 폴더가 없습니다.",
       "NoFolderMounted": "마운트 된 폴더가 없습니다.",
       "NoEnvConfigured": "추가된 환경 변수가 없습니다.",
+      "NoPreOpenPortsConfigured": "추가된 사전 개방 포트가 없습니다.",
       "HomeDirectoryDeletionDialog": "세션 안의 홈 디렉토리는 세션을 종료하면 자동으로 삭제됩니다.",
       "LaunchConfirmationDialog": "코드 및 데이터를 계속 유지하거나 다른 공동 작업자들과 공유하기 위해서는 데이터 & 폴더 메뉴에서 스토리지 폴더를 생성하신 후, 자원을 시작할 때 해당 폴더를 마운트하고 그 안에 보관하시면 됩니다.",
       "Launch": "시작",
@@ -250,7 +256,14 @@
       "ImageDoesNotProvideModelPath": "모델 경로를 지정하지 않은 컨테이너 이미지입니다. 수정이 필요합니다.",
       "ModelStorageToMount": "마운트할 모델 스토리지 폴더",
       "AIAccelerator": "AI 가속기",
-      "DescAIAccelerator": "<p>AI 가속기 (GPU 및 NPU)는 기계 학습과 관련된 행렬 / 벡터 계산에 적합합니다. AI 가속기는 훈련 및 인퍼런스 알고리즘을 몇 배나 가속화하여 기계 학습 워크로드의 실행 시간을 몇 주에서 몇 일로 줄입니다.</p>"
+      "DescAIAccelerator": "<p>AI 가속기 (GPU 및 NPU)는 기계 학습과 관련된 행렬 / 벡터 계산에 적합합니다. AI 가속기는 훈련 및 인퍼런스 알고리즘을 몇 배나 가속화하여 기계 학습 워크로드의 실행 시간을 몇 주에서 몇 일로 줄입니다.</p>",
+      "PreOpenPortTitle": "사전 개방 포트",
+      "DescSetPreOpenPort": "네트워크 기기 또는 컴퓨터에서 외부로부터의 접속을 허용하는 <span style='color:var(--paper-red-400);'>컨테이너 내부 특정 포트 번호</span>를 '사전 개방 포트' 값으로 설정합니다.",
+      "PortsTitleWithRange": "포트 값 (1024 ~ 65535 사이)",
+      "PrePortConfigWillDisappear": "저장되지 않은 사전 개방 포트값은 사라집니다.",
+      "PreOpenPortConfigurationDone": "사전 개방 포트값이 설정되었습니다.",
+      "PreOpenPortPanelTitle": "추가될 사전 개방 포트값 (옵션)",
+      "PreOpenPortRange": "사전 개방 포트는 1024 ~ 65535 사이만 설정할 수 있습니다."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -372,7 +385,42 @@
     "SFTPExtraNotification": "개수 제한이 있으므로 다 사용한 후에는 삭제하는 것이 좋습니다. 일정 시간 업로드를 하지 않는 세션은 자동으로 삭제될 수 있습니다.",
     "ConnectionNotice": "주의",
     "Readmore": "더 알아보기...",
-    "Readless": "내용 접기"
+    "Readless": "내용 접기",
+    "SessionType": "세션 타입"
+  },
+  "modelService": {
+    "Running": "실행중",
+    "Finished": "종료",
+    "Others": "기타",
+    "Services": "모델 서비스",
+    "StartNewServing": "새 서비스 시작",
+    "ServiceName": "서비스 이름",
+    "OpenToPublic": "앱을 외부에 공개",
+    "DesiredRoutingCount": "원하는 라우팅 수",
+    "DesiredSessionCount": "원하는 세션 수",
+    "EndpointName": "엔드포인트 이름",
+    "EndpointId": "엔드포인트 ID",
+    "Controls": "제어",
+    "Status": "상태",
+    "RoutingsCount": "라우팅 수",
+    "Active/Total": "활성/전체",
+    "Public": "공개",
+    "EditModelService": "모델 서비스 수정",
+    "OnlyAllowsNonNegativeIntegers": "0 이상을 입력해주세요.",
+    "RoutingInfo": "라우팅 정보",
+    "ServiceInfo": "서비스 정보",
+    "StartService": "서비스 시작",
+    "SessionOwner": "세션 소유자",
+    "ServiceEndpoint": "서비스 엔드포인트",
+    "NoServiceEndpoint": "서비스 엔드포인트가 없습니다.",
+    "RoutesInfo": "라우트 정보",
+    "RouteId": "라우트 ID",
+    "SessionId": "세션 ID",
+    "TrafficRatio": "트래픽 비율",
+    "YouAreAboutToTerminate": "아래의 서비스를 삭제하려고 합니다: ",
+    "ClearErrors": "오류 지우고 재시도",
+    "ServingRouteErrorModalTitle": "서빙 라우트 에러",
+    "FailedToStartService": "서비스를 생성하지 못했습니다."
   },
   "button": {
     "Cancel": "취소",
@@ -408,7 +456,8 @@
     "Reset": "초기화",
     "OptOut": "비활성화",
     "Activate": "활성화",
-    "Unset": "초기화"
+    "Unset": "초기화",
+    "OK": "확인"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -587,7 +636,8 @@
     "KeypairDetail": "키페어 정보",
     "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다.",
     "KeySeccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
-    "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다."
+    "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
+    "ModifyUserDetail": "사용자 상세 정보 수정"
   },
   "data": {
     "Folders": "폴더",
@@ -677,7 +727,11 @@
       "FolderUsing": "사용량",
       "FolderQuota": "가용량",
       "MaxFolderQuota": "최대 할당 가능 용량",
-      "Serve": "서비스"
+      "Serve": "서비스",
+      "CloneFolder": "폴더 클론",
+      "LeaveFolder": "초대된 폴더 나가기",
+      "ShareFolder": "폴더 공유하기",
+      "ModifyPermissions": "권한 수정"
     },
     "explorer": {
       "Delete": "삭제",
@@ -734,7 +788,13 @@
       "StartingSSH/SFTPSession": "SFTP 서버 시작",
       "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
       "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
-      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요."
+      "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요.",
+      "Serve": "모델 서빙",
+      "FolderInfo": "폴더 정보",
+      "CloneFolder": "폴더 클론",
+      "Rename": "이름 변경",
+      "FolderOptionUpdate": "폴더 옵션 변경",
+      "LeaveFolder": "초대된 폴더 나가기"
     },
     "invitation": {
       "EnterEmail": "이메일을 입력하세요",
@@ -1406,7 +1466,7 @@
     "ResourcePolicyAlreadyExist": "같은 이름의 자원 정책이 이미 있습니다.",
     "ScalingGroupAlreadyExist": "같은 이름의 자원 그룹이 이미 있습니다.",
     "ResourceLimitExceed": "자원 제한을 초과했습니다. 가용 자원량을 확인하세요.",
-    "SmallerResourceThenImageRequires": "요청한 자원이 이미지가 요구하는 자원보다 적습니다. 자원를 보다 크게 해서 시도해보세요.",
+    "SmallerResourceThenImageRequires": "요청한 자원이 이미지가 요구하는 자원보다 적습니다. 자원을 보다 크게 해서 시도해보세요.",
     "LoginSucceededManagerNotResponding": "로그인은 성공하였으나 매니저 서버가 응답하지 않습니다.",
     "UserNameAlreadyExist": "이미 사용하고 있는 사용자명입니다.",
     "ResourcePolicyStillReferenced": "이 자원 정책을 사용하고 있는 자격 증명이 있습니다.",
@@ -1435,6 +1495,9 @@
     "1024": "(<= 1024)",
     "2048": "(<= 2048)"
   },
+  "inputLimit": {
+    "4to64chars": "(4~64자)"
+  },
   "explorer": {
     "ValueRequired": "값이 필요합니다.",
     "InputTooShort": "입력값이 너무 짧습니다."
@@ -1448,6 +1511,9 @@
     "ScanQRToEnable": "이중 인증 프로그램으로 하단의 QR 코드를 스캔하여 이중 인증을 인증기에 등록하세요.",
     "TypeInAuthKey": "혹은, 하단의 인증 코드를 입력하여 직접 이중 인증을 활성화할 수도 있습니다.",
     "EnterConfirmationCode": "이제 확인을 위해 인증기에서 보이는 6자리 숫자를 입력하세요.",
-    "ConfirmTotpRemovalBody": "이중 인증을 정말 비활성화 하시겠습니까?"
+    "ConfirmTotpRemovalBody": "이중 인증을 정말 비활성화 하시겠습니까?",
+    "TotpSetupNotAvailable": "이중 인증 설정이 불가합니다.",
+    "RemoveTotpSetupCompleted": "이중 인증이 비활성화 되었습니다.",
+    "TurnOffTotp": "이중 인증 비활성화"
   }
 }

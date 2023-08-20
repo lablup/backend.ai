@@ -46,6 +46,7 @@ from trafaret.dataerror import DataError as TrafaretDataError
 
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     EventProducer,
@@ -299,7 +300,7 @@ class AgentRPCServer(aobject):
     async def init_background_task_manager(self):
         event_producer = await EventProducer.new(
             cast(EtcdRedisConfig, self.local_config["redis"]),
-            db=4,  # Identical to manager's REDIS_STREAM_DB
+            db=REDIS_STREAM_DB,
         )
         self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
 
@@ -347,8 +348,9 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def ping_kernel(self, kernel_id: str):
-        log.debug("rpc::ping_kernel({0})", kernel_id)
+    async def ping_kernel(self, kernel_id: str) -> dict[str, float] | None:
+        log.debug("rpc::ping_kernel(k:{})", kernel_id)
+        return await self.agent.ping_kernel(KernelId(UUID(kernel_id)))
 
     @rpc_function
     @collect_error
@@ -880,7 +882,7 @@ def main(
             pprint(cfg)
         cfg["_src"] = cfg_src_path
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
@@ -893,10 +895,8 @@ def main(
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
-            (
-                "ConfigurationError: "
-                "Cannot use link-local or unspecified IP address as the RPC listening host."
-            ),
+            "ConfigurationError: "
+            "Cannot use link-local or unspecified IP address as the RPC listening host.",
             file=sys.stderr,
         )
         raise click.Abort()
@@ -919,11 +919,9 @@ def main(
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
             if core_pattern.startswith("|") or not core_pattern.startswith("/"):
                 print(
-                    (
-                        "ConfigurationError: "
-                        "/proc/sys/kernel/core_pattern must be an absolute path "
-                        "to enable container coredumps."
-                    ),
+                    "ConfigurationError: "
+                    "/proc/sys/kernel/core_pattern must be an absolute path "
+                    "to enable container coredumps.",
                     file=sys.stderr,
                 )
                 raise click.Abort()

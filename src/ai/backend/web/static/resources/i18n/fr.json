@@ -60,7 +60,13 @@
       "AgentSummary": "__NOT_TRANSLATED__",
       "SetupTotp": "__NOT_TRANSLATED__",
       "TotpActivated": "__NOT_TRANSLATED__",
-      "AIAccelerator": "__NOT_TRANSLATED__"
+      "AIAccelerator": "__NOT_TRANSLATED__",
+      "Serving": "__NOT_TRANSLATED__",
+      "Notifications": "__NOT_TRANSLATED__",
+      "Tasks": "__NOT_TRANSLATED__",
+      "YouMushChangeYourPassword": "__NOT_TRANSLATED__",
+      "NewPasswordCannotBeSame": "__NOT_TRANSLATED__",
+      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "CONNEXION REQUISE",
     "YouAreOffline": "Vous êtes maintenant hors ligne",
@@ -248,7 +254,16 @@
       "ModelStorageToMount": "__NOT_TRANSLATED__",
       "AIAccelerator": "__NOT_TRANSLATED__",
       "DescAIAccelerator": "__NOT_TRANSLATED__",
-      "SessionAlreadyExists": "__NOT_TRANSLATED__"
+      "SessionAlreadyExists": "__NOT_TRANSLATED__",
+      "PreOpenPortTitle": "__NOT_TRANSLATED__",
+      "DescSetPreOpenPort": "__NOT_TRANSLATED__",
+      "SetPreopenPorts": "__NOT_TRANSLATED__",
+      "PreOpenPortConfigurationDone": "__NOT_TRANSLATED__",
+      "NoPreOpenPortsConfigured": "__NOT_TRANSLATED__",
+      "PortsTitleWithRange": "__NOT_TRANSLATED__",
+      "PrePortConfigWillDisappear": "__NOT_TRANSLATED__",
+      "PreOpenPortPanelTitle": "__NOT_TRANSLATED__",
+      "PreOpenPortRange": "__NOT_TRANSLATED__"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -372,7 +387,8 @@
     "ConnectionNotice": "__NOT_TRANSLATED__",
     "ReadMore": "__NOT_TRANSLATED__",
     "Readless": "__NOT_TRANSLATED__",
-    "Readmore": "__NOT_TRANSLATED__"
+    "Readmore": "__NOT_TRANSLATED__",
+    "SessionType": "__NOT_TRANSLATED__"
   },
   "button": {
     "Cancel": "Annuler",
@@ -407,7 +423,9 @@
     "Reset": "Réinitialisation",
     "EnterManually": "__NOT_TRANSLATED__",
     "OptOut": "__NOT_TRANSLATED__",
-    "Activate": "__NOT_TRANSLATED__"
+    "Activate": "__NOT_TRANSLATED__",
+    "Unset": "__NOT_TRANSLATED__",
+    "OK": "__NOT_TRANSLATED__"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -536,7 +554,8 @@
     "KeypairDetail": "__NOT_TRANSLATED__",
     "AdminCanOnlyRemoveTotp": "__NOT_TRANSLATED__",
     "KeySeccessfullyDeleted": "__NOT_TRANSLATED__",
-    "SignoutSeccessfullyFinished": "__NOT_TRANSLATED__"
+    "SignoutSeccessfullyFinished": "__NOT_TRANSLATED__",
+    "ModifyUserDetail": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Dossiers",
@@ -616,7 +635,11 @@
       "FolderInfo": "__NOT_TRANSLATED__",
       "OpenAFolder": "__NOT_TRANSLATED__",
       "Status": "__NOT_TRANSLATED__",
-      "Serve": "__NOT_TRANSLATED__"
+      "Serve": "__NOT_TRANSLATED__",
+      "CloneFolder": "__NOT_TRANSLATED__",
+      "LeaveFolder": "__NOT_TRANSLATED__",
+      "ShareFolder": "__NOT_TRANSLATED__",
+      "ModifyPermissions": "__NOT_TRANSLATED__"
     },
     "explorer": {
       "Delete": "Effacer...",
@@ -673,7 +696,13 @@
       "EmptyFilesAndFoldersAreNotUploaded": "__NOT_TRANSLATED__",
       "FolderAlreadyExists": "__NOT_TRANSLATED__",
       "NumberOfSFTPSessionsExceededTitle": "__NOT_TRANSLATED__",
-      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__"
+      "NumberOfSFTPSessionsExceededBody": "__NOT_TRANSLATED__",
+      "Serve": "__NOT_TRANSLATED__",
+      "FolderInfo": "__NOT_TRANSLATED__",
+      "CloneFolder": "__NOT_TRANSLATED__",
+      "Rename": "__NOT_TRANSLATED__",
+      "FolderOptionUpdate": "__NOT_TRANSLATED__",
+      "LeaveFolder": "__NOT_TRANSLATED__"
     },
     "invitation": {
       "EnterEmail": "Entrer l'adresse e-mail",
@@ -700,7 +729,14 @@
       "StatusOfSelectedHost": "__NOT_TRANSLATED__",
       "Status": "__NOT_TRANSLATED__",
       "used": "__NOT_TRANSLATED__"
-    }
+    },
+    "SelectStorageHost": "__NOT_TRANSLATED__",
+    "NumberOfFolders": "__NOT_TRANSLATED__",
+    "Limit": "__NOT_TRANSLATED__",
+    "ProjectFolder": "__NOT_TRANSLATED__",
+    "QuotaPerStorageVolume": "__NOT_TRANSLATED__",
+    "HostDetails": "__NOT_TRANSLATED__",
+    "Used": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
@@ -1386,6 +1422,77 @@
     "ScanQRToEnable": "__NOT_TRANSLATED__",
     "TypeInAuthKey": "__NOT_TRANSLATED__",
     "EnterConfirmationCode": "__NOT_TRANSLATED__",
-    "ConfirmTotpRemovalBody": "__NOT_TRANSLATED__"
+    "ConfirmTotpRemovalBody": "__NOT_TRANSLATED__",
+    "TotpSetupNotAvailable": "__NOT_TRANSLATED__",
+    "TurnOffTotp": "__NOT_TRANSLATED__",
+    "RemoveTotpSetupCompleted": "__NOT_TRANSLATED__"
+  },
+  "inputLimit": {
+    "4to64chars": "__NOT_TRANSLATED__"
+  },
+  "storageHost": {
+    "quotaSettings": {
+      "SelectDomain": "__NOT_TRANSLATED__",
+      "AllowNumberAndDot": "__NOT_TRANSLATED__",
+      "SelectProject": "__NOT_TRANSLATED__",
+      "SelectFirst": "__NOT_TRANSLATED__",
+      "ClickSettingButton": "__NOT_TRANSLATED__",
+      "AddQuotaConfigs": "__NOT_TRANSLATED__",
+      "QuotaScopeId": "__NOT_TRANSLATED__",
+      "UnsetCustomSettings": "__NOT_TRANSLATED__",
+      "ConfirmUnsetCustomQuota": "__NOT_TRANSLATED__",
+      "QuotaScopeSuccessfullyUpdated": "__NOT_TRANSLATED__",
+      "QuotaSettings": "__NOT_TRANSLATED__",
+      "SelectUser": "__NOT_TRANSLATED__"
+    },
+    "ResourcePolicySuccessfullyUpdated": "__NOT_TRANSLATED__",
+    "ResourcePolicySuccessfullyCreated": "__NOT_TRANSLATED__",
+    "ResourcePolicySettings": "__NOT_TRANSLATED__",
+    "BeCarefulToSetProjectResourcePolicy": "__NOT_TRANSLATED__",
+    "MaxFolderSize": "__NOT_TRANSLATED__",
+    "HardLimit": "__NOT_TRANSLATED__",
+    "Usage": "__NOT_TRANSLATED__",
+    "UnsetResourcePolicy": "__NOT_TRANSLATED__",
+    "DoYouWantToUseDefaultValue": "__NOT_TRANSLATED__",
+    "SelectProjectOrUserFirst": "__NOT_TRANSLATED__",
+    "ResourcePolicy": "__NOT_TRANSLATED__",
+    "Used": "__NOT_TRANSLATED__",
+    "Total": "__NOT_TRANSLATED__",
+    "QuotaSettings": "__NOT_TRANSLATED__",
+    "ForUser": "__NOT_TRANSLATED__",
+    "ForProject": "__NOT_TRANSLATED__",
+    "QuotaDoesNotSupported": "__NOT_TRANSLATED__",
+    "BeCarefulToSetUserResourcePolicy": "__NOT_TRANSLATED__"
+  },
+  "modelService": {
+    "EditModelService": "__NOT_TRANSLATED__",
+    "DesiredSessionCount": "__NOT_TRANSLATED__",
+    "OnlyAllowsNonNegativeIntegers": "__NOT_TRANSLATED__",
+    "StartNewServing": "__NOT_TRANSLATED__",
+    "ServiceName": "__NOT_TRANSLATED__",
+    "OpenToPublic": "__NOT_TRANSLATED__",
+    "DesiredRoutingCount": "__NOT_TRANSLATED__",
+    "Services": "__NOT_TRANSLATED__",
+    "RoutingInfo": "__NOT_TRANSLATED__",
+    "ServiceInfo": "__NOT_TRANSLATED__",
+    "EndpointName": "__NOT_TRANSLATED__",
+    "EndpointId": "__NOT_TRANSLATED__",
+    "SessionOwner": "__NOT_TRANSLATED__",
+    "ServiceEndpoint": "__NOT_TRANSLATED__",
+    "NoServiceEndpoint": "__NOT_TRANSLATED__",
+    "RoutesInfo": "__NOT_TRANSLATED__",
+    "RouteId": "__NOT_TRANSLATED__",
+    "SessionId": "__NOT_TRANSLATED__",
+    "Status": "__NOT_TRANSLATED__",
+    "TrafficRatio": "__NOT_TRANSLATED__",
+    "StartService": "__NOT_TRANSLATED__",
+    "Controls": "__NOT_TRANSLATED__",
+    "RoutingsCount": "__NOT_TRANSLATED__",
+    "Active/Total": "__NOT_TRANSLATED__",
+    "Public": "__NOT_TRANSLATED__",
+    "YouAreAboutToTerminate": "__NOT_TRANSLATED__",
+    "FailedToStartService": "__NOT_TRANSLATED__",
+    "ServingRouteErrorModalTitle": "__NOT_TRANSLATED__",
+    "ClearErrors": "__NOT_TRANSLATED__"
   }
 }
