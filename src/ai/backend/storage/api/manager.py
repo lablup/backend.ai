@@ -171,7 +171,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("qsid"): tx.QuotaScopeID(),
                     t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
-                    t.Key("extra_args", default=None): t.Null | t.Dict,
+                    t.Key("extra_args", default=None): t.Null | t.Mapping(t.String, t.Any),
                 },
             ),
         ),
