@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Cho phép đại lý tự đăng ký với người quản lý. <br/> Chỉ sử dụng nếu cụm Backend.AI được quản lý trên vị trí an toàn.",
     "Plugins": "bổ sung",
     "CUDAGPUsupport": "Hỗ trợ GPU CUDA",
-    "DescCUDAGPUsupport": "Hỗ trợ GPU NVidia CUDA. <br/> Yêu cầu Plugin Backend.AI CUDA.",
+    "DescCUDAGPUsupport": "Hỗ trợ GPU NVIDIA CUDA. <br/> Yêu cầu Plugin Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Bị vô hiệu hóa do hệ thống sử dụng plugin GPU Fractional",
     "ROCMGPUsupport": "Hỗ trợ GPU ROCm",
     "DescROCMGPUsupport": "Hỗ trợ GPU AMD ROCm. <br/> Yêu cầu Plugin Backend.AI ROCm.",

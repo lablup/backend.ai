@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Permitir que el agente se registre como administrador. <br/> Úselo solo si el clúster Backend.AI se administra en una ubicación segura.",
     "Plugins": "Complementos",
     "CUDAGPUsupport": "Compatibilidad con GPU CUDA",
-    "DescCUDAGPUsupport": "Soporte de GPU NVidia CUDA. <br/> Requiere el complemento Backend.AI CUDA.",
+    "DescCUDAGPUsupport": "Soporte de GPU NVIDIA CUDA. <br/> Requiere el complemento Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Deshabilitado porque el sistema usa el complemento de GPU fraccional",
     "ROCMGPUsupport": "Soporte de GPU ROCm",
     "DescROCMGPUsupport": "Compatibilidad con GPU AMD ROCm. <br/> Requiere el complemento Backend.AI ROCm.",
