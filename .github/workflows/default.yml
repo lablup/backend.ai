@@ -42,7 +42,7 @@ jobs:
         echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
       env: 
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT != '' }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
@@ -111,7 +111,7 @@ jobs:
         echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
       env: 
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT != '' }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
@@ -184,7 +184,7 @@ jobs:
         echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
       env: 
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
-      if: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT != '' }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
