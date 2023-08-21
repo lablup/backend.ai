@@ -14,6 +14,7 @@ from typing import (
     Callable,
     Iterator,
     List,
+    NotRequired,
     TypedDict,
     cast,
 )
@@ -25,12 +26,18 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
+from .. import __version__
 from ..abc import AbstractVolume
 from ..context import Context
-from ..exception import InvalidSubpathError, StorageProxyError, VFolderNotFoundError
+from ..exception import (
+    InvalidSubpathError,
+    QuotaScopeNotFoundError,
+    StorageProxyError,
+    VFolderNotFoundError,
+)
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 
@@ -42,8 +49,8 @@ async def token_auth_middleware(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> web.StreamResponse:
-    skip_token_check = getattr(handler, "skip_token_check", False)
-    if not skip_token_check:
+    skip_token_auth = getattr(handler, "skip_token_auth", False)
+    if not skip_token_auth:
         token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
         if not token:
             raise web.HTTPForbidden()
@@ -53,19 +60,22 @@ async def token_auth_middleware(
     return await handler(request)
 
 
-def skip_token_check(
+def skip_token_auth(
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
-    setattr(handler, "skip_token_check", True)
+    setattr(handler, "skip_token_auth", True)
     return handler
 
 
-async def get_status(request: web.Request) -> web.Response:
+@skip_token_auth
+async def check_status(request: web.Request) -> web.Response:
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_status", params)
         return web.json_response(
             {
                 "status": "ok",
+                "type": "maanger-facing",
+                "storage-proxy": __version__,
             },
         )
 
@@ -146,8 +156,9 @@ async def get_hwinfo(request: web.Request) -> web.Response:
 async def create_quota_scope(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
-        qsid: str
+        qsid: QuotaScopeID
         options: QuotaConfig | None
+        extra_args: NotRequired[dict[str, Any]]
 
     async with cast(
         AsyncContextManager[Params],
@@ -158,6 +169,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("qsid"): tx.QuotaScopeID(),
                     t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
+                    t.Key("extra_args", default=None): t.Null | t.Dict,
                 },
             ),
         ),
@@ -165,7 +177,98 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_quota_scope", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.create_quota_scope(
+                params["qsid"], params["options"], params.get("extra_args")
+            )
+            return web.Response(status=204)
+
+
+async def get_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "get_quota_scope", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            return web.json_response(
+                {
+                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                    "limit_bytes": (
+                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
+                    ),
+                }
+            )
+
+
+async def update_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+        options: QuotaConfig
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                    t.Key("options"): QuotaConfig.as_trafaret(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "update_quota_scope", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            return web.Response(status=204)
+
+
+async def unset_quota(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "unset_quota", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            await volume.quota_model.unset_quota(params["qsid"])
             return web.Response(status=204)
 
 
@@ -189,9 +292,23 @@ async def create_vfolder(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_vfolder", params)
+        assert params["vfid"].quota_scope_id is not None
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.create_vfolder(params["vfid"])
+            try:
+                await volume.create_vfolder(params["vfid"])
+            except QuotaScopeNotFoundError:
+                assert params["vfid"].quota_scope_id
+                if initial_max_size_for_quota_scope := (params["options"] or {}).get(
+                    "initial_max_size_for_quota_scope"
+                ):
+                    options = QuotaConfig(initial_max_size_for_quota_scope)
+                else:
+                    options = None
+                await volume.quota_model.create_quota_scope(
+                    params["vfid"].quota_scope_id, options=options
+                )
+                await volume.create_vfolder(params["vfid"])
             return web.Response(status=204)
 
 
@@ -501,15 +618,6 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
             )
 
 
-@skip_token_check
-async def status(request: web.Request) -> web.Response:
-    return web.json_response(
-        {
-            "status": "ok",
-        },
-    )
-
-
 async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -668,6 +776,7 @@ async def list_files(request: web.Request) -> web.Response:
                     async for item in volume.scandir(
                         params["vfid"],
                         params["relpath"],
+                        recursive=False,
                     )
                 ]
         return web.json_response(
@@ -879,13 +988,14 @@ async def init_manager_app(ctx: Context) -> web.Application:
         ],
     )
     app["ctx"] = ctx
-    app.router.add_route("GET", "/", get_status)
+    app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/quota-scope", create_quota_scope)
-    # TODO: app.router.add_route("GET", "/quota-scope", get_quota_scope)
-    # TODO: app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
-    # TODO: app.router.add_route("DELETE", "/quota-scope", delete_quota_scope)
+    app.router.add_route("GET", "/quota-scope", get_quota_scope)
+    app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
+    app.router.add_route("DELETE", "/quota-scope/quota", unset_quota)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
     app.router.add_route("POST", "/folder/clone", clone_vfolder)
@@ -906,5 +1016,4 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
-    app.router.add_route("GET", "/status", status)
     return app

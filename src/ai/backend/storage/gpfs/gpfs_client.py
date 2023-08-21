@@ -206,6 +206,7 @@ class GPFSAPIClient:
                 f"/filesystems/{fs_name}/filesets/{fileset_name}/quotas?{query}",
             )
             data = await response.json()
+            log.debug("response: {}", data)
         return [GPFSQuota.from_dict(quota_info) for quota_info in data["quotas"]]
 
     @error_handler

@@ -42,6 +42,7 @@ from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
+from .types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -315,6 +316,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     async def list_files(self, path: str):
         raise NotImplementedError
 
+    @abstractmethod
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
+
+    async def ping(self) -> dict[str, float] | None:
+        assert self.runner is not None
+        return await self.runner.ping()
+
     async def execute(
         self,
         run_id: Optional[str],
@@ -374,6 +383,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
+    status_queue_lock: asyncio.Lock
     output_queue: Optional[asyncio.Queue[ResultRecord]]
     current_run_id: Optional[str]
     pending_queues: OrderedDict[str, Tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
@@ -411,6 +421,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
+        self.status_queue_lock = asyncio.Lock()
         self.output_queue = None
         self.pending_queues = OrderedDict()
         self.current_run_id = None
@@ -503,6 +514,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except Exception:
             log.exception("AbstractCodeRunner.close(): unexpected error")
 
+    async def ping(self) -> dict[str, float] | None:
+        try:
+            return await self.feed_and_get_status()
+        except Exception:
+            log.exception("AbstractCodeRunner.ping(): unexpected error")
+            return None
+
     async def ping_status(self):
         """
         This is to keep the REPL in/out port mapping in the Linux
@@ -560,21 +578,32 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"input", text.encode("utf8")])
 
+    async def feed_event(self, evdata: AgentEventData):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        data = {
+            "type": evdata.type,
+            "data": evdata.data,
+        }
+        await self.input_sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
+
     async def feed_interrupt(self):
         if self.input_sock.closed:
             raise asyncio.CancelledError
         await self.input_sock.send_multipart([b"interrupt", b""])
 
-    async def feed_and_get_status(self):
+    async def feed_and_get_status(self) -> dict[str, float] | None:
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"status", b""])
-        try:
-            result = await self.status_queue.get()
-            self.status_queue.task_done()
-            return msgpack.unpackb(result)
-        except asyncio.CancelledError:
-            return None
+
+        async with self.status_queue_lock:
+            await self.input_sock.send_multipart([b"status", b""])
+            try:
+                result = await self.status_queue.get()
+                self.status_queue.task_done()
+                return msgpack.unpackb(result)
+            except asyncio.CancelledError:
+                return None
 
     async def feed_and_get_completion(self, code_text, opts):
         if self.input_sock.closed:

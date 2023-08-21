@@ -3,8 +3,9 @@ import logging
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -39,24 +40,28 @@ class GPFSQuotaModel(BaseQuotaModel):
 
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
-        config: Optional[QuotaConfig] = None,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
             self.fs,
-            quota_scope_id,
+            quota_scope_id.pathname,
             path=qspath,
             owner=self.gpfs_owner,
         )
-        if config is not None:
-            await self.update_quota_scope(quota_scope_id, config)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
 
-    async def update_quota_scope(self, quota_scope_id: str, config: QuotaConfig) -> None:
-        await self.api_client.set_quota(self.fs, quota_scope_id, config.limit_bytes)
+    async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
+        await self.api_client.set_quota(self.fs, quota_scope_id.pathname, config.limit_bytes)
 
-    async def describe_quota_scope(self, quota_scope_id: str) -> QuotaUsage:
-        quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id)
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+        if not self.mangle_qspath(quota_scope_id).exists():
+            return None
+
+        quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id.pathname)
         custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
         if len(custom_defined_quotas) == 0:
             return QuotaUsage(-1, -1)
@@ -67,8 +72,11 @@ class GPFSQuotaModel(BaseQuotaModel):
             limit_bytes=quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1,
         )
 
-    async def delete_quota_scope(self, quota_scope_id: str) -> None:
-        await self.api_client.remove_fileset(self.fs, quota_scope_id)
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
+        await self.api_client.remove_quota(self.fs, quota_scope_id.pathname)
+
+    async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
+        await self.api_client.remove_fileset(self.fs, quota_scope_id.pathname)
 
 
 class GPFSOpModel(BaseFSOpModel):
@@ -106,9 +114,10 @@ class GPFSVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, options=options)
+        super().__init__(local_config, mount_path, etcd=etcd, options=options)
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
         self.api_client = GPFSAPIClient(
             self.config["gpfs_endpoint"],
@@ -182,7 +191,10 @@ class GPFSVolume(BaseVolume):
                 continue
             total += pool.totalDataInKB
             free += pool.freeDataInKB
-        return CapacityUsage(BinarySize(total), BinarySize(total - free))
+        return CapacityUsage(
+            used_bytes=BinarySize(total - free) * 1024,
+            capacity_bytes=BinarySize(total) * 1024,
+        )
 
     async def get_performance_metric(self) -> FSPerfMetric:
         # ref: https://www.ibm.com/docs/en/spectrum-scale/5.0.3?topic=2-perfmondata-get

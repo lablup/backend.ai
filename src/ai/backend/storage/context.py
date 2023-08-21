@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
@@ -12,6 +16,7 @@ from .cephfs import CephFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
+from .kmanila import KManilaFSVolume
 from .netapp import NetAppVolume
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
@@ -28,11 +33,13 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "dellemc-onefs": DellEMCOneFSVolume,
     "weka": WekaVolume,
     "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
+    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
     "cephfs": CephFSVolume,
+    "kmanila": KManilaFSVolume,
 }
 
 
-class Context:
+class BaseContext:
     __slots__ = ("pid", "etcd", "local_config", "dsn")
 
     pid: int
@@ -67,9 +74,31 @@ class Context:
             local_config=self.local_config,
             mount_path=Path(volume_config["path"]),
             options=volume_config["options"] or {},
+            etcd=self.etcd,
         )
         await volume_obj.init()
         try:
             yield volume_obj
         finally:
             await volume_obj.shutdown()
+
+
+class Context(BaseContext):
+    __slots__ = ("pid", "etcd", "local_config", "dsn", "event_producer", "event_dispatcher")
+
+    event_producer: EventProducer
+    event_dispatcher: EventDispatcher
+
+    def __init__(
+        self,
+        pid: int,
+        local_config: Mapping[str, Any],
+        etcd: AsyncEtcd,
+        event_producer: EventProducer,
+        event_dispatcher: EventDispatcher,
+        *,
+        dsn: str | None = None,
+    ) -> None:
+        super().__init__(pid, local_config, etcd, dsn=dsn)
+        self.event_producer = event_producer
+        self.event_dispatcher = event_dispatcher

@@ -59,7 +59,7 @@ from ai.backend.manager.utils import query_userinfo
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
-from ..defs import LockID
+from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentStatus,
@@ -600,7 +600,7 @@ class SchedulerDispatcher(aobject):
         requested_architectures = set(k.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architectureon single node session",
+                "Cannot assign multiple kernels with different architectures' single node session",
             )
         requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
@@ -610,7 +610,7 @@ class SchedulerDispatcher(aobject):
             if not compatible_candidate_agents:
                 raise InstanceNotAvailable(
                     extra_msg=(
-                        "No agents found to be compatible with the image acrhitecture "
+                        "No agents found to be compatible with the image architecture "
                         f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
                         f"arch: {requested_architecture})"
                     ),
@@ -719,38 +719,42 @@ class SchedulerDispatcher(aobject):
             raise
 
         async def _finalize_scheduled() -> None:
+            agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 now = datetime.now(tzutc())
-                kernel_query = (
-                    sa.update(KernelRow)
-                    .values(
-                        agent=agent_alloc_ctx.agent_id,
-                        agent_addr=agent_alloc_ctx.agent_addr,
-                        scaling_group=sgroup_name,
-                        status=KernelStatus.SCHEDULED,
-                        status_info="scheduled",
-                        status_data={},
-                        status_changed=now,
-                        status_history=sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                KernelStatus.SCHEDULED.name: now.isoformat(),
-                            },
-                        ),
+                for kernel in sess_ctx.kernels:
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .values(
+                            agent=agent_alloc_ctx.agent_id,
+                            agent_addr=agent_alloc_ctx.agent_addr,
+                            scaling_group=sgroup_name,
+                            status=KernelStatus.SCHEDULED,
+                            status_info="scheduled",
+                            status_data={},
+                            status_changed=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.SCHEDULED.name: now.isoformat(),
+                                },
+                            ),
+                        )
+                        .where(KernelRow.id == kernel.id)
                     )
-                    .where(KernelRow.session_id == sess_ctx.id)
-                )
-                await db_sess.execute(kernel_query)
+                    await db_sess.execute(kernel_query)
+                if agent_alloc_ctx.agent_id is not None:
+                    agent_ids.append(agent_alloc_ctx.agent_id)
 
                 session_query = (
                     sa.update(SessionRow)
                     .values(
                         scaling_group_name=sgroup_name,
+                        agent_ids=agent_ids,
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        # status_changed=now,
                         status_history=sql_json_merge(
                             SessionRow.status_history,
                             (),
@@ -822,7 +826,7 @@ class SchedulerDispatcher(aobject):
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
-                                    "No agents found to be compatible with the image acrhitecture "
+                                    "No agents found to be compatible with the image architecture "
                                     f"(image: {kernel.image_ref}, "
                                     f"arch: {kernel.architecture})"
                                 ),
@@ -922,6 +926,7 @@ class SchedulerDispatcher(aobject):
         # Proceed to PREPARING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
+            agent_ids: list[AgentId] = []
             async with self.db.begin_session() as db_sess:
                 for binding in kernel_agent_bindings:
                     now = datetime.now(tzutc())
@@ -943,14 +948,17 @@ class SchedulerDispatcher(aobject):
                                 },
                             ),
                         )
-                        .where(KernelRow.session_id == sess_ctx.id)
+                        .where(KernelRow.id == binding.kernel.id)
                     )
                     await db_sess.execute(kernel_query)
+                    if binding.agent_alloc_ctx.agent_id is not None:
+                        agent_ids.append(binding.agent_alloc_ctx.agent_id)
 
                 session_query = (
                     sa.update(SessionRow)
                     .values(
                         scaling_group_name=sgroup_name,
+                        agent_ids=agent_ids,
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
@@ -1090,6 +1098,7 @@ class SchedulerDispatcher(aobject):
         # Altering inference sessions should only be done by this method
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
+        endpoints_to_remove: set[EndpointRow] = set()
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
         # endpoints_to_flush = [
@@ -1101,17 +1110,24 @@ class SchedulerDispatcher(aobject):
         #     query = sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoints_to_flush))
         #     await session.execute(query)
         for endpoint in endpoints:
+            non_error_routings = [
+                r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
+            ]
             desired_session_count = endpoint.desired_session_count
             if desired_session_count < 0:
                 desired_session_count = 0
-            if len(endpoint.routings) > desired_session_count:
+                if len(endpoint.routings) == 0:
+                    endpoints_to_remove.add(endpoint)
+                    continue
+
+            if len(non_error_routings) > desired_session_count:
                 # We need to scale down!
-                destroy_count = len(endpoint.routings) - desired_session_count
+                destroy_count = len(non_error_routings) - desired_session_count
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
-                            for route in endpoint.routings
+                            for route in non_error_routings
                             if (
                                 route.status != RouteStatus.PROVISIONING
                                 and route.status != RouteStatus.TERMINATING
@@ -1123,17 +1139,19 @@ class SchedulerDispatcher(aobject):
                 log.debug(
                     "Shrinking {} from {} to {}",
                     endpoint.name,
-                    len(endpoint.routings),
+                    len(non_error_routings),
                     endpoint.desired_session_count,
                 )
-            elif len(endpoint.routings) < desired_session_count:
+            elif len(non_error_routings) < desired_session_count:
+                if endpoint.retries > SERVICE_MAX_RETRIES:
+                    continue
                 # We need to scale up!
-                create_count = desired_session_count - len(endpoint.routings)
+                create_count = desired_session_count - len(non_error_routings)
                 endpoints_to_expand[endpoint] = create_count
                 log.debug(
                     "Expanding {} from {} to {}",
                     endpoint.name,
-                    len(endpoint.routings),
+                    len(non_error_routings),
                     endpoint.desired_session_count,
                 )
 
@@ -1249,6 +1267,12 @@ class SchedulerDispatcher(aobject):
                 except Exception:
                     # TODO: Handle
                     log.exception("error while creating session:")
+
+        async with self.db.begin_session() as sess:
+            query = sa.delete(EndpointRow).where(
+                EndpointRow.id.in_([e.id for e in endpoints_to_remove])
+            )
+            await sess.execute(query)
 
     async def start_session(
         self,

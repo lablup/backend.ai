@@ -425,7 +425,7 @@ async def check_password_age(
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
-    Fetches user information and sets up keypair, uesr, and is_authorized
+    Fetches user information and sets up keypair, user, and is_authorized
     attributes.
     """
     # This is a global middleware: request.app is the root app.
@@ -570,6 +570,7 @@ def auth_required(handler):
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "user")
     return wrapped
 
 
@@ -581,6 +582,7 @@ def admin_required(handler):
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "admin")
     return wrapped
 
 
@@ -592,6 +594,7 @@ def superadmin_required(handler):
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "superadmin")
     return wrapped
 
 
@@ -802,10 +805,14 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             "status_info": "user-signup",
             "role": UserRole.USER,
             "integration_id": None,
+            "resource_policy": "default",
         }
         if user_data_overriden:
             for key, val in user_data_overriden.items():
-                if key in data:  # take only valid fields
+                if (
+                    key in data  # take only valid fields
+                    and key != "resource_policy"  # resource_policy in user_data is for keypair
+                ):
                     data[key] = val
         query = users.insert().values(data)
         result = await conn.execute(query)

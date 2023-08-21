@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
 from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.config import load_local_config
 from ai.backend.storage.types import VFolderID
@@ -29,6 +31,17 @@ def local_volume(vfroot) -> Iterator[Path]:
     volume = vfroot / "local"
     volume.mkdir(parents=True, exist_ok=True)
     yield volume
+
+
+@pytest.fixture
+def mock_etcd() -> Iterator[AsyncEtcd]:
+    yield AsyncEtcd(
+        addr=HostPortPair("", 0),
+        namespace="",
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "",
+        },
+    )
 
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:
@@ -53,7 +66,7 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
         "xfs",
     ]
 )
-async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
+async def volume(request, local_volume, mock_etcd) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
     backend_options = {}
     volume_path = local_volume
@@ -101,6 +114,7 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
             },
         },
         volume_path,
+        etcd=mock_etcd,
         options=backend_options,
     )
     await volume.init()
@@ -112,7 +126,7 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
 
 @pytest.fixture
 async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
-    qsid = f"testing-qs-{secrets.token_hex(16)}-0"
+    qsid = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     vfid = VFolderID(qsid, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qsid)
     await volume.create_vfolder(vfid)
