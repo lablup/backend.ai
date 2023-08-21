@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+import json
 import logging
 import uuid
 from contextvars import ContextVar
@@ -23,10 +24,12 @@ import aiotools
 import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
+from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -48,6 +51,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ResourceSlot,
+    SchedulerStatus,
     SessionId,
     SessionTypes,
     aobject,
@@ -58,6 +62,7 @@ from ai.backend.manager.types import DistributedLockFactory, UserScope
 from ai.backend.manager.utils import query_userinfo
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
+from ...common.defs import REDIS_LIVE_DB
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
@@ -164,6 +169,10 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
+        self.redis_live = redis_helper.get_redis_object(
+            self.shared_config.data["redis"],
+            db=REDIS_LIVE_DB,
+        )
 
     async def __ainit__(self) -> None:
         coalescing_opts: CoalescingOptions = {
@@ -212,6 +221,7 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.scale_timer.leave())
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
+        await self.redis_live.close()
         log.info("Session scheduler stopped")
 
     async def schedule(
@@ -232,13 +242,17 @@ class SchedulerDispatcher(aobject):
         """
         log.debug("schedule(): triggered")
         manager_id = self.local_config["manager"]["id"]
-        await self.shared_config.etcd.put_prefix(
-            f"manager/{manager_id}/schedule",
-            {
-                "trigger-event": event.__class__.name,
-                "execution-time": datetime.now(tzutc()).isoformat(),
-            },
-        )
+        schedule_status: SchedulerStatus = {
+            "trigger_event": event.__class__.name,
+            "execution_time": datetime.now(tzutc()).isoformat(),
+        }
+
+        async def _pipeline(r: Redis):
+            pipe = r.pipeline()
+            pipe.hset(f"manager.{manager_id}", "schedule", json.dumps(schedule_status))
+            return pipe
+
+        await redis_helper.execute(self.redis_live, _pipeline)
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -267,13 +281,9 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                        await self.shared_config.etcd.put_prefix(
-                            f"manager/{manager_id}/schedule",
-                            {
-                                "resource-group": sgroup_name,
-                                "finish-time": datetime.now(tzutc()).isoformat(),
-                            },
-                        )
+                        schedule_status["resource_group"] = sgroup_name
+                        schedule_status["finish_time"] = datetime.now(tzutc()).isoformat()
+                        await redis_helper.execute(self.redis_live, _pipeline)
                     except InstanceNotAvailable as e:
                         # Proceed to the next scaling group and come back later.
                         log.debug(
@@ -1008,13 +1018,17 @@ class SchedulerDispatcher(aobject):
         Session status transition: SCHEDULED -> PREPARING
         """
         manager_id = self.local_config["manager"]["id"]
-        await self.shared_config.etcd.put_prefix(
-            f"manager/{manager_id}/prepare",
-            {
-                "trigger-event": event.__class__.name,
-                "execution-time": datetime.now(tzutc()).isoformat(),
-            },
-        )
+        prepare_status: SchedulerStatus = {
+            "trigger_event": event.__class__.name,
+            "execution_time": datetime.now(tzutc()).isoformat(),
+        }
+
+        async def _pipeline(r: Redis):
+            pipe = r.pipeline()
+            pipe.hset(f"manager.{manager_id}", "prepare", json.dumps(prepare_status))
+            return pipe
+
+        await redis_helper.execute(self.redis_live, _pipeline)
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             self.registry,
@@ -1099,14 +1113,10 @@ class SchedulerDispatcher(aobject):
                                 scheduled_session,
                             )
                         )
-                        await self.shared_config.etcd.put(
-                            f"manager/{manager_id}/prepare/resource-group",
-                            scheduled_session.scaling_group_name,
-                        )
-            await self.shared_config.etcd.put(
-                f"manager/{manager_id}/prepare/finish-time",
-                datetime.now(tzutc()).isoformat(),
-            )
+                        prepare_status["resource_group"] = scheduled_session.scaling_group_name
+                        await redis_helper.execute(self.redis_live, _pipeline)
+            prepare_status["finish_time"] = datetime.now(tzutc()).isoformat()
+            await redis_helper.execute(self.redis_live, _pipeline)
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
@@ -1127,13 +1137,17 @@ class SchedulerDispatcher(aobject):
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by this method
         manager_id = self.local_config["manager"]["id"]
-        await self.shared_config.etcd.put_prefix(
-            f"manager/{manager_id}/scale",
-            {
-                "trigger-event": event.__class__.name,
-                "execution-time": datetime.now(tzutc()).isoformat(),
-            },
-        )
+        scale_status: SchedulerStatus = {
+            "trigger_event": event.__class__.name,
+            "execution_time": datetime.now(tzutc()).isoformat(),
+        }
+
+        async def _pipeline(r: Redis):
+            pipe = r.pipeline()
+            pipe.hset(f"manager.{manager_id}", "scale", json.dumps(scale_status))
+            return pipe
+
+        await redis_helper.execute(self.redis_live, _pipeline)
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_remove: set[EndpointRow] = set()
@@ -1208,16 +1222,15 @@ class SchedulerDispatcher(aobject):
             result = await db_session.execute(query)
             target_sessions_to_destory = result.scalars().all()
         # TODO: Update logic to not to wait for sessions to actually terminate
-        await self.shared_config.etcd.put(f"manager/{manager_id}/scale/action", "down")
         for session in target_sessions_to_destory:
             await self.registry.destroy_session(
                 session,
                 forced=False,
                 reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
             )
-            await self.shared_config.etcd.put(
-                f"manager/{manager_id}/scale/endpoint-name", session.routing.endpoint_row.name
-            )
+            scale_status["action"] = "down"
+            scale_status["endpoint_name"] = session.routing.endpoint_row.name
+            await redis_helper.execute(self.redis_live, _pipeline)
 
         user_ids = tuple(
             {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
@@ -1255,12 +1268,11 @@ class SchedulerDispatcher(aobject):
             keypair_resource_policy_name_policy_mapping = {
                 row.name: row for row in result.fetchall()
             }
-        await self.shared_config.etcd.put(f"manager/{manager_id}/scale/action", "up")
         for endpoint, expand_count in endpoints_to_expand.items():
             log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
-            await self.shared_config.etcd.put(
-                f"manager/{manager_id}/scale/endpoint-name", endpoint.name
-            )
+            scale_status["action"] = "up"
+            scale_status["endpoint_name"] = endpoint.name
+            await redis_helper.execute(self.redis_live, _pipeline)
             async with self.db.begin_readonly() as conn:
                 _, group_id, resource_policy = await query_userinfo(
                     conn,
@@ -1312,10 +1324,8 @@ class SchedulerDispatcher(aobject):
                 except Exception:
                     # TODO: Handle
                     log.exception("error while creating session:")
-        await self.shared_config.etcd.put(
-            f"manager/{manager_id}/scale/finish-time",
-            datetime.now(tzutc()).isoformat(),
-        )
+        scale_status["finish_time"] = datetime.now(tzutc()).isoformat()
+        await redis_helper.execute(self.redis_live, _pipeline)
 
         async with self.db.begin_session() as sess:
             query = sa.delete(EndpointRow).where(

@@ -16,6 +16,7 @@ import trafaret as t
 from aiohttp import web
 from aiotools import aclosing
 
+from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEvent
 from ai.backend.common.logging import BraceStyleAdapter
@@ -269,12 +270,17 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     manager_id = root_ctx.local_config["manager"]["id"]
-    data = dict(await root_ctx.shared_config.etcd.get_prefix(f"manager/{manager_id}"))
-    await root_ctx.event_producer.produce_event(DoScheduleEvent())
-    if not data:
-        return web.json_response({manager_id: "empty"})
-    else:
-        return web.json_response(data)
+
+    scheduler_status = await redis_helper.execute(
+        root_ctx.redis_live,
+        lambda r: r.hgetall(f"manager.{manager_id}"),
+        encoding="utf-8",
+    )
+    if not scheduler_status:
+        return web.json_response({f"manager.{manager_id}": "empty"})
+    for method_name, status_json in scheduler_status.items():
+        scheduler_status[method_name] = json.loads(status_json)
+    return web.json_response(scheduler_status)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

@@ -22,6 +22,7 @@ from typing import (
     Literal,
     Mapping,
     NewType,
+    NotRequired,
     Optional,
     Sequence,
     Tuple,
@@ -1125,3 +1126,12 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class SchedulerStatus(TypedDict):
+    trigger_event: str
+    execution_time: str
+    finish_time: NotRequired[str]
+    resource_group: NotRequired[str]
+    endpoint_name: NotRequired[str]
+    action: NotRequired[str]
