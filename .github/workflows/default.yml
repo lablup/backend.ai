@@ -44,7 +44,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./.github/workflows/init-pants
+      uses: ./actions/init-pants
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
@@ -113,7 +113,7 @@ jobs:
         super_secret: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.PANTS_REMOTE_CACHE_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./.github/workflows/init-pants
+      uses: ./actions/init-pants
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
@@ -186,7 +186,7 @@ jobs:
         super_secret: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.PANTS_REMOTE_CACHE_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: ./.github/workflows/init-pants
+      uses: ./actions/init-pants
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
