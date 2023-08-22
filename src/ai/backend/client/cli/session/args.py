@@ -8,7 +8,7 @@ START_OPTION = [
         "--name",
         "--client-token",
         metavar="NAME",
-        help="Specify a human-readable session name. " "If not set, a random hex string is used.",
+        help="Specify a human-readable session name. If not set, a random hex string is used.",
     ),
     # job scheduling options
     click.option(
@@ -70,20 +70,24 @@ START_OPTION = [
         metavar="NAME[=PATH]",
         type=str,
         multiple=True,
-        help="User-owned virtual folder names to mount. "
-        "If path is not provided, virtual folder will be mounted under /home/work. "
-        "When the target path is relative, it is placed under /home/work "
-        "with auto-created parent directories if any. "
-        "Absolute paths are mounted as-is, but it is prohibited to "
-        "override the predefined Linux system directories.",
+        help=(
+            "User-owned virtual folder names to mount. "
+            "If path is not provided, virtual folder will be mounted under /home/work. "
+            "When the target path is relative, it is placed under /home/work "
+            "with auto-created parent directories if any. "
+            "Absolute paths are mounted as-is, but it is prohibited to "
+            "override the predefined Linux system directories."
+        ),
     ),
     click.option(
         "--scaling-group",
         "--sgroup",
         type=str,
         default=None,
-        help="The scaling group to execute session. If not specified, "
-        "all available scaling groups are included in the scheduling.",
+        help=(
+            "The scaling group to execute session. If not specified, "
+            "all available scaling groups are included in the scheduling."
+        ),
     ),
     click.option(
         "-r",
@@ -91,10 +95,12 @@ START_OPTION = [
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Set computation resources used by the session "
-        "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
-        "1 slot of cpu/gpu represents 1 core. "
-        "The unit of mem(ory) is MiB.",
+        help=(
+            "Set computation resources used by the session "
+            "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
+            "1 slot of cpu/gpu represents 1 core. "
+            "The unit of mem(ory) is MiB."
+        ),
     ),
     click.option(
         "--cluster-size",
@@ -108,7 +114,7 @@ START_OPTION = [
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Resource options for creating compute session " "(e.g: shmem=64m)",
+        help="Resource options for creating compute session (e.g: shmem=64m)",
     ),
     # resource grouping
     click.option(
@@ -116,16 +122,20 @@ START_OPTION = [
         "--domain",
         metavar="DOMAIN_NAME",
         default=None,
-        help="Domain name where the session will be spawned. "
-        "If not specified, config's domain name will be used.",
+        help=(
+            "Domain name where the session will be spawned. "
+            "If not specified, config's domain name will be used."
+        ),
     ),
     click.option(
         "-g",
         "--group",
         metavar="GROUP_NAME",
         default=None,
-        help="Group name where the session is spawned. "
-        "User should be a member of the group to execute the code.",
+        help=(
+            "Group name where the session is spawned. "
+            "User should be a member of the group to execute the code."
+        ),
     ),
 ]
 
