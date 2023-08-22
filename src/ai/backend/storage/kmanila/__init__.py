@@ -99,7 +99,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             }
             headers = {"Accept": "application/json"}
             async with sess.post(
-                self.api_base_url / "d3/identity/auth/tokens", headers=headers, json=request_body
+                self.api_base_url / "identity/auth/tokens", headers=headers, json=request_body
             ) as resp:
                 token = resp.headers.get("X-Subject-Token")
                 if token is None:
@@ -133,16 +133,34 @@ class KManilaQuotaModel(BaseQuotaModel):
         *,
         do_hard_check: bool = True,
     ) -> VolumeId | None:
-        if (vol_id := await self.get_user_volume_id(quota_scope_id)) is not None:
-            if not do_hard_check:
-                return vol_id
+        if (vol_id := await self.get_user_volume_id(quota_scope_id)) is None:
+            return None
+        if not do_hard_check:
+            return VolumeId(vol_id)
         project_id = auth_info["project_id"]
-        async with session.get(f"/d3/adm/manila/v2/{project_id}/shares/{vol_id}") as resp:
+        async with session.get(f"/d3/nas/{project_id}/shares/{vol_id}") as resp:
             if resp.status == 200:
                 volume_info = (await resp.json())["share"]
                 return VolumeId(volume_info["id"])
             elif resp.status // 100 == 5:
                 raise ExternalError("Cannot get data from API server")
+        return None
+
+    async def fetch_volume_info(
+        self, session: aiohttp.ClientSession, volume_id: VolumeId, auth_info: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        project_id = auth_info["project_id"]
+        async with session.get(f"/d3/nas/{project_id}/shares/{volume_id}") as resp:
+            if resp.status == 200:
+                return await resp.json()
+            elif resp.status // 100 == 4:
+                raise ValueError(
+                    f"Cannot get data from API server. {resp.status = }, {resp.url = }"
+                )
+            elif resp.status // 100 == 5:
+                # If there is no volume data with given volume id, the Kmanila server returns 500 status
+                log.info(f"Volume info not found. (id: {volume_id})")
+                return None
         return None
 
     async def _create_volume(
@@ -168,19 +186,20 @@ class KManilaQuotaModel(BaseQuotaModel):
                 "share_type": self.share_type,
             }
         }
-        async with session.post(url=f"/{project_id}/shares", json=request_body) as resp:
+        async with session.post(url=f"/d3/nas/{project_id}/shares", json=request_body) as resp:
             if resp.status not in (200, 201, 204):
                 raise ExternalError(
                     f"Got invalid status code when post data to API server. {resp.status = }"
                 )
+            body = await resp.json()
+            volume_creation_info = body["share"]
+            volume_id = VolumeId(volume_creation_info["id"])
 
         # Poll creation complete
         trial = 1
         while True:
             log.debug(f"Poll if the volume has been created, {trial = }")
-            if (
-                volume_id := await self.get_volume_id(session, quota_scope_id, project_id)
-            ) is not None:
+            if (await self.fetch_volume_info(session, volume_id, auth_info)) is not None:
                 await self.put_user_volume_id(
                     quota_scope_id, QuotaVolumeMap(volume_id=volume_id, volume_name=name)
                 )
@@ -205,12 +224,16 @@ class KManilaQuotaModel(BaseQuotaModel):
         """
 
         project_id = auth_info["project_id"]
+
+        # Check the access control already exists with the given volume id.
         async with session.post(
-            url=f"/{project_id}/shares/{volume_id}/action",
+            url=f"/d3/nas/{project_id}/shares/{volume_id}/action",
             json={
                 "os-access_list": None,
             },
         ) as resp:
+            if resp.status != 200:
+                raise ExternalError(f"Unable to fetch access control data. {resp.status = }")
             result = await resp.json()
             access_list: list[dict[str, Any]] = result["access_list"]
             log_items = [
@@ -228,10 +251,16 @@ class KManilaQuotaModel(BaseQuotaModel):
                 "access_to": self.access_to,
             }
         }
+
+        # Should wait before create access control
+        # Else, we get status code 500
+        await asyncio.sleep(5)
         async with session.post(
-            f"/{project_id}/shares/{volume_id}/action",
+            f"/d3/nas/{project_id}/shares/{volume_id}/action",
             json=request_data,
         ) as resp:
+            if resp.status != 200:
+                raise ExternalError(f"Unable to create access control. {resp.status = }")
             return True
 
     async def create_quota_scope(
