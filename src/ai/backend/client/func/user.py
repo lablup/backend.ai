@@ -26,11 +26,15 @@ _default_list_fields = (
     user_fields["role"],
     user_fields["username"],
     user_fields["email"],
+    user_fields["need_password_change"],
+    user_fields["status"],
+    user_fields["status_info"],
     user_fields["is_active"],
     user_fields["created_at"],
     user_fields["domain_name"],
     user_fields["groups"],
     user_fields["allowed_client_ip"],
+    user_fields["totp_activated"],
 )
 
 _default_detail_fields = (
@@ -45,6 +49,7 @@ _default_detail_fields = (
     user_fields["role"],
     user_fields["groups"],
     user_fields["allowed_client_ip"],
+    user_fields["totp_activated"],
 )
 
 
@@ -126,13 +131,11 @@ class User(BaseFunction):
         :param group: Fetch users in a specific group.
         :param fields: Additional per-user query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             query($status: String, $group: UUID) {
                 users(status: $status, group_id: $group) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "status": status,
@@ -190,21 +193,17 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if email is None:
-            query = textwrap.dedent(
-                """\
+            query = textwrap.dedent("""\
                 query {
                     user {$fields}
                 }
-            """
-            )
+            """)
         else:
-            query = textwrap.dedent(
-                """\
+            query = textwrap.dedent("""\
                 query($email: String) {
                     user(email: $email) {$fields}
                 }
-            """
-            )
+            """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables if email is not None else None)
@@ -225,21 +224,17 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if user_uuid is None:
-            query = textwrap.dedent(
-                """\
+            query = textwrap.dedent("""\
                 query {
                     user {$fields}
                 }
-            """
-            )
+            """)
         else:
-            query = textwrap.dedent(
-                """\
+            query = textwrap.dedent("""\
                 query($user_id: ID) {
                     user_from_uuid(user_id: $user_id) {$fields}
                 }
-            """
-            )
+            """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"user_id": str(user_uuid)}
         data = await api_session.get().Admin._query(
@@ -261,6 +256,7 @@ class User(BaseFunction):
         need_password_change: bool = False,
         description: str = "",
         allowed_client_ip: Iterable[str] = None,
+        totp_activated: bool = False,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -268,15 +264,13 @@ class User(BaseFunction):
         Creates a new user with the given options.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($email: String!, $input: UserInput!) {
                 create_user(email: $email, props: $input) {
                     ok msg user {$fields}
                 }
             }
-        """
-        )
+        """)
         default_fields = (
             user_fields["domain_name"],
             user_fields["email"],
@@ -296,6 +290,7 @@ class User(BaseFunction):
                 "need_password_change": need_password_change,
                 "description": description,
                 "domain_name": domain_name,
+                "totp_activated": totp_activated,
                 "group_ids": group_ids,
                 "allowed_client_ip": allowed_client_ip,
             },
@@ -317,6 +312,7 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         allowed_client_ip: Iterable[str] = None,
+        totp_activated: bool = False,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -324,15 +320,13 @@ class User(BaseFunction):
         Update existing user.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($email: String!, $input: ModifyUserInput!) {
                 modify_user(email: $email, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "email": email,
             "input": {
@@ -345,6 +339,7 @@ class User(BaseFunction):
                 "need_password_change": need_password_change,
                 "description": description,
                 "allowed_client_ip": allowed_client_ip,
+                "totp_activated": totp_activated,
                 "group_ids": group_ids,
             },
         }
@@ -357,15 +352,13 @@ class User(BaseFunction):
         """
         Inactivates an existing user.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($email: String!) {
                 delete_user(email: $email) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_user"]
@@ -380,15 +373,13 @@ class User(BaseFunction):
         Shared virtual folder's ownership will be transferred to the requested admin.
         To delete shared folders as well, set ``purge_shared_vfolders`` to ``True``.
         """
-        query = textwrap.dedent(
-            """\
+        query = textwrap.dedent("""\
             mutation($email: String!, $input: PurgeUserInput!) {
                 purge_user(email: $email, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {
             "email": email,
             "input": {

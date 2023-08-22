@@ -82,7 +82,7 @@ common_image_label_schema = t.Dict(
         t.Key("ai.backend.runtime-type"): t.String(),
         t.Key("ai.backend.runtime-path"): tx.PurePath(),
         # Optional labels
-        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE"),
+        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
         t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
@@ -175,9 +175,7 @@ async def login(
         log.debug("docker-registry: {0} -> basic-auth", registry_url)
         return {"auth": basic_auth, "headers": {}}
     elif ping_status == 404:
-        raise RuntimeError(
-            f"Unsupported docker registry: {registry_url}! " "(API v2 not implemented)"
-        )
+        raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
     elif ping_status == 401:
         params = {
             "scope": scope,
@@ -196,7 +194,7 @@ async def login(
                         "Authorization": f"Bearer {token}",
                     },
                 }
-    raise RuntimeError("authentication for docker registry " f"{registry_url} failed")
+    raise RuntimeError(f"authentication for docker registry {registry_url} failed")
 
 
 async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
@@ -249,7 +247,10 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
     common_labels = common_image_label_schema.check(labels)
     service_ports = {
         item["name"]: item
-        for item in parse_service_ports(common_labels.get("ai.backend.service-ports", ""))
+        for item in parse_service_ports(
+            common_labels.get("ai.backend.service-ports", ""),
+            common_labels.get("ai.backend.endpoint-ports", ""),
+        )
     }
     match common_labels["ai.backend.role"]:
         case "INFERENCE":
@@ -270,7 +271,6 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
 
 
 class PlatformTagSet(Mapping):
-
     __slots__ = ("_data",)
     _data: Dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")

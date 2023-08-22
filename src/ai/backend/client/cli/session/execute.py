@@ -280,8 +280,10 @@ def prepare_mount_arg(
     metavar="PATH",
     type=click.Path(),
     default=None,
-    help="Base directory path of uploaded files. "
-    "All uploaded files must reside inside this directory.",
+    help=(
+        "Base directory path of uploaded files. "
+        "All uploaded files must reside inside this directory."
+    ),
 )
 # extra options
 @click.option(
@@ -294,13 +296,13 @@ def prepare_mount_arg(
 @click.option(
     "--rm",
     is_flag=True,
-    help="Terminate the session immediately after running " "the given code or files",
+    help="Terminate the session immediately after running the given code or files",
 )
 @click.option(
     "-s",
     "--stats",
     is_flag=True,
-    help="Show resource usage statistics after termination " '(only works if "--rm" is given)',
+    help='Show resource usage statistics after termination (only works if "--rm" is given)',
 )
 @click.option(
     "-q",
@@ -350,7 +352,7 @@ def prepare_mount_arg(
     metavar="KEY=VAL",
     type=str,
     multiple=True,
-    help="Resource options for creating compute session. " "(e.g: shmem=64m)",
+    help="Resource options for creating compute session. (e.g: shmem=64m)",
 )
 @click.option(
     "--arch",
@@ -367,9 +369,11 @@ def prepare_mount_arg(
     "--assign-agent",
     default=None,
     type=list_expr,
-    help="Show mapping list of tuple which mapped containers with agent. "
-    "When user role is Super Admin. "
-    "(e.g., --assign-agent agent_id_1,agent_id_2,...)",
+    help=(
+        "Show mapping list of tuple which mapped containers with agent. "
+        "When user role is Super Admin. "
+        "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
+    ),
 )
 @click_start_option()
 def run(
@@ -427,9 +431,7 @@ def run(
         vprint_wait = print_wait
         vprint_done = print_done
     if files and code:
-        print(
-            "You can run only either source files or command-line " "code snippet.", file=sys.stderr
-        )
+        print("You can run only either source files or command-line code snippet.", file=sys.stderr)
         sys.exit(ExitCode.INVALID_ARGUMENT)
     if not files and not code:
         print(
@@ -492,7 +494,7 @@ def run(
     if is_multi:
         if max_parallel <= 0:
             print(
-                "The number maximum parallel sessions must be " "a positive integer.",
+                "The number maximum parallel sessions must be a positive integer.",
                 file=sys.stderr,
             )
             sys.exit(ExitCode.INVALID_ARGUMENT)
@@ -585,7 +587,7 @@ def run(
                     )
             if terminal:
                 raise NotImplementedError(
-                    "Terminal access is not supported in " "the legacy synchronous mode."
+                    "Terminal access is not supported in the legacy synchronous mode."
                 )
             if code:
                 exec_loop_sync(

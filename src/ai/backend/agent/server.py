@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
-import json
 import logging
 import logging.config
 import os
@@ -22,6 +21,7 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
+    Iterable,
     Literal,
     Mapping,
     Optional,
@@ -47,7 +47,11 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
+from ai.backend.common.events import (
+    EventProducer,
+    KernelLifecycleEventReason,
+    KernelTerminatedEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -119,7 +123,7 @@ async def get_extra_volumes(docker, lang):
             mount_list.append(vol)
         else:
             log.info(
-                "skipped attaching extra volume {0} " "to a kernel based on image {1}",
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
                 vol.name,
                 lang,
             )
@@ -139,7 +143,6 @@ def collect_error(meth: Callable) -> Callable:
 
 
 class RPCFunctionRegistry:
-
     functions: Set[str]
 
     def __init__(self) -> None:
@@ -349,6 +352,39 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def sync_kernel_registry(
+        self,
+        raw_kernel_session_ids: Iterable[tuple[str, str]],
+    ) -> None:
+        kernel_session_ids = [
+            (KernelId(UUID(raw_kid)), SessionId(UUID(raw_sid)))
+            for raw_kid, raw_sid in raw_kernel_session_ids
+        ]
+        for kid, sid in kernel_session_ids:
+            if kid not in self.agent.kernel_registry:
+                # produce KernelTerminatedEvent
+                await self.agent.produce_event(
+                    KernelTerminatedEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    )
+                )
+
+        kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
+        for kid, kernel in self.agent.kernel_registry.items():
+            if kid not in kernel_ids:
+                # destroy kernel
+                await self.agent.inject_container_lifecycle_event(
+                    kid,
+                    kernel.session_id,
+                    LifecycleEvent.DESTROY,
+                    KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                    suppress_events=True,
+                )
+
+    @rpc_function
+    @collect_error
     async def create_kernels(
         self,
         raw_session_id: str,
@@ -360,6 +396,7 @@ class AgentRPCServer(aobject):
         session_id = SessionId(UUID(raw_session_id))
         raw_results = []
         coros = []
+        throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
             log.info(
                 "rpc::create_kernel(k:{0}, img:{1})",
@@ -374,6 +411,7 @@ class AgentRPCServer(aobject):
                     kernel_id,
                     kernel_config,
                     cluster_info,
+                    throttle_sema=throttle_sema,
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
@@ -407,6 +445,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
+        session_id: str,
         reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
@@ -415,6 +454,7 @@ class AgentRPCServer(aobject):
         log.info("rpc::destroy_kernel(k:{0})", kernel_id)
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
+            SessionId(UUID(session_id)),
             LifecycleEvent.DESTROY,
             reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
@@ -550,23 +590,6 @@ class AgentRPCServer(aobject):
             },
             "watcher": self.local_config["watcher"],
         }
-
-    @rpc_function
-    @collect_error
-    async def get_abusing_report(
-        self,
-        kernel_id,  # type: str
-    ) -> Mapping[str, str] | None:
-        if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
-            report_path = Path(abuse_path, f"report.{kernel_id}.json")
-            if report_path.is_file():
-
-                def _read_file():
-                    with open(report_path, "r") as file:
-                        return json.load(file)
-
-                return await self.loop.run_in_executor(None, _read_file)
-        return None
 
     @rpc_function
     @collect_error
@@ -790,7 +813,7 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. " "(default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
@@ -810,7 +833,6 @@ def main(
     log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
-
     # Delete this part when you remove --debug option
     if debug:
         click.echo("Please use --log-level options instead")
@@ -858,7 +880,7 @@ def main(
             pprint(cfg)
         cfg["_src"] = cfg_src_path
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
@@ -885,12 +907,10 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
-                    "ConfigurationError: "
-                    "Storing container coredumps is only supported in Linux.",
+                    "ConfigurationError: Storing container coredumps is only supported in Linux.",
                     file=sys.stderr,
                 )
                 raise click.Abort()

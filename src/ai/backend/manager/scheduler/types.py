@@ -396,7 +396,6 @@ class SchedulingPredicate(Protocol):
 
 
 class AbstractScheduler(metaclass=ABCMeta):
-
     """
     Interface for scheduling algorithms where the
     ``schedule()`` method is a pure function.

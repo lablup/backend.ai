@@ -47,7 +47,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
             if not line:
                 proxy_proc.wait()
                 print_fail(
-                    f"Unexpected early termination of the sshd app command "
+                    "Unexpected early termination of the sshd app command "
                     f"(exit: {proxy_proc.returncode}):"
                 )
                 print((b"\n".join(lines)).decode())

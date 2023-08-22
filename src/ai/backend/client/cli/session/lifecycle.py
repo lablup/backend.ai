@@ -46,7 +46,7 @@ def session():
 
 
 def _create_cmd(docs: str = None):
-    @click.argument("image", type=str)
+    @click.argument("image")
     @click.option(
         "-o",
         "--owner",
@@ -66,8 +66,10 @@ def _create_cmd(docs: str = None):
         metavar="SESSION_ID",
         type=str,
         multiple=True,
-        help="Set the list of session ID or names that the newly created session depends on. "
-        "The session will get scheduled after all of them successfully finish.",
+        help=(
+            "Set the list of session ID or names that the newly created session depends on. "
+            "The session will get scheduled after all of them successfully finish."
+        ),
     )
     # extra options
     @click.option(
@@ -103,9 +105,11 @@ def _create_cmd(docs: str = None):
         "--assign-agent",
         default=None,
         type=list_expr,
-        help="Show mapping list of tuple which mapped containers with agent. "
-        "When user role is Super Admin. "
-        "(e.g., --assign-agent agent_id_1,agent_id_2,...)",
+        help=(
+            "Show mapping list of tuple which mapped containers with agent. "
+            "When user role is Super Admin. "
+            "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
+        ),
     )
     @click_start_option()
     def create(
@@ -190,9 +194,9 @@ def _create_cmd(docs: str = None):
                     domain_name=domain,
                     group_name=group,
                     scaling_group=scaling_group,
-                    bootstrap_script=bootstrap_script.read()
-                    if bootstrap_script is not None
-                    else None,
+                    bootstrap_script=(
+                        bootstrap_script.read() if bootstrap_script is not None else None
+                    ),
                     tag=tag,
                     architecture=architecture,
                     preopen_ports=preopen_ports,
@@ -242,9 +246,8 @@ def _create_cmd(docs: str = None):
                     )
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            compute_session.id
-                        )
+                        "Session ID {0} has an error during scheduling/startup or cancelled."
+                        .format(compute_session.id)
                     )
 
     if docs is not None:
@@ -267,14 +270,6 @@ def _create_from_template_cmd(docs: str = None):
         help="Set the owner of the target session explicitly.",
     )
     # job scheduling options
-    @click.option(
-        "--type",
-        "type_",
-        metavar="SESSTYPE",
-        type=click.Choice(["batch", "interactive", undefined]),  # type: ignore
-        default=undefined,
-        help="Either batch or interactive",
-    )
     @click.option("-i", "--image", default=undefined, help="Set compute_session image to run.")
     @click.option(
         "-c",
@@ -292,80 +287,16 @@ def _create_from_template_cmd(docs: str = None):
         "The session will get scheduled after all of them successfully finish.",
     )
     @click.option(
-        "--enqueue-only",
-        is_flag=True,
-        help="Enqueue the session and return immediately without waiting for its startup.",
-    )
-    @click.option(
-        "--max-wait",
-        metavar="SECONDS",
-        type=int,
-        default=undefined,
-        help="The maximum duration to wait until the session starts.",
-    )
-    @click.option(
-        "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
-    )
-    @click.option(
         "--depends",
         metavar="SESSION_ID",
         type=str,
         multiple=True,
-        help="Set the list of session ID or names that the newly created session depends on. "
-        "The session will get scheduled after all of them successfully finish.",
-    )
-    @click.option(
-        "--callback-url",
-        metavar="CALLBACK_URL",
-        type=str,
-        default=None,
-        help="Callback URL which will be called upon session lifecycle events.",
-    )
-    # execution environment
-    @click.option(
-        "-e",
-        "--env",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help="Environment variable (may appear multiple times)",
-    )
-    # extra options
-    @click.option(
-        "--tag", type=str, default=undefined, help="User-defined tag string to annotate sessions."
+        help=(
+            "Set the list of session ID or names that the newly created session depends on. "
+            "The session will get scheduled after all of them successfully finish."
+        ),
     )
     # resource spec
-    @click.option(
-        "-m",
-        "--mount",
-        metavar="NAME[=PATH]",
-        type=str,
-        multiple=True,
-        help="User-owned virtual folder names to mount. "
-        "When the target path is relative, it is placed under /home/work "
-        "with auto-created parent directories if any. "
-        "Absolute paths are mounted as-is, but it is prohibited to "
-        "override the predefined Linux system directories.",
-    )
-    @click.option(
-        "--scaling-group",
-        "--sgroup",
-        type=str,
-        default=undefined,
-        help="The scaling group to execute session. If not specified, "
-        "all available scaling groups are included in the scheduling.",
-    )
-    @click.option(
-        "-r",
-        "--resources",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help="Set computation resources used by the session "
-        "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
-        "1 slot of cpu/gpu represents 1 core. "
-        "The unit of mem(ory) is MiB.",
-    )
     @click.option(
         "--cluster-size",
         metavar="NUMBER",
@@ -378,43 +309,32 @@ def _create_from_template_cmd(docs: str = None):
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Resource options for creating compute session " "(e.g: shmem=64m)",
-    )
-    # resource grouping
-    @click.option(
-        "-d",
-        "--domain",
-        metavar="DOMAIN_NAME",
-        default=None,
-        help="Domain name where the session will be spawned. "
-        "If not specified, config's domain name will be used.",
-    )
-    @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
-        default=None,
-        help="Group name where the session is spawned. "
-        "User should be a member of the group to execute the code.",
+        help="Resource options for creating compute session (e.g: shmem=64m)",
     )
     # template overrides
     @click.option(
         "--no-mount",
         is_flag=True,
-        help="If specified, client.py will tell server not to mount "
-        "any vFolders specified at template,",
+        help=(
+            "If specified, client.py will tell server not to mount "
+            "any vFolders specified at template,"
+        ),
     )
     @click.option(
         "--no-env",
         is_flag=True,
-        help="If specified, client.py will tell server not to add "
-        "any environs specified at template,",
+        help=(
+            "If specified, client.py will tell server not to add "
+            "any environs specified at template,"
+        ),
     )
     @click.option(
         "--no-resource",
         is_flag=True,
-        help="If specified, client.py will tell server not to add "
-        "any resource specified at template,",
+        help=(
+            "If specified, client.py will tell server not to add "
+            "any resource specified at template,"
+        ),
     )
     @click_start_option()
     def create_from_template(
@@ -530,9 +450,8 @@ def _create_from_template_cmd(docs: str = None):
                     print_info("Session ID {0} is still on the job queue.".format(name))
                 elif compute_session.status in ("ERROR", "CANCELLED"):
                     print_fail(
-                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
-                            name
-                        )
+                        "Session ID {0} has an error during scheduling/startup or cancelled."
+                        .format(name)
                     )
 
     if docs is not None:
@@ -564,7 +483,10 @@ def _destroy_cmd(docs: str = None):
     @click.option(
         "-s", "--stats", is_flag=True, help="Show resource usage statistics after termination"
     )
-    def destroy(session_names, forced, owner, stats):
+    @click.option(
+        "-r", "--recursive", is_flag=True, help="Cancel all the dependant sessions recursively"
+    )
+    def destroy(session_names, forced, owner, stats, recursive):
         """
         Terminate and destroy the given session.
 
@@ -579,7 +501,8 @@ def _destroy_cmd(docs: str = None):
             for session_name in session_names:
                 try:
                     compute_session = session.ComputeSession(session_name, owner)
-                    ret = compute_session.destroy(forced=forced)
+                    ret = compute_session.destroy(forced=forced, recursive=recursive)
+
                 except BackendAPIError as e:
                     print_error(e)
                     if e.status == 404:

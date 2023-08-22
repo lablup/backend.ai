@@ -36,12 +36,32 @@ usage() {
   echo "  ${LWHITE}--skip-venvs${NC}       Skip removal of temporary virtualenvs (default: false)"
 }
 
+show_error() {
+  echo " "
+  echo "${RED}[ERROR]${NC} ${LRED}$1${NC}"
+}
+
+show_warning() {
+  echo " "
+  echo "${YELLOW}[WARN]${NC} ${LYELLOW}$1${NC}"
+}
+
+show_info() {
+  echo " "
+  echo "${BLUE}[INFO]${NC} ${GREEN}$1${NC}"
+}
+
+show_note() {
+  echo " "
+  echo "${BLUE}[NOTE]${NC} $1"
+}
+
 has_python() {
   "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
-    echo 0
+  if [ "$?" -eq 0 ]; then
+    echo 0  # ok
   else
-    echo 1
+    echo 1  # missing
   fi
 }
 
@@ -67,16 +87,13 @@ else
   DOCKER_COMPOSE="docker-compose"
 fi
 
-if [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
-else
-  # Ensure "readlinkf" is working...
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
+show_info "Checking the bootstrapper Python version..."
+STANDALONE_PYTHON_VERSION="3.11.3"
+STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
+bpython="${STANDALONE_PYTHON_PATH}/bin/python3"
+if [ $(has_python "$bpython") -ne 0 ]; then
+  show_error "Python for bootstrapping is not available!"
+  echo "Check if you have installed using the 'install-dev.sh' script."
   exit 1
 fi
 
@@ -98,25 +115,32 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $REMOVE_VENVS -eq 1 ]; then
-  echo "Removing the unified and temporary venvs..."
+  show_info "Removing the unified and temporary venvs..."
   rm -rf dist/export
   pyenv uninstall -f "tmp-grpcio-build"
 else
-  echo "Skipped removal of Python virtual environments."
+  show_info "Skipped removal of Python virtual environments."
 fi
 
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
-  echo "Removing Docker containers..."
-  $docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" down
-  rm "docker-compose.halfstack.current.yml"
+  show_info "Removing Docker containers..."
+  if [ -f "docker-compose.halfstack.current.yml" ]; then
+    $docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" down
+    rm "docker-compose.halfstack.current.yml"
+  else
+    show_warning "The halfstack containers are already removed."
+  fi
 else
-  echo "Skipped removal of Docker containers."
+  show_info "Skipped removal of Docker containers."
 fi
 
 echo ""
-echo "(FYI) To reset Pants and its cache data, run:"
+show_note "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
-echo "  $ rm -r .tmp .pants.d .pants.env pants-local ~/.cache/pants"
+echo "  $ rm -rf .pants.d ~/.cache/pants"
+if [ -f .pants.rc ]; then
+  echo "  \$ rm -rf $($bpython scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')"
+fi
 
 echo ""
-echo "Done."
+show_info "Done."

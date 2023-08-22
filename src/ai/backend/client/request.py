@@ -36,9 +36,8 @@ from yarl import URL
 
 from .auth import generate_signature
 from .exceptions import BackendAPIError, BackendClientError
-from .session import AsyncSession, BaseSession
+from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
-from .session import api_session
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
@@ -418,7 +417,6 @@ class Request:
 
 
 class AsyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -437,7 +435,6 @@ class AsyncResponseMixin:
 
 
 class SyncResponseMixin:
-
     _session: BaseSession
     _raw_response: aiohttp.ClientResponse
 
@@ -598,7 +595,7 @@ class FetchContextManager:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n" "\u279c {!r}".format(e)
+                msg = "API endpoint response error.\n\u279c {!r}".format(e)
                 await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
             finally:
@@ -739,7 +736,7 @@ class WebSocketContextManager:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n" "\u279c {!r}".format(e)
+                msg = "API endpoint response error.\n\u279c {!r}".format(e)
                 raise BackendClientError(msg) from e
             else:
                 break
@@ -767,7 +764,6 @@ class SSEMessage:
 
 
 class SSEResponse(BaseResponse):
-
     __slots__ = (
         "_auto_reconnect",
         "_retry",
@@ -850,7 +846,6 @@ class SSEResponse(BaseResponse):
 
 
 class SSEContextManager:
-
     __slots__ = (
         "session",
         "rqst_ctx_builder",
@@ -903,7 +898,7 @@ class SSEContextManager:
                     self.session.config.rotate_endpoints()
                     continue
             except aiohttp.ClientResponseError as e:
-                msg = "API endpoint response error.\n" "\u279c {!r}".format(e)
+                msg = "API endpoint response error.\n\u279c {!r}".format(e)
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()
