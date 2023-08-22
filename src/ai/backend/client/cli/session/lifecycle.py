@@ -111,35 +111,35 @@ def _create_cmd(docs: str = None):
     def create(
         # base args
         image: str,
-        name: str | None,
+        name: str | None,  # click_start_option
         owner: str | None,
         # job scheduling options
-        type: Literal["batch", "interactive"],
-        starts_at: str | None,
+        type: Literal["batch", "interactive"],  # click_start_option
+        starts_at: str | None,  # click_start_option
         startup_command: str | None,
-        enqueue_only: bool,
-        max_wait: int,
-        no_reuse: bool,
+        enqueue_only: bool,  # click_start_option
+        max_wait: int,  # click_start_option
+        no_reuse: bool,  # click_start_option
         depends: Sequence[str],
-        callback_url: str,
+        callback_url: str,  # click_start_option
         # execution environment
-        env: Sequence[str],
+        env: Sequence[str],  # click_start_option
         # extra options
         bootstrap_script: IO | None,
-        tag: str | None,
+        tag: str | None,  # click_start_option
         architecture: str,
         # resource spec
-        mount: Sequence[str],
-        scaling_group: str | None,
-        resources: Sequence[str],
-        cluster_size: int,
+        mount: Sequence[str],  # click_start_option
+        scaling_group: str | None,  # click_start_option
+        resources: Sequence[str],  # click_start_option
+        cluster_size: int,  # click_start_option
         cluster_mode: Literal["single-node", "multi-node"],
-        resource_opts: Sequence[str],
+        resource_opts: Sequence[str],  # click_start_option
         preopen: str | None,
         assign_agent: str | None,
         # resource grouping
-        domain: str | None,
-        group: str | None,
+        domain: str | None,  # click_start_option
+        group: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -420,31 +420,31 @@ def _create_from_template_cmd(docs: str = None):
     def create_from_template(
         # base args
         template_id: str,
-        name: str | Undefined,
+        name: str | Undefined,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
-        type_: Literal["batch", "interactive"] | Undefined,
-        starts_at: str | None,
+        type_: Literal["batch", "interactive"] | Undefined,  # click_start_option
+        starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
-        enqueue_only: bool,
-        max_wait: int | Undefined,
-        no_reuse: bool,
+        enqueue_only: bool,  # click_start_option
+        max_wait: int | Undefined,  # click_start_option
+        no_reuse: bool,  # click_start_option
         depends: Sequence[str],
-        callback_url: str,
+        callback_url: str,  # click_start_option
         # execution environment
-        env: Sequence[str],
+        env: Sequence[str],  # click_start_option
         # extra options
-        tag: str | Undefined,
+        tag: str | Undefined,  # click_start_option
         # resource spec
-        mount: Sequence[str],
-        scaling_group: str | Undefined,
-        resources: Sequence[str],
-        cluster_size: int | Undefined,
-        resource_opts: Sequence[str],
+        mount: Sequence[str],  # click_start_option
+        scaling_group: str | Undefined,  # click_start_option
+        resources: Sequence[str],  # click_start_option
+        cluster_size: int | Undefined,  # click_start_option
+        resource_opts: Sequence[str],  # click_start_option
         # resource grouping
-        domain: str | None,
-        group: str | None,
+        domain: str | None,  # click_start_option
+        group: str | None,  # click_start_option
         # template overrides
         no_mount: bool,
         no_env: bool,

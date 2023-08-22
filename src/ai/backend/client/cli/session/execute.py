@@ -375,38 +375,38 @@ def prepare_mount_arg(
 def run(
     image,
     files,
-    name,  # base args
-    type,
-    starts_at,
-    enqueue_only,
-    max_wait,
-    no_reuse,  # job scheduling options
-    callback_url,
+    name,  # click_start_option
+    type,  # click_start_option
+    starts_at,  # click_start_option
+    enqueue_only,  # click_start_option
+    max_wait,  # click_start_option
+    no_reuse,  # click_start_option
+    callback_url,  # click_start_option
     code,
     terminal,  # query-mode options
     clean,
     build,
     exec,
     basedir,  # batch-mode options
-    env,  # execution environment
+    env,  # click_start_option
     bootstrap_script,
     rm,
     stats,
-    tag,
+    tag,  # click_start_option
     quiet,  # extra options
     env_range,
     build_range,
     exec_range,
     max_parallel,  # experiment support
-    mount,
-    scaling_group,
-    resources,  # resource spec
-    cluster_size,
+    mount,  # click_start_option
+    scaling_group,  # click_start_option
+    resources,  # click_start_option
+    cluster_size,  # click_start_option
     cluster_mode,
-    resource_opts,
+    resource_opts,  # click_start_option
     architecture,
-    domain,
-    group,
+    domain,  # click_start_option
+    group,  # click_start_option
     preopen,
     assign_agent,  # resource grouping
 ):
