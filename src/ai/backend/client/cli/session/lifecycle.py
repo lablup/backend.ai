@@ -106,8 +106,8 @@ def _create_cmd(docs: str = None):
         default=None,
         type=list_expr,
         help=(
-            "Show mapping list of tuple which mapped containers with agent. "
-            "When user role is Super Admin. "
+            "Assign the session to specific agents. "
+            "This option is only applicable when the user role is Super Admin. "
             "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
         ),
     )
@@ -266,6 +266,7 @@ def _create_from_template_cmd(docs: str = None):
         "--owner",
         "--owner-access-key",
         metavar="ACCESS_KEY",
+        type=OptionalType(str),
         default=undefined,
         help="Set the owner of the target session explicitly.",
     )
@@ -275,6 +276,7 @@ def _create_from_template_cmd(docs: str = None):
         "-c",
         "--startup-command",
         metavar="COMMAND",
+        type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
     )
@@ -302,7 +304,7 @@ def _create_from_template_cmd(docs: str = None):
     @click.option(
         "--cluster-size",
         metavar="NUMBER",
-        type=int,
+        type=OptionalType(int),
         default=undefined,
         help="The size of cluster in number of containers.",
     )

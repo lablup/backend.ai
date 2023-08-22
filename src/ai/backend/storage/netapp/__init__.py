@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
 from typing import (
+    Any,
     FrozenSet,
     Optional,
 )
@@ -73,6 +74,7 @@ class QTreeQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         result = await self.netapp_client.create_qtree(self.svm_id, self.volume_id, qspath.name)

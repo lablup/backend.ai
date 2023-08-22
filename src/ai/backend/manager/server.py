@@ -36,6 +36,13 @@ from setproctitle import setproctitle
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+    REDIS_STREAM_LOCK,
+)
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -57,7 +64,6 @@ from .api.exceptions import (
 from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .models import SessionRow
 from .types import DistributedLockFactory

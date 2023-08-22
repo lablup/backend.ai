@@ -42,7 +42,10 @@ def get_service_id(session: Session, name_or_id: str):
         return name_or_id
     except Exception:
         services = session.Service.list(name=name_or_id)
-        return services[0]["id"]
+        try:
+            return services[0]["id"]
+        except KeyError:
+            raise RuntimeError(f"Service {name_or_id} not found")
 
 
 @main.group()
