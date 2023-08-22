@@ -31,7 +31,7 @@ from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from ...types import Undefined, undefined
 from .. import events
-from ..params import CommaSeparatedListType
+from ..params import CommaSeparatedListType, OptionalType
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .args import click_start_option
 from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
