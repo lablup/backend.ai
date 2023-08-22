@@ -6,7 +6,7 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.run import prepare_env_arg, prepare_resource_arg
+from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
 from ai.backend.client.session import Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
