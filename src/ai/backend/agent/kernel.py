@@ -474,6 +474,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
+        self.status_queue_lock = asyncio.Lock()
         self.output_queue = None
         self.pending_queues = OrderedDict()
         self.read_task = None
