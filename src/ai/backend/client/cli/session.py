@@ -232,8 +232,8 @@ def _create_cmd(docs: str = None):
         default=None,
         type=list_expr,
         help=(
-            "Show mapping list of tuple which mapped containers with agent. "
-            "When user role is Super Admin. "
+            "Assign the session to specific agents. "
+            "This option is only applicable when the user role is Super Admin. "
             "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
         ),
     )

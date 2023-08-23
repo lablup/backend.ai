@@ -30,6 +30,8 @@ disabled-plugins = []
 
 hide-agents = true
 
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 [docker-registry]
 ssl-verify = false
