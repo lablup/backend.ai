@@ -18,6 +18,7 @@ from typing import (
     Union,
 )
 
+import psutil
 import redis.exceptions
 import yarl
 from redis.asyncio import Redis
@@ -32,7 +33,7 @@ from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
 from .logging import BraceStyleAdapter
-from .types import EtcdRedisConfig, RedisConnectionInfo
+from .types import EtcdRedisConfig, RedisConnectionInfo, SentinelRedisConnection
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -164,7 +165,7 @@ async def blpop(
         assert service_name is not None
         r = redis_client.master_for(
             service_name,
-            redis_class=Redis,
+            redis_class=SentinelRedisConnection,
             connection_pool_class=SentinelConnectionPool,
             **_conn_opts,
         )
@@ -198,6 +199,17 @@ async def blpop(
             await asyncio.sleep(0)
 
 
+def count_open_sockets():
+    current_process = psutil.Process()
+    socket_count = 0
+
+    for conn in current_process.connections(kind="inet"):
+        if conn.status == "ESTABLISHED":
+            socket_count += 1
+
+    return socket_count
+
+
 async def execute(
     redis_obj: RedisConnectionInfo | Redis | Sentinel,
     func: Callable[[Redis], Awaitable[Any]],
@@ -229,19 +241,20 @@ async def execute(
         if read_only:
             r = redis_client.slave_for(
                 service_name,
-                redis_class=Redis,
+                redis_class=SentinelRedisConnection,
                 connection_pool_class=SentinelConnectionPool,
                 **_conn_opts,
             )
         else:
             r = redis_client.master_for(
                 service_name,
-                redis_class=Redis,
+                redis_class=SentinelRedisConnection,
                 connection_pool_class=SentinelConnectionPool,
                 **_conn_opts,
             )
     else:
         r = redis_client
+
     while True:
         try:
             async with r:
@@ -255,7 +268,7 @@ async def execute(
                     async with aw_or_pipe:
                         result = await aw_or_pipe.execute()
                 elif inspect.isawaitable(aw_or_pipe):
-                    result = await aw_or_pipe
+                    result = await aw_or_pipe  # Leak occurred at This point!!!!!
                 else:
                     raise TypeError(
                         "The return value must be an awaitable"
@@ -264,7 +277,7 @@ async def execute(
                 if isinstance(result, Pipeline):
                     # This happens when func is an async function that returns a pipeline.
                     async with result:
-                        result = await result.execute()
+                        result = await result.execute()  # Leak occurred at This point!!!!!
                 if encoding:
                     if isinstance(result, bytes):
                         return result.decode(encoding)
@@ -485,18 +498,25 @@ def get_redis_object(
         else:
             sentinel_addresses = _sentinel_addresses
 
-        assert redis_config.get("service_name") is not None
+        service_name = redis_config.get("service_name")
+        password = redis_config.get("password")
+        assert (
+            service_name is not None
+        ), "config/redis/service_name is required when using Redis Sentinel"
+
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],
-            password=redis_config.get("password"),
+            password=password,
             db=str(db),
             sentinel_kwargs={
+                "password": password,
                 **kwargs,
             },
         )
+
         return RedisConnectionInfo(
             client=sentinel,
-            service_name=redis_config.get("service_name"),
+            service_name=service_name,
         )
     else:
         redis_url = redis_config.get("addr")
@@ -504,15 +524,29 @@ def get_redis_object(
         url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
+
         return RedisConnectionInfo(
             client=Redis.from_url(str(url), **kwargs),
             service_name=None,
         )
 
 
-async def ping_redis_connection(client: Redis) -> bool:
+async def ping_redis_connection(
+    redis_config: EtcdRedisConfig, redis_client: Redis | Sentinel
+) -> bool:
     try:
-        return await client.ping()
+        if isinstance(redis_client, Redis):
+            return await redis_client.ping()
+        else:
+            service_name = redis_config.get("service_name")
+            assert service_name is not None
+            r = redis_client.master_for(
+                service_name,
+                redis_class=SentinelRedisConnection,
+                connection_pool_class=SentinelConnectionPool,
+                **_default_conn_opts,
+            )
+            return await r.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e
