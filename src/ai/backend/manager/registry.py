@@ -2885,7 +2885,7 @@ class AgentRegistry:
 
                     if row is None or row["status"] is None:
                         # new agent detected!
-                        log.info("agent {0} joined!", agent_id)
+                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
                         await self.shared_config.update_resource_slots(slot_key_and_units)
                         insert_query = sa.insert(agents).values(
                             {
@@ -3765,7 +3765,7 @@ async def handle_agent_lifecycle(
     event: AgentStartedEvent | AgentTerminatedEvent,
 ) -> None:
     if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined ({1})", source, event.reason)
+        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
         await context.update_instance(
             source,
             {
