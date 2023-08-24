@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from abc import ABCMeta, abstractmethod
@@ -35,6 +36,7 @@ from ai.backend.common.types import (
     DeviceModelInfo,
     DeviceName,
     HardwareMetadata,
+    KernelId,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -467,3 +469,44 @@ class Mount:
             raise ValueError("Mount target must be an absolute path.", target)
         perm = MountPermission(perm)
         return cls(type, source, target, perm, None)
+
+
+async def scan_resource_usage_per_slot(
+    kernel_ids: Sequence[KernelId],
+    scratch_root: Path,
+) -> Mapping[SlotName, Decimal]:
+    """
+    Fetch the current allocated amounts for each resource slot from
+    ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+    """
+    occupied_slots_from_kernel: dict[SlotName, Decimal] = {}
+    loop = asyncio.get_running_loop()
+
+    def _read_kernel_resource_spec(filename) -> Optional[KernelResourceSpec]:
+        try:
+            with open(filename, "r") as f:
+                resource_spec = KernelResourceSpec.read_from_file(f)
+        except FileNotFoundError:
+            # there may be races with container destruction
+            return None
+        return resource_spec
+
+    for kernel_id in kernel_ids:
+        kernel_resource_spec = await loop.run_in_executor(
+            None,
+            _read_kernel_resource_spec,
+            scratch_root / str(kernel_id) / "config" / "resource.txt",
+        )
+        if kernel_resource_spec is None:
+            continue
+        else:
+            for slot_name in kernel_resource_spec.slots.keys():
+                if slot_name in occupied_slots_from_kernel:
+                    occupied_slots_from_kernel[slot_name] = Decimal(
+                        occupied_slots_from_kernel[slot_name]
+                    ) + Decimal(kernel_resource_spec.slots[slot_name])
+                else:
+                    occupied_slots_from_kernel[slot_name] = Decimal(
+                        kernel_resource_spec.slots[slot_name]
+                    )
+    return occupied_slots_from_kernel

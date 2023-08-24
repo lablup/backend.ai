@@ -141,6 +141,7 @@ from .resources import (
     AbstractComputePlugin,
     KernelResourceSpec,
     Mount,
+    scan_resource_usage_per_slot,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -1206,42 +1207,6 @@ class AbstractAgent(
                             kernel_id,
                         )
 
-    async def scan_resource_usage_by_slot(self) -> Mapping[SlotName, Decimal]:
-        """
-        Fetch the current allocated amounts for each resource slot from
-        ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
-        """
-        occupied_slots_from_kernel: dict[SlotName, Decimal] = {}
-
-        def _read_kernel_resource_spec(filename):
-            with open(filename, "r") as f:
-                resource_spec = KernelResourceSpec.read_from_file(f)
-            return resource_spec
-
-        async with self.registry_lock:
-            for kernel_id in self.kernel_registry.keys():
-                scratch_dir = (
-                    self.local_config["container"]["scratch-root"] / str(kernel_id)
-                ).resolve()
-                kernel_resource_spec = await self.loop.run_in_executor(
-                    None,
-                    _read_kernel_resource_spec,
-                    scratch_dir / "config" / "resource.txt",
-                )
-                if kernel_resource_spec is None:
-                    continue
-                else:
-                    for slot_name in kernel_resource_spec.slots.keys():
-                        if slot_name in occupied_slots_from_kernel:
-                            occupied_slots_from_kernel[slot_name] = Decimal(
-                                occupied_slots_from_kernel[slot_name]
-                            ) + Decimal(kernel_resource_spec.slots[slot_name])
-                        else:
-                            occupied_slots_from_kernel[slot_name] = Decimal(
-                                kernel_resource_spec.slots[slot_name]
-                            )
-        return occupied_slots_from_kernel
-
     async def sync_container_lifecycles(self, interval: float) -> None:
         """
         Periodically synchronize the alive/known container sets,
@@ -1791,7 +1756,12 @@ class AbstractAgent(
                                         plugin_alloc_map[dev_name][desired_slot_name][
                                             desired_device_id
                                         ] += desired_slot_dict[desired_device_id]
-                            occupied_slots_from_kernel = await self.scan_resource_usage_by_slot()
+                            async with self.registry_lock:
+                                kernel_ids = [*self.kernel_registry.keys()]
+                            occupied_slots_from_kernel = await scan_resource_usage_per_slot(
+                                kernel_ids,
+                                self.local_config["container"]["scratch-root"],
+                            )
                             log.error(
                                 # TODO: rewrite
                                 "-----------------------------------------------\n"
