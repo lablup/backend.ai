@@ -185,9 +185,8 @@ class KManilaQuotaModel(BaseQuotaModel):
             if resp.status == 200:
                 return await resp.json()
             elif resp.status // 100 == 4:
-                raise ValueError(
-                    f"Cannot get data from API server. {resp.status = }, {resp.url = }"
-                )
+                log.info(f"Volume info not found. (id: {volume_id})")
+                return None
             elif resp.status // 100 == 5:
                 # If there is no volume data with given volume id, the Kmanila server returns 500 status
                 log.info(f"Volume info not found. (id: {volume_id})")
@@ -409,11 +408,15 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info = await self._get_auth_info(quota_scope_id)
 
         async with aiohttp.ClientSession(base_url=self.api_base_url) as session:
-            if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is None:
+            if (
+                volume_id := await self.get_volume_id(
+                    session, quota_scope_id, auth_info, do_hard_check=False
+                )
+            ) is None:
                 raise QuotaScopeNotFoundError
             if (data := await self.fetch_volume_info(session, volume_id, auth_info)) is not None:
                 return data["share"]
-            raise ExternalError("Cannot get volume info from NAS server.")
+            return None
 
     # override
     async def update_quota_scope(
