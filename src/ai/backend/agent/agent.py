@@ -1756,10 +1756,8 @@ class AbstractAgent(
                                         plugin_alloc_map[dev_name][desired_slot_name][
                                             desired_device_id
                                         ] += desired_slot_dict[desired_device_id]
-                            async with self.registry_lock:
-                                kernel_ids = [*self.kernel_registry.keys()]
                             occupied_slots_from_kernel = await scan_resource_usage_per_slot(
-                                kernel_ids,
+                                [*self.kernel_registry.keys()],
                                 self.local_config["container"]["scratch-root"],
                             )
                             log.error(
