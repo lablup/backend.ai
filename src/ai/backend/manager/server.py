@@ -166,6 +166,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".logs",
 ]
 
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
+
 
 async def hello(request: web.Request) -> web.Response:
     """
@@ -384,6 +386,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
     )
     yield
