@@ -35,23 +35,23 @@ class NotMultipleOfQuantum(InvalidResourceArgument):
 
 @dataclass
 class InsufficientResource(ResourceError):
-    error_title: str
-    context_tag: Optional[str]
+    msg: str
     slot_name: SlotName
     requested_alloc: Decimal
     total_allocatable: Decimal | int
     allocation: dict[SlotName, dict[DeviceId, Decimal]]
+    context_tag: Optional[str] = None
 
     def __reduce__(self):
         return (
             self.__class__,
             (
-                self.error_title,
-                self.context_tag,
+                self.msg,
                 self.slot_name,
                 self.requested_alloc,
                 self.total_allocatable,
                 self.allocation,
+                self.context_tag,
             ),
         )
 

@@ -1797,7 +1797,7 @@ class AbstractAgent(
                                 " {6}\n"
                                 "-----------------------------------------------\n"
                                 "occupied slots from kernel resources: {7}",
-                                e.error_title,
+                                e.msg,
                                 e.context_tag,
                                 e.slot_name,
                                 e.requested_alloc,
