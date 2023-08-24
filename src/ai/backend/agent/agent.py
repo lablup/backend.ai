@@ -169,6 +169,7 @@ DEAD_STATUS_SET = frozenset(
 )
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
@@ -613,6 +614,7 @@ class AbstractAgent(
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)

@@ -9,7 +9,7 @@ from typing import Final, Iterator, List
 
 from ai.backend.cli.types import ExitCode
 
-from .pretty import print_fail, print_info
+from ..pretty import print_fail, print_info
 
 CLI_EXECUTABLE: Final = (sys.executable, "-m", "ai.backend.cli")
 
