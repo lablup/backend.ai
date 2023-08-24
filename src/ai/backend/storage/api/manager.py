@@ -223,6 +223,32 @@ async def get_quota_scope(request: web.Request) -> web.Response:
             )
 
 
+async def get_external_volume(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "get_external_volume", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            data = await volume.quota_model.get_external_volume_info(params["qsid"])
+            if not data:
+                raise QuotaScopeNotFoundError
+            return web.json_response(data)
+
+
 async def update_quota_scope(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -1001,6 +1027,7 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/quota-scope", create_quota_scope)
     app.router.add_route("GET", "/quota-scope", get_quota_scope)
+    app.router.add_route("GET", "/volume-quota-scope", get_external_volume)
     app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
     app.router.add_route("DELETE", "/quota-scope/quota", unset_quota)
     app.router.add_route("POST", "/folder/create", create_vfolder)

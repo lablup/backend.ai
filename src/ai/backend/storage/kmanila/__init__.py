@@ -17,8 +17,13 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 
 from ..abc import AbstractQuotaModel
-from ..exception import ExecutionError, ExternalError, QuotaScopeAlreadyExists
-from ..types import QuotaConfig
+from ..exception import (
+    ExecutionError,
+    ExternalError,
+    QuotaScopeAlreadyExists,
+    QuotaScopeNotFoundError,
+)
+from ..types import QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -146,6 +151,9 @@ class KManilaQuotaModel(BaseQuotaModel):
         await self.etcd.put_prefix(
             f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}", cast(dict, data)
         )
+
+    async def delete_user_volume_info(self, quota_scope_id: QuotaScopeID) -> None:
+        await self.etcd.delete_prefix(f"{QUOTA_VOLUME_ID_MAP_KEY}/{quota_scope_id.scope_id}")
 
     async def get_volume_id(
         self,
@@ -349,6 +357,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             "x_auth_signature": sign,
         }
 
+    # override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -379,6 +388,80 @@ class KManilaQuotaModel(BaseQuotaModel):
                 edit_fstab=True,
             )
         )
+
+    # override
+    async def describe_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> QuotaUsage | None:
+        auth_info = await self._get_auth_info(quota_scope_id)
+
+        async with aiohttp.ClientSession(base_url=self.api_base_url) as session:
+            if (await self.get_volume_id(session, quota_scope_id, auth_info)) is None:
+                raise QuotaScopeNotFoundError
+            return QuotaUsage(-1, -1)
+
+    # override
+    async def get_external_volume_info(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> dict[str, Any] | None:
+        auth_info = await self._get_auth_info(quota_scope_id)
+
+        async with aiohttp.ClientSession(base_url=self.api_base_url) as session:
+            if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is None:
+                raise QuotaScopeNotFoundError
+            if (data := await self.fetch_volume_info(session, volume_id, auth_info)) is not None:
+                return data["share"]
+            raise ExternalError("Cannot get volume info from NAS server.")
+
+    # override
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: QuotaConfig,
+    ) -> None:
+        auth_info = await self._get_auth_info(quota_scope_id)
+
+        async with aiohttp.ClientSession(base_url=self.api_base_url) as session:
+            if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is None:
+                raise QuotaScopeNotFoundError
+            project_id = auth_info["project_id"]
+            auth_token = auth_info["auth_token"]
+            subpath = f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action"
+            headers = self._build_header(auth_token, subpath, "POST")
+            rqst_body = {"os-extend": {"new_size": options.limit_bytes, "force": True}}
+            async with session.post(
+                url=subpath,
+                headers=headers,
+                json=rqst_body,
+            ):
+                pass
+
+    # override
+    async def unset_quota(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        auth_info = await self._get_auth_info(quota_scope_id)
+
+        async with aiohttp.ClientSession(base_url=self.api_base_url) as session:
+            if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is None:
+                raise QuotaScopeNotFoundError
+            project_id = auth_info["project_id"]
+            auth_token = auth_info["auth_token"]
+            subpath = f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}"
+            headers = self._build_header(auth_token, subpath, "DELETE")
+            async with session.delete(
+                url=subpath,
+                headers=headers,
+            ) as resp:
+                status_code = resp.status
+                if status_code != 202:
+                    raise ExecutionError(f"Cannot delete volume. {status_code = }, {volume_id = }")
+
+        # Delete user volume map info saved in etcd
+        await self.delete_user_volume_info(quota_scope_id)
 
 
 class KManilaFSVolume(BaseVolume):

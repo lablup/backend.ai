@@ -59,6 +59,16 @@ class AbstractQuotaModel(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    async def get_external_volume_info(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> dict[str, Any] | None:
+        """
+        Get the information about the given volume.
+        Returns None if target volume does not exist.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     async def describe_quota_scope(
         self,
