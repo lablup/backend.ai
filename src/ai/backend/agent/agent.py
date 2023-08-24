@@ -964,7 +964,7 @@ class AbstractAgent(
                         "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
                     )
                     if ev.container_id is None:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
@@ -1055,7 +1055,7 @@ class AbstractAgent(
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
@@ -1183,7 +1183,11 @@ class AbstractAgent(
         Enumerate the containers with the given status filter.
         """
 
-    async def rescan_resource_usage(self) -> None:
+    async def reconstruct_resource_usage(self) -> None:
+        """
+        Reconstruct the resource alloc maps for each compute plugin from
+        ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+        """
         async with self.resource_lock:
             for computer_set in self.computers.values():
                 computer_set.alloc_map.clear()
@@ -1201,6 +1205,42 @@ class AbstractAgent(
                             "maybe already terminated",
                             kernel_id,
                         )
+
+    async def scan_resource_usage_by_slot(self) -> Mapping[SlotName, Decimal]:
+        """
+        Fetch the current allocated amounts for each resource slot from
+        ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+        """
+        occupied_slots_from_kernel: dict[SlotName, Decimal] = {}
+
+        def _read_kernel_resource_spec(filename):
+            with open(filename, "r") as f:
+                resource_spec = KernelResourceSpec.read_from_file(f)
+            return resource_spec
+
+        async with self.registry_lock:
+            for kernel_id in self.kernel_registry.keys():
+                scratch_dir = (
+                    self.local_config["container"]["scratch-root"] / str(kernel_id)
+                ).resolve()
+                kernel_resource_spec = await self.loop.run_in_executor(
+                    None,
+                    _read_kernel_resource_spec,
+                    scratch_dir / "config" / "resource.txt",
+                )
+                if kernel_resource_spec is None:
+                    continue
+                else:
+                    for slot_name in kernel_resource_spec.slots.keys():
+                        if slot_name in occupied_slots_from_kernel:
+                            occupied_slots_from_kernel[slot_name] = Decimal(
+                                occupied_slots_from_kernel[slot_name]
+                            ) + Decimal(kernel_resource_spec.slots[slot_name])
+                        else:
+                            occupied_slots_from_kernel[slot_name] = Decimal(
+                                kernel_resource_spec.slots[slot_name]
+                            )
+        return occupied_slots_from_kernel
 
     async def sync_container_lifecycles(self, interval: float) -> None:
         """
@@ -1751,57 +1791,18 @@ class AbstractAgent(
                                         plugin_alloc_map[dev_name][desired_slot_name][
                                             desired_device_id
                                         ] += desired_slot_dict[desired_device_id]
-                            occupied_slots_from_kernel: dict[SlotName, Decimal] = {}
-
-                            def _kernel_resource_spec_read(filename):
-                                with open(filename, "r") as f:
-                                    resource_spec = KernelResourceSpec.read_from_file(f)
-                                return resource_spec
-
-                            async with self.registry_lock:
-                                for kernel_id in self.kernel_registry.keys():
-                                    scratch_dir = (
-                                        self.local_config["container"]["scratch-root"]
-                                        / str(kernel_id)
-                                    ).resolve()
-                                    kernel_resource_spec = await self.loop.run_in_executor(
-                                        None,
-                                        _kernel_resource_spec_read,
-                                        scratch_dir / "config" / "resource.txt",
-                                    )
-                                    if kernel_resource_spec is None:
-                                        continue
-                                    else:
-                                        for slot_name in kernel_resource_spec.slots.keys():
-                                            if slot_name in occupied_slots_from_kernel:
-                                                occupied_slots_from_kernel[slot_name] = Decimal(
-                                                    occupied_slots_from_kernel[slot_name]
-                                                ) + Decimal(kernel_resource_spec.slots[slot_name])
-                                            else:
-                                                occupied_slots_from_kernel[slot_name] = Decimal(
-                                                    kernel_resource_spec.slots[slot_name]
-                                                )
-                            # fmt: off
+                            occupied_slots_from_kernel = await self.scan_resource_usage_by_slot()
                             log.error(
-                                "resource allocation failed (InsufficientResource)\n"
-                                "{0}\n"
-                                "with context tag: {1}\n"
-                                "at allocating {2} {3}\n"
-                                "total allocatable amount: {4}\n"
+                                # TODO: rewrite
                                 "-----------------------------------------------\n"
                                 "(before allocation) compute plugin alloc map:\n"
-                                " {5}\n"
+                                " {5}"
                                 "-----------------------------------------------\n"
                                 "(error during allocation) occupied slots from "
                                 "compute plugin alloc map:\n"
                                 " {6}\n"
                                 "-----------------------------------------------\n"
                                 "occupied slots from kernel resources: {7}",
-                                e.msg,
-                                e.context_tag,
-                                e.slot_name,
-                                e.requested_alloc,
-                                e.total_allocatable,
                                 pprint.pformat(original_plugin_alloc_map),
                                 pprint.pformat(plugin_alloc_map),
                                 occupied_slots_from_kernel,
@@ -2152,7 +2153,7 @@ class AbstractAgent(
                 # upon firing of the "session_started" event.
                 return kernel_creation_info
             except Exception as e:
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
                 raise e
 
     async def start_and_monitor_model_service_initial_health(

@@ -42,6 +42,17 @@ class InsufficientResource(ResourceError):
     allocation: dict[SlotName, dict[DeviceId, Decimal]]
     context_tag: Optional[str] = None
 
+    def __str__(self) -> str:
+        # TODO: rewrite
+        return (
+            # fmt: off
+            f"resource allocation failed (InsufficientResource)\n"
+            f"{0}\n"
+            f"with context tag: {1}\n"
+            f"at allocating {2} {3}\n"
+            f"total allocatable amount: {4}\n"
+        )
+
     def __reduce__(self):
         return (
             self.__class__,
