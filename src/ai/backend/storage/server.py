@@ -32,7 +32,7 @@ from .api.manager import init_manager_app
 from .config import load_local_config, load_shared_config
 from .context import Context
 
-EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
