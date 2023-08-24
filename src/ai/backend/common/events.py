@@ -318,6 +318,14 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
+class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_healthy"
+
+
+class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_health_check_failed"
+
+
 @attrs.define(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attrs.field()
@@ -680,9 +688,9 @@ class EventDispatcher(aobject):
         db: int = 0,
         log_events: bool = False,
         *,
+        consumer_group: str,
         service_name: str = None,
         stream_key: str = "events",
-        consumer_group: str = "manager",
         node_id: str = None,
         consumer_exception_handler: PTGExceptionHandler = None,
         subscriber_exception_handler: PTGExceptionHandler = None,

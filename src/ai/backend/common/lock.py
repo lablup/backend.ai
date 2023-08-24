@@ -198,6 +198,7 @@ class RedisLock(AbstractDistributedLock):
     _lock: Optional[AsyncRedisLock]
 
     default_timeout = 9600
+    default_lock_acquire_pause = 1.0
 
     def __init__(
         self,
@@ -208,6 +209,7 @@ class RedisLock(AbstractDistributedLock):
         lifetime: Optional[float] = None,
         socket_connect_timeout: float = 0.3,
         debug: bool = False,
+        lock_acquire_pause: Optional[float] = None,
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
@@ -227,6 +229,7 @@ class RedisLock(AbstractDistributedLock):
             )
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._lock_acquire_pause = lock_acquire_pause or self.default_lock_acquire_pause
 
     async def __aenter__(self) -> None:
         self._lock = AsyncRedisLock(
@@ -235,6 +238,7 @@ class RedisLock(AbstractDistributedLock):
             blocking_timeout=self._timeout,
             timeout=self._lifetime,
             thread_local=False,
+            sleep=self._lock_acquire_pause,
         )
         await self._lock.acquire()
         if self._debug:
