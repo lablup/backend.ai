@@ -43,14 +43,14 @@ class InsufficientResource(ResourceError):
     context_tag: Optional[str] = None
 
     def __str__(self) -> str:
-        # TODO: rewrite
         return (
-            # fmt: off
-            f"resource allocation failed (InsufficientResource)\n"
-            f"{0}\n"
-            f"with context tag: {1}\n"
-            f"at allocating {2} {3}\n"
-            f"total allocatable amount: {4}\n"
+            f"InsufficientResource: {self.msg} ("
+            + (
+                f"{self.slot_name} {self.context_tag}, "
+                if self.context_tag
+                else f"{self.slot_name}, "
+            )
+            + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
     def __reduce__(self):
