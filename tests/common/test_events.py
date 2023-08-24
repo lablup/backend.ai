@@ -31,6 +31,9 @@ class DummyEvent(AbstractEvent):
         return cls(value[0] + 1)
 
 
+EVENT_DISPATCHER_CONSUMER_GROUP = "test"
+
+
 @pytest.mark.asyncio
 async def test_dispatch(redis_container) -> None:
     app = object()
@@ -38,7 +41,7 @@ async def test_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
-        consumer_group="",
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
     producer = await EventProducer.new(redis_config)
 
@@ -90,7 +93,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
-        consumer_group="",
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         consumer_exception_handler=handle_exception,
         subscriber_exception_handler=handle_exception,
     )
