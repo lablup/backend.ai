@@ -1693,6 +1693,10 @@ class AbstractAgent(
                     None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
                 )
                 async with self.resource_lock:
+                    current_per_slot_occupancy = await scan_resource_usage_per_slot(
+                        [*self.kernel_registry.keys()],
+                        self.local_config["container"]["scratch-root"],
+                    )
                     for dev_name in ordered_dev_names:
                         computer_set = self.computers[dev_name]
                         device_id_map = {
@@ -1722,68 +1726,31 @@ class AbstractAgent(
                             affinity_hint = AffinityHint(
                                 hint_devices, self.affinity_map, affinity_hint.policy
                             )
-                        except InsufficientResource as e:
-                            await self.produce_event(
-                                DoAgentResourceCheckEvent(
-                                    ctx.agent_id,
-                                )
-                            )
-                            plugin_alloc_map: dict[
-                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
-                            ] = {}
+                        except (InsufficientResource, ResourceError) as e:
+                            await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
                             original_plugin_alloc_map: dict[
                                 DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
                             ] = {}
                             for dev in ordered_dev_names:
-                                plugin_alloc_map[dev] = dict(
-                                    self.computers[dev].alloc_map.allocations
+                                original_plugin_alloc_map[dev] = copy.deepcopy(
+                                    dict(self.computers[dev].alloc_map.allocations)
                                 )
-                                if dev != dev_name:
-                                    original_plugin_alloc_map[dev] = dict(
-                                        self.computers[dev].alloc_map.allocations
-                                    )
-                                else:
-                                    original_plugin_alloc_map[dev] = copy.deepcopy(
-                                        dict(self.computers[dev].alloc_map.allocations)
-                                    )
-
-                            for desired_slot_name, desired_slot_dict in e.allocation.items():
-                                for desired_device_id in desired_slot_dict.keys():
-                                    if (
-                                        desired_device_id
-                                        in plugin_alloc_map[dev_name][desired_slot_name].keys()
-                                    ):
-                                        plugin_alloc_map[dev_name][desired_slot_name][
-                                            desired_device_id
-                                        ] += desired_slot_dict[desired_device_id]
-                            occupied_slots_from_kernel = await scan_resource_usage_per_slot(
-                                [*self.kernel_registry.keys()],
-                                self.local_config["container"]["scratch-root"],
+                            alloc_failure_log_fmt = "\n".join(
+                                [
+                                    "resource allocation failed: {0}",
+                                    "(before allocation) device-specific slots:\n{1}",
+                                    "(before allocation) per-slot occupancy:\n{2}",
+                                    "(before allocation) compute plugin alloc map:\n{3}",
+                                ]
                             )
-                            log.error(
-                                # TODO: rewrite
-                                "-----------------------------------------------\n"
-                                "(before allocation) compute plugin alloc map:\n"
-                                " {5}"
-                                "-----------------------------------------------\n"
-                                "(error during allocation) occupied slots from "
-                                "compute plugin alloc map:\n"
-                                " {6}\n"
-                                "-----------------------------------------------\n"
-                                "occupied slots from kernel resources: {7}",
-                                pprint.pformat(original_plugin_alloc_map),
-                                pprint.pformat(plugin_alloc_map),
-                                occupied_slots_from_kernel,
-                            )
-                            raise
-                            # fmt: on
-                        except ResourceError as e:
                             log.info(
-                                "resource allocation failed ({}): {} of {}\n(alloc map: {})",
-                                type(e).__name__,
-                                device_specific_slots,
-                                dev_name,
-                                dict(computer_set.alloc_map.allocations),
+                                alloc_failure_log_fmt,
+                                e,
+                                textwrap.indent(pprint.pformat(device_specific_slots), "  "),
+                                textwrap.indent(pprint.pformat(current_per_slot_occupancy), "  "),
+                                textwrap.indent(
+                                    pprint.pformat(computer_set.alloc_map.allocations), "  "
+                                ),
                             )
                             raise
             try:
