@@ -23,17 +23,18 @@ from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
-from ..compat import asyncio_run
-from ..exceptions import BackendAPIError
-from ..func.session import ComputeSession
-from ..output.fields import session_fields
-from ..output.types import FieldSpec
-from ..session import AsyncSession, Session
-from ..types import Undefined, undefined
-from . import events
-from .params import CommaSeparatedListType, OptionalType
-from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
-from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from ...compat import asyncio_run
+from ...exceptions import BackendAPIError
+from ...func.session import ComputeSession
+from ...output.fields import session_fields
+from ...output.types import FieldSpec
+from ...session import AsyncSession, Session
+from ...types import Undefined, undefined
+from .. import events
+from ..params import CommaSeparatedListType, OptionalType
+from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
+from .args import click_start_option
+from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
@@ -47,13 +48,6 @@ def session():
 def _create_cmd(docs: str = None):
     @click.argument("image")
     @click.option(
-        "-t",
-        "--name",
-        "--client-token",
-        metavar="NAME",
-        help="Specify a human-readable session name. If not set, a random hex string is used.",
-    )
-    @click.option(
         "-o",
         "--owner",
         "--owner-access-key",
@@ -62,39 +56,10 @@ def _create_cmd(docs: str = None):
     )
     # job scheduling options
     @click.option(
-        "--type",
-        metavar="SESSTYPE",
-        type=click.Choice(["batch", "interactive"]),
-        default="interactive",
-        help="Either batch or interactive",
-    )
-    @click.option(
-        "--starts-at",
-        metavar="STARTS_AT",
-        type=str,
-        default=None,
-        help="Let session to be started at a specific or relative time.",
-    )
-    @click.option(
         "-c",
         "--startup-command",
         metavar="COMMAND",
         help="Set the command to execute for batch-type sessions.",
-    )
-    @click.option(
-        "--enqueue-only",
-        is_flag=True,
-        help="Enqueue the session and return immediately without waiting for its startup.",
-    )
-    @click.option(
-        "--max-wait",
-        metavar="SECONDS",
-        type=int,
-        default=0,
-        help="The maximum duration to wait until the session starts.",
-    )
-    @click.option(
-        "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
     )
     @click.option(
         "--depends",
@@ -105,22 +70,6 @@ def _create_cmd(docs: str = None):
             "Set the list of session ID or names that the newly created session depends on. "
             "The session will get scheduled after all of them successfully finish."
         ),
-    )
-    @click.option(
-        "--callback-url",
-        metavar="CALLBACK_URL",
-        type=str,
-        default=None,
-        help="Callback URL which will be called upon sesison lifecycle events.",
-    )
-    # execution environment
-    @click.option(
-        "-e",
-        "--env",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help="Environment variable (may appear multiple times)",
     )
     # extra options
     @click.option(
@@ -144,89 +93,14 @@ def _create_cmd(docs: str = None):
     )
     # resource spec
     @click.option(
-        "-v",
-        "--volume",
-        "-m",
-        "--mount",
-        "mount",
-        metavar="NAME[=PATH]",
-        type=str,
-        multiple=True,
-        help=(
-            "User-owned virtual folder names to mount. "
-            "If path is not provided, virtual folder will be mounted under /home/work. "
-            "When the target path is relative, it is placed under /home/work "
-            "with auto-created parent directories if any. "
-            "Absolute paths are mounted as-is, but it is prohibited to "
-            "override the predefined Linux system directories."
-        ),
-    )
-    @click.option(
-        "--scaling-group",
-        "--sgroup",
-        type=str,
-        default=None,
-        help=(
-            "The scaling group to execute session. If not specified, "
-            "all available scaling groups are included in the scheduling."
-        ),
-    )
-    @click.option(
-        "-r",
-        "--resources",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help=(
-            "Set computation resources used by the session "
-            "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
-            "1 slot of cpu/gpu represents 1 core. "
-            "The unit of mem(ory) is MiB."
-        ),
-    )
-    @click.option(
-        "--cluster-size",
-        metavar="NUMBER",
-        type=int,
-        default=1,
-        help="The size of cluster in number of containers.",
-    )
-    @click.option(
         "--cluster-mode",
         metavar="MODE",
         type=click.Choice(["single-node", "multi-node"]),
         default="single-node",
         help="The mode of clustering.",
     )
-    @click.option(
-        "--resource-opts",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help="Resource options for creating compute session (e.g: shmem=64m)",
-    )
     @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
     # resource grouping
-    @click.option(
-        "-d",
-        "--domain",
-        metavar="DOMAIN_NAME",
-        default=None,
-        help=(
-            "Domain name where the session will be spawned. "
-            "If not specified, config's domain name will be used."
-        ),
-    )
-    @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
-        default=None,
-        help=(
-            "Group name where the session is spawned. "
-            "User should be a member of the group to execute the code."
-        ),
-    )
     @click.option(
         "--assign-agent",
         default=None,
@@ -237,38 +111,39 @@ def _create_cmd(docs: str = None):
             "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
         ),
     )
+    @click_start_option()
     def create(
         # base args
         image: str,
-        name: str | None,
+        name: str | None,  # click_start_option
         owner: str | None,
         # job scheduling options
-        type: Literal["batch", "interactive"],
-        starts_at: str | None,
+        type: Literal["batch", "interactive"],  # click_start_option
+        starts_at: str | None,  # click_start_option
         startup_command: str | None,
-        enqueue_only: bool,
-        max_wait: int,
-        no_reuse: bool,
+        enqueue_only: bool,  # click_start_option
+        max_wait: int,  # click_start_option
+        no_reuse: bool,  # click_start_option
         depends: Sequence[str],
-        callback_url: str,
+        callback_url: str,  # click_start_option
         # execution environment
-        env: Sequence[str],
+        env: Sequence[str],  # click_start_option
         # extra options
         bootstrap_script: IO | None,
-        tag: str | None,
+        tag: str | None,  # click_start_option
         architecture: str,
         # resource spec
-        mount: Sequence[str],
-        scaling_group: str | None,
-        resources: Sequence[str],
-        cluster_size: int,
+        mount: Sequence[str],  # click_start_option
+        scaling_group: str | None,  # click_start_option
+        resources: Sequence[str],  # click_start_option
+        cluster_size: int,  # click_start_option
         cluster_mode: Literal["single-node", "multi-node"],
-        resource_opts: Sequence[str],
+        resource_opts: Sequence[str],  # click_start_option
         preopen: str | None,
         assign_agent: str | None,
         # resource grouping
-        domain: str | None,
-        group: str | None,
+        domain: str | None,  # click_start_option
+        group: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -387,15 +262,6 @@ session.command()(_create_cmd())
 def _create_from_template_cmd(docs: str = None):
     @click.argument("template_id")
     @click.option(
-        "-t",
-        "--name",
-        "--client-token",
-        metavar="NAME",
-        type=OptionalType(str),
-        default=undefined,
-        help="Specify a human-readable session name. If not set, a random hex string is used.",
-    )
-    @click.option(
         "-o",
         "--owner",
         "--owner-access-key",
@@ -405,28 +271,7 @@ def _create_from_template_cmd(docs: str = None):
         help="Set the owner of the target session explicitly.",
     )
     # job scheduling options
-    @click.option(
-        "--type",
-        "type_",
-        metavar="SESSTYPE",
-        type=click.Choice(["batch", "interactive", undefined]),  # type: ignore
-        default=undefined,
-        help="Either batch or interactive",
-    )
-    @click.option(
-        "--starts_at",
-        metavar="STARTS_AT",
-        type=str,
-        default=None,
-        help="Let session to be started at a specific or relative time.",
-    )
-    @click.option(
-        "-i",
-        "--image",
-        type=OptionalType(str),
-        default=undefined,
-        help="Set compute_session image to run.",
-    )
+    @click.option("-i", "--image", default=undefined, help="Set compute_session image to run.")
     @click.option(
         "-c",
         "--startup-command",
@@ -434,21 +279,6 @@ def _create_from_template_cmd(docs: str = None):
         type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
-    )
-    @click.option(
-        "--enqueue-only",
-        is_flag=True,
-        help="Enqueue the session and return immediately without waiting for its startup.",
-    )
-    @click.option(
-        "--max-wait",
-        metavar="SECONDS",
-        type=OptionalType(int),
-        default=undefined,
-        help="The maximum duration to wait until the session starts.",
-    )
-    @click.option(
-        "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
     )
     @click.option(
         "--depends",
@@ -461,66 +291,16 @@ def _create_from_template_cmd(docs: str = None):
         ),
     )
     @click.option(
-        "--callback-url",
-        metavar="CALLBACK_URL",
-        type=str,
-        default=None,
-        help="Callback URL which will be called upon session lifecycle events.",
-    )
-    # execution environment
-    @click.option(
-        "-e",
-        "--env",
-        metavar="KEY=VAL",
+        "--depends",
+        metavar="SESSION_ID",
         type=str,
         multiple=True,
-        help="Environment variable (may appear multiple times)",
-    )
-    # extra options
-    @click.option(
-        "--tag",
-        type=OptionalType(str),
-        default=undefined,
-        help="User-defined tag string to annotate sessions.",
+        help=(
+            "Set the list of session ID or names that the newly created session depends on. "
+            "The session will get scheduled after all of them successfully finish."
+        ),
     )
     # resource spec
-    @click.option(
-        "-m",
-        "--mount",
-        metavar="NAME[=PATH]",
-        type=str,
-        multiple=True,
-        help=(
-            "User-owned virtual folder names to mount. "
-            "When the target path is relative, it is placed under /home/work "
-            "with auto-created parent directories if any. "
-            "Absolute paths are mounted as-is, but it is prohibited to "
-            "override the predefined Linux system directories."
-        ),
-    )
-    @click.option(
-        "--scaling-group",
-        "--sgroup",
-        type=OptionalType(str),
-        default=undefined,
-        help=(
-            "The scaling group to execute session. If not specified, "
-            "all available scaling groups are included in the scheduling."
-        ),
-    )
-    @click.option(
-        "-r",
-        "--resources",
-        metavar="KEY=VAL",
-        type=str,
-        multiple=True,
-        help=(
-            "Set computation resources used by the session "
-            "(e.g: -r cpu=2 -r mem=256 -r gpu=1)."
-            "1 slot of cpu/gpu represents 1 core. "
-            "The unit of mem(ory) is MiB."
-        ),
-    )
     @click.option(
         "--cluster-size",
         metavar="NUMBER",
@@ -534,28 +314,6 @@ def _create_from_template_cmd(docs: str = None):
         type=str,
         multiple=True,
         help="Resource options for creating compute session (e.g: shmem=64m)",
-    )
-    # resource grouping
-    @click.option(
-        "-d",
-        "--domain",
-        metavar="DOMAIN_NAME",
-        default=None,
-        help=(
-            "Domain name where the session will be spawned. "
-            "If not specified, config's domain name will be used."
-        ),
-    )
-    @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
-        type=OptionalType(str),
-        default=undefined,
-        help=(
-            "Group name where the session is spawned. "
-            "User should be a member of the group to execute the code."
-        ),
     )
     # template overrides
     @click.option(
@@ -582,34 +340,35 @@ def _create_from_template_cmd(docs: str = None):
             "any resource specified at template,"
         ),
     )
+    @click_start_option()
     def create_from_template(
         # base args
         template_id: str,
-        name: str | Undefined,
+        name: str | Undefined,  # click_start_option
         owner: str | Undefined,
         # job scheduling options
-        type_: Literal["batch", "interactive"] | Undefined,
-        starts_at: str | None,
+        type_: Literal["batch", "interactive"] | Undefined,  # click_start_option
+        starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
-        enqueue_only: bool,
-        max_wait: int | Undefined,
-        no_reuse: bool,
+        enqueue_only: bool,  # click_start_option
+        max_wait: int | Undefined,  # click_start_option
+        no_reuse: bool,  # click_start_option
         depends: Sequence[str],
-        callback_url: str,
+        callback_url: str,  # click_start_option
         # execution environment
-        env: Sequence[str],
+        env: Sequence[str],  # click_start_option
         # extra options
-        tag: str | Undefined,
+        tag: str | Undefined,  # click_start_option
         # resource spec
-        mount: Sequence[str],
-        scaling_group: str | Undefined,
-        resources: Sequence[str],
-        cluster_size: int | Undefined,
-        resource_opts: Sequence[str],
+        mount: Sequence[str],  # click_start_option
+        scaling_group: str | Undefined,  # click_start_option
+        resources: Sequence[str],  # click_start_option
+        cluster_size: int | Undefined,  # click_start_option
+        resource_opts: Sequence[str],  # click_start_option
         # resource grouping
-        domain: str | None,
-        group: str | None,
+        domain: str | None,  # click_start_option
+        group: str | None,  # click_start_option
         # template overrides
         no_mount: bool,
         no_env: bool,
