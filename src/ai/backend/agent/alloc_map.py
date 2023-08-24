@@ -305,11 +305,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             if total_allocatable < requested_alloc:
                 raise InsufficientResource(
                     "DiscretePropertyAllocMap: insufficient allocatable amount!",
-                    context_tag,
-                    slot_name,
-                    str(requested_alloc),
-                    str(total_allocatable),
-                    allocation,
+                    context_tag=context_tag,
+                    slot_name=slot_name,
+                    requested_alloc=requested_alloc,
+                    total_allocatable=total_allocatable,
+                    allocation=allocation,
                 )
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
@@ -359,11 +359,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if total_allocatable < remaining_alloc:
                     raise InsufficientResource(
                         "DiscretePropertyAllocMap: insufficient allocatable amount!",
-                        context_tag,
-                        slot_name,
-                        str(requested_alloc),
-                        str(total_allocatable),
-                        allocation,
+                        context_tag=context_tag,
+                        slot_name=slot_name,
+                        requested_alloc=requested_alloc,
+                        total_allocatable=total_allocatable,
+                        allocation=allocation,
                     )
 
                 sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
@@ -381,11 +381,11 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if len(nonzero_devs) == 0:
                     raise InsufficientResource(
                         "DiscretePropertyAllocMap: insufficient allocatable candidate devices!",
-                        context_tag,
-                        slot_name,
-                        str(requested_alloc),
-                        str(total_allocatable),
-                        allocation,
+                        context_tag=context_tag,
+                        slot_name=slot_name,
+                        requested_alloc=requested_alloc,
+                        total_allocatable=total_allocatable,
+                        allocation=allocation,
                     )
                 initial_diffs = distribute(remaining_alloc, nonzero_devs)
                 diffs = {
@@ -533,11 +533,11 @@ class FractionAllocMap(AbstractAllocMap):
             if total_allocatable < alloc:
                 raise InsufficientResource(
                     "FractionAllocMap: insufficient allocatable amount!",
-                    context_tag,
-                    slot_name,
-                    str(alloc),
-                    str(total_allocatable),
-                    allocation,
+                    context_tag=context_tag,
+                    slot_name=slot_name,
+                    requested_alloc=alloc,
+                    total_allocatable=total_allocatable,
+                    allocation=allocation,
                 )
             for dev_id, current_alloc in sorted_dev_allocs:
                 current_alloc = self.allocations[slot_name][dev_id]
@@ -658,11 +658,11 @@ class FractionAllocMap(AbstractAllocMap):
             if total_allocatable.quantize(self.digits) < remaining_alloc.quantize(self.digits):
                 raise InsufficientResource(
                     "FractionAllocMap: insufficient allocatable amount!",
-                    context_tag,
-                    slot_name,
-                    str(alloc),
-                    str(total_allocatable),
-                    allocation,
+                    context_tag=context_tag,
+                    slot_name=slot_name,
+                    requested_alloc=alloc,
+                    total_allocatable=total_allocatable,
+                    allocation=allocation,
                 )
 
             # allocate resources

@@ -38,8 +38,8 @@ class InsufficientResource(ResourceError):
     error_title: str
     context_tag: Optional[str]
     slot_name: SlotName
-    requested_alloc: str
-    total_allocatable: str
+    requested_alloc: Decimal
+    total_allocatable: Decimal | int
     allocation: dict[SlotName, dict[DeviceId, Decimal]]
 
     def __reduce__(self):
