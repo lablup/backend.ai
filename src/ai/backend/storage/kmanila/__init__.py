@@ -1,7 +1,11 @@
 import asyncio
+import base64
+import hashlib
+import hmac
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, NewType, TypedDict, cast
+from typing import Any, Final, NewType, Required, TypedDict, cast
 
 import aiohttp
 import trafaret as t
@@ -39,6 +43,18 @@ class QuotaVolumeMap(TypedDict):
     volume_name: str
 
 
+RequestHeader = TypedDict(
+    "RequestHeader",
+    {
+        "Content-Type": Required[str],
+        "X-Auth-Token": Required[str],
+        "x_auth_client_id": Required[str],
+        "x_auth_date": Required[str],
+        "x_auth_signature": Required[str],
+    },
+)
+
+
 class KManilaQuotaModel(BaseQuotaModel):
     def __init__(
         self,
@@ -52,6 +68,8 @@ class KManilaQuotaModel(BaseQuotaModel):
         access_level: str,
         kmanila_requestor_id: str,
         kmanila_requestor_pwd: str,
+        kmanila_client_id: str,
+        kmanila_client_secret_key: str,
         default_project_id: str | None,
         default_network_id: str | None,
         availability_zone: str,
@@ -67,6 +85,8 @@ class KManilaQuotaModel(BaseQuotaModel):
         self.access_level = access_level
         self.kmanila_requestor_id = kmanila_requestor_id
         self.kmanila_requestor_pwd = kmanila_requestor_pwd
+        self.kmanila_client_id = kmanila_client_id
+        self.kmanila_client_secret_key = kmanila_client_secret_key
         self.default_project_id = default_project_id
         self.default_network_id = default_network_id
         self.availability_zone = availability_zone
@@ -97,9 +117,11 @@ class KManilaQuotaModel(BaseQuotaModel):
                     },
                 }
             }
-            headers = {"Accept": "application/json"}
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
             async with sess.post(
-                self.api_base_url / "identity/auth/tokens", headers=headers, json=request_body
+                self.api_base_url / "d3/adm/keystone/v3/auth/tokens",
+                headers=headers,
+                json=request_body,
             ) as resp:
                 token = resp.headers.get("X-Subject-Token")
                 if token is None:
@@ -137,20 +159,21 @@ class KManilaQuotaModel(BaseQuotaModel):
             return None
         if not do_hard_check:
             return VolumeId(vol_id)
-        project_id = auth_info["project_id"]
-        async with session.get(f"/d3/nas/{project_id}/shares/{vol_id}") as resp:
-            if resp.status == 200:
-                volume_info = (await resp.json())["share"]
-                return VolumeId(volume_info["id"])
-            elif resp.status // 100 == 5:
-                raise ExternalError("Cannot get data from API server")
+        if (volume_info := await self.fetch_volume_info(session, vol_id, auth_info)) is not None:
+            return VolumeId(volume_info["share"]["id"])
         return None
 
     async def fetch_volume_info(
-        self, session: aiohttp.ClientSession, volume_id: VolumeId, auth_info: dict[str, Any]
+        self,
+        session: aiohttp.ClientSession,
+        volume_id: VolumeId,
+        auth_info: dict[str, Any],
     ) -> dict[str, Any] | None:
         project_id = auth_info["project_id"]
-        async with session.get(f"/d3/nas/{project_id}/shares/{volume_id}") as resp:
+        auth_token = auth_info["auth_token"]
+        subpath = f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}"
+        headers = self._build_header(auth_token, subpath, "GET")
+        async with session.get(subpath, headers=headers) as resp:
             if resp.status == 200:
                 return await resp.json()
             elif resp.status // 100 == 4:
@@ -175,6 +198,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is not None:
             return volume_id
         project_id = auth_info["project_id"]
+        auth_token = auth_info["auth_token"]
         request_body = {
             "share": {
                 "share_proto": "nfs",
@@ -186,7 +210,9 @@ class KManilaQuotaModel(BaseQuotaModel):
                 "share_type": self.share_type,
             }
         }
-        async with session.post(url=f"/d3/nas/{project_id}/shares", json=request_body) as resp:
+        subpath = f"/d3/adm/manila/v2/{project_id}/shares"
+        headers = self._build_header(auth_token, subpath, "POST")
+        async with session.post(url=subpath, headers=headers, json=request_body) as resp:
             if resp.status not in (200, 201, 204):
                 raise ExternalError(
                     f"Got invalid status code when post data to API server. {resp.status = }"
@@ -209,6 +235,68 @@ class KManilaQuotaModel(BaseQuotaModel):
             if trial > self.max_poll_count:
                 raise ExternalError(f"Poll trial exceeds the maximum trial count, {trial = }")
 
+    async def list_volume_access_control(
+        self,
+        session: aiohttp.ClientSession,
+        quota_scope_id: QuotaScopeID,
+        volume_id: str,
+        auth_info: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """
+        List all access controls of the given volume.
+        """
+
+        project_id = auth_info["project_id"]
+        auth_token = auth_info["auth_token"]
+        subpath = f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action"
+        headers = self._build_header(auth_token, subpath, "POST")
+
+        async with session.post(
+            url=subpath,
+            headers=headers,
+            json={
+                "os-access_list": None,
+            },
+        ) as resp:
+            if resp.status != 200:
+                raise ExternalError(f"Unable to fetch access control data. {resp.status = }")
+            result = await resp.json()
+            access_list: list[dict[str, Any]] = result["access_list"]
+            return access_list
+
+    async def create_volume_access_control(
+        self,
+        session: aiohttp.ClientSession,
+        quota_scope_id: QuotaScopeID,
+        volume_id: str,
+        auth_info: dict[str, Any],
+        *,
+        access_level: str,
+        access_to: str,
+    ) -> None:
+        """
+        Create access controls of the given volume.
+        """
+
+        project_id = auth_info["project_id"]
+        auth_token = auth_info["auth_token"]
+        subpath = f"/d3/adm/manila/v2/{project_id}/shares/{volume_id}/action"
+        headers = self._build_header(auth_token, subpath, "POST")
+        request_data = {
+            "os-allow_access": {
+                "access_level": access_level,
+                "access_type": "ip",
+                "access_to": access_to,
+            }
+        }
+        async with session.post(
+            subpath,
+            headers=headers,
+            json=request_data,
+        ) as resp:
+            if resp.status != 200:
+                raise ExternalError(f"Unable to create access control. {resp.status = }")
+
     async def _create_access_control(
         self,
         session: aiohttp.ClientSession,
@@ -223,45 +311,43 @@ class KManilaQuotaModel(BaseQuotaModel):
         if the access control does not exists, create it and returns True.
         """
 
-        project_id = auth_info["project_id"]
-
         # Check the access control already exists with the given volume id.
-        async with session.post(
-            url=f"/d3/nas/{project_id}/shares/{volume_id}/action",
-            json={
-                "os-access_list": None,
-            },
-        ) as resp:
-            if resp.status != 200:
-                raise ExternalError(f"Unable to fetch access control data. {resp.status = }")
-            result = await resp.json()
-            access_list: list[dict[str, Any]] = result["access_list"]
-            log_items = [
-                str({"access_level": item["access_level"], "access_to": item["access_to"]})
-                for item in access_list
-            ]
-            log.debug(f"Found {len(access_list)} access control items. ({', '.join(log_items)})")
-            if access_list:
-                return False
-
-        request_data = {
-            "os-allow_access": {
-                "access_level": self.access_level,
-                "access_type": "ip",
-                "access_to": self.access_to,
-            }
-        }
+        access_list = await self.list_volume_access_control(
+            session, quota_scope_id, volume_id, auth_info
+        )
+        log_items = [
+            str({"access_level": item["access_level"], "access_to": item["access_to"]})
+            for item in access_list
+        ]
+        log.debug(f"Found {len(access_list)} access control items. ({', '.join(log_items)})")
+        if access_list:
+            return False
 
         # Should wait before create access control
-        # Else, we get status code 500
+        # Otherwise, we get status code 500
         await asyncio.sleep(5)
-        async with session.post(
-            f"/d3/nas/{project_id}/shares/{volume_id}/action",
-            json=request_data,
-        ) as resp:
-            if resp.status != 200:
-                raise ExternalError(f"Unable to create access control. {resp.status = }")
-            return True
+        await self.create_volume_access_control(
+            session,
+            quota_scope_id,
+            volume_id,
+            auth_info,
+            access_level=self.access_level,
+            access_to=self.access_to,
+        )
+        return True
+
+    def _build_header(self, auth_token: str, subpath: str, method: str) -> RequestHeader:
+        now = datetime.now().strftime("%Y%m%d%H%M%S")
+        signature = bytes(self.kmanila_client_secret_key, "utf8")
+        md = hmac.new(signature, bytes(f"{now}_{method}_{subpath}", "utf8"), hashlib.sha256)
+        sign = base64.b64encode(md.digest()).decode("utf8")
+        return {
+            "Content-Type": "application/json",
+            "X-Auth-Token": auth_token,
+            "x_auth_client_id": self.kmanila_client_id,
+            "x_auth_date": now,
+            "x_auth_signature": sign,
+        }
 
     async def create_quota_scope(
         self,
@@ -274,11 +360,8 @@ class KManilaQuotaModel(BaseQuotaModel):
         event_producer: EventProducer = _extra_args["event_producer"]
 
         auth_info = await self._get_auth_info(quota_scope_id)
-        headers = {
-            "X-Auth-Token": auth_info["auth_token"],
-            "Content-Type": "application/json",
-        }
-        async with aiohttp.ClientSession(base_url=self.api_base_url, headers=headers) as sess:
+
+        async with aiohttp.ClientSession(base_url=self.api_base_url) as sess:
             volume_id = await self._create_volume(
                 sess, quota_scope_id, options, auth_info, name=volume_name
             )
@@ -316,6 +399,8 @@ class KManilaFSVolume(BaseVolume):
             access_level=access_level,
             kmanila_requestor_id=self.config["user_id"],
             kmanila_requestor_pwd=self.config["user_password"],
+            kmanila_client_id=self.config["client_id"],
+            kmanila_client_secret_key=self.config["client_secret_key"],
             default_project_id=self.config.get("project_id"),
             default_network_id=self.config.get("network_id"),
             availability_zone=self.config["availability_zone"],
