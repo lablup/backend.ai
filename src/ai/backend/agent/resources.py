@@ -547,15 +547,15 @@ async def allocate(
 
     try:
         for dev_name in ordered_dev_names:
-            computer_set = computers[dev_name]
-            device_id_map = {device.device_id: device for device in computer_set.devices}
+            computer_ctx = computers[dev_name]
+            device_id_map = {device.device_id: device for device in computer_ctx.devices}
             device_specific_slots = {
                 SlotName(slot_name): Decimal(alloc)
                 for slot_name, alloc in slots.items()
                 if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
             }
             try:
-                resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
+                resource_spec.allocations[dev_name] = computer_ctx.alloc_map.allocate(
                     device_specific_slots,
                     affinity_hint=affinity_hint,
                     context_tag=dev_name,

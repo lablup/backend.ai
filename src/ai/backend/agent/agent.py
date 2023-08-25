@@ -477,13 +477,13 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         for dev_type, device_alloc in resource_spec.allocations.items():
-            computer_set = self.computers[dev_type]
+            computer_ctx = self.computers[dev_type]
             await self.apply_accelerator_allocation(
-                computer_set.instance,
+                computer_ctx.instance,
                 device_alloc,
             )
             accelerator_mounts = await self.generate_accelerator_mounts(
-                computer_set.instance,
+                computer_ctx.instance,
                 device_alloc,
             )
             for mount_info in accelerator_mounts:
@@ -492,11 +492,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             for dev_id, per_dev_alloc in device_alloc.items():
                 alloc_sum += sum(per_dev_alloc.values())
             if alloc_sum > 0:
-                hook_paths = await computer_set.instance.get_hooks(distro, arch)
+                hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
                 if hook_paths:
                     log.debug(
                         "accelerator {} provides hooks: {}",
-                        type(computer_set.instance).__name__,
+                        type(computer_ctx.instance).__name__,
                         ", ".join(map(str, hook_paths)),
                     )
                 for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
@@ -1188,14 +1188,14 @@ class AbstractAgent(
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
         async with self.resource_lock:
-            for computer_set in self.computers.values():
-                computer_set.alloc_map.clear()
+            for computer_ctx in self.computers.values():
+                computer_ctx.alloc_map.clear()
             for kernel_id, container in await self.enumerate_containers():
-                for computer_set in self.computers.values():
+                for computer_ctx in self.computers.values():
                     try:
-                        await computer_set.instance.restore_from_container(
+                        await computer_ctx.instance.restore_from_container(
                             container,
-                            computer_set.alloc_map,
+                            computer_ctx.alloc_map,
                         )
                     except Exception:
                         log.warning(
@@ -1483,10 +1483,10 @@ class AbstractAgent(
                             self.port_pool.discard(p.host_port)
                     # Restore compute resources.
                     async with self.resource_lock:
-                        for computer_set in self.computers.values():
-                            await computer_set.instance.restore_from_container(
+                        for computer_ctx in self.computers.values():
+                            await computer_ctx.instance.restore_from_container(
                                 container,
-                                computer_set.alloc_map,
+                                computer_ctx.alloc_map,
                             )
                     await self.inject_container_lifecycle_event(
                         kernel_id,
@@ -1720,8 +1720,8 @@ class AbstractAgent(
                 # Get attached devices information (including model_name).
                 attached_devices = {}
                 for dev_name, device_alloc in resource_spec.allocations.items():
-                    computer_set = self.computers[dev_name]
-                    devices = await computer_set.instance.get_attached_devices(device_alloc)
+                    computer_ctx = self.computers[dev_name]
+                    devices = await computer_ctx.instance.get_attached_devices(device_alloc)
                     attached_devices[dev_name] = devices
 
                 exposed_ports = [2000, 2001]

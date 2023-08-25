@@ -250,6 +250,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # prune zero alloc slots
         requested_slots = {k: v for k, v in slots.items() if v > 0}
+        if SlotName("mem") in requested_slots:
+            requested_slots[SlotName("mem")] = Decimal(100000000000000000000000000000)  # DEBUG
 
         # check exclusive
         for slot_name_a in requested_slots.keys():
