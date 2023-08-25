@@ -106,6 +106,7 @@ async def server_main(
         )
         log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
         ctx = Context(
+            node_id=local_config["storage-proxy"]["node-id"],
             pid=os.getpid(),
             local_config=local_config,
             etcd=etcd,

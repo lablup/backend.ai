@@ -84,13 +84,22 @@ class BaseContext:
 
 
 class Context(BaseContext):
-    __slots__ = ("pid", "etcd", "local_config", "dsn", "event_producer", "event_dispatcher")
+    __slots__ = (
+        "pid",
+        "node_id",
+        "etcd",
+        "local_config",
+        "dsn",
+        "event_producer",
+        "event_dispatcher",
+    )
 
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
 
     def __init__(
         self,
+        node_id: str,
         pid: int,
         local_config: Mapping[str, Any],
         etcd: AsyncEtcd,
@@ -100,5 +109,6 @@ class Context(BaseContext):
         dsn: str | None = None,
     ) -> None:
         super().__init__(pid, local_config, etcd, dsn=dsn)
+        self.node_id = node_id
         self.event_producer = event_producer
         self.event_dispatcher = event_dispatcher

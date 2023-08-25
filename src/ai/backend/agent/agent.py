@@ -76,6 +76,8 @@ from ai.backend.common.events import (
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
     EventDispatcher,
     EventProducer,
     ExecutionCancelledEvent,
@@ -92,8 +94,9 @@ from ai.backend.common.events import (
     KernelTerminatedEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
-    VolumeCreated,
-    VolumeDeleted,
+    VolumeMountableNodeType,
+    VolumeMounted,
+    VolumeUnmounted,
 )
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
@@ -127,7 +130,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop
+from ai.backend.common.utils import cancel_tasks, current_loop, mount, unmount
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -682,8 +685,8 @@ class AbstractAgent(
 
         # passive events
         evd = self.event_dispatcher
-        evd.subscribe(VolumeCreated, self, handle_volume_mount, name="ag.volume.created")
-        evd.subscribe(VolumeDeleted, self, handle_volume_unmount, name="ag.volume.deleted")
+        evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
+        evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_unmount, name="ag.volume.unmount")
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         """
@@ -2364,15 +2367,45 @@ class AbstractAgent(
 async def handle_volume_mount(
     context: AbstractAgent,
     source: AgentId,
-    event: VolumeCreated,
+    event: DoVolumeMountEvent,
 ) -> None:
     mount_prefix = await context.etcd.get("volumes/_mount")
-    await event.mount(mount_prefix)
+    await mount(
+        event.mount_path,
+        event.fs_location,
+        event.fs_type,
+        event.cmd_options,
+        event.edit_fstab,
+        event.fstab_path,
+        mount_prefix,
+    )
+    await context.event_producer.produce_event(
+        VolumeMounted(
+            str(context.id),
+            VolumeMountableNodeType.AGENT,
+            event.mount_path,
+            event.quota_scope_id,
+        )
+    )
 
 
 async def handle_volume_unmount(
     context: AbstractAgent,
     source: AgentId,
-    event: VolumeDeleted,
+    event: DoVolumeUnmountEvent,
 ) -> None:
-    pass
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    await unmount(
+        event.mount_path,
+        mount_prefix,
+        event.edit_fstab,
+        event.fstab_path,
+    )
+    await context.event_producer.produce_event(
+        VolumeUnmounted(
+            str(context.id),
+            VolumeMountableNodeType.AGENT,
+            event.mount_path,
+            event.quota_scope_id,
+        )
+    )

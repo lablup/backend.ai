@@ -9,7 +9,6 @@ import secrets
 import socket
 import uuid
 from collections import defaultdict
-from pathlib import Path
 from types import TracebackType
 from typing import (
     Any,
@@ -28,7 +27,6 @@ from typing import (
     cast,
 )
 
-import aiofiles
 import attrs
 from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
@@ -38,18 +36,18 @@ from redis.asyncio import ConnectionPool
 from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
-from .exception import VolumeMountFailed
 from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
     EtcdRedisConfig,
     KernelId,
     LogSeverity,
+    QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
+    VolumeMountableNodeType,
     aobject,
 )
-from .utils import Fstab
 
 __all__ = (
     "AbstractEvent",
@@ -556,10 +554,11 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
 
 
 @attrs.define(auto_attribs=True, slots=True)
-class VolumeCreated(AbstractEvent):
-    name = "volume_created"
+class DoVolumeMountEvent(AbstractEvent):
+    name = "do_volume_mount"
 
     mount_path: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
 
     fs_location: str = attrs.field()
     fs_type: str = attrs.field(default="nfs")
@@ -574,6 +573,7 @@ class VolumeCreated(AbstractEvent):
     def serialize(self) -> tuple:
         return (
             self.mount_path,
+            str(self.quota_scope_id),
             self.fs_location,
             self.fs_type,
             self.cmd_options,
@@ -586,59 +586,22 @@ class VolumeCreated(AbstractEvent):
     def deserialize(cls, value: tuple):
         return cls(
             mount_path=value[0],
-            scaling_group=value[1],
-            edit_fstab=value[2],
-            fstab_path=value[3],
-            fs_location=value[4],
-            fs_type=value[5],
-            cmd_options=value[6],
+            quota_scope_id=QuotaScopeID.parse(value[1]),
+            scaling_group=value[2],
+            edit_fstab=value[3],
+            fstab_path=value[4],
+            fs_location=value[5],
+            fs_type=value[6],
+            cmd_options=value[7],
         )
-
-    async def mount(self, mount_prefix: str | None = None) -> None:
-        if mount_prefix is None:
-            mount_prefix = "/"
-        mountpoint = Path(mount_prefix) / self.mount_path
-        mountpoint.mkdir(exist_ok=True)
-        if self.cmd_options is not None:
-            cmd = [
-                "sudo",
-                "mount",
-                "-t",
-                self.fs_type,
-                "-o",
-                self.cmd_options,
-                self.fs_location,
-                str(mountpoint),
-            ]
-        else:
-            cmd = ["sudo", "mount", "-t", self.fs_type, self.fs_location, str(mountpoint)]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        raw_out, raw_err = await proc.communicate()
-        raw_out.decode("utf8")
-        err = raw_err.decode("utf8")
-        await proc.wait()
-        if err:
-            log.error("Mount error: " + err)
-            raise VolumeMountFailed(f"Failed to mount {self.mount_path} on {mount_prefix}")
-        log.info(f"Mounted {self.mount_path} on {mount_prefix}")
-        if self.edit_fstab:
-            async with aiofiles.open(self.fstab_path, mode="r+") as fp:  # type: ignore
-                fstab = Fstab(fp)
-                await fstab.add(
-                    self.fs_location,
-                    str(mountpoint),
-                    self.fs_type,
-                    self.cmd_options,
-                )
 
 
 @attrs.define(auto_attribs=True, slots=True)
-class VolumeDeleted(AbstractEvent):
-    name = "volume_deleted"
+class DoVolumeUnmountEvent(AbstractEvent):
+    name = "do_volume_unmount"
 
     mount_path: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
     scaling_group: str | None = attrs.field(default=None)
 
     # if `edit_fstab` is False, `fstab_path` is ignored
@@ -649,6 +612,7 @@ class VolumeDeleted(AbstractEvent):
     def serialize(self) -> tuple:
         return (
             self.mount_path,
+            str(self.quota_scope_id),
             self.scaling_group,
             self.edit_fstab,
             self.fstab_path,
@@ -657,8 +621,45 @@ class VolumeDeleted(AbstractEvent):
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            mount_path=value[0], scaling_group=value[1], edit_fstab=value[2], fstab_path=value[3]
+            mount_path=value[0],
+            quota_scope_id=QuotaScopeID.parse(value[1]),
+            scaling_group=value[2],
+            edit_fstab=value[3],
+            fstab_path=value[4],
         )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VolumeMountEventArgs(AbstractEvent):
+    node_id: str = attrs.field()
+    node_type: VolumeMountableNodeType = attrs.field()
+    mount_path: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (
+            self.node_id,
+            str(self.node_type),
+            self.mount_path,
+            str(self.quota_scope_id),
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            value[0],
+            VolumeMountableNodeType(value[1]),
+            value[2],
+            QuotaScopeID.parse(value[3]),
+        )
+
+
+class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
+    name = "volume_mounted"
+
+
+class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
+    name = "volume_unmounted"
 
 
 class RedisConnectorFunc(Protocol):

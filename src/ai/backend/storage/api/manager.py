@@ -25,15 +25,23 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.events import VolumeCreated, VolumeDeleted
+from ai.backend.common.events import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
+    VolumeMountableNodeType,
+    VolumeMounted,
+    VolumeUnmounted,
+)
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
+from ai.backend.common.utils import mount, unmount
 from ai.backend.storage.exception import ExecutionError
 
 from .. import __version__
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import (
+    InvalidQuotaConfig,
     InvalidSubpathError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
@@ -274,7 +282,10 @@ async def update_quota_scope(request: web.Request) -> web.Response:
             quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
-            await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            try:
+                await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            except InvalidQuotaConfig:
+                return web.Response(status=400)
             return web.Response(status=204)
 
 
@@ -1053,23 +1064,53 @@ async def init_manager_app(ctx: Context) -> web.Application:
 
     # passive events
     evd = ctx.event_dispatcher
-    evd.subscribe(VolumeCreated, ctx, handle_volume_mount, name="storage.volume.created")
-    evd.subscribe(VolumeDeleted, ctx, handle_volume_unmount, name="storage.volume.deleted")
+    evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
+    evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_unmount, name="storage.volume.unmount")
     return app
 
 
 async def handle_volume_mount(
     context: Context,
     source: AgentId,
-    event: VolumeCreated,
+    event: DoVolumeMountEvent,
 ) -> None:
     mount_prefix = await context.etcd.get("volumes/_mount")
-    await event.mount(mount_prefix)
+    await mount(
+        event.mount_path,
+        event.fs_location,
+        event.fs_type,
+        event.cmd_options,
+        event.edit_fstab,
+        event.fstab_path,
+        mount_prefix,
+    )
+    await context.event_producer.produce_event(
+        VolumeMounted(
+            str(context.node_id),
+            VolumeMountableNodeType.STORAGE_PROXY,
+            event.mount_path,
+            event.quota_scope_id,
+        )
+    )
 
 
 async def handle_volume_unmount(
     context: Context,
     source: AgentId,
-    event: VolumeDeleted,
+    event: DoVolumeUnmountEvent,
 ) -> None:
-    pass
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    await unmount(
+        event.mount_path,
+        mount_prefix,
+        event.edit_fstab,
+        event.fstab_path,
+    )
+    await context.event_producer.produce_event(
+        VolumeUnmounted(
+            str(context.node_id),
+            VolumeMountableNodeType.STORAGE_PROXY,
+            event.mount_path,
+            event.quota_scope_id,
+        )
+    )

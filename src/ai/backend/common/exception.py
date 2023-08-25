@@ -82,3 +82,9 @@ class VolumeMountFailed(RuntimeError):
     """
     Represents a mount process failure.
     """
+
+
+class VolumeUnmountFailed(RuntimeError):
+    """
+    Represents a mount process failure.
+    """

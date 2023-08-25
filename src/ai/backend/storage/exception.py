@@ -37,6 +37,10 @@ class QuotaScopeAlreadyExists(StorageProxyError):
     pass
 
 
+class InvalidQuotaConfig(StorageProxyError):
+    pass
+
+
 class InvalidSubpathError(StorageProxyError):
     pass
 

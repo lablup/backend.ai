@@ -203,7 +203,7 @@ async def handle_mount(request: web.Request) -> web.Response:
     return web.Response(text=out)
 
 
-async def handle_umount(request: web.Request) -> web.Response:
+async def handle_unmount(request: web.Request) -> web.Response:
     log.info("HANDLE_UMOUNT")
     params = await request.json()
     config = request.app["config_server"]
@@ -255,7 +255,7 @@ async def init_app(app):
     r("GET", "/fstab", handle_fstab_detail)
     r("GET", "/mounts", handle_list_mounts)
     r("POST", "/mounts", handle_mount)
-    r("DELETE", "/mounts", handle_umount)
+    r("DELETE", "/mounts", handle_unmount)
 
 
 async def shutdown_app(app):

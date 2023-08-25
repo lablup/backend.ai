@@ -12,14 +12,15 @@ import trafaret as t
 from yarl import URL
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events import EventProducer, VolumeCreated
+from ai.backend.common.events import DoVolumeMountEvent, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import QuotaScopeID
+from ai.backend.common.types import QuotaScopeID, VolumeMountableNodeType
 
 from ..abc import AbstractQuotaModel
 from ..exception import (
     ExecutionError,
     ExternalError,
+    InvalidQuotaConfig,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
 )
@@ -32,6 +33,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 DEFAULT_MAX_POLL_COUNT: Final = 20
 DEFAULT_VOLUME_SIZE: Final = 1000
 QUOTA_VOLUME_ID_MAP_KEY: Final = "kmanila/volumes"
+VOLUME_MOUNTABLE_NODE_MAP_KEY: Final = "kmanila/nodes"
 
 
 kmanila_request_params = t.Dict(
@@ -380,8 +382,9 @@ class KManilaQuotaModel(BaseQuotaModel):
                 raise QuotaScopeAlreadyExists
 
         await event_producer.produce_event(
-            VolumeCreated(
+            DoVolumeMountEvent(
                 mount_path=str(self.mangle_qspath(quota_scope_id)),
+                quota_scope_id=quota_scope_id,
                 fs_location=f"{self.fs_location_prefix}:/share_{volume_id}",
                 fs_type="nfs",
                 edit_fstab=True,
@@ -408,11 +411,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info = await self._get_auth_info(quota_scope_id)
 
         async with aiohttp.ClientSession(base_url=self.api_base_url) as session:
-            if (
-                volume_id := await self.get_volume_id(
-                    session, quota_scope_id, auth_info, do_hard_check=False
-                )
-            ) is None:
+            if (volume_id := await self.get_user_volume_id(quota_scope_id)) is None:
                 raise QuotaScopeNotFoundError
             if (data := await self.fetch_volume_info(session, volume_id, auth_info)) is not None:
                 return data["share"]
@@ -438,8 +437,12 @@ class KManilaQuotaModel(BaseQuotaModel):
                 url=subpath,
                 headers=headers,
                 json=rqst_body,
-            ):
-                pass
+            ) as resp:
+                if resp.status // 100 == 2:
+                    return
+                elif resp.status // 100 == 4:
+                    raise InvalidQuotaConfig
+                raise ExternalError
 
     # override
     async def unset_quota(
@@ -467,6 +470,12 @@ class KManilaQuotaModel(BaseQuotaModel):
         await self.delete_user_volume_info(quota_scope_id)
 
 
+async def _save_storage_proxy_to_etcd(etcd: AsyncEtcd, node_id: str) -> None:
+    await etcd.put_prefix(
+        VOLUME_MOUNTABLE_NODE_MAP_KEY, {node_id: str(VolumeMountableNodeType.STORAGE_PROXY)}
+    )
+
+
 class KManilaFSVolume(BaseVolume):
     async def create_quota_model(self) -> AbstractQuotaModel:
         access_level = self.config.get("access_level", "rw")
@@ -475,6 +484,8 @@ class KManilaFSVolume(BaseVolume):
             if self.config.get("max_poll_count")
             else DEFAULT_MAX_POLL_COUNT
         )
+        node_id: str = self.local_config["storage-proxy"]["node-id"]
+        await _save_storage_proxy_to_etcd(self.etcd, node_id)
         return KManilaQuotaModel(
             self.mount_path,
             self.etcd,
