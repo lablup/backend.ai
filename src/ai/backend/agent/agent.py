@@ -1728,6 +1728,7 @@ class AbstractAgent(
                             )
                         except (InsufficientResource, ResourceError) as e:
                             await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                            # TODO: rollback allocation in previous compute devices in the loop
                             original_plugin_alloc_map: dict[
                                 DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
                             ] = {}
