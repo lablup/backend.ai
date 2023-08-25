@@ -1737,14 +1737,6 @@ class AbstractAgent(
                                     hint_devices, self.affinity_map, affinity_hint.policy
                                 )
                             except ResourceError as e:  # including InsufficientResource
-                                await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
-                                original_plugin_alloc_map: dict[
-                                    DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
-                                ] = {}
-                                for dev in ordered_dev_names:
-                                    original_plugin_alloc_map[dev] = copy.deepcopy(
-                                        dict(self.computers[dev].alloc_map.allocations)
-                                    )
                                 alloc_failure_log_fmt = "\n".join(
                                     [
                                         "resource allocation failed: {0}",
@@ -1764,8 +1756,7 @@ class AbstractAgent(
                                         pprint.pformat(dict(current_per_slot_occupancy)), "  "
                                     ),
                                     textwrap.indent(
-                                        pprint.pformat(dict(computer_set.alloc_map.allocations)),
-                                        "  ",
+                                        pprint.pformat(dict(current_dev_alloc_maps)), "  "
                                     ),
                                 )
                                 raise
@@ -1773,6 +1764,7 @@ class AbstractAgent(
                         # rollback the entire allocations in all devices
                         for dev in ordered_dev_names:
                             self.computers[dev].alloc_map.allocations = current_dev_alloc_maps[dev]
+                        await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
                         raise
             try:
                 # Prepare scratch spaces and dotfiles inside it.
