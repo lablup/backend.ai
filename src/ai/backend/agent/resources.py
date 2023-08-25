@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
+import pprint
+import textwrap
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
@@ -45,11 +48,13 @@ from ai.backend.common.types import (
 )
 
 # Expose legacy import names for plugins
+from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
 from .alloc_map import AbstractAllocMap as AbstractAllocMap  # noqa: F401
 from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
 from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
+from .exception import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import Container as SessionContainer
 from .types import MountInfo
@@ -58,6 +63,8 @@ if TYPE_CHECKING:
     from io import TextIOWrapper
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
+
+    from .agent import ComputerContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -507,3 +514,79 @@ async def scan_resource_usage_per_slot(
             )
             tg.create_task(_wrap_future(fut))
     return slot_allocs
+
+
+async def allocate(
+    computers: Mapping[DeviceName, ComputerContext],
+    resource_spec: KernelResourceSpec,
+    alloc_order: Sequence[DeviceName],
+    affinity_map: AffinityMap,
+    affinity_policy: AffinityPolicy,
+) -> None:
+    """
+    Updates the allocation maps of the given computer contexts by allocating the given resource spec.
+    If it fails, the entire modification of allocation maps is rolled back to the initial state.
+    """
+    slots = resource_spec.slots
+
+    # Sort out the device names in the resource spec based on the configured allocation order
+    dev_names: set[DeviceName] = set()
+    for slot_name in slots.keys():
+        dev_name = slot_name.split(".", maxsplit=1)[0]
+        dev_names.add(DeviceName(dev_name))
+    ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
+
+    affinity_hint = AffinityHint(
+        None,
+        affinity_map,
+        affinity_policy,
+    )
+    current_dev_alloc_maps = {
+        dev: copy.deepcopy(computers[dev].alloc_map.allocations) for dev in ordered_dev_names
+    }
+
+    try:
+        for dev_name in ordered_dev_names:
+            computer_set = computers[dev_name]
+            device_id_map = {device.device_id: device for device in computer_set.devices}
+            device_specific_slots = {
+                SlotName(slot_name): Decimal(alloc)
+                for slot_name, alloc in slots.items()
+                if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
+            }
+            try:
+                resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
+                    device_specific_slots,
+                    affinity_hint=affinity_hint,
+                    context_tag=dev_name,
+                )
+                log.debug(
+                    "allocated {} for device {}",
+                    resource_spec.allocations[dev_name],
+                    dev_name,
+                )
+                hint_devices: list[AbstractComputeDevice] = []
+                for slot_name, per_device_alloc in resource_spec.allocations[dev_name].items():
+                    hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
+                affinity_hint = AffinityHint(hint_devices, affinity_map, affinity_hint.policy)
+            except ResourceError as e:  # including InsufficientResource
+                alloc_failure_log_fmt = "\n".join(
+                    [
+                        "resource allocation failed: {0}",
+                        "(before allocation) device-specific slots ({1}):\n{2}",
+                        "(before allocation) compute plugin alloc map:\n{3}",
+                    ]
+                )
+                log.info(
+                    alloc_failure_log_fmt,
+                    e,
+                    dev_name,
+                    textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
+                    textwrap.indent(pprint.pformat(dict(current_dev_alloc_maps)), "  "),
+                )
+                raise
+    except ResourceError:
+        # rollback the entire allocations in all devices
+        for dev in ordered_dev_names:
+            computers[dev].alloc_map.allocations = current_dev_alloc_maps[dev]
+        raise
