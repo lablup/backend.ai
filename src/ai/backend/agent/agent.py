@@ -133,7 +133,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
-from .exception import AgentError, ContainerCreationError, InsufficientResource, ResourceError
+from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -538,7 +538,7 @@ class AbstractAgent(
     etcd: AsyncEtcd
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
-    computers: MutableMapping[str, ComputerContext]
+    computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
     port_pool: Set[int]
 
@@ -1218,7 +1218,7 @@ class AbstractAgent(
         kernel_session_map: Dict[KernelId, SessionId] = {}
         terminated_kernels = {}
 
-        async with self.resource_lock:
+        async with self.registry_lock:
             try:
                 # Check if: there are dead containers
                 for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
@@ -1470,7 +1470,7 @@ class AbstractAgent(
             kernel_obj.agent_config = self.local_config
             if kernel_obj.runner is not None:
                 await kernel_obj.runner.__ainit__()
-        async with self.resource_lock:
+        async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
             ):
@@ -1484,11 +1484,12 @@ class AbstractAgent(
                         if p.host_port is not None:
                             self.port_pool.discard(p.host_port)
                     # Restore compute resources.
-                    for computer_set in self.computers.values():
-                        await computer_set.instance.restore_from_container(
-                            container,
-                            computer_set.alloc_map,
-                        )
+                    async with self.resource_lock:
+                        for computer_set in self.computers.values():
+                            await computer_set.instance.restore_from_container(
+                                container,
+                                computer_set.alloc_map,
+                            )
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         session_id,
@@ -1697,66 +1698,82 @@ class AbstractAgent(
                         [*self.kernel_registry.keys()],
                         self.local_config["container"]["scratch-root"],
                     )
-                    for dev_name in ordered_dev_names:
-                        computer_set = self.computers[dev_name]
-                        device_id_map = {
-                            device.device_id: device for device in computer_set.devices
-                        }
-                        device_specific_slots = {
-                            SlotName(slot_name): Decimal(alloc)
-                            for slot_name, alloc in slots.items()
-                            if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
-                        }
-                        try:
-                            resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
-                                device_specific_slots,
-                                affinity_hint=affinity_hint,
-                                context_tag=dev_name,
-                            )
-                            log.debug(
-                                "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
-                            )
-                            hint_devices: list[AbstractComputeDevice] = []
-                            for slot_name, per_device_alloc in resource_spec.allocations[
-                                dev_name
-                            ].items():
-                                hint_devices.extend(
-                                    device_id_map[k] for k in per_device_alloc.keys()
+                    current_dev_alloc_maps = {
+                        dev: copy.deepcopy(self.computers[dev].alloc_map.allocations)
+                        for dev in ordered_dev_names
+                    }
+                    try:
+                        for dev_name in ordered_dev_names:
+                            computer_set = self.computers[dev_name]
+                            device_id_map = {
+                                device.device_id: device for device in computer_set.devices
+                            }
+                            device_specific_slots = {
+                                SlotName(slot_name): Decimal(alloc)
+                                for slot_name, alloc in slots.items()
+                                if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
+                            }
+                            try:
+                                resource_spec.allocations[dev_name] = (
+                                    computer_set.alloc_map.allocate(
+                                        device_specific_slots,
+                                        affinity_hint=affinity_hint,
+                                        context_tag=dev_name,
+                                    )
                                 )
-                            affinity_hint = AffinityHint(
-                                hint_devices, self.affinity_map, affinity_hint.policy
-                            )
-                        except (InsufficientResource, ResourceError) as e:
-                            await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
-                            # TODO: rollback allocation in previous compute devices in the loop
-                            original_plugin_alloc_map: dict[
-                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
-                            ] = {}
-                            for dev in ordered_dev_names:
-                                original_plugin_alloc_map[dev] = copy.deepcopy(
-                                    dict(self.computers[dev].alloc_map.allocations)
+                                log.debug(
+                                    "{} allocations: {}",
+                                    dev_name,
+                                    resource_spec.allocations[dev_name],
                                 )
-                            alloc_failure_log_fmt = "\n".join(
-                                [
-                                    "resource allocation failed: {0}",
-                                    "(before allocation) device-specific slots ({1}):\n{2}",
-                                    "(before allocation) current per-slot occupancy:\n{3}",
-                                    "(after trying allocation) compute plugin alloc map:\n{4}",
-                                ]
-                            )
-                            log.info(
-                                alloc_failure_log_fmt,
-                                e,
-                                dev_name,
-                                textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
-                                textwrap.indent(
-                                    pprint.pformat(dict(current_per_slot_occupancy)), "  "
-                                ),
-                                textwrap.indent(
-                                    pprint.pformat(dict(computer_set.alloc_map.allocations)), "  "
-                                ),
-                            )
-                            raise
+                                hint_devices: list[AbstractComputeDevice] = []
+                                for slot_name, per_device_alloc in resource_spec.allocations[
+                                    dev_name
+                                ].items():
+                                    hint_devices.extend(
+                                        device_id_map[k] for k in per_device_alloc.keys()
+                                    )
+                                affinity_hint = AffinityHint(
+                                    hint_devices, self.affinity_map, affinity_hint.policy
+                                )
+                            except ResourceError as e:  # including InsufficientResource
+                                await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                                original_plugin_alloc_map: dict[
+                                    DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
+                                ] = {}
+                                for dev in ordered_dev_names:
+                                    original_plugin_alloc_map[dev] = copy.deepcopy(
+                                        dict(self.computers[dev].alloc_map.allocations)
+                                    )
+                                alloc_failure_log_fmt = "\n".join(
+                                    [
+                                        "resource allocation failed: {0}",
+                                        "(before allocation) device-specific slots ({1}):\n{2}",
+                                        "(before allocation) current per-slot occupancy:\n{3}",
+                                        "(after trying allocation) compute plugin alloc map:\n{4}",
+                                    ]
+                                )
+                                log.info(
+                                    alloc_failure_log_fmt,
+                                    e,
+                                    dev_name,
+                                    textwrap.indent(
+                                        pprint.pformat(dict(device_specific_slots)), "  "
+                                    ),
+                                    textwrap.indent(
+                                        pprint.pformat(dict(current_per_slot_occupancy)), "  "
+                                    ),
+                                    textwrap.indent(
+                                        pprint.pformat(dict(computer_set.alloc_map.allocations)),
+                                        "  ",
+                                    ),
+                                )
+                                raise
+                    except ResourceError:
+                        # rollback the entire allocations in all devices
+                        for dev in ordered_dev_names:
+                            self.computers[dev].alloc_map.allocations = current_dev_alloc_maps[dev]
+                        raise
             try:
                 # Prepare scratch spaces and dotfiles inside it.
                 if not restarting:
