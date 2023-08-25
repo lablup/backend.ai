@@ -1,10 +1,18 @@
 import json
+import tempfile
+import textwrap
+import unittest.mock
+import uuid
+from decimal import Decimal
+from pathlib import Path
 from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
 
+from ai.backend.agent.resources import scan_resource_usage_per_slot
 from ai.backend.agent.vendor import linux
+from ai.backend.common.types import KernelId, SlotName
 
 # TODO: write tests for KernelResourceSpec (read/write consistency)
 # from ai.backend.agent.resources import (
@@ -116,3 +124,59 @@ async def test_get_core_topology(mocker):
 
     numa = linux.libnuma()
     assert (await numa.get_core_topology()) == ([0, 2], [1, 3])
+
+
+@pytest.mark.asyncio
+async def test_scan_resource_usage_per_slot(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir_name:
+        tmpdir = Path(tmpdir_name)
+        random_kernel_id = KernelId(uuid.uuid4())
+        slot_allocs = await scan_resource_usage_per_slot([random_kernel_id], tmpdir)
+        # should not raise FileNotFoundError
+        assert not slot_allocs  # should be empty
+
+        kernel_ids = [
+            KernelId(uuid.uuid4()),
+            KernelId(uuid.uuid4()),
+            KernelId(uuid.uuid4()),
+        ]
+        (tmpdir / str(kernel_ids[0]) / "config").mkdir(parents=True, exist_ok=True)
+        (tmpdir / str(kernel_ids[1]) / "config").mkdir(parents=True, exist_ok=True)
+        (tmpdir / str(kernel_ids[2]) / "config").mkdir(parents=True, exist_ok=True)
+        (tmpdir / str(kernel_ids[0]) / "config" / "resource.txt").write_text(textwrap.dedent("""
+        CID=a001
+        SCRATCH_SIZE=0
+        MOUNTS=
+        SLOTS={"cpu":"5","mem":"4096","cuda.shares":"0.5"}
+        """))
+        (tmpdir / str(kernel_ids[1]) / "config" / "resource.txt").write_text(textwrap.dedent("""
+        CID=a002
+        SCRATCH_SIZE=0
+        MOUNTS=
+        SLOTS={"cpu":"7","mem":"2048","cuda.shares":"0.8"}
+        """))
+        (tmpdir / str(kernel_ids[2]) / "config" / "resource.txt").write_text(textwrap.dedent("""
+        CID=a003
+        SCRATCH_SIZE=0
+        MOUNTS=
+        SLOTS={"cpu":"13","mem":"1024","cuda.shares":"0.2"}
+        """))
+        slot_allocs = await scan_resource_usage_per_slot(kernel_ids, tmpdir)
+        assert slot_allocs[SlotName("cpu")] == Decimal(25)
+        assert slot_allocs[SlotName("mem")] == Decimal(7168)
+        assert slot_allocs[SlotName("cuda.shares")] == Decimal("1.5")
+
+        # Simulate that a container has terminated in the middle.
+        (tmpdir / str(kernel_ids[1]) / "config" / "resource.txt").unlink()
+        slot_allocs = await scan_resource_usage_per_slot(kernel_ids, tmpdir)
+        assert slot_allocs[SlotName("cpu")] == Decimal(18)
+        assert slot_allocs[SlotName("mem")] == Decimal(5120)
+        assert slot_allocs[SlotName("cuda.shares")] == Decimal("0.7")
+
+        # Other parsing errors should be an explicit error.
+        with unittest.mock.patch(
+            "ai.backend.agent.resources.KernelResourceSpec.read_from_string",
+        ) as mock:
+            mock.side_effect = ValueError("parsing error")
+            with pytest.raises(ExceptionGroup):
+                await scan_resource_usage_per_slot(kernel_ids, tmpdir)
