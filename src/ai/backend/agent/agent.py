@@ -1705,7 +1705,7 @@ class AbstractAgent(
                         device_specific_slots = {
                             SlotName(slot_name): Decimal(alloc)
                             for slot_name, alloc in slots.items()
-                            if slot_name.startswith(dev_name)
+                            if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
                         }
                         try:
                             resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
@@ -1739,14 +1739,15 @@ class AbstractAgent(
                             alloc_failure_log_fmt = "\n".join(
                                 [
                                     "resource allocation failed: {0}",
-                                    "(before allocation) device-specific slots:\n{1}",
-                                    "(before allocation) per-slot occupancy:\n{2}",
-                                    "(before allocation) compute plugin alloc map:\n{3}",
+                                    "(before allocation) device-specific slots ({1}):\n{2}",
+                                    "(before allocation) current per-slot occupancy:\n{3}",
+                                    "(after trying allocation) compute plugin alloc map:\n{4}",
                                 ]
                             )
                             log.info(
                                 alloc_failure_log_fmt,
                                 e,
+                                dev_name,
                                 textwrap.indent(pprint.pformat(device_specific_slots), "  "),
                                 textwrap.indent(pprint.pformat(current_per_slot_occupancy), "  "),
                                 textwrap.indent(
