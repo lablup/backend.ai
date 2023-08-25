@@ -26,7 +26,11 @@ from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
 from ..models import (
+    EndpointRow,
+    EndpointTokenRow,
     ImageRow,
+    RouteStatus,
+    RoutingRow,
     SessionRow,
     UserRow,
     query_accessible_vfolders,
@@ -34,8 +38,6 @@ from ..models import (
     scaling_groups,
     vfolders,
 )
-from ..models.endpoint import EndpointRow
-from ..models.routing import RouteStatus, RoutingRow
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
@@ -94,7 +96,9 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
-    query_conds = EndpointRow.session_owner == request["user"]["uuid"]
+    query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
+        EndpointRow.desired_session_count >= 0
+    )
     if params["name"]:
         query_conds &= EndpointRow.name == params["name"]
 
@@ -641,7 +645,19 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
             },
         ) as resp:
             token_json = await resp.json()
-            return web.json_response({"token": token_json["token"]})
+            token = token_json["token"]
+
+    async with root_ctx.db.begin_session() as db_sess:
+        token_row = EndpointTokenRow(
+            token,
+            endpoint.id,
+            endpoint.domain,
+            endpoint.project,
+            endpoint.session_owner,
+        )
+        db_sess.add(token_row)
+        await db_sess.commit()
+        return web.json_response({"token": token})
 
 
 @auth_required

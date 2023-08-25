@@ -1114,7 +1114,7 @@ class SchedulerDispatcher(aobject):
         # Altering inference sessions should only be done by this method
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
-        endpoints_to_remove: set[EndpointRow] = set()
+        endpoints_to_mark_terminated: set[EndpointRow] = set()
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
         # endpoints_to_flush = [
@@ -1133,7 +1133,7 @@ class SchedulerDispatcher(aobject):
             if desired_session_count < 0:
                 desired_session_count = 0
                 if len(endpoint.routings) == 0:
-                    endpoints_to_remove.add(endpoint)
+                    endpoints_to_mark_terminated.add(endpoint)
                     continue
 
             if len(non_error_routings) > desired_session_count:
@@ -1285,8 +1285,10 @@ class SchedulerDispatcher(aobject):
                     log.exception("error while creating session:")
 
         async with self.db.begin_session() as sess:
-            query = sa.delete(EndpointRow).where(
-                EndpointRow.id.in_([e.id for e in endpoints_to_remove])
+            query = (
+                sa.update(EndpointRow)
+                .values({"terminated_at": sa.func.now()})
+                .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
             )
             await sess.execute(query)
 

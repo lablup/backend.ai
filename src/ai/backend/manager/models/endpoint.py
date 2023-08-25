@@ -1,10 +1,13 @@
+import datetime
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
 
 import graphene
+import jwt
 import sqlalchemy as sa
 import yarl
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
@@ -14,15 +17,31 @@ from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 
-from ..api.exceptions import EndpointNotFound
-from .base import GUID, Base, EndpointIDColumn, Item, PaginatedList, ResourceSlotColumn, URLColumn
+from ..api.exceptions import EndpointNotFound, EndpointTokenNotFound
+from .base import (
+    GUID,
+    Base,
+    EndpointIDColumn,
+    ForeignKeyIDColumn,
+    Item,
+    PaginatedList,
+    ResourceSlotColumn,
+    URLColumn,
+)
 from .image import ImageRow
 from .routing import RouteStatus, Routing
 
 if TYPE_CHECKING:
     pass  # from .gql import GraphQueryContext
 
-__all__ = ("EndpointRow", "Endpoint", "EndpointList")
+__all__ = (
+    "EndpointRow",
+    "Endpoint",
+    "EndpointList",
+    "EndpointTokenRow",
+    "EndpointToken",
+    "EndpointTokenList",
+)
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -96,8 +115,20 @@ class EndpointRow(Base):
     )
 
     retries = sa.Column("retries", sa.Integer, nullable=False, default=0, server_default="0")
+    created_at = sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=True,
+    )
+    terminated_at = sa.Column(
+        "terminated_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
+    tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
     image_row = relationship("ImageRow", back_populates="endpoints")
 
     def __init__(
@@ -154,6 +185,7 @@ class EndpointRow(Base):
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
         load_routes=False,
+        load_tokens=False,
         load_image=False,
     ) -> "EndpointRow":
         """
@@ -162,6 +194,8 @@ class EndpointRow(Base):
         query = sa.select(EndpointRow).filter(EndpointRow.id == endpoint_id)
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
+        if load_tokens:
+            query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
         if project:
@@ -185,12 +219,18 @@ class EndpointRow(Base):
         user_uuid: Optional[uuid.UUID] = None,
         load_routes=False,
         load_image=False,
+        load_tokens=False,
+        include_destroying_endpoints=False,
     ) -> List["EndpointRow"]:
-        query = sa.select(EndpointRow)
+        query = sa.select(EndpointRow).order_by(sa.desc(EndpointRow.created_at))
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
+        if load_tokens:
+            query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
+        if not include_destroying_endpoints:
+            query = query.filter(EndpointRow.desired_session_count >= 0)
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -199,6 +239,98 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return result.scalars().all()
+
+
+class EndpointTokenRow(Base):
+    __tablename__ = "endpoint_tokens"
+
+    token = sa.Column("token", sa.VARCHAR(1024), primary_key=True)
+    endpoint = ForeignKeyIDColumn("endpoint", "endpoints.id")
+    session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
+    domain = sa.Column(
+        "domain",
+        sa.String(length=64),
+        sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    project = sa.Column(
+        "project",
+        GUID,
+        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    created_at = sa.Column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
+    )
+
+    endpoint_row = relationship("EndpointRow", back_populates="tokens")
+
+    def __init__(
+        self,
+        token: str,
+        endpoint: uuid.UUID,
+        domain: str,
+        project: uuid.UUID,
+        session_owner: uuid.UUID,
+    ) -> None:
+        self.token = token
+        self.endpoint = endpoint
+        self.domain = domain
+        self.project = project
+        self.session_owner = session_owner
+
+    @classmethod
+    async def list(
+        cls,
+        session: AsyncSession,
+        endpoint_id: uuid.UUID,
+        *,
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        load_endpoint=False,
+    ) -> Iterable["EndpointTokenRow"]:
+        query = (
+            sa.select(EndpointTokenRow)
+            .filter(EndpointTokenRow.endpoint == endpoint_id)
+            .order_by(sa.desc(EndpointTokenRow.created_at))
+        )
+        if load_endpoint:
+            query = query.options(selectinload(EndpointTokenRow.tokens))
+        if project:
+            query = query.filter(EndpointTokenRow.project == project)
+        if domain:
+            query = query.filter(EndpointTokenRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointTokenRow.session_owner == user_uuid)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @classmethod
+    async def get(
+        cls,
+        session: AsyncSession,
+        token: str,
+        *,
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        load_endpoint=False,
+    ) -> "EndpointTokenRow":
+        query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
+        if load_endpoint:
+            query = query.options(selectinload(EndpointTokenRow.tokens))
+        if project:
+            query = query.filter(EndpointTokenRow.project == project)
+        if domain:
+            query = query.filter(EndpointTokenRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointTokenRow.session_owner == user_uuid)
+        result = await session.execute(query)
+        row = result.scalar()
+        if not row:
+            raise NoResultFound
+        return row
 
 
 class InferenceSessionError(graphene.ObjectType):
@@ -239,6 +371,9 @@ class Endpoint(graphene.ObjectType):
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
 
+    created_at = GQLDateTime(required=True)
+    terminated_at = GQLDateTime()
+
     routings = graphene.List(Routing)
     retries = graphene.Int()
     status = graphene.String()
@@ -274,6 +409,8 @@ class Endpoint(graphene.ObjectType):
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
+            created_at=row.created_at,
+            terminated_at=row.terminated_at,
             retries=row.retries,
             routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
         )
@@ -317,6 +454,7 @@ class Endpoint(graphene.ObjectType):
             .offset(offset)
             .options(selectinload(EndpointRow.image_row))
             .options(selectinload(EndpointRow.routings))
+            .order_by(sa.desc(EndpointRow.created_at))
         )
         if project is not None:
             query = query.where(EndpointRow.project == project)
@@ -434,3 +572,161 @@ class EndpointList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(Endpoint, required=True)
+
+
+class EndpointToken(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+    token = graphene.String(required=True)
+    endpoint_id = graphene.UUID(required=True)
+    domain = graphene.String(required=True)
+    project = graphene.String(required=True)
+    session_owner = graphene.UUID(required=True)
+
+    created_at = GQLDateTime(required=True)
+    valid_until = GQLDateTime()
+
+    @classmethod
+    async def from_row(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        row: EndpointTokenRow,
+    ) -> "EndpointToken":
+        return cls(
+            token=row.token,
+            endpoint_id=row.endpoint,
+            created_at=row.created_at,
+        )
+
+    @classmethod
+    async def load_count(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        *,
+        endpoint_id: Optional[uuid.UUID] = None,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> int:
+        query = sa.select([sa.func.count()]).select_from()
+        if endpoint_id is not None:
+            query = query.where(EndpointTokenRow.endpoint == endpoint_id)
+        if project:
+            query = query.filter(EndpointTokenRow.project == project)
+        if domain_name:
+            query = query.filter(EndpointTokenRow.domain == domain_name)
+        if user_uuid:
+            query = query.filter(EndpointTokenRow.session_owner == user_uuid)
+        async with ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        endpoint_id: Optional[uuid.UUID] = None,
+        filter: str | None = None,
+        order: str | None = None,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> Sequence["EndpointToken"]:
+        log.debug(
+            "Endpoint: {}, project: {}, domain: {}, user: {}",
+            endpoint_id,
+            project,
+            domain_name,
+            user_uuid,
+        )
+        query = (
+            sa.select(EndpointTokenRow)
+            .limit(limit)
+            .offset(offset)
+            .order_by(sa.desc(EndpointTokenRow.created_at))
+        )
+        if endpoint_id is not None:
+            query = query.where(EndpointTokenRow.endpoint == endpoint_id)
+        if project:
+            query = query.filter(EndpointTokenRow.project == project)
+        if domain_name:
+            query = query.filter(EndpointTokenRow.domain == domain_name)
+        if user_uuid:
+            query = query.filter(EndpointTokenRow.session_owner == user_uuid)
+        """
+        if filter is not None:
+            parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = parser.append_filter(query, filter)
+        if order is not None:
+            parser = QueryOrderParser(cls._queryorder_colmap)
+            query = parser.append_ordering(query, order)
+        """
+        async with ctx.db.begin_readonly_session() as session:
+            result = await session.execute(query)
+            return [await cls.from_row(ctx, row) for row in result.scalars().all()]
+
+    @classmethod
+    async def load_all(
+        cls,
+        ctx,  # ctx: GraphQueryContext
+        endpoint_id: uuid.UUID,
+        *,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> Sequence["EndpointToken"]:
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await EndpointTokenRow.list(
+                session,
+                endpoint_id,
+                project=project,
+                domain=domain_name,
+                user_uuid=user_uuid,
+            )
+        return [await EndpointToken.from_row(ctx, row) for row in rows]
+
+    @classmethod
+    async def load_item(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        token: str,
+        *,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> "EndpointToken":
+        try:
+            async with ctx.db.begin_readonly_session() as session:
+                row = await EndpointTokenRow.get(
+                    session, token, project=project, domain=domain_name, user_uuid=user_uuid
+                )
+        except NoResultFound:
+            raise EndpointTokenNotFound
+        return await EndpointToken.from_row(ctx, row)
+
+    async def resolve_valid_until(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> datetime.datetime | None:
+        try:
+            decoded = jwt.decode(
+                self.token,
+                algorithms=["HS256"],
+                options={"verify_signature": False, "verify_exp": False},
+            )
+        except jwt.DecodeError:
+            return None
+        if "exp" not in decoded:
+            return None
+        return datetime.datetime.fromtimestamp(decoded["exp"])
+
+
+class EndpointTokenList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(EndpointToken, required=True)
