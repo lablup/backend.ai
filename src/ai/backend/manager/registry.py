@@ -63,6 +63,7 @@ from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
     KernelCancelledEvent,
@@ -414,6 +415,7 @@ class AgentRegistry:
         evd.consume(
             DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
         )
+        evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
@@ -2600,7 +2602,7 @@ class AgentRegistry:
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
-                log.exception("unexpected-error in _restart_kerenl()")
+                log.exception("unexpected-error in _restart_kernel()")
 
         restart_coros = []
         for kernel in kernel_list:
@@ -3794,6 +3796,20 @@ async def handle_agent_heartbeat(
     event: AgentHeartbeatEvent,
 ) -> None:
     await context.handle_heartbeat(source, event.agent_info)
+
+
+async def handle_check_agent_resource(
+    context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
+) -> None:
+    async with context.db.begin_readonly() as conn:
+        query = (
+            sa.select([agents.c.occupied_slots]).select_from(agents).where(agents.c.id == source)
+        )
+        result = await conn.execute(query)
+        row = result.first()
+        if not row:
+            raise InstanceNotFound(source)
+        log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
 
 
 async def check_scaling_group(

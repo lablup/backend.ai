@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from abc import ABCMeta, abstractmethod
@@ -35,6 +36,7 @@ from ai.backend.common.types import (
     DeviceModelInfo,
     DeviceName,
     HardwareMetadata,
+    KernelId,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -467,3 +469,41 @@ class Mount:
             raise ValueError("Mount target must be an absolute path.", target)
         perm = MountPermission(perm)
         return cls(type, source, target, perm, None)
+
+
+async def scan_resource_usage_per_slot(
+    kernel_ids: Sequence[KernelId],
+    scratch_root: Path,
+) -> Mapping[SlotName, Decimal]:
+    """
+    Fetch the current allocated amounts for each resource slot from
+    ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+    """
+    slot_allocs: dict[SlotName, Decimal] = defaultdict(lambda: Decimal(0))
+    loop = asyncio.get_running_loop()
+
+    def _read_kernel_resource_spec(path: Path) -> None:
+        nonlocal slot_allocs
+        try:
+            resource_spec = KernelResourceSpec.read_from_string(path.read_text())
+        except FileNotFoundError:
+            # there may be races with container destruction
+            return
+        if resource_spec is None:
+            return
+        for slot_name in resource_spec.slots.keys():
+            slot_allocs[slot_name] += Decimal(resource_spec.slots[slot_name])
+
+    async def _wrap_future(fut: asyncio.Future) -> None:
+        # avoid type check failures when a future is directly consumed by a taskgroup
+        await fut
+
+    async with asyncio.TaskGroup() as tg:
+        for kernel_id in kernel_ids:
+            fut = loop.run_in_executor(
+                None,
+                _read_kernel_resource_spec,
+                scratch_root / str(kernel_id) / "config" / "resource.txt",
+            )
+            tg.create_task(_wrap_future(fut))
+    return slot_allocs
