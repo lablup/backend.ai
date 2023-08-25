@@ -542,7 +542,8 @@ async def allocate(
         affinity_policy,
     )
     current_dev_alloc_maps = {
-        dev: copy.deepcopy(computers[dev].alloc_map.allocations) for dev in ordered_dev_names
+        dev_name: copy.deepcopy(computers[dev_name].alloc_map.allocations)
+        for dev_name in ordered_dev_names
     }
 
     try:
@@ -574,7 +575,7 @@ async def allocate(
                     [
                         "resource allocation failed: {0}",
                         "(before allocation) device-specific slots ({1}):\n{2}",
-                        "(before allocation) compute plugin alloc map:\n{3}",
+                        "(before allocation) allocation map ({1}):\n{3}",
                     ]
                 )
                 log.info(
@@ -582,7 +583,7 @@ async def allocate(
                     e,
                     dev_name,
                     textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
-                    textwrap.indent(pprint.pformat(dict(current_dev_alloc_maps)), "  "),
+                    textwrap.indent(pprint.pformat(dict(current_dev_alloc_maps[dev_name])), "  "),
                 )
                 raise
     except ResourceError:
