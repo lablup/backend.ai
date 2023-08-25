@@ -44,12 +44,8 @@ class InsufficientResource(ResourceError):
 
     def __str__(self) -> str:
         return (
-            f"InsufficientResource: {self.msg} ("
-            + (
-                f"{self.slot_name} {self.context_tag}, "
-                if self.context_tag
-                else f"{self.slot_name}, "
-            )
+            f"InsufficientResource: {self.msg} ({self.slot_name}"
+            + (f" (tag: {self.context_tag!r}), " if self.context_tag else ", ")
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 

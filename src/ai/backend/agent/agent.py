@@ -1748,10 +1748,12 @@ class AbstractAgent(
                                 alloc_failure_log_fmt,
                                 e,
                                 dev_name,
-                                textwrap.indent(pprint.pformat(device_specific_slots), "  "),
-                                textwrap.indent(pprint.pformat(current_per_slot_occupancy), "  "),
+                                textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
                                 textwrap.indent(
-                                    pprint.pformat(computer_set.alloc_map.allocations), "  "
+                                    pprint.pformat(dict(current_per_slot_occupancy)), "  "
+                                ),
+                                textwrap.indent(
+                                    pprint.pformat(dict(computer_set.alloc_map.allocations)), "  "
                                 ),
                             )
                             raise
