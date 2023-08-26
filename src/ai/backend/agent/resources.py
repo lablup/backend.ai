@@ -516,7 +516,7 @@ async def scan_resource_usage_per_slot(
     return slot_allocs
 
 
-async def allocate(
+def allocate(
     computers: Mapping[DeviceName, ComputerContext],
     resource_spec: KernelResourceSpec,
     alloc_order: Sequence[DeviceName],

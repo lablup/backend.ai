@@ -1683,7 +1683,7 @@ class AbstractAgent(
                 ]
                 async with self.resource_lock:
                     try:
-                        await allocate(
+                        allocate(
                             self.computers,
                             resource_spec,
                             alloc_order,
