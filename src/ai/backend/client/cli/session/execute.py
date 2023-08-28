@@ -20,12 +20,12 @@ from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
-from ..compat import asyncio_run, current_loop
-from ..config import local_cache_path
-from ..exceptions import BackendError
-from ..session import AsyncSession
-from .params import CommaSeparatedListType, RangeExprOptionType
-from .pretty import (
+from ...compat import asyncio_run, current_loop
+from ...config import local_cache_path
+from ...exceptions import BackendError
+from ...session import AsyncSession
+from ..params import CommaSeparatedListType, RangeExprOptionType
+from ..pretty import (
     format_info,
     print_done,
     print_error,
@@ -34,6 +34,7 @@ from .pretty import (
     print_wait,
     print_warn,
 )
+from .args import click_start_option
 
 tabulate_mod.PRESERVE_WHITESPACE = True
 range_expr = RangeExprOptionType()
@@ -265,50 +266,6 @@ def prepare_mount_arg(
 @main.command()
 @click.argument("image", type=str)
 @click.argument("files", nargs=-1, type=click.Path())
-@click.option(
-    "-t",
-    "--name",
-    "--client-token",
-    metavar="NAME",
-    help="Specify a human-readable session name. If not set, a random hex string is used.",
-)
-# job scheduling options
-@click.option(
-    "--type",
-    metavar="SESSTYPE",
-    type=click.Choice(["batch", "interactive"]),
-    default="interactive",
-    help="Either batch or interactive",
-)
-@click.option(
-    "--starts-at",
-    metavar="STARTS_AT",
-    type=str,
-    default=None,
-    help="Let session to be started at a specific or relative time.",
-)
-@click.option(
-    "--enqueue-only",
-    is_flag=True,
-    help="Enqueue the session and return immediately without waiting for its startup.",
-)
-@click.option(
-    "--max-wait",
-    metavar="SECONDS",
-    type=int,
-    default=0,
-    help="The maximum duration to wait until the session starts.",
-)
-@click.option(
-    "--no-reuse", is_flag=True, help="Do not reuse existing sessions but return an error."
-)
-@click.option(
-    "--callback-url",
-    metavar="CALLBACK_URL",
-    type=str,
-    default=None,
-    help="Callback URL which will be called upon sesison lifecycle events.",
-)
 # query-mode options
 @click.option("-c", "--code", metavar="CODE", help="The code snippet as a single string")
 @click.option("--terminal", is_flag=True, help="Connect to the terminal-type compute_session.")
@@ -327,15 +284,6 @@ def prepare_mount_arg(
         "Base directory path of uploaded files. "
         "All uploaded files must reside inside this directory."
     ),
-)
-# execution environment
-@click.option(
-    "-e",
-    "--env",
-    metavar="KEY=VAL",
-    type=str,
-    multiple=True,
-    help="Environment variable (may appear multiple times)",
 )
 # extra options
 @click.option(
@@ -356,7 +304,6 @@ def prepare_mount_arg(
     is_flag=True,
     help='Show resource usage statistics after termination (only works if "--rm" is given)',
 )
-@click.option("--tag", type=str, default=None, help="User-defined tag string to annotate sessions.")
 @click.option(
     "-q",
     "--quiet",
@@ -394,50 +341,6 @@ def prepare_mount_arg(
 )
 # resource spec
 @click.option(
-    "-v",
-    "--volume",
-    "-m",
-    "--mount",
-    "mount",
-    metavar="NAME[=PATH]",
-    type=str,
-    multiple=True,
-    help=(
-        "User-owned virtual folder names to mount. "
-        "If path is not provided, virtual folder will be mounted under /home/work. "
-        "When the target path is relative, it is placed under /home/work "
-        "with auto-created parent directories if any. "
-        "Absolute paths are mounted as-is, but it is prohibited to "
-        "override the predefined Linux system directories."
-    ),
-)
-@click.option(
-    "--scaling-group",
-    "--sgroup",
-    type=str,
-    default=None,
-    help=(
-        "The scaling group to execute session. If not specified, "
-        "all available scaling groups are included in the scheduling."
-    ),
-)
-@click.option(
-    "-r",
-    "--resources",
-    "--resource",
-    metavar="KEY=VAL",
-    type=str,
-    multiple=True,
-    help="Set computation resources (e.g: -r cpu=2 -r mem=256 -r cuda.device=1)",
-)
-@click.option(
-    "--cluster-size",
-    metavar="NUMBER",
-    type=int,
-    default=1,
-    help="The size of cluster in number of containers.",
-)
-@click.option(
     "--cluster-mode",
     metavar="MODE",
     type=click.Choice(["single-node", "multi-node"]),
@@ -461,26 +364,6 @@ def prepare_mount_arg(
     help="Architecture of the image to use.",
 )
 # resource grouping
-@click.option(
-    "-d",
-    "--domain",
-    metavar="DOMAIN_NAME",
-    default=None,
-    help=(
-        "Domain name where the session will be spawned. "
-        "If not specified, config's domain name will be used."
-    ),
-)
-@click.option(
-    "-g",
-    "--group",
-    metavar="GROUP_NAME",
-    default=None,
-    help=(
-        "Group name where the session is spawned. "
-        "User should be a member of the group to execute the code."
-    ),
-)
 @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
 @click.option(
     "--assign-agent",
@@ -492,41 +375,42 @@ def prepare_mount_arg(
         "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
     ),
 )
+@click_start_option()
 def run(
     image,
     files,
-    name,  # base args
-    type,
-    starts_at,
-    enqueue_only,
-    max_wait,
-    no_reuse,  # job scheduling options
-    callback_url,
+    name,  # click_start_option
+    type,  # click_start_option
+    starts_at,  # click_start_option
+    enqueue_only,  # click_start_option
+    max_wait,  # click_start_option
+    no_reuse,  # click_start_option
+    callback_url,  # click_start_option
     code,
     terminal,  # query-mode options
     clean,
     build,
     exec,
     basedir,  # batch-mode options
-    env,  # execution environment
+    env,  # click_start_option
     bootstrap_script,
     rm,
     stats,
-    tag,
+    tag,  # click_start_option
     quiet,  # extra options
     env_range,
     build_range,
     exec_range,
     max_parallel,  # experiment support
-    mount,
-    scaling_group,
-    resources,  # resource spec
-    cluster_size,
+    mount,  # click_start_option
+    scaling_group,  # click_start_option
+    resources,  # click_start_option
+    cluster_size,  # click_start_option
     cluster_mode,
-    resource_opts,
+    resource_opts,  # click_start_option
     architecture,
-    domain,
-    group,
+    domain,  # click_start_option
+    group,  # click_start_option
     preopen,
     assign_agent,  # resource grouping
 ):

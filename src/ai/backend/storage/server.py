@@ -8,7 +8,7 @@ import ssl
 import sys
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Final, Sequence
 
 import aiomonitor
 import aiotools
@@ -31,6 +31,8 @@ from .api.client import init_client_app
 from .api.manager import init_manager_app
 from .config import load_local_config, load_shared_config
 from .context import Context
+
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -100,6 +102,7 @@ async def server_main(
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
         ctx = Context(
