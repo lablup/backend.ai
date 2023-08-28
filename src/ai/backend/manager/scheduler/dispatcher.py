@@ -473,7 +473,7 @@ class SchedulerDispatcher(aobject):
                     has_failure = True
 
             async def _check_predicates_hook() -> HookResult:
-                async with self.db.begin_session() as db_sess:
+                async with self.db.begin_readonly_session() as db_sess:
                     return await self.registry.hook_plugin_ctx.dispatch(
                         "PREDICATE",
                         (
