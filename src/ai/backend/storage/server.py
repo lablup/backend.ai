@@ -67,7 +67,8 @@ async def server_main(
     loop.set_debug(local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
-        port=local_config["storage-proxy"]["aiomonitor-port"] + pidx,
+        termui_port=local_config["storage-proxy"]["aiomonitor-termui-port"] + pidx,
+        webui_port=local_config["storage-proxy"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
