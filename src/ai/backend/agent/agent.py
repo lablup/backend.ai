@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import json
 import logging
 import os
 import pickle
-import pprint
 import re
 import shutil
 import signal
@@ -132,8 +130,8 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
-from .affinity_map import AffinityHint, AffinityMap
-from .exception import AgentError, ContainerCreationError, InsufficientResource, ResourceError
+from .affinity_map import AffinityMap
+from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -141,7 +139,7 @@ from .resources import (
     AbstractComputePlugin,
     KernelResourceSpec,
     Mount,
-    scan_resource_usage_per_slot,
+    allocate,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -197,7 +195,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
@@ -479,13 +477,13 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         for dev_type, device_alloc in resource_spec.allocations.items():
-            computer_set = self.computers[dev_type]
+            computer_ctx = self.computers[dev_type]
             await self.apply_accelerator_allocation(
-                computer_set.instance,
+                computer_ctx.instance,
                 device_alloc,
             )
             accelerator_mounts = await self.generate_accelerator_mounts(
-                computer_set.instance,
+                computer_ctx.instance,
                 device_alloc,
             )
             for mount_info in accelerator_mounts:
@@ -494,11 +492,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             for dev_id, per_dev_alloc in device_alloc.items():
                 alloc_sum += sum(per_dev_alloc.values())
             if alloc_sum > 0:
-                hook_paths = await computer_set.instance.get_hooks(distro, arch)
+                hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
                 if hook_paths:
                     log.debug(
                         "accelerator {} provides hooks: {}",
-                        type(computer_set.instance).__name__,
+                        type(computer_ctx.instance).__name__,
                         ", ".join(map(str, hook_paths)),
                     )
                 for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
@@ -538,7 +536,7 @@ class AbstractAgent(
     etcd: AsyncEtcd
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
-    computers: MutableMapping[str, ComputerContext]
+    computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
     port_pool: Set[int]
 
@@ -1190,14 +1188,14 @@ class AbstractAgent(
         ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
         """
         async with self.resource_lock:
-            for computer_set in self.computers.values():
-                computer_set.alloc_map.clear()
+            for computer_ctx in self.computers.values():
+                computer_ctx.alloc_map.clear()
             for kernel_id, container in await self.enumerate_containers():
-                for computer_set in self.computers.values():
+                for computer_ctx in self.computers.values():
                     try:
-                        await computer_set.instance.restore_from_container(
+                        await computer_ctx.instance.restore_from_container(
                             container,
-                            computer_set.alloc_map,
+                            computer_ctx.alloc_map,
                         )
                     except Exception:
                         log.warning(
@@ -1218,7 +1216,7 @@ class AbstractAgent(
         kernel_session_map: Dict[KernelId, SessionId] = {}
         terminated_kernels = {}
 
-        async with self.resource_lock:
+        async with self.registry_lock:
             try:
                 # Check if: there are dead containers
                 for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
@@ -1470,7 +1468,7 @@ class AbstractAgent(
             kernel_obj.agent_config = self.local_config
             if kernel_obj.runner is not None:
                 await kernel_obj.runner.__ainit__()
-        async with self.resource_lock:
+        async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
             ):
@@ -1484,11 +1482,12 @@ class AbstractAgent(
                         if p.host_port is not None:
                             self.port_pool.discard(p.host_port)
                     # Restore compute resources.
-                    for computer_set in self.computers.values():
-                        await computer_set.instance.restore_from_container(
-                            container,
-                            computer_set.alloc_map,
-                        )
+                    async with self.resource_lock:
+                        for computer_ctx in self.computers.values():
+                            await computer_ctx.instance.restore_from_container(
+                                container,
+                                computer_ctx.alloc_map,
+                            )
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         session_id,
@@ -1678,85 +1677,22 @@ class AbstractAgent(
                 )
 
             # Realize ComputeDevice (including accelerators) allocations.
-            slots = resource_spec.slots
-            dev_names: set[DeviceName] = set()
-            for slot_name in slots.keys():
-                dev_name = slot_name.split(".", maxsplit=1)[0]
-                dev_names.add(DeviceName(dev_name))
-
             if not restarting:
                 alloc_order = [
                     DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
                 ]
-                ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
-                affinity_hint = AffinityHint(
-                    None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
-                )
                 async with self.resource_lock:
-                    current_per_slot_occupancy = await scan_resource_usage_per_slot(
-                        [*self.kernel_registry.keys()],
-                        self.local_config["container"]["scratch-root"],
-                    )
-                    for dev_name in ordered_dev_names:
-                        computer_set = self.computers[dev_name]
-                        device_id_map = {
-                            device.device_id: device for device in computer_set.devices
-                        }
-                        device_specific_slots = {
-                            SlotName(slot_name): Decimal(alloc)
-                            for slot_name, alloc in slots.items()
-                            if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
-                        }
-                        try:
-                            resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
-                                device_specific_slots,
-                                affinity_hint=affinity_hint,
-                                context_tag=dev_name,
-                            )
-                            log.debug(
-                                "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
-                            )
-                            hint_devices: list[AbstractComputeDevice] = []
-                            for slot_name, per_device_alloc in resource_spec.allocations[
-                                dev_name
-                            ].items():
-                                hint_devices.extend(
-                                    device_id_map[k] for k in per_device_alloc.keys()
-                                )
-                            affinity_hint = AffinityHint(
-                                hint_devices, self.affinity_map, affinity_hint.policy
-                            )
-                        except (InsufficientResource, ResourceError) as e:
-                            await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
-                            # TODO: rollback allocation in previous compute devices in the loop
-                            original_plugin_alloc_map: dict[
-                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
-                            ] = {}
-                            for dev in ordered_dev_names:
-                                original_plugin_alloc_map[dev] = copy.deepcopy(
-                                    dict(self.computers[dev].alloc_map.allocations)
-                                )
-                            alloc_failure_log_fmt = "\n".join(
-                                [
-                                    "resource allocation failed: {0}",
-                                    "(before allocation) device-specific slots ({1}):\n{2}",
-                                    "(before allocation) current per-slot occupancy:\n{3}",
-                                    "(after trying allocation) compute plugin alloc map:\n{4}",
-                                ]
-                            )
-                            log.info(
-                                alloc_failure_log_fmt,
-                                e,
-                                dev_name,
-                                textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
-                                textwrap.indent(
-                                    pprint.pformat(dict(current_per_slot_occupancy)), "  "
-                                ),
-                                textwrap.indent(
-                                    pprint.pformat(dict(computer_set.alloc_map.allocations)), "  "
-                                ),
-                            )
-                            raise
+                    try:
+                        allocate(
+                            self.computers,
+                            resource_spec,
+                            alloc_order,
+                            self.affinity_map,
+                            self.local_config["resource"]["affinity-policy"],
+                        )
+                    except ResourceError:
+                        await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                        raise
             try:
                 # Prepare scratch spaces and dotfiles inside it.
                 if not restarting:
@@ -1784,8 +1720,8 @@ class AbstractAgent(
                 # Get attached devices information (including model_name).
                 attached_devices = {}
                 for dev_name, device_alloc in resource_spec.allocations.items():
-                    computer_set = self.computers[dev_name]
-                    devices = await computer_set.instance.get_attached_devices(device_alloc)
+                    computer_ctx = self.computers[dev_name]
+                    devices = await computer_ctx.instance.get_attached_devices(device_alloc)
                     attached_devices[dev_name] = devices
 
                 exposed_ports = [2000, 2001]

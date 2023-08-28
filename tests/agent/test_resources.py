@@ -10,16 +10,14 @@ from unittest import mock
 import pytest
 from aioresponses import aioresponses
 
+from ai.backend.agent import resources
+from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
+from ai.backend.agent.agent import ComputerContext
+from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
+from ai.backend.agent.exception import InsufficientResource
 from ai.backend.agent.resources import scan_resource_usage_per_slot
 from ai.backend.agent.vendor import linux
-from ai.backend.common.types import KernelId, SlotName
-
-# TODO: write tests for KernelResourceSpec (read/write consistency)
-# from ai.backend.agent.resources import (
-#     KernelResourceSpec,
-# )
-
-# TODO: write tests for DiscretePropertyAllocMap, FractionAllocMap
+from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName
 
 
 def test_parse_cpuset():
@@ -127,7 +125,7 @@ async def test_get_core_topology(mocker):
 
 
 @pytest.mark.asyncio
-async def test_scan_resource_usage_per_slot(monkeypatch):
+async def test_scan_resource_usage_per_slot():
     with tempfile.TemporaryDirectory() as tmpdir_name:
         tmpdir = Path(tmpdir_name)
         random_kernel_id = KernelId(uuid.uuid4())
@@ -180,3 +178,143 @@ async def test_scan_resource_usage_per_slot(monkeypatch):
             mock.side_effect = ValueError("parsing error")
             with pytest.raises(ExceptionGroup):
                 await scan_resource_usage_per_slot(kernel_ids, tmpdir)
+
+
+@pytest.mark.asyncio
+async def test_allocate_rollback(monkeypatch):
+    local_config = {}
+    cpu_plugin = CPUPlugin(
+        {},
+        local_config,
+        {
+            "agent": {"resource": {"cpu": {"core-indexes": [0, 1]}}},
+        },
+    )
+    mem_plugin = MemoryPlugin(
+        {},
+        local_config,
+        {
+            "agent": {"resource": {"memory": {"size": 1024}}},
+        },
+    )
+    cpu_devices = await cpu_plugin.list_devices()
+    mem_devices = await mem_plugin.list_devices()
+    computers = {
+        DeviceName("cpu"): ComputerContext(
+            cpu_plugin, cpu_devices, await cpu_plugin.create_alloc_map()
+        ),
+        DeviceName("mem"): ComputerContext(
+            mem_plugin, mem_devices, await mem_plugin.create_alloc_map()
+        ),
+    }
+    alloc_order = [DeviceName("cpu"), DeviceName("mem")]
+    affinity_map = AffinityMap.build(list(cpu_devices) + list(mem_devices))
+    affinity_policy = AffinityPolicy.PREFER_SINGLE_NODE
+
+    resource_spec = resources.KernelResourceSpec(
+        "a0001",
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "512",
+            }
+        ),
+        allocations={},
+        scratch_disk_size=0,
+        mounts=[],
+    )
+    resources.allocate(computers, resource_spec, alloc_order, affinity_map, affinity_policy)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(0)
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(512)
+    resource_spec = resources.KernelResourceSpec(
+        "a0001",
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "1024",  # should fail to allocate
+            }
+        ),
+        allocations={},
+        scratch_disk_size=0,
+        mounts=[],
+    )
+    with pytest.raises(InsufficientResource):
+        resources.allocate(computers, resource_spec, alloc_order, affinity_map, affinity_policy)
+    # check if the cpu alloc is NOT rolled back
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(
+        0
+    )  # has been rolled back
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(512)
+
+    # Now let's test the case when the rollback does not happen.
+    # Reset the alloc map
+    computers[DeviceName("cpu")].alloc_map.clear()
+    computers[DeviceName("mem")].alloc_map.clear()
+
+    # Make deepcopy a no-op returning the target object's reference as-is
+    monkeypatch.setattr(resources.copy, "deepcopy", lambda o: o)
+
+    resource_spec = resources.KernelResourceSpec(
+        "a0001",
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "512",
+            }
+        ),
+        allocations={},
+        scratch_disk_size=0,
+        mounts=[],
+    )
+    resources.allocate(computers, resource_spec, alloc_order, affinity_map, affinity_policy)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(0)
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(512)
+    resource_spec = resources.KernelResourceSpec(
+        "a0001",
+        ResourceSlot.from_json(
+            {
+                "cpu": "1",
+                "mem": "1024",  # should fail to allocate
+            }
+        ),
+        allocations={},
+        scratch_disk_size=0,
+        mounts=[],
+    )
+    with pytest.raises(InsufficientResource):
+        resources.allocate(computers, resource_spec, alloc_order, affinity_map, affinity_policy)
+    # check if the cpu alloc is NOT rolled back
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("0")
+    ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(
+        1
+    )  # not rolled back...
+    assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
+        DeviceId("root")
+    ] == Decimal(
+        512
+    )  # this is rolled back because it failed to allocate the mem slot.
