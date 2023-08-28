@@ -47,7 +47,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifec
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -165,6 +165,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
 ]
+
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
 
 async def hello(request: web.Request) -> web.Response:
@@ -384,6 +386,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
     )
     yield
@@ -741,6 +744,7 @@ def build_root_app(
         "limit": 2048,
         "close_timeout": 30,
         "exception_handler": global_exception_handler,
+        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }
     app["scheduler_opts"] = {
         **default_scheduler_opts,

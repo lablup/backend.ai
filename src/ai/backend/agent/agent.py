@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import os
 import pickle
+import pprint
 import re
 import shutil
 import signal
@@ -75,6 +77,7 @@ from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     EventDispatcher,
     EventProducer,
@@ -130,7 +133,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
-from .exception import AgentError, ContainerCreationError, ResourceError
+from .exception import AgentError, ContainerCreationError, InsufficientResource, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -138,6 +141,7 @@ from .resources import (
     AbstractComputePlugin,
     KernelResourceSpec,
     Mount,
+    scan_resource_usage_per_slot,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -167,6 +171,7 @@ DEAD_STATUS_SET = frozenset(
 )
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
@@ -611,6 +616,7 @@ class AbstractAgent(
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
@@ -959,7 +965,7 @@ class AbstractAgent(
                         "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
                     )
                     if ev.container_id is None:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
@@ -1050,7 +1056,7 @@ class AbstractAgent(
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
@@ -1178,7 +1184,11 @@ class AbstractAgent(
         Enumerate the containers with the given status filter.
         """
 
-    async def rescan_resource_usage(self) -> None:
+    async def reconstruct_resource_usage(self) -> None:
+        """
+        Reconstruct the resource alloc maps for each compute plugin from
+        ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+        """
         async with self.resource_lock:
             for computer_set in self.computers.values():
                 computer_set.alloc_map.clear()
@@ -1683,6 +1693,10 @@ class AbstractAgent(
                     None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
                 )
                 async with self.resource_lock:
+                    current_per_slot_occupancy = await scan_resource_usage_per_slot(
+                        [*self.kernel_registry.keys()],
+                        self.local_config["container"]["scratch-root"],
+                    )
                     for dev_name in ordered_dev_names:
                         computer_set = self.computers[dev_name]
                         device_id_map = {
@@ -1691,7 +1705,7 @@ class AbstractAgent(
                         device_specific_slots = {
                             SlotName(slot_name): Decimal(alloc)
                             for slot_name, alloc in slots.items()
-                            if slot_name.startswith(dev_name)
+                            if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
                         }
                         try:
                             resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
@@ -1712,13 +1726,35 @@ class AbstractAgent(
                             affinity_hint = AffinityHint(
                                 hint_devices, self.affinity_map, affinity_hint.policy
                             )
-                        except ResourceError as e:
+                        except (InsufficientResource, ResourceError) as e:
+                            await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                            # TODO: rollback allocation in previous compute devices in the loop
+                            original_plugin_alloc_map: dict[
+                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
+                            ] = {}
+                            for dev in ordered_dev_names:
+                                original_plugin_alloc_map[dev] = copy.deepcopy(
+                                    dict(self.computers[dev].alloc_map.allocations)
+                                )
+                            alloc_failure_log_fmt = "\n".join(
+                                [
+                                    "resource allocation failed: {0}",
+                                    "(before allocation) device-specific slots ({1}):\n{2}",
+                                    "(before allocation) current per-slot occupancy:\n{3}",
+                                    "(after trying allocation) compute plugin alloc map:\n{4}",
+                                ]
+                            )
                             log.info(
-                                "resource allocation failed ({}): {} of {}\n(alloc map: {})",
-                                type(e).__name__,
-                                device_specific_slots,
+                                alloc_failure_log_fmt,
+                                e,
                                 dev_name,
-                                dict(computer_set.alloc_map.allocations),
+                                textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
+                                textwrap.indent(
+                                    pprint.pformat(dict(current_per_slot_occupancy)), "  "
+                                ),
+                                textwrap.indent(
+                                    pprint.pformat(dict(computer_set.alloc_map.allocations)), "  "
+                                ),
                             )
                             raise
             try:
@@ -2056,7 +2092,7 @@ class AbstractAgent(
                 # upon firing of the "session_started" event.
                 return kernel_creation_info
             except Exception as e:
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
                 raise e
 
     async def start_and_monitor_model_service_initial_health(
@@ -2329,6 +2365,9 @@ class AbstractAgent(
 
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
+
+    async def ping_kernel(self, kernel_id: KernelId):
+        return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:
         now = time.monotonic()

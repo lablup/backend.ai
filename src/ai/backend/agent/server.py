@@ -348,8 +348,9 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def ping_kernel(self, kernel_id: str):
-        log.debug("rpc::ping_kernel({0})", kernel_id)
+    async def ping_kernel(self, kernel_id: str) -> dict[str, float] | None:
+        log.debug("rpc::ping_kernel(k:{})", kernel_id)
+        return await self.agent.ping_kernel(KernelId(UUID(kernel_id)))
 
     @rpc_function
     @collect_error
