@@ -227,6 +227,9 @@ async def test_allocate_rollback(monkeypatch):
     assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
         DeviceId("0")
     ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(0)
     assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
         DeviceId("root")
     ] == Decimal(512)
@@ -281,6 +284,9 @@ async def test_allocate_rollback(monkeypatch):
     assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
         DeviceId("0")
     ] == Decimal(1)
+    assert computers[DeviceName("cpu")].alloc_map.allocations[SlotName("cpu")][
+        DeviceId("1")
+    ] == Decimal(0)
     assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
         DeviceId("root")
     ] == Decimal(512)
