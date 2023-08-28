@@ -33,7 +33,7 @@ from ai.backend.common.types import VFolderID
 
 from .. import __version__
 from ..abc import AbstractVolume
-from ..context import Context
+from ..context import RootContext
 from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
@@ -113,7 +113,7 @@ async def check_status(request: web.Request) -> web.StreamResponse:
 
 
 async def download(request: web.Request) -> web.StreamResponse:
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
 
     class Params(TypedDict):
@@ -277,7 +277,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
     """
     Check the availability of an upload session.
     """
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
 
     class Params(TypedDict):
@@ -310,7 +310,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     """
     Perform the chunk upload.
     """
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
 
     class Params(TypedDict):
@@ -373,7 +373,7 @@ async def tus_options(request: web.Request) -> web.Response:
     """
     Let clients discover the supported features of our tus.io server-side implementation.
     """
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
     headers["Access-Control-Allow-Headers"] = (
@@ -425,7 +425,7 @@ async def prepare_tus_session_headers(
     return headers
 
 
-async def init_client_app(ctx: Context) -> web.Application:
+async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application()
     app["ctx"] = ctx
     cors_options = {

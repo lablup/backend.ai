@@ -8,7 +8,7 @@ import ssl
 import sys
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Final, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
 import aiotools
@@ -30,14 +30,12 @@ from . import __version__ as VERSION
 from .api.client import init_client_app
 from .api.manager import init_manager_app
 from .config import load_local_config, load_shared_config
-from .context import Context
-
-EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
+from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(loop, pidx, _args):
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
     try:
@@ -51,13 +49,13 @@ async def server_main_logwrapper(loop, pidx, _args):
             yield
 
 
-async def check_migration(ctx: Context):
+async def check_migration(ctx: RootContext):
     from .migration import check_latest
 
     await check_latest(ctx)
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -106,78 +104,79 @@ async def server_main(
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
-        ctx = Context(
+        ctx = RootContext(
             pid=os.getpid(),
             local_config=local_config,
             etcd=etcd,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
         )
-        m.console_locals["ctx"] = ctx
-        client_api_app = await init_client_app(ctx)
-        manager_api_app = await init_manager_app(ctx)
-        m.console_locals["client_api_app"] = client_api_app
-        m.console_locals["manager_api_app"] = manager_api_app
+        async with ctx:
+            m.console_locals["ctx"] = ctx
+            client_api_app = await init_client_app(ctx)
+            manager_api_app = await init_manager_app(ctx)
+            m.console_locals["client_api_app"] = client_api_app
+            m.console_locals["manager_api_app"] = manager_api_app
 
-        if pidx == 0:
-            await check_migration(ctx)
+            if pidx == 0:
+                await check_migration(ctx)
 
-        client_ssl_ctx = None
-        manager_ssl_ctx = None
-        if local_config["api"]["client"]["ssl-enabled"]:
-            client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            client_ssl_ctx.load_cert_chain(
-                str(local_config["api"]["client"]["ssl-cert"]),
-                str(local_config["api"]["client"]["ssl-privkey"]),
+            client_ssl_ctx = None
+            manager_ssl_ctx = None
+            if local_config["api"]["client"]["ssl-enabled"]:
+                client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                client_ssl_ctx.load_cert_chain(
+                    str(local_config["api"]["client"]["ssl-cert"]),
+                    str(local_config["api"]["client"]["ssl-privkey"]),
+                )
+            if local_config["api"]["manager"]["ssl-enabled"]:
+                manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                manager_ssl_ctx.load_cert_chain(
+                    str(local_config["api"]["manager"]["ssl-cert"]),
+                    str(local_config["api"]["manager"]["ssl-privkey"]),
+                )
+            client_api_runner = web.AppRunner(client_api_app)
+            manager_api_runner = web.AppRunner(manager_api_app)
+            await client_api_runner.setup()
+            await manager_api_runner.setup()
+            client_service_addr = local_config["api"]["client"]["service-addr"]
+            manager_service_addr = local_config["api"]["manager"]["service-addr"]
+            client_api_site = web.TCPSite(
+                client_api_runner,
+                str(client_service_addr.host),
+                client_service_addr.port,
+                backlog=1024,
+                reuse_port=True,
+                ssl_context=client_ssl_ctx,
             )
-        if local_config["api"]["manager"]["ssl-enabled"]:
-            manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            manager_ssl_ctx.load_cert_chain(
-                str(local_config["api"]["manager"]["ssl-cert"]),
-                str(local_config["api"]["manager"]["ssl-privkey"]),
+            manager_api_site = web.TCPSite(
+                manager_api_runner,
+                str(manager_service_addr.host),
+                manager_service_addr.port,
+                backlog=1024,
+                reuse_port=True,
+                ssl_context=manager_ssl_ctx,
             )
-        client_api_runner = web.AppRunner(client_api_app)
-        manager_api_runner = web.AppRunner(manager_api_app)
-        await client_api_runner.setup()
-        await manager_api_runner.setup()
-        client_service_addr = local_config["api"]["client"]["service-addr"]
-        manager_service_addr = local_config["api"]["manager"]["service-addr"]
-        client_api_site = web.TCPSite(
-            client_api_runner,
-            str(client_service_addr.host),
-            client_service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=client_ssl_ctx,
-        )
-        manager_api_site = web.TCPSite(
-            manager_api_runner,
-            str(manager_service_addr.host),
-            manager_service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=manager_ssl_ctx,
-        )
-        await client_api_site.start()
-        await manager_api_site.start()
-        if os.geteuid() == 0:
-            uid = local_config["storage-proxy"]["user"]
-            gid = local_config["storage-proxy"]["group"]
-            os.setgroups(
-                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
-            )
-            os.setgid(gid)
-            os.setuid(uid)
-            log.info("Changed process uid:gid to {}:{}", uid, gid)
-        log.info("Started service.")
-        try:
-            yield
-        finally:
-            log.info("Shutting down...")
-            await manager_api_runner.cleanup()
-            await client_api_runner.cleanup()
-            await event_producer.close()
-            await event_dispatcher.close()
+            await client_api_site.start()
+            await manager_api_site.start()
+            if os.geteuid() == 0:
+                uid = local_config["storage-proxy"]["user"]
+                gid = local_config["storage-proxy"]["group"]
+                os.setgroups(
+                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+                )
+                os.setgid(gid)
+                os.setuid(uid)
+                log.info("Changed process uid:gid to {}:{}", uid, gid)
+            log.info("Started service.")
+            try:
+                yield
+            finally:
+                log.info("Shutting down...")
+                await manager_api_runner.cleanup()
+                await client_api_runner.cleanup()
+                await event_producer.close()
+                await event_dispatcher.close()
     finally:
         if aiomon_started:
             m.close()
