@@ -383,7 +383,6 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
-    status_queue_lock: asyncio.Lock
     output_queue: Optional[asyncio.Queue[ResultRecord]]
     current_run_id: Optional[str]
     pending_queues: OrderedDict[str, Tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
@@ -421,7 +420,6 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
-        self.status_queue_lock = asyncio.Lock()
         self.output_queue = None
         self.pending_queues = OrderedDict()
         self.current_run_id = None
@@ -595,15 +593,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_and_get_status(self) -> dict[str, float] | None:
         if self.input_sock.closed:
             raise asyncio.CancelledError
-
-        async with self.status_queue_lock:
-            await self.input_sock.send_multipart([b"status", b""])
-            try:
-                result = await self.status_queue.get()
-                self.status_queue.task_done()
-                return msgpack.unpackb(result)
-            except asyncio.CancelledError:
-                return None
+        await self.input_sock.send_multipart([b"status", b""])
+        try:
+            result = await self.status_queue.get()
+            self.status_queue.task_done()
+            return msgpack.unpackb(result)
+        except asyncio.CancelledError:
+            return None
 
     async def feed_and_get_completion(self, code_text, opts):
         if self.input_sock.closed:

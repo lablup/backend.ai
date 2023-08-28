@@ -224,9 +224,19 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
                 if prefix:
+                    data = await etcd.get_prefix(key, scope=scope)
+                    if not data:
+                        log.info(f"No keys found to delete with prefix: {key}")
+                        return
                     await etcd.delete_prefix(key, scope=scope)
+                    log.info(f"All keys starting with '{key}' successfully deleted.")
                 else:
+                    data = await etcd.get(key, scope=scope)
+                    if data is None:
+                        log.info(f"No key found to delete: {key}")
+                        return
                     await etcd.delete(key, scope=scope)
+                log.info(f"Key '{key}' successfully deleted.")
             except Exception:
                 log.exception("An error occurred.")
 
