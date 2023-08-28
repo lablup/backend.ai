@@ -700,7 +700,8 @@ async def server_main(
     loop.set_debug(local_config["debug"]["asyncio"])
     monitor = aiomonitor.Monitor(
         loop,
-        port=local_config["agent"]["aiomonitor-port"],
+        termui_port=local_config["agent"]["aiomonitor-termui-port"] + pidx,
+        webui_port=local_config["agent"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
