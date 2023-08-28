@@ -444,12 +444,10 @@ class SchedulerDispatcher(aobject):
                 return check_results
 
             check_results = await execute_with_retry(_check_predicates)
-            has_failure = False
             failed_predicates = []
             passed_predicates = []
             for predicate_name, result in check_results:
                 if isinstance(result, Exception):
-                    has_failure = True
                     failed_predicates.append(
                         {
                             "name": predicate_name,
@@ -470,7 +468,6 @@ class SchedulerDispatcher(aobject):
                             "msg": result.message or "",
                         }
                     )
-                    has_failure = True
 
             async def _check_predicates_hook() -> HookResult:
                 async with self.db.begin_readonly_session() as db_sess:
@@ -509,7 +506,7 @@ class SchedulerDispatcher(aobject):
                 "failed_predicates": failed_predicates,
                 "passed_predicates": passed_predicates,
             }
-            if has_failure:
+            if failed_predicates:
                 log.debug(log_fmt + "predicate-checks-failed (temporary)", *log_args)
 
                 async def _cancel_failed_system_session() -> None:
