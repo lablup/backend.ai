@@ -542,6 +542,7 @@ kernels = sa.Table(
             "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
         ),
     ),
+    # sa.Column("enable_sudo_session", sa.Boolean(), default=False),
 )
 
 

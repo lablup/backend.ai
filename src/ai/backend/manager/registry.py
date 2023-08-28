@@ -503,6 +503,7 @@ class AgentRegistry:
         callback_url: Optional[yarl.URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
+        enable_sudo_session: bool = False,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
         resp: MutableMapping[str, Any] = {}
@@ -661,6 +662,7 @@ class AgentRegistry:
                         public_sgroup_only=public_sgroup_only,
                         endpoint_id=endpoint_id,
                         traffic_ratio=traffic_ratio,
+                        enable_sudo_session=enable_sudo_session,
                     )
                 ),
             )
@@ -727,6 +729,7 @@ class AgentRegistry:
         tag: str,
         enqueue_only=False,
         max_wait_seconds=0,
+        enable_sudo_session=False,
     ) -> Mapping[str, Any]:
         resp: MutableMapping[str, Any] = {}
 
@@ -875,6 +878,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         session_tag=tag,
+                        enable_sudo_session=enable_sudo_session,
                     ),
                 )
             )
@@ -957,6 +961,7 @@ class AgentRegistry:
         callback_url: Optional[URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
+        enable_sudo_session: bool = False,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
 
@@ -1262,6 +1267,13 @@ class AgentRegistry:
             else:
                 mapped_agent = agent_list[idx]
 
+            env_variables = [f"{k}={v}" for k, v in environ.items()]
+
+            print("enable_sudo_session", enable_sudo_session)
+
+            if enable_sudo_session:
+                env_variables.append("ENABLE_SUDO_SESSION=1")
+
             kernel_data.append(
                 {
                     **kernel_shared_data,
@@ -1284,7 +1296,7 @@ class AgentRegistry:
                     "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
                     "resource_opts": resource_opts,
-                    "environ": [f"{k}={v}" for k, v in environ.items()],
+                    "environ": env_variables,
                     "bootstrap_script": kernel.get("bootstrap_script"),
                     "preopen_ports": creation_config.get("preopen_ports", []),
                 }

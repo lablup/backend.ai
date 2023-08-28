@@ -729,6 +729,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
         container_log_file_size = BinarySize(container_log_size // container_log_file_count)
+
         container_config: MutableMapping[str, Any] = {
             "Image": self.image_ref.canonical,
             "Tty": True,

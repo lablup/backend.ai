@@ -35,6 +35,7 @@ _default_list_fields = (
     user_fields["groups"],
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
+    user_fields["enable_sudo_session"],
 )
 
 _default_detail_fields = (
@@ -50,6 +51,7 @@ _default_detail_fields = (
     user_fields["groups"],
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
+    user_fields["enable_sudo_session"],
 )
 
 
@@ -259,6 +261,7 @@ class User(BaseFunction):
         totp_activated: bool = False,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
+        enable_sudo_session: bool = False,
     ) -> dict:
         """
         Creates a new user with the given options.
@@ -293,6 +296,7 @@ class User(BaseFunction):
                 "totp_activated": totp_activated,
                 "group_ids": group_ids,
                 "allowed_client_ip": allowed_client_ip,
+                "enable_sudo_session": enable_sudo_session,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -315,6 +319,7 @@ class User(BaseFunction):
         totp_activated: bool = False,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
+        enable_sudo_session: bool = False,
     ) -> dict:
         """
         Update existing user.
@@ -341,6 +346,7 @@ class User(BaseFunction):
                 "allowed_client_ip": allowed_client_ip,
                 "totp_activated": totp_activated,
                 "group_ids": group_ids,
+                "enable_sudo_session": enable_sudo_session,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
