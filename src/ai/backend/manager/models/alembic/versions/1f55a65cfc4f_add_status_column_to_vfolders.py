@@ -9,7 +9,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.models.base import EnumValueType
 from ai.backend.manager.models.vfolder import VFolderOperationStatus
 
 # revision identifiers, used by Alembic.

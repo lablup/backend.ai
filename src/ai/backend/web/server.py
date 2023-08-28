@@ -487,9 +487,12 @@ async def token_login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
 
-    # Check if auth token is delivered through cookie.
+    # Check if auth token is delivered via request body or cookie.
+    rqst_data: dict[str, Any] = await request.json()
     auth_token_name = config["api"]["auth_token_name"]
-    auth_token = request.cookies.get(auth_token_name)
+    auth_token = rqst_data.get(auth_token_name)
+    if not auth_token:
+        auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
         return web.HTTPBadRequest(
             text=json.dumps(
@@ -520,9 +523,19 @@ async def token_login_handler(request: web.Request) -> web.Response:
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            # Instead of email and password, cookie token will be used for auth.
+            # Instead of email and password, token will be used for user auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            token = await api_session.User.authorize("fake-email", "fake-pwd")
+            extra_args = {**rqst_data, auth_token_name: auth_token}
+            # The purpose of token login is to authenticate a client, typically a browser, using a
+            # separate token referred to as `sToken`, rather than using user's email and password.
+            # However, the `api_session.User.authorize` SDK requires email and password as
+            # parameters, so we just pass fake (arbitrary) email and password which are placeholders
+            # in token-based login. Each authorize hook plugin will deal with various type of
+            # `sToken` and related parameters to authorize a user. In this process, email and
+            # password do not play any role.
+            token = await api_session.User.authorize(
+                "fake-email", "fake-pwd", extra_args=extra_args
+            )
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],

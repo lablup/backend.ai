@@ -67,6 +67,9 @@ class NoopEvent(AbstractEvent):
         return cls(value[0])
 
 
+EVENT_DISPATCHER_CONSUMER_GROUP = "test"
+
+
 async def run_timer(
     lock_factory: Callable[[], AbstractDistributedLock],
     stop_event: asyncio.Event,
@@ -82,6 +85,7 @@ async def run_timer(
     redis_config = EtcdRedisConfig(addr=redis_addr)
     event_dispatcher = await EventDispatcher.new(
         redis_config,
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
         stream_key=f"events-{test_case_ns}",
     )
@@ -122,6 +126,7 @@ def etcd_timer_node_process(
         redis_config = EtcdRedisConfig(addr=timer_ctx.redis_addr)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=timer_ctx.test_case_ns,
             stream_key=f"events-{timer_ctx.test_case_ns}",
         )
@@ -185,6 +190,7 @@ class TimerNode(threading.Thread):
         redis_config = EtcdRedisConfig(addr=self.redis_addr)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=self.test_case_ns,
             stream_key=f"events-{self.test_case_ns}",
         )
@@ -367,6 +373,7 @@ async def test_global_timer_join_leave(request, test_case_ns, redis_container) -
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     event_dispatcher = await EventDispatcher.new(
         redis_config,
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
         stream_key=f"events-{test_case_ns}",
     )

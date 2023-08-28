@@ -261,6 +261,10 @@ manager_local_config_iv = (
                     t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("hide-agents", default=False): t.Bool,
+                    t.Key(
+                        "agent-selection-resource-priority",
+                        default=["cuda", "rocm", "tpu", "cpu", "mem"],
+                    ): t.List(t.String),
                     t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import os
 import pickle
+import pprint
 import re
 import shutil
 import signal
@@ -66,6 +68,8 @@ from tenacity import (
 from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.config import model_definition_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -73,13 +77,17 @@ from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
+    EventDispatcher,
     EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelHealthCheckFailedEvent,
+    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -125,8 +133,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
-from .config import model_definition_iv
-from .exception import AgentError, ContainerCreationError, ResourceError
+from .exception import AgentError, ContainerCreationError, InsufficientResource, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -134,6 +141,7 @@ from .resources import (
     AbstractComputePlugin,
     KernelResourceSpec,
     Mount,
+    scan_resource_usage_per_slot,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -163,6 +171,7 @@ DEAD_STATUS_SET = frozenset(
 )
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
@@ -599,8 +608,15 @@ class AbstractAgent(
 
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
-            db=4,
+            db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
+        )
+        self.event_dispatcher = await EventDispatcher.new(
+            self.local_config["redis"],
+            db=REDIS_STREAM_DB,
+            log_events=self.local_config["debug"]["log-events"],
+            node_id=self.local_config["agent"]["id"],
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
@@ -697,6 +713,7 @@ class AbstractAgent(
 
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
+        await self.event_dispatcher.close()
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
 
@@ -948,7 +965,7 @@ class AbstractAgent(
                         "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
                     )
                     if ev.container_id is None:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
@@ -1039,7 +1056,7 @@ class AbstractAgent(
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
@@ -1167,7 +1184,11 @@ class AbstractAgent(
         Enumerate the containers with the given status filter.
         """
 
-    async def rescan_resource_usage(self) -> None:
+    async def reconstruct_resource_usage(self) -> None:
+        """
+        Reconstruct the resource alloc maps for each compute plugin from
+        ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+        """
         async with self.resource_lock:
             for computer_set in self.computers.values():
                 computer_set.alloc_map.clear()
@@ -1672,6 +1693,10 @@ class AbstractAgent(
                     None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
                 )
                 async with self.resource_lock:
+                    current_per_slot_occupancy = await scan_resource_usage_per_slot(
+                        [*self.kernel_registry.keys()],
+                        self.local_config["container"]["scratch-root"],
+                    )
                     for dev_name in ordered_dev_names:
                         computer_set = self.computers[dev_name]
                         device_id_map = {
@@ -1680,7 +1705,7 @@ class AbstractAgent(
                         device_specific_slots = {
                             SlotName(slot_name): Decimal(alloc)
                             for slot_name, alloc in slots.items()
-                            if slot_name.startswith(dev_name)
+                            if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
                         }
                         try:
                             resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
@@ -1701,13 +1726,35 @@ class AbstractAgent(
                             affinity_hint = AffinityHint(
                                 hint_devices, self.affinity_map, affinity_hint.policy
                             )
-                        except ResourceError as e:
+                        except (InsufficientResource, ResourceError) as e:
+                            await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
+                            # TODO: rollback allocation in previous compute devices in the loop
+                            original_plugin_alloc_map: dict[
+                                DeviceName, dict[SlotName, MutableMapping[DeviceId, Decimal]]
+                            ] = {}
+                            for dev in ordered_dev_names:
+                                original_plugin_alloc_map[dev] = copy.deepcopy(
+                                    dict(self.computers[dev].alloc_map.allocations)
+                                )
+                            alloc_failure_log_fmt = "\n".join(
+                                [
+                                    "resource allocation failed: {0}",
+                                    "(before allocation) device-specific slots ({1}):\n{2}",
+                                    "(before allocation) current per-slot occupancy:\n{3}",
+                                    "(after trying allocation) compute plugin alloc map:\n{4}",
+                                ]
+                            )
                             log.info(
-                                "resource allocation failed ({}): {} of {}\n(alloc map: {})",
-                                type(e).__name__,
-                                device_specific_slots,
+                                alloc_failure_log_fmt,
+                                e,
                                 dev_name,
-                                dict(computer_set.alloc_map.allocations),
+                                textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
+                                textwrap.indent(
+                                    pprint.pformat(dict(current_per_slot_occupancy)), "  "
+                                ),
+                                textwrap.indent(
+                                    pprint.pformat(dict(computer_set.alloc_map.allocations)), "  "
+                                ),
                             )
                             raise
             try:
@@ -1784,24 +1831,21 @@ class AbstractAgent(
                         model_definition_path = Path(
                             model_folder.host_path / "model-definition.yaml"
                         )
-                        if not model_definition_path.is_file():
-                            raise AgentError(
-                                "Model definition file (model-definition.yml or"
-                                " model-definition.yaml) does not exist on vFolder {} (ID {})",
-                                model_folder.name,
-                                model_folder.vfid,
-                            )
+                    if not model_definition_path.is_file():
+                        raise AgentError(
+                            "Model definition file (model-definition.yml or"
+                            " model-definition.yaml) does not exist under vFolder"
+                            f" {model_folder.name} (ID {model_folder.vfid})",
+                        )
                     try:
                         model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
                             None, model_definition_path.read_text
                         )
-                    except FileNotFoundError:
+                    except FileNotFoundError as e:
                         raise AgentError(
-                            "Model definition file (model-definition.yml) does not exist on"
-                            " vFolder {} (ID {})",
-                            model_folder.name,
-                            model_folder.vfid,
-                        )
+                            "Model definition file (model-definition.yml) does not exist under"
+                            f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+                        ) from e
                     try:
                         model_definition = model_definition_iv.check(
                             yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
@@ -1820,12 +1864,13 @@ class AbstractAgent(
                                         "is_inference": True,
                                     }
                                 )
-                    except DataError:
+                    except DataError as e:
                         raise AgentError(
-                            "Failed to read model definition from vFolder {} (ID {})",
-                            model_folder.name,
-                            model_folder.vfid,
-                        )
+                            "Failed to validate model definition from vFolder"
+                            f" {model_folder.name} (ID {model_folder.vfid})",
+                        ) from e
+                    except yaml.error.YAMLError as e:
+                        raise AgentError(f"Invalid YAML syntax: {e}") from e
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -1939,7 +1984,7 @@ class AbstractAgent(
                         KernelLifecycleEventReason.UNKNOWN,
                         container_id=ContainerId(cid),
                     )
-                    raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
+                    raise AgentError(f"Kernel failed to create container (k:{str(ctx.kernel_id)})")
                 except Exception:
                     log.warning(
                         "Kernel failed to create container (k:{}). Kernel is going to be"
@@ -1992,57 +2037,83 @@ class AbstractAgent(
                     self._pending_creation_tasks[kernel_id].remove(current_task)
                     if not self._pending_creation_tasks[kernel_id]:
                         del self._pending_creation_tasks[kernel_id]
-            except Exception as e:
-                await self.rescan_resource_usage()
-                raise e
 
-            public_service_ports: List[ServicePort] = self.get_public_service_ports(service_ports)
+                public_service_ports: List[ServicePort] = self.get_public_service_ports(
+                    service_ports
+                )
 
-            kernel_creation_info: KernelCreationResult = {
-                "id": KernelId(kernel_id),
-                "kernel_host": str(kernel_obj["kernel_host"]),
-                "repl_in_port": kernel_obj["repl_in_port"],
-                "repl_out_port": kernel_obj["repl_out_port"],
-                "stdin_port": kernel_obj["stdin_port"],  # legacy
-                "stdout_port": kernel_obj["stdout_port"],  # legacy
-                "service_ports": public_service_ports,
-                "container_id": kernel_obj["container_id"],
-                "resource_spec": attrs.asdict(resource_spec),
-                "scaling_group": kernel_config["scaling_group"],
-                "agent_addr": kernel_config["agent_addr"],
-                "attached_devices": attached_devices,
-            }
+                kernel_creation_info: KernelCreationResult = {
+                    "id": KernelId(kernel_id),
+                    "kernel_host": str(kernel_obj["kernel_host"]),
+                    "repl_in_port": kernel_obj["repl_in_port"],
+                    "repl_out_port": kernel_obj["repl_out_port"],
+                    "stdin_port": kernel_obj["stdin_port"],  # legacy
+                    "stdout_port": kernel_obj["stdout_port"],  # legacy
+                    "service_ports": public_service_ports,
+                    "container_id": kernel_obj["container_id"],
+                    "resource_spec": attrs.asdict(resource_spec),
+                    "scaling_group": kernel_config["scaling_group"],
+                    "agent_addr": kernel_config["agent_addr"],
+                    "attached_devices": attached_devices,
+                }
 
-            if model_definition:
-                for model in model_definition["models"]:
-                    log.debug("starting model service of model {}", model)
-                    await kernel_obj.start_model_service(model)
+                if model_definition:
+                    for model in model_definition["models"]:
+                        asyncio.create_task(
+                            self.start_and_monitor_model_service_initial_health(kernel_obj, model)
+                        )
 
-            # Finally we are done.
-            await self.produce_event(
-                KernelStartedEvent(
-                    kernel_id,
-                    session_id,
-                    creation_info={
-                        **kernel_creation_info,
-                        "id": str(KernelId(kernel_id)),
-                        "container_id": str(kernel_obj["container_id"]),
-                    },
-                ),
-            )
-
-            if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
-                self._ongoing_exec_batch_tasks.add(
-                    asyncio.create_task(
-                        self.execute_batch(
-                            session_id, kernel_id, kernel_config["startup_command"] or ""
-                        ),
+                # Finally we are done.
+                await self.produce_event(
+                    KernelStartedEvent(
+                        kernel_id,
+                        session_id,
+                        creation_info={
+                            **kernel_creation_info,
+                            "id": str(KernelId(kernel_id)),
+                            "container_id": str(kernel_obj["container_id"]),
+                        },
                     ),
                 )
 
-            # The startup command for the batch-type sessions will be executed by the manager
-            # upon firing of the "session_started" event.
-            return kernel_creation_info
+                if (
+                    kernel_config["session_type"] == "batch"
+                    and kernel_config["cluster_role"] == "main"
+                ):
+                    self._ongoing_exec_batch_tasks.add(
+                        asyncio.create_task(
+                            self.execute_batch(
+                                session_id, kernel_id, kernel_config["startup_command"] or ""
+                            ),
+                        ),
+                    )
+
+                # The startup command for the batch-type sessions will be executed by the manager
+                # upon firing of the "session_started" event.
+                return kernel_creation_info
+            except Exception as e:
+                await self.reconstruct_resource_usage()
+                raise e
+
+    async def start_and_monitor_model_service_initial_health(
+        self,
+        kernel_obj: KernelObjectType,
+        model: Any,
+    ) -> None:
+        log.debug("starting model service of model {}", model["name"])
+        result = await kernel_obj.start_model_service(model)
+        if result["status"] == "failed":
+            await self.event_producer.produce_event(
+                KernelHealthCheckFailedEvent(
+                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                )
+            )
+        else:
+            await self.event_producer.produce_event(
+                KernelHealthyEvent(
+                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                )
+            )
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
@@ -2294,6 +2365,9 @@ class AbstractAgent(
 
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
+
+    async def ping_kernel(self, kernel_id: KernelId):
+        return await self.kernel_registry[kernel_id].ping()
 
     async def save_last_registry(self, force=False) -> None:
         now = time.monotonic()

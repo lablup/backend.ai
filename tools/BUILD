@@ -4,19 +4,14 @@ python_requirements(
     resolve="pytest",
 )
 python_requirements(
-    name="reqs-flake8",
-    source="flake8-requirements.txt",
-    resolve="flake8",
+    name="reqs-ruff",
+    source="ruff-requirements.txt",
+    resolve="ruff",
 )
 python_requirements(
     name="reqs-black",
     source="black-requirements.txt",
     resolve="black",
-)
-python_requirements(
-    name="reqs-isort",
-    source="isort-requirements.txt",
-    resolve="isort",
 )
 python_requirements(
     name="reqs-mypy",
