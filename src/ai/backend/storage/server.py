@@ -6,6 +6,7 @@ import os
 import pwd
 import ssl
 import sys
+from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from pprint import pprint
 from typing import Any, AsyncIterator, Sequence
@@ -34,7 +35,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 @aiotools.server_context
-async def server_main_logwrapper(loop, pidx, _args):
+async def server_main_logwrapper(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    _args: Sequence[Any],
+) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
     try:
         asyncio.get_child_watcher()
@@ -53,7 +58,7 @@ async def check_migration(ctx: RootContext):
     await check_latest(ctx)
 
 
-@aiotools.server_context
+@actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
