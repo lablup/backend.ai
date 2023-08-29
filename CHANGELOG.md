@@ -18,6 +18,4 @@ Changes
 
 ## 23.03 and earlier
 
-Please refer the following per-package changelogs.
-
 * [Unified changelog for the core components](https://github.com/lablup/backend.ai/blob/23.03/CHANGELOG.md)
