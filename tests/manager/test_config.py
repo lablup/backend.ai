@@ -3,7 +3,7 @@ from pprint import pprint
 import pytest
 import yarl
 
-from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.config import SharedConfig, container_registry_iv
 
 
 def test_shared_config_flatten():
@@ -29,9 +29,42 @@ def test_shared_config_flatten():
         SharedConfig.flatten(
             "abc/def",
             {
-                "": None,
+                "": None,  # undefined serialization
             },
         )
+    with pytest.raises(ValueError):
+        SharedConfig.flatten(
+            "abc/def",
+            {
+                "key": [0, 1, 2],  # undefined serialization
+            },
+        )
+
+
+def test_container_registry_iv() -> None:
+    data = container_registry_iv.check(
+        {
+            "": "http://user:passwd@example.com:8080/registry",
+            "username": "hello",
+            "password": "world",
+            "project": "",
+        }
+    )
+    assert isinstance(data[""], yarl.URL)
+    assert data["project"] == []
+    assert data["ssl-verify"] is True
+
+    data = container_registry_iv.check(
+        {
+            "": "http://user:passwd@example.com:8080/registry",
+            "username": "hello",
+            "password": "world",
+            "project": "a,b,c",
+        }
+    )
+    assert isinstance(data[""], yarl.URL)
+    assert data["project"] == ["a", "b", "c"]
+    assert data["ssl-verify"] is True
 
 
 @pytest.mark.asyncio
@@ -45,8 +78,8 @@ async def test_shared_config_add_and_list_container_registry(test_ns, etcd_conta
     await shared_config.add_container_registry(
         "docker.internal:8080/registry",  # slash is automatically quoted
         {
-            "": yarl.URL("https://docker.internal:8080/registry"),
-            "project": "wow",
+            "": "https://docker.internal:8080/registry",
+            "project": "wow,bar,baz",
             "username": "admin",
             "password": "dummy",
         },
@@ -56,7 +89,7 @@ async def test_shared_config_add_and_list_container_registry(test_ns, etcd_conta
     pprint(items)
     assert len(items) == 1
     assert isinstance(items["docker.internal:8080/registry"][""], yarl.URL)
-    assert items["docker.internal:8080/registry"]["project"] == ["wow"]
+    assert items["docker.internal:8080/registry"]["project"] == ["wow", "bar", "baz"]
     assert items["docker.internal:8080/registry"]["username"] == "admin"
     assert items["docker.internal:8080/registry"]["password"] == "dummy"
 
@@ -69,7 +102,7 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
     await shared_config.add_container_registry(
         "docker.internal:8080/registry",
         {
-            "": yarl.URL("https://docker.internal:8080/registry"),
+            "": "https://docker.internal:8080/registry",
             "project": "wow",
             "username": "admin",
             "password": "dummy",
@@ -78,7 +111,7 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
     await shared_config.add_container_registry(
         "docker.internal:8080/registry2",  # shares the prefix
         {
-            "": yarl.URL("https://docker.internal:8080/registry2"),
+            "": "https://docker.internal:8080/registry2",
             "project": "wow",
             "username": "admin",
             "password": "dummy",
@@ -106,8 +139,9 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
     await shared_config.modify_container_registry(
         "docker.internal:8080/registry",
         {
-            "": yarl.URL("https://docker.internal:8080/registry_first"),
+            "": "https://docker.internal:8080/registry_first",
             "password": "ooops",
+            "project": "foo,bar",
         },
     )
 
@@ -118,7 +152,7 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
     assert items["docker.internal:8080/registry"][""] == yarl.URL(
         "https://docker.internal:8080/registry_first"  # modified
     )
-    assert items["docker.internal:8080/registry"]["project"] == ["wow"]
+    assert items["docker.internal:8080/registry"]["project"] == ["foo", "bar"]
     assert items["docker.internal:8080/registry"]["username"] == "admin"
     assert items["docker.internal:8080/registry"]["password"] == "ooops"  # modified
     assert items["docker.internal:8080/registry2"][""] == yarl.URL(
@@ -137,7 +171,7 @@ async def test_shared_config_delete_container_registry(test_ns, etcd_container) 
     await shared_config.add_container_registry(
         "docker.internal:8080/registry",
         {
-            "": yarl.URL("https://docker.internal:8080/registry"),
+            "": "https://docker.internal:8080/registry",
             "project": "wow",
             "username": "admin",
             "password": "dummy",
@@ -146,7 +180,7 @@ async def test_shared_config_delete_container_registry(test_ns, etcd_container) 
     await shared_config.add_container_registry(
         "docker.internal:8080/registry2",  # shares the prefix
         {
-            "": yarl.URL("https://docker.internal:8080/registry2"),
+            "": "https://docker.internal:8080/registry2",
             "project": "wow",
             "username": "admin",
             "password": "waldo",
