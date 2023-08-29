@@ -640,53 +640,62 @@ class SharedConfig(AbstractConfig):
 
     async def list_container_registry(self) -> dict[str, dict[str, Any]]:
         raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
-        return dict(raw_registries)
+        return {
+            hostname: container_registry_iv.check(item)
+            for hostname, item in raw_registries.items()
+            # type: ignore
+        }
 
     async def get_container_registry(self, hostname: str) -> dict[str, Any]:
-        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
-        registries = dict(raw_registries)
+        registries = await self.list_container_registry()
         try:
             item = registries[hostname]
         except KeyError:
             raise ObjectNotFound(object_name="container registry")
         return item
 
-    async def add_container_registry(self, hostname: str, config: dict[str, Any]) -> None:
-        updates = self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
+    async def add_container_registry(self, hostname: str, config_new: dict[str, Any]) -> None:
+        updates = self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config_new)
         await self.etcd.put_dict(updates)
 
-    async def modify_container_registry(self, hostname: str, config_update: dict[str, Any]) -> None:
-        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
-        registries = dict(raw_registries)
+    async def modify_container_registry(
+        self, hostname: str, config_updated: dict[str, Any]
+    ) -> None:
+        # Fetch the raw registries data and make it a mutable dict.
+        raw_registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
+        # Exclude the target hostname from the raw data.
         try:
-            del registries[hostname]
+            del raw_registries[hostname]
         except KeyError:
             raise ObjectNotFound(object_name="container registry")
-        # Delete all items with the same prefix
+        # Delete all items with having the prefix of the given hostname.
+        # This will "accidentally" delete any registry sharing the same prefix.
         await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
 
         # Re-add the "accidentally" deleted items
         updates: dict[str, Any] = {}
-        for key, item in registries.items():
+        for key, item in raw_registries.items():
             if key.startswith(hostname):
                 updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, key, item))
         # Re-add the updated item
-        updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config_update))
+        updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config_updated))
         await self.etcd.put_dict(updates)
 
     async def delete_container_registry(self, hostname: str) -> None:
-        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
-        registries = dict(raw_registries)
+        # Fetch the raw registries data and make it a mutable dict.
+        raw_registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
+        # Exclude the target hostname from the raw data.
         try:
-            del registries[hostname]
+            del raw_registries[hostname]
         except KeyError:
             raise ObjectNotFound(object_name="container registry")
-        # Delete all items with the same prefix
+        # Delete all items with having the prefix of the given hostname.
+        # This will "accidentally" delete any registry sharing the same prefix.
         await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
 
-        # Re-add the "accidentally" deleted items
+        # Re-add the "accidentally" deleted items.
         updates: dict[str, Any] = {}
-        for key, item in registries.items():
+        for key, item in raw_registries.items():
             if key.startswith(hostname):
                 updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, key, item))
         await self.etcd.put_dict(updates)
