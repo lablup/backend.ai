@@ -97,6 +97,9 @@ disabled-plugins = []
 # Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
 hide-agents = false
 
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
 # One of: "asyncio", "uvloop"
 # This changes the event loop backend.
 # uvloop is a fast libuv-based implementation but sometimes has
@@ -122,7 +125,8 @@ importer-image = "lablup/importer:manylinux2010"
 # The starting port number for aiomonitor.
 # Since the manager is composed of multiple processes, each process will be exposed
 # via the port number of this base port number + pidx.
-# aiomonitor-port = 48100
+# aiomonitor-termui-port = 48100
+# aiomonitor-webui-port = 49100
 
 
 [docker-registry]
