@@ -160,7 +160,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: maxnowack/local-cache@v1
       id: lfs-cache
       with:
           path: .git/lfs
