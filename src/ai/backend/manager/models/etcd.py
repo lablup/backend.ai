@@ -76,7 +76,7 @@ class ContainerRegistry(graphene.ObjectType):
         ctx: GraphQueryContext,
     ) -> Sequence[ContainerRegistry]:
         log.info(
-            "ETCD.LOAD_ALL_CONTAINER_REGISTRIES (ak:{})",
+            "ETCD.LIST_CONTAINER_REGISTRY (ak:{})",
             ctx.access_key,
         )
         registries = await ctx.shared_config.list_container_registry()
@@ -85,7 +85,7 @@ class ContainerRegistry(graphene.ObjectType):
     @classmethod
     async def load_registry(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
         log.info(
-            "ETCD.LOAD_CONTAINER_REGISTRY (ak:{}, hostname:{})",
+            "ETCD.GET_CONTAINER_REGISTRY (ak:{}, hostname:{})",
             ctx.access_key,
             hostname,
         )
