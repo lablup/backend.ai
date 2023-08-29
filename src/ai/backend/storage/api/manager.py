@@ -3,6 +3,7 @@ Manager-facing API
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from contextlib import contextmanager as ctxmgr
@@ -1046,6 +1047,20 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
+async def _chown(path, user, group) -> None:
+    proc = await asyncio.create_subprocess_exec(
+        *["sudo", "chown", f"{user}.{group}", path],
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    raw_out, raw_err = await proc.communicate()
+    raw_out.decode("utf8")
+    err = raw_err.decode("utf8")
+    await proc.wait()
+    if err:
+        raise StorageProxyError(f"Error occured while chown of {path}. {err}")
+
+
 async def handle_volume_mount(
     context: RootContext,
     source: AgentId,
@@ -1063,6 +1078,7 @@ async def handle_volume_mount(
         event.fstab_path,
         mount_prefix,
     )
+    await _chown(event.mount_path, "bai", "bai")
     await context.event_producer.produce_event(
         VolumeMounted(
             str(context.node_id),
