@@ -16,7 +16,6 @@ from .cephfs import CephFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
-from .kmanila import KManilaFSVolume
 from .netapp import NetAppVolume
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
@@ -35,7 +34,6 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
     "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
     "cephfs": CephFSVolume,
-    "kmanila": KManilaFSVolume,
 }
 
 
@@ -86,7 +84,6 @@ class BaseContext:
 class Context(BaseContext):
     __slots__ = (
         "pid",
-        "pidx",
         "node_id",
         "etcd",
         "local_config",
@@ -102,7 +99,6 @@ class Context(BaseContext):
         self,
         node_id: str,
         pid: int,
-        pidx: int,
         local_config: Mapping[str, Any],
         etcd: AsyncEtcd,
         event_producer: EventProducer,
@@ -112,6 +108,5 @@ class Context(BaseContext):
     ) -> None:
         super().__init__(pid, local_config, etcd, dsn=dsn)
         self.node_id = node_id
-        self.pidx = pidx
         self.event_producer = event_producer
         self.event_dispatcher = event_dispatcher

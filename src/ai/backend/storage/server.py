@@ -109,7 +109,6 @@ async def server_main(
         ctx = Context(
             node_id=local_config["storage-proxy"]["node-id"],
             pid=os.getpid(),
-            pidx=pidx,
             local_config=local_config,
             etcd=etcd,
             event_producer=event_producer,
