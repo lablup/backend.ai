@@ -63,6 +63,7 @@ from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
     KernelCancelledEvent,
@@ -415,6 +416,7 @@ class AgentRegistry:
         evd.consume(
             DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
         )
+        evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
@@ -2602,7 +2604,7 @@ class AgentRegistry:
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
-                log.exception("unexpected-error in _restart_kerenl()")
+                log.exception("unexpected-error in _restart_kernel()")
 
         restart_coros = []
         for kernel in kernel_list:
@@ -2886,7 +2888,7 @@ class AgentRegistry:
 
                     if row is None or row["status"] is None:
                         # new agent detected!
-                        log.info("agent {0} joined!", agent_id)
+                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
                         await self.shared_config.update_resource_slots(slot_key_and_units)
                         insert_query = sa.insert(agents).values(
                             {
@@ -3756,7 +3758,7 @@ async def handle_agent_lifecycle(
     event: AgentStartedEvent | AgentTerminatedEvent,
 ) -> None:
     if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined ({1})", source, event.reason)
+        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
         await context.update_instance(
             source,
             {
@@ -3786,6 +3788,20 @@ async def handle_agent_heartbeat(
     event: AgentHeartbeatEvent,
 ) -> None:
     await context.handle_heartbeat(source, event.agent_info)
+
+
+async def handle_check_agent_resource(
+    context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
+) -> None:
+    async with context.db.begin_readonly() as conn:
+        query = (
+            sa.select([agents.c.occupied_slots]).select_from(agents).where(agents.c.id == source)
+        )
+        result = await conn.execute(query)
+        row = result.first()
+        if not row:
+            raise InstanceNotFound(source)
+        log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
 
 
 async def check_scaling_group(
