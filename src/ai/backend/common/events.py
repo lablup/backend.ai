@@ -569,7 +569,7 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
 
 
-@attrs.define(auto_attribs=True, slots=True)
+@attrs.define(slots=True)
 class DoVolumeMountEvent(AbstractEvent):
     name = "do_volume_mount"
 
@@ -603,16 +603,16 @@ class DoVolumeMountEvent(AbstractEvent):
         return cls(
             mount_path=value[0],
             quota_scope_id=QuotaScopeID.parse(value[1]),
-            scaling_group=value[2],
-            edit_fstab=value[3],
-            fstab_path=value[4],
-            fs_location=value[5],
-            fs_type=value[6],
-            cmd_options=value[7],
+            fs_location=value[2],
+            fs_type=value[3],
+            cmd_options=value[4],
+            scaling_group=value[5],
+            edit_fstab=value[6],
+            fstab_path=value[7],
         )
 
 
-@attrs.define(auto_attribs=True, slots=True)
+@attrs.define(slots=True)
 class DoVolumeUnmountEvent(AbstractEvent):
     name = "do_volume_unmount"
 

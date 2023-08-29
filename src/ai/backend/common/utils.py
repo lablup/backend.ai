@@ -327,7 +327,7 @@ async def mount(
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        raise VolumeMountFailed(f"Failed to mount {mount_path} on {mount_prefix}")
+        raise VolumeMountFailed(f"Failed to mount {mount_path} on {mountpoint}")
     if edit_fstab:
         async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
             fstab = Fstab(fp)

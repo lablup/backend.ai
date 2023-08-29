@@ -1074,6 +1074,8 @@ async def handle_volume_mount(
     source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
+    if context.pid != 0:
+        return
     mount_prefix = await context.etcd.get("volumes/_mount")
     await mount(
         event.mount_path,
@@ -1099,6 +1101,8 @@ async def handle_volume_unmount(
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
+    if context.pid != 0:
+        return
     mount_prefix = await context.etcd.get("volumes/_mount")
     await unmount(
         event.mount_path,

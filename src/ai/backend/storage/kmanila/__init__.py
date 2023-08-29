@@ -50,6 +50,11 @@ class QuotaVolumeMap(TypedDict):
     volume_name: str
 
 
+class VolumeInfo(TypedDict):
+    volume_id: VolumeId
+    export_location: str
+
+
 RequestHeader = TypedDict(
     "RequestHeader",
     {
@@ -203,9 +208,7 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info: dict[str, Any],
         *,
         name: str,
-    ) -> VolumeId:
-        if (volume_id := await self.get_volume_id(session, quota_scope_id, auth_info)) is not None:
-            return volume_id
+    ) -> VolumeInfo:
         project_id = auth_info["project_id"]
         auth_token = auth_info["auth_token"]
         request_body = {
@@ -234,11 +237,16 @@ class KManilaQuotaModel(BaseQuotaModel):
         trial = 1
         while True:
             log.debug(f"Poll if the volume has been created, {trial = }")
-            if (await self.fetch_volume_info(session, volume_id, auth_info)) is not None:
+            if (
+                vol_info := await self.fetch_volume_info(session, volume_id, auth_info)
+            ) is not None:
+                export_location = vol_info["share"]["export_location"]
+                if export_location is None:
+                    continue
                 await self.put_user_volume_id(
                     quota_scope_id, QuotaVolumeMap(volume_id=volume_id, volume_name=name)
                 )
-                return volume_id
+                return {"volume_id": volume_id, "export_location": export_location}
             await asyncio.sleep(1)
             trial += 1
             if trial > self.max_poll_count:
@@ -343,6 +351,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             access_level=self.access_level,
             access_to=self.access_to,
         )
+        await asyncio.sleep(2)
         return True
 
     def _build_header(self, auth_token: str, subpath: str, method: str) -> RequestHeader:
@@ -372,11 +381,12 @@ class KManilaQuotaModel(BaseQuotaModel):
         auth_info = await self._get_auth_info(quota_scope_id)
 
         async with aiohttp.ClientSession(base_url=self.api_base_url) as sess:
-            volume_id = await self._create_volume(
-                sess, quota_scope_id, options, auth_info, name=volume_name
-            )
+            if (await self.get_volume_id(sess, quota_scope_id, auth_info)) is None:
+                volume_info = await self._create_volume(
+                    sess, quota_scope_id, options, auth_info, name=volume_name
+                )
             is_newly_created = await self._create_access_control(
-                sess, quota_scope_id, volume_id, auth_info
+                sess, quota_scope_id, volume_info["volume_id"], auth_info
             )
             if not is_newly_created:
                 raise QuotaScopeAlreadyExists
@@ -385,7 +395,7 @@ class KManilaQuotaModel(BaseQuotaModel):
             DoVolumeMountEvent(
                 mount_path=str(self.mangle_qspath(quota_scope_id)),
                 quota_scope_id=quota_scope_id,
-                fs_location=f"{self.fs_location_prefix}:/share_{volume_id}",
+                fs_location=volume_info["export_location"],
                 fs_type="nfs",
                 edit_fstab=True,
             )
