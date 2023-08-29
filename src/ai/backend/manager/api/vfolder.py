@@ -314,6 +314,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
     group_id_or_name = params["group"]
+    ownership_type = "group" if group_id_or_name else "user"
     log.info(
         "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         request["user"]["email"],
@@ -385,7 +386,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if resource_policy["max_vfolder_count"] > 0:
             query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
             result = await conn.scalar(query)
-            if result >= resource_policy["max_vfolder_count"]:
+            if result >= resource_policy["max_vfolder_count"] and ownership_type == "user":
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
@@ -447,7 +448,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise VFolderCreationFailed
         user_uuid = str(user_uuid) if group_id is None else None
         group_uuid = str(group_id) if group_id is not None else None
-        ownership_type = "group" if group_uuid is not None else "user"
         insert_values = {
             "id": folder_id.hex,
             "name": params["name"],
