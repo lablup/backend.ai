@@ -177,12 +177,23 @@ import os
 import secrets
 import socket
 import sys
+import urllib.parse
 from abc import abstractmethod
 from collections import UserDict
+from collections.abc import Mapping
 from contextvars import ContextVar
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Final,
+    List,
+    Optional,
+    Sequence,
+    TypeAlias,
+)
 
 import aiotools
 import click
@@ -214,6 +225,8 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
 
 current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
@@ -619,23 +632,26 @@ class SharedConfig(AbstractConfig):
         # Just treat it like an opaque object.
         return hash(id(self))
 
-    def flatten(self, key_prefix: str, hostname: str, inner_dict) -> dict[str, Any]:
-        raw_dict: dict[str, Any] = {}
+    @classmethod
+    def flatten(cls, key_prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str, str]:
+        flattend_dict: dict[str, str] = {}
         for k, v in inner_dict.items():
             if k == "":
-                inner_prefix = f"{key_prefix}/{hostname}"
+                flattened_key = key_prefix
             else:
-                inner_prefix = f"{key_prefix}/{hostname}/{k}"
+                flattened_key = key_prefix + "/" + urllib.parse.quote(k, safe="")
             match v:
                 case Mapping():
-                    raw_dict[inner_prefix] = self.flatten(key_prefix, hostname, v)
-                case str() | int() | float() | yarl.URL():
-                    raw_dict[inner_prefix] = str(v)
+                    flattend_dict.update(cls.flatten(flattened_key, v))  # type: ignore
+                case str():
+                    flattend_dict[flattened_key] = v
+                case int() | float() | yarl.URL():
+                    flattend_dict[flattened_key] = str(v)
                 case _:
                     raise ValueError(
                         f"The value {v!r} must be serialized before storing to the etcd"
                     )
-        return raw_dict
+        return flattend_dict
 
     async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
         value = await self.etcd.get(key)
@@ -644,10 +660,10 @@ class SharedConfig(AbstractConfig):
         return value
 
     async def list_container_registry(self) -> dict[str, dict[str, Any]]:
-        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
+        registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
         return {
             hostname: container_registry_iv.check(item)
-            for hostname, item in raw_registries.items()
+            for hostname, item in registries.items()
             # type: ignore
         }
 
@@ -660,49 +676,70 @@ class SharedConfig(AbstractConfig):
         return item
 
     async def add_container_registry(self, hostname: str, config_new: dict[str, Any]) -> None:
-        updates = self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config_new)
+        updates = self.flatten(
+            self.ETCD_CONTAINER_REGISTRY_KEY,
+            {hostname: config_new},
+        )
         await self.etcd.put_dict(updates)
 
     async def modify_container_registry(
         self, hostname: str, config_updated: dict[str, Any]
     ) -> None:
         # Fetch the raw registries data and make it a mutable dict.
-        raw_registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
+        registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
         # Exclude the target hostname from the raw data.
         try:
-            del raw_registries[hostname]
+            original_item = registries[hostname]
+            del registries[hostname]
         except KeyError:
             raise ObjectNotFound(object_name="container registry")
         # Delete all items with having the prefix of the given hostname.
         # This will "accidentally" delete any registry sharing the same prefix.
-        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+        raw_hostname = urllib.parse.quote(hostname, safe="")
+        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
 
         # Re-add the "accidentally" deleted items
-        updates: dict[str, Any] = {}
-        for key, item in raw_registries.items():
+        updates: dict[str, str] = {}
+        for key, item in registries.items():
             if key.startswith(hostname):
-                updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, key, item))
+                updates.update(
+                    self.flatten(
+                        self.ETCD_CONTAINER_REGISTRY_KEY,
+                        {key: item},  # type: ignore
+                    )
+                )
         # Re-add the updated item
-        updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config_updated))
+        updates.update(
+            self.flatten(
+                self.ETCD_CONTAINER_REGISTRY_KEY,
+                {hostname: {**original_item, **config_updated}},  # type: ignore
+            )
+        )
         await self.etcd.put_dict(updates)
 
     async def delete_container_registry(self, hostname: str) -> None:
         # Fetch the raw registries data and make it a mutable dict.
-        raw_registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
+        registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
         # Exclude the target hostname from the raw data.
         try:
-            del raw_registries[hostname]
+            del registries[hostname]
         except KeyError:
             raise ObjectNotFound(object_name="container registry")
         # Delete all items with having the prefix of the given hostname.
         # This will "accidentally" delete any registry sharing the same prefix.
-        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+        raw_hostname = urllib.parse.quote(hostname, safe="")
+        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
 
         # Re-add the "accidentally" deleted items.
-        updates: dict[str, Any] = {}
-        for key, item in raw_registries.items():
+        updates: dict[str, str] = {}
+        for key, item in registries.items():
             if key.startswith(hostname):
-                updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, key, item))
+                updates.update(
+                    self.flatten(
+                        self.ETCD_CONTAINER_REGISTRY_KEY,
+                        {key: item},  # type: ignore
+                    )
+                )
         await self.etcd.put_dict(updates)
 
     async def register_myself(self) -> None:
