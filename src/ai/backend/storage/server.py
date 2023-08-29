@@ -52,7 +52,7 @@ async def server_main_logwrapper(
             yield
 
 
-async def check_migration(ctx: RootContext):
+async def check_migration(ctx: RootContext) -> None:
     from .migration import check_latest
 
     await check_latest(ctx)
@@ -208,7 +208,7 @@ async def server_main(
 )
 @click.pass_context
 def main(
-    cli_ctx,
+    cli_ctx: click.Context,
     config_path: Path,
     log_level: LogSeverity,
     debug: bool = False,
