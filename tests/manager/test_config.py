@@ -16,7 +16,7 @@ def test_shared_config_flatten():
         {
             "": yarl.URL("https://example.com"),
             "normal": "okay",
-            "aa:bb/cc": {
+            "aa:bb/cc": {  # special chars are auto-quoted
                 "f1": "hello",
                 "f2": 1234,
             },
@@ -104,7 +104,7 @@ async def test_shared_config_add_and_list_container_registry(test_ns, etcd_conta
     assert len(items) == 0
 
     await shared_config.add_container_registry(
-        "docker.internal:8080/registry",  # slash is automatically quoted
+        "docker.internal:8080/registry",  # special chars are auto-quoted
         {
             "": "https://docker.internal:8080/registry",
             "project": "wow,bar,baz",
