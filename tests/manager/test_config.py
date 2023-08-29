@@ -3,7 +3,11 @@ from pprint import pprint
 import pytest
 import yarl
 
-from ai.backend.manager.config import SharedConfig, container_registry_iv
+from ai.backend.manager.config import (
+    SharedConfig,
+    container_registry_iv,
+    container_registry_serialize,
+)
 
 
 def test_shared_config_flatten():
@@ -66,6 +70,29 @@ def test_container_registry_iv() -> None:
     assert isinstance(data[""], yarl.URL)
     assert data["project"] == ["a", "b", "c"]
     assert data["ssl_verify"] is False
+
+    data = container_registry_iv.check(
+        {
+            "": "http://user:passwd@example.com:8080/registry",
+            "type": "harbor2",
+            "project": ["x", "y", "z"],  # already structured
+        }
+    )
+    assert isinstance(data[""], yarl.URL)
+    assert data["type"] == "harbor2"
+    assert data["project"] == ["x", "y", "z"]
+    assert data["ssl_verify"] is True
+
+    serialized_data = container_registry_serialize(data)
+    assert isinstance(serialized_data[""], str)
+    assert serialized_data["type"] == "harbor2"
+    assert serialized_data["project"] == "x,y,z"
+    assert serialized_data["ssl_verify"] == "1"
+    deserialized_data = container_registry_iv.check(serialized_data)
+    assert isinstance(deserialized_data[""], yarl.URL)
+    assert deserialized_data["type"] == "harbor2"
+    assert deserialized_data["project"] == ["x", "y", "z"]
+    assert deserialized_data["ssl_verify"] is True
 
 
 @pytest.mark.asyncio
