@@ -31,7 +31,12 @@ from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
 from .netapp import NetAppVolume
-from .plugin import StoragePluginContext, StorageWebappPluginContext
+from .plugin import (
+    BasePluginContext,
+    StorageClientWebappPluginContext,
+    StorageManagerWebappPluginContext,
+    StoragePluginContext,
+)
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
 from .vfs import BaseVolume
@@ -120,7 +125,14 @@ class RootContext:
             **DEFAULT_BACKENDS,
         }
         await self.init_storage_plugin()
-        await self.init_storage_webapp_plugin()
+        self.manager_webapp_plugin_ctx = await self.init_storage_webapp_plugin(
+            StorageManagerWebappPluginContext(self.etcd, self.local_config),
+            self.manager_api_app,
+        )
+        self.client_webapp_plugin_ctx = await self.init_storage_webapp_plugin(
+            StorageClientWebappPluginContext(self.etcd, self.local_config),
+            self.client_api_app,
+        )
 
     async def init_storage_plugin(self) -> None:
         plugin_ctx = StoragePluginContext(self.etcd, self.local_config)
@@ -131,22 +143,24 @@ class RootContext:
             volume_cls = plugin_instance.get_volume_class()
             self.backends[plugin_name] = volume_cls
 
-    async def init_storage_webapp_plugin(self) -> None:
-        plugin_ctx = StorageWebappPluginContext(self.etcd, self.local_config)
+    async def init_storage_webapp_plugin(
+        self, plugin_ctx: BasePluginContext, root_app: web.Application
+    ) -> BasePluginContext:
         await plugin_ctx.init()
-        self.webapp_plugin_ctx = plugin_ctx
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             if self.pid == 0:
                 log.info("Loading storage webapp plugin: {0}", plugin_name)
             subapp, global_middlewares = await plugin_instance.create_app(self.cors_options)
-            _init_subapp(plugin_name, self.manager_api_app, subapp, global_middlewares)
+            _init_subapp(plugin_name, root_app, subapp, global_middlewares)
+        return plugin_ctx
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: VolumeInfo(**info) for name, info in self.local_config["volume"].items()}
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         await self.storage_plugin_ctx.cleanup()
-        await self.webapp_plugin_ctx.cleanup()
+        await self.manager_webapp_plugin_ctx.cleanup()
+        await self.client_webapp_plugin_ctx.cleanup()
         return None
 
     @actxmgr

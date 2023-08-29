@@ -32,7 +32,7 @@ class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
         yield from scanned_plugins
 
 
-class StorageWebappPlugin(AbstractPlugin, metaclass=ABCMeta):
+class StorageManagerWebappPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def create_app(
         self,
@@ -41,5 +41,18 @@ class StorageWebappPlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class StorageWebappPluginContext(BasePluginContext[StorageWebappPlugin]):
-    plugin_group = "backendai_storage_webapp_v20"
+class StorageManagerWebappPluginContext(BasePluginContext[StorageManagerWebappPlugin]):
+    plugin_group = "backendai_storage_manager_webapp_v10"
+
+
+class StorageClientWebappPlugin(AbstractPlugin, metaclass=ABCMeta):
+    @abstractmethod
+    async def create_app(
+        self,
+        cors_options: CORSOptions,
+    ) -> tuple[web.Application, list[WebMiddleware]]:
+        raise NotImplementedError
+
+
+class StorageClientWebappPluginContext(BasePluginContext[StorageClientWebappPlugin]):
+    plugin_group = "backendai_storage_client_webapp_v10"
