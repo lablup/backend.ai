@@ -360,9 +360,26 @@ container_registry_iv = t.Dict(
         t.Key("username", default=None): t.Null | t.String,
         t.Key("password", default=None): t.Null | t.String,
         t.Key("project", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
-        t.Key("ssl-verify", default=True): t.ToBool,
+        tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,
     }
 ).allow_extra("*")
+
+
+def container_registry_serialize(v: dict[str, Any]) -> dict[str, str]:
+    raw_data = {
+        "": str(v[""]),
+        "type": str(v["type"]),
+    }
+    if (username := v.get("username")) is not None:
+        raw_data["username"] = str(username)
+    if (password := v.get("password", None)) is not None:
+        raw_data["password"] = str(password)
+    if (project := v.get("project", None)) is not None:
+        raw_data["project"] = ",".join(project)
+    if (ssl_verify := v.get("ssl_verify", None)) is not None:
+        raw_data["ssl_verify"] = "1" if ssl_verify else "0"
+    return raw_data
+
 
 session_hang_tolerance_iv = t.Dict(
     {
@@ -678,7 +695,7 @@ class SharedConfig(AbstractConfig):
     async def add_container_registry(self, hostname: str, config_new: dict[str, Any]) -> None:
         updates = self.flatten(
             self.ETCD_CONTAINER_REGISTRY_KEY,
-            {hostname: config_new},
+            {hostname: container_registry_serialize(container_registry_iv.check(config_new))},
         )
         await self.etcd.put_dict(updates)
 
@@ -700,19 +717,30 @@ class SharedConfig(AbstractConfig):
 
         # Re-add the "accidentally" deleted items
         updates: dict[str, str] = {}
-        for key, item in registries.items():
+        for key, raw_item in registries.items():
             if key.startswith(hostname):
                 updates.update(
                     self.flatten(
                         self.ETCD_CONTAINER_REGISTRY_KEY,
-                        {key: item},  # type: ignore
+                        {key: raw_item},  # type: ignore
                     )
                 )
         # Re-add the updated item
+        if (_ssl_verify := config_updated.pop("ssl-verify", None)) is not None:
+            # Move "ssl-verify" to "ssl_verify" if exists, for key aliasing compatibility:
+            # the etcd-stored original item has already the normalized name "ssl_verify",
+            # while the user input may have either "ssl-verify" or "ssl_verify".
+            # We should run the IV check after merging the original item and the user input
+            # to prevent overwriting non-existent fields with the default values in IV.
+            config_updated["ssl_verify"] = _ssl_verify
         updates.update(
             self.flatten(
                 self.ETCD_CONTAINER_REGISTRY_KEY,
-                {hostname: {**original_item, **config_updated}},  # type: ignore
+                {
+                    hostname: container_registry_serialize(
+                        container_registry_iv.check({**original_item, **config_updated})  # type: ignore
+                    )
+                },
             )
         )
         await self.etcd.put_dict(updates)
@@ -732,12 +760,12 @@ class SharedConfig(AbstractConfig):
 
         # Re-add the "accidentally" deleted items.
         updates: dict[str, str] = {}
-        for key, item in registries.items():
+        for key, raw_item in registries.items():
             if key.startswith(hostname):
                 updates.update(
                     self.flatten(
                         self.ETCD_CONTAINER_REGISTRY_KEY,
-                        {key: item},  # type: ignore
+                        {key: raw_item},  # type: ignore
                     )
                 )
         await self.etcd.put_dict(updates)

@@ -7,7 +7,6 @@ import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..config import container_registry_iv
 from . import UserRole
 from .base import privileged_mutation, set_if_set
 
@@ -32,6 +31,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
+    ssl_verify = graphene.Boolean()
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
@@ -40,6 +40,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
+    ssl_verify = graphene.Boolean()
 
 
 class ContainerRegistryConfig(graphene.ObjectType):
@@ -48,6 +49,7 @@ class ContainerRegistryConfig(graphene.ObjectType):
     project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
+    ssl_verify = graphene.Boolean()
 
 
 class ContainerRegistry(graphene.ObjectType):
@@ -64,6 +66,7 @@ class ContainerRegistry(graphene.ObjectType):
                 project=config.get("project", None),
                 username=config.get("username", None),
                 password=config.get("password", None),
+                ssl_verify=config.get("ssl_verify", None),
             ),
         )
 
@@ -111,14 +114,14 @@ class CreateContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
-        registry_config = container_registry_iv.check(input_config)
+        set_if_set(props, input_config, "ssl_verify")
         log.info(
             "ETCD.CREATE_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,
             hostname,
-            registry_config,
+            input_config,
         )
-        await ctx.shared_config.add_container_registry(hostname, registry_config)
+        await ctx.shared_config.add_container_registry(hostname, input_config)
         return cls(result="ok")
 
 
@@ -147,14 +150,14 @@ class ModifyContainerRegistry(graphene.Mutation):
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
-        registry_config = container_registry_iv.check(input_config)
+        set_if_set(props, input_config, "ssl_verify")
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,
             hostname,
-            registry_config,
+            input_config,
         )
-        await ctx.shared_config.modify_container_registry(hostname, registry_config)
+        await ctx.shared_config.modify_container_registry(hostname, input_config)
         return cls(result="ok")
 
 

@@ -52,7 +52,7 @@ def test_container_registry_iv() -> None:
     )
     assert isinstance(data[""], yarl.URL)
     assert data["project"] == []
-    assert data["ssl-verify"] is True
+    assert data["ssl_verify"] is True
 
     data = container_registry_iv.check(
         {
@@ -60,11 +60,12 @@ def test_container_registry_iv() -> None:
             "username": "hello",
             "password": "world",
             "project": "a,b,c",
+            "ssl_verify": "false",  # accepts various true/false expressions in strings
         }
     )
     assert isinstance(data[""], yarl.URL)
     assert data["project"] == ["a", "b", "c"]
-    assert data["ssl-verify"] is True
+    assert data["ssl_verify"] is False
 
 
 @pytest.mark.asyncio
@@ -82,6 +83,7 @@ async def test_shared_config_add_and_list_container_registry(test_ns, etcd_conta
             "project": "wow,bar,baz",
             "username": "admin",
             "password": "dummy",
+            "ssl_verify": "0",  # accepts various true/false expressions in strings
         },
     )
     items = await shared_config.list_container_registry()
@@ -92,6 +94,7 @@ async def test_shared_config_add_and_list_container_registry(test_ns, etcd_conta
     assert items["docker.internal:8080/registry"]["project"] == ["wow", "bar", "baz"]
     assert items["docker.internal:8080/registry"]["username"] == "admin"
     assert items["docker.internal:8080/registry"]["password"] == "dummy"
+    assert items["docker.internal:8080/registry"]["ssl_verify"] is False
 
 
 @pytest.mark.asyncio
@@ -106,6 +109,7 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
             "project": "wow",
             "username": "admin",
             "password": "dummy",
+            "ssl_verify": "true",
         },
     )
     await shared_config.add_container_registry(
@@ -115,6 +119,7 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
             "project": "wow",
             "username": "admin",
             "password": "dummy",
+            "ssl-verify": "1",  # test the key aliasing
         },
     )
 
@@ -128,20 +133,22 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
     assert items["docker.internal:8080/registry"]["project"] == ["wow"]
     assert items["docker.internal:8080/registry"]["username"] == "admin"
     assert items["docker.internal:8080/registry"]["password"] == "dummy"
+    assert items["docker.internal:8080/registry"]["ssl_verify"] is True
     assert items["docker.internal:8080/registry2"][""] == yarl.URL(
         "https://docker.internal:8080/registry2"
     )
     assert items["docker.internal:8080/registry2"]["project"] == ["wow"]
     assert items["docker.internal:8080/registry2"]["username"] == "admin"
     assert items["docker.internal:8080/registry2"]["password"] == "dummy"
+    assert items["docker.internal:8080/registry2"]["ssl_verify"] is True
 
     # modify the first registry
     await shared_config.modify_container_registry(
         "docker.internal:8080/registry",
         {
             "": "https://docker.internal:8080/registry_first",
-            "password": "ooops",
             "project": "foo,bar",
+            "ssl-verify": "0",  # test the key aliasing
         },
     )
 
@@ -152,15 +159,17 @@ async def test_shared_config_modify_container_registry(test_ns, etcd_container) 
     assert items["docker.internal:8080/registry"][""] == yarl.URL(
         "https://docker.internal:8080/registry_first"  # modified
     )
-    assert items["docker.internal:8080/registry"]["project"] == ["foo", "bar"]
-    assert items["docker.internal:8080/registry"]["username"] == "admin"
-    assert items["docker.internal:8080/registry"]["password"] == "ooops"  # modified
+    assert items["docker.internal:8080/registry"]["project"] == ["foo", "bar"]  # modified
+    assert items["docker.internal:8080/registry"]["username"] == "admin"  # unmodified
+    assert items["docker.internal:8080/registry"]["password"] == "dummy"  # unmodified
+    assert items["docker.internal:8080/registry"]["ssl_verify"] is False  # modified
     assert items["docker.internal:8080/registry2"][""] == yarl.URL(
         "https://docker.internal:8080/registry2"  # should not be modified
     )
     assert items["docker.internal:8080/registry2"]["project"] == ["wow"]
     assert items["docker.internal:8080/registry2"]["username"] == "admin"
     assert items["docker.internal:8080/registry2"]["password"] == "dummy"  # should not be modified
+    assert items["docker.internal:8080/registry2"]["ssl_verify"] is True  # should not be modified
 
 
 @pytest.mark.asyncio
@@ -188,7 +197,7 @@ async def test_shared_config_delete_container_registry(test_ns, etcd_container) 
     )
 
     items = await shared_config.list_container_registry()
-    print("--> before modification")
+    print("--> before deletion")
     pprint(items)
     assert len(items) == 2
     assert items["docker.internal:8080/registry"][""] == yarl.URL(
