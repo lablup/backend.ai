@@ -10,7 +10,7 @@ from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.api.types import CORSOptions, WebMiddleware
 
 
-class AbstractStoragePlugin(AbstractPlugin):
+class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     def get_volume_class(
         self,
@@ -38,7 +38,7 @@ class StorageWebappPlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         cors_options: CORSOptions,
     ) -> tuple[web.Application, list[WebMiddleware]]:
-        pass
+        raise NotImplementedError
 
 
 class StorageWebappPluginContext(BasePluginContext[StorageWebappPlugin]):
