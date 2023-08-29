@@ -27,8 +27,6 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
-from .api.client import init_client_app
-from .api.manager import init_manager_app
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 
@@ -113,10 +111,8 @@ async def server_main(
         )
         async with ctx:
             m.console_locals["ctx"] = ctx
-            client_api_app = await init_client_app(ctx)
-            manager_api_app = await init_manager_app(ctx)
-            m.console_locals["client_api_app"] = client_api_app
-            m.console_locals["manager_api_app"] = manager_api_app
+            m.console_locals["client_api_app"] = ctx.client_api_app
+            m.console_locals["manager_api_app"] = ctx.manager_api_app
 
             if pidx == 0:
                 await check_migration(ctx)
@@ -135,8 +131,8 @@ async def server_main(
                     str(local_config["api"]["manager"]["ssl-cert"]),
                     str(local_config["api"]["manager"]["ssl-privkey"]),
                 )
-            client_api_runner = web.AppRunner(client_api_app)
-            manager_api_runner = web.AppRunner(manager_api_app)
+            client_api_runner = web.AppRunner(ctx.client_api_app)
+            manager_api_runner = web.AppRunner(ctx.manager_api_app)
             await client_api_runner.setup()
             await manager_api_runner.setup()
             client_service_addr = local_config["api"]["client"]["service-addr"]
