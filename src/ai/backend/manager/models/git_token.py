@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import uuid
@@ -10,6 +11,7 @@ import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.sql import text
 
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -63,10 +65,16 @@ async def insert_update_git_tokens(
     await conn.execute(delete_stmt)
 
     for key, value in token_list.items():
-        data = {"user_id": user_uuid, "domain": key, "token": value}
+        data = {
+            "user_id": user_uuid,
+            "domain": key,
+            "token": value,
+            "modified_at": datetime.datetime.now(),
+        }
         query = insert(git_tokens).values(data)
         query = query.on_conflict_do_update(
-            index_elements=["user_id", "domain"], set_=dict(token=query.excluded.token)
+            index_elements=["user_id", "domain"],
+            set_=dict(token=query.excluded.token, modified_at=text("NOW()")),
         )
         await conn.execute(query)
 
