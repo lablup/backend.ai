@@ -14,6 +14,7 @@ from typing import (
     final,
 )
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
@@ -49,6 +50,7 @@ class AbstractQuotaModel(metaclass=ABCMeta):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Creates a new quota scope.
@@ -181,11 +183,13 @@ class AbstractVolume(metaclass=ABCMeta):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
         self.config = options or {}
+        self.etcd = etcd
 
     async def init(self) -> None:
         self.fsop_model = await self.create_fsop_model()

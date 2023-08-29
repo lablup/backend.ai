@@ -32,6 +32,7 @@ container_fields = FieldSet(
         FieldSpec("container_id"),
         FieldSpec("resource_opts", formatter=nested_dict_formatter),
         FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("preopen_ports", "Preopen Ports"),
         FieldSpec("live_stat", formatter=KernelStatFormatter()),
         FieldSpec("last_stat", formatter=KernelStatFormatter()),
     ]
@@ -163,6 +164,8 @@ scaling_group_fields = FieldSet(
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
         FieldSpec("use_host_network"),
+        FieldSpec("wsproxy_addr"),
+        FieldSpec("wsproxy_api_token"),
     ]
 )
 

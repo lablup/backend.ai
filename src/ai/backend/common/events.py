@@ -193,6 +193,22 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
+@attrs.define(slots=True, frozen=True)
+class DoAgentResourceCheckEvent(AbstractEvent):
+    name = "do_agent_resource_check"
+
+    agent_id: AgentId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.agent_id,)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            AgentId(value[0]),
+        )
+
+
 class KernelLifecycleEventReason(str, enum.Enum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -200,6 +216,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     EXEC_TIMEOUT = "exec-timeout"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
+    HANG_TIMEOUT = "hang-timeout"
     IDLE_TIMEOUT = "idle-timeout"
     IDLE_SESSION_LIFETIME = "idle-session-lifetime"
     IDLE_UTILIZATION = "idle-utilization"
@@ -299,6 +316,14 @@ class KernelStartedEvent(KernelCreationEventArgs, AbstractEvent):
 
 class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
+
+
+class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_healthy"
+
+
+class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_health_check_failed"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -663,9 +688,9 @@ class EventDispatcher(aobject):
         db: int = 0,
         log_events: bool = False,
         *,
+        consumer_group: str,
         service_name: str = None,
         stream_key: str = "events",
-        consumer_group: str = "manager",
         node_id: str = None,
         consumer_exception_handler: PTGExceptionHandler = None,
         subscriber_exception_handler: PTGExceptionHandler = None,

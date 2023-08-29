@@ -153,7 +153,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -859,7 +859,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 assert container is not None
                 cid = container._id
                 resource_spec.container_id = cid
-                # Write resource.txt again to update the contaienr id.
+                # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
                     await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
@@ -1338,13 +1338,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == 409 and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             elif e.status == 404:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             else:
                 log.exception("destroy_kernel(k:{0}) kill error", kernel_id)
                 await self.error_monitor.capture_exception()
@@ -1522,10 +1522,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             if evdata is None:
                                 # Break out to the outermost loop when the connection is closed
                                 log.info(
-                                    (
-                                        "monitor_docker_events(): "
-                                        "restarting aiodocker event subscriber"
-                                    ),
+                                    "monitor_docker_events(): "
+                                    "restarting aiodocker event subscriber",
                                 )
                                 break
                             if evdata["Type"] != "container":

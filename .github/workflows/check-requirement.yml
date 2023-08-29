@@ -1,9 +1,7 @@
 name: Check if a precompiled binary file exists in dependencies
 
 on:
-  pull_request:
-    paths:
-      python.lock
+  workflow_dispatch:
 
 jobs:
   check-requirement:

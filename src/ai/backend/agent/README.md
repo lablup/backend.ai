@@ -16,7 +16,7 @@ The Backend.AI Agent is a small daemon that does:
       information of the agent daemon and manipulation of the agent's systemd service
   - `helpers`: A utility package that is available as `ai.backend.helpers` *inside* Python-based containers
   - `kernel`: Language-specific runtimes (mostly ipykernel client adaptor) which run *inside* containers
-  - `runner`: Auxiliary components (usually self-contained binaries) mounted *inside* contaienrs
+  - `runner`: Auxiliary components (usually self-contained binaries) mounted *inside* containers
 
 
 ## Installation

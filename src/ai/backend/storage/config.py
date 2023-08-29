@@ -56,7 +56,10 @@ local_config_iv = (
                     t.Key("group", default=None): tx.GroupID(
                         default_gid=_default_gid,
                     ),
-                    t.Key("aiomonitor-port", default=48300): t.Int[1:65535],
+                    tx.AliasedKey(
+                        ["aiomonitor-termui-port", "aiomonitor-port"], default=48300
+                    ): t.ToInt[1:65535],
+                    t.Key("aiomonitor-webui-port", default=49300): t.ToInt[1:65535],
                 },
             ),
             t.Key("logging"): logging_config_iv,
@@ -94,6 +97,7 @@ local_config_iv = (
                     t.Key("enabled", default=False): t.ToBool,
                     t.Key("asyncio", default=False): t.ToBool,
                     t.Key("enhanced-aiomonitor-task-info", default=False): t.ToBool,
+                    t.Key("log-events", default=False): t.ToBool,
                 },
             ).allow_extra("*"),
         },
@@ -121,7 +125,7 @@ def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str
         return local_config
     except ConfigurationError as e:
         print(
-            "ConfigurationError: Validation of agent configuration has failed:",
+            "ConfigurationError: Validation of storage-proxy local config has failed:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)

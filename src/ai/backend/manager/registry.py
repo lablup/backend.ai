@@ -52,19 +52,24 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, noload, selectinload
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelHealthCheckFailedEvent,
+    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -131,17 +136,19 @@ from .defs import (
     DEFAULT_IMAGE_ARCH,
     DEFAULT_ROLE,
     INTRINSIC_SLOTS,
-    REDIS_STREAM_DB,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     PRIVATE_KERNEL_ROLES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
     EndpointRow,
     ImageRow,
+    KernelLoadingStrategy,
     KernelRole,
     KernelRow,
     KernelStatus,
@@ -373,6 +380,16 @@ class AgentRegistry:
             name="api.session.kterm",
         )
         evd.consume(
+            KernelHealthCheckFailedEvent,
+            self,
+            handle_kernel_health_check_result,
+        )
+        evd.consume(
+            KernelHealthyEvent,
+            self,
+            handle_kernel_health_check_result,
+        )
+        evd.consume(
             SessionTerminatingEvent,
             self,
             handle_session_termination_lifecycle,
@@ -398,6 +415,7 @@ class AgentRegistry:
         evd.consume(
             DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
         )
+        evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
@@ -544,10 +562,11 @@ class AgentRegistry:
             # NOTE: We can reuse the session IDs of TERMINATED sessions only.
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
             async with self.db.begin_readonly_session() as db_sess:
-                sess = await SessionRow.get_session_with_main_kernel(
+                sess = await SessionRow.get_session(
+                    db_sess,
                     session_name,
                     owner_access_key,
-                    db_session=db_sess,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
             running_image_ref = ImageRef(
                 sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
@@ -719,9 +738,9 @@ class AgentRegistry:
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
             async with self.db.begin_readonly_session() as db_sess:
                 await SessionRow.get_session(
+                    db_sess,
                     session_name,
                     owner_access_key,
-                    db_session=db_sess,
                 )
         except SessionNotFound:
             pass
@@ -951,10 +970,8 @@ class AgentRegistry:
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
-                (
-                    "You cannot create session with more than "
-                    f"{resource_policy['max_containers_per_session']} containers."
-                ),
+                "You cannot create session with more than "
+                f"{resource_policy['max_containers_per_session']} containers.",
             )
 
         async with self.db.begin_readonly() as conn:
@@ -969,11 +986,9 @@ class AgentRegistry:
             )
             if scaling_group is None:
                 log.warning(
-                    (
-                        f"enqueue_session(s:{session_name}, ak:{access_key}): "
-                        "The client did not specify the scaling group for session; "
-                        f"falling back to {checked_scaling_group}"
-                    ),
+                    f"enqueue_session(s:{session_name}, ak:{access_key}): "
+                    "The client did not specify the scaling group for session; "
+                    f"falling back to {checked_scaling_group}",
                 )
 
             use_host_network_query = (
@@ -1105,6 +1120,7 @@ class AgentRegistry:
         }
 
         kernel_data = []
+        session_images: list[str] = []
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
             kernel_id = KernelId(uuid.uuid4())
@@ -1273,10 +1289,17 @@ class AgentRegistry:
                 }
             )
 
+            if image_ref.canonical not in session_images:
+                if kernel["cluster_role"] == DEFAULT_ROLE:
+                    session_images.insert(0, image_ref.canonical)
+                else:
+                    session_images.append(image_ref.canonical)
+        session_data["images"] = session_images
         try:
 
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
+                    session_data["environ"] = environ
                     session_data["requested_slots"] = session_requested_slots
                     session = SessionRow(**session_data)
                     kernels = [KernelRow(**kernel) for kernel in kernel_data]
@@ -1303,9 +1326,9 @@ class AgentRegistry:
                         for dependency_id in dependency_sessions:
                             try:
                                 match_info = await SessionRow.get_session(
+                                    db_sess,
                                     dependency_id,
                                     access_key,
-                                    db_session=db_sess,
                                 )
                             except SessionNotFound:
                                 raise InvalidAPIParameters(
@@ -1638,8 +1661,21 @@ class AgentRegistry:
             new_session_status = await SessionRow.transit_session_status(self.db, session_id)
             if new_session_status is None or new_session_status != SessionStatus.RUNNING:
                 return
-
-            updated_session = await SessionRow.get_session_to_produce_event(self.db, session_id)
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    noload("*"),
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.name,
+                        SessionRow.creation_id,
+                        SessionRow.access_key,
+                    ),
+                )
+            )
+            async with self.db.begin_readonly_session() as db_session:
+                updated_session = (await db_session.scalars(query)).first()
 
             log.debug(
                 "Producing SessionStartedEvent({}, {})",
@@ -1971,57 +2007,71 @@ class AgentRegistry:
             occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
                 lambda: ResourceSlot({"cpu": 0, "mem": 0})
             )
-            async with self.db.begin() as conn:
+
+            async with self.db.begin_session() as db_sess:
                 # Query running containers and calculate concurrency_used per AK and
                 # occupied_slots per agent.
-                query = (
-                    sa.select([kernels.c.access_key, kernels.c.agent, kernels.c.occupied_slots])
-                    .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    .order_by(sa.asc(kernels.c.access_key))
-                )
-                async for row in await conn.stream(query):
-                    occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
-                query = (
-                    sa.select(
-                        [
-                            kernels.c.access_key,
-                            kernels.c.session_id,
-                            kernels.c.agent,
-                            kernels.c.occupied_slots,
-                            kernels.c.role,
-                        ]
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(
+                        (
+                            SessionRow.status.in_(
+                                {
+                                    *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                                    *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
+                                }
+                            )
+                        )
                     )
-                    .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    .order_by(sa.asc(kernels.c.access_key))
+                    .options(
+                        load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
+                        selectinload(SessionRow.kernels).options(
+                            load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
+                        ),
+                    )
                 )
-                async for row in await conn.stream(query):
-                    if row.role in PRIVATE_KERNEL_ROLES:
-                        sftp_concurrency_used_per_key[row.access_key].add(row.session_id)
-                    else:
-                        concurrency_used_per_key[row.access_key].add(row.session_id)
+                async for session_row in await db_sess.stream_scalars(session_query):
+                    for kernel in session_row.kernels:
+                        if session_row.status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
+                            occupied_slots_per_agent[kernel.agent] += ResourceSlot(
+                                kernel.occupied_slots
+                            )
+                        if session_row.status in USER_RESOURCE_OCCUPYING_KERNEL_STATUSES:
+                            if kernel.role in PRIVATE_KERNEL_ROLES:
+                                sftp_concurrency_used_per_key[session_row.access_key].add(
+                                    session_row.id
+                                )
+                            else:
+                                concurrency_used_per_key[session_row.access_key].add(session_row.id)
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
-                    for aid, slots in occupied_slots_per_agent.items():
-                        query = (
-                            sa.update(agents).values(occupied_slots=slots).where(agents.c.id == aid)
-                        )
-                        await conn.execute(query)
-                    # Update all other agents to have empty occupied_slots.
-                    query = (
-                        sa.update(agents)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(agents.c.status == AgentStatus.ALIVE)
-                        .where(sa.not_(agents.c.id.in_(occupied_slots_per_agent.keys())))
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .where(AgentRow.id == sa.bindparam("agent_id"))
+                            .values(occupied_slots=sa.bindparam("occupied_slots"))
+                        ),
+                        [
+                            {"agent_id": aid, "occupied_slots": slots}
+                            for aid, slots in occupied_slots_per_agent.items()
+                        ],
                     )
-                    await conn.execute(query)
+                    await db_sess.execute(
+                        (
+                            sa.update(AgentRow)
+                            .values(occupied_slots=ResourceSlot({}))
+                            .where(AgentRow.status == AgentStatus.ALIVE)
+                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
+                        )
+                    )
                 else:
                     query = (
-                        sa.update(agents)
+                        sa.update(AgentRow)
                         .values(occupied_slots=ResourceSlot({}))
-                        .where(agents.c.status == AgentStatus.ALIVE)
+                        .where(AgentRow.status == AgentStatus.ALIVE)
                     )
-                    await conn.execute(query)
+                    await db_sess.execute(query)
 
         await execute_with_retry(_recalc)
 
@@ -2055,7 +2105,7 @@ class AgentRegistry:
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
-        if do_fullscan:
+        if do_fullscan or not concurrency_used_per_key:
             await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
@@ -2146,7 +2196,29 @@ class AgentRegistry:
             session_id,
             set_error=True,
         ):
-            target_session = await SessionRow.get_session_to_destroy(self.db, session_id)
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    noload("*"),
+                    load_only(SessionRow.creation_id, SessionRow.status),
+                    selectinload(SessionRow.kernels).options(
+                        noload("*"),
+                        load_only(
+                            KernelRow.id,
+                            KernelRow.role,
+                            KernelRow.access_key,
+                            KernelRow.status,
+                            KernelRow.container_id,
+                            KernelRow.cluster_role,
+                            KernelRow.agent,
+                            KernelRow.agent_addr,
+                        ),
+                    ),
+                )
+            )
+            async with self.db.begin_readonly_session() as db_session:
+                target_session = (await db_session.scalars(query)).first()
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -2158,10 +2230,8 @@ class AgentRegistry:
                 case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
                     if not forced:
                         raise GenericForbidden(
-                            (
-                                "Cannot destroy sessions in scheduled/preparing/terminating/error"
-                                " status"
-                            ),
+                            "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                            " status",
                         )
                     log.warning(
                         "force-terminating session (s:{}, status:{})",
@@ -2230,10 +2300,8 @@ class AgentRegistry:
                         case KernelStatus.SCHEDULED | KernelStatus.PREPARING | KernelStatus.TERMINATING | KernelStatus.ERROR:
                             if not forced:
                                 raise GenericForbidden(
-                                    (
-                                        "Cannot destroy kernels in"
-                                        " scheduled/preparing/terminating/error status"
-                                    ),
+                                    "Cannot destroy kernels in"
+                                    " scheduled/preparing/terminating/error status",
                                 )
                             log.warning(
                                 "force-terminating kernel (k:{}, status:{})",
@@ -2535,7 +2603,7 @@ class AgentRegistry:
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
-                log.exception("unexpected-error in _restart_kerenl()")
+                log.exception("unexpected-error in _restart_kernel()")
 
         restart_coros = []
         for kernel in kernel_list:
@@ -2819,7 +2887,7 @@ class AgentRegistry:
 
                     if row is None or row["status"] is None:
                         # new agent detected!
-                        log.info("agent {0} joined!", agent_id)
+                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
                         await self.shared_config.update_resource_slots(slot_key_and_units)
                         insert_query = sa.insert(agents).values(
                             {
@@ -3261,13 +3329,12 @@ class AgentRegistry:
         }
 
     async def update_appproxy_endpoint_routes(
-        self, db_sess: AsyncSession, endpoint: EndpointRow
+        self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
     ) -> None:
-        active_routes = [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-
-        target_sessions = await SessionRow.list_sessions_with_main_kernels(
+        target_sessions = await SessionRow.list_sessions(
+            db_sess,
             [r.session for r in active_routes],
-            db_session=db_sess,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         query = (
             sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
@@ -3305,6 +3372,16 @@ class AgentRegistry:
                 f"{wsproxy_addr}/v2/endpoints/{endpoint.id}",
                 json={
                     "service_name": endpoint.name,
+                    "tags": {
+                        "session": {
+                            "user_uuid": str(endpoint.session_owner),
+                            "group_id": str(endpoint.project),
+                            "domain_name": endpoint.domain,
+                        },
+                        "endpoint": {
+                            "id": str(endpoint.id),
+                        },
+                    },
                     "apps": inference_apps,
                     "open_to_public": endpoint.open_to_public,
                 },  # TODO: support for multiple inference apps
@@ -3313,7 +3390,6 @@ class AgentRegistry:
                 },
             ) as resp:
                 endpoint_json = await resp.json()
-                log.debug("resp: {}", endpoint_json)
                 async with self.db.begin_session() as db_sess:
                     query = (
                         sa.update(EndpointRow)
@@ -3449,12 +3525,68 @@ async def handle_destroy_session(
     event: DoTerminateSessionEvent,
 ) -> None:
     async with context.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+        session = await SessionRow.get_session(
+            db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
+        )
     await context.destroy_session(
         session,
         forced=False,
         reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
     )
+
+
+async def handle_kernel_health_check_result(
+    context: AgentRegistry,
+    source: AgentId,
+    event: KernelHealthyEvent | KernelHealthCheckFailedEvent,
+) -> None:
+    log.info("HANDLE_KERNEL_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
+    try:
+        async with context.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                event.session_id,
+                allow_stale=False,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+            route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+    except SessionNotFound:
+        return
+
+    async def _update():
+        async with context.db.begin_session() as db_sess:
+            query = (
+                sa.update(RoutingRow)
+                .values(
+                    {
+                        "status": (
+                            RouteStatus.HEALTHY
+                            if isinstance(event, KernelHealthyEvent)
+                            else RouteStatus.UNHEALTHY
+                        )
+                    }
+                )
+                .where(RoutingRow.id == route.id)
+            )
+            await db_sess.execute(query)
+
+            query = sa.select(RoutingRow).where(
+                (RoutingRow.endpoint == route.endpoint) & (RoutingRow.status == RouteStatus.HEALTHY)
+            )
+            result = await db_sess.execute(query)
+            latest_routes = result.fetchall()
+            latest_routes = await RoutingRow.list(
+                db_sess, route.endpoint, status_filter=[RouteStatus.HEALTHY]
+            )
+
+            try:
+                await context.update_appproxy_endpoint_routes(
+                    db_sess, route.endpoint_row, latest_routes
+                )
+            except Exception:
+                log.exception("failed to communicate with AppProxy endpoint:")
+
+    await execute_with_retry(_update)
 
 
 async def invoke_session_callback(
@@ -3474,8 +3606,11 @@ async def invoke_session_callback(
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with context.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess, allow_stale=allow_stale
+            session = await SessionRow.get_session(
+                db_sess,
+                event.session_id,
+                allow_stale=allow_stale,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
     except SessionNotFound:
         return
@@ -3484,36 +3619,55 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
+            async with context.db.begin_session() as db_sess:
+                route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
             async def _update() -> None:
+                new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
-                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-
-                    if isinstance(event, SessionTerminatedEvent) or isinstance(
-                        event, SessionCancelledEvent
-                    ):
-                        await db_sess.delete(route)
+                    if isinstance(event, SessionCancelledEvent):
+                        query = (
+                            sa.update(RoutingRow)
+                            .values({"status": RouteStatus.FAILED_TO_START})
+                            .where(RoutingRow.id == route.id)
+                        )
+                        await db_sess.execute(query)
+                        query = (
+                            sa.update(EndpointRow)
+                            .values({"retries": endpoint.retries + 1})
+                            .where(EndpointRow.id == endpoint.id)
+                        )
+                        await db_sess.execute(query)
+                    elif isinstance(event, SessionTerminatedEvent):
+                        query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
+                        await db_sess.execute(query)
                         if (
                             len(endpoint.routings) == 1
                             and endpoint.desired_session_count < 0  # we just removed last one
                         ):
-                            await db_sess.delete(endpoint)
+                            query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint.id)
+                            await db_sess.execute(query)
                             try:
                                 await context.delete_appproxy_endpoint(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         else:
+                            new_routes = [
+                                r
+                                for r in endpoint.routings
+                                if r.id != route.id and r.status == RouteStatus.HEALTHY
+                            ]
                             try:
-                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                                await context.update_appproxy_endpoint_routes(
+                                    db_sess, endpoint, new_routes
+                                )
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
-                        if isinstance(event, SessionStartedEvent):
-                            new_route_status = RouteStatus.HEALTHY
-                        elif isinstance(event, SessionTerminatingEvent):
+                        if isinstance(event, SessionTerminatingEvent):
                             new_route_status = RouteStatus.TERMINATING
 
                         if new_route_status:
@@ -3523,12 +3677,45 @@ async def invoke_session_callback(
                                 .values({"status": new_route_status})
                             )
                             await db_sess.execute(query)
+
+                            new_routes = [
+                                r
+                                for r in endpoint.routings
+                                if r.id != route.id and r.status == RouteStatus.HEALTHY
+                            ]
+                            if new_route_status == RouteStatus.HEALTHY:
+                                new_routes.append(route)
                             try:
-                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                                await context.update_appproxy_endpoint_routes(
+                                    db_sess, endpoint, new_routes
+                                )
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                        await db_sess.commit()
 
             await execute_with_retry(_update)
+
+            async def _clear_error() -> None:
+                async with context.db.begin_session() as db_sess:
+                    query = sa.select([sa.func.count("*")]).where(
+                        (RoutingRow.endpoint == endpoint.id)
+                        & (RoutingRow.status == RouteStatus.HEALTHY)
+                    )
+                    healthy_routes = await db_sess.scalar(query)
+                    if endpoint.desired_session_count == healthy_routes:
+                        query = (
+                            sa.update(EndpointRow)
+                            .where(EndpointRow.id == endpoint.id)
+                            .values({"retries": 0})
+                        )
+                        await db_sess.execute(query)
+                        query = sa.delete(RoutingRow).where(
+                            (RoutingRow.endpoint == endpoint.id)
+                            & (RoutingRow.status == RouteStatus.FAILED_TO_START)
+                        )
+                        await db_sess.execute(query)
+
+            await execute_with_retry(_clear_error)
     except Exception:
         log.exception("error while updating route status:")
 
@@ -3561,8 +3748,8 @@ async def handle_batch_result(
         await SessionRow.set_session_result(context.db, event.session_id, False, event.exit_code)
     async with context.db.begin_session() as db_sess:
         try:
-            session = await SessionRow.get_session_with_kernels(
-                event.session_id, db_session=db_sess
+            session = await SessionRow.get_session(
+                db_sess, event.session_id, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
             )
         except SessionNotFound:
             return
@@ -3580,7 +3767,7 @@ async def handle_agent_lifecycle(
     event: AgentStartedEvent | AgentTerminatedEvent,
 ) -> None:
     if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined ({1})", source, event.reason)
+        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
         await context.update_instance(
             source,
             {
@@ -3610,6 +3797,20 @@ async def handle_agent_heartbeat(
     event: AgentHeartbeatEvent,
 ) -> None:
     await context.handle_heartbeat(source, event.agent_info)
+
+
+async def handle_check_agent_resource(
+    context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
+) -> None:
+    async with context.db.begin_readonly() as conn:
+        query = (
+            sa.select([agents.c.occupied_slots]).select_from(agents).where(agents.c.id == source)
+        )
+        result = await conn.execute(query)
+        row = result.first()
+        if not row:
+            raise InstanceNotFound(source)
+        log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
 
 
 async def check_scaling_group(
