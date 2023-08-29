@@ -227,6 +227,8 @@ def format_stats(stats):
 def prepare_resource_arg(resources):
     if resources:
         resources = {k: v for k, v in map(lambda s: s.split("=", 1), resources)}
+        if resources["mem"] and "m" not in resources["mem"] and "g" not in resources["mem"]:
+            resources["mem"] += "m"
     else:
         resources = {}  # use the defaults configured in the server
     return resources
