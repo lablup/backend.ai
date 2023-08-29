@@ -619,17 +619,22 @@ class SharedConfig(AbstractConfig):
         # Just treat it like an opaque object.
         return hash(id(self))
 
-    def flatten(self, key_prefix: str, hostname: str, inner_dict) -> Mapping[str, Any]:
-        raw_dict = {}
+    def flatten(self, key_prefix: str, hostname: str, inner_dict) -> dict[str, Any]:
+        raw_dict: dict[str, Any] = {}
         for k, v in inner_dict.items():
             if k == "":
                 inner_prefix = f"{key_prefix}/{hostname}"
             else:
                 inner_prefix = f"{key_prefix}/{hostname}/{k}"
-            if isinstance(v, Mapping):
-                raw_dict[inner_prefix] = self.flatten(key_prefix, hostname, v)
-            else:
-                raw_dict[inner_prefix] = v
+            match v:
+                case Mapping():
+                    raw_dict[inner_prefix] = self.flatten(key_prefix, hostname, v)
+                case str() | int() | float() | yarl.URL():
+                    raw_dict[inner_prefix] = str(v)
+                case _:
+                    raise ValueError(
+                        f"The value {v!r} must be serialized before storing to the etcd"
+                    )
         return raw_dict
 
     async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
