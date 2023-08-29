@@ -7,7 +7,6 @@ import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..api.exceptions import ObjectNotFound
 from ..config import container_registry_iv
 from . import UserRole
 from .base import privileged_mutation, set_if_set
@@ -25,8 +24,6 @@ __all__: Sequence[str] = (
     "ModifyContainerRegistry",
     "DeleteContainerRegistry",
 )
-
-ETCD_CONTAINER_REGISTRY_KEY = "config/docker/registry"
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
@@ -76,27 +73,21 @@ class ContainerRegistry(graphene.ObjectType):
         ctx: GraphQueryContext,
     ) -> Sequence[ContainerRegistry]:
         log.info(
-            "ETCD.LOAD_ALL_CONTAINER_REGISTRIES (ak:{}, key:{})",
+            "ETCD.LOAD_ALL_CONTAINER_REGISTRIES (ak:{})",
             ctx.access_key,
-            ETCD_CONTAINER_REGISTRY_KEY,
         )
-        registries = await ctx.shared_config.get_container_registry(ETCD_CONTAINER_REGISTRY_KEY)
+        registries = await ctx.shared_config.list_container_registry()
         return [cls.from_row(hostname, config) for hostname, config in registries.items()]
 
     @classmethod
     async def load_registry(cls, ctx: GraphQueryContext, hostname: str) -> ContainerRegistry:
         log.info(
-            "ETCD.LOAD_CONTAINER_REGISTRY (ak:{}, key:{}, hostname:{})",
+            "ETCD.LOAD_CONTAINER_REGISTRY (ak:{}, hostname:{})",
             ctx.access_key,
-            ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
         )
-        registries = await ctx.shared_config.get_container_registry(ETCD_CONTAINER_REGISTRY_KEY)
-        try:
-            registry = registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name=f"registry: {hostname}")
-        return cls.from_row(hostname, registry)
+        item = await ctx.shared_config.get_container_registry(hostname)
+        return cls.from_row(hostname, item)
 
 
 class CreateContainerRegistry(graphene.Mutation):
@@ -116,20 +107,18 @@ class CreateContainerRegistry(graphene.Mutation):
         cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
-        config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
-        set_if_set(props, config, "project")
-        set_if_set(props, config, "username")
-        set_if_set(props, config, "password")
-        container_registry_iv.check(config)
+        input_config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
+        set_if_set(props, input_config, "project")
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        registry_config = container_registry_iv.check(input_config)
         log.info(
-            "ETCD.CREATE_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
+            "ETCD.CREATE_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,
-            ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
-            config,
+            registry_config,
         )
-        updates = ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
-        await ctx.shared_config.etcd.put_dict(updates)
+        await ctx.shared_config.add_container_registry(hostname, registry_config)
         return cls(result="ok")
 
 
@@ -147,36 +136,25 @@ class ModifyContainerRegistry(graphene.Mutation):
         lambda id, **kwargs: (None, id),
     )
     async def mutate(
-        cls, root, info: graphene.ResolveInfo, hostname: str, props: ModifyContainerRegistryInput
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
-        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
-        registries = dict(raw_registries)
-        try:
-            del registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name=f"registry: {hostname}")
-        await ctx.shared_config.etcd.delete_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
-
-        updated_config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
-        set_if_set(props, updated_config, "project")
-        set_if_set(props, updated_config, "username")
-        set_if_set(props, updated_config, "password")
-        container_registry_iv.check(updated_config)
+        input_config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
+        set_if_set(props, input_config, "project")
+        set_if_set(props, input_config, "username")
+        set_if_set(props, input_config, "password")
+        registry_config = container_registry_iv.check(input_config)
         log.info(
-            "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{}, config:{})",
+            "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
             ctx.access_key,
-            ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
-            updated_config,
+            registry_config,
         )
-        updates: Dict[str, Any] = {}
-        updates.update(
-            ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, updated_config)
-        )
-        for hostname, config in registries.items():
-            updates.update(ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config))
-        await ctx.shared_config.etcd.put_dict(updates)
+        await ctx.shared_config.modify_container_registry(hostname, registry_config)
         return cls(result="ok")
 
 
@@ -199,21 +177,10 @@ class DeleteContainerRegistry(graphene.Mutation):
         hostname: str,
     ) -> DeleteContainerRegistry:
         ctx: GraphQueryContext = info.context
-        raw_registries = await ctx.shared_config.etcd.get_prefix_dict(ETCD_CONTAINER_REGISTRY_KEY)
-        registries = dict(raw_registries)
-        try:
-            del registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name=f"registry: {hostname}")
         log.info(
-            "ETCD.DELETE_CONTAINER_REGISTRY (ak:{}, key: {}, hostname:{})",
+            "ETCD.DELETE_CONTAINER_REGISTRY (ak:{}, hostname:{})",
             ctx.access_key,
-            ETCD_CONTAINER_REGISTRY_KEY,
             hostname,
         )
-        await ctx.shared_config.etcd.delete_prefix(f"{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
-        updates: Dict[str, Any] = {}
-        for hostname, config in registries.items():
-            updates.update(ctx.shared_config.flatten(ETCD_CONTAINER_REGISTRY_KEY, hostname, config))
-        await ctx.shared_config.etcd.put_dict(updates)
+        await ctx.shared_config.delete_container_registry(hostname)
         return cls(result="ok")

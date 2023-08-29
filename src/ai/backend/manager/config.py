@@ -182,7 +182,7 @@ from collections import UserDict
 from contextvars import ContextVar
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Awaitable, Callable, Dict, Final, List, Mapping, Optional, Sequence
+from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
 
 import aiotools
 import click
@@ -204,7 +204,7 @@ from ai.backend.common.types import (
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
-from .api.exceptions import ServerMisconfiguredError
+from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -575,6 +575,8 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
 
 
 class SharedConfig(AbstractConfig):
+    ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
+
     def __init__(
         self,
         etcd_addr: HostPortPair,
@@ -636,9 +638,58 @@ class SharedConfig(AbstractConfig):
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
 
-    async def get_container_registry(self, key_prefix: str) -> Dict[str, Dict[str, Any]]:
-        registries = await self.etcd.get_prefix_dict(key_prefix)
-        return t.Mapping(t.String, container_registry_iv).check(registries)
+    async def list_container_registry(self) -> dict[str, dict[str, Any]]:
+        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
+        return dict(raw_registries)
+
+    async def get_container_registry(self, hostname: str) -> dict[str, Any]:
+        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
+        registries = dict(raw_registries)
+        try:
+            item = registries[hostname]
+        except KeyError:
+            raise ObjectNotFound(object_name="container registry")
+        return item
+
+    async def add_container_registry(self, hostname: str, config: dict[str, Any]) -> None:
+        updates = self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config)
+        await self.etcd.put_dict(updates)
+
+    async def modify_container_registry(self, hostname: str, config_update: dict[str, Any]) -> None:
+        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
+        registries = dict(raw_registries)
+        try:
+            del registries[hostname]
+        except KeyError:
+            raise ObjectNotFound(object_name="container registry")
+        # Delete all items with the same prefix
+        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+
+        # Re-add the "accidentally" deleted items
+        updates: dict[str, Any] = {}
+        for key, item in registries.items():
+            if key.startswith(hostname):
+                updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, key, item))
+        # Re-add the updated item
+        updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, hostname, config_update))
+        await self.etcd.put_dict(updates)
+
+    async def delete_container_registry(self, hostname: str) -> None:
+        raw_registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
+        registries = dict(raw_registries)
+        try:
+            del registries[hostname]
+        except KeyError:
+            raise ObjectNotFound(object_name="container registry")
+        # Delete all items with the same prefix
+        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{hostname}")
+
+        # Re-add the "accidentally" deleted items
+        updates: dict[str, Any] = {}
+        for key, item in registries.items():
+            if key.startswith(hostname):
+                updates.update(self.flatten(self.ETCD_CONTAINER_REGISTRY_KEY, key, item))
+        await self.etcd.put_dict(updates)
 
     async def register_myself(self) -> None:
         instance_id = await get_instance_id()
