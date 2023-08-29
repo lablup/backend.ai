@@ -1,6 +1,7 @@
 """
 Client-facing API
 """
+from __future__ import annotations
 
 import asyncio
 import json
@@ -10,6 +11,7 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncContextManager,
     Final,
@@ -32,11 +34,13 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderID
 
 from .. import __version__
-from ..abc import AbstractVolume
-from ..context import RootContext
 from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
+
+if TYPE_CHECKING:
+    from ..abc import AbstractVolume
+    from ..context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 

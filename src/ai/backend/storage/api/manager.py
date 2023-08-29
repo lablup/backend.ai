@@ -1,6 +1,7 @@
 """
 Manager-facing API
 """
+from __future__ import annotations
 
 import json
 import logging
@@ -8,6 +9,7 @@ from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncContextManager,
     Awaitable,
@@ -30,8 +32,6 @@ from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
 from .. import __version__
-from ..abc import AbstractVolume
-from ..context import RootContext
 from ..exception import (
     InvalidSubpathError,
     QuotaScopeNotFoundError,
@@ -40,6 +40,10 @@ from ..exception import (
 )
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
+
+if TYPE_CHECKING:
+    from ..abc import AbstractVolume
+    from ..context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
