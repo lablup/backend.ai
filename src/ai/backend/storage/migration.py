@@ -243,6 +243,8 @@ async def check_and_upgrade(
     )
     ctx = RootContext(
         pid=os.getpid(),
+        pidx=0,
+        node_id=local_config["storage-proxy"]["node-id"],
         local_config=local_config,
         etcd=etcd,
         dsn=dsn,
