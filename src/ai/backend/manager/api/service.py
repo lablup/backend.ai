@@ -26,6 +26,7 @@ from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
 from ..models import (
+    EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
     ImageRow,
@@ -97,7 +98,7 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
     query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
-        EndpointRow.desired_session_count >= 0
+        EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
     )
     if params["name"]:
         query_conds &= EndpointRow.name == params["name"]
@@ -428,12 +429,18 @@ async def delete(request: web.Request) -> web.Response:
 
     async with root_ctx.db.begin_session() as db_sess:
         if len(endpoint.routings) == 0:
-            query = sa.delete(EndpointRow).where(EndpointRow.id == service_id)
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == service_id)
+                .values({"lifecycle_stage": EndpointLifecycle.DESTROYED})
+            )
         else:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
-                .values({"desired_session_count": -1})
+                .values(
+                    {"desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING}
+                )
             )
         await db_sess.execute(query)
     return web.json_response({"success": True}, status=200)
@@ -600,7 +607,8 @@ async def delete_route(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("duration"): tx.TimeDuration,
+            t.Key("duration", default=None): t.Null | tx.TimeDuration,
+            t.Key("valid_until", default=None): t.Null | t.Int,
         }
     ),
 )
@@ -634,8 +642,15 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    exp = datetime.now() + params["duration"]
-    body = {"user_uuid": str(endpoint.session_owner), "exp": int(exp.timestamp())}
+    if params["valid_until"]:
+        exp = params["valid_until"]
+    elif params["duration"]:
+        exp = int((datetime.now() + params["duration"]).timestamp())
+    else:
+        raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
+    if datetime.now().timestamp() > exp:
+        raise InvalidAPIParameters("valid_until is older than now")
+    body = {"user_uuid": str(endpoint.session_owner), "exp": exp}
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",

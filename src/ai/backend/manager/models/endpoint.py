@@ -1,6 +1,7 @@
 import datetime
 import logging
 import uuid
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence
 
 import graphene
@@ -22,6 +23,7 @@ from .base import (
     GUID,
     Base,
     EndpointIDColumn,
+    EnumValueType,
     ForeignKeyIDColumn,
     Item,
     PaginatedList,
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
 __all__ = (
     "EndpointRow",
     "Endpoint",
+    "EndpointLifecycle",
     "EndpointList",
     "EndpointTokenRow",
     "EndpointToken",
@@ -45,6 +48,12 @@ __all__ = (
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+
+
+class EndpointLifecycle(Enum):
+    CREATED = "created"
+    DESTROYING = "destroying"
+    DESTROYED = "destroyed"
 
 
 class EndpointRow(Base):
@@ -93,6 +102,12 @@ class EndpointRow(Base):
         index=True,
         nullable=False,
     )
+    lifecycle_stage = sa.Column(
+        "lifecycle_stage",
+        EnumValueType(EndpointLifecycle),
+        nullable=False,
+        default=EndpointLifecycle.CREATED,
+    )
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
     bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
@@ -121,8 +136,8 @@ class EndpointRow(Base):
         server_default=sa.text("now()"),
         nullable=True,
     )
-    terminated_at = sa.Column(
-        "terminated_at",
+    destroyed_at = sa.Column(
+        "destroyed_at",
         sa.DateTime(timezone=True),
         nullable=True,
     )
@@ -220,17 +235,19 @@ class EndpointRow(Base):
         load_routes=False,
         load_image=False,
         load_tokens=False,
-        include_destroying_endpoints=False,
+        status_filter=[EndpointLifecycle.CREATED],
     ) -> List["EndpointRow"]:
-        query = sa.select(EndpointRow).order_by(sa.desc(EndpointRow.created_at))
+        query = (
+            sa.select(EndpointRow)
+            .order_by(sa.desc(EndpointRow.created_at))
+            .filter(EndpointRow.lifecycle_stage.in_(status_filter))
+        )
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
         if load_tokens:
             query = query.options(selectinload(EndpointRow.tokens))
         if load_image:
             query = query.options(selectinload(EndpointRow.image_row))
-        if not include_destroying_endpoints:
-            query = query.filter(EndpointRow.desired_session_count >= 0)
         if project:
             query = query.filter(EndpointRow.project == project)
         if domain:
@@ -372,11 +389,13 @@ class Endpoint(graphene.ObjectType):
     open_to_public = graphene.Boolean()
 
     created_at = GQLDateTime(required=True)
-    terminated_at = GQLDateTime()
+    destroyed_at = GQLDateTime()
 
     routings = graphene.List(Routing)
     retries = graphene.Int()
     status = graphene.String()
+
+    lifecycle_stage = graphene.String()
 
     errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
 
@@ -410,9 +429,10 @@ class Endpoint(graphene.ObjectType):
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
             created_at=row.created_at,
-            terminated_at=row.terminated_at,
+            destroyed_at=row.destroyed_at,
             retries=row.retries,
             routings=[await Routing.from_row(ctx, routing) for routing in row.routings],
+            lifecycle_stage=row.lifecycle_stage.name,
         )
 
     @classmethod
@@ -424,7 +444,15 @@ class Endpoint(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from(EndpointRow)
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(EndpointRow)
+            .filter(
+                EndpointRow.lifecycle_stage.in_(
+                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
+                )
+            )
+        )
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
@@ -455,6 +483,11 @@ class Endpoint(graphene.ObjectType):
             .options(selectinload(EndpointRow.image_row))
             .options(selectinload(EndpointRow.routings))
             .order_by(sa.desc(EndpointRow.created_at))
+            .filter(
+                EndpointRow.lifecycle_stage.in_(
+                    [EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING]
+                )
+            )
         )
         if project is not None:
             query = query.where(EndpointRow.project == project)
@@ -520,10 +553,10 @@ class Endpoint(graphene.ObjectType):
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
         if self.retries > SERVICE_MAX_RETRIES:
             return "UNHEALTHY"
+        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
+            return "DESTROYING"
         if len(self.routings) == 0:
             return "READY"
-        if self.desired_session_count == -1:
-            return "DESTROYING"
         if (
             len([r for r in self.routings if r.status == RouteStatus.HEALTHY.name])
             == self.desired_session_count
