@@ -9,6 +9,13 @@ import graphene
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from .etcd import (
+    ContainerRegistry,
+    CreateContainerRegistry,
+    DeleteContainerRegistry,
+    ModifyContainerRegistry,
+)
+
 if TYPE_CHECKING:
     from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
@@ -217,6 +224,10 @@ class Mutations(graphene.ObjectType):
 
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
+
+    create_container_registry = CreateContainerRegistry.Field()
+    modify_container_registry = ModifyContainerRegistry.Field()
+    delete_container_registry = DeleteContainerRegistry.Field()
 
 
 class Queries(graphene.ObjectType):
@@ -569,6 +580,10 @@ class Queries(graphene.ObjectType):
         storage_host_name=graphene.String(required=True),
         quota_scope_id=graphene.String(required=True),
     )
+
+    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+
+    container_registries = graphene.List(ContainerRegistry)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -1698,6 +1713,29 @@ class Queries(graphene.ObjectType):
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_container_registry(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        domain_name: Optional[str] = None,
+        access_key: AccessKey = None,
+    ) -> ContainerRegistry:
+        ctx: GraphQueryContext = info.context
+        return await ContainerRegistry.load_registry(ctx, hostname)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_container_registries(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        domain_name: Optional[str] = None,
+        access_key: AccessKey = None,
+    ) -> Sequence[ContainerRegistry]:
+        ctx: GraphQueryContext = info.context
+        return await ContainerRegistry.load_all(ctx)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
