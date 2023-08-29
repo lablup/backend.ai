@@ -131,7 +131,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop, mount, unmount
+from ai.backend.common.utils import cancel_tasks, current_loop, mount, umount
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -688,7 +688,7 @@ class AbstractAgent(
         # passive events
         evd = self.event_dispatcher
         evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
-        evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_unmount, name="ag.volume.unmount")
+        evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         """
@@ -2359,13 +2359,13 @@ async def handle_volume_mount(
     )
 
 
-async def handle_volume_unmount(
+async def handle_volume_umount(
     context: AbstractAgent,
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
     mount_prefix = await context.etcd.get("volumes/_mount")
-    await unmount(
+    await umount(
         event.mount_path,
         mount_prefix,
         event.edit_fstab,

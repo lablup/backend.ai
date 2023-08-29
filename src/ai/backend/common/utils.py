@@ -339,7 +339,7 @@ async def mount(
             )
 
 
-async def unmount(
+async def umount(
     mount_path: str,
     mount_prefix: str | None = None,
     edit_fstab: bool = False,

@@ -34,7 +34,7 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
-from ai.backend.common.utils import mount, unmount
+from ai.backend.common.utils import mount, umount
 from ai.backend.storage.exception import ExecutionError
 
 from .. import __version__
@@ -1065,7 +1065,7 @@ async def init_manager_app(ctx: Context) -> web.Application:
     # passive events
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
-    evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_unmount, name="storage.volume.unmount")
+    evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
     return app
 
 
@@ -1096,7 +1096,7 @@ async def handle_volume_mount(
     )
 
 
-async def handle_volume_unmount(
+async def handle_volume_umount(
     context: Context,
     source: AgentId,
     event: DoVolumeUnmountEvent,
@@ -1104,7 +1104,7 @@ async def handle_volume_unmount(
     if context.pid != 0:
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    await unmount(
+    await umount(
         event.mount_path,
         mount_prefix,
         event.edit_fstab,
