@@ -27,7 +27,7 @@ __all__: Sequence[str] = (
 
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
-    registry_type = graphene.String(required=True)
+    type = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -36,7 +36,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
-    registry_type = graphene.String(required=True)
+    type = graphene.String(required=True)
     project = graphene.String()
     username = graphene.String()
     password = graphene.String()
@@ -45,7 +45,7 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 
 class ContainerRegistryConfig(graphene.ObjectType):
     url = graphene.String(required=True)
-    registry_type = graphene.String(required=True)
+    type = graphene.String(required=True)
     project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
@@ -62,7 +62,7 @@ class ContainerRegistry(graphene.ObjectType):
             hostname=hostname,
             config=ContainerRegistryConfig(
                 url=config.get(""),
-                registry_type=config.get("type"),
+                type=config.get("type"),
                 project=config.get("project", None),
                 username=config.get("username", None),
                 password=config.get("password", None),
@@ -110,7 +110,7 @@ class CreateContainerRegistry(graphene.Mutation):
         cls, root, info: graphene.ResolveInfo, hostname: str, props: CreateContainerRegistryInput
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
-        input_config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
+        input_config: Dict[str, Any] = {"": props.url, "type": props.type}
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
@@ -146,7 +146,7 @@ class ModifyContainerRegistry(graphene.Mutation):
         props: ModifyContainerRegistryInput,
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
-        input_config: Dict[str, Any] = {"": props.url, "type": props.registry_type}
+        input_config: Dict[str, Any] = {"": props.url, "type": props.type}
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
