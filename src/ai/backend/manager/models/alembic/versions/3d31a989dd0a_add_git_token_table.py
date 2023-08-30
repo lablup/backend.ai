@@ -1,7 +1,7 @@
 """add git_token table
 
 Revision ID: 3d31a989dd0a
-Revises: 02950808ca3d
+Revises: 02535458c0b3
 Create Date: 2023-08-31 01:04:48.109184
 
 """
@@ -12,7 +12,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "3d31a989dd0a"
-down_revision = "02950808ca3d"
+down_revision = "02535458c0b3"
 branch_labels = None
 depends_on = None
 
