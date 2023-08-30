@@ -604,6 +604,9 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
+    def __neg__(self):
+        return type(self)({k: -v for k, v in self.data.items()})
+
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
@@ -1126,6 +1129,13 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class AgentSelectionStrategy(enum.StrEnum):
+    DISPERSED = "dispersed"
+    CONCENTRATED = "concentrated"
+    # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
+    LEGACY = "legacy"
 
 
 class SchedulerStatus(TypedDict):

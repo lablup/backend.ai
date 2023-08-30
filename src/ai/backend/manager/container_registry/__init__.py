@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from .base import BaseContainerRegistry
 
 
-def get_container_registry(registry_info: Mapping[str, Any]) -> Type[BaseContainerRegistry]:
+def get_container_registry_cls(registry_info: Mapping[str, Any]) -> Type[BaseContainerRegistry]:
     registry_url = yarl.URL(registry_info[""])
     registry_type = registry_info.get("type", "docker")
     cr_cls: Type[BaseContainerRegistry]

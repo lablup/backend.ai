@@ -64,7 +64,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         ssl_ctx = None  # default
-        if not self.registry_info["ssl-verify"]:
+        if not self.registry_info["ssl_verify"]:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
         async with aiohttp.ClientSession(connector=connector) as sess:
