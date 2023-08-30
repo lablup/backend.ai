@@ -97,7 +97,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
         restarting: bool = False,

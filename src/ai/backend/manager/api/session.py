@@ -852,10 +852,6 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             "domain_name": session.domain_name,
         },
     }
-    if session.routing:
-        body["endpoint"] = {
-            "id": str(session.routing.endpoint),
-        }
 
     async with aiohttp.ClientSession() as req:
         async with req.post(
