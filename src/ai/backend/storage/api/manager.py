@@ -199,7 +199,10 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     params["qsid"], params["options"], extra_args
                 )
             except QuotaScopeAlreadyExists:
-                return web.Response(status=409)
+                return web.json_response(
+                    {"msg": "Volume already exists with given quota scope."},
+                    status=409,
+                )
             return web.Response(status=204)
 
 
