@@ -40,6 +40,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
+    "sphinx.ext.imgconverter",
     "sphinx_rtd_theme",
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
