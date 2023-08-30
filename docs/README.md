@@ -22,11 +22,11 @@ $ cd ./bai-dev/docs
 $ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
 $ pip install -U \
->     --find-links=https://dist.backend.ai/pypi/simple/grpcio \
->     --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
->     --find-links=https://dist.backend.ai/pypi/simple/hiredis \
->     --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
->     -r requirements.txt
+    --find-links=https://dist.backend.ai/pypi/simple/grpcio \
+    --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
+    --find-links=https://dist.backend.ai/pypi/simple/hiredis \
+    --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
+    -r requirements.txt
 ```
 
 ## Building API Reference JSON file
