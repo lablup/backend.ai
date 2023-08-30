@@ -58,7 +58,6 @@ from ai.backend.common.types import (
     SessionTypes,
     aobject,
 )
-from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory, UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -69,7 +68,9 @@ from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
+    AgentRow,
     AgentStatus,
+    EndpointLifecycle,
     EndpointRow,
     KernelRow,
     KernelStatus,
@@ -1245,27 +1246,25 @@ class SchedulerDispatcher(aobject):
 
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
-        endpoints_to_remove: set[EndpointRow] = set()
+        endpoints_to_mark_terminated: set[EndpointRow] = set()
         async with self.db.begin_readonly_session() as session:
-            endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
-        # endpoints_to_flush = [
-        #     endpoint.id
-        #     for endpoint in endpoints
-        #     if endpoint.desired_session_count < 0 and len(endpoint.routings) == 0
-        # ]
-        # async with self.db.begin_session() as session:
-        #     query = sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoints_to_flush))
-        #     await session.execute(query)
+            endpoints = await EndpointRow.list(
+                session,
+                load_image=True,
+                load_routes=True,
+                status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
+            )
         for endpoint in endpoints:
             non_error_routings = [
                 r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
             ]
             desired_session_count = endpoint.desired_session_count
-            if desired_session_count < 0:
-                desired_session_count = 0
-                if len(endpoint.routings) == 0:
-                    endpoints_to_remove.add(endpoint)
-                    continue
+            if (
+                endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
+                and len(endpoint.routings) == 0
+            ):
+                endpoints_to_mark_terminated.add(endpoint)
+                continue
 
             if len(non_error_routings) > desired_session_count:
                 # We need to scale down!
@@ -1433,11 +1432,31 @@ class SchedulerDispatcher(aobject):
             ),
         )
 
-        async with self.db.begin_session() as sess:
-            query = sa.delete(EndpointRow).where(
-                EndpointRow.id.in_([e.id for e in endpoints_to_remove])
-            )
-            await sess.execute(query)
+        async def _delete():
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.update(EndpointRow)
+                    .values(
+                        {
+                            "destroyed_at": sa.func.now(),
+                            "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                        }
+                    )
+                    .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
+                )
+                await db_sess.execute(query)
+
+        await execute_with_retry(_delete)
+
+        async with self.db.begin_readonly_session() as db_sess:
+            for endpoint in endpoints_to_mark_terminated:
+                try:
+                    await self.registry.delete_appproxy_endpoint(
+                        db_sess,
+                        endpoint,
+                    )
+                except Exception as e:
+                    log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
 
     async def start_session(
         self,
