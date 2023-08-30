@@ -60,7 +60,7 @@ class ContainerRegistry(graphene.ObjectType):
         interfaces = (graphene.relay.Node,)
 
     @classmethod
-    def get_node(cls, info: graphene.ResolveInfo, id: str):
+    def get_node(cls, info: graphene.ResolveInfo, id):
         raise NotImplementedError
 
     @classmethod
