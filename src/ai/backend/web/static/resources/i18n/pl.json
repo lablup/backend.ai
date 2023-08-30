@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Zezwól agentowi na zarejestrowanie się w menedżerze. <br/> Używaj tylko wtedy, gdy klaster Backend.AI jest zarządzany w bezpiecznej lokalizacji.",
     "Plugins": "Wtyczki",
     "CUDAGPUsupport": "Obsługa procesorów graficznych CUDA",
-    "DescCUDAGPUsupport": "Obsługa procesorów graficznych NVidia CUDA. <br/> Wymaga wtyczki Backend.AI CUDA.",
+    "DescCUDAGPUsupport": "Obsługa procesorów graficznych NVIDIA CUDA. <br/> Wymaga wtyczki Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Wyłączone, ponieważ system używa ułamkowej wtyczki GPU",
     "ROCMGPUsupport": "Obsługa ROCm GPU",
     "DescROCMGPUsupport": "Obsługa procesorów graficznych AMD ROCm. <br/> Wymaga wtyczki Backend.AI ROCm.",
