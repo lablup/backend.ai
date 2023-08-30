@@ -436,7 +436,7 @@ async def query_accessible_vfolders(
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
         ).select_from(j)
-        if user_role != UserRole.SUPERADMIN:
+        if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
         if extra_vf_group_conds is not None:
             query = query.where(extra_vf_group_conds)
