@@ -362,7 +362,7 @@ container_registry_iv = t.Dict(
         t.Key("project", default=None): (
             t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
         ),
-        tx.AliasedKey(["ssl-verify", "ssl_verify"], default=True): t.ToBool,
+        tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,  # TODO
     }
 ).allow_extra("*")
 
