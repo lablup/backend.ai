@@ -641,12 +641,12 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("id"): t.String,
+            t.Key("id"): tx.UUID,
         }
     ),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, uuid.UUID(params["id"]))
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["folders.context"]
 
