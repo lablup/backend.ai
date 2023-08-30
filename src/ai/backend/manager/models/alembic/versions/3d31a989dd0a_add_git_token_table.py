@@ -1,8 +1,8 @@
-"""add git_tokens table
+"""add git_token table
 
-Revision ID: 6da5c6b22bd5
-Revises: 10c58e701d87
-Create Date: 2023-03-06 17:42:53.712150
+Revision ID: 3d31a989dd0a
+Revises: ae7d4cd92aa7
+Create Date: 2023-08-31 01:04:48.109184
 
 """
 import sqlalchemy as sa
@@ -11,8 +11,8 @@ from alembic import op
 from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
-revision = "6da5c6b22bd5"
-down_revision = "10c58e701d87"
+revision = "3d31a989dd0a"
+down_revision = "ae7d4cd92aa7"
 branch_labels = None
 depends_on = None
 
