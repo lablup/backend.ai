@@ -15,6 +15,8 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from aiotools import aclosing
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -261,7 +263,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
             await root_ctx.event_producer.produce_event(DoScheduleEvent())
         case SchedulerEvent.PREPARE:
             await root_ctx.event_producer.produce_event(DoPrepareEvent())
-        case SchedulerEvent.SCALE:
+        case SchedulerEvent.SCALE_SERVICES:
             await root_ctx.event_producer.produce_event(DoScaleEvent())
     return web.Response(status=204)
 
@@ -270,16 +272,16 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     manager_id = root_ctx.local_config["manager"]["id"]
+    event_ids = [e.value for e in SchedulerEvent]
 
-    scheduler_status = await redis_helper.execute(
-        root_ctx.redis_live,
-        lambda r: r.hgetall(f"manager.{manager_id}"),
-        encoding="utf-8",
-    )
-    if not scheduler_status:
-        return web.json_response({f"manager.{manager_id}": "empty"})
-    for method_name, status_json in scheduler_status.items():
-        scheduler_status[method_name] = json.loads(status_json)
+    async def _pipeline(r: Redis) -> RedisPipeline:
+        pipe = r.pipeline()
+        for event_id in event_ids:
+            await pipe.hgetall(f"manager.{manager_id}.{event_id}")
+        return pipe
+
+    result = await redis_helper.execute(root_ctx.redis_live, _pipeline)
+    scheduler_status = {event_id: response for event_id, response in zip(event_ids, result)}
     return web.json_response(scheduler_status)
 
 

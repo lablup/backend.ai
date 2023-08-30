@@ -11,4 +11,4 @@ class ManagerStatus(str, enum.Enum):
 class SchedulerEvent(str, enum.Enum):
     SCHEDULE = "schedule"
     PREPARE = "prepare"
-    SCALE = "scale"
+    SCALE_SERVICES = "scale_services"
