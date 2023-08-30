@@ -59,9 +59,9 @@ class ContainerRegistry(graphene.ObjectType):
     class Meta:
         interfaces = (graphene.relay.Node,)
 
-    @classmethod
-    def get_node(cls, info: graphene.ResolveInfo, id):
-        raise NotImplementedError
+    # @classmethod
+    # def get_node(cls, info: graphene.ResolveInfo, id):
+    #     raise NotImplementedError
 
     @classmethod
     def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
