@@ -15,8 +15,6 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from aiotools import aclosing
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -272,16 +270,15 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
 async def scheduler_healthcheck(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     manager_id = root_ctx.local_config["manager"]["id"]
-    event_ids = [e.value for e in SchedulerEvent]
 
-    async def _pipeline(r: Redis) -> RedisPipeline:
-        pipe = r.pipeline()
-        for event_id in event_ids:
-            await pipe.hgetall(f"manager.{manager_id}.{event_id}")
-        return pipe
+    scheduler_status = {}
+    for event in SchedulerEvent:
+        scheduler_status[event.value] = await redis_helper.execute(
+            root_ctx.redis_live,
+            lambda r: r.hgetall(f"manager.{manager_id}.{event.value}"),
+            encoding="utf-8",
+        )
 
-    result = await redis_helper.execute(root_ctx.redis_live, _pipeline)
-    scheduler_status = {event_id: response for event_id, response in zip(event_ids, result)}
     return web.json_response(scheduler_status)
 
 
@@ -319,7 +316,7 @@ def create_app(
     cors.add(announcement_resource.add_route("POST", update_announcement))
     cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
     cors.add(app.router.add_route("POST", "/scheduler/trigger", scheduler_trigger))
-    cors.add(app.router.add_route("GET", "/scheduler/ping", scheduler_healthcheck))
+    cors.add(app.router.add_route("GET", "/scheduler/status", scheduler_healthcheck))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     return app, []

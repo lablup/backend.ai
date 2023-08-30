@@ -24,6 +24,8 @@ import aiotools
 import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
@@ -246,15 +248,21 @@ class SchedulerDispatcher(aobject):
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.schedule"
 
-        await redis_helper.execute(
-            self.redis_live,
-            lambda r: r.hset(
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
                 redis_key,
                 mapping={
                     "trigger_event": event.__class__.name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
-            ),
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
         )
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
@@ -1081,15 +1089,21 @@ class SchedulerDispatcher(aobject):
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.prepare"
 
-        await redis_helper.execute(
-            self.redis_live,
-            lambda r: r.hset(
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
                 redis_key,
                 mapping={
                     "trigger_event": event.__class__.name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
-            ),
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
         )
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
@@ -1212,16 +1226,23 @@ class SchedulerDispatcher(aobject):
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.scale_services"
 
-        await redis_helper.execute(
-            self.redis_live,
-            lambda r: r.hset(
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
                 redis_key,
                 mapping={
                     "trigger_event": event.__class__.name,
                     "execution_time": datetime.now(tzutc()).isoformat(),
                 },
-            ),
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
         )
+
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_remove: set[EndpointRow] = set()
