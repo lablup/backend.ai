@@ -74,12 +74,21 @@ $ make -e SPHINXOPTS="-D language='ko'" html
 ```
 
 
-## 🚧 Building PDF document (WIP) 🚧
+## Building PDF document
 
-> Help wanted!
+```console
+$ make latexpdf
+```
 
-We are looking for people to help with a short guide for building PDF document based on html files derived from sphinx.
+The compiled documentation is under `_build/latex/BackendAIDoc.pdf`.
 
+### Dependency
+
+* TeX Live 
+  - ko.TeX (texlive-lang-korean)
+  - latexmk
+* ImageMagick
+* Font files (All required font files must be installed)
 
 ## Advanced Settings
 
