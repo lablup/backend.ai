@@ -85,7 +85,7 @@ class ServiceParser:
     def add_model_service(self, name, model_service_info) -> None:
         service_def = ServiceDefinition(
             model_service_info["start_command"],
-            prestart_actions=model_service_info["pre_start_actions"],
+            prestart_actions=model_service_info["pre_start_actions"] or [],
         )
         self.services[name] = service_def
 

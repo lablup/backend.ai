@@ -474,7 +474,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
             )
             result = await conn.scalar(query)
-            if result >= keypair_resource_policy["max_vfolder_count"]:
+            if result >= keypair_resource_policy["max_vfolder_count"] and ownership_type == "user":
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
