@@ -107,6 +107,11 @@ class RoutingRow(Base):
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
         load_endpoint=False,
+        status_filter: list[RouteStatus] = [
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.PROVISIONING,
+        ],
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -114,7 +119,11 @@ class RoutingRow(Base):
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
-        query = sa.select(RoutingRow).filter(RoutingRow.endpoint == endpoint_id)
+        query = (
+            sa.select(RoutingRow)
+            .filter(RoutingRow.endpoint == endpoint_id)
+            .filter(RoutingRow.status.in_(status_filter))
+        )
         if load_endpoint:
             query = query.options(selectinload(RoutingRow.endpoint_row))
         if project:
@@ -262,16 +271,16 @@ class Routing(graphene.ObjectType):
     async def load_all(
         cls,
         ctx,  # ctx: GraphQueryContext
+        endpoint_id: uuid.UUID,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> Sequence["Routing"]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await RoutingRow.list_by_session(
+            rows = await RoutingRow.list(
                 session,
-                endpoint_id=endpoint_id,
+                endpoint_id,
                 project=project,
                 domain=domain_name,
                 user_uuid=user_uuid,

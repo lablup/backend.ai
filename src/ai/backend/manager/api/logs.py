@@ -14,12 +14,13 @@ from aiohttp import web
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
-from ..defs import REDIS_LIVE_DB, LockID
+from ..defs import LockID
 from ..models import UserRole, error_logs, projects
 from ..models import association_projects_users as apus
 from .auth import auth_required

@@ -19,6 +19,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -44,6 +45,8 @@ from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
 
 ARCH_FOR_TEST = "x86_64"
 
+agent_selection_resource_priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
 
 def test_load_intrinsic():
     default_sgroup_opts = ScalingGroupOpts()
@@ -57,6 +60,7 @@ def test_scheduler_configs():
     example_sgroup_opts = ScalingGroupOpts(  # already processed by column trafaret
         allowed_session_types=[SessionTypes.BATCH],
         pending_timeout=timedelta(seconds=86400 * 2),
+        agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
         config={
             "extra_config": None,
             "num_retries_to_skip": 5,
@@ -781,6 +785,8 @@ def test_fifo_scheduler(example_agents, example_pending_sessions, example_existi
     agent_id = scheduler.assign_agent_for_session(
         example_agents,
         picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_resource_priority,
     )
     assert agent_id == AgentId("i-001")
 
@@ -797,7 +803,12 @@ def test_lifo_scheduler(example_agents, example_pending_sessions, example_existi
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents,
+        picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_resource_priority,
+    )
     assert agent_id == "i-001"
 
 
@@ -817,7 +828,12 @@ def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
             example_pending_sessions,
             picked_session_id,
         )
-        agent_id = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
+        agent_id = scheduler.assign_agent_for_session(
+            example_mixed_agents,
+            picked_session,
+            AgentSelectionStrategy.DISPERSED,
+            agent_selection_resource_priority,
+        )
         if idx == 0:
             # example_mixed_agents do not have any agent with ROCM accelerators.
             assert agent_id is None
@@ -952,7 +968,12 @@ def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
         )
         assert picked_session_id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
-        agent_id = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
+        agent_id = scheduler.assign_agent_for_session(
+            example_mixed_agents,
+            picked_session,
+            AgentSelectionStrategy.DISPERSED,
+            agent_selection_resource_priority,
+        )
         if idx == 2:
             # example_mixed_agents do not have any agent with ROCM accelerators.
             assert agent_id is None
@@ -981,7 +1002,12 @@ def test_drf_scheduler(
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents,
+        picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_resource_priority,
+    )
     assert agent_id == "i-001"
 
 
@@ -997,7 +1023,12 @@ def test_mof_scheduler_first_assign(
     assert picked_session_id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents,
+        picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_resource_priority,
+    )
     assert agent_id == "i-001"
 
 
@@ -1013,7 +1044,12 @@ def test_mof_scheduler_second_assign(
     assert picked_session_id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents_first_one_assigned, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents_first_one_assigned,
+        picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_resource_priority,
+    )
     assert agent_id == "i-101"
 
 
@@ -1029,7 +1065,12 @@ def test_mof_scheduler_no_valid_agent(
     assert picked_session_id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents_no_valid, picked_session)
+    agent_id = scheduler.assign_agent_for_session(
+        example_agents_no_valid,
+        picked_session,
+        AgentSelectionStrategy.DISPERSED,
+        agent_selection_resource_priority,
+    )
     assert agent_id is None
 
 
@@ -1107,6 +1148,7 @@ async def test_manually_assign_agent_available(
     example_pending_sessions,
 ):
     mock_local_config = MagicMock()
+
     (
         registry,
         mock_dbconn,
@@ -1141,6 +1183,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_resource_priority,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
@@ -1154,6 +1197,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_resource_priority,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
@@ -1174,6 +1218,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_resource_priority,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
@@ -1195,6 +1240,7 @@ async def test_manually_assign_agent_available(
         sgroup_name,
         candidate_agents,
         sess_ctx,
+        agent_selection_resource_priority,
         mock_check_result,
     )
     result = mock_dbresult.scalar()
