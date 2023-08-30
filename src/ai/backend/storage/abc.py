@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta, abstractmethod
 from pathlib import Path, PurePosixPath
 from typing import (
@@ -13,7 +14,9 @@ from typing import (
     final,
 )
 
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import (
@@ -34,17 +37,20 @@ CAP_FAST_FS_SIZE: Final = "fast-fs-size"  # ability to scan filesystem size fast
 CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder fast (e.g. by API)
 CAP_FAST_SIZE: Final = "fast-size"  # ability to scan vFolder size fast (e.g. by API)
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
 
 class AbstractQuotaModel(metaclass=ABCMeta):
     @abstractmethod
-    def mangle_qspath(self, ref: VFolderID | str | None) -> Path:
+    def mangle_qspath(self, ref: VFolderID | QuotaScopeID | str | None) -> Path:
         raise NotImplementedError
 
     @abstractmethod
     async def create_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Creates a new quota scope.
@@ -56,17 +62,18 @@ class AbstractQuotaModel(metaclass=ABCMeta):
     @abstractmethod
     async def describe_quota_scope(
         self,
-        quota_scope_id: str,
-    ) -> QuotaUsage:
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
         """
         Get the information about the given quota scope.
+        Returns None if target quota scope does not exist.
         """
         raise NotImplementedError
 
     @abstractmethod
     async def update_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
         options: QuotaConfig,
     ) -> None:
         """
@@ -75,9 +82,19 @@ class AbstractQuotaModel(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def unset_quota(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> None:
+        """
+        Lifts off quota set on given quota scope.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def delete_quota_scope(
         self,
-        quota_scope_id: str,
+        quota_scope_id: QuotaScopeID,
     ) -> None:
         """
         Deletes the given quota scope.
@@ -124,6 +141,7 @@ class AbstractFSOpModel(metaclass=ABCMeta):
     def scan_tree(
         self,
         path: Path,
+        recursive=False,
     ) -> AsyncIterator[DirEntry]:
         """
         Iterates over all files within the given path recursively.
@@ -165,11 +183,13 @@ class AbstractVolume(metaclass=ABCMeta):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
         self.config = options or {}
+        self.etcd = etcd
 
     async def init(self) -> None:
         self.fsop_model = await self.create_fsop_model()
@@ -282,7 +302,9 @@ class AbstractVolume(metaclass=ABCMeta):
     # ------ vfolder operations -------
 
     @abstractmethod
-    def scandir(self, vfid: VFolderID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+    def scandir(
+        self, vfid: VFolderID, relpath: PurePosixPath, recursive=True
+    ) -> AsyncIterator[DirEntry]:
         pass
 
     @abstractmethod

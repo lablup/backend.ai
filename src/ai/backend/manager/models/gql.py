@@ -6,10 +6,20 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 import attrs
 import graphene
 
+from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from .etcd import (
+    ContainerRegistry,
+    CreateContainerRegistry,
+    DeleteContainerRegistry,
+    ModifyContainerRegistry,
+)
+
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+    from graphql.execution.executors.asyncio import (
+        AsyncioExecutor,
+    )
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
@@ -17,17 +27,17 @@ if TYPE_CHECKING:
         AccessKey,
         AgentId,
         RedisConnectionInfo,
+        SessionId,
         SlotName,
         SlotTypes,
-        SessionId,
     )
 
     from ..api.manager import ManagerStatus
     from ..config import LocalConfig, SharedConfig
-    from ..registry import AgentRegistry
-    from ..models.utils import ExtendedAsyncSAEngine
-    from .storage import StorageSessionManager
     from ..idle import IdleCheckerHost
+    from ..models.utils import ExtendedAsyncSAEngine
+    from ..registry import AgentRegistry
+    from .storage import StorageSessionManager
 
 from ..api.exceptions import (
     ImageNotFound,
@@ -62,9 +72,17 @@ from .kernel import (
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
+    CreateProjectResourcePolicy,
+    CreateUserResourcePolicy,
     DeleteKeyPairResourcePolicy,
+    DeleteProjectResourcePolicy,
+    DeleteUserResourcePolicy,
     KeyPairResourcePolicy,
     ModifyKeyPairResourcePolicy,
+    ModifyProjectResourcePolicy,
+    ModifyUserResourcePolicy,
+    ProjectResourcePolicy,
+    UserResourcePolicy,
 )
 from .resource_preset import (
     CreateResourcePreset,
@@ -100,10 +118,14 @@ from .user import (
     UserStatus,
 )
 from .vfolder import (
+    QuotaScope,
+    SetQuotaScope,
+    UnsetQuotaScope,
     VirtualFolder,
     VirtualFolderList,
     VirtualFolderPermission,
     VirtualFolderPermissionList,
+    ensure_quota_scope_accessible_by_user,
 )
 
 
@@ -175,6 +197,16 @@ class Mutations(graphene.ObjectType):
     delete_keypair_resource_policy = DeleteKeyPairResourcePolicy.Field()
 
     # super-admin only
+    create_user_resource_policy = CreateUserResourcePolicy.Field()
+    modify_user_resource_policy = ModifyUserResourcePolicy.Field()
+    delete_user_resource_policy = DeleteUserResourcePolicy.Field()
+
+    # super-admin only
+    create_project_resource_policy = CreateProjectResourcePolicy.Field()
+    modify_project_resource_policy = ModifyProjectResourcePolicy.Field()
+    delete_project_resource_policy = DeleteProjectResourcePolicy.Field()
+
+    # super-admin only
     create_resource_preset = CreateResourcePreset.Field()
     modify_resource_preset = ModifyResourcePreset.Field()
     delete_resource_preset = DeleteResourcePreset.Field()
@@ -191,6 +223,13 @@ class Mutations(graphene.ObjectType):
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
+
+    set_quota_scope = SetQuotaScope.Field()
+    unset_quota_scope = UnsetQuotaScope.Field()
+
+    create_container_registry = CreateContainerRegistry.Field()
+    modify_container_registry = ModifyContainerRegistry.Field()
+    delete_container_registry = DeleteContainerRegistry.Field()
 
 
 class Queries(graphene.ObjectType):
@@ -347,8 +386,18 @@ class Queries(graphene.ObjectType):
         KeyPairResourcePolicy,
         name=graphene.String(),
     )
+    user_resource_policy = graphene.Field(
+        UserResourcePolicy,
+        name=graphene.String(),
+    )
+    project_resource_policy = graphene.Field(
+        ProjectResourcePolicy,
+        name=graphene.String(required=True),
+    )
 
     keypair_resource_policies = graphene.List(KeyPairResourcePolicy)
+    user_resource_policies = graphene.List(UserResourcePolicy)
+    project_resource_policies = graphene.List(ProjectResourcePolicy)
 
     resource_preset = graphene.Field(
         ResourcePreset,
@@ -427,6 +476,39 @@ class Queries(graphene.ObjectType):
         offset=graphene.Int(required=True),
         filter=graphene.String(),
         order=graphene.String(),
+    )
+
+    vfolder_own_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    vfolder_invited_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    vfolder_project_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
     )
 
     vfolders = graphene.List(  # legacy non-paginated list
@@ -527,6 +609,16 @@ class Queries(graphene.ObjectType):
         # filters
         endpoint_id=graphene.UUID(),
     )
+
+    quota_scope = graphene.Field(
+        QuotaScope,
+        storage_host_name=graphene.String(required=True),
+        quota_scope_id=graphene.String(required=True),
+    )
+
+    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+
+    container_registries = graphene.List(ContainerRegistry)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -1094,6 +1186,76 @@ class Queries(graphene.ObjectType):
             raise InvalidAPIParameters("Unknown client role")
 
     @staticmethod
+    async def resolve_user_resource_policy(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        name: str = None,
+    ) -> UserResourcePolicy:
+        ctx: GraphQueryContext = info.context
+        user_uuid = ctx.user["uuid"]
+        if name is None:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "UserResourcePolicy.by_user",
+            )
+            return await loader.load(user_uuid)
+        else:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "UserResourcePolicy.by_name",
+            )
+            return await loader.load(name)
+
+    @staticmethod
+    async def resolve_user_resource_policies(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+    ) -> Sequence[UserResourcePolicy]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        user_uuid = ctx.user["uuid"]
+        if client_role == UserRole.SUPERADMIN:
+            return await UserResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.ADMIN:
+            # TODO: filter resource policies by domains?
+            return await UserResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.USER:
+            return await UserResourcePolicy.batch_load_by_user(
+                info.context,
+                [user_uuid],
+            )
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+
+    @staticmethod
+    async def resolve_project_resource_policy(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        name: str,
+    ) -> ProjectResourcePolicy:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "ProjectResourcePolicy.by_name",
+        )
+        return await loader.load(name)
+
+    @staticmethod
+    async def resolve_project_resource_policies(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+    ) -> Sequence[ProjectResourcePolicy]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        if client_role == UserRole.SUPERADMIN:
+            return await ProjectResourcePolicy.load_all(info.context)
+        elif client_role == UserRole.ADMIN:
+            # TODO: filter resource policies by domains?
+            return await ProjectResourcePolicy.load_all(info.context)
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+
+    @staticmethod
     async def resolve_resource_preset(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
@@ -1268,6 +1430,96 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderPermissionList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_own_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_invited_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_invited(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_invited(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_project_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_project(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_project(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
@@ -1561,6 +1813,54 @@ class Queries(graphene.ObjectType):
             user_uuid=user_uuid,
         )
         return RoutingList(routing_list, total_count)
+
+    @staticmethod
+    async def resolve_quota_scope(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        *,
+        quota_scope_id: Optional[str] = None,
+        storage_host_name: Optional[str] = None,
+    ) -> QuotaScope:
+        if not quota_scope_id or not storage_host_name:
+            raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
+        graph_ctx: GraphQueryContext = info.context
+        qsid = QuotaScopeID.parse(quota_scope_id)
+        volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
+        for host, volume in volumes_by_host:
+            if f"{host}:{volume['name']}" == storage_host_name:
+                break
+        else:
+            raise ValueError(f"storage volume {storage_host_name} does not exist")
+        async with graph_ctx.db.begin_readonly_session() as sess:
+            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+            return QuotaScope(
+                quota_scope_id=quota_scope_id,
+                storage_host_name=storage_host_name,
+            )
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_container_registry(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        domain_name: Optional[str] = None,
+        access_key: AccessKey = None,
+    ) -> ContainerRegistry:
+        ctx: GraphQueryContext = info.context
+        return await ContainerRegistry.load_registry(ctx, hostname)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_container_registries(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        domain_name: Optional[str] = None,
+        access_key: AccessKey = None,
+    ) -> Sequence[ContainerRegistry]:
+        ctx: GraphQueryContext = info.context
+        return await ContainerRegistry.load_all(ctx)
 
 
 class GQLMutationPrivilegeCheckMiddleware:

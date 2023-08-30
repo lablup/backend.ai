@@ -32,6 +32,7 @@ container_fields = FieldSet(
         FieldSpec("container_id"),
         FieldSpec("resource_opts", formatter=nested_dict_formatter),
         FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("preopen_ports", "Preopen Ports"),
         FieldSpec("live_stat", formatter=KernelStatFormatter()),
         FieldSpec("last_stat", formatter=KernelStatFormatter()),
     ]
@@ -117,6 +118,7 @@ keypair_fields = FieldSet(
             alt_name="full_name",
             formatter=SubFieldOutputFormatter("full_name"),
         ),
+        FieldSpec("projects"),
         FieldSpec("access_key"),
         FieldSpec("secret_key"),
         FieldSpec("is_active"),
@@ -162,6 +164,8 @@ scaling_group_fields = FieldSet(
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
         FieldSpec("use_host_network"),
+        FieldSpec("wsproxy_addr"),
+        FieldSpec("wsproxy_api_token"),
     ]
 )
 
@@ -181,6 +185,7 @@ session_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("group_name", "Project/Group"),
         FieldSpec("group_id"),
+        FieldSpec("agent_ids"),
         FieldSpec("user_email"),
         FieldSpec("user_id"),
         FieldSpec("access_key", "Owner Access Key"),
@@ -193,6 +198,7 @@ session_fields = FieldSet(
         FieldSpec("created_at"),
         FieldSpec("terminated_at"),
         FieldSpec("starts_at"),
+        FieldSpec("scheduled_at"),
         FieldSpec("startup_command"),
         FieldSpec("result"),
         FieldSpec("resoucre_opts", formatter=nested_dict_formatter),

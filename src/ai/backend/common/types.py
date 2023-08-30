@@ -67,6 +67,7 @@ __all__ = (
     "MountPermissionLiteral",
     "MountTypes",
     "VFolderID",
+    "QuotaScopeID",
     "VFolderUsageMode",
     "VFolderMount",
     "QuotaConfig",
@@ -602,6 +603,9 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
+    def __neg__(self):
+        return type(self)({k: -v for k, v in self.data.items()})
+
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
@@ -787,18 +791,67 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 
 
 @attrs.define(slots=True, frozen=True)
+class QuotaScopeID:
+    scope_type: QuotaScopeType
+    scope_id: Any
+
+    @classmethod
+    def parse(cls, raw: str) -> QuotaScopeID:
+        scope_type, _, rest = raw.partition(":")
+        match scope_type:
+            case "project":
+                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
+            case "user":
+                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+
+    def __str__(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return f"{self.scope_type.value}:{str(self.scope_id)}"
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @property
+    def pathname(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return self.scope_id.hex
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+
 class VFolderID:
-    quota_scope_id: str | None
+    quota_scope_id: QuotaScopeID | None
     folder_id: uuid.UUID
 
     @classmethod
     def from_row(cls, row: Any) -> VFolderID:
         return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
 
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+        self.folder_id = folder_id
+        match quota_scope_id:
+            case QuotaScopeID():
+                self.quota_scope_id = quota_scope_id
+            case str():
+                self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
+            case None:
+                self.quota_scope_id = None
+            case _:
+                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
+
     def __str__(self) -> str:
         if self.quota_scope_id is None:
             return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
+
+    def __eq__(self, other) -> bool:
+        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
 
 
 class VFolderUsageMode(str, enum.Enum):
@@ -907,6 +960,11 @@ class QuotaConfig:
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         return cls.Validator()
+
+
+class QuotaScopeType(str, enum.Enum):
+    USER = "user"
+    PROJECT = "project"
 
 
 class ImageRegistry(TypedDict):
@@ -1070,3 +1128,10 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class AgentSelectionStrategy(enum.StrEnum):
+    DISPERSED = "dispersed"
+    CONCENTRATED = "concentrated"
+    # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
+    LEGACY = "legacy"

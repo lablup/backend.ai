@@ -77,7 +77,7 @@ from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..server import get_extra_volumes
-from ..types import Container, ContainerStatus, LifecycleEvent, MountInfo, Port
+from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -153,7 +153,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -825,13 +825,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.computer_docker_args["HostConfig"]["MemorySwap"] -= shmem
             self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
-        image_service_ports = image_labels.get("ai.backend.service-ports", "")
-        encoded_preopen_ports = ",".join(
-            f"{port_no}:preopen:{port_no}" for port_no in preopen_ports
-        )
-        container_config["Labels"]["ai.backend.service-ports"] = (
-            image_service_ports + "," if image_service_ports else ""
-        ) + encoded_preopen_ports
+        service_ports_label: list[str] = []
+        service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
+        service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
+
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
         if self.local_config["debug"]["log-kernel-config"]:
@@ -861,7 +859,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 assert container is not None
                 cid = container._id
                 resource_spec.container_id = cid
-                # Write resource.txt again to update the contaienr id.
+                # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
                     await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
@@ -1340,13 +1338,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == 409 and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             elif e.status == 404:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             else:
                 log.exception("destroy_kernel(k:{0}) kill error", kernel_id)
                 await self.error_monitor.capture_exception()
@@ -1468,8 +1466,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @preserve_termination_log
     async def monitor_docker_events(self):
-        async def handle_action_start(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
-            session_id = SessionId(UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"]))
+        async def handle_action_start(
+            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+        ) -> None:
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 session_id,
@@ -1478,7 +1477,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 container_id=ContainerId(evdata["Actor"]["ID"]),
             )
 
-        async def handle_action_die(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+        async def handle_action_die(
+            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+        ) -> None:
             # When containers die, we immediately clean up them.
             reason = None
             kernel_obj = self.kernel_registry.get(kernel_id)
@@ -1488,7 +1489,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 exit_code = evdata["Actor"]["Attributes"]["exitCode"]
             except KeyError:
                 exit_code = 255
-            session_id = SessionId(UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"]))
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 session_id,
@@ -1496,6 +1496,19 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
                 exit_code=exit_code,
+            )
+
+        async def handle_action_oom(
+            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+        ) -> None:
+            kernel_obj = self.kernel_registry.get(kernel_id, None)
+            if kernel_obj is None:
+                return
+            await kernel_obj.notify_event(
+                AgentEventData(
+                    type="oom",
+                    data={},
+                )
             )
 
         while True:
@@ -1509,10 +1522,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             if evdata is None:
                                 # Break out to the outermost loop when the connection is closed
                                 log.info(
-                                    (
-                                        "monitor_docker_events(): "
-                                        "restarting aiodocker event subscriber"
-                                    ),
+                                    "monitor_docker_events(): "
+                                    "restarting aiodocker event subscriber",
                                 )
                                 break
                             if evdata["Type"] != "container":
@@ -1524,24 +1535,34 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 continue
                             if self.local_config["debug"]["log-docker-events"] and evdata[
                                 "Action"
-                            ] in ("start", "die"):
+                            ] in ("start", "die", "oom"):
                                 log.debug(
                                     "docker-event: action={}, actor={}",
                                     evdata["Action"],
                                     evdata["Actor"],
                                 )
-                            if evdata["Action"] == "start":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_start(kernel_id, evdata),
+                            session_id = SessionId(
+                                UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"])
+                            )
+                            match evdata["Action"]:
+                                case "start":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_start(session_id, kernel_id, evdata),
+                                        )
                                     )
-                                )
-                            elif evdata["Action"] == "die":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_die(kernel_id, evdata),
+                                case "die":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_die(session_id, kernel_id, evdata),
+                                        )
                                     )
-                                )
+                                case "oom":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_oom(session_id, kernel_id, evdata),
+                                        )
+                                    )
                         except asyncio.CancelledError:
                             # We are shutting down...
                             return

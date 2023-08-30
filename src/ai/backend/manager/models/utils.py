@@ -61,10 +61,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 and self._generic_txn_count >= self._txn_concurrency_threshold
             ):
                 log.warning(
-                    (
-                        "The number of concurrent generic transactions ({}) "
-                        "looks too high (warning threshold: {})."
-                    ),
+                    "The number of concurrent generic transactions ({}) "
+                    "looks too high (warning threshold: {}).",
                     self._generic_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -83,10 +81,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                 and self._readonly_txn_count >= self._txn_concurrency_threshold
             ):
                 log.warning(
-                    (
-                        "The number of concurrent read-only transactions ({}) "
-                        "looks too high (warning threshold: {})."
-                    ),
+                    "The number of concurrent read-only transactions ({}) "
+                    "looks too high (warning threshold: {}).",
                     self._readonly_txn_count,
                     self._txn_concurrency_threshold,
                     stack_info=False,
@@ -183,7 +179,8 @@ async def connect_database(
     version_check_db = create_async_engine(url)
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
-        major, minor, *_ = map(int, result.scalar().split("."))
+        version_str = result.scalar()
+        major, minor, *_ = map(int, version_str.partition(" ")[0].split("."))
         if (major, minor) < (11, 0):
             pgsql_connect_opts["server_settings"].pop("jit")
     await version_check_db.dispose()
@@ -352,3 +349,12 @@ def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
         new_metadata,
         *[_populate_column(c) for c in table.columns],
     )
+
+
+def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
+    # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.aggregate_order_by
+    return sa.func.string_agg(column, psql.aggregate_order_by(sa.literal_column("','"), column))
+
+
+def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
+    return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))

@@ -46,6 +46,7 @@ from trafaret.lib import _empty
 
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
+from .types import QuotaScopeID as _QuotaScopeID
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -65,6 +66,7 @@ __all__ = (
     "UserID",
     "GroupID",
     "UUID",
+    "QuotaScopeID",
     "VFolderID",
     "TimeZone",
     "TimeDuration",
@@ -470,10 +472,10 @@ class UUID(t.Trafaret):
 
 
 class QuotaScopeID(t.Trafaret):
-    regex = r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"
+    regex = r"^[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*:[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*$"
 
-    def check_and_return(self, value: Any) -> str:
-        return t.Regexp(self.regex).check(value)
+    def check_and_return(self, value: Any) -> _QuotaScopeID:
+        return _QuotaScopeID.parse(t.Regexp(self.regex).check(value))
 
 
 class VFolderID(t.Trafaret):
@@ -482,7 +484,10 @@ class VFolderID(t.Trafaret):
         match value:
             case str():
                 pieces = value.partition("/")
-                converted = tuple_t.check((pieces[0], pieces[2]))
+                if len(pieces[2]) == 0:  # for old vFolder ID without quota scope ID
+                    converted = (None, UUID().check(pieces[0]))
+                else:
+                    converted = tuple_t.check((pieces[0], pieces[2]))
             case tuple():
                 converted = tuple_t.check(value)
             case _:
@@ -518,13 +523,13 @@ class TimeDuration(t.Trafaret):
 
     Example:
     >>> t = datetime(2020, 2, 29)
-    >>> t + check_and_return(years=1)
+    >>> t + check_and_return("1yr")
     datetime.datetime(2021, 2, 28, 0, 0)
-    >>> t + check_and_return(years=2)
+    >>> t + check_and_return("2yr")
     datetime.datetime(2022, 2, 28, 0, 0)
-    >>> t + check_and_return(years=3)
+    >>> t + check_and_return("3yr")
     datetime.datetime(2023, 2, 28, 0, 0)
-    >>> t + check_and_return(years=4)
+    >>> t + check_and_return("4yr")
     datetime.datetime(2024, 2, 29, 0, 0)  # preserves the same day of month
     """
 
@@ -642,8 +647,6 @@ if jwt_available:
 
 
 class URL(t.Trafaret):
-    rx_scheme = re.compile(r"^[-a-z0-9]+://")
-
     def __init__(
         self,
         *,
@@ -652,19 +655,16 @@ class URL(t.Trafaret):
         self.scheme_required = scheme_required
 
     def check_and_return(self, value: Any) -> yarl.URL:
-        if not isinstance(value, (str, bytes)):
-            self._failure("A URL must be a unicode string or a byte sequence", value=value)
         if isinstance(value, bytes):
             value = value.decode("utf-8")
-        if self.scheme_required:
-            if not self.rx_scheme.match(value):
-                self._failure(
-                    "The given value does not have the scheme (protocol) part", value=value
-                )
         try:
-            return yarl.URL(value)
-        except ValueError as e:
-            self._failure(f"cannot convert the given value to URL (error: {e!r})", value=value)
+            parsed_url = yarl.URL(value)
+            if self.scheme_required:
+                parsed_url.origin()
+        except (ValueError, TypeError) as e:
+            self._failure(repr(e), value=value)
+        else:
+            return parsed_url
 
 
 class ToSet(t.Trafaret):

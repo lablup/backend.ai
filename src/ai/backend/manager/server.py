@@ -36,11 +36,18 @@ from setproctitle import setproctitle
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+    REDIS_STREAM_LOCK,
+)
+from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -55,11 +62,10 @@ from .api.exceptions import (
     URLNotFound,
 )
 from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
-from .config import LocalConfig, SharedConfig
+from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
-from .config import volume_config_iv
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
+from .models import SessionRow
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -96,6 +102,10 @@ VALID_VERSIONS: Final = frozenset(
         "v6.20220615",
         # added config/resource-slots/details, model mgmt & serving APIs
         "v6.20230315",
+        # added quota scopes (per-user/per-project quota configs)
+        # added user & project resource policies
+        # deprecated per-vfolder quota configs (BREAKING)
+        "v7.20230615",
     ]
 )
 LATEST_REV_DATES: Final = {
@@ -105,8 +115,9 @@ LATEST_REV_DATES: Final = {
     4: "20190615",
     5: "20191215",
     6: "20230315",
+    7: "20230615",
 }
-LATEST_API_VERSION: Final = "v6.20230315"
+LATEST_API_VERSION: Final = "v7.20230615"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -154,6 +165,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
 ]
+
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
 
 async def hello(request: web.Request) -> web.Response:
@@ -373,6 +386,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
+        consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
     )
     yield
@@ -488,6 +502,116 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if init_success:
         await sctx.cleanup()
         await ectx.cleanup()
+
+
+@actxmgr
+async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from contextlib import suppress
+    from datetime import timedelta
+    from typing import TYPE_CHECKING
+
+    import sqlalchemy as sa
+    from dateutil.relativedelta import relativedelta
+    from dateutil.tz import tzutc
+    from sqlalchemy.orm import load_only, noload
+
+    from .config import session_hang_tolerance_iv
+    from .models.session import SessionStatus
+
+    if TYPE_CHECKING:
+        from .models.utils import ExtendedAsyncSAEngine
+
+    async def _fetch_hanging_sessions(
+        db: ExtendedAsyncSAEngine,
+        status: SessionStatus,
+        threshold: relativedelta | timedelta,
+    ) -> tuple[SessionRow, ...]:
+        query = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == status)
+            .where(
+                (
+                    datetime.now(tz=tzutc())
+                    - SessionRow.status_history[status.name].astext.cast(
+                        sa.types.DateTime(timezone=True)
+                    )
+                )
+                > threshold
+            )
+            .options(
+                noload("*"),
+                load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
+            )
+        )
+        async with db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.fetchall()
+
+    async def _force_terminate_hanging_sessions(
+        status: SessionStatus,
+        threshold: relativedelta | timedelta,
+        interval: float,
+    ) -> None:
+        try:
+            sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.error("fetching hanging sessions error: {}", repr(e), exc_info=e)
+            return
+
+        log.debug(f"{len(sessions)} {status.name} sessions found.")
+
+        results_and_exceptions = await asyncio.gather(
+            *[
+                asyncio.create_task(
+                    root_ctx.registry.destroy_session(
+                        session, forced=True, reason=KernelLifecycleEventReason.HANG_TIMEOUT
+                    ),
+                )
+                for session in sessions
+            ],
+            return_exceptions=True,
+        )
+        for result_or_exception in results_and_exceptions:
+            if isinstance(result_or_exception, (BaseException, Exception)):
+                log.error(
+                    "hanging session force-termination error: {}",
+                    repr(result_or_exception),
+                    exc_info=result_or_exception,
+                )
+
+    session_hang_tolerance = session_hang_tolerance_iv.check(
+        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
+    )
+
+    session_force_termination_tasks = []
+    heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
+    max_interval = timedelta(hours=1).total_seconds()
+    threshold: relativedelta | timedelta
+    for status, threshold in session_hang_tolerance["threshold"].items():
+        try:
+            session_status = SessionStatus[status]
+        except KeyError:
+            continue
+        if isinstance(threshold, relativedelta):  # years, months
+            interval = max_interval
+        else:  # timedelta
+            interval = min(max_interval, threshold.total_seconds() * heuristic_interval_weight)
+        session_force_termination_tasks.append(
+            aiotools.create_timer(
+                functools.partial(_force_terminate_hanging_sessions, session_status, threshold),
+                interval,
+            )
+        )
+
+    yield
+
+    for task in session_force_termination_tasks:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 class background_task_ctx:
@@ -620,6 +744,7 @@ def build_root_app(
         "limit": 2048,
         "close_timeout": 30,
         "exception_handler": global_exception_handler,
+        "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
     }
     app["scheduler_opts"] = {
         **default_scheduler_opts,
@@ -641,6 +766,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
+            hanging_session_scanner_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -696,7 +822,8 @@ async def server_main(
     loop.set_debug(root_ctx.local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
-        port=root_ctx.local_config["manager"]["aiomonitor-port"] + pidx,
+        termui_port=root_ctx.local_config["manager"]["aiomonitor-termui-port"] + pidx,
+        webui_port=root_ctx.local_config["manager"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
         hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )

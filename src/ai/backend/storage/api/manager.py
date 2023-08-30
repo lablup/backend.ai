@@ -1,6 +1,7 @@
 """
 Manager-facing API
 """
+from __future__ import annotations
 
 import json
 import logging
@@ -8,12 +9,14 @@ from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncContextManager,
     Awaitable,
     Callable,
     Iterator,
     List,
+    NotRequired,
     TypedDict,
     cast,
 )
@@ -25,14 +28,22 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
 
-from ..abc import AbstractVolume
-from ..context import Context
-from ..exception import InvalidSubpathError, StorageProxyError, VFolderNotFoundError
+from .. import __version__
+from ..exception import (
+    InvalidSubpathError,
+    QuotaScopeNotFoundError,
+    StorageProxyError,
+    VFolderNotFoundError,
+)
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
+
+if TYPE_CHECKING:
+    from ..abc import AbstractVolume
+    from ..context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -42,30 +53,33 @@ async def token_auth_middleware(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> web.StreamResponse:
-    skip_token_check = getattr(handler, "skip_token_check", False)
-    if not skip_token_check:
+    skip_token_auth = getattr(handler, "skip_token_auth", False)
+    if not skip_token_auth:
         token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
         if not token:
             raise web.HTTPForbidden()
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         if token != ctx.local_config["api"]["manager"]["secret"]:
             raise web.HTTPForbidden()
     return await handler(request)
 
 
-def skip_token_check(
+def skip_token_auth(
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
-    setattr(handler, "skip_token_check", True)
+    setattr(handler, "skip_token_auth", True)
     return handler
 
 
-async def get_status(request: web.Request) -> web.Response:
+@skip_token_auth
+async def check_status(request: web.Request) -> web.Response:
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_status", params)
         return web.json_response(
             {
                 "status": "ok",
+                "type": "maanger-facing",
+                "storage-proxy": __version__,
             },
         )
 
@@ -97,13 +111,13 @@ def handle_fs_errors(
 
 
 async def get_volumes(request: web.Request) -> web.Response:
-    async def _get_caps(ctx: Context, volume_name: str) -> List[str]:
+    async def _get_caps(ctx: RootContext, volume_name: str) -> List[str]:
         async with ctx.get_volume(volume_name) as volume:
             return [*await volume.get_capabilities()]
 
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_volumes", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         volumes = ctx.list_volumes()
         return web.json_response(
             {
@@ -137,7 +151,7 @@ async def get_hwinfo(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "get_hwinfo", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             data = await volume.get_hwinfo()
             return web.json_response(data)
@@ -146,8 +160,9 @@ async def get_hwinfo(request: web.Request) -> web.Response:
 async def create_quota_scope(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
-        qsid: str
+        qsid: QuotaScopeID
         options: QuotaConfig | None
+        extra_args: NotRequired[dict[str, Any]]
 
     async with cast(
         AsyncContextManager[Params],
@@ -158,14 +173,106 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("qsid"): tx.QuotaScopeID(),
                     t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
+                    t.Key("extra_args", default=None): t.Null | t.Dict,
                 },
             ),
         ),
     ) as params:
         await log_manager_api_entry(log, "create_quota_scope", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.create_quota_scope(
+                params["qsid"], params["options"], params.get("extra_args")
+            )
+            return web.Response(status=204)
+
+
+async def get_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "get_quota_scope", params)
+        ctx: RootContext = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            return web.json_response(
+                {
+                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                    "limit_bytes": (
+                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
+                    ),
+                }
+            )
+
+
+async def update_quota_scope(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+        options: QuotaConfig
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                    t.Key("options"): QuotaConfig.as_trafaret(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "update_quota_scope", params)
+        ctx: RootContext = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+            await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            return web.Response(status=204)
+
+
+async def unset_quota(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        qsid: QuotaScopeID
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("qsid"): tx.QuotaScopeID(),
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "unset_quota", params)
+        ctx: RootContext = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            await volume.quota_model.unset_quota(params["qsid"])
             return web.Response(status=204)
 
 
@@ -189,9 +296,23 @@ async def create_vfolder(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_vfolder", params)
-        ctx: Context = request.app["ctx"]
+        assert params["vfid"].quota_scope_id is not None
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.create_vfolder(params["vfid"])
+            try:
+                await volume.create_vfolder(params["vfid"])
+            except QuotaScopeNotFoundError:
+                assert params["vfid"].quota_scope_id
+                if initial_max_size_for_quota_scope := (params["options"] or {}).get(
+                    "initial_max_size_for_quota_scope"
+                ):
+                    options = QuotaConfig(initial_max_size_for_quota_scope)
+                else:
+                    options = None
+                await volume.quota_model.create_quota_scope(
+                    params["vfid"].quota_scope_id, options=options
+                )
+                await volume.create_vfolder(params["vfid"])
             return web.Response(status=204)
 
 
@@ -213,7 +334,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "delete_vfolder", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             await volume.delete_vfolder(params["vfid"])
             return web.Response(status=204)
@@ -245,7 +366,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
         await log_manager_api_entry(log, "clone_vfolder", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
         async with ctx.get_volume(params["src_volume"]) as src_volume:
@@ -276,7 +397,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "get_container_mount", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             try:
                 mount_path = await volume.get_vfolder_mount(
@@ -327,7 +448,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "get_performance_metric", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             metric = await volume.get_performance_metric()
             return web.json_response(
@@ -362,7 +483,7 @@ async def fetch_file(request: web.Request) -> web.StreamResponse:
         ),
     ) as params:
         await log_manager_api_entry(log, "fetch_file", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         response = web.StreamResponse(status=200)
         response.headers[hdrs.CONTENT_TYPE] = "application/octet-stream"
         prepared = False
@@ -455,7 +576,7 @@ async def get_vfolder_fs_usage(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "get_vfolder_fs_usage", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             fs_usage = await volume.get_fs_usage()
             return web.json_response(
@@ -485,7 +606,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
     ) as params:
         try:
             await log_manager_api_entry(log, "get_vfolder_usage", params)
-            ctx: Context = request.app["ctx"]
+            ctx: RootContext = request.app["ctx"]
             async with ctx.get_volume(params["volume"]) as volume:
                 usage = await volume.get_usage(params["vfid"])
                 return web.json_response(
@@ -499,15 +620,6 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                 status=500,
                 reason="Storage server is busy. Please try again",
             )
-
-
-@skip_token_check
-async def status(request: web.Request) -> web.Response:
-    return web.json_response(
-        {
-            "status": "ok",
-        },
-    )
 
 
 async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
@@ -529,7 +641,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
     ) as params:
         try:
             await log_manager_api_entry(log, "get_vfolder_used_bytes", params)
-            ctx: Context = request.app["ctx"]
+            ctx: RootContext = request.app["ctx"]
             async with ctx.get_volume(params["volume"]) as volume:
                 usage = await volume.get_used_bytes(params["vfid"])
                 return web.json_response(
@@ -618,7 +730,7 @@ async def mkdir(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "mkdir", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             with handle_fs_errors(volume, params["vfid"]):
                 await volume.mkdir(
@@ -650,7 +762,7 @@ async def list_files(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "list_files", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             with handle_fs_errors(volume, params["vfid"]):
                 items = [
@@ -668,6 +780,7 @@ async def list_files(request: web.Request) -> web.Response:
                     async for item in volume.scandir(
                         params["vfid"],
                         params["relpath"],
+                        recursive=False,
                     )
                 ]
         return web.json_response(
@@ -701,7 +814,7 @@ async def rename_file(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "rename_file", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             with handle_fs_errors(volume, params["vfid"]):
                 await volume.move_file(
@@ -734,7 +847,7 @@ async def move_file(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "move_file", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             with handle_fs_errors(volume, params["vfid"]):
                 await volume.move_file(
@@ -769,7 +882,7 @@ async def create_download_session(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_download_session", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         token_data = {
             "op": "download",
             "volume": params["volume"],
@@ -811,7 +924,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "create_upload_session", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             session_id = await volume.prepare_upload(params["vfid"])
         token_data = {
@@ -857,7 +970,7 @@ async def delete_files(request: web.Request) -> web.Response:
         ),
     ) as params:
         await log_manager_api_entry(log, "delete_files", params)
-        ctx: Context = request.app["ctx"]
+        ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             with handle_fs_errors(volume, params["vfid"]):
                 await volume.delete_files(
@@ -872,20 +985,21 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
-async def init_manager_app(ctx: Context) -> web.Application:
+async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
             token_auth_middleware,
         ],
     )
     app["ctx"] = ctx
-    app.router.add_route("GET", "/", get_status)
+    app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/quota-scope", create_quota_scope)
-    # TODO: app.router.add_route("GET", "/quota-scope", get_quota_scope)
-    # TODO: app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
-    # TODO: app.router.add_route("DELETE", "/quota-scope", delete_quota_scope)
+    app.router.add_route("GET", "/quota-scope", get_quota_scope)
+    app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
+    app.router.add_route("DELETE", "/quota-scope/quota", unset_quota)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
     app.router.add_route("POST", "/folder/clone", clone_vfolder)
@@ -906,5 +1020,4 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
-    app.router.add_route("GET", "/status", status)
     return app
