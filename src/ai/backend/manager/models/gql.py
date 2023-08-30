@@ -50,7 +50,7 @@ from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList
+from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
 from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
 from .image import (
     AliasImage,
@@ -604,6 +604,21 @@ class Queries(graphene.ObjectType):
 
     routing_list = graphene.Field(
         RoutingList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
+        endpoint_id=graphene.UUID(),
+    )
+
+    endpoint_token = graphene.Field(
+        EndpointToken,
+        token=graphene.String(required=True),
+    )
+
+    endpoint_token_list = graphene.Field(
+        EndpointTokenList,
         limit=graphene.Int(required=True),
         offset=graphene.Int(required=True),
         filter=graphene.String(),
@@ -1815,6 +1830,60 @@ class Queries(graphene.ObjectType):
             user_uuid=user_uuid,
         )
         return RoutingList(routing_list, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
+    async def resolve_endpoint_token(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        token: str,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> EndpointToken:
+        graph_ctx: GraphQueryContext = info.context
+        return await EndpointToken.load_item(
+            graph_ctx,
+            token,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
+    async def resolve_endpoint_token_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> EndpointTokenList:
+        total_count = await EndpointToken.load_count(
+            info.context,
+            endpoint_id=endpoint_id,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+        token_list = await EndpointToken.load_slice(
+            info.context,
+            limit,
+            offset,
+            endpoint_id=endpoint_id,
+            filter=filter,
+            order=order,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+        return EndpointTokenList(token_list, total_count)
 
     @staticmethod
     async def resolve_quota_scope(
