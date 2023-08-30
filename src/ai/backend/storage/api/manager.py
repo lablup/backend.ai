@@ -267,7 +267,10 @@ async def update_quota_scope(request: web.Request) -> web.Response:
             try:
                 await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
             except InvalidQuotaConfig:
-                return web.Response(status=400)
+                return web.json_response(
+                    {"msg": "Invalid quota config option"},
+                    status=400,
+                )
             return web.Response(status=204)
 
 
