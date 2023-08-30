@@ -59,6 +59,8 @@ class ContainerRegistry(graphene.ObjectType):
     class Meta:
         interfaces = (graphene.relay.Node,)
 
+    # TODO: `get_node()` should be implemented to query a scalar object directly by ID
+    #       (https://docs.graphene-python.org/en/latest/relay/nodes/#nodes)
     # @classmethod
     # def get_node(cls, info: graphene.ResolveInfo, id):
     #     raise NotImplementedError
