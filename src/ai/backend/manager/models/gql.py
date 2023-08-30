@@ -237,6 +237,8 @@ class Queries(graphene.ObjectType):
     All available GraphQL queries.
     """
 
+    node = graphene.relay.Node.Field()
+
     # super-admin only
     agent = graphene.Field(
         Agent,

@@ -56,6 +56,13 @@ class ContainerRegistry(graphene.ObjectType):
     hostname = graphene.String()
     config = graphene.Field(ContainerRegistryConfig)
 
+    class Meta:
+        interfaces = (graphene.relay.Node,)
+
+    @classmethod
+    def get_node(cls, info: graphene.ResolveInfo, id: str):
+        raise NotImplementedError
+
     @classmethod
     def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
         return cls(
