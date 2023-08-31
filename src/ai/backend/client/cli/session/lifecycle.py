@@ -6,16 +6,19 @@ import secrets
 import subprocess
 import sys
 import uuid
+from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import IO, List, Literal, Optional, Sequence
 
 import click
 import inquirer
+import treelib
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from faker import Faker
+from graphlib import TopologicalSorter
 from humanize import naturalsize
 from tabulate import tabulate
 
@@ -1198,6 +1201,116 @@ def _watch_cmd(docs: Optional[str] = None):
     if docs is not None:
         watch.__doc__ = docs
     return watch
+
+
+def get_dependency_session_table(root_node: OrderedDict) -> List[OrderedDict]:
+    ts: TopologicalSorter = TopologicalSorter()
+    session_info_dict = {}
+    visited = {}
+
+    def construct_topological_sorter(session: OrderedDict):
+        visited[session["session_id"]] = True
+        session_info_dict[session["session_id"]] = session
+        ts.add(
+            session["session_id"],
+            *map(lambda session: session["session_id"], session["depends_on"]),
+        )
+
+        for dependency_session in session["depends_on"]:
+            if not visited.get(dependency_session["session_id"]):
+                construct_topological_sorter(dependency_session)
+
+    construct_topological_sorter(root_node)
+    return [*map(lambda session_id: session_info_dict[session_id], [*ts.static_order()])]
+
+
+def show_dependency_session_table(root_node: OrderedDict) -> None:
+    table = get_dependency_session_table(root_node)
+    header_keys = ["session_name", "session_id", "status", "status_changed"]
+
+    print(
+        tabulate(
+            [
+                header_keys,
+                *map(
+                    lambda item: [
+                        *map(lambda key: item[key], header_keys),
+                    ],
+                    table,
+                ),
+            ],
+            headers="firstrow",
+        )
+    )
+
+
+def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
+    dependency_tree = treelib.Tree()
+
+    root_session_name = root_node["session_name"]
+    session_name_counter: defaultdict = defaultdict(lambda: 1)
+    session_name_counter[root_session_name] += 1
+
+    def discard_below_dot(time_str: str) -> str:
+        return time_str.split(".")[0]
+
+    def get_node_name(session: OrderedDict) -> str:
+        task_name = session["session_name"].split("-")[-3]
+        status = session["status"].split("KernelStatus.")[1]
+        delta = ""
+
+        if session["status_changed"] != "None":
+            status_changed = datetime.strptime(
+                discard_below_dot(session["status_changed"]), "%Y-%m-%d %H:%M:%S"
+            )
+            delta = f" {discard_below_dot(str(datetime.now() - status_changed))} ago"
+
+        return f'{task_name} ("{status}"{delta})'
+
+    def get_node_id(session_name: str) -> str:
+        return "@".join([session_name, str(session_name_counter[session_name])])
+
+    dependency_tree.create_node(get_node_name(root_node), get_node_id(root_session_name))
+
+    def construct_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
+        for dependency_session in dependency_sessions:
+            dependency_session_name = dependency_session["session_name"]
+            session_name_counter[dependency_session_name] += 1
+
+            dependency_tree.create_node(
+                get_node_name(dependency_session),
+                get_node_id(dependency_session_name),
+                parent=get_node_id(session_name),
+            )
+
+            construct_dependency_tree(dependency_session_name, dependency_session["depends_on"])
+
+    construct_dependency_tree(root_node["session_name"], root_node["depends_on"])
+    return dependency_tree
+
+
+@session.command("show-graph")
+@click.argument("session_id", metavar="SESSID")
+@click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
+def show_dependency_graph(session_id: uuid.UUID | str, table: bool):
+    """
+    Shows the dependency graph of a compute session.
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        print_wait("Retrieving the session dependencies graph...")
+        print()
+
+        kernel = session.ComputeSession(str(session_id))
+
+        if table:
+            show_dependency_session_table(kernel.get_dependency_graph())
+        else:
+            get_dependency_session_tree(kernel.get_dependency_graph()).show()
+
+        print_done("End of session dependencies graph.")
 
 
 # Make it available as:
