@@ -97,6 +97,9 @@ else
   # Correct the ownership of agent socket.
   chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
 
+  # Ensure ownership of agent home directory.
+  chown -R $USER_NAME:$GROUP_NAME /home
+  
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
