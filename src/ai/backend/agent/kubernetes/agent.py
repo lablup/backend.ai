@@ -123,7 +123,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         self.config_dir = scratch_dir / "config"
         self.rel_work_dir = self.rel_scratch_dir / "work"
         self.rel_config_dir = self.rel_scratch_dir / "config"
-        
+
         self.static_pvc_name = static_pvc_name
         self.workers = workers
         self.agent_sockpath = agent_sockpath
@@ -517,9 +517,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
-                    if (
-                        KernelFeatures.UID_MATCH in self.kernel_features
-                    ):  
+                    if KernelFeatures.UID_MATCH in self.kernel_features:
                         uid = self.local_config["container"]["kernel-uid"]
                         gid = self.local_config["container"]["kernel-gid"]
                         if os.geteuid() == 0:
