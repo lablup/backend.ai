@@ -2,9 +2,11 @@ import asyncio
 import functools
 import hashlib
 import logging
+import os
 import random
 import shutil
 import signal
+import sys
 import uuid
 from decimal import Decimal
 from io import StringIO
@@ -112,10 +114,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        rel_scratch_dir = Path(str(kernel_id)) # need relative path for nfs mount
 
         self.scratch_dir = scratch_dir
+        self.rel_scratch_dir = rel_scratch_dir
         self.work_dir = scratch_dir / "work"
         self.config_dir = scratch_dir / "config"
+        self.rel_work_dir = self.rel_scratch_dir / "work"
+        self.rel_config_dir = self.rel_scratch_dir / "config"
+        
         self.static_pvc_name = static_pvc_name
         self.workers = workers
 
@@ -236,7 +243,16 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             # Mount scratch directory
             Mount(
                 MountTypes.K8S_GENERIC,
-                Path(str(self.kernel_id)),
+                self.rel_config_dir,
+                Path("/home/config"),
+                MountPermission.READ_ONLY,
+                opts={
+                    "name": f"kernel-{self.kernel_id}-scratches",
+                },
+            ),
+            Mount(
+                MountTypes.K8S_GENERIC,
+                self.rel_work_dir,
                 Path("/home/work"),
                 MountPermission.READ_WRITE,
                 opts={
