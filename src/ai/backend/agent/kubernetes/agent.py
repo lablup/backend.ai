@@ -88,7 +88,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     static_pvc_name: str
     workers: Mapping[str, Mapping[str, str]]
     config_maps: List[ConfigMap]
-
+    agent_sockpath: Path
     volume_mounts: List[KubernetesVolumeMount]
     volumes: List[KubernetesAbstractVolume]
 
@@ -99,6 +99,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
+        agent_sockpath: Path,
         computers: MutableMapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
@@ -114,7 +115,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
-        rel_scratch_dir = Path(str(kernel_id)) # need relative path for nfs mount
+        rel_scratch_dir = Path(str(kernel_id))  # need relative path for nfs mount
 
         self.scratch_dir = scratch_dir
         self.rel_scratch_dir = rel_scratch_dir
@@ -125,6 +126,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         
         self.static_pvc_name = static_pvc_name
         self.workers = workers
+        self.agent_sockpath = agent_sockpath
 
         self.volume_mounts = []
         self.volumes = [
@@ -260,6 +262,21 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 },
             ),
         ]
+
+        rel_agent_sockpath = Path(str(self.agent_sockpath).split("/")[-1])
+        # agent-socket mount
+        if sys.platform != "darwin":
+            mounts.append(
+                Mount(
+                    MountTypes.K8S_GENERIC,
+                    rel_agent_sockpath,
+                    Path("/opt/kernel/agent.sock"),
+                    MountPermission.READ_WRITE,
+                    opts={
+                        "name": f"kernel-{self.kernel_id}-scratches",
+                    },
+                )
+            )
 
         # TODO: Find way to mount extra volumes
 
@@ -756,6 +773,7 @@ class KubernetesAgent(
 ):
     workers: MutableMapping[str, MutableMapping[str, str]] = {}
     k8s_ptask_group: aiotools.PersistentTaskGroup
+    agent_sockpath: Path
 
     def __init__(
         self,
@@ -973,6 +991,7 @@ class KubernetesAgent(
             self.id,
             kernel_config,
             self.local_config,
+            self.agent_sockpath,
             self.computers,
             self.workers,
             "backend-ai-static-pvc",
