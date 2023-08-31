@@ -164,21 +164,18 @@ htmlhelp_basename = "BackendAIDoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_engine = "pdflatex"
+latex_engine = "xelatex"
 
 latex_elements = {
     "papersize": "a4paper",
     "pointsize": "12pt",
-    "preamble": (
-        "\n".join(
-            [
-                "\\usepackage[T1]{fontenc}",
-                "\\usepackage{kotex}",
-                "\\usepackage{dhucs-nanumfont}",
-            ]
-        )
-        + "\n"
-    ),
+    "fontpkg": "\n".join([
+        "\\usepackage{fontspec}",
+        "\\setmainfont{Pretendard}",
+        "\\setmonofont{D2Coding}",
+        "\\usepackage{kotex}",
+        ""
+    ])
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }
