@@ -95,7 +95,7 @@ Building PDF requires following libraries to be present on your system.
 2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
 3. Exceute following command to install missing dependencies.   
 ```console
-latexmk tex-gyre fncychap wrapfig capt-of framed needspace kotex-utf collection-langkorean collection-fontsrecommended unfonts-base
+latexmk tex-gyre fncychap wrapfig capt-of framed needspace kotex-utf collection-langkorean collection-fontsrecommended unfonts-base-type1
 ```
 
 ## Advanced Settings
