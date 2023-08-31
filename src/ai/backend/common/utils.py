@@ -308,7 +308,6 @@ async def mount(
     mountpoint.mkdir(exist_ok=True)
     if cmd_options is not None:
         cmd = [
-            "sudo",
             "mount",
             "-t",
             fs_type,
@@ -318,7 +317,7 @@ async def mount(
             str(mountpoint),
         ]
     else:
-        cmd = ["sudo", "mount", "-t", fs_type, fs_location, str(mountpoint)]
+        cmd = ["mount", "-t", fs_type, fs_location, str(mountpoint)]
     proc = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
@@ -353,7 +352,6 @@ async def umount(
     assert Path(mount_prefix) != mountpoint
     proc = await asyncio.create_subprocess_exec(
         *[
-            "sudo",
             "umount",
             str(mountpoint),
         ],

@@ -3,9 +3,9 @@ Manager-facing API
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import os
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -37,8 +37,8 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
-from ai.backend.common.utils import mount, umount
 from ai.backend.storage.exception import ExecutionError
+from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
@@ -1053,18 +1053,18 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
-async def _chown(path, user, group) -> None:
-    proc = await asyncio.create_subprocess_exec(
-        *["sudo", "chown", f"{user}.{group}", path],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    raw_out, raw_err = await proc.communicate()
-    raw_out.decode("utf8")
-    err = raw_err.decode("utf8")
-    await proc.wait()
-    if err:
-        raise StorageProxyError(f"Error occured while chown of {path}. {err}")
+# async def _chown(path, user, group) -> None:
+#     proc = await asyncio.create_subprocess_exec(
+#         *["sudo", "chown", f"{user}.{group}", path],
+#         stdout=asyncio.subprocess.PIPE,
+#         stderr=asyncio.subprocess.PIPE,
+#     )
+#     raw_out, raw_err = await proc.communicate()
+#     raw_out.decode("utf8")
+#     err = raw_err.decode("utf8")
+#     await proc.wait()
+#     if err:
+#         raise StorageProxyError(f"Error occured while chown of {path}. {err}")
 
 
 async def handle_volume_mount(
@@ -1075,16 +1075,12 @@ async def handle_volume_mount(
     if context.pidx != 0:
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    await mount(
-        event.mount_path,
-        event.fs_location,
-        event.fs_type,
-        event.cmd_options,
-        event.edit_fstab,
-        event.fstab_path,
-        mount_prefix,
-    )
-    await _chown(event.mount_path, "bai", "bai")
+    mount_task = MountTask.from_event(event, mount_prefix)
+    await mount_task.request(context.watcher)
+
+    # change owner of mounted directory
+    chown_task = ChownTask(event.mount_path, os.getuid(), os.getgid())
+    await chown_task.request(context.watcher)
     await context.event_producer.produce_event(
         VolumeMounted(
             str(context.node_id),
@@ -1103,12 +1099,8 @@ async def handle_volume_umount(
     if context.pidx != 0:
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    await umount(
-        event.mount_path,
-        mount_prefix,
-        event.edit_fstab,
-        event.fstab_path,
-    )
+    umount_task = UmountTask.from_event(event, mount_prefix)
+    await umount_task.request(context.watcher)
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.node_id),
