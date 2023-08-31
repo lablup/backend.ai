@@ -95,8 +95,9 @@ Building PDF requires following libraries to be present on your system.
 2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
 3. Exceute following command to install missing dependencies.   
 ```console
-latexmk tex-gyre fncychap wrapfig capt-of framed needspace kotex-utf collection-langkorean collection-fontsrecommended unfonts-base-type1
+sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
 ```
+4. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts on your system.
 
 ## Advanced Settings
 
