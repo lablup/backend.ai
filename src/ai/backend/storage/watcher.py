@@ -45,8 +45,8 @@ async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
 # Using extra_procs
 def main_job(
     worker_pidx: int,
-    insock_path: str,
-    outsock_path: str,
+    insock_prefix: str | None,
+    outsock_prefix: str | None,
     intr_event: Any,
     pidx: int,
     args: Sequence[Any],
@@ -54,8 +54,11 @@ def main_job(
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+    insock_path = get_zmq_socket_file_path(insock_prefix, worker_pidx)
+    outsock_path = get_zmq_socket_file_path(outsock_prefix, worker_pidx)
+
     try:
-        loop.run_until_complete(_main_job(loop, worker_pidx, insock_path, outsock_path))
+        loop.run_until_complete(_main_job(loop, insock_path, outsock_path))
     except Exception:
         print("Error ====", flush=True)
         print(traceback.format_exc(), flush=True)
@@ -78,15 +81,14 @@ def main_job(
 
 async def _main_job(
     loop: asyncio.AbstractEventLoop,
-    pidx: int,
     insock_path: str,
     outsock_path: str,
 ) -> None:
     zctx = zmq.asyncio.Context()
     insock = zctx.socket(zmq.PULL)
-    insock.bind(get_zmq_socket_file_path(insock_path, pidx))
+    insock.bind(insock_path)
     outsock = zctx.socket(zmq.PUSH)
-    outsock.bind(get_zmq_socket_file_path(outsock_path, pidx))
+    outsock.bind(outsock_path)
 
     try:
         while True:
@@ -296,7 +298,9 @@ SERIALIZER_MAP: dict[str, Type[AbstractTask]] = {
 }
 
 
-def get_zmq_socket_file_path(path: str | Path, pidx: int) -> str:
+def get_zmq_socket_file_path(path: str | Path | None, pidx: int) -> str:
+    if path is None:
+        raise ValueError("Socket path should not be None")
     return f"ipc://{path}-{pidx}"
 
 
@@ -304,22 +308,22 @@ class WatcherClient:
     def __init__(
         self,
         pidx: int,
-        input_sock_addr: str,
-        output_sock_addr: str,
+        input_sock_prefix: str | None,
+        output_sock_prefix: str | None,
     ) -> None:
         self.pidx = pidx
         zctx = zmq.asyncio.Context()
         self.input_sock = zctx.socket(zmq.PUSH)
-        self.input_sock_addr = input_sock_addr
+        self.input_sock_addr = get_zmq_socket_file_path(input_sock_prefix, self.pidx)
         self.output_sock = zctx.socket(zmq.PULL)
-        self.output_sock_addr = output_sock_addr
+        self.output_sock_addr = get_zmq_socket_file_path(output_sock_prefix, self.pidx)
         self.result_queue: asyncio.Queue[list[bytes]] = asyncio.Queue(maxsize=128)
         self.output_listening_task: asyncio.Task | None = None
 
     async def init(self) -> None:
-        self.input_sock.connect(get_zmq_socket_file_path(self.input_sock_addr, self.pidx))
+        self.input_sock.connect(self.input_sock_addr)
         self.input_sock.setsockopt(zmq.LINGER, 50)
-        self.output_sock.connect(get_zmq_socket_file_path(self.output_sock_addr, self.pidx))
+        self.output_sock.connect(self.output_sock_addr)
         self.output_sock.setsockopt(zmq.LINGER, 50)
         loop = asyncio.get_running_loop()
         self.output_listening_task = loop.create_task(self.listen_output())
