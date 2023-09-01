@@ -46,6 +46,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
+        user_fields["enable_sudo_session"],
     ]
     with Session() as session:
         try:
@@ -146,6 +147,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
+        user_fields["enable_sudo_session"],
     ]
     try:
         with Session() as session:
