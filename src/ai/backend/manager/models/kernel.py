@@ -383,7 +383,7 @@ kernels = sa.Table(
     sa.Column(
         "session_id",
         SessionIDColumnType,
-        sa.ForeignKey("sessions.id"),
+        sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         unique=False,
         index=True,
         nullable=False,

@@ -907,6 +907,7 @@ class PurgeUser(graphene.Mutation):
                 )
             await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, user_uuid)
+            await cls.delete_sessions(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1020,7 +1021,7 @@ class PurgeUser(graphene.Mutation):
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
             result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host])
+                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
                 .select_from(vfolders)
                 .where(vfolders.c.user == user_uuid),
             )
@@ -1123,6 +1124,26 @@ class PurgeUser(graphene.Mutation):
         )
         if result.rowcount > 0:
             log.info("deleted {0} user's kernels ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all sessions.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete sessions
+        :return: number of deleted rows
+        """
+        from .session import SessionRow
+
+        result = await conn.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's sessions ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
     @classmethod
