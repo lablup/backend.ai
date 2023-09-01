@@ -92,9 +92,6 @@ class AbstractTask(metaclass=ABCMeta):
         header = bytes(self.name, "utf8")
         return Request(header, self.serialize())
 
-    async def request(self, watcher: WatcherClient) -> Response:
-        return await watcher.request(self.serialize_to_request())
-
     @abstractmethod
     def serialize(self) -> bytes:
         pass
@@ -435,3 +432,6 @@ class WatcherClient:
             print("WatcherClient.write error ===", flush=True)
             print(traceback.format_exc(), flush=True)
             raise
+
+    async def request_task(self, task: AbstractTask) -> Response:
+        return await self.request(task.serialize_to_request())

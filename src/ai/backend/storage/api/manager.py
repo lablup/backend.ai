@@ -1062,11 +1062,11 @@ async def handle_volume_mount(
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     mount_task = MountTask.from_event(event, mount_prefix)
-    await mount_task.request(context.watcher)
+    await context.watcher.request_task(mount_task)
 
     # change owner of mounted directory
     chown_task = ChownTask(event.mount_path, os.getuid(), os.getgid())
-    await chown_task.request(context.watcher)
+    await context.watcher.request_task(chown_task)
     await context.event_producer.produce_event(
         VolumeMounted(
             str(context.node_id),
@@ -1086,7 +1086,7 @@ async def handle_volume_umount(
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     umount_task = UmountTask.from_event(event, mount_prefix)
-    await umount_task.request(context.watcher)
+    await context.watcher.request_task(umount_task)
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.node_id),
