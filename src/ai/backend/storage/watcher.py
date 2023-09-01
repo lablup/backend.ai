@@ -63,20 +63,17 @@ def main_job(
         print("Error ====", flush=True)
         print(traceback.format_exc(), flush=True)
         raise
-
-    # try:
-    #     loop.run_until_complete(_main_job(loop, job_rfd))
-    # finally:
-    #     try:
-    #         loop.run_until_complete(cancel_all_tasks(loop))
-    #         loop.run_until_complete(loop.shutdown_asyncgens())
-    #         try:
-    #             loop.run_until_complete(loop.shutdown_default_executor())
-    #         except (AttributeError, NotImplementedError):  # for uvloop
-    #             pass
-    #     finally:
-    #         loop.close()
-    #         asyncio.set_event_loop(None)
+    finally:
+        try:
+            loop.run_until_complete(cancel_all_tasks(loop))
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            try:
+                loop.run_until_complete(loop.shutdown_default_executor())
+            except (AttributeError, NotImplementedError):  # for uvloop
+                pass
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
 
 async def _main_job(
