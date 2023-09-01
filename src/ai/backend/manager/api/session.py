@@ -1586,63 +1586,70 @@ async def find_dependent_sessions(
     return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
 
 
-async def find_dependency_sessions(
-    root_session_name_or_id: uuid.UUID | str,
+@aiotools.lru_cache(maxsize=100)
+async def _find_dependency_sessions(
+    session_name_or_id: uuid.UUID | str,
     db_session: SASession,
     access_key: AccessKey,
 ):
-    @aiotools.lru_cache(maxsize=100)
-    async def _find_dependency_sessions(session_name_or_id: uuid.UUID | str):
-        sessions = await SessionRow.match_sessions(
-            db_session,
-            session_name_or_id,
-            access_key=access_key,
+    sessions = await SessionRow.match_sessions(
+        db_session,
+        session_name_or_id,
+        access_key=access_key,
+    )
+
+    assert len(sessions) >= 1, "session not found!"
+
+    session_id = str(sessions[0].id)
+    session_name = sessions[0].name
+
+    assert isinstance(session_id, get_args(uuid.UUID | str))
+    assert isinstance(session_name, str)
+
+    kernel_query = (
+        sa.select(
+            [
+                kernels.c.status,
+                kernels.c.status_changed,
+            ]
         )
+        .select_from(kernels)
+        .where(kernels.c.session_id == session_id)
+    )
 
-        assert len(sessions) >= 1, "session not found!"
-
-        session_id = str(sessions[0].id)
-        session_name = sessions[0].name
-
-        assert isinstance(session_id, get_args(uuid.UUID | str))
-        assert isinstance(session_name, str)
-
-        kernel_query = (
-            sa.select(
-                [
-                    kernels.c.status,
-                    kernels.c.status_changed,
-                ]
+    dependency_session_ids: list[SessionDependencyRow] = (
+        await db_session.execute(
+            sa.select(SessionDependencyRow.depends_on).where(
+                SessionDependencyRow.session_id == session_id
             )
-            .select_from(kernels)
-            .where(kernels.c.session_id == session_id)
         )
+    ).first()
 
-        dependency_session_ids = (
-            await db_session.execute(
-                sa.select(SessionDependencyRow).where(SessionDependencyRow.session_id == session_id)
-            )
-        ).first()
+    if not dependency_session_ids:
+        dependency_session_ids = []
 
-        if not dependency_session_ids:
-            dependency_session_ids = []
+    kernel_query_result = (await db_session.execute(kernel_query)).first()
 
-        kernel_query_result = (await db_session.execute(kernel_query)).first()
+    session_info: Dict[str, Union[List, str]] = {
+        "session_id": session_id,
+        "session_name": session_name,
+        "status": str(kernel_query_result[0]),
+        "status_changed": str(kernel_query_result[1]),
+        "depends_on": [
+            await _find_dependency_sessions(dependency_session_id, db_session, access_key)
+            for dependency_session_id in dependency_session_ids
+        ],
+    }
 
-        session_info: Dict[str, Union[List, str]] = {
-            "session_id": session_id,
-            "session_name": session_name,
-            "status": str(kernel_query_result[0]),
-            "status_changed": str(kernel_query_result[1]),
-            "depends_on": [
-                await _find_dependency_sessions(dependency_session_id)
-                for dependency_session_id in dependency_session_ids
-            ],
-        }
+    return session_info
 
-        return session_info
 
-    return await _find_dependency_sessions(root_session_name_or_id)
+async def find_dependency_sessions(
+    session_name_or_id: uuid.UUID | str,
+    db_session: SASession,
+    access_key: AccessKey,
+):
+    return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
 
 
 @server_status_required(READ_ALLOWED)
