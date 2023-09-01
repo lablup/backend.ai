@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: self-hosted-ubuntu-latest-8-cores
+    runs-on: [ubuntu-latest-8-cores, self-hosted]
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -82,7 +82,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: self-hosted-ubuntu-latest-8-cores
+    runs-on: [ubuntu-latest-8-cores, self-hosted]
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -145,7 +145,7 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: self-hosted-ubuntu-latest-8-cores
+    runs-on: [ubuntu-latest-8-cores, self-hosted]
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -374,7 +374,7 @@ jobs:
 
   build-client-image:
     needs: [build-wheels]
-    runs-on: self-hosted-ubuntu-latest-8-cores
+    runs-on: [ubuntu-latest-8-cores, self-hosted]
     environment: deploy-to-docker-hub
     steps:
       - uses: actions/checkout@v3
