@@ -131,11 +131,7 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import (
-    DEFAULT_IMAGE_ARCH,
-    DEFAULT_ROLE,
-    INTRINSIC_SLOTS,
-)
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1267,13 +1263,6 @@ class AgentRegistry:
             else:
                 mapped_agent = agent_list[idx]
 
-            env_variables = [f"{k}={v}" for k, v in environ.items()]
-
-            print("enable_sudo_session", enable_sudo_session)
-
-            if enable_sudo_session:
-                env_variables.append("ENABLE_SUDO_SESSION=1")
-
             kernel_data.append(
                 {
                     **kernel_shared_data,
@@ -1296,7 +1285,7 @@ class AgentRegistry:
                     "occupied_slots": requested_slots,
                     "requested_slots": requested_slots,
                     "resource_opts": resource_opts,
-                    "environ": env_variables,
+                    "environ": [f"{k}={v}" for k, v in environ.items()],
                     "bootstrap_script": kernel.get("bootstrap_script"),
                     "preopen_ports": creation_config.get("preopen_ports", []),
                 }
@@ -1312,6 +1301,9 @@ class AgentRegistry:
 
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
+                    if enable_sudo_session:
+                        environ["ENABLE_SUDO_SESSION"] = "1"
+
                     session_data["environ"] = environ
                     session_data["requested_slots"] = session_requested_slots
                     session = SessionRow(**session_data)

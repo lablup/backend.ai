@@ -7,17 +7,7 @@ import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Final,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
 import aiotools
 import async_timeout
@@ -1240,6 +1230,7 @@ class SchedulerDispatcher(aobject):
                         users.c.uuid,
                         users.c.role,
                         users.c.domain_name,
+                        users.c.enable_sudo_session,
                         keypairs.c.access_key,
                         keypairs.c.resource_policy,
                     ]
@@ -1311,6 +1302,9 @@ class SchedulerDispatcher(aobject):
                         callback_url=endpoint.callback_url,
                         enqueue_only=True,
                         endpoint_id=endpoint.id,
+                        enable_sudo_session=user_id_row_mapping[
+                            endpoint.created_user
+                        ].enable_sudo_session,
                     )
                 except Exception:
                     # TODO: Handle

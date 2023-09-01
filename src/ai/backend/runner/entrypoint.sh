@@ -106,7 +106,7 @@ else
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 
-  # ENABLE_SUDO_SESSION
+  # Enable sudo
   if [ "$ENABLE_SUDO_SESSION" = "1" ]; then
     echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
   fi

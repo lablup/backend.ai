@@ -22,6 +22,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
+from ai.backend.manager.models.user import users
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
@@ -41,12 +42,7 @@ from ..models import (
 )
 from ..types import UserScope
 from .auth import auth_required
-from .exceptions import (
-    InvalidAPIParameters,
-    ObjectNotFound,
-    ServiceUnavailable,
-    VFolderNotFound,
-)
+from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -351,6 +347,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
 
+    async with root_ctx.db.begin_readonly() as conn:
+        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+
+        enable_sudo_session = await conn.scalar(
+            sa.select([users.c.enable_sudo_session]).where(
+                request["user"]["uuid"] == users.c.uuid,
+            )
+        )
+
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
@@ -373,6 +378,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         startup_command=params["startup_command"],
         tag=params["tag"],
         callback_url=params["callback_url"],
+        enable_sudo_session=enable_sudo_session,
     )
 
     async with root_ctx.db.begin_session() as db_sess:

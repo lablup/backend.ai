@@ -331,11 +331,11 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
-        query = sa.select([users.c.enable_sudo_session]).where(
-            request["user"]["uuid"] == users.c.uuid,
+        enable_sudo_session = await conn.scalar(
+            sa.select([users.c.enable_sudo_session]).where(
+                request["user"]["uuid"] == users.c.uuid,
+            )
         )
-
-        enable_sudo_session = await conn.scalar(query)
 
     try:
         resp = await root_ctx.registry.create_session(
@@ -695,12 +695,13 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             raise TaskTemplateNotFound
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
-        query = sa.select([users.c.enable_sudo_session]).where(
-            request["user"]["uuid"] == users.c.uuid,
+        enable_sudo_session = await conn.scalar(
+            sa.select([users.c.enable_sudo_session]).where(
+                request["user"]["uuid"] == users.c.uuid,
+            )
         )
 
-        enable_sudo_session = await conn.scalar(query)
-        print("enable_sudo_session", enable_sudo_session)
+        print("enable_sudo_session 3", enable_sudo_session)
 
     try:
         resp = await root_ctx.registry.create_cluster(
