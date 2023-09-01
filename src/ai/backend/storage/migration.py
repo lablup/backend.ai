@@ -242,7 +242,6 @@ async def check_and_upgrade(
         node_id=local_config["storage-proxy"]["node-id"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
-    reader, writer = os.pipe()
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
@@ -252,7 +251,11 @@ async def check_and_upgrade(
         dsn=dsn,
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
-        watcher=WatcherClient(reader, writer),
+        watcher=WatcherClient(
+            0,
+            local_config["storage-proxy"]["watcher-insock-path-prefix"],
+            local_config["storage-proxy"]["watcher-outsock-path-prefix"],
+        ),
     )
     volumes_to_upgrade = await check_latest(ctx)
     for upgrade_info in volumes_to_upgrade:

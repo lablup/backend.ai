@@ -109,7 +109,10 @@ async def server_main(
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
-        watcher_client: WatcherClient = _args[2]
+        insock_path = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+        outsock_path = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+        watcher_client = WatcherClient(pidx, insock_path, outsock_path)
+        await watcher_client.init()
         ctx = RootContext(
             pid=os.getpid(),
             node_id=local_config["storage-proxy"]["node-id"],
@@ -184,6 +187,7 @@ async def server_main(
                 await client_api_runner.cleanup()
                 await event_producer.close()
                 await event_dispatcher.close()
+                await watcher_client.close()
     finally:
         if aiomon_started:
             m.close()
@@ -264,16 +268,19 @@ def main(
 
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
-                watcher_job_reader, watcher_job_writer = os.pipe()
-                # job_queue: queue.Queue[bytes | Sentinel] = queue.Queue()
-                watcher_client = WatcherClient(watcher_job_reader, watcher_job_writer)
+                insock_path_prefix = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+                outsock_path_prefix = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+                num_workers = local_config["storage-proxy"]["num-proc"]
                 aiotools.start_server(
                     server_main_logwrapper,
-                    num_workers=local_config["storage-proxy"]["num-proc"],
-                    extra_procs=(
-                        functools.partial(main_job, watcher_job_reader, watcher_job_writer),
+                    num_workers=num_workers,
+                    extra_procs=tuple(
+                        functools.partial(
+                            main_job, worker_pidx, insock_path_prefix, outsock_path_prefix
+                        )
+                        for worker_pidx in range(num_workers)
                     ),
-                    args=(local_config, log_endpoint, watcher_client),
+                    args=(local_config, log_endpoint),
                 )
                 log.info("exit.")
         finally:

@@ -3,10 +3,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import traceback
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
 from typing import Any, ClassVar, Sequence, Type
 
 import attrs
+import zmq
+import zmq.asyncio
 
 from ai.backend.common import msgpack
 from ai.backend.common.events import DoVolumeMountEvent, DoVolumeUnmountEvent
@@ -40,8 +44,9 @@ async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:
 
 # Using extra_procs
 def main_job(
-    reader_fd: int,
-    writer_fd: int,
+    worker_pidx: int,
+    insock_path: str,
+    outsock_path: str,
     intr_event: Any,
     pidx: int,
     args: Sequence[Any],
@@ -49,7 +54,13 @@ def main_job(
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    loop.run_until_complete(_main_job(loop, reader_fd, writer_fd))
+    try:
+        loop.run_until_complete(_main_job(loop, worker_pidx, insock_path, outsock_path))
+    except Exception:
+        print("Error ====", flush=True)
+        print(traceback.format_exc(), flush=True)
+        raise
+
     # try:
     #     loop.run_until_complete(_main_job(loop, job_rfd))
     # finally:
@@ -67,23 +78,30 @@ def main_job(
 
 async def _main_job(
     loop: asyncio.AbstractEventLoop,
-    reader_fd: int,
-    writer_fd: int,
+    pidx: int,
+    insock_path: str,
+    outsock_path: str,
 ) -> None:
-    while True:
-        print("Wait for pipe ...", flush=True)
-        # with open(job_rfd, "rb") as fp:
-        #     data = fp.read()
-        #     print(f"{data = }")
+    zctx = zmq.asyncio.Context()
+    insock = zctx.socket(zmq.PULL)
+    insock.bind(get_zmq_socket_file_path(insock_path, pidx))
+    outsock = zctx.socket(zmq.PUSH)
+    outsock.bind(get_zmq_socket_file_path(outsock_path, pidx))
 
-        # async with aiofiles.open(job_rfd, mode="rb") as fp:
-        #     data = await fp.read()
-        #     print(f'{data = }', flush=True)
-
-        # raw_data = await loop.run_in_executor(None, _read)
-        raw_data = await WatcherClient.read_pipe(reader_fd)
-        print(f"{raw_data = }", flush=True)
-        # await WatcherClient.run_pipe_task(raw_data)
+    try:
+        while True:
+            raw_data = await WatcherClient.read(insock)
+            task = AbstractTask._deserialize(raw_data)
+            try:
+                await task.run()
+            except Exception as e:
+                log.exception(f"Error in watcher task. (e: {e})")
+                await WatcherClient.response(outsock, [bytes(repr(e), "utf8")])
+            else:
+                await WatcherClient.ack(outsock)
+    finally:
+        insock.close()
+        outsock.close()
 
 
 class AbstractTask(metaclass=ABCMeta):
@@ -93,8 +111,15 @@ class AbstractTask(metaclass=ABCMeta):
     async def run(self) -> None:
         pass
 
-    async def request(self, watcher: WatcherClient) -> None:
-        await watcher.write_pipe(self.serialize())
+    @staticmethod
+    def _deserialize(raw_data: list[bytes]) -> AbstractTask:
+        serializer_name = str(raw_data[0], "utf8")
+        values: tuple = msgpack.unpackb(raw_data[1])
+        serializer_cls = SERIALIZER_MAP[serializer_name]
+        return serializer_cls.deserialize(values)
+
+    async def request(self, watcher: WatcherClient) -> list[bytes] | None:
+        return await watcher.write(bytes(self.name, "utf8"), self.serialize())
 
     @abstractmethod
     def serialize(self) -> bytes:
@@ -120,7 +145,6 @@ class ChownTask(AbstractTask):
     def serialize(self) -> bytes:
         return msgpack.packb(
             (
-                self.name,
                 self.directory,
                 self.uid,
                 self.gid,
@@ -155,7 +179,7 @@ class MountTask(AbstractTask):
     mount_prefix: str | None = attrs.field(default=None)
 
     async def run(self) -> None:
-        await _mount(
+        return await _mount(
             self.mount_path,
             self.fs_location,
             self.fs_type,
@@ -182,15 +206,15 @@ class MountTask(AbstractTask):
     def serialize(self) -> bytes:
         return msgpack.packb(
             (
-                self.name,
                 self.mount_path,
-                self.quota_scope_id,
+                str(self.quota_scope_id),
                 self.fs_location,
                 self.fs_type,
                 self.cmd_options,
                 self.scaling_group,
                 self.edit_fstab,
                 self.fstab_path,
+                self.mount_prefix,
             )
         )
 
@@ -198,12 +222,14 @@ class MountTask(AbstractTask):
     def deserialize(cls, values: tuple) -> MountTask:
         return MountTask(
             values[0],
-            values[1],
+            QuotaScopeID.parse(values[1]),
             values[2],
             values[3],
             values[4],
             values[5],
             values[6],
+            values[7],
+            values[8],
         )
 
 
@@ -222,7 +248,7 @@ class UmountTask(AbstractTask):
     mount_prefix: str | None = attrs.field(default=None)
 
     async def run(self) -> None:
-        await _umount(
+        return await _umount(
             self.mount_path,
             edit_fstab=self.edit_fstab,
             fstab_path=self.fstab_path,
@@ -242,9 +268,8 @@ class UmountTask(AbstractTask):
     def serialize(self) -> bytes:
         return msgpack.packb(
             (
-                self.name,
                 self.mount_path,
-                self.quota_scope_id,
+                str(self.quota_scope_id),
                 self.scaling_group,
                 self.edit_fstab,
                 self.fstab_path,
@@ -256,15 +281,13 @@ class UmountTask(AbstractTask):
     def deserialize(cls, values: tuple) -> UmountTask:
         return UmountTask(
             values[0],
-            values[1],
+            QuotaScopeID.parse(values[1]),
             values[2],
             values[3],
             values[4],
             values[5],
         )
 
-
-# TaskType = TypeVar("TaskType", bound=AbstractTask)
 
 SERIALIZER_MAP: dict[str, Type[AbstractTask]] = {
     MountTask.name: MountTask,
@@ -273,56 +296,85 @@ SERIALIZER_MAP: dict[str, Type[AbstractTask]] = {
 }
 
 
-def _deserialize(raw_data: bytes) -> AbstractTask:
-    values: tuple = msgpack.unpackb(raw_data)
-    serializer_name = values[0]
-    serializer_cls = SERIALIZER_MAP[serializer_name]
-    return serializer_cls.deserialize(values[1:])
+def get_zmq_socket_file_path(path: str | Path, pidx: int) -> str:
+    return f"ipc://{path}-{pidx}"
 
 
 class WatcherClient:
     def __init__(
         self,
-        reader_fd: int,
-        writer_fd: int,
+        pidx: int,
+        input_sock_addr: str,
+        output_sock_addr: str,
     ) -> None:
-        self.reader_fd = reader_fd
-        self.writer_fd = writer_fd
+        self.pidx = pidx
+        zctx = zmq.asyncio.Context()
+        self.input_sock = zctx.socket(zmq.PUSH)
+        self.input_sock_addr = input_sock_addr
+        self.output_sock = zctx.socket(zmq.PULL)
+        self.output_sock_addr = output_sock_addr
+        self.result_queue: asyncio.Queue[list[bytes]] = asyncio.Queue(maxsize=128)
+        self.output_listening_task: asyncio.Task | None = None
 
-        # self.job_queue = job_queue
+    async def init(self) -> None:
+        self.input_sock.connect(get_zmq_socket_file_path(self.input_sock_addr, self.pidx))
+        self.input_sock.setsockopt(zmq.LINGER, 50)
+        self.output_sock.connect(get_zmq_socket_file_path(self.output_sock_addr, self.pidx))
+        self.output_sock.setsockopt(zmq.LINGER, 50)
+        loop = asyncio.get_running_loop()
+        self.output_listening_task = loop.create_task(self.listen_output())
 
-    # @classmethod
-    # async def read_queue(cls, queue: queue.Queue[bytes | Sentinel]) -> bytes | Sentinel:
-    #     def _read() -> bytes | Sentinel:
-    #         return queue.get()
-    #     return await asyncio.get_running_loop().run_in_executor(None, _read)
-
-    # async def write_queue(self, data: bytes) -> None:
-    #     # await self.job_queue.async_q.put(data)
-    #     def _write() -> None:
-    #         # os.close(self.reader_fd)
-    #         # fd = os.fdopen(self.writer_fd, "wb")
-    #         # fd.write(data)
-    #         # fd.close()
-
-    #         os.write(self.writer_fd, data)
-
-    #     await asyncio.get_running_loop().run_in_executor(None, _write)
-
-    @classmethod
-    async def read_pipe(cls, reader_fd: int) -> bytes:
-        def _read() -> bytes:
-            return os.read(reader_fd, 1000)
-
-        return await asyncio.get_running_loop().run_in_executor(None, _read)
-
-    async def write_pipe(self, data: bytes) -> None:
-        def _write() -> None:
-            os.write(self.writer_fd, data)
-
-        await asyncio.get_running_loop().run_in_executor(None, _write)
+    async def close(self) -> None:
+        if self.output_listening_task and not self.output_listening_task.done():
+            self.output_listening_task.cancel()
+            await self.output_listening_task
+        if self.input_sock:
+            self.input_sock.close()
+        if self.output_sock:
+            self.output_sock.close()
 
     @classmethod
-    async def run_pipe_task(cls, raw_data: bytes):
-        task = _deserialize(raw_data)
-        await task.run()
+    async def read(cls, input_reader_sock: zmq.asyncio.Socket) -> list[bytes]:
+        data = await input_reader_sock.recv_multipart()
+        return data
+
+    @classmethod
+    async def ack(cls, output_reader_sock: zmq.asyncio.Socket) -> None:
+        if output_reader_sock.closed:
+            raise asyncio.CancelledError
+        await output_reader_sock.send_multipart([bool.to_bytes(True)])
+
+    @classmethod
+    async def response(cls, output_reader_sock: zmq.asyncio.Socket, data: list[bytes]) -> None:
+        if output_reader_sock.closed:
+            raise asyncio.CancelledError
+        await output_reader_sock.send_multipart(data)
+
+    async def listen_output(self) -> None:
+        while True:
+            try:
+                data = await self.output_sock.recv_multipart()
+                try:
+                    await self.result_queue.put(data)
+                except asyncio.QueueFull:
+                    pass
+            except (asyncio.CancelledError, GeneratorExit):
+                break
+            except Exception:
+                log.exception("unexpected error")
+                break
+
+    async def write(self, msg_prefix: bytes, data: bytes) -> list[bytes] | None:
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        try:
+            await self.input_sock.send_multipart([msg_prefix, data])
+            result = await self.result_queue.get()
+            self.result_queue.task_done()
+            return result
+        except asyncio.CancelledError:
+            return None
+        except Exception:
+            print("WatcherClient.write error ===", flush=True)
+            print(traceback.format_exc(), flush=True)
+            raise
