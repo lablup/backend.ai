@@ -169,15 +169,14 @@ async def server_main(
             )
             await client_api_site.start()
             await manager_api_site.start()
-            if os.geteuid() == 0:
-                uid = local_config["storage-proxy"]["user"]
-                gid = local_config["storage-proxy"]["group"]
-                os.setgroups(
-                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
-                )
-                os.setgid(gid)
-                os.setuid(uid)
-                log.info("Changed process uid:gid to {}:{}", uid, gid)
+            uid = local_config["storage-proxy"]["user"]
+            gid = local_config["storage-proxy"]["group"]
+            os.setgroups(
+                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+            )
+            os.setgid(gid)
+            os.setuid(uid)
+            log.info("Changed process uid:gid to {}:{}", uid, gid)
             log.info("Started service.")
             try:
                 yield
@@ -268,6 +267,10 @@ def main(
 
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
+
+                if os.geteuid() != 0:
+                    log.exception("Storage proxy must be run as root privileges. Abort")
+                    return 1
                 insock_path_prefix = local_config["storage-proxy"]["watcher-insock-path-prefix"]
                 outsock_path_prefix = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
                 num_workers = local_config["storage-proxy"]["num-proc"]
