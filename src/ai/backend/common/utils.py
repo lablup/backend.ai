@@ -343,6 +343,7 @@ async def umount(
     mount_prefix: str | None = None,
     edit_fstab: bool = False,
     fstab_path: str | None = None,
+    delete_if_empty: bool = False,
 ) -> None:
     if mount_prefix is None:
         mount_prefix = "/"
@@ -364,10 +365,11 @@ async def umount(
     await proc.wait()
     if err:
         raise VolumeUnmountFailed(f"Failed to unmount {mount_path} from {mount_prefix}")
-    try:
-        mountpoint.rmdir()  # delete directory if empty
-    except OSError:
-        pass
+    if delete_if_empty:
+        try:
+            mountpoint.rmdir()  # delete directory if empty
+        except OSError:
+            pass
     if edit_fstab:
         async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
             fstab = Fstab(fp)
