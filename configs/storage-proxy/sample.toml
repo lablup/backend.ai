@@ -192,24 +192,3 @@ gpfs_password = "admin"  # Spectrum Scale GUI Password
 gpfs_fs_name = "example_fs"  # Target filesystem to use as vFolder, must match with the one mounted under `volume.gpfs.path`
 gpfs_verify_ssl = false  # Skips GPFS API's SSL Certificate validation if set to true. Defaults to false.
 gpfs_owner = "1000:1000"  # Default ownership to created fileset
-
-
-[volume.kmanila]
-backend = "kmanila"
-path = "/vfroot/kmanila"
-
-
-[volume.kmanila.options]
-api_base_url = ""
-agent_addrs = []
-access_to = ""
-access_level = "rw"
-user_id = ""
-user_password = ""
-project_id = ""
-network_id = ""
-availability_zone = ""
-share_type = ""
-fs_location_prefix = ""
-client_id = ""
-client_secret_key = ""
