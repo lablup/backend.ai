@@ -1,8 +1,8 @@
 """Add enable_sudo_session
 
-Revision ID: f05a11824e38
-Revises: ae7d4cd92aa7
-Create Date: 2023-09-01 05:44:20.955402
+Revision ID: 4871d46ba31b
+Revises: 02535458c0b3
+Create Date: 2023-09-01 07:02:30.868334
 
 """
 import sqlalchemy as sa
@@ -10,8 +10,8 @@ from alembic import op
 from sqlalchemy.sql.expression import false
 
 # revision identifiers, used by Alembic.
-revision = "f05a11824e38"
-down_revision = "ae7d4cd92aa7"
+revision = "4871d46ba31b"
+down_revision = "02535458c0b3"
 branch_labels = None
 depends_on = None
 
