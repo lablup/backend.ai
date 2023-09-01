@@ -54,11 +54,9 @@ def main_job(
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    insock_path = get_zmq_socket_file_path(insock_prefix, worker_pidx)
-    outsock_path = get_zmq_socket_file_path(outsock_prefix, worker_pidx)
-
     try:
-        loop.run_until_complete(_main_job(loop, insock_path, outsock_path))
+        proc = WatcherProcess(worker_pidx, insock_prefix, outsock_prefix)
+        loop.run_until_complete(proc.main())
     except Exception:
         print("Error ====", flush=True)
         print(traceback.format_exc(), flush=True)
@@ -76,33 +74,6 @@ def main_job(
             asyncio.set_event_loop(None)
 
 
-async def _main_job(
-    loop: asyncio.AbstractEventLoop,
-    insock_path: str,
-    outsock_path: str,
-) -> None:
-    zctx = zmq.asyncio.Context()
-    insock = zctx.socket(zmq.PULL)
-    insock.bind(insock_path)
-    outsock = zctx.socket(zmq.PUSH)
-    outsock.bind(outsock_path)
-
-    try:
-        while True:
-            raw_data = await WatcherClient.read(insock)
-            task = AbstractTask._deserialize(raw_data)
-            try:
-                await task.run()
-            except Exception as e:
-                log.exception(f"Error in watcher task. (e: {e})")
-                await WatcherClient.response(outsock, [bytes(repr(e), "utf8")])
-            else:
-                await WatcherClient.ack(outsock)
-    finally:
-        insock.close()
-        outsock.close()
-
-
 class AbstractTask(metaclass=ABCMeta):
     name: ClassVar[str] = "undefined"
 
@@ -110,15 +81,19 @@ class AbstractTask(metaclass=ABCMeta):
     async def run(self) -> None:
         pass
 
-    @staticmethod
-    def _deserialize(raw_data: list[bytes]) -> AbstractTask:
-        serializer_name = str(raw_data[0], "utf8")
-        values: tuple = msgpack.unpackb(raw_data[1])
+    @classmethod
+    def deserialize_from_request(cls, raw_data: Request) -> AbstractTask:
+        serializer_name = str(raw_data.header, "utf8")
+        values: tuple = msgpack.unpackb(raw_data.body)
         serializer_cls = SERIALIZER_MAP[serializer_name]
         return serializer_cls.deserialize(values)
 
-    async def request(self, watcher: WatcherClient) -> list[bytes] | None:
-        return await watcher.write(bytes(self.name, "utf8"), self.serialize())
+    def serialize_to_request(self) -> Request:
+        header = bytes(self.name, "utf8")
+        return Request(header, self.serialize())
+
+    async def request(self, watcher: WatcherClient) -> Response:
+        return await watcher.request(self.serialize_to_request())
 
     @abstractmethod
     def serialize(self) -> bytes:
@@ -295,10 +270,110 @@ SERIALIZER_MAP: dict[str, Type[AbstractTask]] = {
 }
 
 
+@attrs.define(slots=True)
+class Request:
+    header: bytes = attrs.field()
+    body: bytes = attrs.field()
+
+    def serialize(self) -> tuple[bytes, bytes]:
+        return (self.header, self.body)
+
+    @classmethod
+    def deserialize(cls, data: tuple[bytes, bytes]) -> Request:
+        return Request(data[0], data[1])
+
+
+@attrs.define(slots=True)
+class Response:
+    succeeded: bool = attrs.field()
+    body: str = attrs.field()
+
+    def serialize(self) -> tuple[bytes, bytes]:
+        return (bool.to_bytes(self.succeeded), bytes(self.body, "utf8"))
+
+    @classmethod
+    def deserialize(cls, data: tuple[bytes, bytes]) -> Response:
+        return Response(bool.from_bytes(data[0]), str(data[1], "utf8"))
+
+
 def get_zmq_socket_file_path(path: str | Path | None, pidx: int) -> str:
     if path is None:
         raise ValueError("Socket path should not be None")
     return f"ipc://{path}-{pidx}"
+
+
+class Protocol:
+    @classmethod
+    async def request(cls, insock: zmq.asyncio.Socket, data: Request) -> None:
+        if insock.closed:
+            raise asyncio.CancelledError
+        await insock.send_multipart(data.serialize())
+
+    @classmethod
+    async def listen_to_request(cls, insock: zmq.asyncio.Socket) -> Request:
+        if insock.closed:
+            raise asyncio.CancelledError
+        data = await insock.recv_multipart()
+        if (data_len := len(data)) != 2:
+            raise ValueError(f"data length for request should be 2, not {data_len}")
+        return Request.deserialize((data[0], data[1]))
+
+    @classmethod
+    async def respond(cls, outsock: zmq.asyncio.Socket, data: Response) -> None:
+        if outsock.closed:
+            raise asyncio.CancelledError
+        await outsock.send_multipart(data.serialize())
+
+    @classmethod
+    async def listen_to_response(cls, outsock: zmq.asyncio.Socket) -> Response:
+        if outsock.closed:
+            raise asyncio.CancelledError
+        data = await outsock.recv_multipart()
+        if (data_len := len(data)) != 2:
+            raise ValueError(f"data length for respond should be 2, not {data_len}")
+        return Response.deserialize((data[0], data[1]))
+
+
+class WatcherProcess:
+    def __init__(
+        self,
+        pidx: int,
+        input_sock_prefix: str | None,
+        output_sock_prefix: str | None,
+    ) -> None:
+        self.pidx = pidx
+        zctx = zmq.asyncio.Context()
+        self.insock = zctx.socket(zmq.PULL)
+        self.insock.bind(get_zmq_socket_file_path(input_sock_prefix, self.pidx))
+
+        self.outsock = zctx.socket(zmq.PUSH)
+        self.outsock.bind(get_zmq_socket_file_path(output_sock_prefix, self.pidx))
+
+    async def close(self) -> None:
+        self.insock.close()
+        self.outsock.close()
+
+    async def ack(self) -> None:
+        await Protocol.respond(self.outsock, Response(True, ""))
+
+    async def respond(self, succeeded: bool, data: str) -> None:
+        await Protocol.respond(self.outsock, Response(succeeded, data))
+
+    async def main(self) -> None:
+        try:
+            while True:
+                client_request = await Protocol.listen_to_request(self.insock)
+
+                task = AbstractTask.deserialize_from_request(client_request)
+                try:
+                    await task.run()
+                except Exception as e:
+                    log.exception(f"Error in watcher task. (e: {e})")
+                    await self.respond(False, repr(e))
+                else:
+                    await self.ack()
+        finally:
+            await self.close()
 
 
 class WatcherClient:
@@ -314,7 +389,7 @@ class WatcherClient:
         self.input_sock_addr = get_zmq_socket_file_path(input_sock_prefix, self.pidx)
         self.output_sock = zctx.socket(zmq.PULL)
         self.output_sock_addr = get_zmq_socket_file_path(output_sock_prefix, self.pidx)
-        self.result_queue: asyncio.Queue[list[bytes]] = asyncio.Queue(maxsize=128)
+        self.result_queue: asyncio.Queue[Response] = asyncio.Queue(maxsize=128)
         self.output_listening_task: asyncio.Task | None = None
 
     async def init(self) -> None:
@@ -334,27 +409,10 @@ class WatcherClient:
         if self.output_sock:
             self.output_sock.close()
 
-    @classmethod
-    async def read(cls, input_reader_sock: zmq.asyncio.Socket) -> list[bytes]:
-        data = await input_reader_sock.recv_multipart()
-        return data
-
-    @classmethod
-    async def ack(cls, output_reader_sock: zmq.asyncio.Socket) -> None:
-        if output_reader_sock.closed:
-            raise asyncio.CancelledError
-        await output_reader_sock.send_multipart([bool.to_bytes(True)])
-
-    @classmethod
-    async def response(cls, output_reader_sock: zmq.asyncio.Socket, data: list[bytes]) -> None:
-        if output_reader_sock.closed:
-            raise asyncio.CancelledError
-        await output_reader_sock.send_multipart(data)
-
     async def listen_output(self) -> None:
         while True:
             try:
-                data = await self.output_sock.recv_multipart()
+                data = await Protocol.listen_to_response(self.output_sock)
                 try:
                     await self.result_queue.put(data)
                 except asyncio.QueueFull:
@@ -365,16 +423,14 @@ class WatcherClient:
                 log.exception("unexpected error")
                 break
 
-    async def write(self, msg_prefix: bytes, data: bytes) -> list[bytes] | None:
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+    async def request(self, data: Request) -> Response:
         try:
-            await self.input_sock.send_multipart([msg_prefix, data])
+            await Protocol.request(self.input_sock, data)
             result = await self.result_queue.get()
             self.result_queue.task_done()
             return result
         except asyncio.CancelledError:
-            return None
+            raise
         except Exception:
             print("WatcherClient.write error ===", flush=True)
             print(traceback.format_exc(), flush=True)
