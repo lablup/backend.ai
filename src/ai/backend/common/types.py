@@ -1048,7 +1048,6 @@ class KernelCreationConfig(TypedDict):
     scaling_group: str
     agent_addr: str
     endpoint_id: Optional[str]
-    enable_sudo_session: bool
 
 
 class SessionEnqueueingConfig(TypedDict):

@@ -701,8 +701,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             )
         )
 
-        print("enable_sudo_session 3", enable_sudo_session)
-
     try:
         resp = await root_ctx.registry.create_cluster(
             template,
