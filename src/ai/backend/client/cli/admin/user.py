@@ -208,6 +208,15 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
+@click.option(
+    "--enable-sudo-session",
+    is_flag=True,
+    default=False,
+    help=(
+        "Enable passwordless sudo for a user inside a compute session. "
+        "Note that this feature does not automatically install sudo for the session."
+    ),
+)
 @click.option("--description", type=str, default="", help="Description of the user.")
 def add(
     ctx: CLIContext,
@@ -221,6 +230,7 @@ def add(
     need_password_change,
     allowed_ip,
     description,
+    enable_sudo_session,
 ):
     """
     Add new user. A user must belong to a domain, so DOMAIN_NAME should be provided.
@@ -243,6 +253,7 @@ def add(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
+                enable_sudo_session=enable_sudo_session,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -300,6 +311,15 @@ def add(
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
+@click.option(
+    "--enable-sudo-session",
+    is_flag=True,
+    default=False,
+    help=(
+        "Enable passwordless sudo for a user inside a compute session. "
+        "Note that this feature does not automatically install sudo for the session."
+    ),
+)
 @click.option("--description", type=str, default="", help="Description of the user.")
 def update(
     ctx: CLIContext,
@@ -313,6 +333,7 @@ def update(
     need_password_change,
     allowed_ip,
     description,
+    enable_sudo_session,
 ):
     """
     Update an existing user.
@@ -333,6 +354,7 @@ def update(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
+                enable_sudo_session=enable_sudo_session,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
