@@ -326,7 +326,7 @@ async def mount(
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        raise VolumeMountFailed(f"Failed to mount {mount_path} on {mountpoint}")
+        raise VolumeMountFailed(f"Failed to mount {fs_location} on {mountpoint}. (e: {err})")
     if edit_fstab:
         async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
             fstab = Fstab(fp)
@@ -364,7 +364,7 @@ async def umount(
     err = raw_err.decode("utf8")
     await proc.wait()
     if err:
-        raise VolumeUnmountFailed(f"Failed to unmount {mount_path} from {mount_prefix}")
+        raise VolumeUnmountFailed(f"Failed to unmount {mountpoint}")
     if rmdir_if_empty:
         try:
             mountpoint.rmdir()  # delete directory if empty

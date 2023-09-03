@@ -19,6 +19,8 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
 
+from .exception import WatcherClientError
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
@@ -89,6 +91,7 @@ class AbstractTask(metaclass=ABCMeta):
         return serializer_cls.deserialize(values)
 
     def serialize_to_request(self) -> Request:
+        assert self.name in SERIALIZER_MAP
         header = bytes(self.name, "utf8")
         return Request(header, self.serialize())
 
@@ -161,9 +164,11 @@ class MountTask(AbstractTask):
         )
 
     @classmethod
-    def from_event(cls, event: DoVolumeMountEvent, mount_prefix: str | None = None) -> MountTask:
+    def from_event(
+        cls, event: DoVolumeMountEvent, *, mount_path: Path, mount_prefix: str | None = None
+    ) -> MountTask:
         return MountTask(
-            event.mount_path,
+            str(mount_path),
             event.quota_scope_id,
             event.fs_location,
             event.fs_type,
@@ -226,9 +231,11 @@ class UmountTask(AbstractTask):
         )
 
     @classmethod
-    def from_event(cls, event: DoVolumeUnmountEvent, mount_prefix: str | None = None) -> UmountTask:
+    def from_event(
+        cls, event: DoVolumeUnmountEvent, *, mount_path: Path, mount_prefix: str | None = None
+    ) -> UmountTask:
         return UmountTask(
-            event.mount_path,
+            str(mount_path),
             event.quota_scope_id,
             event.scaling_group,
             event.edit_fstab,
@@ -361,8 +368,8 @@ class WatcherProcess:
             while True:
                 client_request = await Protocol.listen_to_request(self.insock)
 
-                task = AbstractTask.deserialize_from_request(client_request)
                 try:
+                    task = AbstractTask.deserialize_from_request(client_request)
                     await task.run()
                 except Exception as e:
                     log.exception(f"Error in watcher task. (e: {e})")
@@ -395,7 +402,7 @@ class WatcherClient:
         self.output_sock.connect(self.output_sock_addr)
         self.output_sock.setsockopt(zmq.LINGER, 50)
         loop = asyncio.get_running_loop()
-        self.output_listening_task = loop.create_task(self.listen_output())
+        self.output_listening_task = loop.create_task(self._listen_output())
 
     async def close(self) -> None:
         if self.output_listening_task and not self.output_listening_task.done():
@@ -406,7 +413,7 @@ class WatcherClient:
         if self.output_sock:
             self.output_sock.close()
 
-    async def listen_output(self) -> None:
+    async def _listen_output(self) -> None:
         while True:
             try:
                 data = await Protocol.listen_to_response(self.output_sock)
@@ -425,12 +432,13 @@ class WatcherClient:
             await Protocol.request(self.input_sock, data)
             result = await self.result_queue.get()
             self.result_queue.task_done()
+            if not result.succeeded:
+                raise WatcherClientError(result.body)
             return result
         except asyncio.CancelledError:
             raise
-        except Exception:
-            print("WatcherClient.write error ===", flush=True)
-            print(traceback.format_exc(), flush=True)
+        except WatcherClientError:
+            log.exception(result.body)
             raise
 
     async def request_task(self, task: AbstractTask) -> Response:

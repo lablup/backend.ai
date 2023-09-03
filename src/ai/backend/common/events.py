@@ -573,7 +573,10 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
 class DoVolumeMountEvent(AbstractEvent):
     name = "do_volume_mount"
 
-    mount_path: str = attrs.field()
+    # Let storage proxies and agents find the real path of volume
+    # with their mount_path or mount_prefix.
+    dir_name: str = attrs.field()
+    volume_backend_name: str = attrs.field()
     quota_scope_id: QuotaScopeID = attrs.field()
 
     fs_location: str = attrs.field()
@@ -588,7 +591,8 @@ class DoVolumeMountEvent(AbstractEvent):
 
     def serialize(self) -> tuple:
         return (
-            self.mount_path,
+            self.dir_name,
+            self.volume_backend_name,
             str(self.quota_scope_id),
             self.fs_location,
             self.fs_type,
@@ -601,14 +605,15 @@ class DoVolumeMountEvent(AbstractEvent):
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            mount_path=value[0],
-            quota_scope_id=QuotaScopeID.parse(value[1]),
-            fs_location=value[2],
-            fs_type=value[3],
-            cmd_options=value[4],
-            scaling_group=value[5],
-            edit_fstab=value[6],
-            fstab_path=value[7],
+            dir_name=value[0],
+            volume_backend_name=value[1],
+            quota_scope_id=QuotaScopeID.parse(value[2]),
+            fs_location=value[3],
+            fs_type=value[4],
+            cmd_options=value[5],
+            scaling_group=value[6],
+            edit_fstab=value[7],
+            fstab_path=value[8],
         )
 
 
@@ -616,7 +621,10 @@ class DoVolumeMountEvent(AbstractEvent):
 class DoVolumeUnmountEvent(AbstractEvent):
     name = "do_volume_unmount"
 
-    mount_path: str = attrs.field()
+    # Let storage proxies and agents find the real path of volume
+    # with their mount_path or mount_prefix.
+    dir_name: str = attrs.field()
+    volume_backend_name: str = attrs.field()
     quota_scope_id: QuotaScopeID = attrs.field()
     scaling_group: str | None = attrs.field(default=None)
 
@@ -627,7 +635,8 @@ class DoVolumeUnmountEvent(AbstractEvent):
 
     def serialize(self) -> tuple:
         return (
-            self.mount_path,
+            self.dir_name,
+            self.volume_backend_name,
             str(self.quota_scope_id),
             self.scaling_group,
             self.edit_fstab,
@@ -637,11 +646,12 @@ class DoVolumeUnmountEvent(AbstractEvent):
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            mount_path=value[0],
-            quota_scope_id=QuotaScopeID.parse(value[1]),
-            scaling_group=value[2],
-            edit_fstab=value[3],
-            fstab_path=value[4],
+            dir_name=value[0],
+            volume_backend_name=value[1],
+            quota_scope_id=QuotaScopeID.parse(value[2]),
+            scaling_group=value[3],
+            edit_fstab=value[4],
+            fstab_path=value[5],
         )
 
 

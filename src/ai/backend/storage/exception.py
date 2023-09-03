@@ -53,6 +53,10 @@ class InvalidVolumeError(StorageProxyError):
     pass
 
 
+class WatcherClientError(RuntimeError):
+    pass
+
+
 class InvalidAPIParameters(web.HTTPBadRequest):
     def __init__(
         self,

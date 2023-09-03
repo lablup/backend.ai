@@ -49,17 +49,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
 DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
-    "purestorage": FlashBladeVolume,
-    "vfs": BaseVolume,
-    "xfs": XfsVolume,
-    "netapp": NetAppVolume,
+    FlashBladeVolume.name: FlashBladeVolume,
+    BaseVolume.name: BaseVolume,
+    XfsVolume.name: XfsVolume,
+    NetAppVolume.name: NetAppVolume,
     # NOTE: Dell EMC has two different storage: PowerStore and PowerScale (OneFS).
     #       We support the latter only for now.
-    "dellemc-onefs": DellEMCOneFSVolume,
-    "weka": WekaVolume,
-    "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
+    DellEMCOneFSVolume.name: DellEMCOneFSVolume,
+    WekaVolume.name: WekaVolume,
+    GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
     "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
-    "cephfs": CephFSVolume,
+    CephFSVolume.name: CephFSVolume,
 }
 
 
@@ -183,6 +183,8 @@ class RootContext:
             mount_path=Path(volume_config["path"]),
             options=volume_config["options"] or {},
             etcd=self.etcd,
+            event_dispathcer=self.event_dispatcher,
+            event_producer=self.event_producer,
         )
         await volume_obj.init()
         try:

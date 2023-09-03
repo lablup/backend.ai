@@ -2340,8 +2340,10 @@ async def handle_volume_mount(
     event: DoVolumeMountEvent,
 ) -> None:
     mount_prefix = await context.etcd.get("volumes/_mount")
+    volume_mount_prefix = context.local_config["agent"]["mount-path"]
+    real_path = Path(volume_mount_prefix, event.dir_name)
     await mount(
-        event.mount_path,
+        str(real_path),
         event.fs_location,
         event.fs_type,
         event.cmd_options,
@@ -2353,7 +2355,7 @@ async def handle_volume_mount(
         VolumeMounted(
             str(context.id),
             VolumeMountableNodeType.AGENT,
-            event.mount_path,
+            str(real_path),
             event.quota_scope_id,
         )
     )
@@ -2365,8 +2367,10 @@ async def handle_volume_umount(
     event: DoVolumeUnmountEvent,
 ) -> None:
     mount_prefix = await context.etcd.get("volumes/_mount")
+    volume_mount_prefix = context.local_config["agent"]["mount-path"]
+    real_path = Path(volume_mount_prefix, event.dir_name)
     await umount(
-        event.mount_path,
+        str(real_path),
         mount_prefix,
         event.edit_fstab,
         event.fstab_path,
@@ -2375,7 +2379,7 @@ async def handle_volume_umount(
         VolumeUnmounted(
             str(context.id),
             VolumeMountableNodeType.AGENT,
-            event.mount_path,
+            str(real_path),
             event.quota_scope_id,
         )
     )

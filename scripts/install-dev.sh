@@ -781,6 +781,7 @@ configure_backendai() {
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+  sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then

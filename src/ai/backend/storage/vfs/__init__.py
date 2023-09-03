@@ -359,6 +359,8 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 
 class BaseVolume(AbstractVolume):
+    name = "vfs"
+
     async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)
 

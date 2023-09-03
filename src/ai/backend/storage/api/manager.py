@@ -193,10 +193,8 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             try:
-                extra_args = params["extra_args"] or {}
-                extra_args["event_producer"] = ctx.event_producer
                 await volume.quota_model.create_quota_scope(
-                    params["qsid"], params["options"], extra_args
+                    params["qsid"], params["options"], params["extra_args"]
                 )
             except QuotaScopeAlreadyExists:
                 return web.json_response(
@@ -1061,17 +1059,19 @@ async def handle_volume_mount(
     if context.pidx != 0:
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    mount_task = MountTask.from_event(event, mount_prefix)
+    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    mount_path = Path(volume_mount_path, event.dir_name)
+    mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
     await context.watcher.request_task(mount_task)
 
     # change owner of mounted directory
-    chown_task = ChownTask(event.mount_path, os.getuid(), os.getgid())
+    chown_task = ChownTask(str(mount_path), os.getuid(), os.getgid())
     await context.watcher.request_task(chown_task)
     await context.event_producer.produce_event(
         VolumeMounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
-            event.mount_path,
+            str(mount_path),
             event.quota_scope_id,
         )
     )
@@ -1085,13 +1085,19 @@ async def handle_volume_umount(
     if context.pidx != 0:
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    umount_task = UmountTask.from_event(event, mount_prefix)
+    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    mount_path = Path(volume_mount_path, event.dir_name)
+    umount_task = UmountTask.from_event(
+        event,
+        mount_path=mount_path,
+        mount_prefix=mount_prefix,
+    )
     await context.watcher.request_task(umount_task)
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
-            event.mount_path,
+            str(mount_path),
             event.quota_scope_id,
         )
     )
