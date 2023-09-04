@@ -4,11 +4,11 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
 from ai.backend.storage.abc import AbstractVolume
@@ -45,16 +45,6 @@ def mock_etcd() -> Iterator[AsyncEtcd]:
     )
 
 
-@pytest.fixture
-def mock_event_dispathcer() -> Iterator[EventDispatcher]:
-    yield EventDispatcher({}, consumer_group="null")
-
-
-@pytest.fixture
-def mock_event_producer() -> Iterator[EventProducer]:
-    yield EventProducer({})
-
-
 def has_backend(backend_name: str) -> dict[str, Any] | None:
     try:
         local_config = load_local_config(None, debug=True)
@@ -78,7 +68,9 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
     ]
 )
 async def volume(
-    request, local_volume, mock_etcd, mock_event_dispathcer, mock_event_producer
+    request,
+    local_volume,
+    mock_etcd,
 ) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
     backend_options = {}
@@ -120,6 +112,8 @@ async def volume(
             volume_cls = XfsVolume
         case _:
             raise RuntimeError(f"Unknown volume backend: {request.param}")
+    mock_event_dispatcher = MagicMock()
+    mock_event_producer = MagicMock()
     volume = volume_cls(
         {
             "storage-proxy": {
@@ -129,7 +123,7 @@ async def volume(
         volume_path,
         etcd=mock_etcd,
         options=backend_options,
-        event_dispathcer=mock_event_dispathcer,
+        event_dispathcer=mock_event_dispatcher,
         event_producer=mock_event_producer,
     )
     await volume.init()
