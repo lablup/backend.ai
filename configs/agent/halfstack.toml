@@ -19,6 +19,7 @@ var-base-path = "./var/lib/backend.ai"
 # block-compute-plugins = []
 image-commit-path = "./tmp/backend.ai/commit/"
 mount-path = "/vfroot"
+cohabiting-storage-proxy = true
 
 
 [container]

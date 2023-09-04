@@ -2339,6 +2339,9 @@ async def handle_volume_mount(
     source: AgentId,
     event: DoVolumeMountEvent,
 ) -> None:
+    if context.local_config["agent"]["cohabiting-storage-proxy"]:
+        log.debug("Storage proxy is in the same node. Skip the volume task.")
+        return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
@@ -2366,6 +2369,9 @@ async def handle_volume_umount(
     source: AgentId,
     event: DoVolumeUnmountEvent,
 ) -> None:
+    if context.local_config["agent"]["cohabiting-storage-proxy"]:
+        log.debug("Storage proxy is in the same node. Skip the volume task.")
+        return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
