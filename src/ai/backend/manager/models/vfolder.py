@@ -958,50 +958,40 @@ async def initiate_vfolder_clone(
 
 async def initiate_vfolder_purge(
     db_engine: ExtendedAsyncSAEngine,
-    requested_vfolders: Sequence[VFolderDeletionInfo],
+    requested_vfolder: VFolderDeletionInfo,
     storage_manager: StorageSessionManager,
     storage_ptask_group: aiotools.PersistentTaskGroup,
-) -> int:
-    vfolder_info_len = len(requested_vfolders)
-    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
-    cond = vfolders.c.id.in_(vfolder_ids)
-    if vfolder_info_len == 0:
-        return 0
-    elif vfolder_info_len == 1:
-        cond = vfolders.c.id == vfolder_ids[0]
+) -> None:
+    folder_id = requested_vfolder.vfolder_id
 
     await update_vfolder_status(
-        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
+        db_engine, [folder_id.folder_id], VFolderOperationStatus.PURGE_ONGOING, do_log=False
     )
+    proxy_name, volume_name = storage_manager.split_host(requested_vfolder.host)
+    try:
+        async with storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/delete",
+            json={
+                "volume": volume_name,
+                "vfid": str(folder_id),
+            },
+        ):
+            pass
+    except aiohttp.ClientResponseError:
+        raise VFolderOperationFailed(extra_msg=str(folder_id))
 
     async def _delete():
-        for folder_id, host_name in requested_vfolders:
-            proxy_name, volume_name = storage_manager.split_host(host_name)
-            try:
-                async with storage_manager.request(
-                    proxy_name,
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": volume_name,
-                        "vfid": str(folder_id),
-                    },
-                ):
-                    pass
-            except aiohttp.ClientResponseError:
-                raise VFolderOperationFailed(extra_msg=str(folder_id))
-
         async def _delete_row() -> None:
             async with db_engine.begin_session() as db_session:
-                await db_session.execute(sa.delete(vfolders).where(cond))
+                await db_session.execute(sa.delete(vfolders).where(vfolders.c.id == folder_id))
 
         await execute_with_retry(_delete_row)
-        log.debug("Successfully purged vFolders {}", [str(x) for x in vfolder_ids])
+        log.debug(f"Successfully purged vFolder (id: {folder_id})")
 
     storage_ptask_group.create_task(_delete())
-    log.debug("Started purging vFolders {}", [str(x) for x in vfolder_ids])
-
-    return vfolder_info_len
+    log.debug(f"Started purging vFolders  (id: {folder_id})")
 
 
 async def ensure_quota_scope_accessible_by_user(

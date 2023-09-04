@@ -1028,15 +1028,17 @@ class PurgeUser(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            deleted_count = await initiate_vfolder_purge(
-                engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
-                storage_manager,
-                storage_ptask_group,
-            )
+            for vf in target_vfs:
+                await initiate_vfolder_purge(
+                    engine,
+                    VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]),
+                    storage_manager,
+                    storage_ptask_group,
+                )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
             raise
+        deleted_count = len(target_vfs)
         if deleted_count > 0:
             log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
         return deleted_count
