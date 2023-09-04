@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
 
 import aiofiles
+from async_timeout import timeout
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -34,6 +35,7 @@ from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
 from .exception import VolumeMountFailed, VolumeUnmountFailed
+from .defs import DEFAULT_UMOUNT_TIMEOUT
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
@@ -344,27 +346,36 @@ async def umount(
     edit_fstab: bool = False,
     fstab_path: str | None = None,
     rmdir_if_empty: bool = False,
-) -> None:
+) -> bool:
     if mount_prefix is None:
         mount_prefix = "/"
     if fstab_path is None:
         fstab_path = "/etc/fstab"
     mountpoint = Path(mount_prefix) / mount_path
     assert Path(mount_prefix) != mountpoint
-    proc = await asyncio.create_subprocess_exec(
-        *[
-            "umount",
-            str(mountpoint),
-        ],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    raw_out, raw_err = await proc.communicate()
-    raw_out.decode("utf8")
-    err = raw_err.decode("utf8")
-    await proc.wait()
+    if not mountpoint.exists() or not mountpoint.is_dir():
+        return False
+    try:
+        with timeout(DEFAULT_UMOUNT_TIMEOUT):
+            proc = await asyncio.create_subprocess_exec(
+                *[
+                    "umount",
+                    str(mountpoint),
+                ],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            raw_out, raw_err = await proc.communicate()
+            raw_out.decode("utf8")
+            err = raw_err.decode("utf8")
+            await proc.wait()
+    except asyncio.TimeoutError:
+        raise VolumeUnmountFailed(
+            f"Failed to umount {mountpoint}. Raise timeout ({DEFAULT_UMOUNT_TIMEOUT}sec). "
+            "The process may be hanging in state D, which needs to be checked."
+        )
     if err:
-        raise VolumeUnmountFailed(f"Failed to unmount {mountpoint}")
+        raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
     if rmdir_if_empty:
         try:
             mountpoint.rmdir()  # delete directory if empty
@@ -374,3 +385,4 @@ async def umount(
         async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
+    return True

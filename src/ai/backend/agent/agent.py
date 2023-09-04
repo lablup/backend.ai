@@ -2383,7 +2383,7 @@ async def handle_volume_umount(
     real_path = Path(volume_mount_prefix, event.dir_name)
     err_msg: str | None = None
     try:
-        await umount(
+        did_umount = await umount(
             str(real_path),
             mount_prefix,
             event.edit_fstab,
@@ -2391,6 +2391,8 @@ async def handle_volume_umount(
         )
     except VolumeMountFailed as e:
         err_msg = str(e)
+    if not did_umount:
+        log.warning(f"{real_path} does not exist. Skip umount")
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.id),

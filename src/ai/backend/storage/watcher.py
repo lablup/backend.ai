@@ -78,7 +78,7 @@ class AbstractTask(metaclass=ABCMeta):
     name: ClassVar[str] = "undefined"
 
     @abstractmethod
-    async def run(self) -> None:
+    async def run(self) -> Any:
         pass
 
     @classmethod
@@ -111,7 +111,7 @@ class ChownTask(AbstractTask):
     uid: int = attrs.field()
     gid: int = attrs.field()
 
-    async def run(self) -> None:
+    async def run(self) -> Any:
         os.chown(self.directory, self.uid, self.gid)
 
     def serialize(self) -> bytes:
@@ -150,7 +150,7 @@ class MountTask(AbstractTask):
     fstab_path: str = attrs.field(default="/etc/fstab")
     mount_prefix: str | None = attrs.field(default=None)
 
-    async def run(self) -> None:
+    async def run(self) -> Any:
         return await _mount(
             self.mount_path,
             self.fs_location,
@@ -221,12 +221,15 @@ class UmountTask(AbstractTask):
     fstab_path: str | None = attrs.field(default=None)
     mount_prefix: str | None = attrs.field(default=None)
 
-    async def run(self) -> None:
-        return await _umount(
+    async def run(self) -> Any:
+        did_umount = await _umount(
             self.mount_path,
             edit_fstab=self.edit_fstab,
             fstab_path=self.fstab_path,
         )
+        if not did_umount:
+            return f"{self.mount_path} not exists. Skip umount."
+        return None
 
     @classmethod
     def from_event(
@@ -368,12 +371,15 @@ class WatcherProcess:
 
                 try:
                     task = AbstractTask.deserialize_from_request(client_request)
-                    await task.run()
+                    result = await task.run()
                 except Exception as e:
                     log.exception(f"Error in watcher task. (e: {e})")
                     await self.respond(False, repr(e))
                 else:
-                    await self.ack()
+                    if result is not None:
+                        await self.respond(True, str(result))
+                    else:
+                        await self.ack()
         finally:
             await self.close()
 

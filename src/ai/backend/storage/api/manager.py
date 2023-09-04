@@ -1117,6 +1117,8 @@ async def handle_volume_umount(
     resp = await context.watcher.request_task(umount_task)
     if not resp.succeeded:
         err_msg = resp.body
+    if resp.body:
+        log.warning(resp.body)
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.node_id),
