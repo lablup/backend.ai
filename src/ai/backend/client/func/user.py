@@ -260,8 +260,8 @@ class User(BaseFunction):
         allowed_client_ip: Iterable[str] = None,
         totp_activated: bool = False,
         group_ids: Iterable[str] = None,
-        fields: Iterable[FieldSpec | str] = None,
         enable_sudo_session: bool = False,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new user with the given options.
@@ -318,8 +318,8 @@ class User(BaseFunction):
         allowed_client_ip: Iterable[str] = None,
         totp_activated: bool = False,
         group_ids: Iterable[str] = None,
-        fields: Iterable[FieldSpec | str] = None,
         enable_sudo_session: bool = False,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing user.

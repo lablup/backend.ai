@@ -208,6 +208,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
+@click.option("--description", type=str, default="", help="Description of the user.")
 @click.option(
     "--enable-sudo-session",
     is_flag=True,
@@ -217,7 +218,6 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         "Note that this feature does not automatically install sudo for the session."
     ),
 )
-@click.option("--description", type=str, default="", help="Description of the user.")
 def add(
     ctx: CLIContext,
     domain_name,
@@ -311,6 +311,7 @@ def add(
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
+@click.option("--description", type=str, default="", help="Description of the user.")
 @click.option(
     "--enable-sudo-session",
     is_flag=True,
@@ -320,7 +321,6 @@ def add(
         "Note that this feature does not automatically install sudo for the session."
     ),
 )
-@click.option("--description", type=str, default="", help="Description of the user.")
 def update(
     ctx: CLIContext,
     email,
