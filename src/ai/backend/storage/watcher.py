@@ -19,8 +19,6 @@ from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
 
-from .exception import WatcherClientError
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
@@ -432,13 +430,8 @@ class WatcherClient:
             await Protocol.request(self.input_sock, data)
             result = await self.result_queue.get()
             self.result_queue.task_done()
-            if not result.succeeded:
-                raise WatcherClientError(result.body)
             return result
         except asyncio.CancelledError:
-            raise
-        except WatcherClientError:
-            log.exception(result.body)
             raise
 
     async def request_task(self, task: AbstractTask) -> Response:

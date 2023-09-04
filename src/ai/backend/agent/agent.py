@@ -99,6 +99,7 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -2345,21 +2346,26 @@ async def handle_volume_mount(
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
-    await mount(
-        str(real_path),
-        event.fs_location,
-        event.fs_type,
-        event.cmd_options,
-        event.edit_fstab,
-        event.fstab_path,
-        mount_prefix,
-    )
+    err_msg: str | None = None
+    try:
+        await mount(
+            str(real_path),
+            event.fs_location,
+            event.fs_type,
+            event.cmd_options,
+            event.edit_fstab,
+            event.fstab_path,
+            mount_prefix,
+        )
+    except VolumeMountFailed as e:
+        err_msg = str(e)
     await context.event_producer.produce_event(
         VolumeMounted(
             str(context.id),
             VolumeMountableNodeType.AGENT,
             str(real_path),
             event.quota_scope_id,
+            err_msg,
         )
     )
 
@@ -2375,17 +2381,22 @@ async def handle_volume_umount(
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
-    await umount(
-        str(real_path),
-        mount_prefix,
-        event.edit_fstab,
-        event.fstab_path,
-    )
+    err_msg: str | None = None
+    try:
+        await umount(
+            str(real_path),
+            mount_prefix,
+            event.edit_fstab,
+            event.fstab_path,
+        )
+    except VolumeMountFailed as e:
+        err_msg = str(e)
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.id),
             VolumeMountableNodeType.AGENT,
             str(real_path),
             event.quota_scope_id,
+            err_msg,
         )
     )

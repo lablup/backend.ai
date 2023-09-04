@@ -1061,21 +1061,37 @@ async def handle_volume_mount(
     if context.watcher is None:
         log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
         return
+    err_msg: str | None = None
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
     mount_path = Path(volume_mount_path, event.dir_name)
     mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
-    await context.watcher.request_task(mount_task)
+    resp = await context.watcher.request_task(mount_task)
+    if not resp.succeeded:
+        err_msg = resp.body
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                str(context.node_id),
+                VolumeMountableNodeType.STORAGE_PROXY,
+                str(mount_path),
+                event.quota_scope_id,
+                err_msg,
+            )
+        )
+        return
 
     # change owner of mounted directory
     chown_task = ChownTask(str(mount_path), os.getuid(), os.getgid())
-    await context.watcher.request_task(chown_task)
+    resp = await context.watcher.request_task(chown_task)
+    if not resp.succeeded:
+        err_msg = resp.body
     await context.event_producer.produce_event(
         VolumeMounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
             str(mount_path),
             event.quota_scope_id,
+            err_msg,
         )
     )
 
@@ -1098,12 +1114,15 @@ async def handle_volume_umount(
         mount_path=mount_path,
         mount_prefix=mount_prefix,
     )
-    await context.watcher.request_task(umount_task)
+    resp = await context.watcher.request_task(umount_task)
+    if not resp.succeeded:
+        err_msg = resp.body
     await context.event_producer.produce_event(
         VolumeUnmounted(
             str(context.node_id),
             VolumeMountableNodeType.STORAGE_PROXY,
             str(mount_path),
             event.quota_scope_id,
+            err_msg,
         )
     )

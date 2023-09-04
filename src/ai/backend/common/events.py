@@ -661,6 +661,7 @@ class VolumeMountEventArgs(AbstractEvent):
     node_type: VolumeMountableNodeType = attrs.field()
     mount_path: str = attrs.field()
     quota_scope_id: QuotaScopeID = attrs.field()
+    err_msg: str | None = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -668,6 +669,7 @@ class VolumeMountEventArgs(AbstractEvent):
             str(self.node_type),
             self.mount_path,
             str(self.quota_scope_id),
+            self.err_msg,
         )
 
     @classmethod
@@ -677,6 +679,7 @@ class VolumeMountEventArgs(AbstractEvent):
             VolumeMountableNodeType(value[1]),
             value[2],
             QuotaScopeID.parse(value[3]),
+            value[4],
         )
 
 
