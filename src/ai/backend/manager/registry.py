@@ -115,7 +115,6 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.manager.models.routing import RouteStatus
 
 from .api.exceptions import (
     AgentError,
@@ -146,6 +145,7 @@ from .models import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
+    EndpointLifecycle,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
@@ -154,6 +154,7 @@ from .models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    RouteStatus,
     RoutingRow,
     SessionDependencyRow,
     SessionRow,
@@ -3625,7 +3626,7 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
-            async with context.db.begin_session() as db_sess:
+            async with context.db.begin_readonly_session() as db_sess:
                 route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                 endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
@@ -3648,17 +3649,7 @@ async def invoke_session_callback(
                     elif isinstance(event, SessionTerminatedEvent):
                         query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                         await db_sess.execute(query)
-                        if (
-                            len(endpoint.routings) == 1
-                            and endpoint.desired_session_count < 0  # we just removed last one
-                        ):
-                            query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint.id)
-                            await db_sess.execute(query)
-                            try:
-                                await context.delete_appproxy_endpoint(db_sess, endpoint)
-                            except Exception as e:
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-                        else:
+                        if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
                             new_routes = [
                                 r
                                 for r in endpoint.routings
