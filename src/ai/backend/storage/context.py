@@ -96,7 +96,7 @@ class RootContext:
     dsn: str | None
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
-    watcher: WatcherClient
+    watcher: WatcherClient | None
 
     def __init__(
         self,
@@ -108,7 +108,7 @@ class RootContext:
         *,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
-        watcher: WatcherClient,
+        watcher: WatcherClient | None,
         dsn: Optional[str] = None,
     ) -> None:
         self.pid = pid

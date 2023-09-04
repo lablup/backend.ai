@@ -54,6 +54,10 @@ watcher-insock-path-prefix = ""
 watcher-outsock-path-prefix = ""
 
 
+# Watcher delegates root permission and do privileged tasks. This option enables the use of watcher.
+use-watcher = false
+
+
 [api.client]
 # Client-facing API
 service-addr = { host = "0.0.0.0", port = 6021 }

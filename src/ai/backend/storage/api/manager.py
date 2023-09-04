@@ -1058,6 +1058,9 @@ async def handle_volume_mount(
 ) -> None:
     if context.pidx != 0:
         return
+    if context.watcher is None:
+        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
+        return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
     mount_path = Path(volume_mount_path, event.dir_name)
@@ -1083,6 +1086,9 @@ async def handle_volume_umount(
     event: DoVolumeUnmountEvent,
 ) -> None:
     if context.pidx != 0:
+        return
+    if context.watcher is None:
+        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])

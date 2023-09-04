@@ -30,7 +30,6 @@ from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
-from .watcher import WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -251,11 +250,7 @@ async def check_and_upgrade(
         dsn=dsn,
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
-        watcher=WatcherClient(
-            0,
-            local_config["storage-proxy"]["watcher-insock-path-prefix"],
-            local_config["storage-proxy"]["watcher-outsock-path-prefix"],
-        ),
+        watcher=None,
     )
     volumes_to_upgrade = await check_latest(ctx)
     for upgrade_info in volumes_to_upgrade:

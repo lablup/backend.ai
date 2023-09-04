@@ -36,6 +36,10 @@ from .watcher import WatcherClient, main_job
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+def _is_root() -> bool:
+    return os.geteuid() == 0
+
+
 @aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
@@ -109,10 +113,18 @@ async def server_main(
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
-        insock_path = local_config["storage-proxy"]["watcher-insock-path-prefix"]
-        outsock_path = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
-        watcher_client = WatcherClient(pidx, insock_path, outsock_path)
-        await watcher_client.init()
+        if local_config["storage-proxy"]["use-watcher"]:
+            if not _is_root():
+                raise ValueError(
+                    "Storage proxy must be run as root if watcher is enabled. Else, set"
+                    " `use-wathcer` to false in your local config file."
+                )
+            insock_path = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+            outsock_path = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            watcher_client = WatcherClient(pidx, insock_path, outsock_path)
+            await watcher_client.init()
+        else:
+            watcher_client = None
         ctx = RootContext(
             pid=os.getpid(),
             node_id=local_config["storage-proxy"]["node-id"],
@@ -169,7 +181,7 @@ async def server_main(
             )
             await client_api_site.start()
             await manager_api_site.start()
-            if os.geteuid() == 0:
+            if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]
                 os.setgroups(
@@ -187,7 +199,8 @@ async def server_main(
                 await client_api_runner.cleanup()
                 await event_producer.close()
                 await event_dispatcher.close()
-                await watcher_client.close()
+                if watcher_client is not None:
+                    await watcher_client.close()
     finally:
         if aiomon_started:
             m.close()
