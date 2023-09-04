@@ -273,7 +273,7 @@ class EndpointTokenRow(Base):
     project = sa.Column(
         "project",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        sa.ForeignKey("projects.id", ondelete="RESTRICT"),
         nullable=False,
     )
     created_at = sa.Column(
