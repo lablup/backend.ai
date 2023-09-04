@@ -1,8 +1,8 @@
 """add_app_vfolder_type
 
-Revision ID: dae5150a8547
-Revises: ae7d4cd92aa7
-Create Date: 2023-08-30 13:13:00.252596
+Revision ID: fbec1a24b18f
+Revises: 02535458c0b3
+Create Date: 2023-09-04 15:40:16.284847
 
 """
 import enum
@@ -16,10 +16,11 @@ from sqlalchemy.sql import text
 from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
-revision = "dae5150a8547"
-down_revision = "ae7d4cd92aa7"
+revision = "fbec1a24b18f"
+down_revision = "02535458c0b3"
 branch_labels = None
 depends_on = None
+
 
 enum_name = "vfolderusagemode"
 enum_val = "app"
