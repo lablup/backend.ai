@@ -33,6 +33,8 @@ agent_local_config_iv = (
                     t.Key("var-base-path", default="./var/lib/backend.ai"): tx.Path(
                         type="dir", auto_create=True
                     ),
+                    t.Key("mount-path"): tx.Path(type="dir", auto_create=True),
+                    t.Key("cohabiting-storage-proxy", default=True): t.Bool(),
                     t.Key("public-host", default=None): t.Null | t.String,
                     t.Key("region", default=None): t.Null | t.String,
                     t.Key("instance-type", default=None): t.Null | t.String,

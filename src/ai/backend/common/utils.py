@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import numbers
 import random
@@ -9,7 +10,11 @@ import uuid
 from collections import OrderedDict
 from datetime import timedelta
 from itertools import chain
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
+
+import aiofiles
+from async_timeout import timeout
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -29,6 +34,8 @@ from .enum_extension import StringSetFlag  # for legacy imports  # noqa
 from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
+from .exception import VolumeMountFailed, VolumeUnmountFailed
+from .defs import DEFAULT_FILE_IO_TIMEOUT
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
@@ -284,3 +291,100 @@ class Fstab:
         if entry:
             return await self.remove_entry(entry)
         return False
+
+
+async def mount(
+    mount_path: str,
+    fs_location: str,
+    fs_type: str = "nfs",
+    cmd_options: str | None = None,
+    edit_fstab: bool = False,
+    fstab_path: str | None = None,
+    mount_prefix: str | None = None,
+) -> None:
+    if mount_prefix is None:
+        mount_prefix = "/"
+    if fstab_path is None:
+        fstab_path = "/etc/fstab"
+    mountpoint = Path(mount_prefix) / mount_path
+    mountpoint.mkdir(exist_ok=True)
+    if cmd_options is not None:
+        cmd = [
+            "mount",
+            "-t",
+            fs_type,
+            "-o",
+            cmd_options,
+            fs_location,
+            str(mountpoint),
+        ]
+    else:
+        cmd = ["mount", "-t", fs_type, fs_location, str(mountpoint)]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    raw_out, raw_err = await proc.communicate()
+    raw_out.decode("utf8")
+    err = raw_err.decode("utf8")
+    await proc.wait()
+    if err:
+        raise VolumeMountFailed(f"Failed to mount {fs_location} on {mountpoint}. (e: {err})")
+    if edit_fstab:
+        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+            fstab = Fstab(fp)
+            await fstab.add(
+                fs_location,
+                str(mountpoint),
+                fs_type,
+                cmd_options,
+            )
+
+
+async def umount(
+    mount_path: str,
+    mount_prefix: str | None = None,
+    edit_fstab: bool = False,
+    fstab_path: str | None = None,
+    rmdir_if_empty: bool = False,
+    *,
+    timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
+) -> bool:
+    if mount_prefix is None:
+        mount_prefix = "/"
+    if fstab_path is None:
+        fstab_path = "/etc/fstab"
+    mountpoint = Path(mount_prefix) / mount_path
+    assert Path(mount_prefix) != mountpoint
+    if not mountpoint.is_mount():
+        return False
+    try:
+        with timeout(timeout_sec):
+            proc = await asyncio.create_subprocess_exec(
+                *[
+                    "umount",
+                    str(mountpoint),
+                ],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            raw_out, raw_err = await proc.communicate()
+            raw_out.decode("utf8")
+            err = raw_err.decode("utf8")
+            await proc.wait()
+    except asyncio.TimeoutError:
+        raise VolumeUnmountFailed(
+            f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
+            "The process may be hanging in state D, which needs to be checked."
+        )
+    if err:
+        raise VolumeUnmountFailed(f"Failed to umount {mountpoint}")
+    if rmdir_if_empty:
+        try:
+            mountpoint.rmdir()  # delete directory if empty
+        except OSError:
+            pass
+    if edit_fstab:
+        async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
+            fstab = Fstab(fp)
+            await fstab.remove_by_mountpoint(str(mountpoint))
+    return True
