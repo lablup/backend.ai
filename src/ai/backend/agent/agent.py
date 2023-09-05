@@ -2344,7 +2344,9 @@ async def handle_volume_mount(
         log.debug("Storage proxy is in the same node. Skip the volume task.")
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
-    volume_mount_prefix = context.local_config["agent"]["mount-path"]
+    volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
+    if volume_mount_prefix is None:
+        volume_mount_prefix = "./"
     real_path = Path(volume_mount_prefix, event.dir_name)
     err_msg: str | None = None
     try:
