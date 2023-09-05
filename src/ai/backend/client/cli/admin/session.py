@@ -14,7 +14,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_fail
-from ..session import session as user_session
+from ..session.lifecycle import session as user_session
 from ..types import CLIContext
 from . import admin
 
@@ -57,7 +57,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--access-key",
         type=str,
         default=None,
-        help="Get sessions for a specific access key " "(only works if you are a super-admin)",
+        help="Get sessions for a specific access key (only works if you are a super-admin)",
     )
     @click.option("--name-only", is_flag=True, help="Display session names only.")
     @click.option(
@@ -86,7 +86,10 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--all",
         is_flag=True,
         default=False,
-        help='Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status. Ignores --status option.',
+        help=(
+            'Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status.'
+            " Ignores --status option."
+        ),
     )
     def list(
         ctx: CLIContext,
@@ -212,6 +215,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     fetch_func,
                     initial_page_offset=offset,
                     page_size=limit,
+                    plain=plain,
                 )
         except Exception as e:
             ctx.output.print_error(e)
@@ -255,6 +259,7 @@ def _info_cmd(docs: str = None):
                     session_fields["status_info"],
                     session_fields["status_data"],
                     session_fields["occupying_slots"],
+                    session_fields["idle_checks"],
                 ]
             )
             if session_.api_version[0] >= 6:
@@ -262,7 +267,7 @@ def _info_cmd(docs: str = None):
             else:
                 fields.append(session_fields_v5["containers"])
             fields.append(session_fields["dependencies"])
-            q = "query($id: UUID!) {" "  compute_session(id: $id) {" "    $fields" "  }" "}"
+            q = "query($id: UUID!) {  compute_session(id: $id) {    $fields  }}"
             try:
                 uuid.UUID(session_id)
             except ValueError:

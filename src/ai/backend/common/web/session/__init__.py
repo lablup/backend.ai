@@ -46,7 +46,6 @@ class SessionData(TypedDict, total=False):
 
 
 class Session(MutableMapping[str, Any]):
-
     """Session dict-like object."""
 
     def __init__(
@@ -154,9 +153,7 @@ async def get_session(request: web.Request) -> Session:
     if session is None:
         storage = request.get(STORAGE_KEY)
         if storage is None:
-            raise RuntimeError(
-                "Install aiohttp_session middleware " "in your aiohttp.web.Application"
-            )
+            raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
 
         session = await storage.load_session(request)
         if not isinstance(session, Session):
@@ -171,7 +168,7 @@ async def get_session(request: web.Request) -> Session:
 async def new_session(request: web.Request) -> Session:
     storage = request.get(STORAGE_KEY)
     if storage is None:
-        raise RuntimeError("Install aiohttp_session middleware " "in your aiohttp.web.Application")
+        raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
 
     session = await storage.new_session()
     if not isinstance(session, Session):
@@ -282,7 +279,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         pass
 
     def load_cookie(self, request: web.Request) -> Optional[str]:
-        # TODO: Remove explicit type anotation when aiohttp 3.8 is out
+        # TODO: Remove explicit type annotation when aiohttp 3.8 is out
         cookie: Optional[str] = request.cookies.get(self._cookie_name)
         return cookie
 

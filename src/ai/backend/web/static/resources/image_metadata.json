@@ -1,0 +1,892 @@
+{
+  "imageInfo": {
+    "python": {
+      "name": "Python",
+      "description": "Python is a programming language that lets you work quickly and integrate systems more effectively.",
+      "group": "Language",
+      "tags": [],
+      "icon": "python.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Python",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-intel": {
+      "name": "Python (Intel)",
+      "description": "Python is a programming language that lets you work quickly and integrate systems more effectively. Optimized for Intel CPUs.",
+      "group": "Language",
+      "tags": [],
+      "icon": "python.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Python",
+          "color": "blue"
+        },
+        {
+          "tag": "Intel MKL",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-ff": {
+      "name": "Lablup Platform",
+      "description": "Lablup Research Platform is full-featured all-in-one research environment for machine learning and data science maintained by Lablup Inc.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "lablup.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Lablup Research Platform",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "python-tensorflow": {
+      "name": "TensorFlow",
+      "description": "TensorFlow is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML powered applications.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        }
+      ]
+    },
+    "aifactory-tensorflow": {
+      "name": "TensorFlow (Fashion-How)",
+      "description": "TensorFlow is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML powered applications.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-tfx": {
+      "name": "TensorFlow Extended",
+      "description": "TensorFlow Extended (TFX) is an end-to-end platform for deploying production ML pipelines.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-pytorch": {
+      "name": "PyTorch",
+      "description": "PyTorch is an open source machine learning framework that accelerates the path from research prototyping to production deployment.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "pytorch.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "PyTorch",
+          "color": "blue"
+        }
+      ]
+    },
+    "aifactory-pytorch": {
+      "name": "PyTorch (Fashion-How)",
+      "description": "PyTorch is an open source machine learning framework that accelerates the path from research prototyping to production deployment.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "pytorch.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "PyTorch",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-chainer": {
+      "name": "Chainer",
+      "description": "Chainer is a powerful, flexible and intuitive deep learning framework.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Chainer",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-caffe": {
+      "name": "Caffe",
+      "description": "Caffe is a deep learning framework made with expression, speed, and modularity in mind.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "caffe.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Caffe",
+          "color": "blue"
+        }
+      ]
+    },
+    "python-mxnet": {
+      "name": "MXNet",
+      "description": "MXNet is an open source deep learning framework suited for flexible research prototyping and production.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "mxnet.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Amazon MXNet",
+          "color": "blue"
+        }
+      ]
+    },
+    "swift-tensorflow": {
+      "name": "Swift For TensorFlow",
+      "description": "Swift for TensorFlow is a next generation system for deep learning and differentiable computing. TensorFlow is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML powered applications.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "swift-tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        }
+      ]
+    },
+    "julia-tensorflow": {
+      "name": "Julia TensorFlow",
+      "description": "This is Julia-integrated TensorFlow environment. TensorFlow is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML powered applications.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        }
+      ]
+    },
+    "julia-flux": {
+      "name": "Flux",
+      "description": "Flux is a Julia-based machine learning library. It comes batteries-included with many useful tools built in, but also lets you use the full power of the Julia language where you need it. Flux is 100% pure-Julia stack and provides lightweight abstractions on top of Julia's native GPU and AD support.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "flux.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Flux",
+          "color": "blue"
+        },
+        {
+          "tag": "Julia",
+          "color": "blue"
+        }
+      ]
+    },
+    "ngc-digits": {
+      "name": "DIGITS (NGC)",
+      "description": "This environment is integrated with Nvidia GPU Cloud. ",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "DIGITS",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-tensorflow": {
+      "name": "TensorFlow (NGC)",
+      "description": "TensorFlow is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML powered applications. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-pytorch": {
+      "name": "PyTorch (NGC)",
+      "description": "PyTorch is an open source machine learning framework that accelerates the path from research prototyping to production deployment. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "pytorch.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "PyTorch",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-caffe2": {
+      "name": "Caffe 2 (NGC)",
+      "description": "Caffe2 is a deep learning framework that provides an easy and straightforward way for you to experiment with deep learning and leverage community contributions of new models and algorithms. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "caffe2.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Caffe2",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-caffe3": {
+      "name": "Caffe (NGC, Python 3)",
+      "description": "Caffe is a deep learning framework made with expression, speed, and modularity in mind. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "caffe.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Caffe3",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-nvcaffe": {
+      "name": "NVCaffe (NGC)",
+      "description": "Caffe is a deep-learning framework made with flexibility, speed, and modularity in mind. NVCaffe is an NVIDIA-maintained fork of BVLC Caffe tuned for NVIDIA GPUs, particularly in multi-GPU configurations. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "caffe2.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Caffe",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-mxnet": {
+      "name": "MXNet (NGC)",
+      "description": "MXNet is an open source deep learning framework suited for flexible research prototyping and production. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "mxnet.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Amazon MXNet",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-triton": {
+      "name": "Triton Server (NGC)",
+      "description": "NVIDIA Triton Inference Server is an open-source, high-performance server that simplifies the deployment of AI models for inference in production environments..This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "nvidia.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Triton",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "ngc-matlab": {
+      "name": "MATLAB (NGC)",
+      "description": "MATLAB® combines a desktop environment tuned for iterative analysis and design processes with a programming language that expresses matrix and array mathematics directly. This environment is integrated with Nvidia GPU Cloud.",
+      "group": "Scientific Language",
+      "tags": [],
+      "icon": "matlab.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "MATLAB",
+          "color": "blue"
+        },
+        {
+          "tag": "Mathworks",
+          "color": "blue"
+        },
+        {
+          "tag": "Nvidia GPU Cloud",
+          "color": "green"
+        }
+      ]
+    },
+    "matlab": {
+      "name": "MATLAB",
+      "description": "MATLAB® combines a desktop environment tuned for iterative analysis and design processes with a programming language that expresses matrix and array mathematics directly.",
+      "group": "Scientific Language",
+      "tags": [],
+      "icon": "matlab.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "MATLAB",
+          "color": "blue"
+        },
+        {
+          "tag": "Mathworks",
+          "color": "blue"
+        }
+      ]
+    },
+    "intel-tensorflow": {
+      "name": "TensorFlow (Intel MKL)",
+      "description": "TensorFlow is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML powered applications. This environment is optimized with Intel MKL.",
+      "group": "Machine Learning / Deep Learning",
+      "tags": [],
+      "icon": "tensorflow.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "TensorFlow",
+          "color": "blue"
+        },
+        {
+          "tag": "Intel",
+          "color": "blue"
+        }
+      ]
+    },
+    "intel-python": {
+      "name": "Python (Intel MKL)",
+      "description": "Python is a programming language that lets you work quickly and integrate systems more effectively. This environment is optimized with Intel MKL.",
+      "group": "Language",
+      "tags": [],
+      "icon": "python.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Python",
+          "color": "blue"
+        },
+        {
+          "tag": "Intel",
+          "color": "blue"
+        }
+      ]
+    },
+    "apache-spark": {
+      "name": "Spark",
+      "description": "Apache Spark is an open-source unified analytics engine for large-scale data processing. Spark provides an interface for programming entire clusters with implicit data parallelism and fault tolerance.",
+      "group": "Big Data",
+      "tags": [],
+      "icon": "apache-spark.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Spark",
+          "color": "blue"
+        }
+      ]
+    },
+    "julia": {
+      "name": "Julia",
+      "description": "Julia was designed from the beginning for high performance.",
+      "group": "Scientific Language",
+      "tags": [],
+      "icon": "julia.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Julia",
+          "color": "blue"
+        }
+      ]
+    },
+    "r": {
+      "name": "R (legacy)",
+      "description": "R is a free software environment for statistical computing and graphics.",
+      "group": "Scientific Language",
+      "tags": [],
+      "icon": "r-lang.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "R",
+          "color": "blue"
+        }
+      ]
+    },
+    "r-base": {
+      "name": "R",
+      "description": "R is a free software environment for statistical computing and graphics.",
+      "group": "Scientific Language",
+      "tags": [],
+      "icon": "r-lang.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "R",
+          "color": "blue"
+        }
+      ]
+    },
+    "c": {
+      "name": "C",
+      "description": "C is a procedural programming language.",
+      "group": "Language",
+      "tags": [],
+      "icon": "c.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "C",
+          "color": "blue"
+        }
+      ]
+    },
+    "cpp": {
+      "name": "C++",
+      "description": "C++ is a cross-platform language that can be used to create high-performance applications.",
+      "group": "Language",
+      "tags": [],
+      "icon": "cpp.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "C++",
+          "color": "blue"
+        }
+      ]
+    },
+    "gcc": {
+      "name": "GCC",
+      "description": "The GNU Compiler Collection includes front ends for C, C++, Objective-C, Fortran, Ada, Go, and D, as well as libraries for these languages (libstdc++,...).",
+      "group": "Language",
+      "tags": [],
+      "icon": "gcc.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "C",
+          "color": "blue"
+        }
+      ]
+    },
+    "rust": {
+      "name": "Rust",
+      "description": "Rust is a modern systems programming language focusing on safety, speed, and concurrency. It accomplishes these goals by being memory safe without using garbage collection.",
+      "group": "Language",
+      "tags": [],
+      "icon": "rust.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Rust",
+          "color": "blue"
+        }
+      ]
+    },
+    "octave": {
+      "name": "GNU Octave",
+      "description": "GNU Octave is an free scientific programming language that provides powerful mathematics-oriented syntax with built-in plotting and visualization tools.",
+      "group": "Scientific Language",
+      "tags": [],
+      "icon": "octave.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Octave",
+          "color": "blue"
+        }
+      ]
+    },
+    "php": {
+      "name": "PHP",
+      "description": "PHP is a general-purpose programming language originally designed for web development.",
+      "group": "Language",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "PHP",
+          "color": "blue"
+        }
+      ]
+    },
+    "scala": {
+      "name": "Scala",
+      "description": "Scala is a general-purpose programming language providing support for functional programming and a strong static type system.",
+      "group": "Language",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Scala",
+          "color": "blue"
+        }
+      ]
+    },
+    "fortran-caf": {
+      "name": "Fortran",
+      "description": "Fortran is a general-purpose, compiled imperative programming language that is especially suited to numeric computation and scientific computing.",
+      "group": "Language",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Fortran",
+          "color": "blue"
+        }
+      ]
+    },
+    "swift": {
+      "name": "Swift",
+      "description": "Swift is a general-purpose programming language built using a modern approach to safety, performance, and software design patterns.",
+      "group": "Language",
+      "tags": [],
+      "icon": "swift.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Swift",
+          "color": "blue"
+        }
+      ]
+    },
+    "h2o": {
+      "name": "H2O.ai",
+      "description": "",
+      "group": "Deep Learning Toolkit",
+      "tags": [],
+      "icon": "h2o.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "H2O",
+          "color": "blue"
+        }
+      ]
+    },
+    "spectravis": {
+      "name": "SpectraVis",
+      "description": "An interactive network visualization tool for exploring functional brain connectivity using d3.js.",
+      "group": "Scientific Toolkit",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "SpectraVis",
+          "color": "blue"
+        }
+      ]
+    },
+    "neurodebian": {
+      "name": "NeuroDebian",
+      "description": "NeuroDebian provides a large collection of popular neuroscience research software for the Debian operating system as well as Ubuntu and other derivatives.",
+      "group": "Scientific Environment",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Debian",
+          "color": "blue"
+        }
+      ]
+    },
+    "afni": {
+      "name": "AFNI",
+      "description": "AFNI (Analysis of Functional NeuroImages) is a leading software suite of C, Python, R programs and shell scripts primarily developed for the analysis and display of anatomical and functional MRI (FMRI) data.",
+      "group": "Scientific Toolkit",
+      "tags": [],
+      "label": [
+        {
+          "category": "Env",
+          "tag": "AFNI",
+          "color": "blue"
+        },
+        {
+          "tag": "NeuroDebian",
+          "color": "yellow"
+        }
+      ]
+    },
+    "texlive": {
+      "name": "TeXLive",
+      "description": "TeX Live is an easy (we hope) way to get up and running with the TeX document production system.",
+      "group": "Language",
+      "tags": [],
+      "icon": "texlive.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "LaTeX",
+          "color": "blue"
+        }
+      ]
+    },
+    "filebrowser": {
+      "name": "FileBrowser",
+      "description": "",
+      "group": "Utilities",
+      "tags": [],
+      "icon": "filebrowser.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "FileBrowser",
+          "color": "blue"
+        }
+      ]
+    },
+    "ubuntu-linux": {
+      "name": "Ubuntu Linux",
+      "description": "Ubuntu is an open source software operating system that runs from the desktop, to the cloud, to all your internet connected things.",
+      "group": "Desktop Environment",
+      "tags": [],
+      "icon": "ubuntu.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Ubuntu Linux",
+          "color": "yellow"
+        }
+      ]
+    },
+    "kubuntu-linux": {
+      "name": "Kubuntu Linux",
+      "description": "Kubuntu is an official flavour of the Ubuntu operating system that uses the KDE Plasma Desktop instead of the GNOME desktop environment. As part of the Ubuntu project, Kubuntu uses the same underlying systems.",
+      "group": "Desktop Environment",
+      "tags": [],
+      "icon": "kubuntu.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Kubuntu Linux",
+          "color": "yellow"
+        }
+      ]
+    },
+    "sftp": {
+      "name": "SFTP",
+      "description": "",
+      "group": "Application",
+      "tags": [],
+      "icon": "sftp.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "SFTP",
+          "color": "blue"
+        },
+        {
+          "tag": "Backend.AI",
+          "color": "green"
+        }
+      ]
+    },
+    "mask-rcnn": {
+      "name": "MLPerf Mask-RCNN",
+      "description": "MLPerf Mask-RCNN module",
+      "group": "Benchmarks",
+      "tags": [],
+      "icon": "python.png",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Pytorch",
+          "color": "blue"
+        }
+      ]
+    },
+    "atom-orbit": {
+      "name": "Orbit Inference",
+      "description": "Orbit Inference Service",
+      "group": "Inference",
+      "tags": [],
+      "icon": "orbit.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Orbit",
+          "color": "red"
+        }
+      ]
+    }
+  },
+  "tagAlias": {
+    "python": "Python",
+    "tensorflow": "TensorFlow",
+    "pytorch": "PyTorch",
+    "lua": "Lua",
+    "r": "R",
+    "r-base": "R",
+    "julia": "Julia",
+    "rust": "Rust",
+    "cpp": "C++",
+    "gcc": "GCC",
+    "go": "Go",
+    "tester": "Tester",
+    "haskell": "Haskell",
+    "matlab": "MATLAB",
+    "sagemath": "Sage",
+    "texlive": "TeXLive",
+    "java": "Java",
+    "php": "PHP",
+    "octave": "Octave",
+    "nodejs": "Node",
+    "caffe": "Caffe",
+    "scheme": "Scheme",
+    "scala": "Scala",
+    "base": "Base",
+    "cntk": "CNTK",
+    "h2o": "H2O.AI",
+    "triton-server": "Triton Server",
+    "digits": "DIGITS",
+    "ubuntu-linux": "Ubuntu Linux",
+    "tf1": "TensorFlow 1",
+    "tf1.15": "TensorFlow 1.15",
+    "tf2": "TensorFlow 2",
+    "tf2.3": "TensorFlow 2.3",
+    "tf2.8": "TensorFlow 2.8",
+    "tf2.9": "TensorFlow 2.9",
+    "tf2.10": "TensorFlow 2.10",
+    "tf2.11": "TensorFlow 2.11",
+    "tf2.12": "TensorFlow 2.12",
+    "tf2.13": "TensorFlow 2.13",
+    "py3": "Python 3",
+    "py2": "Python 2",
+    "py27": "Python 2.7",
+    "py2.7": "Python 2.7",
+    "py35": "Python 3.5",
+    "py3.5": "Python 3.5",
+    "py36": "Python 3.6",
+    "py3.6": "Python 3.6",
+    "py37": "Python 3.7",
+    "py3.7": "Python 3.7",
+    "py38": "Python 3.8",
+    "py3.8": "Python 3.8",
+    "py39": "Python 3.9",
+    "py3.9": "Python 3.9",
+    "py310": "Python 3.10",
+    "py3.10": "Python 3.10",
+    "py311": "Python 3.11",
+    "py3.11": "Python 3.11",
+    "py312": "Python 3.12",
+    "py3.12": "Python 3.12",
+    "ji15": "Julia 1.5",
+    "ji16": "Julia 1.6",
+    "ji17": "Julia 1.7",
+    "lxde": "LXDE",
+    "lxqt": "LXQt",
+    "xfce": "XFCE",
+    "xrdp": "XRDP",
+    "gnome": "GNOME",
+    "kde": "KDE",
+    "ubuntu16.04": "Ubuntu 16.04",
+    "ubuntu18.04": "Ubuntu 18.04",
+    "ubuntu20.04": "Ubuntu 20.04",
+    "ubuntu22.04": "Ubuntu 22.04",
+    "intel": "Intel MKL",
+    "2018": "2018",
+    "2019": "2019",
+    "2020": "2020",
+    "2021": "2021",
+    "2022": "2022",
+    "2023": "2023",
+    "tpu": "TPU:TPUv3",
+    "tpuv3": "TPU:TPUv3",
+    "tpuv4": "TPU:TPUv4",
+    "rocm": "GPU:ROCm",
+    "rocm3": "GPU:ROCm3",
+    "rocm4": "GPU:ROCm4",
+    "rocm5": "GPU:ROCm5",
+    "cuda8": "GPU:CUDA8",
+    "cuda9": "GPU:CUDA9",
+    "cuda10": "GPU:CUDA10",
+    "cuda10.0": "GPU:CUDA10",
+    "cuda10.1": "GPU:CUDA10.1",
+    "cuda10.2": "GPU:CUDA10.2",
+    "cuda10.3": "GPU:CUDA10.3",
+    "cuda11": "GPU:CUDA11",
+    "cuda11.0": "GPU:CUDA11",
+    "cuda11.1": "GPU:CUDA11.1",
+    "cuda11.2": "GPU:CUDA11.2",
+    "cuda11.3": "GPU:CUDA11.3",
+    "cuda11.4": "GPU:CUDA11.4",
+    "cuda11.5": "GPU:CUDA11.5",
+    "cuda11.6": "GPU:CUDA11.6",
+    "cuda11.7": "GPU:CUDA11.7",
+    "cuda11.8": "GPU:CUDA11.8",
+    "cuda12": "GPU:CUDA12",
+    "cuda12.0": "GPU:CUDA12",
+    "cuda12.1": "GPU:CUDA12.1",
+    "miniconda": "Miniconda",
+    "anaconda2018.12": "Anaconda 2018.12",
+    "anaconda2019.12": "Anaconda 2019.12",
+    "anaconda2020.12": "Anaconda 2020.12",
+    "anaconda2021.12": "Anaconda 2021.12",
+    "anaconda2022.12": "Anaconda 2022.12",
+    "alpine3.8": "Alpine Linux 3.8",
+    "alpine3.12": "Alpine Linux 3.12",
+    "ngc": "Nvidia GPU Cloud",
+    "ff": "Research Env.",
+    "atom-orbit": "Orbit"
+  },
+  "tagReplace": {
+    "^(tf)([0-9.]*)$": "TensorFlow $2",
+    "^(pytorch)([0-9.]*)$": "PyTorch $2",
+    "^(cuda)([0-9.]*)$": "GPU:CUDA$2"
+  }
+}

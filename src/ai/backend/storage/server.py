@@ -6,8 +6,9 @@ import os
 import pwd
 import ssl
 import sys
+from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pprint
 from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
@@ -16,23 +17,29 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import config
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
-from .api.client import init_client_app
-from .api.manager import init_manager_app
-from .config import local_config_iv
-from .context import Context
+from .config import load_local_config, load_shared_config
+from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-@aiotools.server
-async def server_main_logwrapper(loop, pidx, _args):
+@aiotools.server_context
+async def server_main_logwrapper(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    _args: Sequence[Any],
+) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: storage-proxy worker-{pidx}")
     try:
         asyncio.get_child_watcher()
@@ -45,7 +52,13 @@ async def server_main_logwrapper(loop, pidx, _args):
             yield
 
 
-@aiotools.server
+async def check_migration(ctx: RootContext) -> None:
+    from .migration import check_latest
+
+    await check_latest(ctx)
+
+
+@actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -55,7 +68,8 @@ async def server_main(
     loop.set_debug(local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
-        port=local_config["storage-proxy"]["aiomonitor-port"] + pidx,
+        termui_port=local_config["storage-proxy"]["aiomonitor-termui-port"] + pidx,
+        webui_port=local_config["storage-proxy"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
@@ -69,83 +83,101 @@ async def server_main(
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     try:
-        etcd_credentials = None
-        if local_config["etcd"]["user"]:
-            etcd_credentials = {
-                "user": local_config["etcd"]["user"],
-                "password": local_config["etcd"]["password"],
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
-        }
-        etcd = AsyncEtcd(
-            local_config["etcd"]["addr"],
-            local_config["etcd"]["namespace"],
-            scope_prefix_map,
-            credentials=etcd_credentials,
-        )
-        ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
-        m.console_locals["ctx"] = ctx
-        client_api_app = await init_client_app(ctx)
-        manager_api_app = await init_manager_app(ctx)
-        m.console_locals["client_api_app"] = client_api_app
-        m.console_locals["manager_api_app"] = manager_api_app
-
-        client_ssl_ctx = None
-        manager_ssl_ctx = None
-        if local_config["api"]["client"]["ssl-enabled"]:
-            client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            client_ssl_ctx.load_cert_chain(
-                str(local_config["api"]["client"]["ssl-cert"]),
-                str(local_config["api"]["client"]["ssl-privkey"]),
-            )
-        if local_config["api"]["manager"]["ssl-enabled"]:
-            manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            manager_ssl_ctx.load_cert_chain(
-                str(local_config["api"]["manager"]["ssl-cert"]),
-                str(local_config["api"]["manager"]["ssl-privkey"]),
-            )
-        client_api_runner = web.AppRunner(client_api_app)
-        manager_api_runner = web.AppRunner(manager_api_app)
-        await client_api_runner.setup()
-        await manager_api_runner.setup()
-        client_service_addr = local_config["api"]["client"]["service-addr"]
-        manager_service_addr = local_config["api"]["manager"]["service-addr"]
-        client_api_site = web.TCPSite(
-            client_api_runner,
-            str(client_service_addr.host),
-            client_service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=client_ssl_ctx,
-        )
-        manager_api_site = web.TCPSite(
-            manager_api_runner,
-            str(manager_service_addr.host),
-            manager_service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=manager_ssl_ctx,
-        )
-        await client_api_site.start()
-        await manager_api_site.start()
-        if os.geteuid() == 0:
-            uid = local_config["storage-proxy"]["user"]
-            gid = local_config["storage-proxy"]["group"]
-            os.setgroups(
-                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
-            )
-            os.setgid(gid)
-            os.setuid(uid)
-            log.info("Changed process uid:gid to {}:{}", uid, gid)
-        log.info("Started service.")
+        etcd = load_shared_config(local_config)
         try:
-            yield
-        finally:
-            log.info("Shutting down...")
-            await manager_api_runner.cleanup()
-            await client_api_runner.cleanup()
+            redis_config = redis_config_iv.check(
+                await etcd.get_prefix("config/redis"),
+            )
+            log.info(f"PID: {pidx} - configured redis_addr: {redis_config['addr']}")
+        except Exception as e:
+            log.exception("Unable to read config from etcd")
+            raise e
+
+        event_producer = await EventProducer.new(
+            redis_config,
+            db=REDIS_STREAM_DB,
+            log_events=local_config["debug"]["log-events"],
+        )
+        log.info(f"PID: {pidx} - Event producer created. (addr: {redis_config['addr']})")
+        event_dispatcher = await EventDispatcher.new(
+            redis_config,
+            db=REDIS_STREAM_DB,
+            log_events=local_config["debug"]["log-events"],
+            node_id=local_config["storage-proxy"]["node-id"],
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+        )
+        log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
+        ctx = RootContext(
+            pid=os.getpid(),
+            local_config=local_config,
+            etcd=etcd,
+            event_producer=event_producer,
+            event_dispatcher=event_dispatcher,
+        )
+        async with ctx:
+            m.console_locals["ctx"] = ctx
+            m.console_locals["client_api_app"] = ctx.client_api_app
+            m.console_locals["manager_api_app"] = ctx.manager_api_app
+
+            if pidx == 0:
+                await check_migration(ctx)
+
+            client_ssl_ctx = None
+            manager_ssl_ctx = None
+            if local_config["api"]["client"]["ssl-enabled"]:
+                client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                client_ssl_ctx.load_cert_chain(
+                    str(local_config["api"]["client"]["ssl-cert"]),
+                    str(local_config["api"]["client"]["ssl-privkey"]),
+                )
+            if local_config["api"]["manager"]["ssl-enabled"]:
+                manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                manager_ssl_ctx.load_cert_chain(
+                    str(local_config["api"]["manager"]["ssl-cert"]),
+                    str(local_config["api"]["manager"]["ssl-privkey"]),
+                )
+            client_api_runner = web.AppRunner(ctx.client_api_app)
+            manager_api_runner = web.AppRunner(ctx.manager_api_app)
+            await client_api_runner.setup()
+            await manager_api_runner.setup()
+            client_service_addr = local_config["api"]["client"]["service-addr"]
+            manager_service_addr = local_config["api"]["manager"]["service-addr"]
+            client_api_site = web.TCPSite(
+                client_api_runner,
+                str(client_service_addr.host),
+                client_service_addr.port,
+                backlog=1024,
+                reuse_port=True,
+                ssl_context=client_ssl_ctx,
+            )
+            manager_api_site = web.TCPSite(
+                manager_api_runner,
+                str(manager_service_addr.host),
+                manager_service_addr.port,
+                backlog=1024,
+                reuse_port=True,
+                ssl_context=manager_ssl_ctx,
+            )
+            await client_api_site.start()
+            await manager_api_site.start()
+            if os.geteuid() == 0:
+                uid = local_config["storage-proxy"]["user"]
+                gid = local_config["storage-proxy"]["group"]
+                os.setgroups(
+                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+                )
+                os.setgid(gid)
+                os.setuid(uid)
+                log.info("Changed process uid:gid to {}:{}", uid, gid)
+            log.info("Started service.")
+            try:
+                yield
+            finally:
+                log.info("Shutting down...")
+                await manager_api_runner.cleanup()
+                await client_api_runner.cleanup()
+                await event_producer.close()
+                await event_dispatcher.close()
     finally:
         if aiomon_started:
             m.close()
@@ -158,8 +190,10 @@ async def server_main(
     "--config",
     type=Path,
     default=None,
-    help="The config file path. "
-    "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)",
+    help=(
+        "The config file path. "
+        "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)"
+    ),
 )
 @click.option(
     "--debug",
@@ -173,47 +207,31 @@ async def server_main(
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, log_level, debug=False):
-
+def main(
+    cli_ctx: click.Context,
+    config_path: Path,
+    log_level: LogSeverity,
+    debug: bool = False,
+) -> int:
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
 
-    # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")
-
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    if log_level == LogSeverity.DEBUG:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
-
     try:
-        local_config = config.check(raw_cfg, local_config_iv)
-        local_config["_src"] = cfg_src_path
-    except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of agent configuration has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
+        local_config = load_local_config(config_path, debug=debug)
+    except ConfigurationError:
         raise click.Abort()
-
-    config.override_key(local_config, ("logging", "level"), log_level.name)
-    config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
-
-    # if os.getuid() != 0:
-    #     print('Storage agent can only be run as root', file=sys.stderr)
-    #     raise click.Abort()
+    override_key(local_config, ("logging", "level"), log_level.name)
+    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
     multiprocessing.set_start_method("spawn")
 
     if cli_ctx.invoked_subcommand is None:
         local_config["storage-proxy"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
         log_sockpath = Path(
-            f"/tmp/backend.ai/ipc/storage-proxy-logger-{os.getpid()}.sock",
+            ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
         )
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"

@@ -118,8 +118,8 @@ class BasePluginContext(Generic[P]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: set[str] = None,
-        blocklist: set[str] = None,
+        allowlist: Optional[set[str]] = None,
+        blocklist: Optional[set[str]] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
         cls_allowlist = set() if cls.allowlist is None else cls.allowlist
         arg_allowlist = set() if allowlist is None else allowlist
@@ -144,7 +144,9 @@ class BasePluginContext(Generic[P]):
             if union := allowlist & blocklist:
                 raise ConfigurationError(
                     {
-                        "plugin.BasePluginContext": f"allowlist and blocklist has union value '{union}'"
+                        "plugin.BasePluginContext": (
+                            f"allowlist and blocklist has union value '{union}'"
+                        )
                     }
                 )
         scanned_plugins = self.discover_plugins(

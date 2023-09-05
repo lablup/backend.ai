@@ -22,7 +22,7 @@ ssl-enabled = false
 #ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
 #ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
 # ipc-base-path = "/tmp/backend.ai/ipc"
-heartbeat-timeout = 10.0
+heartbeat-timeout = 40.0
 #id = ""
 pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
 # allowed-plugins = []
@@ -30,6 +30,8 @@ disabled-plugins = []
 
 hide-agents = true
 
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 [docker-registry]
 ssl-verify = false

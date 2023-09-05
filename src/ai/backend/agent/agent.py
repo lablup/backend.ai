@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import sys
+import textwrap
 import time
 import traceback
 import weakref
@@ -27,6 +28,7 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    Final,
     FrozenSet,
     Generic,
     List,
@@ -48,6 +50,7 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
+import yaml
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -60,8 +63,11 @@ from tenacity import (
     stop_after_delay,
     wait_fixed,
 )
+from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.config import model_definition_iv
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -69,14 +75,17 @@ from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
-    DoSyncKernelStatsEvent,
+    EventDispatcher,
     EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelHealthCheckFailedEvent,
+    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -90,9 +99,13 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReportValue,
+    AcceleratorMetadata,
+    AgentId,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
+    CommitStatus,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -107,15 +120,17 @@ from ai.backend.common.types import (
     ServicePort,
     ServicePortProtocols,
     SessionId,
+    SessionTypes,
     SlotName,
     VFolderMount,
+    VFolderUsageMode,
     aobject,
 )
 from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
-from .affinity_map import AffinityHint, AffinityMap
+from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -124,6 +139,7 @@ from .resources import (
     AbstractComputePlugin,
     KernelResourceSpec,
     Mount,
+    allocate,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -152,6 +168,8 @@ DEAD_STATUS_SET = frozenset(
     ]
 )
 
+COMMIT_STATUS_EXPIRE: Final[int] = 13
+EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
@@ -159,6 +177,8 @@ KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
     kernel_id: KernelId
+    session_id: SessionId
+    agent_id: AgentId
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
     kernel_features: FrozenSet[str]
@@ -171,15 +191,19 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
         self.kernel_features = frozenset(self.image_labels.get("ai.backend.features", "").split())
         self.kernel_id = kernel_id
+        self.session_id = session_id
+        self.agent_id = agent_id
         self.kernel_config = kernel_config
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
@@ -209,6 +233,12 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     @abstractmethod
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
+
+    def update_user_bootstrap_script(self, script: str) -> None:
+        """
+        Replace user-defined bootstrap script to an arbitrary one created by agent.
+        """
+        self.kernel_config["bootstrap_script"] = script
 
     @abstractmethod
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
@@ -392,8 +422,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/opt/kernel/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/opt/kernel/scp")
+        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
+        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
         mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
         mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
         mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
@@ -447,13 +477,13 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         for dev_type, device_alloc in resource_spec.allocations.items():
-            computer_set = self.computers[dev_type]
+            computer_ctx = self.computers[dev_type]
             await self.apply_accelerator_allocation(
-                computer_set.instance,
+                computer_ctx.instance,
                 device_alloc,
             )
             accelerator_mounts = await self.generate_accelerator_mounts(
-                computer_set.instance,
+                computer_ctx.instance,
                 device_alloc,
             )
             for mount_info in accelerator_mounts:
@@ -462,11 +492,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             for dev_id, per_dev_alloc in device_alloc.items():
                 alloc_sum += sum(per_dev_alloc.values())
             if alloc_sum > 0:
-                hook_paths = await computer_set.instance.get_hooks(distro, arch)
+                hook_paths = await computer_ctx.instance.get_hooks(distro, arch)
                 if hook_paths:
                     log.debug(
                         "accelerator {} provides hooks: {}",
-                        type(computer_set.instance).__name__,
+                        type(computer_ctx.instance).__name__,
                         ", ".join(map(str, hook_paths)),
                     )
                 for hook_path in map(lambda p: Path(p).absolute(), hook_paths):
@@ -500,13 +530,13 @@ class ComputerContext:
 class AbstractAgent(
     aobject, Generic[KernelObjectType, KernelCreationContextType], metaclass=ABCMeta
 ):
-
+    id: AgentId
     loop: asyncio.AbstractEventLoop
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
-    computers: MutableMapping[str, ComputerContext]
+    computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
     port_pool: Set[int]
 
@@ -541,6 +571,7 @@ class AbstractAgent(
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
+        self.id = AgentId(local_config["agent"]["id"])
         self.local_instance_id = generate_local_instance_id(__file__)
         self.kernel_registry = {}
         self.computers = {}
@@ -575,20 +606,42 @@ class AbstractAgent(
 
         self.event_producer = await EventProducer.new(
             self.local_config["redis"],
-            db=4,
+            db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
+        )
+        self.event_dispatcher = await EventDispatcher.new(
+            self.local_config["redis"],
+            db=REDIS_STREAM_DB,
+            log_events=self.local_config["debug"]["log-events"],
+            node_id=self.local_config["agent"]["id"],
+            consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
-        all_devices: list[AbstractComputeDevice] = []
+        all_devices: List[AbstractComputeDevice] = []
+        metadatas: List[AcceleratorMetadata] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
             all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
+            metadatas.append(computer.get_metadata())
+
+        async def _pipeline(r: Redis):
+            pipe = r.pipeline()
+            for metadata in metadatas:
+                await pipe.hset(
+                    "computer.metadata",
+                    metadata["slot_name"],
+                    json.dumps(metadata),
+                )
+            return pipe
+
+        await redis_helper.execute(self.redis_stat_pool, _pipeline)
+
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
@@ -602,7 +655,8 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.collect_process_stat, 5.0))
 
         # Prepare heartbeats.
-        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, 3.0))
+        heartbeat_interval = self.local_config["debug"]["heartbeat-interval"]
+        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
 
         # Prepare auto-cleaning of idle kernels.
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
@@ -613,6 +667,11 @@ class AbstractAgent(
             )
             abuse_report_path.mkdir(exist_ok=True, parents=True)
             self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
+
+        # Report commit status
+        self.timer_tasks.append(
+            aiotools.create_timer(self._report_all_kernel_commit_status_map, 7.0)
+        )
 
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
@@ -652,6 +711,7 @@ class AbstractAgent(
 
         # Shut down the event dispatcher and Redis connection pools.
         await self.event_producer.close()
+        await self.event_dispatcher.close()
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
 
@@ -677,7 +737,7 @@ class AbstractAgent(
                             continue
         if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
             await self.save_last_registry()
-        await self.event_producer.produce_event(event, source=self.local_config["agent"]["id"])
+        await self.event_producer.produce_event(event, source=str(self.id))
 
     async def produce_error_event(
         self,
@@ -687,6 +747,52 @@ class AbstractAgent(
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
         await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
+
+    async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
+        """
+        Commit statuses are managed by `lock` file.
+        +- base_commit_path
+        |_ subdir1 (usually user's email)
+            |_ commit_file1 (named by timestamp)
+            |_ commit_file2
+            |_ lock
+                |_ kernel_id1 (means the user is currently committing the kernel)
+                |_ kernel_id2
+        |_ subdir2
+        """
+        loop = current_loop()
+        base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        commit_kernels: set[str] = set()
+
+        def _map_commit_status() -> None:
+            for subdir in base_commit_path.iterdir():
+                for commit_path in subdir.glob("./**/lock/*"):
+                    kern = commit_path.name
+                    if kern not in commit_kernels:
+                        commit_kernels.add(kern)
+
+        await loop.run_in_executor(None, _map_commit_status)
+
+        commit_status_script = textwrap.dedent("""
+        local key_and_value = {}
+        for i, k in pairs(KEYS) do
+            key_and_value[i*2-1] = k
+            key_and_value[i*2] = 'ongoing'
+        end
+        if next(key_and_value) ~= nil then
+            redis.call('MSET', unpack(key_and_value))
+            for i, k in pairs(KEYS) do
+                redis.call('EXPIRE', k, ARGV[1])
+            end
+        end
+        """)
+        await redis_helper.execute_script(
+            self.redis_stat_pool,
+            "check_kernel_commit_statuses",
+            commit_status_script,
+            [f"kernel.{kern}.commit" for kern in commit_kernels],
+            [COMMIT_STATUS_EXPIRE],
+        )
 
     async def heartbeat(self, interval: float):
         """
@@ -705,6 +811,7 @@ class AbstractAgent(
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
                 "addr": f"tcp://{self.local_config['agent']['rpc-listen-addr']}",
+                "public_host": str(self._get_public_host()),
                 "resource_slots": res_slots,
                 "version": VERSION,
                 "compute_plugins": {
@@ -719,6 +826,9 @@ class AbstractAgent(
                 ),
                 "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
+                "auto_terminate_abusing_kernel": self.local_config["agent"][
+                    "force-terminate-abusing-containers"
+                ],
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
@@ -792,18 +902,13 @@ class AbstractAgent(
         if self.local_config["debug"]["log-stats"]:
             log.debug("collecting container statistics")
         try:
-            updated_kernel_ids = []
             container_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
                     if not kernel_obj.stats_enabled:
                         continue
-                    updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
                 await self.stat_ctx.collect_container_stat(container_ids)
-            # Let the manager store the statistics in the persistent database.
-            if updated_kernel_ids:
-                await self.produce_event(DoSyncKernelStatsEvent(updated_kernel_ids))
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -829,6 +934,15 @@ class AbstractAgent(
             log.exception("unhandled exception while syncing process stats")
             await self.produce_error_event()
 
+    def _get_public_host(self) -> str:
+        agent_config: Mapping[str, Any] = self.local_config["agent"]
+        container_config: Mapping[str, Any] = self.local_config["container"]
+        return (
+            agent_config.get("public-host")
+            or container_config.get("advertised-host")
+            or container_config["bind-host"]
+        )
+
     async def _handle_start_event(self, ev: ContainerLifecycleEvent) -> None:
         async with self.registry_lock:
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
@@ -849,11 +963,13 @@ class AbstractAgent(
                         "destroy_kernel(k:{0}) kernel missing (already dead?)", ev.kernel_id
                     )
                     if ev.container_id is None:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
                                 KernelTerminatedEvent(
-                                    ev.kernel_id, KernelLifecycleEventReason.ALREADY_TERMINATED
+                                    ev.kernel_id,
+                                    ev.session_id,
+                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
                                 ),
                             )
                         if ev.done_future is not None:
@@ -876,6 +992,7 @@ class AbstractAgent(
                         await self.container_lifecycle_queue.put(
                             ContainerLifecycleEvent(
                                 ev.kernel_id,
+                                ev.session_id,
                                 ev.container_id,
                                 LifecycleEvent.CLEAN,
                                 ev.reason,
@@ -937,10 +1054,12 @@ class AbstractAgent(
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
                         restart_tracker.destroy_event.set()
                     else:
-                        await self.rescan_resource_usage()
+                        await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
-                                KernelTerminatedEvent(ev.kernel_id, ev.reason),
+                                KernelTerminatedEvent(
+                                    ev.kernel_id, ev.session_id, reason=ev.reason
+                                ),
                             )
                     # Notify cleanup waiters after all state updates.
                     if kernel_obj is not None and kernel_obj.clean_event is not None:
@@ -988,6 +1107,7 @@ class AbstractAgent(
     async def inject_container_lifecycle_event(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         event: LifecycleEvent,
         reason: KernelLifecycleEventReason,
         *,
@@ -1043,6 +1163,7 @@ class AbstractAgent(
         await self.container_lifecycle_queue.put(
             ContainerLifecycleEvent(
                 kernel_id,
+                session_id,
                 cid,
                 event,
                 reason,
@@ -1061,16 +1182,20 @@ class AbstractAgent(
         Enumerate the containers with the given status filter.
         """
 
-    async def rescan_resource_usage(self) -> None:
+    async def reconstruct_resource_usage(self) -> None:
+        """
+        Reconstruct the resource alloc maps for each compute plugin from
+        ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+        """
         async with self.resource_lock:
-            for computer_set in self.computers.values():
-                computer_set.alloc_map.clear()
+            for computer_ctx in self.computers.values():
+                computer_ctx.alloc_map.clear()
             for kernel_id, container in await self.enumerate_containers():
-                for computer_set in self.computers.values():
+                for computer_ctx in self.computers.values():
                     try:
-                        await computer_set.instance.restore_from_container(
+                        await computer_ctx.instance.restore_from_container(
                             container,
-                            computer_set.alloc_map,
+                            computer_ctx.alloc_map,
                         )
                     except Exception:
                         log.warning(
@@ -1088,9 +1213,10 @@ class AbstractAgent(
         """
         known_kernels: Dict[KernelId, ContainerId] = {}
         alive_kernels: Dict[KernelId, ContainerId] = {}
+        kernel_session_map: Dict[KernelId, SessionId] = {}
         terminated_kernels = {}
 
-        async with self.resource_lock:
+        async with self.registry_lock:
             try:
                 # Check if: there are dead containers
                 for kernel_id, container in await self.enumerate_containers(DEAD_STATUS_SET):
@@ -1104,16 +1230,22 @@ class AbstractAgent(
                         kernel_id,
                         container.id,
                     )
+                    session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                     terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                         kernel_id,
+                        session_id,
                         known_kernels[kernel_id],
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
                     )
                 for kernel_id, container in await self.enumerate_containers(ACTIVE_STATUS_SET):
                     alive_kernels[kernel_id] = container.id
+                    session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
+                    kernel_session_map[kernel_id] = session_id
                 for kernel_id, kernel_obj in self.kernel_registry.items():
                     known_kernels[kernel_id] = kernel_obj["container_id"]
+                    session_id = kernel_obj.session_id
+                    kernel_session_map[kernel_id] = session_id
                 # Check if: kernel_registry has the container but it's gone.
                 for kernel_id in known_kernels.keys() - alive_kernels.keys():
                     if (
@@ -1123,6 +1255,7 @@ class AbstractAgent(
                         continue
                     terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                         kernel_id,
+                        kernel_session_map[kernel_id],
                         known_kernels[kernel_id],
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
@@ -1133,6 +1266,7 @@ class AbstractAgent(
                         continue
                     terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                         kernel_id,
+                        kernel_session_map[kernel_id],
                         alive_kernels[kernel_id],
                         LifecycleEvent.DESTROY,
                         KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
@@ -1152,6 +1286,7 @@ class AbstractAgent(
         for kernel_id in kernel_ids:
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                self.kernel_registry[kernel_id].session_id,
                 LifecycleEvent.DESTROY,
                 KernelLifecycleEventReason.AGENT_TERMINATION,
                 done_future=clean_events[kernel_id] if blocking else None,
@@ -1202,6 +1337,7 @@ class AbstractAgent(
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):
+        # dest_path == abuse_report_path
         dest_path: Path = self.local_config["agent"]["abuse-report-path"]
         auto_terminate: bool = self.local_config["agent"].get(
             "force-terminate-abusing-containers", False
@@ -1214,16 +1350,25 @@ class AbstractAgent(
         def _rm(path: Path) -> None:
             os.remove(path)
 
-        terminated_kernels: MutableMapping[str, ContainerLifecycleEvent] = {}
+        terminated_kernels: dict[str, ContainerLifecycleEvent] = {}
+        abuse_report: dict[str, str] = {}
         try:
             async with FileLock(path=dest_path / "report.lock"):
                 for reported_kernel in dest_path.glob("report.*.json"):
                     raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
-                    body: MutableMapping[str, str] = json.loads(raw_body)
+                    body: dict[str, str] = json.loads(raw_body)
+                    kern_id = body["ID"]
                     if auto_terminate:
                         log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
+                        kernel_id = KernelId(UUID(body["ID"]))
+                        kernel_obj = self.kernel_registry.get(kernel_id)
+                        if kernel_obj is None:
+                            continue
+                        abuse_report[kern_id] = AbuseReportValue.CLEANING.value
+                        session_id = kernel_obj.session_id
                         terminated_kernels[body["ID"]] = ContainerLifecycleEvent(
-                            KernelId(UUID(body["ID"])),
+                            kernel_id,
+                            session_id,
                             ContainerId(body["CID"]),
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.from_value(body.get("reason"))
@@ -1231,14 +1376,47 @@ class AbstractAgent(
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
+                        abuse_report[kern_id] = AbuseReportValue.DETECTED.value
                         log.debug(
                             "abusing container detected, skipping auto-termination: {} ({})",
-                            body["ID"],
+                            kern_id,
                             body.get("reason"),
                         )
+        except Exception:
+            log.exception("error while paring abuse reports:")
         finally:
-            for kernel_id, ev in terminated_kernels.items():
+            for kid, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
+
+            hash_name = "abuse_report"
+            abuse_report_script = textwrap.dedent("""
+                local key = KEYS[1]
+                local new_report = cjson.decode(ARGV[1])
+
+                -- Delete dangling reports
+                local all_report = redis.call('HKEYS', key)
+                if all_report ~= nil and next(all_report) ~= nil then
+                    for _, v in ipairs(all_report) do
+                        if next(all_report) == nil or not new_report[v] then
+                            redis.call('HDEL', key, v)
+                        end
+                    end
+                end
+
+                -- Update new reports
+                if next(new_report) ~= nil then
+                    for kern_id, report_val in pairs(new_report) do
+                        redis.call('HSET', key, kern_id, report_val)
+                    end
+                end
+            """)
+            await redis_helper.execute_script(
+                self.redis_stat_pool,
+                "report_abusing_kernels",
+                abuse_report_script,
+                [hash_name],
+                [json.dumps(abuse_report)],
+            )
 
     @abstractmethod
     async def scan_images(self) -> Mapping[str, str]:
@@ -1280,20 +1458,21 @@ class AbstractAgent(
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
                 self.kernel_registry = pickle.load(f)
-                for kernel_obj in self.kernel_registry.values():
-                    kernel_obj.agent_config = self.local_config
-                    if kernel_obj.runner is not None:
-                        await kernel_obj.runner.__ainit__()
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
             )
         except FileNotFoundError:
             pass
-        async with self.resource_lock:
+        for kernel_obj in self.kernel_registry.values():
+            kernel_obj.agent_config = self.local_config
+            if kernel_obj.runner is not None:
+                await kernel_obj.runner.__ainit__()
+        async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
                 ACTIVE_STATUS_SET | DEAD_STATUS_SET,
             ):
+                session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                 if container.status in ACTIVE_STATUS_SET:
                     kernelspec = int(container.labels.get("ai.backend.kernelspec", "1"))
                     if not (MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC):
@@ -1303,13 +1482,15 @@ class AbstractAgent(
                         if p.host_port is not None:
                             self.port_pool.discard(p.host_port)
                     # Restore compute resources.
-                    for computer_set in self.computers.values():
-                        await computer_set.instance.restore_from_container(
-                            container,
-                            computer_set.alloc_map,
-                        )
+                    async with self.resource_lock:
+                        for computer_ctx in self.computers.values():
+                            await computer_ctx.instance.restore_from_container(
+                                container,
+                                computer_ctx.alloc_map,
+                            )
                     await self.inject_container_lifecycle_event(
                         kernel_id,
+                        session_id,
                         LifecycleEvent.START,
                         KernelLifecycleEventReason.RESUMING_AGENT_OPERATION,
                         container_id=container.id,
@@ -1322,6 +1503,7 @@ class AbstractAgent(
                     )
                     await self.inject_container_lifecycle_event(
                         kernel_id,
+                        session_id,
                         LifecycleEvent.CLEAN,
                         KernelLifecycleEventReason.SELF_TERMINATED,
                         container_id=container.id,
@@ -1335,6 +1517,7 @@ class AbstractAgent(
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1373,7 +1556,7 @@ class AbstractAgent(
                 except KeyError:
                     await self.produce_event(
                         KernelTerminatedEvent(
-                            kernel_id, KernelLifecycleEventReason.SELF_TERMINATED
+                            kernel_id, session_id, reason=KernelLifecycleEventReason.SELF_TERMINATED
                         ),
                     )
                     break
@@ -1418,376 +1601,458 @@ class AbstractAgent(
         cluster_info: ClusterInfo,
         *,
         restarting: bool = False,
+        throttle_sema: Optional[asyncio.Semaphore] = None,
     ) -> KernelCreationResult:
         """
         Create a new kernel.
         """
+        if throttle_sema is None:
+            # make a local semaphore
+            throttle_sema = asyncio.Semaphore(1)
+        async with throttle_sema:
+            if not restarting:
+                await self.produce_event(
+                    KernelPreparingEvent(kernel_id, session_id),
+                )
 
-        if not restarting:
-            await self.produce_event(
-                KernelPreparingEvent(kernel_id),
+            # Initialize the creation context
+            if self.local_config["debug"]["log-kernel-config"]:
+                log.debug("Kernel creation config: {0}", pretty(kernel_config))
+            ctx = await self.init_kernel_context(
+                kernel_id,
+                session_id,
+                kernel_config,
+                restarting=restarting,
+                cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
             )
+            environ: MutableMapping[str, str] = {**kernel_config["environ"]}
 
-        # Initialize the creation context
-        if self.local_config["debug"]["log-kernel-config"]:
-            log.debug("Kernel creation config: {0}", pretty(kernel_config))
-        ctx = await self.init_kernel_context(
-            kernel_id,
-            kernel_config,
-            restarting=restarting,
-            cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
-        )
-        environ: MutableMapping[str, str] = {**kernel_config["environ"]}
-
-        # Inject Backend.AI-intrinsic env-variables for gosu
-        if KernelFeatures.UID_MATCH in ctx.kernel_features:
-            uid = self.local_config["container"]["kernel-uid"]
-            gid = self.local_config["container"]["kernel-gid"]
-            environ["LOCAL_USER_ID"] = str(uid)
-            environ["LOCAL_GROUP_ID"] = str(gid)
-        environ.update(
-            await ctx.get_extra_envs(),
-        )
-        image_labels = kernel_config["image"]["labels"]
-
-        agent_architecture = get_arch_name()
-        if agent_architecture != ctx.image_ref.architecture:
-            # disable running different architecture's image
-            raise AgentError(
-                f"cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine",
+            # Inject Backend.AI-intrinsic env-variables for gosu
+            if KernelFeatures.UID_MATCH in ctx.kernel_features:
+                uid = self.local_config["container"]["kernel-uid"]
+                gid = self.local_config["container"]["kernel-gid"]
+                environ["LOCAL_USER_ID"] = str(uid)
+                environ["LOCAL_GROUP_ID"] = str(gid)
+            environ.update(
+                await ctx.get_extra_envs(),
             )
+            image_labels = kernel_config["image"]["labels"]
 
-        # Check if we need to pull the container image
-        do_pull = (not ctx.image_ref.is_local) and await self.check_image(
-            ctx.image_ref,
-            kernel_config["image"]["digest"],
-            AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
-        )
-        if do_pull:
-            await self.produce_event(
-                KernelPullingEvent(kernel_id, ctx.image_ref.canonical),
+            agent_architecture = get_arch_name()
+            if agent_architecture != ctx.image_ref.architecture:
+                # disable running different architecture's image
+                raise AgentError(
+                    f"cannot run {ctx.image_ref.architecture} image on"
+                    f" {agent_architecture} machine",
+                )
+
+            # Check if we need to pull the container image
+            do_pull = (not ctx.image_ref.is_local) and await self.check_image(
+                ctx.image_ref,
+                kernel_config["image"]["digest"],
+                AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
-            await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+            if do_pull:
+                await self.produce_event(
+                    KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
+                )
+                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
 
-        if not restarting:
-            await self.produce_event(
-                KernelCreatingEvent(kernel_id),
-            )
+            if not restarting:
+                await self.produce_event(
+                    KernelCreatingEvent(kernel_id, session_id),
+                )
 
-        # Get the resource spec from existing kernel scratches
-        # or create a new resource spec from ctx.kernel_config
-        resource_spec, resource_opts = await ctx.prepare_resource_spec()
-        # When creating a new kernel,
-        # we need to allocate agent resources, prepare the networks,
-        # adn specify the container mounts.
+            # Get the resource spec from existing kernel scratches
+            # or create a new resource spec from ctx.kernel_config
+            resource_spec, resource_opts = await ctx.prepare_resource_spec()
+            # When creating a new kernel,
+            # we need to allocate agent resources, prepare the networks,
+            # adn specify the container mounts.
 
-        # Mount backend-specific intrinsic mounts (e.g., scratch directories)
-        if not restarting:
-            resource_spec.mounts.extend(
-                await ctx.get_intrinsic_mounts(),
-            )
+            # Mount backend-specific intrinsic mounts (e.g., scratch directories)
+            if not restarting:
+                resource_spec.mounts.extend(
+                    await ctx.get_intrinsic_mounts(),
+                )
 
-        # Realize ComputeDevice (including accelerators) allocations.
-        slots = resource_spec.slots
-        dev_names: set[DeviceName] = set()
-        for slot_name in slots.keys():
-            dev_name = slot_name.split(".", maxsplit=1)[0]
-            dev_names.add(DeviceName(dev_name))
-
-        if not restarting:
-            alloc_order = [
-                DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
-            ]
-            ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
-            affinity_hint = AffinityHint(
-                None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
-            )
-            async with self.resource_lock:
-                for dev_name in ordered_dev_names:
-                    computer_set = self.computers[dev_name]
-                    device_id_map = {device.device_id: device for device in computer_set.devices}
-                    device_specific_slots = {
-                        SlotName(slot_name): Decimal(alloc)
-                        for slot_name, alloc in slots.items()
-                        if slot_name.startswith(dev_name)
-                    }
+            # Realize ComputeDevice (including accelerators) allocations.
+            if not restarting:
+                alloc_order = [
+                    DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
+                ]
+                async with self.resource_lock:
                     try:
-                        resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
-                            device_specific_slots,
-                            affinity_hint=affinity_hint,
-                            context_tag=dev_name,
+                        allocate(
+                            self.computers,
+                            resource_spec,
+                            alloc_order,
+                            self.affinity_map,
+                            self.local_config["resource"]["affinity-policy"],
                         )
-                        log.debug(
-                            "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
-                        )
-                        hint_devices: list[AbstractComputeDevice] = []
-                        for slot_name, per_device_alloc in resource_spec.allocations[
-                            dev_name
-                        ].items():
-                            hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
-                        affinity_hint = AffinityHint(
-                            hint_devices, self.affinity_map, affinity_hint.policy
-                        )
-                    except ResourceError as e:
-                        log.info(
-                            "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",
-                            type(e).__name__,
-                            device_specific_slots,
-                            dev_name,
-                            dict(computer_set.alloc_map.allocations),
-                        )
+                    except ResourceError:
+                        await self.produce_event(DoAgentResourceCheckEvent(ctx.agent_id))
                         raise
+            try:
+                # Prepare scratch spaces and dotfiles inside it.
+                if not restarting:
+                    await ctx.prepare_scratch()
 
-        # Prepare scratch spaces and dotfiles inside it.
-        if not restarting:
-            await ctx.prepare_scratch()
+                # Prepare networking.
+                await ctx.apply_network(cluster_info)
+                await ctx.prepare_ssh(cluster_info)
 
-        # Prepare networking.
-        await ctx.apply_network(cluster_info)
-        await ctx.prepare_ssh(cluster_info)
+                # Mount vfolders and krunner stuffs.
+                vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
+                if not restarting:
+                    await ctx.mount_vfolders(vfolder_mounts, resource_spec)
+                    await ctx.mount_krunner(resource_spec, environ)
 
-        # Mount vfolders and krunner stuffs.
-        if not restarting:
-            vfolder_mounts = [VFolderMount.from_json(item) for item in kernel_config["mounts"]]
-            await ctx.mount_vfolders(vfolder_mounts, resource_spec)
-            await ctx.mount_krunner(resource_spec, environ)
+                # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
+                label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")
+                envs_corecount = label_envs_corecount.split(",") if label_envs_corecount else []
+                cpu_core_count = len(resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")])
+                environ.update({k: str(cpu_core_count) for k in envs_corecount if k not in environ})
 
-        # Inject Backend.AI-intrinsic env-variables for libbaihook and gosu
-        label_envs_corecount = image_labels.get("ai.backend.envs.corecount", "")
-        envs_corecount = label_envs_corecount.split(",") if label_envs_corecount else []
-        cpu_core_count = len(resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")])
-        environ.update({k: str(cpu_core_count) for k in envs_corecount if k not in environ})
+                # Realize mounts.
+                await ctx.process_mounts(resource_spec.mounts)
 
-        # Realize mounts.
-        await ctx.process_mounts(resource_spec.mounts)
+                # Get attached devices information (including model_name).
+                attached_devices = {}
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    computer_ctx = self.computers[dev_name]
+                    devices = await computer_ctx.instance.get_attached_devices(device_alloc)
+                    attached_devices[dev_name] = devices
 
-        # Get attached devices information (including model_name).
-        attached_devices = {}
-        for dev_name, device_alloc in resource_spec.allocations.items():
-            computer_set = self.computers[dev_name]
-            devices = await computer_set.instance.get_attached_devices(device_alloc)
-            attached_devices[dev_name] = devices
+                exposed_ports = [2000, 2001]
+                service_ports: List[ServicePort] = []
+                port_map: Dict[str, ServicePort] = {}
+                preopen_ports = ctx.kernel_config.get("preopen_ports")
+                if preopen_ports is None:
+                    preopen_ports = []
 
-        exposed_ports = [2000, 2001]
-        service_ports: List[ServicePort] = []
-        port_map: Dict[str, ServicePort] = {}
-        preopen_ports = ctx.kernel_config.get("preopen_ports")
-        if preopen_ports is None:
-            preopen_ports = []
-
-        service_ports.append(
-            {
-                "name": "sshd",
-                "protocol": ServicePortProtocols.TCP,
-                "container_ports": (2200,),
-                "host_ports": (None,),
-            }
-        )
-        service_ports.append(
-            {
-                "name": "ttyd",
-                "protocol": ServicePortProtocols.HTTP,
-                "container_ports": (7681,),
-                "host_ports": (None,),
-            }
-        )
-
-        if ctx.kernel_config["cluster_role"] in ("main", "master"):
-            for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
-                port_map[sport["name"]] = sport
-            for port_no in preopen_ports:
-                preopen_sport: ServicePort = {
-                    "name": str(port_no),
-                    "protocol": ServicePortProtocols.PREOPEN,
-                    "container_ports": (port_no,),
-                    "host_ports": (None,),
-                }
-                service_ports.append(preopen_sport)
-                for cport in preopen_sport["container_ports"]:
-                    exposed_ports.append(cport)
-            for sport in port_map.values():
-                service_ports.append(sport)
-                for cport in sport["container_ports"]:
-                    exposed_ports.append(cport)
-            for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
                 service_ports.append(
                     {
-                        "name": f"hostport{index+1}",
-                        "protocol": ServicePortProtocols.INTERNAL,
-                        "container_ports": (port,),
-                        "host_ports": (port,),
+                        "name": "sshd",
+                        "protocol": ServicePortProtocols.TCP,
+                        "container_ports": (2200,),
+                        "host_ports": (None,),
+                        "is_inference": False,
                     }
                 )
-                exposed_ports.append(port)
-            log.debug("exposed ports: {!r}", exposed_ports)
+                service_ports.append(
+                    {
+                        "name": "ttyd",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7681,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    }
+                )
 
-        runtime_type = image_labels.get("ai.backend.runtime-type", "python")
-        runtime_path = image_labels.get("ai.backend.runtime-path", None)
-        cmdargs: list[str] = []
-        krunner_opts: list[str] = []
-        if self.local_config["container"]["sandbox-type"] == "jail":
-            cmdargs += [
-                "/opt/kernel/jail",
-                # "--policy",
-                # "/etc/backend.ai/jail/policy.yml",
-                # TODO: Update default Jail policy in images
-            ]
-            if self.local_config["container"]["jail-args"]:
-                cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
-            cmdargs += ["--"]
-        if self.local_config["debug"]["kernel-runner"]:
-            krunner_opts.append("--debug")
-        cmdargs += [
-            "/opt/backend.ai/bin/python",
-            "-m",
-            "ai.backend.kernel",
-            *krunner_opts,
-            runtime_type,
-        ]
-        if runtime_path is not None:
-            cmdargs.append(runtime_path)
+                model_definition: Optional[Mapping[str, Any]] = None
+                # Read model config
+                model_folders = [
+                    folder
+                    for folder in vfolder_mounts
+                    if folder.usage_mode == VFolderUsageMode.MODEL
+                ]
+                if (
+                    len(model_folders) > 0
+                    and kernel_config["session_type"] == SessionTypes.INFERENCE
+                ):
+                    model_folder = model_folders[0]
+                    model_definition_path = Path(model_folder.host_path / "model-definition.yml")
+                    if not model_definition_path.is_file():
+                        model_definition_path = Path(
+                            model_folder.host_path / "model-definition.yaml"
+                        )
+                    if not model_definition_path.is_file():
+                        raise AgentError(
+                            "Model definition file (model-definition.yml or"
+                            " model-definition.yaml) does not exist under vFolder"
+                            f" {model_folder.name} (ID {model_folder.vfid})",
+                        )
+                    try:
+                        model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
+                            None, model_definition_path.read_text
+                        )
+                    except FileNotFoundError as e:
+                        raise AgentError(
+                            "Model definition file (model-definition.yml) does not exist under"
+                            f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+                        ) from e
+                    try:
+                        model_definition = model_definition_iv.check(
+                            yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+                        )
+                        assert model_definition is not None
+                        for model in model_definition["models"]:
+                            environ["BACKEND_MODEL_NAME"] = model["name"]
+                            environ["BACKEND_MODEL_PATH"] = model["model_path"]
+                            if service := model.get("service"):
+                                service_ports.append(
+                                    {
+                                        "name": f"{model['name']}-{service['port']}",
+                                        "protocol": ServicePortProtocols.PREOPEN,
+                                        "container_ports": (service["port"],),
+                                        "host_ports": (None,),
+                                        "is_inference": True,
+                                    }
+                                )
+                    except DataError as e:
+                        raise AgentError(
+                            "Failed to validate model definition from vFolder"
+                            f" {model_folder.name} (ID {model_folder.vfid})",
+                        ) from e
+                    except yaml.error.YAMLError as e:
+                        raise AgentError(f"Invalid YAML syntax: {e}") from e
 
-        # Store information required for restarts.
-        # NOTE: kconfig may be updated after restarts.
-        resource_spec.freeze()
-        await self.restart_kernel__store_config(
-            kernel_id,
-            "kconfig.dat",
-            pickle.dumps(ctx.kernel_config),
-        )
-        if not restarting:
-            await self.restart_kernel__store_config(
-                kernel_id,
-                "cluster.json",
-                json.dumps(cluster_info).encode("utf8"),
-            )
+                if ctx.kernel_config["cluster_role"] in ("main", "master"):
+                    for sport in parse_service_ports(
+                        image_labels.get("ai.backend.service-ports", ""),
+                        image_labels.get("ai.backend.endpoint-ports", ""),
+                    ):
+                        port_map[sport["name"]] = sport
+                    for port_no in preopen_ports:
+                        preopen_sport: ServicePort = {
+                            "name": str(port_no),
+                            "protocol": ServicePortProtocols.PREOPEN,
+                            "container_ports": (port_no,),
+                            "host_ports": (None,),
+                            "is_inference": False,
+                        }
+                        service_ports.append(preopen_sport)
+                        for cport in preopen_sport["container_ports"]:
+                            exposed_ports.append(cport)
+                    for sport in port_map.values():
+                        service_ports.append(sport)
+                        for cport in sport["container_ports"]:
+                            exposed_ports.append(cport)
+                    for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
+                        service_ports.append(
+                            {
+                                "name": f"hostport{index+1}",
+                                "protocol": ServicePortProtocols.INTERNAL,
+                                "container_ports": (port,),
+                                "host_ports": (port,),
+                                "is_inference": False,
+                            }
+                        )
+                        exposed_ports.append(port)
+                    log.debug("exposed ports: {!r}", exposed_ports)
 
-        if self.local_config["debug"]["log-kernel-config"]:
-            log.info(
-                "kernel starting with resource spec: \n{0}", pretty(attrs.asdict(resource_spec))
-            )
-        kernel_obj: KernelObjectType = await ctx.spawn(
-            resource_spec,
-            environ,
-            service_ports,
-        )
-        async with self.registry_lock:
-            self.kernel_registry[ctx.kernel_id] = kernel_obj
-        try:
-            container_data = await ctx.start_container(
-                kernel_obj,
-                cmdargs,
-                resource_opts,
-                preopen_ports,
-            )
-        except ContainerCreationError as e:
-            log.warning(
-                "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
-                ctx.kernel_id,
-            )
-            cid = e.container_id
-            async with self.registry_lock:
-                self.kernel_registry[ctx.kernel_id]["container_id"] = cid
-            await self.inject_container_lifecycle_event(
-                kernel_id,
-                LifecycleEvent.DESTROY,
-                KernelLifecycleEventReason.UNKNOWN,
-                container_id=ContainerId(cid),
-            )
-            raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
-        except Exception:
-            log.warning(
-                "Kernel failed to create container (k:{}). Kernel is going to be unregistered.",
-                kernel_id,
-            )
-            async with self.registry_lock:
-                del self.kernel_registry[kernel_id]
-            raise
-        async with self.registry_lock:
-            self.kernel_registry[ctx.kernel_id].data.update(container_data)
-        await kernel_obj.init()
+                runtime_type = image_labels.get("ai.backend.runtime-type", "python")
+                runtime_path = image_labels.get("ai.backend.runtime-path", None)
+                cmdargs: list[str] = []
+                krunner_opts: list[str] = []
+                if self.local_config["container"]["sandbox-type"] == "jail":
+                    cmdargs += [
+                        "/opt/kernel/jail",
+                        # "--policy",
+                        # "/etc/backend.ai/jail/policy.yml",
+                        # TODO: Update default Jail policy in images
+                    ]
+                    if self.local_config["container"]["jail-args"]:
+                        cmdargs += map(
+                            lambda s: s.strip(), self.local_config["container"]["jail-args"]
+                        )
+                    cmdargs += ["--"]
+                if self.local_config["debug"]["kernel-runner"]:
+                    krunner_opts.append("--debug")
+                cmdargs += [
+                    "/opt/backend.ai/bin/python",
+                    "-m",
+                    "ai.backend.kernel",
+                    *krunner_opts,
+                    runtime_type,
+                ]
+                if runtime_path is not None:
+                    cmdargs.append(runtime_path)
 
-        current_task = asyncio.current_task()
-        assert current_task is not None
-        self._pending_creation_tasks[kernel_id].add(current_task)
-        try:
-            async for attempt in AsyncRetrying(
-                wait=wait_fixed(0.3),
-                stop=(stop_after_attempt(10) | stop_after_delay(60)),
-                retry=retry_if_exception_type(zmq.error.ZMQError),
-            ):
-                with attempt:
-                    # Wait until bootstrap script is executed.
-                    # - Main kernel runner is executed after bootstrap script, and
-                    #   check_status is accessible only after kernel runner is loaded.
-                    await kernel_obj.check_status()
-                    # Update the service-ports metadata from the image labels
-                    # with the extended template metadata from the agent and krunner.
-                    live_services = await kernel_obj.get_service_apps()
-                    if live_services["status"] != "failed":
-                        for live_service in live_services["data"]:
-                            for service_port in service_ports:
-                                if live_service["name"] == service_port["name"]:
-                                    service_port.update(live_service)
-                                    break
-            if self.local_config["debug"]["log-kernel-config"]:
-                log.debug("service ports:\n{!r}", pretty(service_ports))
-        except asyncio.CancelledError:
-            log.warning("cancelled waiting of container startup (k:{})", kernel_id)
-            raise
-        except Exception:
-            log.exception("unexpected error while waiting container startup (k:{})", kernel_id)
-            raise RuntimeError(
-                "cancelled waiting of container startup due to initialization failure",
-            )
-        finally:
-            self._pending_creation_tasks[kernel_id].remove(current_task)
-            if not self._pending_creation_tasks[kernel_id]:
-                del self._pending_creation_tasks[kernel_id]
+                # Store information required for restarts.
+                # NOTE: kconfig may be updated after restarts.
+                resource_spec.freeze()
+                await self.restart_kernel__store_config(
+                    kernel_id,
+                    "kconfig.dat",
+                    pickle.dumps(ctx.kernel_config),
+                )
+                if not restarting:
+                    await self.restart_kernel__store_config(
+                        kernel_id,
+                        "cluster.json",
+                        json.dumps(cluster_info).encode("utf8"),
+                    )
 
-        public_service_ports: List[ServicePort] = [
-            port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
-        ]
+                if self.local_config["debug"]["log-kernel-config"]:
+                    log.info(
+                        "kernel starting with resource spec: \n{0}",
+                        pretty(attrs.asdict(resource_spec)),
+                    )
+                kernel_obj: KernelObjectType = await ctx.spawn(
+                    resource_spec,
+                    environ,
+                    service_ports,
+                )
+                async with self.registry_lock:
+                    self.kernel_registry[ctx.kernel_id] = kernel_obj
+                try:
+                    container_data = await ctx.start_container(
+                        kernel_obj,
+                        cmdargs,
+                        resource_opts,
+                        preopen_ports,
+                    )
+                except ContainerCreationError as e:
+                    log.warning(
+                        "Kernel failed to create container (k:{}). Kernel is going to be"
+                        " destroyed.",
+                        ctx.kernel_id,
+                    )
+                    cid = e.container_id
+                    async with self.registry_lock:
+                        self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.UNKNOWN,
+                        container_id=ContainerId(cid),
+                    )
+                    raise AgentError(f"Kernel failed to create container (k:{str(ctx.kernel_id)})")
+                except Exception:
+                    log.warning(
+                        "Kernel failed to create container (k:{}). Kernel is going to be"
+                        " unregistered.",
+                        kernel_id,
+                    )
+                    async with self.registry_lock:
+                        del self.kernel_registry[kernel_id]
+                    raise
+                async with self.registry_lock:
+                    self.kernel_registry[ctx.kernel_id].data.update(container_data)
+                await kernel_obj.init()
 
-        kernel_creation_info: KernelCreationResult = {
-            "id": KernelId(kernel_id),
-            "kernel_host": str(kernel_obj["kernel_host"]),
-            "repl_in_port": kernel_obj["repl_in_port"],
-            "repl_out_port": kernel_obj["repl_out_port"],
-            "stdin_port": kernel_obj["stdin_port"],  # legacy
-            "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": public_service_ports,
-            "container_id": kernel_obj["container_id"],
-            "resource_spec": attrs.asdict(resource_spec),
-            "scaling_group": kernel_config["scaling_group"],
-            "agent_addr": kernel_config["agent_addr"],
-            "attached_devices": attached_devices,
-        }
+                current_task = asyncio.current_task()
+                assert current_task is not None
+                self._pending_creation_tasks[kernel_id].add(current_task)
+                try:
+                    async for attempt in AsyncRetrying(
+                        wait=wait_fixed(0.3),
+                        stop=(stop_after_attempt(10) | stop_after_delay(60)),
+                        retry=retry_if_exception_type(zmq.error.ZMQError),
+                    ):
+                        with attempt:
+                            # Wait until bootstrap script is executed.
+                            # - Main kernel runner is executed after bootstrap script, and
+                            #   check_status is accessible only after kernel runner is loaded.
+                            await kernel_obj.check_status()
+                            # Update the service-ports metadata from the image labels
+                            # with the extended template metadata from the agent and krunner.
+                            live_services = await kernel_obj.get_service_apps()
+                            if live_services["status"] != "failed":
+                                for live_service in live_services["data"]:
+                                    for service_port in service_ports:
+                                        if live_service["name"] == service_port["name"]:
+                                            service_port.update(live_service)
+                                            break
+                    if self.local_config["debug"]["log-kernel-config"]:
+                        log.debug("service ports:\n{!r}", pretty(service_ports))
+                except asyncio.CancelledError:
+                    log.warning("cancelled waiting of container startup (k:{})", kernel_id)
+                    raise
+                except Exception:
+                    log.exception(
+                        "unexpected error while waiting container startup (k:{})", kernel_id
+                    )
+                    raise RuntimeError(
+                        "cancelled waiting of container startup due to initialization failure",
+                    )
+                finally:
+                    self._pending_creation_tasks[kernel_id].remove(current_task)
+                    if not self._pending_creation_tasks[kernel_id]:
+                        del self._pending_creation_tasks[kernel_id]
 
-        # Finally we are done.
-        await self.produce_event(
-            KernelStartedEvent(
-                kernel_id,
-                creation_info={
-                    **kernel_creation_info,
-                    "id": str(KernelId(kernel_id)),
-                    "container_id": str(kernel_obj["container_id"]),
-                },
-            ),
-        )
+                public_service_ports: List[ServicePort] = self.get_public_service_ports(
+                    service_ports
+                )
 
-        if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
-            self._ongoing_exec_batch_tasks.add(
-                asyncio.create_task(
-                    self.execute_batch(
-                        session_id, kernel_id, kernel_config["startup_command"] or ""
+                kernel_creation_info: KernelCreationResult = {
+                    "id": KernelId(kernel_id),
+                    "kernel_host": str(kernel_obj["kernel_host"]),
+                    "repl_in_port": kernel_obj["repl_in_port"],
+                    "repl_out_port": kernel_obj["repl_out_port"],
+                    "stdin_port": kernel_obj["stdin_port"],  # legacy
+                    "stdout_port": kernel_obj["stdout_port"],  # legacy
+                    "service_ports": public_service_ports,
+                    "container_id": kernel_obj["container_id"],
+                    "resource_spec": attrs.asdict(resource_spec),
+                    "scaling_group": kernel_config["scaling_group"],
+                    "agent_addr": kernel_config["agent_addr"],
+                    "attached_devices": attached_devices,
+                }
+
+                if model_definition:
+                    for model in model_definition["models"]:
+                        asyncio.create_task(
+                            self.start_and_monitor_model_service_initial_health(kernel_obj, model)
+                        )
+
+                # Finally we are done.
+                await self.produce_event(
+                    KernelStartedEvent(
+                        kernel_id,
+                        session_id,
+                        creation_info={
+                            **kernel_creation_info,
+                            "id": str(KernelId(kernel_id)),
+                            "container_id": str(kernel_obj["container_id"]),
+                        },
                     ),
-                ),
+                )
+
+                if (
+                    kernel_config["session_type"] == "batch"
+                    and kernel_config["cluster_role"] == "main"
+                ):
+                    self._ongoing_exec_batch_tasks.add(
+                        asyncio.create_task(
+                            self.execute_batch(
+                                session_id, kernel_id, kernel_config["startup_command"] or ""
+                            ),
+                        ),
+                    )
+
+                # The startup command for the batch-type sessions will be executed by the manager
+                # upon firing of the "session_started" event.
+                return kernel_creation_info
+            except Exception as e:
+                await self.reconstruct_resource_usage()
+                raise e
+
+    async def start_and_monitor_model_service_initial_health(
+        self,
+        kernel_obj: KernelObjectType,
+        model: Any,
+    ) -> None:
+        log.debug("starting model service of model {}", model["name"])
+        result = await kernel_obj.start_model_service(model)
+        if result["status"] == "failed":
+            await self.event_producer.produce_event(
+                KernelHealthCheckFailedEvent(
+                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                )
+            )
+        else:
+            await self.event_producer.produce_event(
+                KernelHealthyEvent(
+                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                )
             )
 
-        # The startup command for the batch-type sessions will be executed by the manager
-        # upon firing of the "session_started" event.
-        return kernel_creation_info
+    def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
+        return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
     async def destroy_kernel(
@@ -1898,6 +2163,7 @@ class AbstractAgent(
             tracker.done_event.clear()
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.DESTROY,
                 KernelLifecycleEventReason.RESTARTING,
             )
@@ -1909,6 +2175,7 @@ class AbstractAgent(
                 self.restarting_kernels.pop(kernel_id, None)
                 await self.inject_container_lifecycle_event(
                     kernel_id,
+                    session_id,
                     LifecycleEvent.CLEAN,
                     KernelLifecycleEventReason.RESTART_TIMEOUT,
                 )
@@ -1988,6 +2255,7 @@ class AbstractAgent(
             )
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.DESTROY,
                 KernelLifecycleEventReason.EXEC_TIMEOUT,
             )
@@ -2019,7 +2287,7 @@ class AbstractAgent(
     async def commit(self, reporter, kernel_id: KernelId, subdir: str, filename: str):
         return await self.kernel_registry[kernel_id].commit(kernel_id, subdir, filename)
 
-    async def get_commit_status(self, kernel_id: KernelId, subdir: str):
+    async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
@@ -2034,13 +2302,16 @@ class AbstractAgent(
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
 
+    async def ping_kernel(self, kernel_id: KernelId):
+        return await self.kernel_registry[kernel_id].ping()
+
     async def save_last_registry(self, force=False) -> None:
         now = time.monotonic()
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
+        var_base_path = self.local_config["agent"]["var-base-path"]
+        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
         try:
-            var_base_path = self.local_config["agent"]["var-base-path"]
-            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
             with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(self.kernel_registry, f)
             self.last_registry_written_time = now

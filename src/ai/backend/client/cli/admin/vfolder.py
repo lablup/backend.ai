@@ -51,7 +51,7 @@ def _list_cmd(docs: str = None):
         \b
         COLUMNS
             host, name, created_at, creator,
-            ownership_type (UESR, GROUP),
+            ownership_type (USER, GROUP),
             status (READY, PERFORMING, CLONING, DELETING, MOUNTED),
             permission (READ_ONLY, READ_WRITE, RW_DELETE, OWNER_PERM)
 
@@ -377,3 +377,23 @@ def remove_shared_vf_permission(vfolder_id, user_id):
             print_error(e)
             sys.exit(ExitCode.FAILURE)
         print(resp)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_email", type=str)
+def change_vfolder_ownership(vfolder_id, user_email):
+    """
+    Change the ownership of vfolder
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_EMAIL:  user email to have the ownership of current vfolder
+    """
+    with Session() as session:
+        try:
+            session.VFolder.change_vfolder_ownership(vfolder_id, user_email)
+            print(f"Now ownership of VFolder:{vfolder_id} goes to User:{user_email}")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)

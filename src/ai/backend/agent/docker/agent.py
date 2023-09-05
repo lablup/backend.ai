@@ -30,6 +30,7 @@ from typing import (
     Tuple,
     Union,
 )
+from uuid import UUID
 
 import aiohttp
 import aiotools
@@ -47,6 +48,7 @@ from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    AgentId,
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
@@ -62,6 +64,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     Sentinel,
     ServicePort,
+    SessionId,
     SlotName,
     current_resource_slots,
 )
@@ -74,7 +77,7 @@ from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..server import get_extra_volumes
-from ..types import Container, ContainerStatus, LifecycleEvent, MountInfo, Port
+from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -130,7 +133,6 @@ def _DockerContainerError_reduce(self):
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
-
     scratch_dir: Path
     tmp_dir: Path
     config_dir: Path
@@ -147,9 +149,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -157,7 +161,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
     ) -> None:
-        super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
+        super().__init__(
+            kernel_id,
+            session_id,
+            agent_id,
+            kernel_config,
+            local_config,
+            computers,
+            restarting=restarting,
+        )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         tmp_dir = (self.local_config["container"]["scratch-root"] / f"{kernel_id}_tmp").resolve()
 
@@ -255,6 +267,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 bash_profile_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".bash_profile")
                 )
+                zshrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".zshrc"))
                 vimrc_path = Path(pkg_resources.resource_filename("ai.backend.runner", ".vimrc"))
                 tmux_conf_path = Path(
                     pkg_resources.resource_filename("ai.backend.runner", ".tmux.conf")
@@ -267,6 +280,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(font_italic_path.resolve(), jupyter_custom_dir / "roboto-italic.ttf")
                 shutil.copy(bashrc_path.resolve(), self.work_dir / ".bashrc")
                 shutil.copy(bash_profile_path.resolve(), self.work_dir / ".bash_profile")
+                shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
                 if KernelFeatures.UID_MATCH in self.kernel_features:
@@ -278,6 +292,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         os.chown(self.work_dir / ".jupyter" / "custom", uid, gid)
                         os.chown(self.work_dir / ".bashrc", uid, gid)
                         os.chown(self.work_dir / ".bash_profile", uid, gid)
+                        os.chown(self.work_dir / ".zshrc", uid, gid)
                         os.chown(self.work_dir / ".vimrc", uid, gid)
                         os.chown(self.work_dir / ".tmux.conf", uid, gid)
 
@@ -512,8 +527,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         "Target": str(mount.target),
                         "Source": str(mount.source),
                         "Type": mount.type.value,
-                        "ReadOnly": fix_unsupported_perm(mount.permission)
-                        == MountPermission.READ_ONLY,
+                        "ReadOnly": (
+                            fix_unsupported_perm(mount.permission) == MountPermission.READ_ONLY
+                        ),
                         f"{mount.type.value.capitalize()}Options": mount.opts if mount.opts else {},
                     }
                     for mount in mounts
@@ -661,6 +677,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         kernel_obj = DockerKernel(
             self.kernel_id,
+            self.session_id,
+            self.agent_id,
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -725,9 +743,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
                 "ai.backend.kernel-id": str(self.kernel_id),
-                "ai.backend.internal.block-service-ports": "1"
-                if self.internal_data.get("block_service_ports", False)
-                else "0",
+                "ai.backend.session-id": str(self.session_id),
+                "ai.backend.owner": str(self.agent_id),
+                "ai.backend.internal.block-service-ports": (
+                    "1" if self.internal_data.get("block_service_ports", False) else "0"
+                ),
             },
             "HostConfig": {
                 "Init": True,
@@ -805,13 +825,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.computer_docker_args["HostConfig"]["MemorySwap"] -= shmem
             self.computer_docker_args["HostConfig"]["Memory"] -= shmem
 
-        image_service_ports = image_labels.get("ai.backend.service-ports", "")
-        encoded_preopen_ports = ",".join(
-            f"{port_no}:preopen:{port_no}" for port_no in preopen_ports
-        )
-        container_config["Labels"]["ai.backend.service-ports"] = (
-            image_service_ports + "," if image_service_ports else ""
-        ) + encoded_preopen_ports
+        service_ports_label: list[str] = []
+        service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
+        service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
+
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
         if self.local_config["debug"]["log-kernel-config"]:
@@ -841,7 +859,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 assert container is not None
                 cid = container._id
                 resource_spec.container_id = cid
-                # Write resource.txt again to update the contaienr id.
+                # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
                     await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
@@ -927,7 +945,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
-
     docker_info: Mapping[str, Any]
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
@@ -1086,16 +1103,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None or kernel_id not in self.kernel_registry:
+                        if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
-                            await container.show()
-                            result.append(
-                                (
-                                    kernel_id,
-                                    container_from_docker_container(container),
-                                ),
+                            owner_id = AgentId(
+                                container["Config"]["Labels"].get("ai.backend.owner", "")
                             )
+                            if self.id == owner_id:
+                                await container.show()
+                                result.append(
+                                    (
+                                        kernel_id,
+                                        container_from_docker_container(container),
+                                    ),
+                                )
                     except asyncio.CancelledError:
                         pass
                     except Exception:
@@ -1251,6 +1272,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def init_kernel_context(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1258,6 +1280,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     ) -> DockerKernelCreationContext:
         return DockerKernelCreationContext(
             kernel_id,
+            session_id,
+            self.id,
             kernel_config,
             self.local_config,
             self.computers,
@@ -1314,13 +1338,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == 409 and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             elif e.status == 404:
                 # missing
                 log.warning(
-                    "destroy_kernel(k:{0}) kernel missing, " "forgetting this kernel", kernel_id
+                    "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             else:
                 log.exception("destroy_kernel(k:{0}) kill error", kernel_id)
                 await self.error_monitor.capture_exception()
@@ -1442,15 +1466,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @preserve_termination_log
     async def monitor_docker_events(self):
-        async def handle_action_start(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+        async def handle_action_start(
+            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+        ) -> None:
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.START,
                 KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
             )
 
-        async def handle_action_die(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+        async def handle_action_die(
+            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+        ) -> None:
             # When containers die, we immediately clean up them.
             reason = None
             kernel_obj = self.kernel_registry.get(kernel_id)
@@ -1462,10 +1491,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 exit_code = 255
             await self.inject_container_lifecycle_event(
                 kernel_id,
+                session_id,
                 LifecycleEvent.CLEAN,
                 reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
                 exit_code=exit_code,
+            )
+
+        async def handle_action_oom(
+            session_id: SessionId, kernel_id: KernelId, evdata: Mapping[str, Any]
+        ) -> None:
+            kernel_obj = self.kernel_registry.get(kernel_id, None)
+            if kernel_obj is None:
+                return
+            await kernel_obj.notify_event(
+                AgentEventData(
+                    type="oom",
+                    data={},
+                )
             )
 
         while True:
@@ -1492,24 +1535,34 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 continue
                             if self.local_config["debug"]["log-docker-events"] and evdata[
                                 "Action"
-                            ] in ("start", "die"):
+                            ] in ("start", "die", "oom"):
                                 log.debug(
                                     "docker-event: action={}, actor={}",
                                     evdata["Action"],
                                     evdata["Actor"],
                                 )
-                            if evdata["Action"] == "start":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_start(kernel_id, evdata),
+                            session_id = SessionId(
+                                UUID(evdata["Actor"]["Attributes"]["ai.backend.session-id"])
+                            )
+                            match evdata["Action"]:
+                                case "start":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_start(session_id, kernel_id, evdata),
+                                        )
                                     )
-                                )
-                            elif evdata["Action"] == "die":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_die(kernel_id, evdata),
+                                case "die":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_die(session_id, kernel_id, evdata),
+                                        )
                                     )
-                                )
+                                case "oom":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_oom(session_id, kernel_id, evdata),
+                                        )
+                                    )
                         except asyncio.CancelledError:
                             # We are shutting down...
                             return

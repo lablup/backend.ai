@@ -49,9 +49,11 @@ would be:
    mask_user_info = false
    enable_container_commit = false
    hide_agents = true
+   directory_based_usage = false
 
    [resources]
    open_port_to_public = false
+   allow_preferred_port = false
    max_cpu_cores_per_container = 255
    max_memory_per_container = 1000
    max_cuda_devices_per_container = 8
@@ -83,6 +85,7 @@ would be:
    flush_on_startup = false
    login_block_time = 1200  # 20 min (in sec)
    login_allowed_fail_count = 10
+   max_count_for_preopen_ports = 10
 
    [license]
 

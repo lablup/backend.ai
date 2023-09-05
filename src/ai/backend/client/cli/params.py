@@ -5,6 +5,8 @@ from typing import Any, Mapping, Optional, Union
 
 import click
 
+from ..types import undefined
+
 
 class ByteSizeParamType(click.ParamType):
     name = "byte"
@@ -156,7 +158,6 @@ class RangeExprOptionType(click.ParamType):
 
 
 class CommaSeparatedListType(click.ParamType):
-
     name = "List Expression"
 
     def convert(self, arg, param, ctx):
@@ -167,3 +168,19 @@ class CommaSeparatedListType(click.ParamType):
                 return arg.split(",")
         except ValueError as e:
             self.fail(repr(e), param, ctx)
+
+
+class OptionalType(click.ParamType):
+    name = "Optional Type Wrapper"
+
+    def __init__(self, type_: type) -> None:
+        super().__init__()
+        self.type_ = type_
+
+    def convert(self, value: Any, param, ctx):
+        try:
+            if value is None or value is undefined:
+                return value
+            return self.type_(value)
+        except ValueError:
+            self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)

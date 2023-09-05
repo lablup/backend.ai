@@ -33,7 +33,7 @@ from .exceptions import (
     ServiceUnavailable,
 )
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
+from .utils import check_api_params, set_handler_attr
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
@@ -60,6 +60,9 @@ def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
                 msg = f"Server is not in the required status: {allowed_status}"
                 raise ServiceUnavailable(msg)
             return await handler(request, *args, **kwargs)
+
+        set_handler_attr(wrapped, "server_status_required", True)
+        set_handler_attr(wrapped, "required_server_statuses", allowed_status)
 
         return wrapped
 
@@ -266,6 +269,7 @@ def create_app(
     app = web.Application()
     app["api_versions"] = (2, 3, 4)
     app["manager.context"] = PrivateContext()
+    app["prefix"] = "manager"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     status_resource = cors.add(app.router.add_resource("/status"))
     cors.add(status_resource.add_route("GET", fetch_manager_status))

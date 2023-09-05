@@ -122,10 +122,9 @@ Alias keys are also URL-quoted in the same way.
      + watcher
        - token: {some-secret}
    + volumes
-     # pre-20.09
-     - _mount: {path-to-mount-root-for-vfolder-partitions}
-     - _default_host: {default-vfolder-partition-name}
-     - _fsprefix: {path-prefix-inside-host-mounts}
+     - _types     # allowed vfolder types
+       + "user"   # enabled if present
+       + "group"  # enabled if present
      # 20.09 and later
      - default_host: "{default-proxy}:{default-volume}"
      + proxies:   # each proxy may provide multiple volumes
@@ -134,11 +133,15 @@ Alias keys are also URL-quoted in the same way.
          - manager_api: "http://localhost:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+         - sftp_scaling_groups: "group-1,group-2,..."
        + "mynas1"
          - client_api: "https://proxy1.example.com:6021"
          - manager_api: "https://proxy1.example.com:6022"
          - secret: "xxxxxx..."       # for manager API
          - ssl_verify: true | false  # for manager API
+         - sftp_scaling_groups: "group-3,group-4,..."
+     # 23.03 and later
+       + exposed_volume_info: "percentage"
        ...
      ...
    ...
@@ -174,12 +177,23 @@ import os
 import secrets
 import socket
 import sys
+import urllib.parse
 from abc import abstractmethod
 from collections import UserDict
+from collections.abc import Mapping
 from contextvars import ContextVar
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Final,
+    List,
+    Optional,
+    Sequence,
+    TypeAlias,
+)
 
 import aiotools
 import click
@@ -201,7 +215,8 @@ from ai.backend.common.types import (
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
-from .api.exceptions import ServerMisconfiguredError
+from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
+from .models.session import SessionStatus
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -211,13 +226,7 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
-shared_config_defaults = {
-    "volumes/_mount": "/mnt",
-    "volumes/_default_host": "local",
-    "volumes/_fsprefix": "/",
-    "config/api/allow-origins": "*",
-    "config/docker/image/auto_pull": "digest",
-}
+NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
 
 current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
@@ -248,7 +257,7 @@ manager_local_config_iv = (
                     t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
                     t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
                     t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
-                    t.Key("heartbeat-timeout", default=5.0): t.Float[1.0:],  # type: ignore
+                    t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
                     t.Key("secret", default=None): t.Null | t.String,
                     t.Key("ssl-enabled", default=False): t.ToBool,
                     t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
@@ -265,10 +274,22 @@ manager_local_config_iv = (
                     t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("hide-agents", default=False): t.Bool,
+                    t.Key(
+                        "agent-selection-resource-priority",
+                        default=["cuda", "rocm", "tpu", "cpu", "mem"],
+                    ): t.List(t.String),
                     t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
-                    t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
+                    tx.AliasedKey(
+                        ["aiomonitor-termui-port", "aiomonitor-port"], default=48100
+                    ): t.ToInt[1:65535],
+                    t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
                 }
+            ).allow_extra("*"),
+            t.Key("pipeline", default=None): t.Null | t.Dict(
+                {
+                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
+                },
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
@@ -292,7 +313,7 @@ manager_local_config_iv = (
     .allow_extra("*")
 )
 
-_shdefs: Mapping[str, Any] = {
+_config_defaults: Mapping[str, Any] = {
     "system": {
         "timezone": "UTC",
     },
@@ -305,11 +326,17 @@ _shdefs: Mapping[str, Any] = {
     },
     "docker": {
         "registry": {},
+        "image": {
+            "auto_pull": "digest",
+        },
     },
     "network": {
         "subnet": {
             "agent": "0.0.0.0/0",
             "container": "0.0.0.0/0",
+        },
+        "overlay": {
+            "mtu": "1500",
         },
     },
     "plugins": {
@@ -319,6 +346,11 @@ _shdefs: Mapping[str, Any] = {
     "watcher": {
         "token": None,
     },
+    "session": {
+        "hang-tolerance": {
+            "threshold": {},
+        },
+    },
 }
 
 container_registry_iv = t.Dict(
@@ -327,76 +359,154 @@ container_registry_iv = t.Dict(
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
         t.Key("password", default=None): t.Null | t.String,
-        t.Key("project", default=None): t.Null | tx.StringList | t.List(t.String),
-        t.Key("ssl-verify", default=True): t.ToBool,
+        t.Key("project", default=None): (
+            t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
+        ),
+        tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,
     }
 ).allow_extra("*")
+
+
+def container_registry_serialize(v: dict[str, Any]) -> dict[str, str]:
+    raw_data = {
+        "": str(v[""]),
+        "type": str(v["type"]),
+    }
+    if (username := v.get("username")) is not None:
+        raw_data["username"] = str(username)
+    if (password := v.get("password", None)) is not None:
+        raw_data["password"] = str(password)
+    if (project := v.get("project", None)) is not None:
+        raw_data["project"] = ",".join(project)
+    if (ssl_verify := v.get("ssl_verify", None)) is not None:
+        raw_data["ssl_verify"] = "1" if ssl_verify else "0"
+    return raw_data
+
+
+session_hang_tolerance_iv = t.Dict(
+    {
+        t.Key(
+            "threshold", default=_config_defaults["session"]["hang-tolerance"]["threshold"]
+        ): t.Dict(
+            {
+                t.Key(SessionStatus.PREPARING.name, optional=True): tx.TimeDuration(),
+                t.Key(SessionStatus.TERMINATING.name, optional=True): tx.TimeDuration(),
+            }
+        ).ignore_extra(
+            "*"
+        ),
+    },
+)
+
 
 shared_config_iv = t.Dict(
     {
-        t.Key("system", default=_shdefs["system"]): t.Dict(
+        t.Key("system", default=_config_defaults["system"]): t.Dict(
             {
-                t.Key("timezone", default=_shdefs["system"]["timezone"]): tx.TimeZone,
+                t.Key("timezone", default=_config_defaults["system"]["timezone"]): tx.TimeZone,
             }
         ).allow_extra("*"),
-        t.Key("api", default=_shdefs["api"]): t.Dict(
+        t.Key("api", default=_config_defaults["api"]): t.Dict(
             {
-                t.Key("allow-origins", default=_shdefs["api"]["allow-origins"]): t.String,
+                t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
             }
         ).allow_extra("*"),
-        t.Key("redis", default=_shdefs["redis"]): t.Dict(
+        t.Key("redis", default=_config_defaults["redis"]): t.Dict(
             {
-                t.Key("addr", default=_shdefs["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null
-                | tx.DelimiterSeperatedList(tx.HostPortPair),
+                t.Key("addr", default=_config_defaults["redis"]["addr"]): t.Null | tx.HostPortPair,
+                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                    tx.HostPortPair
+                ),
                 t.Key("service_name", default=None): t.Null | t.String,
-                t.Key("password", default=_shdefs["redis"]["password"]): t.Null | t.String,
+                t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
             }
         ).allow_extra("*"),
-        t.Key("docker", default=_shdefs["docker"]): t.Dict(
+        t.Key("docker", default=_config_defaults["docker"]): t.Dict(
             {
                 t.Key("registry"): t.Mapping(t.String, container_registry_iv),
-            }
-        ).allow_extra("*"),
-        t.Key("plugins", default=_shdefs["plugins"]): t.Dict(
-            {
-                t.Key("accelerator", default=_shdefs["plugins"]["accelerator"]): t.Mapping(
-                    t.String, t.Mapping(t.String, t.Any)
-                ),
-                t.Key("scheduler", default=_shdefs["plugins"]["scheduler"]): t.Mapping(
-                    t.String, t.Mapping(t.String, t.Any)
-                ),
-            }
-        ).allow_extra("*"),
-        t.Key("network", default=_shdefs["network"]): t.Dict(
-            {
-                t.Key("subnet", default=_shdefs["network"]["subnet"]): t.Dict(
+                t.Key("image", default=_config_defaults["docker"]["image"]): t.Dict(
                     {
-                        t.Key("agent", default=_shdefs["network"]["subnet"]["agent"]): tx.IPNetwork,
                         t.Key(
-                            "container", default=_shdefs["network"]["subnet"]["container"]
+                            "auto_pull", default=_config_defaults["docker"]["image"]["auto_pull"]
+                        ): t.Enum("digest", "tag", "none"),
+                    }
+                ).allow_extra("*"),
+            }
+        ).allow_extra("*"),
+        t.Key("plugins", default=_config_defaults["plugins"]): t.Dict(
+            {
+                t.Key("accelerator", default=_config_defaults["plugins"]["accelerator"]): t.Mapping(
+                    t.String, t.Mapping(t.String, t.Any)
+                ),
+                t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
+                    t.String, t.Mapping(t.String, t.Any)
+                ),
+            }
+        ).allow_extra("*"),
+        t.Key("network", default=_config_defaults["network"]): t.Dict(
+            {
+                t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict(
+                    {
+                        t.Key(
+                            "agent", default=_config_defaults["network"]["subnet"]["agent"]
+                        ): tx.IPNetwork,
+                        t.Key(
+                            "container", default=_config_defaults["network"]["subnet"]["container"]
                         ): tx.IPNetwork,
                     }
                 ).allow_extra("*"),
-                t.Key("overlay", default=None): t.Null
-                | t.Dict(
+                t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null | t.Dict(
                     {
-                        t.Key("mtu", default=1500): t.Int[1:],
+                        t.Key(
+                            "mtu", default=_config_defaults["network"]["overlay"]["mtu"]
+                        ): t.ToInt(gte=1),
                     }
                 ).allow_extra("*"),
             }
         ).allow_extra("*"),
-        t.Key("watcher", default=_shdefs["watcher"]): t.Dict(
+        t.Key("watcher", default=_config_defaults["watcher"]): t.Dict(
             {
-                t.Key("token", default=_shdefs["watcher"]["token"]): t.Null | t.String,
+                t.Key("token", default=_config_defaults["watcher"]["token"]): t.Null | t.String,
             }
+        ).allow_extra("*"),
+        t.Key("auth", default=None): (
+            t.Dict(
+                {
+                    t.Key("max_password_age", default=None): t.Null | tx.TimeDuration(),
+                }
+            ).allow_extra("*")
+            | t.Null
+        ),
+        t.Key("session", default=_config_defaults["session"]): t.Dict(
+            {
+                t.Key(
+                    "hang-tolerance", default=_config_defaults["session"]["hang-tolerance"]
+                ): session_hang_tolerance_iv,
+            },
         ).allow_extra("*"),
     }
 ).allow_extra("*")
 
+_volume_defaults: dict[str, Any] = {
+    "_types": {
+        "user": {},
+    },
+}
+
 volume_config_iv = t.Dict(
     {
+        t.Key("_types", default=_volume_defaults["_types"]): t.Dict(
+            {
+                t.Key("user", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
+                    "*"
+                ),
+                t.Key("group", optional=True): t.String(allow_blank=True) | t.Dict({}).allow_extra(
+                    "*"
+                ),
+            }
+        ).allow_extra("*"),
         t.Key("default_host"): t.String,
+        t.Key("exposed_volume_info", default="percentage"): tx.StringList(delimiter=","),
         t.Key("proxies"): t.Mapping(
             tx.Slug,
             t.Dict(
@@ -405,6 +515,9 @@ volume_config_iv = t.Dict(
                     t.Key("manager_api"): t.String,
                     t.Key("secret"): t.String,
                     t.Key("ssl_verify"): t.ToBool,
+                    t.Key("sftp_scaling_groups", default=None): t.Null | tx.StringList(
+                        delimiter=","
+                    ),
                 }
             ),
         ),
@@ -416,7 +529,6 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 
 
 class AbstractConfig(UserDict):
-
     _watch_callbacks: List[ConfigWatchCallback]
 
     def __init__(self, initial_data: Mapping[str, Any] = None) -> None:
@@ -441,7 +553,6 @@ class LocalConfig(AbstractConfig):
 
 
 def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
@@ -488,7 +599,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
         if cfg["manager"]["secret"] is None:
             cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print("Validation of manager configuration has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of manager local config has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:
@@ -496,6 +607,8 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
 
 
 class SharedConfig(AbstractConfig):
+    ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
+
     def __init__(
         self,
         etcd_addr: HostPortPair,
@@ -535,16 +648,129 @@ class SharedConfig(AbstractConfig):
 
     def __hash__(self) -> int:
         # When used as a key in dicts, we don't care our contents.
-        # Just treat it lke an opaque object.
+        # Just treat it like an opaque object.
         return hash(id(self))
+
+    @classmethod
+    def flatten(cls, key_prefix: str, inner_dict: NestedStrKeyedDict) -> dict[str, str]:
+        flattend_dict: dict[str, str] = {}
+        for k, v in inner_dict.items():
+            if k == "":
+                flattened_key = key_prefix
+            else:
+                flattened_key = key_prefix + "/" + urllib.parse.quote(k, safe="")
+            match v:
+                case Mapping():
+                    flattend_dict.update(cls.flatten(flattened_key, v))  # type: ignore
+                case str():
+                    flattend_dict[flattened_key] = v
+                case int() | float() | yarl.URL():
+                    flattend_dict[flattened_key] = str(v)
+                case _:
+                    raise ValueError(
+                        f"The value {v!r} must be serialized before storing to the etcd"
+                    )
+        return flattend_dict
 
     async def get_raw(self, key: str, allow_null: bool = True) -> Optional[str]:
         value = await self.etcd.get(key)
-        if value is None:
-            value = shared_config_defaults.get(key, None)
         if not allow_null and value is None:
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
+
+    async def list_container_registry(self) -> dict[str, dict[str, Any]]:
+        registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
+        return {
+            hostname: container_registry_iv.check(item)
+            for hostname, item in registries.items()
+            # type: ignore
+        }
+
+    async def get_container_registry(self, hostname: str) -> dict[str, Any]:
+        registries = await self.list_container_registry()
+        try:
+            item = registries[hostname]
+        except KeyError:
+            raise ObjectNotFound(object_name="container registry")
+        return item
+
+    async def add_container_registry(self, hostname: str, config_new: dict[str, Any]) -> None:
+        updates = self.flatten(
+            self.ETCD_CONTAINER_REGISTRY_KEY,
+            {hostname: container_registry_serialize(container_registry_iv.check(config_new))},
+        )
+        await self.etcd.put_dict(updates)
+
+    async def modify_container_registry(
+        self, hostname: str, config_updated: dict[str, Any]
+    ) -> None:
+        # Fetch the raw registries data and make it a mutable dict.
+        registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
+        # Exclude the target hostname from the raw data.
+        try:
+            original_item = registries[hostname]
+            del registries[hostname]
+        except KeyError:
+            raise ObjectNotFound(object_name="container registry")
+        # Delete all items with having the prefix of the given hostname.
+        # This will "accidentally" delete any registry sharing the same prefix.
+        raw_hostname = urllib.parse.quote(hostname, safe="")
+        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
+
+        # Re-add the "accidentally" deleted items
+        updates: dict[str, str] = {}
+        for key, raw_item in registries.items():
+            if key.startswith(hostname):
+                updates.update(
+                    self.flatten(
+                        self.ETCD_CONTAINER_REGISTRY_KEY,
+                        {key: raw_item},  # type: ignore
+                    )
+                )
+        # Re-add the updated item
+        if (_ssl_verify := config_updated.pop("ssl-verify", None)) is not None:
+            # Move "ssl-verify" to "ssl_verify" if exists, for key aliasing compatibility:
+            # the etcd-stored original item has already the normalized name "ssl_verify",
+            # while the user input may have either "ssl-verify" or "ssl_verify".
+            # We should run the IV check after merging the original item and the user input
+            # to prevent overwriting non-existent fields with the default values in IV.
+            config_updated["ssl_verify"] = _ssl_verify
+        updates.update(
+            self.flatten(
+                self.ETCD_CONTAINER_REGISTRY_KEY,
+                {
+                    hostname: container_registry_serialize(
+                        container_registry_iv.check({**original_item, **config_updated})  # type: ignore
+                    )
+                },
+            )
+        )
+        await self.etcd.put_dict(updates)
+
+    async def delete_container_registry(self, hostname: str) -> None:
+        # Fetch the raw registries data and make it a mutable dict.
+        registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
+        # Exclude the target hostname from the raw data.
+        try:
+            del registries[hostname]
+        except KeyError:
+            raise ObjectNotFound(object_name="container registry")
+        # Delete all items with having the prefix of the given hostname.
+        # This will "accidentally" delete any registry sharing the same prefix.
+        raw_hostname = urllib.parse.quote(hostname, safe="")
+        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
+
+        # Re-add the "accidentally" deleted items.
+        updates: dict[str, str] = {}
+        for key, raw_item in registries.items():
+            if key.startswith(hostname):
+                updates.update(
+                    self.flatten(
+                        self.ETCD_CONTAINER_REGISTRY_KEY,
+                        {key: raw_item},  # type: ignore
+                    )
+                )
+        await self.etcd.put_dict(updates)
 
     async def register_myself(self) -> None:
         instance_id = await get_instance_id()
@@ -603,8 +829,6 @@ class SharedConfig(AbstractConfig):
             ret = current_vfolder_types.get()
         except LookupError:
             vf_types = await self._get_vfolder_types()
-            if not vf_types:
-                vf_types = {"user": ""}
             ret = list(vf_types.keys())
             current_vfolder_types.set(ret)
         return ret

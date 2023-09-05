@@ -69,8 +69,17 @@ def list(ctx: CLIContext) -> None:
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-@click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
+@click.option("-d", "--description", type=str, default="", help="Description of new scaling group.")
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
+@click.option(
+    "-p",
+    "--private",
+    is_flag=True,
+    help=(
+        "New scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
+    ),
+)
 @click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
     "--driver-opts", type=JSONParamType(), default="{}", help="Set driver options as a JSON string."
@@ -85,16 +94,21 @@ def list(ctx: CLIContext) -> None:
 @click.option(
     "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
 )
+@click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
 def add(
     ctx: CLIContext,
     name,
     description,
     inactive,
+    private,
     driver,
     driver_opts,
     scheduler,
     scheduler_opts,
     use_host_network,
+    wsproxy_addr,
+    wsproxy_api_token,
 ):
     """
     Add a new scaling group.
@@ -107,11 +121,14 @@ def add(
                 name,
                 description=description,
                 is_active=not inactive,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
                 use_host_network=use_host_network,
+                wsproxy_addr=wsproxy_addr,
+                wsproxy_api_token=wsproxy_api_token,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -136,8 +153,17 @@ def add(
 @scaling_group.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-@click.option("-d", "--description", type=str, default="", help="Description of new scaling group")
+@click.option("-d", "--description", type=str, default="", help="Description of new scaling group.")
 @click.option("-i", "--inactive", is_flag=True, help="New scaling group will be inactive.")
+@click.option(
+    "-p",
+    "--private",
+    is_flag=True,
+    help=(
+        "The scaling group will be private. "
+        "Private scaling groups cannot be used when users create new sessions."
+    ),
+)
 @click.option("--driver", type=str, default="static", help="Set driver.")
 @click.option(
     "--driver-opts", type=JSONParamType(), default=None, help="Set driver options as a JSON string."
@@ -152,16 +178,21 @@ def add(
 @click.option(
     "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
 )
+@click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
+@click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
 def update(
     ctx: CLIContext,
     name,
     description,
     inactive,
+    private,
     driver,
     driver_opts,
     scheduler,
     scheduler_opts,
     use_host_network,
+    wsproxy_addr,
+    wsproxy_api_token,
 ):
     """
     Update existing scaling group.
@@ -174,11 +205,14 @@ def update(
                 name,
                 description=description,
                 is_active=not inactive,
+                is_public=not private,
                 driver=driver,
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
                 use_host_network=use_host_network,
+                wsproxy_addr=wsproxy_addr,
+                wsproxy_api_token=wsproxy_api_token,
             )
         except Exception as e:
             ctx.output.print_mutation_error(

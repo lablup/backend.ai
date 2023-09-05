@@ -238,9 +238,8 @@ Open yet another terminal for client and run:
 
 .. code-block:: console
 
-   $ export BACKEND_ENDPOINT=http://127.0.0.1:8081/  # change the port number if customized
-   $ export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
-   $ export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+   $ source ./env-local-admin-api.sh  # Use the generated local endpoint and credential config.
+   $ # source ./env-local-user-api.sh  # Yo may choose an alternative credential config.
    $ ./backend.ai config
    $ ./backend.ai run python -c 'print("hello world")'
    ∙ Session token prefix: fb05c73953

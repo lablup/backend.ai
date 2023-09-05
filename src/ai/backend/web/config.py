@@ -26,16 +26,17 @@ config_iv = t.Dict(
                     }
                 ),
                 tx.AliasedKey(["ssl_enabled", "ssl-enabled"], default=False): t.ToBool,
-                tx.AliasedKey(["ssl_cert", "ssl-cert"], default=None): t.Null
-                | tx.Path(type="file"),
-                tx.AliasedKey(["ssl_privkey", "ssl-privkey"], default=None): t.Null
-                | tx.Path(type="file"),
+                tx.AliasedKey(["ssl_cert", "ssl-cert"], default=None): t.Null | tx.Path(
+                    type="file"
+                ),
+                tx.AliasedKey(["ssl_privkey", "ssl-privkey"], default=None): t.Null | tx.Path(
+                    type="file"
+                ),
                 t.Key("static_path", default=default_static_path): tx.Path(type="dir"),
                 tx.AliasedKey(
                     ["force_endpoint_protocol", "force-endpoint-protocol"],
                     default=None,
-                ): t.Null
-                | t.Enum("https", "http"),
+                ): t.Null | t.Enum("https", "http"),
                 t.Key("mode"): t.Enum("webui", "static"),
                 t.Key("enable_signup", default=False): t.ToBool,
                 t.Key("allow_anonymous_change_password", default=False): t.ToBool,
@@ -46,16 +47,22 @@ config_iv = t.Dict(
                 t.Key("always_enqueue_compute_session", default=False): t.ToBool,
                 t.Key("webui_debug", default=False): t.ToBool,
                 t.Key("mask_user_info", default=False): t.ToBool,
-                t.Key("single_sign_on_vendors", default=None): t.Null
-                | tx.StringList(empty_str_as_empty_list=True),
+                t.Key("single_sign_on_vendors", default=None): t.Null | tx.StringList(
+                    empty_str_as_empty_list=True
+                ),
                 t.Key("enable_container_commit", default=False): t.ToBool,
                 t.Key("hide_agents", default=True): t.ToBool,
                 t.Key("app_download_url", default=""): t.String(allow_blank=True),
+                t.Key("enable_2FA", default=False): t.ToBool(),
+                t.Key("force_2FA", default=False): t.ToBool(),
+                t.Key("system_SSH_image", default=""): t.String(allow_blank=True),
+                t.Key("directory_based_usage", default=False): t.ToBool(),
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(
             {
                 t.Key("open_port_to_public", default=False): t.ToBool,
+                t.Key("allow_preferred_port", default=False): t.ToBool,
                 t.Key("max_cpu_cores_per_container", default=64): t.ToInt,
                 t.Key("max_memory_per_container", default=64): t.ToInt,
                 t.Key("max_cuda_devices_per_container", default=16): t.ToInt,
@@ -66,8 +73,9 @@ config_iv = t.Dict(
         ).allow_extra("*"),
         t.Key("environments"): t.Dict(
             {
-                t.Key("allowlist", default=None): t.Null
-                | tx.StringList(empty_str_as_empty_list=True),
+                t.Key("allowlist", default=None): t.Null | tx.StringList(
+                    empty_str_as_empty_list=True
+                ),
             }
         ).allow_extra("*"),
         t.Key("plugin"): t.Dict(
@@ -85,8 +93,9 @@ config_iv = t.Dict(
                 t.Key("brand"): t.String,
                 t.Key("default_environment", default=None): t.Null | t.String,
                 t.Key("default_import_environment", default=None): t.Null | t.String,
-                t.Key("menu_blocklist", default=None): t.Null
-                | tx.StringList(empty_str_as_empty_list=True),
+                t.Key("menu_blocklist", default=None): t.Null | tx.StringList(
+                    empty_str_as_empty_list=True
+                ),
             }
         ).allow_extra("*"),
         t.Key("api"): t.Dict(
@@ -113,6 +122,7 @@ config_iv = t.Dict(
                 t.Key("login_block_time", default=1200): t.ToInt,  # seconds (default: 20 min)
                 t.Key("login_allowed_fail_count", default=10): t.ToInt,
                 t.Key("auto_logout", default=False): t.ToBool,
+                t.Key("max_count_for_preopen_ports", default=10): t.ToInt,
             }
         ).allow_extra("*"),
         t.Key("license", default=license_defs): t.Dict(

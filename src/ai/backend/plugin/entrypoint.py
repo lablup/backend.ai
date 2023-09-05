@@ -3,6 +3,7 @@ import collections
 import configparser
 import itertools
 import logging
+import os
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
@@ -143,6 +144,8 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:
+    if env_build_root := os.environ.get("BACKEND_BUILD_ROOT", None):
+        return Path(env_build_root)
     cwd = Path.cwd() if path is None else path
     while True:
         if (cwd / "BUILD_ROOT").exists():

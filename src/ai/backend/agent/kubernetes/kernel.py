@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import lzma
-import re
+import os
 import shutil
 import textwrap
 from pathlib import Path
@@ -18,23 +18,25 @@ from kubernetes_asyncio import watch
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class KubernetesKernel(AbstractKernel):
-
     deployment_name: str
 
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -46,6 +48,8 @@ class KubernetesKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -63,7 +67,6 @@ class KubernetesKernel(AbstractKernel):
     async def create_code_runner(
         self, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
-
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
             log.error("Scaling failed! Response body: {0}", scale)
@@ -194,6 +197,11 @@ class KubernetesKernel(AbstractKernel):
         )
         return result
 
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
+        return result
+
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
@@ -272,16 +280,14 @@ class KubernetesKernel(AbstractKernel):
         core_api = kube_client.CoreV1Api()
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent(
-            """
+        code = textwrap.dedent("""
         import json
         import os
         import stat
@@ -302,8 +308,7 @@ class KubernetesKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """
-        )
+        """)
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
         async with watch.Watch().stream(
@@ -322,9 +327,11 @@ class KubernetesKernel(AbstractKernel):
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
+    async def notify_event(self, evdata: AgentEventData):
+        raise NotImplementedError
+
 
 class KubernetesCodeRunner(AbstractCodeRunner):
-
     kernel_host: str
     repl_in_port: int
     repl_out_port: int
@@ -351,31 +358,27 @@ class KubernetesCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, root_path: str) -> Tuple[str, Optional[str]]:
-    if distro.startswith("static-"):
-        distro_name = distro.replace("-", "_")  # pkg/mod name use underscores
-    else:
-        if (m := re.search(r"^([a-z]+)\d+\.\d+$", distro)) is None:
-            raise ValueError('Unrecognized "distro[version]" format string.')
-        distro_name = m.group(1)
+async def prepare_krunner_env_impl(
+    distro: str, entrypoint_name: str, root_path: str
+) -> Tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(
         Path(
             pkg_resources.resource_filename(
-                f"ai.backend.krunner.{distro_name}", f"./krunner-version.{distro}.txt"
+                f"ai.backend.krunner.{entrypoint_name}", f"./krunner-version.{distro}.txt"
             )
         )
         .read_text()
         .strip()
     )
-    krunner_folder_name = f"backendai-krunner.v{current_version}.{distro}"
+    krunner_folder_name = f"backendai-krunner.v{current_version}.{arch}.{distro}"
     target_path = Path(root_path) / krunner_folder_name
     extractor_image = "backendai-krunner-extractor:latest"
 
     try:
         for item in await docker.images.list():
-            if item["RepoTags"] is None:
+            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
                 continue
             if item["RepoTags"][0] == extractor_image:
                 break
@@ -396,7 +399,7 @@ async def prepare_krunner_env_impl(distro: str, root_path: str) -> Tuple[str, Op
             target_path.mkdir(exist_ok=False)
             archive_path = Path(
                 pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{distro_name}", f"krunner-env.{distro}.{arch}.tar.xz"
+                    f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
                 )
             ).resolve()
             extractor_path = Path(
@@ -492,7 +495,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
     tar archives.
     """
 
-    all_distros = []
+    all_distros: list[tuple[str, str]] = []
     entry_prefix = "backendai_krunner_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         log.debug("loading krunner pkg: {}", entrypoint.module)
@@ -508,15 +511,17 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
             .read_text()
             .splitlines()
         )
-        all_distros.extend(provided_versions)
+        all_distros.extend((distro, entrypoint.name) for distro in provided_versions)
 
     scratch_mount = local_config["container"]["scratch-root"]
     await copy_runner_files(Path(scratch_mount))
 
     tasks = []
     async with TaskGroup() as tg:
-        for distro in all_distros:
-            tasks.append(tg.create_task(prepare_krunner_env_impl(distro, scratch_mount)))
+        for distro, entrypoint_name in all_distros:
+            tasks.append(
+                tg.create_task(prepare_krunner_env_impl(distro, entrypoint_name, scratch_mount))
+            )
     distro_volumes = [t.result() for t in tasks if not t.cancelled()]
     result = {}
     for distro_name_and_version, volume_name in distro_volumes:

@@ -51,7 +51,6 @@ class ServiceDefinition:
 
 
 class ServiceParser:
-
     variables: MutableMapping[str, str]
     services: MutableMapping[str, ServiceDefinition]
 
@@ -82,6 +81,13 @@ class ServiceParser:
                 self.services[name] = ServiceDefinition(**raw_service_def)
             except TypeError as e:
                 raise InvalidServiceDefinition(e.args[0][11:])  # lstrip "__init__() "
+
+    def add_model_service(self, name, model_service_info) -> None:
+        service_def = ServiceDefinition(
+            model_service_info["start_command"],
+            prestart_actions=model_service_info["pre_start_actions"] or [],
+        )
+        self.services[name] = service_def
 
     async def start_service(
         self,

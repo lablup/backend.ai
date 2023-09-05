@@ -34,7 +34,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.container_registry import get_container_registry
+from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 from .base import (
@@ -114,7 +114,7 @@ async def rescan_images(
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
-            scanner_cls = get_container_registry(registry_info)
+            scanner_cls = get_container_registry_cls(registry_info)
             scanner = scanner_cls(db, registry_name, registry_info)
             tg.create_task(scanner.rescan_single_registry(reporter))
     # TODO: delete images removed from registry?
@@ -569,7 +569,7 @@ class Image(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars.all()]
+            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -660,7 +660,6 @@ class Image(graphene.ObjectType):
 
 
 class PreloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -682,7 +681,6 @@ class PreloadImage(graphene.Mutation):
 
 
 class UnloadImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -704,7 +702,6 @@ class UnloadImage(graphene.Mutation):
 
 
 class RescanImages(graphene.Mutation):
-
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -734,7 +731,6 @@ class RescanImages(graphene.Mutation):
 
 
 class ForgetImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -766,7 +762,6 @@ class ForgetImage(graphene.Mutation):
 
 
 class AliasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -802,7 +797,6 @@ class AliasImage(graphene.Mutation):
 
 
 class DealiasImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -833,7 +827,6 @@ class DealiasImage(graphene.Mutation):
 
 
 class ClearImages(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -882,7 +875,6 @@ class ModifyImageInput(graphene.InputObjectType):
 
 
 class ModifyImage(graphene.Mutation):
-
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:

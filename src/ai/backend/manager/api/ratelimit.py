@@ -10,10 +10,10 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common import redis_helper
+from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
-from ..defs import REDIS_RLIM_DB
 from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler

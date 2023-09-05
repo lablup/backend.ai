@@ -46,7 +46,6 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
 
 
 class FileLock(AbstractDistributedLock):
-
     default_timeout: float = 3  # not allow infinite timeout for safety
 
     _file: IOBase | None
@@ -84,7 +83,7 @@ class FileLock(AbstractDistributedLock):
         assert not self._locked
         if not self._path.exists():
             self._path.touch()
-        self._file = open(self._path, "rb")
+        self._file = open(self._path, "wb")
         stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
         try:
             async for attempt in AsyncRetrying(
@@ -115,8 +114,11 @@ class FileLock(AbstractDistributedLock):
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
         self._file.close()
-        if self._locked and self._remove_when_unlock:
-            self._path.unlink()
+        if self._remove_when_unlock:
+            try:
+                self._path.unlink()
+            except FileNotFoundError:
+                pass
         self._file = None
 
     async def __aenter__(self) -> FileLock:
@@ -142,7 +144,6 @@ class FileLock(AbstractDistributedLock):
 
 
 class EtcdLock(AbstractDistributedLock):
-
     _con_mgr: Optional[EtcdConnectionManager]
     _debug: bool
 
@@ -191,13 +192,13 @@ class EtcdLock(AbstractDistributedLock):
 
 
 class RedisLock(AbstractDistributedLock):
-
     debug: bool
     _redis: Redis
     _timeout: Optional[float]
     _lock: Optional[AsyncRedisLock]
 
     default_timeout = 9600
+    default_lock_acquire_pause = 1.0
 
     def __init__(
         self,
@@ -208,6 +209,7 @@ class RedisLock(AbstractDistributedLock):
         lifetime: Optional[float] = None,
         socket_connect_timeout: float = 0.3,
         debug: bool = False,
+        lock_acquire_pause: Optional[float] = None,
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
@@ -227,6 +229,7 @@ class RedisLock(AbstractDistributedLock):
             )
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._lock_acquire_pause = lock_acquire_pause or self.default_lock_acquire_pause
 
     async def __aenter__(self) -> None:
         self._lock = AsyncRedisLock(
@@ -235,6 +238,7 @@ class RedisLock(AbstractDistributedLock):
             blocking_timeout=self._timeout,
             timeout=self._lifetime,
             thread_local=False,
+            sleep=self._lock_acquire_pause,
         )
         await self._lock.acquire()
         if self._debug:

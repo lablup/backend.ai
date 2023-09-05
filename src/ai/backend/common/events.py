@@ -20,7 +20,6 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
-    Sequence,
     Type,
     TypedDict,
     TypeVar,
@@ -64,7 +63,6 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
-
     # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
@@ -102,6 +100,10 @@ class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
     name = "do_prepare"
 
 
+class DoScaleEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_scale"
+
+
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
@@ -129,7 +131,6 @@ class DoTerminateSessionEvent(AbstractEvent):
 
 @attrs.define(slots=True, frozen=True)
 class GenericAgentEventArgs:
-
     reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:
@@ -192,6 +193,22 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
+@attrs.define(slots=True, frozen=True)
+class DoAgentResourceCheckEvent(AbstractEvent):
+    name = "do_agent_resource_check"
+
+    agent_id: AgentId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.agent_id,)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            AgentId(value[0]),
+        )
+
+
 class KernelLifecycleEventReason(str, enum.Enum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -199,10 +216,12 @@ class KernelLifecycleEventReason(str, enum.Enum):
     EXEC_TIMEOUT = "exec-timeout"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
+    HANG_TIMEOUT = "hang-timeout"
     IDLE_TIMEOUT = "idle-timeout"
     IDLE_SESSION_LIFETIME = "idle-session-lifetime"
     IDLE_UTILIZATION = "idle-utilization"
     KILLED_BY_EVENT = "killed-by-event"
+    SERVICE_SCALED_DOWN = "service-scaled-down"
     NEW_CONTAINER_STARTED = "new-container-started"
     PENDING_TIMEOUT = "pending-timeout"
     RESTARTING = "restarting"
@@ -217,6 +236,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
+    NOT_FOUND_IN_MANAGER = "not-found-in-manager"
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
@@ -230,12 +250,14 @@ class KernelLifecycleEventReason(str, enum.Enum):
 @attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
     reason: str = attrs.field(default="")
     creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
+            str(self.session_id),
             self.reason,
             self.creation_info,
         )
@@ -244,8 +266,9 @@ class KernelCreationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             kernel_id=KernelId(uuid.UUID(value[0])),
-            reason=value[1],
-            creation_info=value[2],
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
+            creation_info=value[3],
         )
 
 
@@ -295,15 +318,25 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
+class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_healthy"
+
+
+class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_health_check_failed"
+
+
 @attrs.define(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
     reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
+            str(self.session_id),
             self.reason,
             self.exit_code,
         )
@@ -312,8 +345,9 @@ class KernelTerminationEventArgs:
     def deserialize(cls, value: tuple):
         return cls(
             KernelId(uuid.UUID(value[0])),
-            value[1],
-            value[2],
+            session_id=SessionId(uuid.UUID(value[1])),
+            reason=value[2],
+            exit_code=value[3],
         )
 
 
@@ -442,22 +476,6 @@ class DoSyncKernelLogsEvent(AbstractEvent):
         return cls(
             KernelId(uuid.UUID(value[0])),
             value[1],
-        )
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class DoSyncKernelStatsEvent(AbstractEvent):
-    name = "do_sync_kernel_stats"
-
-    kernel_ids: Sequence[KernelId] = attrs.field()
-
-    def serialize(self) -> tuple:
-        return ([*map(str, self.kernel_ids)],)
-
-    @classmethod
-    def deserialize(cls, value: tuple):
-        return cls(
-            kernel_ids=tuple(KernelId(uuid.UUID(item)) for item in value[0]),
         )
 
 
@@ -670,9 +688,9 @@ class EventDispatcher(aobject):
         db: int = 0,
         log_events: bool = False,
         *,
+        consumer_group: str,
         service_name: str = None,
         stream_key: str = "events",
-        consumer_group: str = "manager",
         node_id: str = None,
         consumer_exception_handler: PTGExceptionHandler = None,
         subscriber_exception_handler: PTGExceptionHandler = None,

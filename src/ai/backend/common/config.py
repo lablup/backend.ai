@@ -17,6 +17,7 @@ __all__ = (
     "etcd_config_iv",
     "redis_config_iv",
     "vfolder_config_iv",
+    "model_definition_iv",
     "read_from_file",
     "read_from_etcd",
     "override_key",
@@ -55,6 +56,45 @@ vfolder_config_iv = t.Dict(
     }
 ).allow_extra("*")
 
+model_definition_iv = t.Dict(
+    {
+        t.Key("models"): t.List(
+            t.Dict(
+                {
+                    t.Key("name"): t.String,
+                    t.Key("model_path"): t.String,
+                    t.Key("service", default=None): t.Null | t.Dict(
+                        {
+                            # ai.backend.kernel.service.ServiceParser.start_service()
+                            # ai.backend.kernel.service_actions
+                            t.Key("pre_start_actions", default=[]): t.Null | t.List(
+                                t.Dict(
+                                    {
+                                        t.Key("action"): t.String,
+                                        t.Key("args"): t.Dict().allow_extra("*"),
+                                    }
+                                )
+                            ),
+                            t.Key("start_command"): t.List(t.String),
+                            t.Key("port"): t.ToInt[1:],
+                            t.Key("health_check", default=None): t.Null | t.Dict(
+                                {
+                                    t.Key("path"): t.String,
+                                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
+                                    t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
+                                    t.Key("expected_status_code", default=200): (
+                                        t.Null | t.ToInt[100:]
+                                    ),
+                                }
+                            ),
+                        }
+                    ),
+                }
+            )
+        )
+    }
+)
+
 
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
@@ -63,6 +103,11 @@ def find_config_file(daemon_name: str) -> Path:
             Path.cwd() / f"{daemon_name}.toml",
         ]
         if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
+            parent_path = Path.cwd().parent
+            while parent_path.is_relative_to(Path.home()):
+                if (parent_path / "BUILD_ROOT").exists():
+                    toml_paths.append(parent_path / f"{daemon_name}.toml")
+                parent_path = parent_path.parent
             toml_paths += [
                 Path.home() / ".config" / "backend.ai" / f"{daemon_name}.toml",
                 Path(f"/etc/backend.ai/{daemon_name}.toml"),
@@ -70,7 +115,9 @@ def find_config_file(daemon_name: str) -> Path:
         else:
             raise ConfigurationError(
                 {
-                    "read_from_file()": f"Unsupported platform for config path auto-discovery: {sys.platform}",
+                    "read_from_file()": (
+                        f"Unsupported platform for config path auto-discovery: {sys.platform}"
+                    ),
                 }
             )
     else:

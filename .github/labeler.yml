@@ -1,13 +1,17 @@
 require:db-migration:
-- any: ['src/ai/backend/manager/alembic/versions/*.py']
+- any: ['src/ai/backend/manager/models/alembic/versions/*.py']
 
-docs:
-- any: ['docs/**/*']
+area:docs:
+- any: [
+    'docs/**/*',
+    'src/ai/backend/manager/api/**/*.py',
+    'src/ai/backend/manager/models/gql.py',
+  ]
 
-storage-proxy:
+comp:storage-proxy:
 - any: ['src/ai/backend/storage/**/*.py']
 
-agent:
+comp:agent:
 - any: [
     'src/ai/backend/agent/**/*.py',
     'src/ai/backend/kernel/**/*.py',
@@ -15,21 +19,21 @@ agent:
     'src/ai/backend/helpers/**/*.py',
   ]
 
-manager:
+comp:manager:
 - any: ['src/ai/backend/manager/**/*.py']
 
-common:
+comp:common:
 - any: [
     'src/ai/backend/common/**/*.py',
     'src/ai/backend/plugin/**/*.py',
   ]
 
-client:
+comp:client:
 - any: [
     'src/ai/backend/client/**/*.py',
   ]
 
-cli:
+comp:cli:
 - any: [
     'src/ai/backend/cli/**/*.py',
     'src/ai/backend/client/cli/**/*.py',
@@ -37,17 +41,17 @@ cli:
     'src/ai/backend/agent/cli/**/*.py',
   ]
 
-webserver:
+comp:webserver:
 - any: [
     'src/ai/backend/web/**/*.py',
   ]
 
-webui:
+comp:webui:
 - any: [
     'src/ai/backend/web/static',
   ]
 
-installer:
+comp:installer:
 - any: [
     'scripts/install-dev.sh',
     'scripts/delete-dev.sh',
