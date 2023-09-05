@@ -812,10 +812,8 @@ configure_backendai() {
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
   # configure webserver
-  cp configs/webserver/sample.conf ./webserver.conf
-  sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+  cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-  sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
   sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
