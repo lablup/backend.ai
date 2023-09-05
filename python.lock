@@ -82,6 +82,7 @@
 //     "tomlkit~=0.11.1",
 //     "tqdm>=4.61",
 //     "trafaret~=2.1",
+//     "treelib==1.6.1",
 //     "typeguard~=2.10",
 //     "types-Jinja2",
 //     "types-PyYAML",
@@ -863,36 +864,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d77415f22bbc14f3d72eaed2fc9f96d161f3ba7686922ad26d6bbc9d4985f3df",
-              "url": "https://files.pythonhosted.org/packages/c7/e7/5c557d60eb76ba55ff202bea08e15d1840ba0fe8d1c7bfccf54b8c5a2990/boto3-1.28.35-py3-none-any.whl"
+              "hash": "dae0bc5548b39d8dfcf4167d9a238ab899a0491c11c5e77934db71b3ecf34752",
+              "url": "https://files.pythonhosted.org/packages/b0/ab/d412e2874631b0d8b2de5b20526ed5ef63d38a0d16cbe0ea235cf98f7bc0/boto3-1.28.38-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "580b584e36967155abed7cc9b088b3bd784e8242ae4d8841f58cb50ab05520dc",
-              "url": "https://files.pythonhosted.org/packages/77/57/32ed300facd766f9e0ae52792fafd429525c23aef28c7df4940682edc4c2/boto3-1.28.35.tar.gz"
+              "hash": "cdb466e51ebe4c99640269d88d5450328271437d58e6ce089690d0485bef6174",
+              "url": "https://files.pythonhosted.org/packages/20/a6/c1fab54e40fdae8d2c835e97c79d5051f59df427222f5adf5b6ed14f6405/boto3-1.28.38.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.32.0,>=1.31.35",
+            "botocore<1.32.0,>=1.31.38",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.28.35"
+          "version": "1.28.38"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "943e1465aad66db4933b06809134bd08c5b05e8eb18c19742ffec82f54769457",
-              "url": "https://files.pythonhosted.org/packages/35/5a/effb72e1cee7f9f3538a73b75870687cef1d9a377da7a70b75d7e1a38c5c/botocore-1.31.35-py3-none-any.whl"
+              "hash": "86a4c253bba046f775e07f6585ff6c3d75c21a21c171e5bfcf68bc59f29d7b4c",
+              "url": "https://files.pythonhosted.org/packages/86/24/2e778bd9fdea0a45372fa9ce682a641773b422a8b0a154394356eb941220/botocore-1.31.38-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7e4534325262f43293a9cc9937cb3f1711365244ffde8b925a6ee862bcf30a83",
-              "url": "https://files.pythonhosted.org/packages/b8/7e/989d7fdebd245cc392995fd6720f2f7769f7caa7aac434887e54a1c6d320/botocore-1.31.35.tar.gz"
+              "hash": "b02de7898f0a7de0f6569be1c87046035a974006c31fd641f4b97a8dba1fad21",
+              "url": "https://files.pythonhosted.org/packages/bf/d9/e1f6a770eac0e6f1e2bd4913d3758fae36785e33150db19a35d5d5956fd2/botocore-1.31.38.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -903,7 +904,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.31.35"
+          "version": "1.31.38"
         },
         {
           "artifacts": [
@@ -1458,6 +1459,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "34a17436ed1e96697a86f9de3d15a3b0be01d8bc8de9c1dffd59fb8234ed5307",
+              "url": "https://files.pythonhosted.org/packages/8f/2e/cf6accf7415237d6faeeebdc7832023c90e0282aa16fd3263db0eb4715ec/future-0.18.3.tar.gz"
+            }
+          ],
+          "project_name": "future",
+          "requires_dists": [],
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.6",
+          "version": "0.18.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "d61d1b40897407b574da67da1a833bdc10d5a11642566e506565d1b1a46ba873",
               "url": "https://files.pythonhosted.org/packages/9c/8d/bff87fc722553a5691d8514da5523c23547f3894189ba03b57592e37bdc2/google_auth-2.22.0-py2.py3-none-any.whl"
             },
@@ -1584,6 +1598,11 @@
               "algorithm": "sha256",
               "hash": "5454276c07d27a740c5892f4907c86327b632127dd9abec42ee62e12427ff7e3",
               "url": "https://files.pythonhosted.org/packages/71/c5/c26840ce91bcbbfc42c1a246289d9d4c758663652669f24e37f84bcdae2a/greenlet-2.0.2-cp311-cp311-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d4606a527e30548153be1a9f155f4e283d109ffba663a15856089fb55f933e47",
+              "url": "https://files.pythonhosted.org/packages/03/1a/dae7e4abc978e3eff4b8e90e76fb6619ba38d3cabac5f10131880fc03091/greenlet-2.0.2-cp311-cp311-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
@@ -2002,13 +2021,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7441af0c0672edc5d28035e92ba5e32fadcfa8a4e608a434c228836a89df6158",
-              "url": "https://files.pythonhosted.org/packages/29/24/0491f7837cedf39ae0f96d9b3e4db2fae31cc4dd5eac00a98ab0db996c9b/jupyter_client-8.3.0-py3-none-any.whl"
+              "hash": "5eb9f55eb0650e81de6b7e34308d8b92d04fe4ec41cd8193a913979e33d8e1a5",
+              "url": "https://files.pythonhosted.org/packages/73/d4/3c13d6a300be9e894561aea0b81e7aed46e8f98029b7d9369d90b1fc7ac5/jupyter_client-8.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3af69921fe99617be1670399a0b857ad67275eefcfa291e2c81a160b7b650f5f",
-              "url": "https://files.pythonhosted.org/packages/f9/bb/454464291217af5dc1d0dfc636f7f6b68227758319dad5f64b341ffd54f5/jupyter_client-8.3.0.tar.gz"
+              "hash": "60294b2d5b869356c893f57b1a877ea6510d60d45cf4b38057f1672d85699ac9",
+              "url": "https://files.pythonhosted.org/packages/41/6d/01d701db0d4242da9a6ac094a2dfd2984a294b9e6c8318d4119397477c00/jupyter_client-8.3.1.tar.gz"
             }
           ],
           "project_name": "jupyter-client",
@@ -2037,7 +2056,7 @@
             "traitlets>=5.3"
           ],
           "requires_python": ">=3.8",
-          "version": "8.3.0"
+          "version": "8.3.1"
         },
         {
           "artifacts": [
@@ -3134,8 +3153,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d2b04aac4d386b172d5b9692e2d2da8de7bfb6c387fa4f801fbf6fb2e6ba4673",
-              "url": "https://files.pythonhosted.org/packages/7b/5e/efd033ab7199a0b2044dab3b9f7a4f6670e6a52c089de572e928d2873b06/PyYAML-6.0.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "e7d73685e87afe9f3b36c799222440d6cf362062f78be1013661b00c5c6f678b",
+              "url": "https://files.pythonhosted.org/packages/03/5c/c4671451b2f1d76ebe352c0945d4cd13500adb5d05f5a51ee296d80152f7/PyYAML-6.0.1-cp311-cp311-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -3151,6 +3170,11 @@
               "algorithm": "sha256",
               "hash": "42f8152b8dbc4fe7d96729ec2b99c7097d656dc1213a3229ca5383f973a5ed6d",
               "url": "https://files.pythonhosted.org/packages/5e/94/7d5ee059dfb92ca9e62f4057dcdec9ac08a9e42679644854dc01177f8145/PyYAML-6.0.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d2b04aac4d386b172d5b9692e2d2da8de7bfb6c387fa4f801fbf6fb2e6ba4673",
+              "url": "https://files.pythonhosted.org/packages/7b/5e/efd033ab7199a0b2044dab3b9f7a4f6670e6a52c089de572e928d2873b06/PyYAML-6.0.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -3858,6 +3882,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "1cbfffb2d2b75ccac27d0200cee0507b6fbb0726e0afb9fae017ade5d2ce8788",
+              "url": "https://files.pythonhosted.org/packages/04/b0/2269c328abffbb63979f7143351a24a066776b87526d79956aea5018b80a/treelib-1.6.1.tar.gz"
+            }
+          ],
+          "project_name": "treelib",
+          "requires_dists": [
+            "future"
+          ],
+          "requires_python": null,
+          "version": "1.6.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "5e3e3be01e887e7eafae5af63d1f36c849aaa94e3a0112097312aabfa16284f1",
               "url": "https://files.pythonhosted.org/packages/9a/bb/d43e5c75054e53efce310e79d63df0ac3f25e34c926be5dffb7d283fb2a8/typeguard-2.13.3-py3-none-any.whl"
             },
@@ -4051,19 +4090,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0c1618fb14850cb482adbec602bbb519c43f24942d66d66196bc7528320f33b1",
-              "url": "https://files.pythonhosted.org/packages/07/4d/45fcb91a19a82b0b04442ce5f728f01d14fb73495afa0eb56df59d51678d/types_setuptools-68.1.0.0-py3-none-any.whl"
+              "hash": "a9a0d2ca1da8a15924890d464adcee4004deb07b6a99bd0b1881eac5c73cb3a7",
+              "url": "https://files.pythonhosted.org/packages/50/fb/bd066eafa33cc0061fadeacaf44b74462e0cad01bac39dc1246c366add88/types_setuptools-68.1.0.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2bc9b0c0818f77bdcec619970e452b320a423bb3ac074f5f8bc9300ac281c4ae",
-              "url": "https://files.pythonhosted.org/packages/28/5c/08d1db8c7d3a0101b10ec400a55728a6440bcb3c73e7f51cc93943adf5b0/types-setuptools-68.1.0.0.tar.gz"
+              "hash": "271ed8da44885cd9a701c86e48cc6d3cc988052260e72b3ce26c26b3028f86ed",
+              "url": "https://files.pythonhosted.org/packages/a7/b3/19bc83fe656d60591b428a12fbff3b72f8a619fc0f410f6bfb110b167d69/types-setuptools-68.1.0.1.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "68.1.0.0"
+          "version": "68.1.0.1"
         },
         {
           "artifacts": [
@@ -4461,6 +4500,7 @@
     "tomlkit~=0.11.1",
     "tqdm>=4.61",
     "trafaret~=2.1",
+    "treelib==1.6.1",
     "typeguard~=2.10",
     "types-Jinja2",
     "types-PyYAML",
