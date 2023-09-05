@@ -68,7 +68,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
-    roundrobin = False
+    roundrobin: bool = False
 
     def to_json(self) -> dict[str, Any]:
         return {

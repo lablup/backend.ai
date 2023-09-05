@@ -677,37 +677,45 @@ class SchedulerDispatcher(aobject):
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
                 if scheduler.sgroup_opts.roundrobin:
-                    roundrobin_state_str: str | None = await sched_ctx.registry.shared_config.get(
-                        "roundrobin_state", None
+                    rr_state_str: str | None = await sched_ctx.registry.shared_config.get_raw(
+                        "roundrobin_state"
                     )
 
-                    if roundrobin_state_str is not None:
-                        roundrobin_state: Dict[str, Any] = json.loads(roundrobin_state_str)
+                    if rr_state_str is not None:
+                        rr_state: Dict[str, Any] = json.loads(rr_state_str)
 
-                        if requested_architecture in roundrobin_state:
+                        if requested_architecture in rr_state:
                             schedulable_group_id = get_hash(
                                 "#".join(list(map(lambda agent: agent.id, sorted_agents)))
                             )
 
-                            if schedulable_group_id == roundrobin_state.get("schedulable_group_id"):
-                                rr_index = cast(int, roundrobin_state.get("next_index"))
+                            if schedulable_group_id == cast(
+                                Dict[str, Any], rr_state.get(requested_architecture)
+                            ).get("schedulable_group_id"):
+                                rr_index = cast(
+                                    int,
+                                    cast(Dict[str, Any], rr_state.get(requested_architecture)).get(
+                                        "next_index"
+                                    ),
+                                )
 
-                                for i, agent in enumerate(sorted_agents):
+                                for i in range(len(sorted_agents)):
                                     idx = (rr_index + i) % len(sorted_agents)
+                                    agent = sorted_agents[idx]
 
                                     if (
                                         agent.available_slots - agent.occupied_slots
                                         > sess_ctx.requested_slots
                                     ):
-                                        agent_id = sorted_agents[idx].id
+                                        agent_id = agent.id
 
-                                        roundrobin_state[requested_architecture] = {
+                                        rr_state[requested_architecture] = {
                                             "schedulable_group_id": schedulable_group_id,
                                             "next_index": (rr_index + i + 1) % len(sorted_agents),
                                         }
 
                                         await sched_ctx.registry.shared_config.etcd.put(
-                                            "roundrobin_state", json.dumps(roundrobin_state)
+                                            "roundrobin_state", json.dumps(rr_state)
                                         )
                                         break
                                 else:
@@ -734,22 +742,23 @@ class SchedulerDispatcher(aobject):
                     agent_id = cand_agent
 
                     if scheduler.sgroup_opts.roundrobin:
-                        new_metadata = json.load(
-                            await sched_ctx.registry.shared_config.get("roundrobin_state", {})
+                        new_rr_state = json.loads(
+                            (await sched_ctx.registry.shared_config.get_raw("roundrobin_state"))
+                            or "{}"
                         )
-                        new_metadata[requested_architecture] = {
+                        new_rr_state[requested_architecture] = {
                             "schedulable_group_id": get_hash(
                                 "#".join(list(map(lambda agent: agent.id, sorted_agents)))
                             ),
                             "next_index": [
-                                idx
+                                (idx + 1) % len(sorted_agents)
                                 for idx, agent in enumerate(sorted_agents)
                                 if agent.id == agent_id
                             ][0],
                         }
 
                         await sched_ctx.registry.shared_config.etcd.put(
-                            "roundrobin_state", json.dumps(new_metadata)
+                            "roundrobin_state", json.dumps(new_rr_state)
                         )
 
             async with self.db.begin_session() as agent_db_sess:
