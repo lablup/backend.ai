@@ -220,12 +220,14 @@ class UmountTask(AbstractTask):
     edit_fstab: bool = attrs.field(default=False)
     fstab_path: str | None = attrs.field(default=None)
     mount_prefix: str | None = attrs.field(default=None)
+    timeout: float | None = attrs.field(default=None)
 
     async def run(self) -> Any:
         did_umount = await _umount(
             self.mount_path,
             edit_fstab=self.edit_fstab,
             fstab_path=self.fstab_path,
+            timeout_sec=self.timeout,
         )
         if not did_umount:
             return f"{self.mount_path} not exists. Skip umount."
@@ -233,7 +235,12 @@ class UmountTask(AbstractTask):
 
     @classmethod
     def from_event(
-        cls, event: DoVolumeUnmountEvent, *, mount_path: Path, mount_prefix: str | None = None
+        cls,
+        event: DoVolumeUnmountEvent,
+        *,
+        mount_path: Path,
+        mount_prefix: str | None = None,
+        timeout: float | None = None,
     ) -> UmountTask:
         return UmountTask(
             str(mount_path),
@@ -242,6 +249,7 @@ class UmountTask(AbstractTask):
             event.edit_fstab,
             event.fstab_path,
             mount_prefix,
+            timeout,
         )
 
     def serialize(self) -> bytes:
@@ -253,6 +261,7 @@ class UmountTask(AbstractTask):
                 self.edit_fstab,
                 self.fstab_path,
                 self.mount_prefix,
+                self.timeout,
             )
         )
 
@@ -265,6 +274,7 @@ class UmountTask(AbstractTask):
             values[3],
             values[4],
             values[5],
+            values[6],
         )
 
 

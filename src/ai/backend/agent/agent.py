@@ -2379,6 +2379,7 @@ async def handle_volume_umount(
         log.debug("Storage proxy is in the same node. Skip the volume task.")
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
     err_msg: str | None = None
@@ -2388,6 +2389,7 @@ async def handle_volume_umount(
             mount_prefix,
             event.edit_fstab,
             event.fstab_path,
+            timeout_sec=float(timeout) if timeout is not None else None,
         )
     except VolumeMountFailed as e:
         err_msg = str(e)

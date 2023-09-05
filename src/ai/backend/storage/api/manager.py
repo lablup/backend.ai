@@ -1107,12 +1107,14 @@ async def handle_volume_umount(
         log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
     volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
     mount_path = Path(volume_mount_path, event.dir_name)
     umount_task = UmountTask.from_event(
         event,
         mount_path=mount_path,
         mount_prefix=mount_prefix,
+        timeout=float(timeout) if timeout is not None else None,
     )
     resp = await context.watcher.request_task(umount_task)
     if not resp.succeeded:

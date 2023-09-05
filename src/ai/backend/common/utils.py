@@ -35,7 +35,7 @@ from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
 from .exception import VolumeMountFailed, VolumeUnmountFailed
-from .defs import DEFAULT_UMOUNT_TIMEOUT
+from .defs import DEFAULT_FILE_IO_TIMEOUT
 
 KT = TypeVar("KT")
 VT = TypeVar("VT")
@@ -346,6 +346,8 @@ async def umount(
     edit_fstab: bool = False,
     fstab_path: str | None = None,
     rmdir_if_empty: bool = False,
+    *,
+    timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
 ) -> bool:
     if mount_prefix is None:
         mount_prefix = "/"
@@ -356,7 +358,7 @@ async def umount(
     if not mountpoint.is_mount():
         return False
     try:
-        with timeout(DEFAULT_UMOUNT_TIMEOUT):
+        with timeout(timeout_sec):
             proc = await asyncio.create_subprocess_exec(
                 *[
                     "umount",
@@ -371,7 +373,7 @@ async def umount(
             await proc.wait()
     except asyncio.TimeoutError:
         raise VolumeUnmountFailed(
-            f"Failed to umount {mountpoint}. Raise timeout ({DEFAULT_UMOUNT_TIMEOUT}sec). "
+            f"Failed to umount {mountpoint}. Raise timeout ({timeout_sec}sec). "
             "The process may be hanging in state D, which needs to be checked."
         )
     if err:
