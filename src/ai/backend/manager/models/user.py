@@ -905,10 +905,10 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_error_logs(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
