@@ -906,6 +906,7 @@ class PurgeUser(graphene.Mutation):
                     target_user_email=graph_ctx.user["email"],
                 )
             await cls.delete_error_logs(conn, user_uuid)
+            await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
             await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
@@ -1104,6 +1105,26 @@ class PurgeUser(graphene.Mutation):
             ),
         )
         return active_kernel_count > 0
+
+    @classmethod
+    async def delete_endpoint(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all endpoint.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete endpoint
+        :return: number of deleted rows
+        """
+        from .endpoint import Endpoint
+
+        result = await conn.execute(sa.delete(Endpoint).where(Endpoint.session_owner == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
+        return result.rowcount
 
     @classmethod
     async def delete_kernels(
