@@ -27,6 +27,7 @@ from setproctitle import setproctitle
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common import config
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
@@ -762,49 +763,59 @@ async def server_main(
 def main(
     ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
 ) -> None:
-    raw_config = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
-    config = config_iv.check(raw_config)
-    config["debug"] = debug
+    # Delete this part when you remove --debug option
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
+
+    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+
+    cfg = config.check(raw_cfg, config_iv)
 
     if ctx.invoked_subcommand is None:
-        config["webserver"]["pid-file"].write_text(str(os.getpid()))
-        ipc_base_path = config["webserver"]["ipc-base-path"]
+        cfg["webserver"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = cfg["webserver"]["ipc-base-path"]
         log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        config["logging"]["endpoint"] = log_endpoint
+        cfg["logging"]["endpoint"] = log_endpoint
         try:
-            logger = Logger(config["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
             with logger:
                 setproctitle(
-                    f"backend.ai: webserver {config['service']['ip']}:{config['service']['port']}"
+                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
                 )
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
-                log_config = logging.getLogger("ai.backend.webserver.config")
+                log_config = logging.getLogger("ai.backend.web.config")
                 if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
-                    pprint(config)
-                log.info("serving at {0}:{1}", config["service"]["ip"], config["service"]["port"])
-                if config["webserver"]["event-loop"] == "uvloop":
+                    pprint(cfg)
+                log.info("serving at {0}:{1}", cfg["service"]["ip"], cfg["service"]["port"])
+                if cfg["webserver"]["event-loop"] == "uvloop":
                     import uvloop
 
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
                 try:
                     aiotools.start_server(
-                        server_main,
+                        server_main_logwrapper,
                         num_workers=min(4, os.cpu_count() or 1),
-                        args=(config,),
+                        args=(cfg, log_endpoint),
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if config["webserver"]["pid-file"].is_file():
+            if cfg["webserver"]["pid-file"].is_file():
                 # check is_file() to prevent deleting /dev/null!
-                config["webserver"]["pid-file"].unlink()
+                cfg["webserver"]["pid-file"].unlink()
     else:
         # Click is going to invoke a subcommand.
         pass
