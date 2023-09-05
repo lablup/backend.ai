@@ -254,9 +254,7 @@ async def exception_middleware(
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
-            raise MethodNotAllowed(
-                method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
-            )
+            raise MethodNotAllowed(concrete_ex.method, concrete_ex.allowed_methods)
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
