@@ -353,7 +353,7 @@ async def umount(
         fstab_path = "/etc/fstab"
     mountpoint = Path(mount_prefix) / mount_path
     assert Path(mount_prefix) != mountpoint
-    if not mountpoint.exists() or not mountpoint.is_dir():
+    if not mountpoint.is_mount():
         return False
     try:
         with timeout(DEFAULT_UMOUNT_TIMEOUT):
