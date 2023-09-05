@@ -906,6 +906,7 @@ class PurgeUser(graphene.Mutation):
                     target_user_email=graph_ctx.user["email"],
                 )
             await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_error_logs(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
@@ -1124,6 +1125,26 @@ class PurgeUser(graphene.Mutation):
         )
         if result.rowcount > 0:
             log.info("deleted {0} user's kernels ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_error_logs(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all error logs.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete error logs
+        :return: number of deleted rows
+        """
+        from .error_logs import error_logs
+
+        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
     @classmethod
