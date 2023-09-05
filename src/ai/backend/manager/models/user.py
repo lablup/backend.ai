@@ -1119,11 +1119,19 @@ class PurgeUser(graphene.Mutation):
         :param user_uuid: user's UUID to delete endpoint
         :return: number of deleted rows
         """
-        from .endpoint import Endpoint
+        from .endpoint import EndpointRow, EndpointTokenRow
 
-        result = await conn.execute(sa.delete(Endpoint).where(Endpoint.session_owner == user_uuid))
+        result = await conn.execute(
+            sa.delete(EndpointTokenRow).where(EndpointTokenRow.session_owner == user_uuid)
+        )
         if result.rowcount > 0:
-            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
+            log.info("deleted {0} user's endpoint tokens ({1})", result.rowcount, user_uuid)
+
+        result = await conn.execute(
+            sa.delete(EndpointRow).where(EndpointRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
     @classmethod
