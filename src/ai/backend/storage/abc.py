@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import (
     Any,
     AsyncIterator,
+    ClassVar,
     Final,
     FrozenSet,
     Mapping,
@@ -15,6 +16,7 @@ from typing import (
 )
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
@@ -58,6 +60,16 @@ class AbstractQuotaModel(metaclass=ABCMeta):
         Raises `AlreadyExists` error if there is the quota scope with the same name.
         """
         raise NotImplementedError
+
+    async def get_extra_quota_info(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> dict[str, Any] | None:
+        """
+        Get the information about the given volume.
+        Returns None if target volume does not exist.
+        """
+        return None
 
     @abstractmethod
     async def describe_quota_scope(
@@ -177,6 +189,7 @@ class AbstractFSOpModel(metaclass=ABCMeta):
 class AbstractVolume(metaclass=ABCMeta):
     quota_model: AbstractQuotaModel
     fsop_model: AbstractFSOpModel
+    name: ClassVar[str] = "undefined"
 
     def __init__(
         self,
@@ -184,12 +197,16 @@ class AbstractVolume(metaclass=ABCMeta):
         mount_path: Path,
         *,
         etcd: AsyncEtcd,
+        event_dispathcer: EventDispatcher,
+        event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
         self.config = options or {}
         self.etcd = etcd
+        self.event_dispathcer = event_dispathcer
+        self.event_producer = event_producer
 
     async def init(self) -> None:
         self.fsop_model = await self.create_fsop_model()
