@@ -62,7 +62,7 @@ local_config_iv = (
                     t.Key("aiomonitor-webui-port", default=49300): t.ToInt[1:65535],
                     t.Key("watcher-insock-path-prefix"): t.String(allow_blank=False),
                     t.Key("watcher-outsock-path-prefix"): t.String(allow_blank=False),
-                    t.Key("use-watcher", default=True): t.Bool(),
+                    t.Key("use-watcher", default=False): t.Bool(),
                 },
             ),
             t.Key("logging"): logging_config_iv,
