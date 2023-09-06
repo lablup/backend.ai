@@ -119,8 +119,14 @@ async def server_main(
                     "Storage proxy must be run as root if watcher is enabled. Else, set"
                     " `use-wathcer` to false in your local config file."
                 )
-            insock_path = local_config["storage-proxy"]["watcher-insock-path-prefix"]
-            outsock_path = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            insock_path: str | None = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+            outsock_path: str | None = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            if insock_path is None or outsock_path is None:
+                raise ValueError(
+                    "Socket path must be not null. Please set valid socket path to"
+                    " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
+                    " config file."
+                )
             watcher_client = WatcherClient(pidx, insock_path, outsock_path)
             await watcher_client.init()
         else:
