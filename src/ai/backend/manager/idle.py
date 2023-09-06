@@ -216,6 +216,7 @@ class IdleCheckerHost:
             self._event_producer,
             lambda: DoIdleCheckEvent(),
             self.check_interval,
+            task_name="idle_checker",
         )
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,
