@@ -376,6 +376,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
 
     async with root_ctx.db.begin_session() as db_sess:
+        query = sa.select(EndpointRow).where(
+            (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
+            & (EndpointRow.name == params["service_name"])
+        )
+        result = await db_sess.execute(query)
+        service_with_duplicate_name = result.scalar()
+        if service_with_duplicate_name is not None:
+            raise InvalidAPIParameters("Cannot create multiple services with same name")
+
         project_id = await resolve_group_name_or_id(
             await db_sess.connection(), params["domain"], params["group"]
         )
