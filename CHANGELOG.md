@@ -16,6 +16,20 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0a3 (2023-09-07)
+### Fixes
+* Hotfix: DB migration failing ([#1544](https://github.com/lablup/backend.ai/issues/1544))
+
+## 23.09.0a2 (2023-09-06)
+
+### Features
+* Preserve the GlobalTimer tick termination logs in task monitoring. ([#1541](https://github.com/lablup/backend.ai/issues/1541))
+
+### Fixes
+* Fix service not created when trying to use name of already destroyed one ([#1539](https://github.com/lablup/backend.ai/issues/1539))
+* Fix token not stored on database when character count of the token is greater than 1024 ([#1540](https://github.com/lablup/backend.ai/issues/1540))
+
+
 ## 23.09.0a1 (2023-09-06)
 
 ### Breaking Changes
