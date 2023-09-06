@@ -496,10 +496,6 @@ async def scale(request: web.Request, params: Any) -> web.Response:
 
     if params["to"] < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
-    if params["to"] == len(endpoint.routings):
-        return web.json_response(
-            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
-        )
 
     async with root_ctx.db.begin_session() as db_sess:
         query = (
@@ -664,6 +660,7 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
 
     async with root_ctx.db.begin_session() as db_sess:
         token_row = EndpointTokenRow(
+            uuid.uuid4(),
             token,
             endpoint.id,
             endpoint.domain,
