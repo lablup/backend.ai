@@ -66,7 +66,8 @@
       "Tasks": "__NOT_TRANSLATED__",
       "YouMushChangeYourPassword": "__NOT_TRANSLATED__",
       "NewPasswordCannotBeSame": "__NOT_TRANSLATED__",
-      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__"
+      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__",
+      "InputNewPassword": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "LOGIN DIBUTUHKAN",
     "YouAreOffline": "Anda sekarang offline",
@@ -208,6 +209,7 @@
       "ProxyConfiguratorNotResponding": "Konfigurator proksi tidak merespons.",
       "SettingUpProxyForApp": "Menyiapkan proksi untuk aplikasi...",
       "AddingKernelToSocketQueue": "Menambahkan kernel ke antrian soket...",
+      "FailedToConnectCoordinator": "Gagal terhubung ke administrasi aplikasi. Harap periksa koneksi jaringan dan pengaturan firewall Anda.",
       "ManualImageName": "Nama Image (Manual)",
       "NotEnoughResource": "Tidak cukup sumber daya",
       "ResourceAllocationTemplate": "Template Alokasi Sumber Daya",
@@ -263,7 +265,8 @@
       "PortsTitleWithRange": "__NOT_TRANSLATED__",
       "PrePortConfigWillDisappear": "__NOT_TRANSLATED__",
       "PreOpenPortPanelTitle": "__NOT_TRANSLATED__",
-      "PreOpenPortRange": "__NOT_TRANSLATED__"
+      "PreOpenPortRange": "__NOT_TRANSLATED__",
+      "MinMemory": "__NOT_TRANSLATED__"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -300,7 +303,9 @@
       "AppMustBeRunDialog": "Aplikasi ini hanya dapat diakses dan digunakan jika sudah berjalan melalui terminal. Jika tidak, Anda akan diarahkan ke halaman galat yang terjadi saat aplikasi tidak berjalan.",
       "ConfirmAndRun": "Saya sudah memeriksa dan saya akan mulai",
       "Prepared": "Siap",
-      "App": "__NOT_TRANSLATED__"
+      "App": "__NOT_TRANSLATED__",
+      "NoExistingConnectionExample": "Tidak Ada Koneksi Contoh untuk disalin.",
+      "SSHConnectionExampleClipboardCopy": "Contoh Koneksi SSH telah disalin ke clipboard."
     },
     "TensorboardPath": "Direktori log untuk TensorBoard",
     "InputTensorboardPath": "Harap masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahwa direktori log tidak akan dibuat secara otomatis..",
@@ -736,13 +741,16 @@
     "ProjectFolder": "__NOT_TRANSLATED__",
     "QuotaPerStorageVolume": "__NOT_TRANSLATED__",
     "HostDetails": "__NOT_TRANSLATED__",
-    "Used": "__NOT_TRANSLATED__"
+    "Used": "__NOT_TRANSLATED__",
+    "Pipeline": "__NOT_TRANSLATED__",
+    "DialogDataFolder": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "PERINGATAN: ini tidak dapat dibatalkan!",
       "LogDeletion": "Anda yakin ingin menghapus semua pesan log?",
-      "WillBeAppliedToNewSessions": "Pembaruan ini akan diterapkan ke sesi baru."
+      "WillBeAppliedToNewSessions": "Pembaruan ini akan diterapkan ke sesi baru.",
+      "Required": "__NOT_TRANSLATED__"
     },
     "ask": {
       "DoYouWantToProceed": "Apakah Anda ingin lanjut?"
@@ -1363,7 +1371,8 @@
     "CreatingComputeSession": "Membuat sesi komputasi...",
     "SessionStillPreparing": "Sesi masih dalam persiapan. Harap muat ulang setelah beberapa saat",
     "ComputeSessionPrepared": "Sesi komputasi tersiapkan",
-    "sessionStatusIs": "Status sesi adalah"
+    "sessionStatusIs": "Status sesi adalah",
+    "EmptyProject": "__NOT_TRANSLATED__"
   },
   "error": {
     "UpdateError": "Galat pembaruan",
@@ -1493,6 +1502,28 @@
     "YouAreAboutToTerminate": "__NOT_TRANSLATED__",
     "FailedToStartService": "__NOT_TRANSLATED__",
     "ServingRouteErrorModalTitle": "__NOT_TRANSLATED__",
-    "ClearErrors": "__NOT_TRANSLATED__"
+    "ClearErrors": "__NOT_TRANSLATED__",
+    "GeneratedTokens": "__NOT_TRANSLATED__",
+    "CurrentTime": "__NOT_TRANSLATED__",
+    "ExpiredTime": "__NOT_TRANSLATED__",
+    "GenerateNewToken": "__NOT_TRANSLATED__",
+    "GenerateToken": "__NOT_TRANSLATED__",
+    "Generate": "__NOT_TRANSLATED__",
+    "CreatedAt": "__NOT_TRANSLATED__",
+    "TokenGenerated": "__NOT_TRANSLATED__",
+    "TokenGenerationFailed": "__NOT_TRANSLATED__",
+    "PleaseSelectTime": "__NOT_TRANSLATED__",
+    "ExpiredDate": "__NOT_TRANSLATED__",
+    "TokenExpiredDateHelp": "__NOT_TRANSLATED__",
+    "TokenExpiredDateError": "__NOT_TRANSLATED__",
+    "FormValidationFailed": "__NOT_TRANSLATED__",
+    "ServiceNameRule": "__NOT_TRANSLATED__",
+    "resources": "__NOT_TRANSLATED__"
+  },
+  "ErrorBoundary": {
+    "title": "__NOT_TRANSLATED__",
+    "reloadPage": "__NOT_TRANSLATED__",
+    "resetErrorBoundary": "__NOT_TRANSLATED__",
+    "displayOnlyDevEnv": "__NOT_TRANSLATED__"
   }
 }

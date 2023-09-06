@@ -66,7 +66,8 @@
       "Tasks": "__NOT_TRANSLATED__",
       "YouMushChangeYourPassword": "__NOT_TRANSLATED__",
       "NewPasswordCannotBeSame": "__NOT_TRANSLATED__",
-      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__"
+      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__",
+      "InputNewPassword": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "CONNEXION REQUISE",
     "YouAreOffline": "Vous êtes maintenant hors ligne",
@@ -208,6 +209,7 @@
       "ProxyConfiguratorNotResponding": "Le configurateur de proxy ne répond pas.",
       "SettingUpProxyForApp": "Configuration du proxy pour l'application...",
       "AddingKernelToSocketQueue": "Ajout du noyau à la file d'attente des sockets...",
+      "FailedToConnectCoordinator": "Gagal terhubung ke administrasi aplikasi. Harap periksa koneksi jaringan dan pengaturan firewall Anda.",
       "ManualImageName": "Nom de l'image (manuel)",
       "NotEnoughResource": "Pas assez de ressources",
       "ResourceAllocationTemplate": "Modèle d'allocation de ressources",
@@ -263,7 +265,8 @@
       "PortsTitleWithRange": "__NOT_TRANSLATED__",
       "PrePortConfigWillDisappear": "__NOT_TRANSLATED__",
       "PreOpenPortPanelTitle": "__NOT_TRANSLATED__",
-      "PreOpenPortRange": "__NOT_TRANSLATED__"
+      "PreOpenPortRange": "__NOT_TRANSLATED__",
+      "MinMemory": "__NOT_TRANSLATED__"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -300,7 +303,9 @@
       "AppMustBeRunDialog": "Cette application n'est accessible et utilisée que si elle est déjà en cours d'exécution via le terminal. Sinon, vous serez dirigé vers une page d'erreur qui se produit lorsque l'application n'est pas en cours d'exécution.",
       "ConfirmAndRun": "j'ai vérifié et je vais commencer",
       "Prepared": "Préparé",
-      "App": "__NOT_TRANSLATED__"
+      "App": "__NOT_TRANSLATED__",
+      "NoExistingConnectionExample": "Aucun exemple de connexion à copier.",
+      "SSHConnectionExampleClipboardCopy": "L'exemple de connexion SSH a été copié dans le presse-papiers."
     },
     "TensorboardPath": "Répertoire des journaux pour TensorBoard",
     "InputTensorboardPath": "Veuillez saisir le répertoire de journal auquel TensorBoard fera référence. Notez que le répertoire des journaux ne sera pas automatiquement créé.",
@@ -736,13 +741,16 @@
     "ProjectFolder": "__NOT_TRANSLATED__",
     "QuotaPerStorageVolume": "__NOT_TRANSLATED__",
     "HostDetails": "__NOT_TRANSLATED__",
-    "Used": "__NOT_TRANSLATED__"
+    "Used": "__NOT_TRANSLATED__",
+    "Pipeline": "__NOT_TRANSLATED__",
+    "DialogDataFolder": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ATTENTION : cela ne peut pas être annulé !",
       "LogDeletion": "Voulez-vous vraiment supprimer tous les messages du journal ?",
-      "WillBeAppliedToNewSessions": "Cette mise à jour sera appliquée aux nouvelles sessions."
+      "WillBeAppliedToNewSessions": "Cette mise à jour sera appliquée aux nouvelles sessions.",
+      "Required": "__NOT_TRANSLATED__"
     },
     "ask": {
       "DoYouWantToProceed": "Voulez-vous poursuivre?"
@@ -1363,7 +1371,8 @@
     "CreatingComputeSession": "Création d'une session de calcul...",
     "SessionStillPreparing": "La séance est encore en préparation. Actualiser la page après un certain temps",
     "ComputeSessionPrepared": "Séance de calcul préparée",
-    "sessionStatusIs": "L'état de la session est"
+    "sessionStatusIs": "L'état de la session est",
+    "EmptyProject": "__NOT_TRANSLATED__"
   },
   "error": {
     "UpdateError": "Erreur de mise à jour",
@@ -1493,6 +1502,28 @@
     "YouAreAboutToTerminate": "__NOT_TRANSLATED__",
     "FailedToStartService": "__NOT_TRANSLATED__",
     "ServingRouteErrorModalTitle": "__NOT_TRANSLATED__",
-    "ClearErrors": "__NOT_TRANSLATED__"
+    "ClearErrors": "__NOT_TRANSLATED__",
+    "GeneratedTokens": "__NOT_TRANSLATED__",
+    "CurrentTime": "__NOT_TRANSLATED__",
+    "ExpiredTime": "__NOT_TRANSLATED__",
+    "GenerateNewToken": "__NOT_TRANSLATED__",
+    "GenerateToken": "__NOT_TRANSLATED__",
+    "Generate": "__NOT_TRANSLATED__",
+    "CreatedAt": "__NOT_TRANSLATED__",
+    "TokenGenerated": "__NOT_TRANSLATED__",
+    "TokenGenerationFailed": "__NOT_TRANSLATED__",
+    "PleaseSelectTime": "__NOT_TRANSLATED__",
+    "ExpiredDate": "__NOT_TRANSLATED__",
+    "TokenExpiredDateHelp": "__NOT_TRANSLATED__",
+    "TokenExpiredDateError": "__NOT_TRANSLATED__",
+    "FormValidationFailed": "__NOT_TRANSLATED__",
+    "ServiceNameRule": "__NOT_TRANSLATED__",
+    "resources": "__NOT_TRANSLATED__"
+  },
+  "ErrorBoundary": {
+    "title": "__NOT_TRANSLATED__",
+    "reloadPage": "__NOT_TRANSLATED__",
+    "resetErrorBoundary": "__NOT_TRANSLATED__",
+    "displayOnlyDevEnv": "__NOT_TRANSLATED__"
   }
 }

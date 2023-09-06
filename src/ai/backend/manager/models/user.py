@@ -905,8 +905,11 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_error_logs(conn, user_uuid)
+            await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
+            await cls.delete_sessions(conn, user_uuid)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1020,7 +1023,7 @@ class PurgeUser(graphene.Mutation):
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
             result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host])
+                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
                 .select_from(vfolders)
                 .where(vfolders.c.user == user_uuid),
             )
@@ -1106,6 +1109,34 @@ class PurgeUser(graphene.Mutation):
         return active_kernel_count > 0
 
     @classmethod
+    async def delete_endpoint(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all endpoint.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete endpoint
+        :return: number of deleted rows
+        """
+        from .endpoint import EndpointRow, EndpointTokenRow
+
+        result = await conn.execute(
+            sa.delete(EndpointTokenRow).where(EndpointTokenRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint tokens ({1})", result.rowcount, user_uuid)
+
+        result = await conn.execute(
+            sa.delete(EndpointRow).where(EndpointRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
     async def delete_kernels(
         cls,
         conn: SAConnection,
@@ -1125,6 +1156,46 @@ class PurgeUser(graphene.Mutation):
         )
         if result.rowcount > 0:
             log.info("deleted {0} user's kernels ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_error_logs(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all error logs.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete error logs
+        :return: number of deleted rows
+        """
+        from .error_logs import error_logs
+
+        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all sessions.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete sessions
+        :return: number of deleted rows
+        """
+        from .session import SessionRow
+
+        result = await conn.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's sessions ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
     @classmethod
