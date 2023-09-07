@@ -1117,8 +1117,7 @@ async def handle_volume_umount(
         timeout=float(timeout) if timeout is not None else None,
     )
     resp = await context.watcher.request_task(umount_task)
-    if not resp.succeeded:
-        err_msg = resp.body
+    err_msg = resp.body if not resp.succeeded else None
     if resp.body:
         log.warning(resp.body)
     await context.event_producer.produce_event(
