@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import (
+    Any,
     Dict,
     FrozenSet,
     List,
@@ -158,6 +159,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         try:
@@ -270,6 +272,8 @@ class XfsVolume(BaseVolume):
     This backend requires `root` or no password `sudo` permission to run
     `xfs_quota` command and write to `/etc/projects` and `/etc/projid`.
     """
+
+    name = "xfs"
 
     project_registry: XfsProjectRegistry
 

@@ -42,8 +42,10 @@ from .types import (
     EtcdRedisConfig,
     KernelId,
     LogSeverity,
+    QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
+    VolumeMountableNodeType,
     aobject,
 )
 
@@ -193,6 +195,22 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
+@attrs.define(slots=True, frozen=True)
+class DoAgentResourceCheckEvent(AbstractEvent):
+    name = "do_agent_resource_check"
+
+    agent_id: AgentId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.agent_id,)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            AgentId(value[0]),
+        )
+
+
 class KernelLifecycleEventReason(str, enum.Enum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -300,6 +318,14 @@ class KernelStartedEvent(KernelCreationEventArgs, AbstractEvent):
 
 class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
+
+
+class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_healthy"
+
+
+class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
+    name = "kernel_health_check_failed"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -543,6 +569,128 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
 
 
+@attrs.define(slots=True)
+class DoVolumeMountEvent(AbstractEvent):
+    name = "do_volume_mount"
+
+    # Let storage proxies and agents find the real path of volume
+    # with their mount_path or mount_prefix.
+    dir_name: str = attrs.field()
+    volume_backend_name: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+
+    fs_location: str = attrs.field()
+    fs_type: str = attrs.field(default="nfs")
+    cmd_options: str | None = attrs.field(default=None)
+    scaling_group: str | None = attrs.field(default=None)
+
+    # if `edit_fstab` is False, `fstab_path` is ignored
+    # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
+    edit_fstab: bool = attrs.field(default=False)
+    fstab_path: str = attrs.field(default="/etc/fstab")
+
+    def serialize(self) -> tuple:
+        return (
+            self.dir_name,
+            self.volume_backend_name,
+            str(self.quota_scope_id),
+            self.fs_location,
+            self.fs_type,
+            self.cmd_options,
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            dir_name=value[0],
+            volume_backend_name=value[1],
+            quota_scope_id=QuotaScopeID.parse(value[2]),
+            fs_location=value[3],
+            fs_type=value[4],
+            cmd_options=value[5],
+            scaling_group=value[6],
+            edit_fstab=value[7],
+            fstab_path=value[8],
+        )
+
+
+@attrs.define(slots=True)
+class DoVolumeUnmountEvent(AbstractEvent):
+    name = "do_volume_unmount"
+
+    # Let storage proxies and agents find the real path of volume
+    # with their mount_path or mount_prefix.
+    dir_name: str = attrs.field()
+    volume_backend_name: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+    scaling_group: str | None = attrs.field(default=None)
+
+    # if `edit_fstab` is False, `fstab_path` is ignored
+    # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
+    edit_fstab: bool = attrs.field(default=False)
+    fstab_path: str | None = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.dir_name,
+            self.volume_backend_name,
+            str(self.quota_scope_id),
+            self.scaling_group,
+            self.edit_fstab,
+            self.fstab_path,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            dir_name=value[0],
+            volume_backend_name=value[1],
+            quota_scope_id=QuotaScopeID.parse(value[2]),
+            scaling_group=value[3],
+            edit_fstab=value[4],
+            fstab_path=value[5],
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VolumeMountEventArgs(AbstractEvent):
+    node_id: str = attrs.field()
+    node_type: VolumeMountableNodeType = attrs.field()
+    mount_path: str = attrs.field()
+    quota_scope_id: QuotaScopeID = attrs.field()
+    err_msg: str | None = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.node_id,
+            str(self.node_type),
+            self.mount_path,
+            str(self.quota_scope_id),
+            self.err_msg,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            value[0],
+            VolumeMountableNodeType(value[1]),
+            value[2],
+            QuotaScopeID.parse(value[3]),
+            value[4],
+        )
+
+
+class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
+    name = "volume_mounted"
+
+
+class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
+    name = "volume_unmounted"
+
+
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,
@@ -664,9 +812,9 @@ class EventDispatcher(aobject):
         db: int = 0,
         log_events: bool = False,
         *,
+        consumer_group: str,
         service_name: str = None,
         stream_key: str = "events",
-        consumer_group: str = "manager",
         node_id: str = None,
         consumer_exception_handler: PTGExceptionHandler = None,
         subscriber_exception_handler: PTGExceptionHandler = None,

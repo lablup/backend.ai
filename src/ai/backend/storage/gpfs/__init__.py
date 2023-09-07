@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 from typing import Any, FrozenSet, Mapping, Optional
 
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
@@ -41,6 +43,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
@@ -103,6 +106,7 @@ class GPFSOpModel(BaseFSOpModel):
 
 
 class GPFSVolume(BaseVolume):
+    name = "gpfs"
     api_client: GPFSAPIClient
 
     fs: str
@@ -112,9 +116,19 @@ class GPFSVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        etcd: AsyncEtcd,
+        event_dispathcer: EventDispatcher,
+        event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        super().__init__(local_config, mount_path, options=options)
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            event_dispathcer=event_dispathcer,
+            event_producer=event_producer,
+        )
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
         self.api_client = GPFSAPIClient(
             self.config["gpfs_endpoint"],

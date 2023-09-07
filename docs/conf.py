@@ -40,6 +40,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
+    "sphinx.ext.imgconverter",
     "sphinx_rtd_theme",
     "sphinxcontrib_trio",
     "sphinxcontrib.mermaid",
@@ -61,8 +62,9 @@ source_suffix = [".rst", ".md"]
 master_doc = "index"
 
 # General information about the project.
+from datetime import date
 project = "Backend.AI Documentation"
-copyright = "2015-2022, Lablup Inc."
+copyright = f"2015-{date.today().year}, Lablup Inc."
 author = "Lablup Inc."
 
 # The version info for the project you're documenting, acts as replacement for
@@ -162,21 +164,18 @@ htmlhelp_basename = "BackendAIDoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
-latex_engine = "pdflatex"
+latex_engine = "xelatex"
 
 latex_elements = {
     "papersize": "a4paper",
     "pointsize": "12pt",
-    "preamble": (
-        "\n".join(
-            [
-                "\\usepackage[T1]{fontenc}",
-                "\\usepackage{kotex}",
-                "\\usepackage{dhucs-nanumfont}",
-            ]
-        )
-        + "\n"
-    ),
+    "fontpkg": "\n".join([
+        "\\usepackage{fontspec}",
+        "\\setmainfont{Pretendard}",
+        "\\setmonofont{D2Coding}",
+        "\\usepackage{kotex}",
+        ""
+    ])
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }

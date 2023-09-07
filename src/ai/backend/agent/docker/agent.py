@@ -153,7 +153,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -1369,13 +1369,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == 409 and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             elif e.status == 404:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             else:
                 log.exception("destroy_kernel(k:{0}) kill error", kernel_id)
                 await self.error_monitor.capture_exception()

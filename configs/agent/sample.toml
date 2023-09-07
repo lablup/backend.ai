@@ -39,6 +39,13 @@ agent-sock-port = 6007
 # This affects the per-sgroup configuration scope.
 scaling-group = "default"
 
+# Set the volume mount path for the agent node.
+# mount-path = "/vfroot"
+
+# A boolean flag to indicate if there is any cohabiting storage proxy within the same node.
+# If is there any cohabiting storage proxy, then events such as mount or umount will be ignored. [default: true]
+# cohabiting-storage-proxy = true
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./agent.pid"             # env: BACKEND_PID_FILE
@@ -58,7 +65,8 @@ scaling-group = "default"
 metadata-server-port = 40128
 
 # The port number for aiomonitor.
-# aiomonitor-port = 48200
+# aiomonitor-termui-port = 48200
+# aiomonitor-webui-port = 49200
 
 # Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
 # open-source CUDA plugins in the mono-repo source installation.

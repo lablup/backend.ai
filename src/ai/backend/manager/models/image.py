@@ -34,7 +34,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ImageTaskResponse, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.container_registry import get_container_registry
+from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 from .agent import AgentRow
@@ -115,7 +115,7 @@ async def rescan_images(
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
-            scanner_cls = get_container_registry(registry_info)
+            scanner_cls = get_container_registry_cls(registry_info)
             scanner = scanner_cls(db, registry_name, registry_info)
             tg.create_task(scanner.rescan_single_registry(reporter))
     # TODO: delete images removed from registry?

@@ -57,15 +57,19 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
+    DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelHealthCheckFailedEvent,
+    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -112,7 +116,6 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.manager.models.routing import RouteStatus
 
 from .api.exceptions import (
     AgentError,
@@ -133,7 +136,6 @@ from .defs import (
     DEFAULT_IMAGE_ARCH,
     DEFAULT_ROLE,
     INTRINSIC_SLOTS,
-    REDIS_STREAM_DB,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
@@ -144,6 +146,7 @@ from .models import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
+    EndpointLifecycle,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
@@ -152,6 +155,7 @@ from .models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    RouteStatus,
     RoutingRow,
     SessionDependencyRow,
     SessionRow,
@@ -378,6 +382,16 @@ class AgentRegistry:
             name="api.session.kterm",
         )
         evd.consume(
+            KernelHealthCheckFailedEvent,
+            self,
+            handle_kernel_health_check_result,
+        )
+        evd.consume(
+            KernelHealthyEvent,
+            self,
+            handle_kernel_health_check_result,
+        )
+        evd.consume(
             SessionTerminatingEvent,
             self,
             handle_session_termination_lifecycle,
@@ -403,6 +417,7 @@ class AgentRegistry:
         evd.consume(
             DoTerminateSessionEvent, self, handle_destroy_session, name="api.session.doterm"
         )
+        evd.consume(DoAgentResourceCheckEvent, self, handle_check_agent_resource)
 
     async def shutdown(self) -> None:
         await cancel_tasks(self.pending_waits)
@@ -1286,6 +1301,7 @@ class AgentRegistry:
 
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
+                    session_data["environ"] = environ
                     session_data["requested_slots"] = session_requested_slots
                     session = SessionRow(**session_data)
                     kernels = [KernelRow(**kernel) for kernel in kernel_data]
@@ -2107,15 +2123,25 @@ class AgentRegistry:
         async def _update_by_fullscan(r: Redis):
             updates = {}
             keys = await r.keys(f"{kp_key}.*")
-            for ak in keys:
+            for stat_key in keys:
+                if isinstance(stat_key, bytes):
+                    _stat_key = stat_key.decode("utf-8")
+                else:
+                    _stat_key = stat_key
+                ak = _stat_key.replace(f"{kp_key}.", "")
                 session_concurrency = concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
-                updates[f"{kp_key}.{ak}"] = usage
+                updates[_stat_key] = usage
             keys = await r.keys(f"{sftp_kp_key}.*")
-            for ak in keys:
+            for stat_key in keys:
+                if isinstance(stat_key, bytes):
+                    _stat_key = stat_key.decode("utf-8")
+                else:
+                    _stat_key = stat_key
+                ak = _stat_key.replace(f"{sftp_kp_key}.", "")
                 session_concurrency = sftp_concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
-                updates[f"{sftp_kp_key}.{ak}"] = usage
+                updates[_stat_key] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2617,7 +2643,7 @@ class AgentRegistry:
                     self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
                 )
             except Exception:
-                log.exception("unexpected-error in _restart_kerenl()")
+                log.exception("unexpected-error in _restart_kernel()")
 
         restart_coros = []
         for kernel in kernel_list:
@@ -2901,7 +2927,7 @@ class AgentRegistry:
 
                     if row is None or row["status"] is None:
                         # new agent detected!
-                        log.info("agent {0} joined!", agent_id)
+                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
                         await self.shared_config.update_resource_slots(slot_key_and_units)
                         insert_query = sa.insert(agents).values(
                             {
@@ -3343,10 +3369,8 @@ class AgentRegistry:
         }
 
     async def update_appproxy_endpoint_routes(
-        self, db_sess: AsyncSession, endpoint: EndpointRow
+        self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
     ) -> None:
-        active_routes = [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
-
         target_sessions = await SessionRow.list_sessions(
             db_sess,
             [r.session for r in active_routes],
@@ -3395,7 +3419,7 @@ class AgentRegistry:
                             "domain_name": endpoint.domain,
                         },
                         "endpoint": {
-                            "id": endpoint.id,
+                            "id": str(endpoint.id),
                         },
                     },
                     "apps": inference_apps,
@@ -3551,6 +3575,60 @@ async def handle_destroy_session(
     )
 
 
+async def handle_kernel_health_check_result(
+    context: AgentRegistry,
+    source: AgentId,
+    event: KernelHealthyEvent | KernelHealthCheckFailedEvent,
+) -> None:
+    log.info("HANDLE_KERNEL_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
+    try:
+        async with context.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                event.session_id,
+                allow_stale=False,
+                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+            )
+            route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+    except SessionNotFound:
+        return
+
+    async def _update():
+        async with context.db.begin_session() as db_sess:
+            query = (
+                sa.update(RoutingRow)
+                .values(
+                    {
+                        "status": (
+                            RouteStatus.HEALTHY
+                            if isinstance(event, KernelHealthyEvent)
+                            else RouteStatus.UNHEALTHY
+                        )
+                    }
+                )
+                .where(RoutingRow.id == route.id)
+            )
+            await db_sess.execute(query)
+
+            query = sa.select(RoutingRow).where(
+                (RoutingRow.endpoint == route.endpoint) & (RoutingRow.status == RouteStatus.HEALTHY)
+            )
+            result = await db_sess.execute(query)
+            latest_routes = result.fetchall()
+            latest_routes = await RoutingRow.list(
+                db_sess, route.endpoint, status_filter=[RouteStatus.HEALTHY]
+            )
+
+            try:
+                await context.update_appproxy_endpoint_routes(
+                    db_sess, route.endpoint_row, latest_routes
+                )
+            except Exception:
+                log.exception("failed to communicate with AppProxy endpoint:")
+
+    await execute_with_retry(_update)
+
+
 async def invoke_session_callback(
     context: AgentRegistry,
     source: AgentId,
@@ -3581,36 +3659,45 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
+            async with context.db.begin_readonly_session() as db_sess:
+                route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
+                endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
             async def _update() -> None:
+                new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
-                    route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
-                    endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
-
-                    if isinstance(event, SessionTerminatedEvent) or isinstance(
-                        event, SessionCancelledEvent
-                    ):
-                        await db_sess.delete(route)
-                        if (
-                            len(endpoint.routings) == 1
-                            and endpoint.desired_session_count < 0  # we just removed last one
-                        ):
-                            await db_sess.delete(endpoint)
+                    if isinstance(event, SessionCancelledEvent):
+                        query = (
+                            sa.update(RoutingRow)
+                            .values({"status": RouteStatus.FAILED_TO_START})
+                            .where(RoutingRow.id == route.id)
+                        )
+                        await db_sess.execute(query)
+                        query = (
+                            sa.update(EndpointRow)
+                            .values({"retries": endpoint.retries + 1})
+                            .where(EndpointRow.id == endpoint.id)
+                        )
+                        await db_sess.execute(query)
+                    elif isinstance(event, SessionTerminatedEvent):
+                        query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
+                        await db_sess.execute(query)
+                        if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
+                            new_routes = [
+                                r
+                                for r in endpoint.routings
+                                if r.id != route.id and r.status == RouteStatus.HEALTHY
+                            ]
                             try:
-                                await context.delete_appproxy_endpoint(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-                        else:
-                            try:
-                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                                await context.update_appproxy_endpoint_routes(
+                                    db_sess, endpoint, new_routes
+                                )
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
                     else:
                         new_route_status: Optional[RouteStatus] = None
-                        if isinstance(event, SessionStartedEvent):
-                            new_route_status = RouteStatus.HEALTHY
-                        elif isinstance(event, SessionTerminatingEvent):
+                        if isinstance(event, SessionTerminatingEvent):
                             new_route_status = RouteStatus.TERMINATING
 
                         if new_route_status:
@@ -3620,12 +3707,45 @@ async def invoke_session_callback(
                                 .values({"status": new_route_status})
                             )
                             await db_sess.execute(query)
+
+                            new_routes = [
+                                r
+                                for r in endpoint.routings
+                                if r.id != route.id and r.status == RouteStatus.HEALTHY
+                            ]
+                            if new_route_status == RouteStatus.HEALTHY:
+                                new_routes.append(route)
                             try:
-                                await context.update_appproxy_endpoint_routes(db_sess, endpoint)
-                            except aiohttp.ClientError as e:
+                                await context.update_appproxy_endpoint_routes(
+                                    db_sess, endpoint, new_routes
+                                )
+                            except Exception as e:
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
+                        await db_sess.commit()
 
             await execute_with_retry(_update)
+
+            async def _clear_error() -> None:
+                async with context.db.begin_session() as db_sess:
+                    query = sa.select([sa.func.count("*")]).where(
+                        (RoutingRow.endpoint == endpoint.id)
+                        & (RoutingRow.status == RouteStatus.HEALTHY)
+                    )
+                    healthy_routes = await db_sess.scalar(query)
+                    if endpoint.desired_session_count == healthy_routes:
+                        query = (
+                            sa.update(EndpointRow)
+                            .where(EndpointRow.id == endpoint.id)
+                            .values({"retries": 0})
+                        )
+                        await db_sess.execute(query)
+                        query = sa.delete(RoutingRow).where(
+                            (RoutingRow.endpoint == endpoint.id)
+                            & (RoutingRow.status == RouteStatus.FAILED_TO_START)
+                        )
+                        await db_sess.execute(query)
+
+            await execute_with_retry(_clear_error)
     except Exception:
         log.exception("error while updating route status:")
 
@@ -3677,7 +3797,7 @@ async def handle_agent_lifecycle(
     event: AgentStartedEvent | AgentTerminatedEvent,
 ) -> None:
     if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined ({1})", source, event.reason)
+        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
         await context.update_instance(
             source,
             {
@@ -3707,6 +3827,20 @@ async def handle_agent_heartbeat(
     event: AgentHeartbeatEvent,
 ) -> None:
     await context.handle_heartbeat(source, event.agent_info)
+
+
+async def handle_check_agent_resource(
+    context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
+) -> None:
+    async with context.db.begin_readonly() as conn:
+        query = (
+            sa.select([agents.c.occupied_slots]).select_from(agents).where(agents.c.id == source)
+        )
+        result = await conn.execute(query)
+        row = result.first()
+        if not row:
+            raise InstanceNotFound(source)
+        log.info("agent@{0} occupied slots: {1}", source, row["occupied_slots"].to_json())
 
 
 async def check_scaling_group(

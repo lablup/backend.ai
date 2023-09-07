@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Erlauben Sie dem Agenten, sich beim Manager zu registrieren. <br/> Nur verwenden, wenn der Backend.AI-Cluster an einem sicheren Ort verwaltet wird.",
     "Plugins": "Plugins",
     "CUDAGPUsupport": "CUDA-GPU-Unterstützung",
-    "DescCUDAGPUsupport": "NVidia CUDA-GPU-Unterstützung. <br/> Erfordert Backend.AI CUDA-Plugin.",
+    "DescCUDAGPUsupport": "NVIDIA CUDA-GPU-Unterstützung. <br/> Erfordert Backend.AI CUDA-Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Deaktiviert, weil das System das Fractional GPU-Plugin verwendet",
     "ROCMGPUsupport": "ROCm-GPU-Unterstützung",
     "DescROCMGPUsupport": "AMD ROCm-GPU-Unterstützung. <br/> Erfordert Backend.AI ROCm-Plugin.",
