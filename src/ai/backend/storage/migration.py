@@ -243,11 +243,14 @@ async def check_and_upgrade(
     )
     ctx = RootContext(
         pid=os.getpid(),
+        pidx=0,
+        node_id=local_config["storage-proxy"]["node-id"],
         local_config=local_config,
         etcd=etcd,
         dsn=dsn,
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
+        watcher=None,
     )
     volumes_to_upgrade = await check_latest(ctx)
     for upgrade_info in volumes_to_upgrade:

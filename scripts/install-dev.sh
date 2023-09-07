@@ -781,6 +781,7 @@ configure_backendai() {
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+  sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -807,15 +808,12 @@ configure_backendai() {
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
   sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
   sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
-  sed_inplace "s/^kmanila_/# kmanila_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
   # configure webserver
-  cp configs/webserver/sample.conf ./webserver.conf
-  sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+  cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-  sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
   sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then

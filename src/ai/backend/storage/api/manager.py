@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -27,13 +28,23 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.events import (
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
+    VolumeMountableNodeType,
+    VolumeMounted,
+    VolumeUnmounted,
+)
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, QuotaScopeID
+from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
 from ai.backend.storage.exception import ExecutionError
+from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    InvalidQuotaConfig,
     InvalidSubpathError,
+    QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
     VFolderNotFoundError,
@@ -173,7 +184,7 @@ async def create_quota_scope(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("qsid"): tx.QuotaScopeID(),
                     t.Key("options", default=None): t.Null | QuotaConfig.as_trafaret(),
-                    t.Key("extra_args", default=None): t.Null | t.Dict,
+                    t.Key("extra_args", default=None): t.Null | t.Mapping(t.String, t.Any),
                 },
             ),
         ),
@@ -181,9 +192,15 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_quota_scope", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.quota_model.create_quota_scope(
-                params["qsid"], params["options"], params.get("extra_args")
-            )
+            try:
+                await volume.quota_model.create_quota_scope(
+                    params["qsid"], params["options"], params["extra_args"]
+                )
+            except QuotaScopeAlreadyExists:
+                return web.json_response(
+                    {"msg": "Volume already exists with given quota scope."},
+                    status=409,
+                )
             return web.Response(status=204)
 
 
@@ -245,7 +262,13 @@ async def update_quota_scope(request: web.Request) -> web.Response:
             quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
-            await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            try:
+                await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
+            except InvalidQuotaConfig:
+                return web.json_response(
+                    {"msg": "Invalid quota config option"},
+                    status=400,
+                )
             return web.Response(status=204)
 
 
@@ -1020,4 +1043,90 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+
+    # passive events
+    evd = ctx.event_dispatcher
+    evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
+    evd.subscribe(DoVolumeUnmountEvent, ctx, handle_volume_umount, name="storage.volume.umount")
     return app
+
+
+async def handle_volume_mount(
+    context: RootContext,
+    source: AgentId,
+    event: DoVolumeMountEvent,
+) -> None:
+    if context.pidx != 0:
+        return
+    if context.watcher is None:
+        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
+        return
+    err_msg: str | None = None
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    mount_path = Path(volume_mount_path, event.dir_name)
+    mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
+    resp = await context.watcher.request_task(mount_task)
+    if not resp.succeeded:
+        err_msg = resp.body
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                str(context.node_id),
+                VolumeMountableNodeType.STORAGE_PROXY,
+                str(mount_path),
+                event.quota_scope_id,
+                err_msg,
+            )
+        )
+        return
+
+    # change owner of mounted directory
+    chown_task = ChownTask(str(mount_path), os.getuid(), os.getgid())
+    resp = await context.watcher.request_task(chown_task)
+    if not resp.succeeded:
+        err_msg = resp.body
+    await context.event_producer.produce_event(
+        VolumeMounted(
+            str(context.node_id),
+            VolumeMountableNodeType.STORAGE_PROXY,
+            str(mount_path),
+            event.quota_scope_id,
+            err_msg,
+        )
+    )
+
+
+async def handle_volume_umount(
+    context: RootContext,
+    source: AgentId,
+    event: DoVolumeUnmountEvent,
+) -> None:
+    if context.pidx != 0:
+        return
+    if context.watcher is None:
+        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
+        return
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
+    volume_mount_path = str(context.local_config["volume"][event.volume_backend_name]["path"])
+    mount_path = Path(volume_mount_path, event.dir_name)
+    umount_task = UmountTask.from_event(
+        event,
+        mount_path=mount_path,
+        mount_prefix=mount_prefix,
+        timeout=float(timeout) if timeout is not None else None,
+    )
+    resp = await context.watcher.request_task(umount_task)
+    if not resp.succeeded:
+        err_msg = resp.body
+    if resp.body:
+        log.warning(resp.body)
+    await context.event_producer.produce_event(
+        VolumeUnmounted(
+            str(context.node_id),
+            VolumeMountableNodeType.STORAGE_PROXY,
+            str(mount_path),
+            event.quota_scope_id,
+            err_msg,
+        )
+    )

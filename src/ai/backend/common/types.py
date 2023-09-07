@@ -1210,3 +1210,8 @@ class AgentSelectionStrategy(enum.StrEnum):
     CONCENTRATED = "concentrated"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
+
+
+class VolumeMountableNodeType(enum.StrEnum):
+    AGENT = enum.auto()
+    STORAGE_PROXY = enum.auto()

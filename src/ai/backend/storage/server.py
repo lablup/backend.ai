@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import grp
 import logging
 import multiprocessing
@@ -30,8 +31,13 @@ from ai.backend.common.utils import env_info
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .watcher import WatcherClient, main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def _is_root() -> bool:
+    return os.geteuid() == 0
 
 
 @aiotools.server_context
@@ -107,12 +113,33 @@ async def server_main(
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
         log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
+        if local_config["storage-proxy"]["use-watcher"]:
+            if not _is_root():
+                raise ValueError(
+                    "Storage proxy must be run as root if watcher is enabled. Else, set"
+                    " `use-wathcer` to false in your local config file."
+                )
+            insock_path: str | None = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+            outsock_path: str | None = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            if insock_path is None or outsock_path is None:
+                raise ValueError(
+                    "Socket path must be not null. Please set valid socket path to"
+                    " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
+                    " config file."
+                )
+            watcher_client = WatcherClient(pidx, insock_path, outsock_path)
+            await watcher_client.init()
+        else:
+            watcher_client = None
         ctx = RootContext(
             pid=os.getpid(),
+            node_id=local_config["storage-proxy"]["node-id"],
+            pidx=pidx,
             local_config=local_config,
             etcd=etcd,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
+            watcher=watcher_client,
         )
         async with ctx:
             m.console_locals["ctx"] = ctx
@@ -160,7 +187,7 @@ async def server_main(
             )
             await client_api_site.start()
             await manager_api_site.start()
-            if os.geteuid() == 0:
+            if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]
                 os.setgroups(
@@ -178,6 +205,8 @@ async def server_main(
                 await client_api_runner.cleanup()
                 await event_producer.close()
                 await event_dispatcher.close()
+                if watcher_client is not None:
+                    await watcher_client.close()
     finally:
         if aiomon_started:
             m.close()
@@ -258,9 +287,18 @@ def main(
 
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
+                insock_path_prefix = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+                outsock_path_prefix = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+                num_workers = local_config["storage-proxy"]["num-proc"]
                 aiotools.start_server(
                     server_main_logwrapper,
-                    num_workers=local_config["storage-proxy"]["num-proc"],
+                    num_workers=num_workers,
+                    extra_procs=tuple(
+                        functools.partial(
+                            main_job, worker_pidx, insock_path_prefix, outsock_path_prefix
+                        )
+                        for worker_pidx in range(num_workers)
+                    ),
                     args=(local_config, log_endpoint),
                 )
                 log.info("exit.")
