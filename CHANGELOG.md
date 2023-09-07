@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0a3 (2023-09-07)
+### Fixes
+* Hotfix: DB migration failing ([#1544](https://github.com/lablup/backend.ai/issues/1544))
+
 ## 23.09.0a2 (2023-09-06)
 
 ### Features
