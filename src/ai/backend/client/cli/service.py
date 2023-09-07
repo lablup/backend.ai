@@ -6,7 +6,7 @@ import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.run import prepare_env_arg, prepare_resource_arg
+from ai.backend.client.cli.session.execute import prepare_env_arg, prepare_resource_arg
 from ai.backend.client.session import Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
@@ -44,8 +44,11 @@ def get_service_id(session: Session, name_or_id: str):
         services = session.Service.list(name=name_or_id)
         try:
             return services[0]["id"]
-        except KeyError:
-            raise RuntimeError(f"Service {name_or_id} not found")
+        except Exception as e:
+            if isinstance(e, KeyError) or isinstance(e, IndexError):
+                raise RuntimeError(f"Service {name_or_id} not found")
+            else:
+                raise e
 
 
 @main.group()
