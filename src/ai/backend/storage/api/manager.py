@@ -1068,6 +1068,8 @@ async def handle_volume_mount(
     mount_task = MountTask.from_event(event, mount_path=mount_path, mount_prefix=mount_prefix)
     resp = await context.watcher.request_task(mount_task)
     if not resp.succeeded:
+        # Produce volume mounted event with error message.
+        # And skip chown.
         err_msg = resp.body
         await context.event_producer.produce_event(
             VolumeMounted(
