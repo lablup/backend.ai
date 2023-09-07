@@ -311,5 +311,10 @@ def image():
     """Command set for managing images."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
+def redis():
+    """Command set for putting/getting data to/from redis."""
+
+
 if __name__ == "__main__":
     main()

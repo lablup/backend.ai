@@ -10,29 +10,35 @@ import aiotools
 import attrs
 import sqlalchemy as sa
 import trafaret as t
+import yaml
 from aiohttp import web
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import validators as tx
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ClusterMode, SessionTypes, VFolderUsageMode
+from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
 from ai.backend.manager.registry import check_scaling_group
 
-from ..defs import DEFAULT_IMAGE_ARCH
+from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
 from ..models import (
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
     ImageRow,
+    RouteStatus,
+    RoutingRow,
+    SessionRow,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
-from ..models.endpoint import EndpointRow
-from ..models.routing import RouteStatus, RoutingRow
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
@@ -91,7 +97,9 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
-    query_conds = EndpointRow.session_owner == request["user"]["uuid"]
+    query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
+        EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
+    )
     if params["name"]:
         query_conds &= EndpointRow.name == params["name"]
 
@@ -226,7 +234,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         )
 
         query = (
-            sa.select([scaling_groups.c.wsproxy_addr])
+            sa.select([scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token])
             .select_from(scaling_groups)
             .where((scaling_groups.c.name == checked_scaling_group))
         )
@@ -237,14 +245,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
 
+        if not sgroup["wsproxy_api_token"]:
+            raise ServiceUnavailable("Scaling group not ready to start model service")
+
         params["config"]["scaling_group"] = checked_scaling_group
 
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         try:
-            extra_vf_conds = (vfolders.c.id == uuid.UUID(params["config"]["model"])) & (
-                vfolders.c.usage_mode == VFolderUsageMode.MODEL
-            )
+            extra_vf_conds = vfolders.c.id == uuid.UUID(params["config"]["model"])
             matched_vfolders = await query_accessible_vfolders(
                 conn,
                 owner_uuid,
@@ -273,7 +282,63 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     raise VFolderNotFound("Cannot find model folder") from e
             else:
                 raise
-        model_id = matched_vfolders[0]["id"]
+        if len(matched_vfolders) == 0:
+            raise VFolderNotFound
+        folder_row = matched_vfolders[0]
+        if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
+            raise InvalidAPIParameters("Selected vFolder is not a model folder")
+
+        model_id = folder_row["id"]
+
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_row["host"])
+
+    async with root_ctx.storage_manager.request(
+        proxy_name,
+        "POST",
+        "folder/file/list",
+        json={
+            "volume": volume_name,
+            "vfid": str(VFolderID(folder_row["quota_scope_id"], folder_row["id"])),
+            "relpath": ".",
+        },
+    ) as (client_api_url, storage_resp):
+        storage_reply = await storage_resp.json()
+
+    for item in storage_reply["items"]:
+        if item["name"] == "model-definition.yml" or item["name"] == "model-definition.yaml":
+            yaml_name = item["name"]
+            break
+    else:
+        raise InvalidAPIParameters("Model definition YAML file not found inside the model storage")
+
+    chunks = bytes()
+    async with root_ctx.storage_manager.request(
+        proxy_name,
+        "POST",
+        "folder/file/fetch",
+        json={
+            "volume": volume_name,
+            "vfid": str(VFolderID(folder_row["quota_scope_id"], folder_row["id"])),
+            "relpath": f"./{yaml_name}",
+        },
+    ) as (client_api_url, storage_resp):
+        while True:
+            chunk = await storage_resp.content.read(DEFAULT_CHUNK_SIZE)
+            if not chunk:
+                break
+            chunks += chunk
+    model_definition_yaml = chunks.decode("utf-8")
+    model_definition_dict = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
+    try:
+        model_definition = model_definition_iv.check(model_definition_dict)
+        assert model_definition is not None
+    except t.DataError as e:
+        raise InvalidAPIParameters(
+            f"Failed to validate model definition from vFolder {folder_row['name']} (ID"
+            f" {folder_row['id']}): {e}",
+        ) from e
+    except yaml.error.YAMLError as e:
+        raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e
 
     async with root_ctx.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
@@ -311,6 +376,15 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
 
     async with root_ctx.db.begin_session() as db_sess:
+        query = sa.select(EndpointRow).where(
+            (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
+            & (EndpointRow.name == params["service_name"])
+        )
+        result = await db_sess.execute(query)
+        service_with_duplicate_name = result.scalar()
+        if service_with_duplicate_name is not None:
+            raise InvalidAPIParameters("Cannot create multiple services with same name")
+
         project_id = await resolve_group_name_or_id(
             await db_sess.connection(), params["domain"], params["group"]
         )
@@ -363,11 +437,20 @@ async def delete(request: web.Request) -> web.Response:
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     async with root_ctx.db.begin_session() as db_sess:
-        query = (
-            sa.update(EndpointRow)
-            .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": -1})
-        )
+        if len(endpoint.routings) == 0:
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == service_id)
+                .values({"lifecycle_stage": EndpointLifecycle.DESTROYED})
+            )
+        else:
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == service_id)
+                .values(
+                    {"desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING}
+                )
+            )
         await db_sess.execute(query)
     return web.json_response({"success": True}, status=200)
 
@@ -389,7 +472,9 @@ async def sync(request: web.Request) -> web.Response:
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
     async with root_ctx.db.begin_session() as db_sess:
-        await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+        await root_ctx.registry.update_appproxy_endpoint_routes(
+            db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
+        )
     return web.json_response({"success": True}, status=200)
 
 
@@ -420,10 +505,6 @@ async def scale(request: web.Request, params: Any) -> web.Response:
 
     if params["to"] < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
-    if params["to"] == len(endpoint.routings):
-        return web.json_response(
-            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
-        )
 
     async with root_ctx.db.begin_session() as db_sess:
         query = (
@@ -477,7 +558,9 @@ async def update_route(request: web.Request, params: Any) -> web.Response:
         await db_sess.execute(query)
         endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         try:
-            await root_ctx.registry.update_appproxy_endpoint_routes(db_sess, endpoint)
+            await root_ctx.registry.update_appproxy_endpoint_routes(
+                db_sess, endpoint, [r for r in endpoint.routes if r.status == RouteStatus.HEALTHY]
+            )
         except aiohttp.ClientError as e:
             log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
         return web.json_response({"success": True})
@@ -529,7 +612,8 @@ async def delete_route(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("duration"): tx.TimeDuration,
+            t.Key("duration", default=None): t.Null | tx.TimeDuration,
+            t.Key("valid_until", default=None): t.Null | t.Int,
         }
     ),
 )
@@ -563,8 +647,15 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    exp = datetime.now() + params["duration"]
-    body = {"user_uuid": str(endpoint.session_owner), "exp": int(exp.timestamp())}
+    if params["valid_until"]:
+        exp = params["valid_until"]
+    elif params["duration"]:
+        exp = int((datetime.now() + params["duration"]).timestamp())
+    else:
+        raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
+    if datetime.now().timestamp() > exp:
+        raise InvalidAPIParameters("valid_until is older than now")
+    body = {"user_uuid": str(endpoint.session_owner), "exp": exp}
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
@@ -574,7 +665,93 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
             },
         ) as resp:
             token_json = await resp.json()
-            return web.json_response({"token": token_json["token"]})
+            token = token_json["token"]
+
+    async with root_ctx.db.begin_session() as db_sess:
+        token_row = EndpointTokenRow(
+            uuid.uuid4(),
+            token,
+            endpoint.id,
+            endpoint.domain,
+            endpoint.project,
+            endpoint.session_owner,
+        )
+        db_sess.add(token_row)
+        await db_sess.commit()
+        return web.json_response({"token": token})
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def list_errors(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info(
+        "SERVE.LIST_ERRORS (email:{}, ak:{}, s:{})",
+        request["user"]["email"],
+        access_key,
+        service_id,
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
+        query = sa.select(SessionRow).where(SessionRow.id.in_([r.session for r in error_routes]))
+        result = await db_sess.execute(query)
+        error_sessions = result.scalars().all()
+
+    return web.json_response(
+        {
+            "errors": [
+                {
+                    "session_id": str(sess.id),
+                    "error": sess.status_data["error"],
+                }
+                for sess in error_sessions
+            ],
+            "retries": endpoint.retries,
+        }
+    )
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+async def clear_error(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+
+    log.info(
+        "SERVE.CLEAR_ERROR (email:{}, ak:{}, s:{})",
+        request["user"]["email"],
+        access_key,
+        service_id,
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
+        except NoResultFound:
+            raise ObjectNotFound
+    await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
+
+    async with root_ctx.db.begin_session() as db_sess:
+        query = sa.delete(RoutingRow).where(
+            (RoutingRow.endpoint == service_id) & (RoutingRow.status == RouteStatus.FAILED_TO_START)
+        )
+        await db_sess.execute(query)
+        query = sa.update(EndpointRow).values({"retries": 0}).where(EndpointRow.id == endpoint.id)
+        await db_sess.execute(query)
+
+    return web.Response(status=204)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -608,6 +785,8 @@ def create_app(
     cors.add(root_resource.add_route("POST", create))
     cors.add(add_route("GET", "/{service_id}", get_info))
     cors.add(add_route("DELETE", "/{service_id}", delete))
+    cors.add(add_route("GET", "/{service_id}/errors", list_errors))
+    cors.add(add_route("POST", "/{service_id}/errors/clear", clear_error))
     cors.add(add_route("POST", "/{service_id}/scale", scale))
     cors.add(add_route("POST", "/{service_id}/sync", sync))
     cors.add(add_route("PUT", "/{service_id}/routings/{route_id}", update_route))

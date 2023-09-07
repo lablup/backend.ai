@@ -5,10 +5,10 @@ aiohttp~=3.8.1
 aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiodns>=3.0
-aiomonitor-ng~=0.7.2
+aiomonitor~=0.6.0
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
-aiotools~=1.6.1
+aiotools~=1.7.0
 aiotusclient~=0.1.4
 alembic~=1.8.1
 appdirs~=1.4.4
@@ -26,7 +26,7 @@ coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
 dataclasses-json~=0.5.7
-etcetra==0.1.15
+etcetra==0.1.17
 faker~=13.12.0
 graphene~=2.1.9
 hiredis~=2.2.3
@@ -67,6 +67,7 @@ tomli~=2.0.1
 tomlkit~=0.11.1
 tqdm>=4.61
 trafaret~=2.1
+treelib==1.6.1
 typeguard~=2.10
 typing_extensions~=4.3
 uvloop>=0.17; sys_platform != "Windows"
