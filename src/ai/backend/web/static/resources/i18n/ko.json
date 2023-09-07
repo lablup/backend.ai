@@ -37,6 +37,7 @@
       "NewPassword": "새 비밀번호",
       "NewPasswordAgain": "새 비밀번호 (재입력)",
       "InputOriginalPassword": "기존 비밀번호를 입력해주세요.",
+      "InputNewPassword": "새 비밀번호를 입력해주세요.",
       "InvalidPasswordMessage": "영문자, 숫자, 특수 문자를 하나 이상 포함해서 8자 이상 입력하세요",
       "NewPasswordMismatch": "새로 입력한 두 비밀번호가 일치하지 않습니다.",
       "PasswordMismatch": "비밀번호가 일치하지 않습니다",
@@ -184,7 +185,7 @@
       "DescCPU": "<p>CPU는 명령어로 지정된 기본 산술, 논리, 제어 및 입출력 (I/O) 작업을 수행합니다. </p><p>고성능 컴퓨팅 워크로드의 경우 많은 CPU가 도움이 되지만, 여러 CPU를 사용하도록 프로그램 코드를 작성해야 합니다. (그렇지 않으면 대부분의 CPU는 사용되지 않을 것입니다.)</p>",
       "DescMemory": "<p>컴퓨터 메모리는 임시 저장 영역입니다. 중앙 처리 장치 (CPU)에 필요한 데이터와 명령들을 보관하는 역할을 합니다.</p><p>머신 러닝 워크로드를 처리할 때 GPU를 연산 장치로 사용하는 경우, GPU 메모리의 두 배 이상의 메모리를 할당해야 합니다. 그렇지 않으면 GPU의 유휴 시간이 증가하여 성능이 저하됩니다.</p>",
       "DescSharedMemory": "<p>공유 메모리는 여러 프로그램간에 통신을 제공하거나 중복 사본을 피하기 위해 여러 프로그램에서 동시에 접근할 수 있는 메모리입니다.</p><p>멀티 CPU 또는 멀티 스레드를 이용하는 워크로드의 경우 공유메모리는 스레드 간 통신에 사용되므로 매우 중요합니다. 멀티 스레드를 사용하는 딥 러닝 워크로드 및 고성능 컴퓨팅 워크로드의 경우 이 값을 1GB 이상으로 설정하는 것이 좋습니다.</p>",
-      "DescGPU": "<p>AI 가속기 (GPU 및 NPU)는 기계 학습과 관련된 행렬 / 벡터 계산에 적합합니다. AI 가속기는 훈련 및 인퍼런스 알고리즘을 몇 배나 가속화하여 기계 학습 워크로드의 실행 시간을 몇 주에서 몇 일로 줄입니다.</p>",
+      "DescGPU": "<p>AI 가속기 (GPU 및 NPU)는 기계 학습과 관련된 행렬 / 벡터 계산에 적합합니다. AI 가속기는 훈련 및 인퍼런스 알고리즘을 몇 배나 가속화하여 기계 학습 워크로드의 실행 시간을 몇 주에서 며칠로 줄입니다.</p>",
       "DescSession": "<p>세션은 지정된 환경과 자원에 따라 생성되는 계산 환경 단위입니다.</p><p>이 값을 1보다 큰 값으로 설정하면 위의 자원 설정을 이용한 여러 세션이 지정한 값 만큼 동시에 생성됩니다.</p><p>세션 시작 요청 시 사용 가능한 자원이 충분하지 않은 경우, 생성하지 못한 세션 시작 요청들은 생성 대기열에 추가됩니다.</p>",
       "DescSingleNode": "<p>세션을 실행할 때에 관리 노드와 워커 노드들이 하나의 물리 노드 또는 가상 머신에 배치하는 경우입니다.</p>",
       "DescMultiNode": "<p>세션을 실행할 때 하나의 관리 노드와 하나 이상의 워커 노드가 여러 물리 노드 또는 가상 머신에 나누어 배치되는 경우입니다.</p>",
@@ -225,6 +226,7 @@
       "ProxyConfiguratorNotResponding": "프록시 구성자가 응답하지 않습니다.",
       "SettingUpProxyForApp": "애플리케이션을 위한 프록시를 설정합니다...",
       "AddingKernelToSocketQueue": "커널을 소켓 큐에 추가합니다...",
+      "FailedToConnectCoordinator": "앱 접속 관리자 연결에 실패했습니다. 네트워크 연결 및 방화벽 상태를 확인해주세요.",
       "ManualImageName": "환경 이름 (수동)",
       "NotEnoughResource": "할당 가능한 자원 부족",
       "ResourceAllocationTemplate": "자원 할당 템플릿",
@@ -256,14 +258,15 @@
       "ImageDoesNotProvideModelPath": "모델 경로를 지정하지 않은 컨테이너 이미지입니다. 수정이 필요합니다.",
       "ModelStorageToMount": "마운트할 모델 스토리지 폴더",
       "AIAccelerator": "AI 가속기",
-      "DescAIAccelerator": "<p>AI 가속기 (GPU 및 NPU)는 기계 학습과 관련된 행렬 / 벡터 계산에 적합합니다. AI 가속기는 훈련 및 인퍼런스 알고리즘을 몇 배나 가속화하여 기계 학습 워크로드의 실행 시간을 몇 주에서 몇 일로 줄입니다.</p>",
+      "DescAIAccelerator": "<p>AI 가속기 (GPU 및 NPU)는 기계 학습과 관련된 행렬 / 벡터 계산에 적합합니다. AI 가속기는 훈련 및 인퍼런스 알고리즘을 몇 배나 가속화하여 기계 학습 워크로드의 실행 시간을 몇 주에서 며칠로 줄입니다.</p>",
       "PreOpenPortTitle": "사전 개방 포트",
       "DescSetPreOpenPort": "네트워크 기기 또는 컴퓨터에서 외부로부터의 접속을 허용하는 <span style='color:var(--paper-red-400);'>컨테이너 내부 특정 포트 번호</span>를 '사전 개방 포트' 값으로 설정합니다.",
       "PortsTitleWithRange": "포트 값 (1024 ~ 65535 사이)",
       "PrePortConfigWillDisappear": "저장되지 않은 사전 개방 포트값은 사라집니다.",
       "PreOpenPortConfigurationDone": "사전 개방 포트값이 설정되었습니다.",
       "PreOpenPortPanelTitle": "추가될 사전 개방 포트값 (옵션)",
-      "PreOpenPortRange": "사전 개방 포트는 1024 ~ 65535 사이만 설정할 수 있습니다."
+      "PreOpenPortRange": "사전 개방 포트는 1024 ~ 65535 사이만 설정할 수 있습니다.",
+      "MinMemory": "재 선택한 실행환경의 최소 메모리 용량은 {{size}}iB입니다."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -310,7 +313,9 @@
       "AppMustBeRunDialog": "이 앱은 터미널을 통해 미리 실행되고 있는 경우에만 접근 및 사용할 수 있습니다. 그렇지 않은 경우, 앱이 실행중이 아닐때 발생하는 오류 페이지에 접속될 것입니다.",
       "ConfirmAndRun": "확인하였으며 시작하겠습니다",
       "Prepared": "준비되었습니다",
-      "App": "앱"
+      "App": "앱",
+      "NoExistingConnectionExample": "복사할 접속 예제가 없습니다.",
+      "SSHConnectionExampleClipboardCopy": "SSH 접속 예제가 클립보드에 복사되었습니다."
     },
     "TensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로",
     "InputTensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로를 입력하세요. 로그 디렉토리는 자동으로 생성되지 않는다는 점에 주의하십시오.",
@@ -420,7 +425,23 @@
     "YouAreAboutToTerminate": "아래의 서비스를 삭제하려고 합니다: ",
     "ClearErrors": "오류 지우고 재시도",
     "ServingRouteErrorModalTitle": "서빙 라우트 에러",
-    "FailedToStartService": "서비스를 생성하지 못했습니다."
+    "FailedToStartService": "서비스를 생성하지 못했습니다.",
+    "CreatedAt": "생성 시각",
+    "GeneratedTokens": "생성된 토큰 목록",
+    "CurrentTime": "현재 시각",
+    "ExpiredTime": "만료 예정 시각",
+    "GenerateNewToken": "새 토큰 생성하기",
+    "GenerateToken": "토큰 생성",
+    "Generate": "생성하기",
+    "TokenGenerated": "토큰 생성이 완료되었습니다.",
+    "TokenGenerationFailed": "토큰 생성에 실패하였습니다. 잠시 후 다시 시도해주세요.",
+    "PleaseSelectTime": "만료 시간을 선택해주세요!",
+    "ExpiredDate": "토큰 만료 시각",
+    "TokenExpiredDateHelp": "토큰 만료 시각 기본 값은 24시간 뒤입니다.",
+    "TokenExpiredDateError": "토큰 만료 시간은 현재 시간 이후여야 합니다.",
+    "ServiceNameRule": "4~64자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
+    "FormValidationFailed": "양식 유효성 검사 실패",
+    "resources": "자원"
   },
   "button": {
     "Cancel": "취소",
@@ -554,7 +575,7 @@
   },
   "credential": {
     "Permission": "권한",
-    "KeyAge": "키 수명",
+    "KeyAge": "키 경과시간",
     "Allocation": "할당",
     "Information": "정보",
     "Created": "생성일",
@@ -819,13 +840,16 @@
     "Used": "사용됨",
     "Limit": "제한",
     "HostDetails": "선택한 스토리지 호스트의 가용량 정보를 보여줍니다.",
-    "ProjectFolder": "프로젝트 폴더"
+    "ProjectFolder": "프로젝트 폴더",
+    "Pipeline": "파이프라인 폴더",
+    "DialogDataFolder": "FastTrack에서 파이프라인 생성 시 자동으로 생성되는 파이프라인 전용 폴더."
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "주의: 이 동작은 취소할 수 없습니다!",
       "LogDeletion": "정말로 모든 로그를 삭제하시겠습니까?",
-      "WillBeAppliedToNewSessions": "이 변경사항은 새 세션부터 적용됩니다."
+      "WillBeAppliedToNewSessions": "이 변경사항은 새 세션부터 적용됩니다.",
+      "Required": "필수 입력입니다."
     },
     "ask": {
       "DoYouWantToProceed": "계속 진행하시겠습니까?"
@@ -1446,7 +1470,8 @@
     "CreatingComputeSession": "연산 세션 생성 중 ...",
     "SessionStillPreparing": "연산 세션이 계속 준비중입니다. 잠시 후 리로드 하십시오.",
     "ComputeSessionPrepared": "연산 세션이 준비되었습니다",
-    "sessionStatusIs": "세션 상태는 "
+    "sessionStatusIs": "세션 상태는 ",
+    "EmptyProject": "사용자가 소속된 프로젝트가 없습니다."
   },
   "error": {
     "UpdateError": "업데이트 에러",
@@ -1515,5 +1540,11 @@
     "TotpSetupNotAvailable": "이중 인증 설정이 불가합니다.",
     "RemoveTotpSetupCompleted": "이중 인증이 비활성화 되었습니다.",
     "TurnOffTotp": "이중 인증 비활성화"
+  },
+  "ErrorBoundary": {
+    "title": "에러가 발생했습니다.",
+    "reloadPage": "페이지 새로고침",
+    "resetErrorBoundary": "ErrorBoundary 초기화",
+    "displayOnlyDevEnv": "이 에러 블록은 WebUI 개발 환경에서만 표시됩니다."
   }
 }

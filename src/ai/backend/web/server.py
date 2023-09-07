@@ -8,6 +8,7 @@ import socket
 import ssl
 import sys
 import time
+import traceback
 from functools import partial
 from pathlib import Path
 from pprint import pprint
@@ -18,7 +19,6 @@ import aiotools
 import click
 import jinja2
 import tomli
-import uvloop
 import yarl
 from aiohttp import web
 from redis.asyncio import Redis
@@ -27,6 +27,9 @@ from setproctitle import setproctitle
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common import config
+from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
@@ -34,12 +37,12 @@ from ai.backend.common.web.session.redis_storage import RedisStorage
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
-from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
 
 cache_patterns = {
     r"\.(?:manifest|appcache|html?|xml|json|ini|toml)$": {
@@ -584,6 +587,23 @@ async def server_cleanup(app) -> None:
 
 
 @aiotools.server
+async def server_main_logwrapper(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    _args: Tuple[Any, ...],
+) -> AsyncIterator[None]:
+    setproctitle(f"backend.ai: webserver worker-{pidx}")
+    log_endpoint = _args[1]
+    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    try:
+        with logger:
+            async with server_main(loop, pidx, _args):
+                yield
+    except Exception:
+        traceback.print_exc()
+
+
+@aiotools.server
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -733,69 +753,72 @@ async def server_main(
     help="The configuration file to use.",
 )
 @click.option("--debug", is_flag=True, default=False, help="Use more verbose logging.")
-def main(config_path: str, debug: bool) -> None:
-    raw_config = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
-    config = config_iv.check(raw_config)
-    config["debug"] = debug
-    if config["debug"]:
-        debugFlag = "DEBUG"
-    else:
-        debugFlag = "INFO"
-    setproctitle(f"backend.ai: webserver {config['service']['ip']}:{config['service']['port']}")
-
-    logging.config.dictConfig(
-        {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "formatters": {
-                "colored": {
-                    "()": "coloredlogs.ColoredFormatter",
-                    "format": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
-                    "field_styles": {
-                        "levelname": {"color": 248, "bold": True},
-                        "name": {"color": 246, "bold": False},
-                        "process": {"color": "cyan"},
-                        "asctime": {"color": 240},
-                    },
-                },
-            },
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "level": "DEBUG",
-                    "formatter": "colored",
-                    "stream": "ext://sys.stderr",
-                },
-                "null": {
-                    "class": "logging.NullHandler",
-                },
-            },
-            "loggers": {
-                "": {
-                    "handlers": ["console"],
-                    "level": debugFlag,
-                },
-            },
-        }
-    )
-    log.info("Backend.AI Web Server {0}", __version__)
-    log.info("runtime: {0}", sys.prefix)
-    log_config = logging.getLogger("ai.backend.web.config")
-    log_config.debug("debug mode enabled.")
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
+)
+@click.pass_context
+def main(
+    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> None:
+    # Delete this part when you remove --debug option
     if debug:
-        print("== Web Server configuration ==")
-        pprint(config)
-    log.info("serving at {0}:{1}", config["service"]["ip"], config["service"]["port"])
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
-    try:
-        uvloop.install()
-        aiotools.start_server(
-            server_main,
-            num_workers=min(4, os.cpu_count() or 1),
-            args=(config,),
-        )
-    finally:
-        log.info("terminated.")
+    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+
+    cfg = config.check(raw_cfg, config_iv)
+
+    if ctx.invoked_subcommand is None:
+        cfg["webserver"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = cfg["webserver"]["ipc-base-path"]
+        log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
+        log_sockpath.parent.mkdir(parents=True, exist_ok=True)
+        log_endpoint = f"ipc://{log_sockpath}"
+        cfg["logging"]["endpoint"] = log_endpoint
+        try:
+            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            with logger:
+                setproctitle(
+                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
+                )
+                log.info("Backend.AI Web Server {0}", __version__)
+                log.info("runtime: {0}", sys.prefix)
+
+                log_config = logging.getLogger("ai.backend.web.config")
+                if log_level == LogSeverity.DEBUG:
+                    log_config.debug("debug mode enabled.")
+                    print("== Web Server configuration ==")
+                    pprint(cfg)
+                log.info("serving at {0}:{1}", cfg["service"]["ip"], cfg["service"]["port"])
+                if cfg["webserver"]["event-loop"] == "uvloop":
+                    import uvloop
+
+                    uvloop.install()
+                    log.info("Using uvloop as the event loop backend")
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=min(4, os.cpu_count() or 1),
+                        args=(cfg, log_endpoint),
+                    )
+                finally:
+                    log.info("terminated.")
+        finally:
+            if cfg["webserver"]["pid-file"].is_file():
+                # check is_file() to prevent deleting /dev/null!
+                cfg["webserver"]["pid-file"].unlink()
+    else:
+        # Click is going to invoke a subcommand.
+        pass
 
 
 if __name__ == "__main__":
