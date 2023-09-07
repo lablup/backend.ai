@@ -1210,6 +1210,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 struct.pack("i", 0),
                                 struct.pack("i", host_pid),
                             ]
+                        elif msg[0] == b"is-jail-enabled":
+                            reply = [
+                                struct.pack("i", 0),
+                                struct.pack(
+                                    "i",
+                                    (
+                                        1
+                                        if self.local_config["container"]["sandbox-type"] == "jail"
+                                        else 0
+                                    ),
+                                ),
+                            ]
                         else:
                             reply = [struct.pack("i", -2), b"Invalid action"]
                     except asyncio.CancelledError:
