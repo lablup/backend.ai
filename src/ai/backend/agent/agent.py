@@ -146,6 +146,7 @@ from .resources import (
     KernelResourceSpec,
     Mount,
     allocate,
+    known_slot_types,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -626,7 +627,8 @@ class AbstractAgent(
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
-        computers, self.slots = await self.detect_resources()
+        computers = await self.load_resources()
+
         all_devices: List[AbstractComputeDevice] = []
         metadatas: List[AcceleratorMetadata] = []
         for name, computer in computers.items():
@@ -635,6 +637,11 @@ class AbstractAgent(
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
             metadatas.append(computer.get_metadata())
+
+        self.slots = await self.scan_available_resources()
+        log.info("Resource slots: {!r}", self.slots)
+        log.info("Slot types: {!r}", known_slot_types)
+        self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
 
         async def _pipeline(r: Redis):
             pipe = r.pipeline()
@@ -1307,12 +1314,27 @@ class AbstractAgent(
             await asyncio.gather(*waiters)
 
     @abstractmethod
-    async def detect_resources(
+    async def load_resources(
         self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
+    ) -> Mapping[DeviceName, AbstractComputePlugin]:
+        """
+        Detect available resources attached on the system and load corresponding device plugin.
+        """
+
+    @abstractmethod
+    async def scan_available_resources(
+        self,
+    ) -> Mapping[SlotName, Decimal]:
         """
         Scan and define the amount of available resource slots in this node.
         """
+
+    async def update_slots(
+        self,
+        interval: float,
+    ) -> None:
+        self.slots = await self.scan_available_resources()
+        log.debug("slots: {!r}", self.slots)
 
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:
         """
