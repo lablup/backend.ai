@@ -38,12 +38,11 @@ def _list_cmd(name: str = "list", docs: str = None):
             [
                 "PENDING",
                 "SCHEDULED",
+                "PULLING",
                 "PREPARING",
-                "BUILDING",
                 "RUNNING",
                 "RESTARTING",
-                "RESIZING",
-                "SUSPENDED",
+                "RUNNING_DEGRADED",
                 "TERMINATING",
                 "TERMINATED",
                 "ERROR",
@@ -159,6 +158,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 [
                     "PENDING",
                     "SCHEDULED",
+                    "PULLING",
                     "PREPARING",
                     "RUNNING",
                     "TERMINATING",
@@ -187,13 +187,15 @@ def _list_cmd(name: str = "list", docs: str = None):
                 [
                     "PENDING",
                     "SCHEDULED",
+                    "PULLING",
                     "PREPARING",
                     "RUNNING",
+                    "RESTARTING",
                     "RUNNING_DEGRADED",
                     "TERMINATING",
+                    "TERMINATED",
                     "ERROR",
                     "CANCELLED",
-                    "TERMINATED",
                 ]
             )
             no_match_name = "in any status"
