@@ -445,7 +445,7 @@ install_node() {
   fi
 
   node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
-  show_info "Installing Node.js v${node_version}... via NVM..."
+  show_info "Installing Node.js v${node_version} via NVM..."
   nvm install $node_version
   nvm use node
 }
