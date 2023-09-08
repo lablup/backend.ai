@@ -240,13 +240,13 @@ class RedisLock(AbstractDistributedLock):
             thread_local=False,
             sleep=self._lock_acquire_pause,
         )
-        await self._lock.acquire()
+        await self._lock.__aenter__()
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._lock is not None
-        await self._lock.release()
+        await self._lock.__aexit__(*exc_info)
         if self._debug:
             log.debug("RedisLock.__aexit__(): lock released")
 
