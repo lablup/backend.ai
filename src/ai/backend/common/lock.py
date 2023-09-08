@@ -246,8 +246,8 @@ class RedisLock(AbstractDistributedLock):
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._lock is not None
-        await self._lock.__aexit__(*exc_info)
+        val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
         if self._debug:
             log.debug("RedisLock.__aexit__(): lock released")
 
-        return None
+        return val
