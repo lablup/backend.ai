@@ -161,6 +161,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     "PULLING",
                     "PREPARING",
                     "RUNNING",
+                    "RUNNING_DEGRADED",
                     "TERMINATING",
                     "ERROR",
                 ]
@@ -171,6 +172,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 [
                     "PREPARING",
                     "RUNNING",
+                    "RUNNING_DEGRADED",
                 ]
             )
             no_match_name = "running"
