@@ -436,12 +436,13 @@ install_system_pkg() {
 }
 
 install_nvm() {
-  show_info "Installing NVM and Node.js v18..."
+  node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
+  show_info "Installing NVM and Node.js v${node_version}..."
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
   export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
 
-  nvm install 18
+  nvm install $node_version
   nvm use node
 }
 
