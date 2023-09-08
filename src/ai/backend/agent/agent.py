@@ -77,6 +77,8 @@ from ai.backend.common.events import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
+    DoVolumeMountEvent,
+    DoVolumeUnmountEvent,
     EventDispatcher,
     EventProducer,
     ExecutionCancelledEvent,
@@ -93,7 +95,11 @@ from ai.backend.common.events import (
     KernelTerminatedEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
+    VolumeMountableNodeType,
+    VolumeMounted,
+    VolumeUnmounted,
 )
+from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -126,7 +132,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
     aobject,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop
+from ai.backend.common.utils import cancel_tasks, current_loop, mount, umount
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -140,6 +146,7 @@ from .resources import (
     KernelResourceSpec,
     Mount,
     allocate,
+    known_slot_types,
 )
 from .stats import StatContext, StatModes
 from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
@@ -620,7 +627,8 @@ class AbstractAgent(
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
-        computers, self.slots = await self.detect_resources()
+        computers = await self.load_resources()
+
         all_devices: List[AbstractComputeDevice] = []
         metadatas: List[AcceleratorMetadata] = []
         for name, computer in computers.items():
@@ -629,6 +637,11 @@ class AbstractAgent(
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
             metadatas.append(computer.get_metadata())
+
+        self.slots = await self.scan_available_resources()
+        log.info("Resource slots: {!r}", self.slots)
+        log.info("Slot types: {!r}", known_slot_types)
+        self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
 
         async def _pipeline(r: Redis):
             pipe = r.pipeline()
@@ -679,6 +692,11 @@ class AbstractAgent(
 
         # Notify the gateway.
         await self.produce_event(AgentStartedEvent(reason="self-started"))
+
+        # passive events
+        evd = self.event_dispatcher
+        evd.subscribe(DoVolumeMountEvent, self, handle_volume_mount, name="ag.volume.mount")
+        evd.subscribe(DoVolumeUnmountEvent, self, handle_volume_umount, name="ag.volume.umount")
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         """
@@ -1296,12 +1314,27 @@ class AbstractAgent(
             await asyncio.gather(*waiters)
 
     @abstractmethod
-    async def detect_resources(
+    async def load_resources(
         self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
+    ) -> Mapping[DeviceName, AbstractComputePlugin]:
+        """
+        Detect available resources attached on the system and load corresponding device plugin.
+        """
+
+    @abstractmethod
+    async def scan_available_resources(
+        self,
+    ) -> Mapping[SlotName, Decimal]:
         """
         Scan and define the amount of available resource slots in this node.
         """
+
+    async def update_slots(
+        self,
+        interval: float,
+    ) -> None:
+        self.slots = await self.scan_available_resources()
+        log.debug("slots: {!r}", self.slots)
 
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:
         """
@@ -2322,3 +2355,76 @@ class AbstractAgent(
                 os.remove(var_base_path / last_registry_file)
             except FileNotFoundError:
                 pass
+
+
+async def handle_volume_mount(
+    context: AbstractAgent,
+    source: AgentId,
+    event: DoVolumeMountEvent,
+) -> None:
+    if context.local_config["agent"]["cohabiting-storage-proxy"]:
+        log.debug("Storage proxy is in the same node. Skip the volume task.")
+        return
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
+    if volume_mount_prefix is None:
+        volume_mount_prefix = "./"
+    real_path = Path(volume_mount_prefix, event.dir_name)
+    err_msg: str | None = None
+    try:
+        await mount(
+            str(real_path),
+            event.fs_location,
+            event.fs_type,
+            event.cmd_options,
+            event.edit_fstab,
+            event.fstab_path,
+            mount_prefix,
+        )
+    except VolumeMountFailed as e:
+        err_msg = str(e)
+    await context.event_producer.produce_event(
+        VolumeMounted(
+            str(context.id),
+            VolumeMountableNodeType.AGENT,
+            str(real_path),
+            event.quota_scope_id,
+            err_msg,
+        )
+    )
+
+
+async def handle_volume_umount(
+    context: AbstractAgent,
+    source: AgentId,
+    event: DoVolumeUnmountEvent,
+) -> None:
+    if context.local_config["agent"]["cohabiting-storage-proxy"]:
+        log.debug("Storage proxy is in the same node. Skip the volume task.")
+        return
+    mount_prefix = await context.etcd.get("volumes/_mount")
+    timeout = await context.etcd.get("config/watcher/file-io-timeout")
+    volume_mount_prefix = context.local_config["agent"]["mount-path"]
+    real_path = Path(volume_mount_prefix, event.dir_name)
+    err_msg: str | None = None
+    try:
+        did_umount = await umount(
+            str(real_path),
+            mount_prefix,
+            event.edit_fstab,
+            event.fstab_path,
+            timeout_sec=float(timeout) if timeout is not None else None,
+        )
+    except VolumeMountFailed as e:
+        err_msg = str(e)
+    if not did_umount:
+        log.warning(f"{real_path} does not exist. Skip umount")
+    await context.event_producer.produce_event(
+        VolumeUnmounted(
+            str(context.id),
+            VolumeMountableNodeType.AGENT,
+            str(real_path),
+            event.quota_scope_id,
+            err_msg,
+        )
+    )

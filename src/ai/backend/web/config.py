@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pkg_resources
@@ -50,6 +51,7 @@ config_iv = t.Dict(
                 t.Key("single_sign_on_vendors", default=None): t.Null | tx.StringList(
                     empty_str_as_empty_list=True
                 ),
+                t.Key("sso_realm_name", default=""): t.String(allow_blank=True),
                 t.Key("enable_container_commit", default=False): t.ToBool,
                 t.Key("hide_agents", default=True): t.ToBool,
                 t.Key("app_download_url", default=""): t.String(allow_blank=True),
@@ -136,5 +138,20 @@ config_iv = t.Dict(
                 ),
             }
         ).allow_extra("*"),
+        t.Key("webserver"): t.Dict(
+            {
+                t.Key("event-loop", default="uvloop"): t.Enum("asyncio", "uvloop"),
+                t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
+                    type="dir", auto_create=True
+                ),
+                t.Key("pid-file", default=os.devnull): tx.Path(
+                    type="file",
+                    allow_nonexisting=True,
+                    allow_devnull=True,
+                ),
+            }
+        ).allow_extra("*"),
+        t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+        t.Key("debug"): t.Dict({t.Key("enabled", default=False): t.ToBool}).allow_extra("*"),
     }
 ).allow_extra("*")
