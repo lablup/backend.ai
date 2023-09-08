@@ -200,7 +200,7 @@ class MetadataServer(aobject):
         local_config = self.app["_root.context"].local_config
         site = web.TCPSite(
             metadata_server_runner,
-            "0.0.0.0",
+            local_config["agent"]["metadata-server-bind-host"],
             local_config["agent"]["metadata-server-port"],
         )
         self.runner = metadata_server_runner
