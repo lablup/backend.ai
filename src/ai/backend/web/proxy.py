@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
@@ -153,10 +153,11 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
 async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
+    config = request.app["config"]
     path = request.match_info.get("path", "")
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
+        if not (endpoint := config["pipeline"]["endpoint"]):
             log.error("WEB_HANDLER: 'pipeline.endpoint' has not been set.")
         else:
             log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
@@ -206,11 +207,11 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
             if proxy_path == "pipeline":
                 aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
                 if not (sso_token := request.headers.get("X-BackendAI-SSO")):
-                    jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
-                    now = datetime.now(tz=timezone(timedelta(hours=9)))
+                    jwt_secret = config["pipeline"]["jwt"]["secret"]
+                    now = datetime.now().astimezone()
                     payload = {
                         # Registered claims
-                        "exp": now + timedelta(hours=1),
+                        "exp": now + timedelta(seconds=config["session"]["max_age"]),
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
