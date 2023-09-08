@@ -22,7 +22,7 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
@@ -83,7 +83,7 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
@@ -138,7 +138,7 @@ jobs:
         else
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Create LFS file hash list
@@ -198,7 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: deploy-to-pypi
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Create LFS file hash list
@@ -295,7 +295,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -353,7 +353,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: deploy-to-docker-hub
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
