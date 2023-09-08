@@ -24,6 +24,7 @@ class ContainerMetadataPlugin(MetadataPlugin):
     async def routes(self) -> Sequence[MetadataPluginRoute]:
         return [
             MetadataPluginRoute("GET", "/envs", self.get_envs, None),
+            MetadataPluginRoute("GET", "/sandbox", self.get_sandbox_type, None),
             MetadataPluginRoute("GET", "/local-ipv4", self.get_local_ipv4, None),
         ]
 
@@ -36,3 +37,6 @@ class ContainerMetadataPlugin(MetadataPlugin):
 
     async def get_local_ipv4(self, request: web.Request) -> web.Response:
         return web.Response(body=request["container-ip"])
+
+    async def get_sandbox_type(self, request: web.Request) -> web.Response:
+        return web.Response(body=self.local_config["container"]["sandbox-type"])
