@@ -61,7 +61,7 @@ scaling-group = "default"
 # skip-manager-detection = false
 
 # The host container metadata server is going to bind. Defaults to 0.0.0.0.
-metadata-server-port = "0.0.0.0"
+metadata-server-bind-host = "0.0.0.0"
 
 # The port number of container metadata server. Defaults to 40128.
 # Make sure to change source port number in update-metadata-iptables.sh script when changing this value.
