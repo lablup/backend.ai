@@ -241,15 +241,12 @@ class RedisLock(AbstractDistributedLock):
             thread_local=False,
             sleep=self._lock_acquire_pause,
         )
-        while True:
-            try:
-                await self._lock.__aenter__()
-            except LockError:
-                log.debug("Unable to acquire lock. Try again")
-                continue
-            if self._debug:
-                log.debug("RedisLock.__aenter__(): lock acquired")
-            break
+        try:
+            await self._lock.__aenter__()
+        except LockError as e:
+            raise asyncio.TimeoutError(str(e))
+        if self._debug:
+            log.debug("RedisLock.__aenter__(): lock acquired")
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._lock is not None
