@@ -66,7 +66,8 @@
       "Tasks": "__NOT_TRANSLATED__",
       "YouMushChangeYourPassword": "__NOT_TRANSLATED__",
       "NewPasswordCannotBeSame": "__NOT_TRANSLATED__",
-      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__"
+      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__",
+      "InputNewPassword": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "ТРЕБУЕТСЯ ВХОД",
     "YouAreOffline": "Вы сейчас не в сети",
@@ -208,6 +209,7 @@
       "ProxyConfiguratorNotResponding": "Конфигуратор прокси не отвечает.",
       "SettingUpProxyForApp": "Настройка прокси для приложения ...",
       "AddingKernelToSocketQueue": "Добавление ядра в очередь сокетов ...",
+      "FailedToConnectCoordinator": "Не удалось подключиться к администрированию приложения. Пожалуйста, проверьте ваше сетевое подключение и настройки брандмауэра.",
       "ManualImageName": "Имя изображения (вручную)",
       "NotEnoughResource": "Недостаточно ресурса",
       "ResourceAllocationTemplate": "Шаблон распределения ресурсов",
@@ -263,7 +265,8 @@
       "PortsTitleWithRange": "__NOT_TRANSLATED__",
       "PrePortConfigWillDisappear": "__NOT_TRANSLATED__",
       "PreOpenPortPanelTitle": "__NOT_TRANSLATED__",
-      "PreOpenPortRange": "__NOT_TRANSLATED__"
+      "PreOpenPortRange": "__NOT_TRANSLATED__",
+      "MinMemory": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -300,7 +303,9 @@
       "AppMustBeRunDialog": "Доступ к этому приложению и его использование возможно только в том случае, если оно уже запущено через терминал. В противном случае вы будете перенаправлены на страницу с ошибкой, которая возникает, когда приложение не запущено.",
       "ConfirmAndRun": "Я проверил и начну",
       "Prepared": "Готовый",
-      "App": "__NOT_TRANSLATED__"
+      "App": "__NOT_TRANSLATED__",
+      "NoExistingConnectionExample": "Нет примера подключения для копирования.",
+      "SSHConnectionExampleClipboardCopy": "Пример подключения SSH скопирован в буфер обмена."
     },
     "TensorboardPath": "Каталог журналов для TensorBoard",
     "InputTensorboardPath": "Введите каталог журнала, на который будет ссылаться TensorBoard. Обратите внимание, что каталог журналов не будет создан автоматически.",
@@ -736,13 +741,16 @@
     "ProjectFolder": "__NOT_TRANSLATED__",
     "QuotaPerStorageVolume": "__NOT_TRANSLATED__",
     "HostDetails": "__NOT_TRANSLATED__",
-    "Used": "__NOT_TRANSLATED__"
+    "Used": "__NOT_TRANSLATED__",
+    "Pipeline": "__NOT_TRANSLATED__",
+    "DialogDataFolder": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "ВНИМАНИЕ: это нельзя отменить!",
       "LogDeletion": "Вы уверены, что хотите удалить все сообщения журнала?",
-      "WillBeAppliedToNewSessions": "Это обновление будет применено к новым сеансам."
+      "WillBeAppliedToNewSessions": "Это обновление будет применено к новым сеансам.",
+      "Required": "__NOT_TRANSLATED__"
     },
     "ask": {
       "DoYouWantToProceed": "Вы хотите продолжить?"
@@ -1363,7 +1371,8 @@
     "CreatingComputeSession": "Создание вычислительного сеанса ...",
     "SessionStillPreparing": "Сессия все еще находится в стадии подготовки. Перезагрузите через некоторое время",
     "ComputeSessionPrepared": "Вычислительная сессия подготовлена",
-    "sessionStatusIs": "Статус сеанса"
+    "sessionStatusIs": "Статус сеанса",
+    "EmptyProject": "__NOT_TRANSLATED__"
   },
   "error": {
     "UpdateError": "Ошибка обновления",
@@ -1493,6 +1502,28 @@
     "YouAreAboutToTerminate": "__NOT_TRANSLATED__",
     "FailedToStartService": "__NOT_TRANSLATED__",
     "ServingRouteErrorModalTitle": "__NOT_TRANSLATED__",
-    "ClearErrors": "__NOT_TRANSLATED__"
+    "ClearErrors": "__NOT_TRANSLATED__",
+    "GeneratedTokens": "__NOT_TRANSLATED__",
+    "CurrentTime": "__NOT_TRANSLATED__",
+    "ExpiredTime": "__NOT_TRANSLATED__",
+    "GenerateNewToken": "__NOT_TRANSLATED__",
+    "GenerateToken": "__NOT_TRANSLATED__",
+    "Generate": "__NOT_TRANSLATED__",
+    "CreatedAt": "__NOT_TRANSLATED__",
+    "TokenGenerated": "__NOT_TRANSLATED__",
+    "TokenGenerationFailed": "__NOT_TRANSLATED__",
+    "PleaseSelectTime": "__NOT_TRANSLATED__",
+    "ExpiredDate": "__NOT_TRANSLATED__",
+    "TokenExpiredDateHelp": "__NOT_TRANSLATED__",
+    "TokenExpiredDateError": "__NOT_TRANSLATED__",
+    "FormValidationFailed": "__NOT_TRANSLATED__",
+    "ServiceNameRule": "__NOT_TRANSLATED__",
+    "resources": "__NOT_TRANSLATED__"
+  },
+  "ErrorBoundary": {
+    "title": "__NOT_TRANSLATED__",
+    "reloadPage": "__NOT_TRANSLATED__",
+    "resetErrorBoundary": "__NOT_TRANSLATED__",
+    "displayOnlyDevEnv": "__NOT_TRANSLATED__"
   }
 }

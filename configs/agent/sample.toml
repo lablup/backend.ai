@@ -39,6 +39,13 @@ agent-sock-port = 6007
 # This affects the per-sgroup configuration scope.
 scaling-group = "default"
 
+# Set the volume mount path for the agent node.
+# mount-path = "/vfroot"
+
+# A boolean flag to indicate if there is any cohabiting storage proxy within the same node.
+# If is there any cohabiting storage proxy, then events such as mount or umount will be ignored. [default: true]
+# cohabiting-storage-proxy = true
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./agent.pid"             # env: BACKEND_PID_FILE
@@ -52,6 +59,9 @@ scaling-group = "default"
 # A boolean flag to check and wait until at least one manager instances are running
 # when the agent starts up. [default: false]
 # skip-manager-detection = false
+
+# The host container metadata server is going to bind. Defaults to 0.0.0.0.
+metadata-server-bind-host = "0.0.0.0"
 
 # The port number of container metadata server. Defaults to 40128.
 # Make sure to change source port number in update-metadata-iptables.sh script when changing this value.
