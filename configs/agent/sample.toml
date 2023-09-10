@@ -42,10 +42,6 @@ scaling-group = "default"
 # Set the volume mount path for the agent node.
 # mount-path = "/vfroot"
 
-# A boolean flag to indicate if there is any cohabiting storage proxy within the same node.
-# If is there any cohabiting storage proxy, then events such as mount or umount will be ignored. [default: true]
-# cohabiting-storage-proxy = true
-
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./agent.pid"             # env: BACKEND_PID_FILE

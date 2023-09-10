@@ -250,7 +250,6 @@ async def check_and_upgrade(
         dsn=dsn,
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
-        watcher=None,
     )
 
     async with ctx:
