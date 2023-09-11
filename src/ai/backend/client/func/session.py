@@ -174,6 +174,7 @@ class ComputeSession(BaseFunction):
         max_wait: int = 0,
         no_reuse: bool = False,
         dependencies: Sequence[str] = None,
+        continue_on_dependency_error: bool = False,
         callback_url: Optional[str] = None,
         mounts: List[str] = None,
         mount_map: Mapping[str, str] = None,

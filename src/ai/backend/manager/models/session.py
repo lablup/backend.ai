@@ -590,6 +590,9 @@ class SessionRow(Base):
 
     # Lifecycle
     timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
+    continue_on_dependency_error = sa.Column(
+        "continue_on_dependency_error", sa.Boolean(), default=False, nullable=False
+    )
     created_at = sa.Column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
     )
