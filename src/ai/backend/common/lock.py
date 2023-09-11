@@ -12,6 +12,7 @@ from etcetra.client import EtcdCommunicator, EtcdConnectionManager
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
 from redis.asyncio.sentinel import SentinelConnectionPool
+from redis.exceptions import LockError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -240,7 +241,10 @@ class RedisLock(AbstractDistributedLock):
             thread_local=False,
             sleep=self._lock_acquire_pause,
         )
-        await self._lock.__aenter__()
+        try:
+            await self._lock.__aenter__()
+        except LockError as e:
+            raise asyncio.TimeoutError(str(e))
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: [ubuntu-latest-8-cores, self-hosted]
+    runs-on: arc-runner-set
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -41,7 +41,7 @@ jobs:
         echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
         echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
       env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
       uses: ./actions/init-pants
@@ -82,7 +82,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: [ubuntu-latest-8-cores, self-hosted]
+    runs-on: arc-runner-set
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -110,7 +110,7 @@ jobs:
         echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
         echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
       env:
-        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
       uses: ./actions/init-pants
