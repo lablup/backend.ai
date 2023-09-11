@@ -391,8 +391,7 @@ class SchedulingPredicate(Protocol):
         db_conn: SAConnection,
         sched_ctx: SchedulingContext,
         sess_ctx: PendingSession,
-    ) -> PredicateResult:
-        ...
+    ) -> PredicateResult: ...
 
 
 class AbstractScheduler(metaclass=ABCMeta):
