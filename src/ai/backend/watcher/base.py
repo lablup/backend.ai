@@ -50,10 +50,10 @@ class BaseWatcher(metaclass=ABCMeta):
         pass
 
     async def init(self) -> None:
-        pass
+        return
 
     async def shutdown(self) -> None:
-        pass
+        return
 
     async def run_cmd(
         self,
