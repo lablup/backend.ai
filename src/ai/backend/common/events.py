@@ -694,8 +694,7 @@ class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,
-    ) -> ConnectionPool:
-        ...
+    ) -> ConnectionPool: ...
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")
