@@ -143,6 +143,10 @@ class FileLock(AbstractDistributedLock):
     def is_locked(self) -> bool:
         return self._locked
 
+    @classmethod
+    def get_dir_lock_path(cls, path: Path) -> Path:
+        return path.parent / f"{path.name}-lock"
+
 
 class EtcdLock(AbstractDistributedLock):
     _con_mgr: Optional[EtcdConnectionManager]
