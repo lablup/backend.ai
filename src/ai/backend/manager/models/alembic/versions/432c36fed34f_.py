@@ -1,4 +1,4 @@
-"""add-foreign-keys-and-unique-constraint-to-endpoint
+"""add-foreign-keys-and-unique-constraint-to-endpoint-and-endpoint-tokens
 
 Revision ID: 432c36fed34f
 Revises: d04592473df7
