@@ -435,6 +435,20 @@ install_system_pkg() {
   esac
 }
 
+install_node() {
+  if ! command -v nvm &> /dev/null; then
+    show_info "Installing latest version of NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+    export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+  fi
+
+  node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
+  show_info "Installing Node.js v${node_version} via NVM..."
+  nvm install $node_version
+  nvm use node
+}
+
 set_brew_python_build_flags() {
   local _prefix_openssl="$(brew --prefix openssl)"
   local _prefix_sqlite3="$(brew --prefix sqlite3)"
@@ -556,6 +570,9 @@ bootstrap_pants() {
 }
 
 install_editable_webui() {
+  if ! command -v node &> /dev/null; then
+    install_node
+  fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."

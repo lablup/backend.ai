@@ -58,6 +58,16 @@
               "algorithm": "sha256",
               "hash": "6ac9c21bfe7bc9f7f1b6fae441746e6a106e48fc9de530dea29e8cd37a2c0cc4",
               "url": "https://files.pythonhosted.org/packages/f5/e9/0207b4be5f20b15a2a8fc5507941cbf18887c026d21486ad62dd65054dc1/mypy-1.5.1-cp311-cp311-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "021326f464fd3da2f37d9727bd2fdce249fce38f91a48badf5f9331f4c7d3e74",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/mypy/mypy-1.5.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "c6f83a0a38d0fa68c593997bb62d7c0cc0b5ded5e74a4885b625fb20cf339b07",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/mypy/mypy-1.5.1-cp311-cp311-musllinux_1_1_aarch64.whl"
             }
           ],
           "project_name": "mypy",
