@@ -214,7 +214,9 @@ class FstabEntry:
     Entry class represents a non-comment line on the `fstab` file.
     """
 
-    def __init__(self, device, mountpoint, fstype, options, d=0, p=0) -> None:
+    def __init__(
+        self, device: str, mountpoint: str, fstype: str, options: str | None, d=0, p=0
+    ) -> None:
         self.device = device
         self.mountpoint = mountpoint
         self.fstype = fstype
@@ -248,7 +250,7 @@ class Fstab:
     def __init__(self, fp: AsyncTextIOWrapper) -> None:
         self._fp = fp
 
-    def _hydrate_entry(self, line) -> FstabEntry:
+    def _hydrate_entry(self, line: str) -> FstabEntry:
         return FstabEntry(*[x for x in line.strip("\n").split(" ") if x not in ("", None)])
 
     async def get_entries(self) -> AsyncIterator[FstabEntry]:
@@ -274,7 +276,9 @@ class Fstab:
         await self._fp.write(str(entry) + "\n")
         await self._fp.truncate()
 
-    async def add(self, device, mountpoint, fstype, options=None, d=0, p=0) -> None:
+    async def add(
+        self, device: str, mountpoint: str, fstype: str, options: str | None = None, d=0, p=0
+    ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 
     async def remove_entry(self, entry) -> bool:
