@@ -119,8 +119,14 @@ async def server_main(
                     "Storage proxy must be run as root if watcher is enabled. Else, set"
                     " `use-wathcer` to false in your local config file."
                 )
-            insock_path = local_config["storage-proxy"]["watcher-insock-path-prefix"]
-            outsock_path = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            insock_path: str | None = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+            outsock_path: str | None = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            if insock_path is None or outsock_path is None:
+                raise ValueError(
+                    "Socket path must be not null. Please set valid socket path to"
+                    " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
+                    " config file."
+                )
             watcher_client = WatcherClient(pidx, insock_path, outsock_path)
             await watcher_client.init()
         else:
@@ -284,15 +290,38 @@ def main(
                 insock_path_prefix = local_config["storage-proxy"]["watcher-insock-path-prefix"]
                 outsock_path_prefix = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
                 num_workers = local_config["storage-proxy"]["num-proc"]
-                aiotools.start_server(
-                    server_main_logwrapper,
-                    num_workers=num_workers,
-                    extra_procs=tuple(
+
+                if local_config["storage-proxy"]["use-watcher"]:
+                    if not _is_root():
+                        raise ValueError(
+                            "Storage proxy must be run as root if watcher is enabled. Else, set"
+                            " `use-wathcer` to false in your local config file."
+                        )
+                    insock_path: str | None = local_config["storage-proxy"][
+                        "watcher-insock-path-prefix"
+                    ]
+                    outsock_path: str | None = local_config["storage-proxy"][
+                        "watcher-outsock-path-prefix"
+                    ]
+                    if insock_path is None or outsock_path is None:
+                        raise ValueError(
+                            "Socket path must be not null. Please set valid socket path to"
+                            " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in"
+                            " your local config file."
+                        )
+                    extra_procs = tuple(
                         functools.partial(
                             main_job, worker_pidx, insock_path_prefix, outsock_path_prefix
                         )
                         for worker_pidx in range(num_workers)
-                    ),
+                    )
+                else:
+                    extra_procs = tuple()
+
+                aiotools.start_server(
+                    server_main_logwrapper,
+                    num_workers=num_workers,
+                    extra_procs=extra_procs,
                     args=(local_config, log_endpoint),
                 )
                 log.info("exit.")
