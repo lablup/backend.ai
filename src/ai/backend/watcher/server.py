@@ -4,6 +4,8 @@ import os
 import signal
 import ssl
 import sys
+from contextlib import asynccontextmanager as actxmgr
+from pathlib import Path
 from pprint import pformat, pprint
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
@@ -11,8 +13,9 @@ import aiohttp_cors
 import aiotools
 import click
 from aiohttp import web
+from setproctitle import setproctitle
 
-from ai.backend.common import config, utils
+from ai.backend.common import config
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -20,10 +23,11 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
+from ai.backend.common.utils import env_info
 
-from . import __version__
+from . import __version__ as VERSION
 from .config import watcher_config_iv
 from .context import RootContext
 from .defs import CORSOptions, WebMiddleware
@@ -38,7 +42,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 async def ping(request: web.Request) -> web.Response:
     return web.json_response(
         {
-            "version": __version__,
+            "version": VERSION,
         },
         status=200,
     )
@@ -94,15 +98,37 @@ async def _init_watcher(
     module_config: dict[str, Any] = local_config["module"]
     await watcher_ctx.init()
     for plugin_name, plugin_instance in watcher_ctx.plugins.items():
+        try:
+            plugin_config = module_config[plugin_name]
+        except KeyError:
+            log.warning(f"Config not found. Skip initiating watcher. (name: {plugin_name})")
+            continue
         log.info("Loading watcher plugin: {0}", plugin_name)
         watcher_cls = plugin_instance.get_watcher_class()
         watcher_config_cls = watcher_cls.get_watcher_config_cls()
-        watcher_config = watcher_config_cls.from_json(module_config[plugin_name])
+        watcher_config = watcher_config_cls.from_json(plugin_config)
         ctx.register_watcher(watcher_cls, watcher_config)
     return watcher_ctx
 
 
-@aiotools.server
+@aiotools.server_context
+async def server_main_logwrapper(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    _args: list[Any],
+) -> AsyncIterator[None]:
+    try:
+        asyncio.get_child_watcher()
+    except (AttributeError, NotImplementedError):
+        pass
+    log_endpoint = _args[1]
+    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    with logger:
+        async with server_main(loop, pidx, _args):
+            yield
+
+
+@actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -199,7 +225,7 @@ async def server_main(
 
 
 @click.command()
-@click.argument("config_path", metavar="CONFIG")
+@click.argument("config_path", metavar="CONFIG", type=Path)
 @click.option(
     "--debug",
     is_flag=True,
@@ -215,7 +241,7 @@ async def server_main(
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, log_level, debug=False):
+def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False):
     if debug:
         log_level = LogSeverity.DEBUG
     else:
@@ -224,6 +250,8 @@ def main(cli_ctx, config_path, log_level, debug=False):
 
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "watcher")
 
+    if log_level == LogSeverity.DEBUG:
+        config.override_key(raw_cfg, ("debug", "enabled"), True)
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
     config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
     config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
@@ -234,8 +262,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
-    if log_level == LogSeverity.DEBUG:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:
         cfg = config.check(raw_cfg, watcher_config_iv)
@@ -248,31 +274,50 @@ def main(cli_ctx, config_path, log_level, debug=False):
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
-    # # Change the filename from the logging config's file section.
-    # log_sockpath = Path(f"/tmp/backend.ai/ipc/watcher-logger-{os.getpid()}.sock")
-    # log_sockpath.parent.mkdir(parents=True, exist_ok=True)
-    # log_endpoint = f"ipc://{log_sockpath}"
-    # cfg["logging"]["endpoint"] = log_endpoint
-    # logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
-    # if "file" in cfg["logging"]["drivers"]:
-    #     fn = Path(cfg["logging"]["file"]["filename"])
-    #     cfg["logging"]["file"]["filename"] = f"{fn.stem}-watcher{fn.suffix}"
+    if cli_ctx.invoked_subcommand is None:
+        pid_file: Path = cfg["watcher"]["pid-file"]
+        pid_file.write_text(str(os.getpid()))
+        ipc_base_path = cfg["watcher"]["ipc-base-path"]
+        log_sockpath = Path(
+            ipc_base_path / f"watcher-logger-{os.getpid()}.sock",
+        )
+        log_sockpath.parent.mkdir(parents=True, exist_ok=True)
+        log_endpoint = f"ipc://{log_sockpath}"
+        cfg["logging"]["endpoint"] = log_endpoint
 
-    # setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
-    # with logger:
-    log.info("Backend.AI Watcher")
-    log.info("runtime: {0}", utils.env_info())
+        try:
+            logger = Logger(
+                cfg["logging"],
+                is_master=True,
+                log_endpoint=log_endpoint,
+            )
+            with logger:
+                setproctitle("backend.ai: watcher")
+                log.info("Backend.AI Watcher", VERSION)
+                log.info("Runtime: {0}", env_info())
+                log.info("Node ID: {0}", cfg["watcher"]["node-id"])
+                log_config = logging.getLogger("ai.backend.watcher.config")
+                if cfg["debug"]["enabled"]:
+                    log_config.debug("debug mode enabled.")
+                if "debug" in cfg and cfg["debug"]["enabled"]:
+                    print("== Watcher configuration ==")
+                    pprint(cfg)
+                if cfg["watcher"]["event-loop"] == "uvloop":
+                    import uvloop
 
-    log_config = logging.getLogger("ai.backend.agent.config")
-    log_config.debug("debug mode enabled.")
-
-    aiotools.start_server(
-        server_main,
-        num_workers=1,
-        args=(cfg,),
-        stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
-    )
-    log.info("exit.")
+                    uvloop.install()
+                    log.info("Using uvloop as the event loop backend")
+                aiotools.start_server(
+                    server_main_logwrapper,
+                    num_workers=1,
+                    args=(cfg, log_endpoint),
+                    stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
+                )
+                log.info("exit.")
+        finally:
+            if pid_file.is_file():
+                # check is_file() to prevent deleting /dev/null!
+                pid_file.unlink()
     return 0
 
 
