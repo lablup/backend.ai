@@ -4,3 +4,7 @@ class WatcherError(Exception):
 
 class InvalidWatcher(WatcherError):
     pass
+
+
+class AuthorizationFailed(WatcherError):
+    pass

@@ -28,6 +28,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
+from .api import auth_middleware
 from .config import watcher_config_iv
 from .context import RootContext
 from .defs import CORSOptions, WebMiddleware
@@ -159,6 +160,13 @@ async def server_main(
     )
     app["config_server"] = etcd
 
+    # Set token
+    token = await etcd.get("config/watcher/token")
+    if token is None:
+        token = "insecure"
+    log.debug("watcher authentication token: {}", token)
+    app["token"] = token
+
     ssl_ctx = None
     if local_config["watcher"]["ssl-enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -195,6 +203,7 @@ async def server_main(
         event_dispatcher=event_dispatcher,
     )
     app["ctx"] = ctx
+    app.middlewares.append(auth_middleware)
     cors = aiohttp_cors.setup(app, defaults=cors_options)
     cors.add(app.router.add_route("GET", r"", ping))
     cors.add(app.router.add_route("GET", r"/", ping))
