@@ -2,17 +2,24 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Mapping
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Mapping
 
 from async_timeout import timeout
 
+from ai.backend.common.lock import FileLock
 from ai.backend.common.types import JSONSerializableMixin
+from ai.backend.common.utils import mount as _mount
+from ai.backend.common.utils import umount as _umount
 
 from .defs import WatcherName
 from .types import ProcResult
 
 if TYPE_CHECKING:
     from .context import RootContext
+
+
+DEFAULT_FILE_IO_TIMEOUT: Final = 60
 
 
 async def _run_cmd(cmd: list[str]) -> ProcResult:
@@ -49,11 +56,13 @@ class BaseWatcher(metaclass=ABCMeta):
     def get_watcher_config_cls(cls) -> type[BaseWatcherConfig]:
         pass
 
+    @abstractmethod
     async def init(self) -> None:
-        return
+        pass
 
+    @abstractmethod
     async def shutdown(self) -> None:
-        return
+        pass
 
     async def run_cmd(
         self,
@@ -65,6 +74,67 @@ class BaseWatcher(metaclass=ABCMeta):
             return await _run_cmd_timeout(cmd, timeout)
         else:
             return await _run_cmd(cmd)
+
+    async def mount(
+        self,
+        mount_path: str,
+        fs_location: str,
+        fs_type: str = "nfs",
+        cmd_options: str | None = None,
+        edit_fstab: bool = False,
+        fstab_path: str | None = None,
+        mount_prefix: str | None = None,
+    ) -> None:
+        _mount_path = Path(mount_path)
+
+        def already_done() -> bool:
+            return _mount_path.is_mount()
+
+        if already_done():
+            return
+        lock_path = FileLock.get_dir_lock_path(_mount_path)
+        async with FileLock(lock_path, remove_when_unlock=True):
+            if already_done():
+                return
+            return await _mount(
+                mount_path,
+                fs_location,
+                fs_type,
+                cmd_options,
+                edit_fstab,
+                fstab_path,
+                mount_prefix,
+            )
+
+    async def umount(
+        self,
+        mount_path: str,
+        mount_prefix: str | None = None,
+        edit_fstab: bool = False,
+        fstab_path: str | None = None,
+        rmdir_if_empty: bool = False,
+        *,
+        timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
+    ) -> bool:
+        _mount_path = Path(mount_path)
+
+        def already_done() -> bool:
+            return not _mount_path.is_mount()
+
+        if already_done():
+            return True
+        lock_path = FileLock.get_dir_lock_path(_mount_path)
+        async with FileLock(lock_path, remove_when_unlock=True):
+            if already_done():
+                return True
+            return await _umount(
+                mount_path,
+                mount_prefix,
+                edit_fstab,
+                fstab_path,
+                rmdir_if_empty,
+                timeout_sec=timeout_sec,
+            )
 
 
 class BaseWatcherConfig(JSONSerializableMixin):
