@@ -1,5 +1,4 @@
 {
-  "sentinel": "127.0.0.1:9203,127.0.0.1:9204,127.0.0.1:9205",
-  "service_name": "manager",
-  "password": "develove"
+  "sentinel": "127.0.0.1:8217,127.0.0.1:8218,127.0.0.1:8219",
+  "service_name": "manager"
 }

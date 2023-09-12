@@ -121,10 +121,6 @@ usage() {
   echo "  ${LWHITE}--var-base-path PATH${NC}"
   echo "    The base path for shared data files."
   echo "    (default: ./var/lib/backend.ai)"
-  echo ""
-  echo "  ${LWHITE}--configure-ha ${NC}"
-  echo "    Configure HA dev environment."
-  echo "    (default: false)"
 }
 
 show_error() {
@@ -284,12 +280,10 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
-CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
-[[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
-[[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
-
+REDIS_PORT="8111"
+ETCD_PORT="8121"
 MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
@@ -305,14 +299,6 @@ CODESPACES_ON_CREATE=0
 CODESPACES_POST_CREATE=0
 CODESPACES=${CODESPACES:-"false"}
 _INSTALLED_PYENV=0
-
-# Only Used in HA mode
-REDIS_MASTER_PORT="9200"
-REDIS_SLAVE1_PORT="9201"
-REDIS_SLAVE2_PORT="9202"
-REDIS_SENTINEL1_PORT="9203"
-REDIS_SENTINEL2_PORT="9204"
-REDIS_SENTINEL3_PORT="9205"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -343,7 +329,6 @@ while [ $# -gt 0 ]; do
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
     --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
     --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
-    --configure-ha)         CONFIGURE_HA=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -758,66 +743,17 @@ setup_environment() {
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
   mkdir -p "$HALFSTACK_VOLUME_PATH"
-  if [ $CONFIGURE_HA -eq 1 ]; then
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
-
-    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
-
-    sed_inplace 's/\${REDIS_MASTER_PORT}/9200/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9201/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9202/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9203/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9204/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9205/g' "docker-compose.halfstack.current.yml"
-
-    mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
-
-    sentinel01_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel01.conf"
-    sentinel02_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel02.conf"
-    sentinel03_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel03.conf"
-
-    cp ./configs/redis/sentinel.conf $sentinel01_cfg_path
-    cp ./configs/redis/sentinel.conf $sentinel02_cfg_path
-    cp ./configs/redis/sentinel.conf $sentinel03_cfg_path
-
-    sed_inplace "s/\${COMPOSE_PATH}/${ROOT_PATH//\//\\/}\/tmp\/backend\.ai-halfstack-ha\/configs\//g" "docker-compose.halfstack.current.yml"
-
-    # Appends the given text to sentinel01.conf
-    echo "" >> $sentinel01_cfg_path
-    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel01/g" "$sentinel01_cfg_path"
-    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel01_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9203/g" "$sentinel01_cfg_path"
-
-    # Appends the given text to sentinel02.conf
-    echo "" >> $sentinel02_cfg_path
-    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel02/g" "$sentinel02_cfg_path"
-    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel02_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9204/g" "$sentinel02_cfg_path"
-
-    # Appends the given text to sentinel03.conf
-    echo "" >> $sentinel03_cfg_path
-    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
-    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9205/g" "$sentinel03_cfg_path"
-  else
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-    if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-      SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
-    fi
-    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+  SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+  if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
   fi
-
+  cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
-
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
-
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -848,15 +784,7 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
   cp configs/manager/halfstack.alembic.ini ./alembic.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
-
-  if [ $CONFIGURE_HA -eq 1 ]; then
-    ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
-    ./backend.ai mgr etcd put config/redis/service_name "mymaster"
-    ./backend.ai mgr etcd put config/redis/password "develove"
-  else
-    ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-  fi
-
+  ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
@@ -903,14 +831,7 @@ configure_backendai() {
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-
-  if [ $CONFIGURE_HA -eq 1 ]; then
-    sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_MASTER_PORT}/" ./webserver.conf
-    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
-  else
-    sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
-  fi
-
+  sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui

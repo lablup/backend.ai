@@ -80,12 +80,14 @@ async def test_instantiate_redisconninfo() -> None:
         }
     )
 
-    assert isinstance(r1.client, Sentinel)
+    assert isinstance(r1.client, Redis)
 
-    for i in range(3):
-        assert r1.client.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
-        assert r1.client.sentinels[i].connection_pool.connection_kwargs["port"] == (26379 + i)
-        assert r1.client.sentinels[i].connection_pool.connection_kwargs["db"] == 0
+    sentinels1 = await r1.client.sentinel_sentinels("mymaster")
+
+    for i, sentinel in enumerate(sentinels1):
+        assert sentinel.connection_pool.connection_kwargs["host"] == "127.0.0.1"
+        assert sentinel.connection_pool.connection_kwargs["port"] == (26379 + i)
+        assert sentinel.connection_pool.connection_kwargs["db"] == 0
 
     parsed_addresses: Any = tx.DelimiterSeperatedList(tx.HostPortPair).check_and_return(sentinels)
     r2 = redis_helper.get_redis_object(
@@ -96,12 +98,14 @@ async def test_instantiate_redisconninfo() -> None:
         }
     )
 
-    assert isinstance(r2.client, Sentinel)
+    assert isinstance(r2.client, Redis)
 
-    for i in range(3):
-        assert r2.client.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
-        assert r2.client.sentinels[i].connection_pool.connection_kwargs["port"] == (26379 + i)
-        assert r2.client.sentinels[i].connection_pool.connection_kwargs["db"] == 0
+    sentinels2 = await r2.client.sentinel_sentinels("mymaster")
+
+    for i, sentinel in enumerate(sentinels2):
+        assert sentinel.connection_pool.connection_kwargs["host"] == "127.0.0.1"
+        assert sentinel.connection_pool.connection_kwargs["port"] == (26379 + i)
+        assert sentinel.connection_pool.connection_kwargs["db"] == 0
 
 
 @pytest.mark.redis
