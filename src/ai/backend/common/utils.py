@@ -286,13 +286,13 @@ class Fstab:
         lines = await self._fp.readlines()
         line_no: int | None = None
         for index, line in enumerate(lines):
-            try:
-                if not line.strip().startswith("#"):
+            if not line.strip().startswith("#"):
+                try:
                     if self._hydrate_entry(line) == entry:
                         line_no = index
                         break
-            except TypeError:
-                pass
+                except TypeError:
+                    pass
         else:
             return False
         assert line_no is not None
