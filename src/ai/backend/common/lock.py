@@ -23,7 +23,6 @@ from tenacity import (
 )
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.redis_helper import _default_conn_opts
 from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
@@ -194,7 +193,6 @@ class EtcdLock(AbstractDistributedLock):
 class RedisLock(AbstractDistributedLock):
     debug: bool
     _redis: Redis
-    redis_service_name: str
     _timeout: Optional[float]
     _lock: Optional[AsyncRedisLock]
 
@@ -208,25 +206,12 @@ class RedisLock(AbstractDistributedLock):
         *,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
-        socket_connect_timeout: float = 0.3,
         debug: bool = False,
         lock_acquire_pause: Optional[float] = None,
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
-        if isinstance(redis.client, Redis):
-            self._redis = redis.client
-        else:
-            assert redis.service_name is not None
-            self.redis_service_name = redis.service_name
-            _conn_opts = {
-                **_default_conn_opts,
-                "socket_connect_timeout": socket_connect_timeout,
-            }
-            self._redis = redis.client.master_for(
-                redis.service_name,
-                **_conn_opts,
-            )
+        self._redis = redis.client
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
         self._lock_acquire_pause = lock_acquire_pause or self.default_lock_acquire_pause

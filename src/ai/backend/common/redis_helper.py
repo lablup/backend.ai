@@ -18,7 +18,6 @@ from typing import (
     Union,
 )
 
-import psutil
 import redis.exceptions
 import yarl
 from redis.asyncio import Redis
@@ -182,17 +181,6 @@ async def blpop(
             await asyncio.sleep(0)
 
 
-def count_open_sockets():
-    current_process = psutil.Process()
-    socket_count = 0
-
-    for conn in current_process.connections(kind="inet"):
-        if conn.status == "ESTABLISHED":
-            socket_count += 1
-
-    return socket_count
-
-
 async def execute(
     redis_obj: RedisConnectionInfo | Redis,
     func: Callable[[Redis], Awaitable[Any]],
@@ -208,7 +196,6 @@ async def execute(
     Note that when retried, the given function may be executed *multiple* times, so the caller
     should take care of side-effects of it.
     """
-
     if isinstance(redis_obj, RedisConnectionInfo):
         redis_client = redis_obj.client
         service_name = service_name or redis_obj.service_name
@@ -230,7 +217,7 @@ async def execute(
                     async with aw_or_pipe:
                         result = await aw_or_pipe.execute()
                 elif inspect.isawaitable(aw_or_pipe):
-                    result = await aw_or_pipe  # Leak occurred at This point!!!!!
+                    result = await aw_or_pipe
                 else:
                     raise TypeError(
                         "The return value must be an awaitable"
@@ -239,7 +226,7 @@ async def execute(
                 if isinstance(result, Pipeline):
                     # This happens when func is an async function that returns a pipeline.
                     async with result:
-                        result = await result.execute()  # Leak occurred at This point!!!!!
+                        result = await result.execute()
                 if encoding:
                     if isinstance(result, bytes):
                         return result.decode(encoding)
