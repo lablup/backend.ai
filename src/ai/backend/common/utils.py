@@ -281,7 +281,7 @@ class Fstab:
     ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 
-    async def remove_entry(self, entry) -> bool:
+    async def remove_entry(self, entry: FstabEntry) -> bool:
         await self._fp.seek(0)
         lines = await self._fp.readlines()
         line_no: int | None = None
@@ -302,7 +302,7 @@ class Fstab:
         await self._fp.truncate()
         return True
 
-    async def remove_by_mountpoint(self, mountpoint) -> bool:
+    async def remove_by_mountpoint(self, mountpoint: str) -> bool:
         entry = await self.get_entry_by_attr("mountpoint", mountpoint)
         if entry:
             return await self.remove_entry(entry)
