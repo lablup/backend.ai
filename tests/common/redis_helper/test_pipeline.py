@@ -77,12 +77,14 @@ async def test_pipeline_single_instance_retries(redis_container: Tuple[str, Host
 @pytest.mark.redis
 @pytest.mark.asyncio
 async def test_pipeline_sentinel_cluster(redis_cluster: RedisClusterInfo) -> None:
+    s = Sentinel(
+        redis_cluster.sentinel_addrs,
+        password="develove",
+        socket_timeout=0.5,
+    )
+
     rconn = RedisConnectionInfo(
-        Sentinel(
-            redis_cluster.sentinel_addrs,
-            password="develove",
-            socket_timeout=0.5,
-        ),
+        s.master_for(service_name="mymaster"),
         service_name="mymaster",
     )
 

@@ -45,17 +45,19 @@ async def test_blist_cluster_sentinel(
         except asyncio.CancelledError:
             pass
 
-    s = RedisConnectionInfo(
-        Sentinel(
-            redis_cluster.sentinel_addrs,
-            password="develove",
-            socket_timeout=0.2,
-        ),
+    s = Sentinel(
+        redis_cluster.sentinel_addrs,
+        password="develove",
+        socket_timeout=0.2,
+    )
+
+    r = RedisConnectionInfo(
+        s.master_for(service_name="mymaster"),
         service_name="mymaster",
     )
-    await redis_helper.execute(s, lambda r: r.delete("bl1"))
+    await redis_helper.execute(r, lambda r: r.delete("bl1"))
 
-    pop_task = asyncio.create_task(pop(s, "bl1"))
+    pop_task = asyncio.create_task(pop(r, "bl1"))
     interrupt_task = asyncio.create_task(
         interrupt(
             disruption_method,
@@ -71,7 +73,7 @@ async def test_blist_cluster_sentinel(
 
     for i in range(2):
         await redis_helper.execute(
-            s,
+            r,
             lambda r: r.rpush("bl1", str(i)),
             service_name="mymaster",
         )
@@ -86,7 +88,7 @@ async def test_blist_cluster_sentinel(
     wakeup_task = asyncio.create_task(wakeup())
     for i in range(2):
         await redis_helper.execute(
-            s,
+            r,
             lambda r: r.rpush("bl1", str(2 + i)),
             service_name="mymaster",
         )
@@ -96,7 +98,7 @@ async def test_blist_cluster_sentinel(
     await unpaused.wait()
     for i in range(2):
         await redis_helper.execute(
-            s,
+            r,
             lambda r: r.rpush("bl1", str(4 + i)),
             service_name="mymaster",
         )
