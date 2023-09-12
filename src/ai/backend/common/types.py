@@ -34,6 +34,7 @@ from typing import (
 )
 
 import attrs
+import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from redis.asyncio import Redis
@@ -1105,6 +1106,17 @@ class EtcdRedisConfig(TypedDict, total=False):
 class RedisConnectionInfo:
     client: Redis
     service_name: Optional[str]
+    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+
+    def __init__(
+        self,
+        client: Redis,
+        service_name: Optional[str] = None,
+        sentinel: Optional[redis.asyncio.sentinel.Sentinel] = None,
+    ) -> None:
+        self.client = client
+        self.service_name = service_name
+        self.sentinel = sentinel
 
     async def close(self, close_connection_pool: Optional[bool] = None) -> None:
         await self.client.close(close_connection_pool)
