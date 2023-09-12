@@ -225,9 +225,11 @@ async def server_main(
     await site.start()
     log.info("started at {}", watcher_addr)
     try:
-        yield
+        stop_sig = yield
     finally:
         log.info("shutting down...")
+        if stop_sig == signal.SIGALRM:
+            log.warning(f"Stop signal: {stop_sig}")
         await webapp_plugin_ctx.cleanup()
         await watcher_ctx.cleanup()
         await runner.cleanup()
