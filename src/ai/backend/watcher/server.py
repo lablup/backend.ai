@@ -255,14 +255,13 @@ async def server_main(
 def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False):
     if debug:
         log_level = LogSeverity.DEBUG
-    else:
+
+    if log_level != LogSeverity.DEBUG:
         if (uid := os.geteuid()) != 0:
             raise RuntimeError(f"Watcher must be run as root, not {uid}. Abort.")
 
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "watcher")
 
-    if log_level == LogSeverity.DEBUG:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
     config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
     config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
@@ -273,6 +272,10 @@ def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debu
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
 
     try:
         cfg = config.check(raw_cfg, watcher_config_iv)
