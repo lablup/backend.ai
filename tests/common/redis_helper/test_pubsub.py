@@ -42,6 +42,7 @@ async def test_pubsub(redis_container: Tuple[str, HostPortPair], disruption_meth
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        sentinel=None,
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -129,6 +130,7 @@ async def test_pubsub_with_retrying_pub(
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        sentinel=None,
         service_name=None,
     )
     assert isinstance(r.client, Redis)

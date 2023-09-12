@@ -56,6 +56,7 @@ async def test_stream_fanout_cluster(
 
     r = RedisConnectionInfo(
         s.master_for(service_name="mymaster"),
+        sentinel=s,
         service_name="mymaster",
     )
 

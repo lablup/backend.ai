@@ -81,6 +81,7 @@ async def test_instantiate_redisconninfo() -> None:
     )
 
     assert isinstance(r1.client, Redis)
+    assert isinstance(r1.sentinel, Sentinel)
 
     for i in range(3):
         assert r1.sentinel.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
@@ -97,6 +98,7 @@ async def test_instantiate_redisconninfo() -> None:
     )
 
     assert isinstance(r2.client, Redis)
+    assert isinstance(r2.sentinel, Sentinel)
 
     for i in range(3):
         assert r2.sentinel.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"

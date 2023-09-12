@@ -65,6 +65,7 @@ async def test_stream_loadbalance_cluster(
 
     r = RedisConnectionInfo(
         s.master_for(service_name="mymaster"),
+        sentinel=s,
         service_name="mymaster",
     )
     _execute = aiotools.apartial(redis_helper.execute, r)

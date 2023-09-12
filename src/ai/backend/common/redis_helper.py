@@ -477,6 +477,7 @@ def get_redis_object(
 
         return RedisConnectionInfo(
             client=Redis.from_url(str(url), **kwargs),
+            sentinel=None,
             service_name=None,
         )
 

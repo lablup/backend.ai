@@ -44,6 +44,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        sentinel=None,
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -123,6 +124,7 @@ async def test_blist_with_retrying_rpush(
     addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        sentinel=None,
         service_name=None,
     )
     assert isinstance(r.client, Redis)

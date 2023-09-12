@@ -53,6 +53,7 @@ async def test_blist_cluster_sentinel(
 
     r = RedisConnectionInfo(
         s.master_for(service_name="mymaster"),
+        sentinel=s,
         service_name="mymaster",
     )
     await redis_helper.execute(r, lambda r: r.delete("bl1"))
