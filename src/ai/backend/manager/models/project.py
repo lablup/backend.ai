@@ -191,8 +191,7 @@ async def resolve_projects(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]:
-    ...
+) -> Iterable[uuid.UUID]: ...
 
 
 @overload
@@ -200,8 +199,7 @@ async def resolve_projects(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]:
-    ...
+) -> Iterable[uuid.UUID]: ...
 
 
 async def resolve_projects(

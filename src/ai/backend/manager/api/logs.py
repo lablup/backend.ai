@@ -261,6 +261,7 @@ async def init(app: web.Application) -> None:
         lambda: DoLogCleanupEvent(),
         20.0,
         initial_delay=17.0,
+        task_name="log_cleanup_task",
     )
     await app_ctx.log_cleanup_timer.join()
 

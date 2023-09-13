@@ -214,8 +214,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     project: uuid.UUID,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -224,8 +223,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     project: Iterable[uuid.UUID],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -234,8 +232,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     project: str,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -244,8 +241,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     project: Iterable[str],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 async def query_allowed_sgroups(

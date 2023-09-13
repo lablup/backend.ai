@@ -202,6 +202,7 @@ import yarl
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
@@ -345,6 +346,7 @@ _config_defaults: Mapping[str, Any] = {
     },
     "watcher": {
         "token": None,
+        "file-io-timeout": DEFAULT_FILE_IO_TIMEOUT,
     },
     "session": {
         "hang-tolerance": {
@@ -467,6 +469,9 @@ shared_config_iv = t.Dict(
         t.Key("watcher", default=_config_defaults["watcher"]): t.Dict(
             {
                 t.Key("token", default=_config_defaults["watcher"]["token"]): t.Null | t.String,
+                t.Key(
+                    "file-io-timeout", default=_config_defaults["watcher"]["file-io-timeout"]
+                ): t.ToFloat(),
             }
         ).allow_extra("*"),
         t.Key("auth", default=None): (

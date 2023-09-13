@@ -686,7 +686,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             domain_name=domain_name,
             permission=VFolderHostPermission.DELETE,
         )
-    folder_id = VFolderID(quota_scope_id, uuid.UUID(params["id"]))
+    folder_id = VFolderID(quota_scope_id, params["id"])
     await initiate_vfolder_removal(
         root_ctx.db,
         [VFolderDeletionInfo(folder_id, folder_host)],
