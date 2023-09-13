@@ -108,10 +108,6 @@ async def _init_watcher(
             log.warning(f"Config not found. Skip initiating watcher. (name: {watcher_name})")
             continue
         log.info("Loading watcher plugin: {0}", watcher_name)
-        # watcher_config_cls: type[BaseWatcherConfig] = watcher_cls.get_watcher_config_cls()
-        # watcher_config: BaseWatcherConfig = watcher_cls.get_watcher_config_from_json(plugin_config)
-        # watcher_config = watcher_config_cls.from_json(plugin_config)
-        # watcher_config = cast(watcher_cls.config, watcher_config_cls.from_json(plugin_config))
         watcher = watcher_cls(ctx, watcher_config_cls, plugin_config)
         ctx.register_watcher(watcher)
     return watcher_ctx
