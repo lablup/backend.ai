@@ -273,6 +273,8 @@ class XfsVolume(BaseVolume):
     `xfs_quota` command and write to `/etc/projects` and `/etc/projid`.
     """
 
+    name = "xfs"
+
     project_registry: XfsProjectRegistry
 
     async def init(self) -> None:

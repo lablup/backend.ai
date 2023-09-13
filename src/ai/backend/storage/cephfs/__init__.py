@@ -108,6 +108,7 @@ class CephFSOpModel(BaseFSOpModel):
 
 
 class CephFSVolume(BaseVolume):
+    name = "cephfs"
     loop: asyncio.AbstractEventLoop
     registry: Dict[str, int]
     project_id_pool: List[int]
