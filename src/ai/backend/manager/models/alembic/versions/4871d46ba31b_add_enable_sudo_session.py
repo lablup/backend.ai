@@ -1,4 +1,4 @@
-"""Add enable_sudo_session
+"""Add sudo_session_enabled
 
 Revision ID: 4871d46ba31b
 Revises: 02535458c0b3
@@ -20,7 +20,7 @@ def upgrade():
     op.add_column(
         "users",
         sa.Column(
-            "enable_sudo_session",
+            "sudo_session_enabled",
             sa.BOOLEAN(),
             default=False,
             nullable=False,
@@ -31,5 +31,5 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_column("users", "enable_sudo_session")
+    op.drop_column("users", "sudo_session_enabled")
     pass

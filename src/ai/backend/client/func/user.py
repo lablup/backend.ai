@@ -35,7 +35,7 @@ _default_list_fields = (
     user_fields["groups"],
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
-    user_fields["enable_sudo_session"],
+    user_fields["sudo_session_enabled"],
 )
 
 _default_detail_fields = (
@@ -51,7 +51,7 @@ _default_detail_fields = (
     user_fields["groups"],
     user_fields["allowed_client_ip"],
     user_fields["totp_activated"],
-    user_fields["enable_sudo_session"],
+    user_fields["sudo_session_enabled"],
 )
 
 
@@ -260,7 +260,7 @@ class User(BaseFunction):
         allowed_client_ip: Iterable[str] = None,
         totp_activated: bool = False,
         group_ids: Iterable[str] = None,
-        enable_sudo_session: bool = False,
+        sudo_session_enabled: bool = False,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -296,7 +296,7 @@ class User(BaseFunction):
                 "totp_activated": totp_activated,
                 "group_ids": group_ids,
                 "allowed_client_ip": allowed_client_ip,
-                "enable_sudo_session": enable_sudo_session,
+                "sudo_session_enabled": sudo_session_enabled,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -318,7 +318,7 @@ class User(BaseFunction):
         allowed_client_ip: Iterable[str] = None,
         totp_activated: bool = False,
         group_ids: Iterable[str] = None,
-        enable_sudo_session: bool = False,
+        sudo_session_enabled: bool = False,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -346,7 +346,7 @@ class User(BaseFunction):
                 "allowed_client_ip": allowed_client_ip,
                 "totp_activated": totp_activated,
                 "group_ids": group_ids,
-                "enable_sudo_session": enable_sudo_session,
+                "sudo_session_enabled": sudo_session_enabled,
             },
         }
         data = await api_session.get().Admin._query(query, variables)

@@ -1230,7 +1230,7 @@ class SchedulerDispatcher(aobject):
                         users.c.uuid,
                         users.c.role,
                         users.c.domain_name,
-                        users.c.enable_sudo_session,
+                        users.c.sudo_session_enabled,
                         keypairs.c.access_key,
                         keypairs.c.resource_policy,
                     ]
@@ -1302,9 +1302,9 @@ class SchedulerDispatcher(aobject):
                         callback_url=endpoint.callback_url,
                         enqueue_only=True,
                         endpoint_id=endpoint.id,
-                        enable_sudo_session=user_id_row_mapping[
+                        sudo_session_enabled=user_id_row_mapping[
                             endpoint.created_user
-                        ].enable_sudo_session,
+                        ].sudo_session_enabled,
                     )
                 except Exception:
                     # TODO: Handle

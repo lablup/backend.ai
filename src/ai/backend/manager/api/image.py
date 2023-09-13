@@ -481,7 +481,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
             "prevent_vfolder_mounts": True,
             "block_service_ports": True,
         },
-        enable_sudo_session=False,
+        sudo_session_enabled=False,
     )
     return web.json_response(
         {

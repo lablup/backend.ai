@@ -46,7 +46,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
-        user_fields["enable_sudo_session"],
+        user_fields["sudo_session_enabled"],
     ]
     with Session() as session:
         try:
@@ -147,7 +147,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
-        user_fields["enable_sudo_session"],
+        user_fields["sudo_session_enabled"],
     ]
     try:
         with Session() as session:
@@ -230,7 +230,7 @@ def add(
     need_password_change,
     allowed_ip,
     description,
-    enable_sudo_session,
+    sudo_session_enabled,
 ):
     """
     Add new user. A user must belong to a domain, so DOMAIN_NAME should be provided.
@@ -253,7 +253,7 @@ def add(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
-                enable_sudo_session=enable_sudo_session,
+                sudo_session_enabled=sudo_session_enabled,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -333,7 +333,7 @@ def update(
     need_password_change,
     allowed_ip,
     description,
-    enable_sudo_session,
+    sudo_session_enabled,
 ):
     """
     Update an existing user.
@@ -354,7 +354,7 @@ def update(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
-                enable_sudo_session=enable_sudo_session,
+                sudo_session_enabled=sudo_session_enabled,
             )
         except Exception as e:
             ctx.output.print_mutation_error(

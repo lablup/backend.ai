@@ -107,7 +107,7 @@ else
   fi
 
   # Enable sudo
-  if [ "$ENABLE_SUDO_SESSION" = "1" ]; then
+  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
     echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
   fi
 

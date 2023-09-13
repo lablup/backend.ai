@@ -279,7 +279,7 @@ user_fields = FieldSet(
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
         FieldSpec("allowed_client_ip"),
         FieldSpec("totp_activated"),
-        FieldSpec("enable_sudo_session"),
+        FieldSpec("sudo_session_enabled"),
     ]
 )
 

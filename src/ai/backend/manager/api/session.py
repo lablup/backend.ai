@@ -331,8 +331,8 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
-        enable_sudo_session = await conn.scalar(
-            sa.select([users.c.enable_sudo_session]).where(
+        sudo_session_enabled = await conn.scalar(
+            sa.select([users.c.sudo_session_enabled]).where(
                 request["user"]["uuid"] == users.c.uuid,
             )
         )
@@ -363,7 +363,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             starts_at_timestamp=params["starts_at"],
             tag=params["tag"],
             callback_url=params["callback_url"],
-            enable_sudo_session=enable_sudo_session,
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
@@ -695,8 +695,8 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             raise TaskTemplateNotFound
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
-        enable_sudo_session = await conn.scalar(
-            sa.select([users.c.enable_sudo_session]).where(
+        sudo_session_enabled = await conn.scalar(
+            sa.select([users.c.sudo_session_enabled]).where(
                 request["user"]["uuid"] == users.c.uuid,
             )
         )
@@ -718,7 +718,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             params["tag"],
             enqueue_only=params["enqueue_only"],
             max_wait_seconds=params["max_wait_seconds"],
-            enable_sudo_session=enable_sudo_session,
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except TooManySessionsMatched:

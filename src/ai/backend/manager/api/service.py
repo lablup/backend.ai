@@ -350,8 +350,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
-        enable_sudo_session = await conn.scalar(
-            sa.select([users.c.enable_sudo_session]).where(
+        sudo_session_enabled = await conn.scalar(
+            sa.select([users.c.sudo_session_enabled]).where(
                 request["user"]["uuid"] == users.c.uuid,
             )
         )
@@ -378,7 +378,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         startup_command=params["startup_command"],
         tag=params["tag"],
         callback_url=params["callback_url"],
-        enable_sudo_session=enable_sudo_session,
+        sudo_session_enabled=sudo_session_enabled,
     )
 
     async with root_ctx.db.begin_session() as db_sess:

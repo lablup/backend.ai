@@ -499,7 +499,7 @@ class AgentRegistry:
         callback_url: Optional[yarl.URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
-        enable_sudo_session: bool = False,
+        sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
         resp: MutableMapping[str, Any] = {}
@@ -658,7 +658,7 @@ class AgentRegistry:
                         public_sgroup_only=public_sgroup_only,
                         endpoint_id=endpoint_id,
                         traffic_ratio=traffic_ratio,
-                        enable_sudo_session=enable_sudo_session,
+                        sudo_session_enabled=sudo_session_enabled,
                     )
                 ),
             )
@@ -725,7 +725,7 @@ class AgentRegistry:
         tag: str,
         enqueue_only=False,
         max_wait_seconds=0,
-        enable_sudo_session=False,
+        sudo_session_enabled=False,
     ) -> Mapping[str, Any]:
         resp: MutableMapping[str, Any] = {}
 
@@ -874,7 +874,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         session_tag=tag,
-                        enable_sudo_session=enable_sudo_session,
+                        sudo_session_enabled=sudo_session_enabled,
                     ),
                 )
             )
@@ -957,7 +957,7 @@ class AgentRegistry:
         callback_url: Optional[URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
-        enable_sudo_session: bool = False,
+        sudo_session_enabled: bool = False,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
 
@@ -1301,8 +1301,8 @@ class AgentRegistry:
 
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
-                    if enable_sudo_session:
-                        environ["ENABLE_SUDO_SESSION"] = "1"
+                    if sudo_session_enabled:
+                        environ["SUDO_SESSION_ENABLED"] = "1"
 
                     session_data["environ"] = environ
                     session_data["requested_slots"] = session_requested_slots
