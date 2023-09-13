@@ -88,7 +88,12 @@ config_iv = t.Dict(
         t.Key("pipeline"): t.Dict(
             {
                 t.Key("endpoint", default=None): t.Null | tx.URL,
-            }
+                t.Key("jwt"): t.Dict(
+                    {
+                        t.Key("secret"): t.String,
+                    },
+                ),
+            },
         ).allow_extra("*"),
         t.Key("ui"): t.Dict(
             {
