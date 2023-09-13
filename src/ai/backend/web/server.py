@@ -677,6 +677,8 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("GET", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("GET", "/func/{path:openid/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:openid/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))

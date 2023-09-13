@@ -2236,7 +2236,7 @@ async def _delete(
 @check_api_params(
     t.Dict(
         {
-            t.Key("id"): t.String,
+            t.Key("id"): tx.UUID,
         }
     ),
 )
