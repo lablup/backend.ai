@@ -57,7 +57,7 @@ ssl-enabled = false
 
 
 # Set module's config.
-# <MODULE_NAME> should be the name of watcher plugin.
+# <MODULE_NAME> should be the `name` property of watcher plugin.
 # It is recommended to define a watcher config that inherits from BaseWatcherConfig
 # for better config validation and strict typing.
 # [module.<MODULE_NAME>]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Mapping
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Mapping, TypeVar, cast
 
 from async_timeout import timeout
 
@@ -42,19 +42,25 @@ async def _run_cmd_timeout(cmd: list[str], timeout_sec: float) -> ProcResult:
         return await _run_cmd(cmd)
 
 
-class BaseWatcher(metaclass=ABCMeta):
-    name: ClassVar[WatcherName] = WatcherName("base")
-    ctx: RootContext
-    config: BaseWatcherConfig
-
-    def __init__(self, ctx: RootContext, config: BaseWatcherConfig) -> None:
-        self.ctx = ctx
-        self.config = config
-
+class BaseWatcherConfig(JSONSerializableMixin):
     @classmethod
-    @abstractmethod
-    def get_watcher_config_cls(cls) -> type[BaseWatcherConfig]:
-        pass
+    def from_json(cls, obj: Mapping[str, Any]) -> BaseWatcherConfig:
+        return cls(**cls.as_trafaret().check(obj))
+
+
+WatcherConfigType = TypeVar("WatcherConfigType", bound=BaseWatcherConfig)
+
+
+class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
+    ctx: RootContext
+    config: WatcherConfigType
+    name: ClassVar[WatcherName] = WatcherName("base")
+
+    def __init__(
+        self, ctx: RootContext, config_cls: type[WatcherConfigType], obj: Mapping[str, Any]
+    ) -> None:
+        self.ctx = ctx
+        self.config = cast(WatcherConfigType, config_cls.from_json(obj))
 
     @abstractmethod
     async def init(self) -> None:
@@ -135,9 +141,3 @@ class BaseWatcher(metaclass=ABCMeta):
                 rmdir_if_empty,
                 timeout_sec=timeout_sec,
             )
-
-
-class BaseWatcherConfig(JSONSerializableMixin):
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> BaseWatcherConfig:
-        return cls(**cls.as_trafaret().check(obj))

@@ -5,14 +5,14 @@ from abc import ABCMeta, abstractmethod
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.watcher.base import BaseWatcher
+from ai.backend.watcher.base import BaseWatcher, BaseWatcherConfig
 
 from .defs import CORSOptions, WebMiddleware
 
 
 class AbstractWatcherPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    def get_watcher_class(self) -> type[BaseWatcher]:
+    def get_watcher_class(self) -> tuple[type[BaseWatcher], type[BaseWatcherConfig]]:
         raise NotImplementedError
 
 

@@ -20,7 +20,7 @@ from .defs import WatcherName
 from .exception import InvalidWatcher
 
 if TYPE_CHECKING:
-    from .base import BaseWatcher, BaseWatcherConfig
+    from .base import BaseWatcher
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -36,7 +36,7 @@ class RootContext:
     dsn: str | None
     event_producer: EventProducer | None
     event_dispatcher: EventDispatcher | None
-    _watchers: dict[WatcherName, tuple[type[BaseWatcher], BaseWatcherConfig]]
+    _watchers: dict[WatcherName, BaseWatcher]
 
     def __init__(
         self,
@@ -64,17 +64,17 @@ class RootContext:
     async def __aexit__(self, *exc_info) -> bool | None:
         pass
 
-    def register_watcher(self, watcher_cls: type[BaseWatcher], config: BaseWatcherConfig) -> None:
-        self._watchers[watcher_cls.name] = (watcher_cls, config)
+    def register_watcher(self, watcher: BaseWatcher) -> None:
+        if (watcher_name := watcher.name) in self._watchers:
+            raise TypeError(f"Duplicate watcher name. `{watcher_name}` already registered.")
+        self._watchers[watcher_name] = watcher
 
     @actxmgr
     async def get_watcher(self, name: WatcherName) -> AsyncIterator[BaseWatcher]:
         try:
-            watcher_cls, config = self._watchers[name]
+            watcher = self._watchers[name]
         except KeyError:
             raise InvalidWatcher(f"Watcher with name {name} not found")
-
-        watcher = watcher_cls(self, config)
 
         await watcher.init()
         try:

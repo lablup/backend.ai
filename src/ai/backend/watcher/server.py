@@ -37,6 +37,7 @@ from .plugin import WatcherPluginContext, WatcherWebAppPluginContext
 if TYPE_CHECKING:
     from ai.backend.common.types import HostPortPair
 
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
@@ -98,17 +99,21 @@ async def _init_watcher(
     watcher_ctx = WatcherPluginContext(etcd, local_config)
     module_config: dict[str, Any] = local_config["module"]
     await watcher_ctx.init()
-    for plugin_name, plugin_instance in watcher_ctx.plugins.items():
+    for _, plugin_instance in watcher_ctx.plugins.items():
+        watcher_cls, watcher_config_cls = plugin_instance.get_watcher_class()
+        watcher_name = str(watcher_cls.name)
         try:
-            plugin_config = module_config[plugin_name]
+            plugin_config = module_config[watcher_name]
         except KeyError:
-            log.warning(f"Config not found. Skip initiating watcher. (name: {plugin_name})")
+            log.warning(f"Config not found. Skip initiating watcher. (name: {watcher_name})")
             continue
-        log.info("Loading watcher plugin: {0}", plugin_name)
-        watcher_cls = plugin_instance.get_watcher_class()
-        watcher_config_cls = watcher_cls.get_watcher_config_cls()
-        watcher_config = watcher_config_cls.from_json(plugin_config)
-        ctx.register_watcher(watcher_cls, watcher_config)
+        log.info("Loading watcher plugin: {0}", watcher_name)
+        # watcher_config_cls: type[BaseWatcherConfig] = watcher_cls.get_watcher_config_cls()
+        # watcher_config: BaseWatcherConfig = watcher_cls.get_watcher_config_from_json(plugin_config)
+        # watcher_config = watcher_config_cls.from_json(plugin_config)
+        # watcher_config = cast(watcher_cls.config, watcher_config_cls.from_json(plugin_config))
+        watcher = watcher_cls(ctx, watcher_config_cls, plugin_config)
+        ctx.register_watcher(watcher)
     return watcher_ctx
 
 
