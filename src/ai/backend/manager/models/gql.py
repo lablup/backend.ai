@@ -1411,6 +1411,7 @@ class Queries(graphene.ObjectType):
             user_uuid=user_id,
             user_role=user_role,
             domain_name=domain_name,
+            group_id=group_id,
         )
         return await loader.load(id)
 

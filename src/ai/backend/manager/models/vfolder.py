@@ -295,11 +295,9 @@ def verify_vfolder_name(folder: str) -> bool:
     return True
 
 
-async def _query_vfolders(
+async def query_accessible_vfolders(
     conn: SAConnection,
-    vf_cond: sa.sql.BinaryExpression,
-    vf_perm_cond: sa.sql.BinaryExpression,
-    group_cond: sa.sql.BinaryExpression,
+    user_uuid: uuid.UUID,
     *,
     # when enabled, skip vfolder ownership check if user role is admin or superadmin
     allow_privileged_access=False,
@@ -389,7 +387,7 @@ async def _query_vfolders(
         if not allow_privileged_access or (
             user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
         ):
-            query = query.where(vf_cond)
+            query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
         # Scan vfolders shared with me.
@@ -409,7 +407,8 @@ async def _query_vfolders(
             )
             .select_from(j)
             .where(
-                (vf_perm_cond) & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
+                (vfolder_permissions.c.user == user_uuid)
+                & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
             )
         )
         if extra_invited_vf_conds is not None:
@@ -429,7 +428,7 @@ async def _query_vfolders(
             group_ids = [g.id for g in grps]
         else:
             j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(group_cond)
+            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
@@ -456,7 +455,7 @@ async def _query_vfolders(
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
             .where(
-                (vfolders.c.group.in_(group_ids)) & (vf_perm_cond),
+                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
             )
         )
         if extra_vf_conds is not None:
@@ -473,67 +472,6 @@ async def _query_vfolders(
                 entry["permission"] = overriding_permissions[entry["id"]]
 
     return entries
-
-
-async def query_accessible_vfolders(
-    conn: SAConnection,
-    user_uuid: uuid.UUID,
-    *,
-    # when enabled, skip vfolder ownership check if user role is admin or superadmin
-    allow_privileged_access=False,
-    user_role=None,
-    domain_name=None,
-    allowed_vfolder_types=None,
-    extra_vf_conds=None,
-    extra_invited_vf_conds=None,
-    extra_vf_user_conds=None,
-    extra_vf_group_conds=None,
-) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-
-    vf_cond = vfolders.c.user == user_uuid
-    vf_perm_cond = vfolder_permissions.c.user == user_uuid
-    group_cond = agus.c.user_id == user_uuid
-    return await _query_vfolders(
-        conn,
-        vf_cond,
-        vf_perm_cond,
-        group_cond,
-        allow_privileged_access=allow_privileged_access,
-        user_role=user_role,
-        domain_name=domain_name,
-        allowed_vfolder_types=allowed_vfolder_types,
-        extra_vf_conds=extra_vf_conds,
-        extra_invited_vf_conds=extra_invited_vf_conds,
-        extra_vf_user_conds=extra_vf_user_conds,
-        extra_vf_group_conds=extra_vf_group_conds,
-    )
-
-
-async def get_allowed_vfolder_by_id(
-    conn: SAConnection,
-    vfolder_id: uuid.UUID,
-    *,
-    user_uuid: uuid.UUID,
-    user_role=None,
-    domain_name=None,
-) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models import association_groups_users as agus
-
-    vf_cond = (vfolders.c.id == vfolder_id) & (vfolders.c.user == user_uuid)
-    vf_perm_cond = (vfolder_permissions.c.id == vfolder_id) & (
-        vfolder_permissions.c.user == user_uuid
-    )
-    group_cond = agus.c.user_id == user_uuid
-    return await _query_vfolders(
-        conn,
-        vf_cond,
-        vf_perm_cond,
-        group_cond,
-        allow_privileged_access=False,
-        user_role=user_role,
-        domain_name=domain_name,
-    )
 
 
 async def get_allowed_vfolder_hosts_by_group(
@@ -1246,23 +1184,38 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         ids: list[str],
         *,
-        user_uuid: uuid.UUID,
-        user_role: UserRole | None,
-        domain_name: str | None,
-    ) -> list[VirtualFolder | None]:
-        vfolders = []
-        async with graph_ctx.db.begin_readonly() as conn:
-            for vid in ids:
-                vfolder = await get_allowed_vfolder_by_id(
-                    conn,
-                    uuid.UUID(vid),
-                    user_uuid=user_uuid,
-                    user_role=user_role,
-                    domain_name=domain_name,
-                )
-                vfolders.append(vfolder)
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[Sequence[VirtualFolder]]:
+        from .user import UserRow
 
-        return [cls.from_row(graph_ctx, vf) for vf in vfolders]
+        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        query = (
+            sa.select(VFolderRow)
+            .select_from(j)
+            .where(VFolderRow.id.in_(ids))
+            .order_by(sa.desc(VFolderRow.created_at))
+        )
+        if user_id is not None:
+            query = query.where(VFolderRow.user == user_id)
+            if domain_name is not None:
+                query = query.where(UserRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(VFolderRow.group == group_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                ids,
+                lambda row: row["user"],
+            )
 
     @classmethod
     async def batch_load_by_user(
