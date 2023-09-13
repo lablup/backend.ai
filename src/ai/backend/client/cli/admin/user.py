@@ -210,7 +210,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
 @click.option(
-    "--enable-sudo-session",
+    "--sudo-session-enabled",
     is_flag=True,
     default=False,
     help=(
@@ -313,7 +313,7 @@ def add(
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
 @click.option(
-    "--enable-sudo-session",
+    "--sudo-session-enabled",
     is_flag=True,
     default=False,
     help=(

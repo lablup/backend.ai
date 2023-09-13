@@ -44,8 +44,6 @@ from redis.asyncio import Redis
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
-from ai.backend.manager.models.user import users
-
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -331,11 +329,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
-        sudo_session_enabled = await conn.scalar(
-            sa.select([users.c.sudo_session_enabled]).where(
-                request["user"]["uuid"] == users.c.uuid,
-            )
-        )
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
         resp = await root_ctx.registry.create_session(
@@ -694,12 +688,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         if not template:
             raise TaskTemplateNotFound
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-
-        sudo_session_enabled = await conn.scalar(
-            sa.select([users.c.sudo_session_enabled]).where(
-                request["user"]["uuid"] == users.c.uuid,
-            )
-        )
+        sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
         resp = await root_ctx.registry.create_cluster(

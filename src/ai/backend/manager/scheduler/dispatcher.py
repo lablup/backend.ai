@@ -1303,7 +1303,7 @@ class SchedulerDispatcher(aobject):
                         enqueue_only=True,
                         endpoint_id=endpoint.id,
                         sudo_session_enabled=user_id_row_mapping[
-                            endpoint.created_user
+                            endpoint.session_owner
                         ].sudo_session_enabled,
                     )
                 except Exception:

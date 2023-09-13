@@ -22,7 +22,6 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, SessionTypes, VFolderID, VFolderUsageMode
-from ai.backend.manager.models.user import users
 from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
@@ -346,15 +345,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         )
 
     params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
-
-    async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-
-        sudo_session_enabled = await conn.scalar(
-            sa.select([users.c.sudo_session_enabled]).where(
-                request["user"]["uuid"] == users.c.uuid,
-            )
-        )
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
     await root_ctx.registry.create_session(
