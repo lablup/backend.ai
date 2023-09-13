@@ -87,7 +87,7 @@ from ..utils import (
 )
 from .kernel import DockerKernel
 from .metadata.server import MetadataServer
-from .resources import detect_resources
+from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
@@ -1086,10 +1086,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"system.slice/docker-{container_id}.scope"
         return mount_point / cgroup
 
-    async def detect_resources(
-        self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
-        return await detect_resources(self.etcd, self.local_config)
+    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await load_resources(self.etcd, self.local_config)
+
+    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await scan_available_resources(
+            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+        )
 
     async def enumerate_containers(
         self,
@@ -1210,6 +1213,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             reply = [
                                 struct.pack("i", 0),
                                 struct.pack("i", host_pid),
+                            ]
+                        elif msg[0] == b"is-jail-enabled":
+                            reply = [
+                                struct.pack("i", 0),
+                                struct.pack(
+                                    "i",
+                                    (
+                                        1
+                                        if self.local_config["container"]["sandbox-type"] == "jail"
+                                        else 0
+                                    ),
+                                ),
                             ]
                         else:
                             reply = [struct.pack("i", -2), b"Invalid action"]
