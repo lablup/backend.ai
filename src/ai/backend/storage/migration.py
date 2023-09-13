@@ -252,16 +252,18 @@ async def check_and_upgrade(
         event_dispatcher=event_dispatcher,
         watcher=None,
     )
-    volumes_to_upgrade = await check_latest(ctx)
-    for upgrade_info in volumes_to_upgrade:
-        handler = upgrade_handlers[upgrade_info.target_version]
-        await handler(
-            ctx,
-            upgrade_info.volume,
-            outfile,
-            report_path=report_path,
-            force_scan_folder_size=force_scan_folder_size,
-        )
+
+    async with ctx:
+        volumes_to_upgrade = await check_latest(ctx)
+        for upgrade_info in volumes_to_upgrade:
+            handler = upgrade_handlers[upgrade_info.target_version]
+            await handler(
+                ctx,
+                upgrade_info.volume,
+                outfile,
+                report_path=report_path,
+                force_scan_folder_size=force_scan_folder_size,
+            )
 
 
 @click.command()

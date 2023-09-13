@@ -189,6 +189,7 @@ class SchedulerDispatcher(aobject):
             self.event_producer,
             lambda: DoScheduleEvent(),
             interval=10.0,
+            task_name="schedule_timer",
         )
         self.prepare_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
@@ -196,6 +197,7 @@ class SchedulerDispatcher(aobject):
             lambda: DoPrepareEvent(),
             interval=10.0,
             initial_delay=5.0,
+            task_name="prepare_timer",
         )
         self.scale_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
@@ -203,6 +205,7 @@ class SchedulerDispatcher(aobject):
             lambda: DoScaleEvent(),
             interval=10.0,
             initial_delay=7.0,
+            task_name="scale_timer",
         )
         await self.schedule_timer.join()
         await self.prepare_timer.join()
