@@ -1,0 +1,63 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 8121 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = ""                                   # env: BACKEND_ETCD_USER
+password = ""				    # env: BACKEND_ETCD_PASSWORD
+
+
+[logging]
+# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# Set the global logging level.
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+# If set true, use ANSI colors if the console is a terminal.
+# If set false, always disable the colored output in console logs.
+colored = true
+
+# One of: "simple", "verbose"
+format = "simple"
+
+[debug]
+# Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
+enabled = false
+
+[watcher]
+# Override the name of this watcher node.
+# If empty or unspecified, the config builds this from the hostname by prefixing it with "i-",
+# like "i-watcher-hostname".  The "i-watcher-" prefix is not mandatory, though.
+# Explicit configuration may be required if the hostname changes frequently,
+# to handle the event bus messages consistently.
+# This affects the per-node configuration scope.
+# node-id = "i-watcher-storage-proxy-01"
+
+# One of: "asyncio", "uvloop"
+# This changes the event loop backend.
+# uvloop is a fast libuv-based implementation but sometimes has
+# compatibility issues.
+# event-loop = "uvloop"
+
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+# ipc-base-path = "/tmp/backend.ai/ipc"
+
+# Set the SSL certificate chain and the private keys used for serving the API requests.
+ssl-enabled = false
+#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
+#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
+
+
+# Set module's config.
+# <MODULE_NAME> should be the name of watcher plugin.
+# It is recommended to define a watcher config that inherits from BaseWatcherConfig
+# for better config validation and strict typing.
+# [module.<MODULE_NAME>]

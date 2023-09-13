@@ -1,4 +1,5 @@
 import os
+import socket
 
 import trafaret as t
 
@@ -13,7 +14,7 @@ watcher_config_iv = (
                     t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
                         type="dir", auto_create=True
                     ),
-                    t.Key("node-id"): t.String,
+                    t.Key("node-id", default=f"i-watcher-{socket.gethostname()}"): t.String,
                     t.Key("pid-file", default=os.devnull): tx.Path(
                         type="file",
                         allow_nonexisting=True,
@@ -21,9 +22,9 @@ watcher_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("service-addr", default=("0.0.0.0", 6009)): tx.HostPortPair,
-                    t.Key("ssl-enabled", default=False): t.Bool,
+                    t.Key("ssl-enabled", default=False): t.ToBool,
                     t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
-                    t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
+                    t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
                     t.Key("target-service", default=None): t.Null | t.String,
                     t.Key("soft-reset-available", default=False): t.Bool,
                     t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
