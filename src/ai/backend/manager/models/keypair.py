@@ -251,10 +251,12 @@ class KeyPair(graphene.ObjectType):
             return int(concurrency_used)
         return 0
 
-    async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime:
+    async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
         last_call_time_key = f"kp:{self.access_key}:last_call_time"
         row_ts = await redis_helper.execute(ctx.redis_stat, lambda r: r.get(last_call_time_key))
+        if row_ts is None:
+            return None
         return datetime.fromtimestamp(float(row_ts))
 
     @classmethod
