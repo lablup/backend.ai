@@ -58,6 +58,8 @@ class GlobalTimer:
                             return
                         await asyncio.sleep(self.interval)
                 except asyncio.TimeoutError:  # timeout raised from etcd lock
+                    if self._stopped:
+                        return
                     log.warn("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass

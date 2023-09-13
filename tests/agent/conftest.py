@@ -69,6 +69,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "backend": "docker",
             "rpc-listen-addr": HostPortPair("", 18100 + get_parallel_slot()),
             "agent-sock-port": 18200 + get_parallel_slot(),
+            "metadata-server-bind-host": "0.0.0.0",
             "metadata-server-port": 18300 + get_parallel_slot(),
             "allow-compute-plugins": set(),
             "block-compute-plugins": set(),
