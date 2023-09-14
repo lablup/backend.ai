@@ -824,10 +824,10 @@ class AbstractAgent(
                         slot_type,
                         str(self.slots.get(slot_key, 0)),
                     )
-            if self.local_config["agent"]["advertised-rpc-listen-addr"]:
-                rpc_addr = self.local_config["agent"]["advertised-rpc-listen-addr"]
+            if self.local_config["agent"]["advertised-rpc-addr"]:
+                rpc_addr = self.local_config["agent"]["advertised-rpc-addr"]
             else:
-                rpc_addr = self.local_config["agent"]["bind-rpc-listen-addr"]
+                rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
             agent_info = {
                 "ip": str(rpc_addr.host),
                 "region": self.local_config["agent"]["region"],

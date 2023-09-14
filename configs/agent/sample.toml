@@ -15,10 +15,10 @@ mode = "docker"
 # If host is an empty string, the agent tries to auto-detect it with a fallback to "127.0.0.1".
 # For mobile environments such as developer laptops which roam around different networks,
 # it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
-bind-rpc-listen-addr = { host = "", port = 6001 }
+rpc-listen-addr = { host = "", port = 6001 }
 # Address where manager will actually try to establish connection.
 # Must be set if agent RPC layer is behind NAT.
-advertised-rpc-listen-addr = { host = "", port = 6001 }
+advertised-rpc-addr = { host = "", port = 6001 }
 # env: BACKEND_AGENT_HOST_OVERRIDE
 # env: BACKEND_AGENT_PORT
 

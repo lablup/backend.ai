@@ -7,7 +7,7 @@ password = ""
 
 [agent]
 mode = "docker"
-bind-rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
+rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
 agent-sock-port = 6007
 # id = "i-something-special"
 scaling-group = "default"

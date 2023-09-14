@@ -66,7 +66,7 @@ would be:
    [agent]
    mode = "docker"
    # NOTE: You cannot use network alias here. Write the actual IP address.
-   bind-rpc-listen-addr = { host = "10.20.30.10", port = 6001 }
+   rpc-listen-addr = { host = "10.20.30.10", port = 6001 }
    # id = "i-something-special"
    scaling-group = "default"
    pid-file = "/home/bai/agent/agent.pid"

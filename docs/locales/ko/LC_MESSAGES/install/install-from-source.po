@@ -108,7 +108,7 @@ msgid "``[etcd].addr.host``: Replace with ``MANAGER_IP``"
 msgstr ""
 
 #: ../../install/install-from-source.rst:56 4332a8dca72d40fb861fb0d8b97d579d
-msgid "``[agent].bind-rpc-listen-addr.host``: Replace with ``AGENT_IP``"
+msgid "``[agent].rpc-listen-addr.host``: Replace with ``AGENT_IP``"
 msgstr ""
 
 #: ../../install/install-from-source.rst:58 efeb59f2f6ca41fc84924749cdedf216
