@@ -2374,6 +2374,14 @@ async def handle_volume_mount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                "",
+                event.quota_scope_id,
+            )
+        )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
@@ -2411,6 +2419,14 @@ async def handle_volume_umount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeUnmounted(
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                "",
+                event.quota_scope_id,
+            )
+        )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
