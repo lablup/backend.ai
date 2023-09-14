@@ -42,7 +42,7 @@ etcd_config_iv = t.Dict(
 
 redis_config_iv = t.Dict(
     {
-        t.Key("addr", default=("127.0.0.1", 6379)): tx.HostPortPair,
+        t.Key("addr", default=None): t.Null | tx.HostPortPair,
         t.Key("password", default=None): t.Null | t.String,
     }
 ).allow_extra("*")

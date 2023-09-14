@@ -94,7 +94,7 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            log.info(f"PID: {pidx} - configured redis_addr: {redis_config['addr']}")
+            log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
@@ -104,7 +104,7 @@ async def server_main(
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
-        log.info(f"PID: {pidx} - Event producer created. (addr: {redis_config['addr']})")
+        log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
             db=REDIS_STREAM_DB,
@@ -112,7 +112,7 @@ async def server_main(
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
-        log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
+        log.info("PID: {0} - Event dispatcher created. (redis_config: {1})", pidx, redis_config)
         if local_config["storage-proxy"]["use-watcher"]:
             if not _is_root():
                 raise ValueError(
