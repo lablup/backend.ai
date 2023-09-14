@@ -1,0 +1,203 @@
+import asyncio
+import json
+import logging
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Final, FrozenSet, Literal, Mapping, Optional
+
+import aiofiles
+import aiofiles.os
+
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
+
+from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
+from ..exception import InvalidQuotaScopeError
+from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ..vfs import BaseQuotaModel, BaseVolume
+from .vastdata_client import VastAPIClient, VastQuotaID
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+VAST_QUOTA_ID_FILE_NAME: Final = ".vast-quota-id"
+
+
+class VastQuotaModel(BaseQuotaModel):
+    def __init__(
+        self,
+        mount_path: Path,
+        api_client: VastAPIClient,
+    ) -> None:
+        super().__init__(mount_path)
+        self.api_client = api_client
+
+    async def _get_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> VastQuotaID | None:
+        qs_path = self.mangle_qspath(quota_scope_id)
+
+        def _read():
+            try:
+                with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "r") as f:
+                    return VastQuotaID(f.read())
+            except FileNotFoundError:
+                return None
+
+        return await asyncio.get_running_loop().run_in_executor(None, _read)
+
+    async def _set_vast_quota_id(
+        self, quota_scope_id: QuotaScopeID, vast_quota_id: VastQuotaID
+    ) -> None:
+        qs_path = self.mangle_qspath(quota_scope_id)
+
+        def _write():
+            qs_path.mkdir(parents=True, exist_ok=True)
+            with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "w") as f:
+                f.write(str(vast_quota_id))
+
+        await asyncio.get_running_loop().run_in_executor(None, _write)
+
+    async def create_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        await aiofiles.os.makedirs(qspath)
+        if options is not None:
+            quota = await self.api_client.set_quota(
+                qspath,
+                soft_limit=options.limit_bytes,
+                hard_limit=options.limit_bytes,
+            )
+            await self._set_vast_quota_id(quota_scope_id, quota.id)
+
+    async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
+        vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
+        if vast_quota_id is None:
+            raise InvalidQuotaScopeError
+        await self.api_client.modify_quota(
+            vast_quota_id,
+            soft_limit=config.limit_bytes,
+            hard_limit=config.limit_bytes,
+        )
+
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            return None
+        vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
+        if vast_quota_id is None:
+            return QuotaUsage(-1, -1)
+        quota = await self.api_client.get_quota(vast_quota_id)
+        return QuotaUsage(
+            used_bytes=quota.used_capacity,
+            limit_bytes=quota.hard_limit,
+        )
+
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
+        vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
+        if vast_quota_id is None:
+            return
+        await self.api_client.remove_quota(vast_quota_id)
+
+    async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
+        await self.unset_quota(quota_scope_id)
+        qspath = self.mangle_qspath(quota_scope_id)
+        await aiofiles.os.rmdir(qspath)
+
+
+class VastVolume(BaseVolume):
+    api_client: VastAPIClient
+
+    name = "vast"
+
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        etcd: AsyncEtcd,
+        event_dispathcer: EventDispatcher,
+        event_producer: EventProducer,
+        options: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            event_dispathcer=event_dispathcer,
+            event_producer=event_producer,
+        )
+        ssl_verify = self.config.get("vast_verify_ssl", False)
+        self.api_client = VastAPIClient(
+            self.config["vast_endpoint"],
+            self.config["vast_username"],
+            self.config["vast_password"],
+            api_version=self.config["vast_api_version"],
+            ssl=ssl_verify,
+        )
+
+    async def create_quota_model(self) -> VastQuotaModel:
+        return VastQuotaModel(self.mount_path, self.api_client)
+
+    async def get_capabilities(self) -> FrozenSet[str]:
+        return frozenset(
+            [CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_FAST_SIZE]
+        )
+
+    async def get_hwinfo(self) -> HardwareMetadata:
+        clsuter_infos = await self.api_client.get_cluster_info()
+        try:
+            default_cluster = clsuter_infos[0]
+        except IndexError:
+            return {
+                "status": "unavailable",
+                "status_info": None,
+                "metadata": {},
+            }
+        healthy_status: Literal["healthy", "degraded", "unavailable"] = "unavailable"
+        match default_cluster.state.lower():
+            case "online" | "healthy":
+                healthy_status = "healthy"
+            case "init":
+                healthy_status = "degraded"
+            case "unknown":
+                healthy_status = "unavailable"
+        quotas = await self.api_client.list_quotas()
+        return {
+            "status": healthy_status,
+            "status_info": default_cluster.state,
+            "metadata": {
+                "quota": json.dumps([asdict(q) for q in quotas]),
+                "cluster_info": json.dumps(asdict(default_cluster)),
+            },
+        }
+
+    async def get_performance_metric(self) -> FSPerfMetric:
+        clsuter_infos = await self.api_client.get_cluster_info()
+        try:
+            default_cluster = clsuter_infos[0]
+        except IndexError:
+            return FSPerfMetric(
+                iops_read=-1,
+                iops_write=-1,
+                io_bytes_read=-1,
+                io_bytes_write=-1,
+                io_usec_read=-1,
+                io_usec_write=-1,
+            )
+        return FSPerfMetric(
+            iops_read=default_cluster.rd_iops,
+            iops_write=default_cluster.wr_iops,
+            io_usec_read=default_cluster.rd_latency,
+            io_usec_write=default_cluster.wr_latency,
+            io_bytes_read=default_cluster.rd_bw,
+            io_bytes_write=default_cluster.wr_bw,
+        )
+
+    async def get_fs_usage(self) -> CapacityUsage:
+        return await self.api_client.get_capacity_info()
