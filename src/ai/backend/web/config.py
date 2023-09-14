@@ -118,9 +118,13 @@ config_iv = t.Dict(
             {
                 t.Key("redis"): t.Dict(
                     {
-                        t.Key("host", default="localhost"): t.String,
-                        t.Key("port", default=6379): t.ToInt[1:65535],
+                        t.Key("host", default=None): t.Null | t.String,
+                        t.Key("port", default=None): t.Null | t.ToInt[1:65535],
                         t.Key("db", default=0): t.ToInt,
+                        t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                            tx.HostPortPair
+                        ),
+                        t.Key("service_name", default=None): t.Null | t.String,
                         t.Key("password", default=None): t.Null | t.String,
                     }
                 ),
