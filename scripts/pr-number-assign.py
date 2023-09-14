@@ -25,7 +25,7 @@ def main(pr_number: str) -> None:
     files = [f.name for f in base_path.iterdir() if f.is_file()]
     existing_fragments = []
     for file in files:
-        if file[0 : file.find(".")] == pr_number:
+        if file[0 : file.find(".")] == pr_number and rx_unnumbered_fragment.search(file[file.find(".") :]):
             existing_fragments.append(file)
     if existing_fragments:
         print(f"The news fragment(s) for the PR #{pr_number} already exists:")
