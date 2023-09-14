@@ -307,12 +307,12 @@ CODESPACES=${CODESPACES:-"false"}
 _INSTALLED_PYENV=0
 
 # Only Used in HA mode
-REDIS_MASTER_PORT="9200"
-REDIS_SLAVE1_PORT="9201"
-REDIS_SLAVE2_PORT="9202"
-REDIS_SENTINEL1_PORT="9203"
-REDIS_SENTINEL2_PORT="9204"
-REDIS_SENTINEL3_PORT="9205"
+REDIS_MASTER_PORT="9500"
+REDIS_SLAVE1_PORT="9501"
+REDIS_SLAVE2_PORT="9502"
+REDIS_SENTINEL1_PORT="9503"
+REDIS_SENTINEL2_PORT="9504"
+REDIS_SENTINEL3_PORT="9505"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -766,12 +766,12 @@ setup_environment() {
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace 's/\${REDIS_MASTER_PORT}/9200/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9201/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9202/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9203/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9204/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9205/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
@@ -789,19 +789,19 @@ setup_environment() {
     echo "" >> $sentinel01_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel01/g" "$sentinel01_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel01_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9203/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9503/g" "$sentinel01_cfg_path"
 
     # Appends the given text to sentinel02.conf
     echo "" >> $sentinel02_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel02/g" "$sentinel02_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel02_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9204/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9504/g" "$sentinel02_cfg_path"
 
     # Appends the given text to sentinel03.conf
     echo "" >> $sentinel03_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9205/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
     if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
@@ -905,8 +905,11 @@ configure_backendai() {
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
   if [ $CONFIGURE_HA -eq 1 ]; then
-    sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_MASTER_PORT}/" ./webserver.conf
+    sed_inplace "s/redis.host = \"localhost\"/# redis.host = \"localhost\"/" ./webserver.conf
+    sed_inplace "s/redis.port = 6379/# redis.port = 6379/" ./webserver.conf
     sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
+    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
+    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
   else
     sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   fi
