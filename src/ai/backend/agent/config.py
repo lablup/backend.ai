@@ -22,9 +22,10 @@ agent_local_config_iv = (
             t.Key("agent"): t.Dict(
                 {
                     tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
-                    t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
+                    t.Key("bind-rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
                         allow_blank_host=True
                     ),
+                    t.Key("advertised-rpc-listen-addr", default=None): t.Null | tx.HostPortPair,
                     t.Key("agent-sock-port", default=6007): t.ToInt[1024:65535],
                     t.Key("id", default=None): t.Null | t.String,
                     t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(

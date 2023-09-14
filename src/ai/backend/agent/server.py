@@ -227,7 +227,7 @@ class AgentRPCServer(aobject):
             error_monitor=self.error_monitor,
         )
 
-        rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
+        rpc_addr = self.local_config["agent"]["bind-rpc-listen-addr"]
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
@@ -747,14 +747,14 @@ async def server_main(
         credentials=etcd_credentials,
     )
 
-    rpc_addr = local_config["agent"]["rpc-listen-addr"]
+    rpc_addr = local_config["agent"]["bind-rpc-listen-addr"]
     if not rpc_addr.host:
         _subnet_hint = await etcd.get("config/network/subnet/agent")
         subnet_hint = None
         if _subnet_hint is not None:
             subnet_hint = ip_network(_subnet_hint)
         log.debug("auto-detecting agent host")
-        local_config["agent"]["rpc-listen-addr"] = HostPortPair(
+        local_config["agent"]["bind-rpc-listen-addr"] = HostPortPair(
             await identity.get_instance_ip(subnet_hint),
             rpc_addr.port,
         )
@@ -768,14 +768,14 @@ async def server_main(
     if not local_config["container"]["bind-host"]:
         log.debug(
             "auto-detecting `container.bind-host` from container subnet config "
-            "and agent.rpc-listen-addr"
+            "and agent.bind-rpc-listen-addr"
         )
         local_config["container"]["bind-host"] = await get_subnet_ip(
             etcd,
             "container",
-            fallback_addr=local_config["agent"]["rpc-listen-addr"].host,
+            fallback_addr=local_config["agent"]["bind-rpc-listen-addr"].host,
         )
-    log.info("Agent external IP: {}", local_config["agent"]["rpc-listen-addr"].host)
+    log.info("Agent external IP: {}", local_config["agent"]["bind-rpc-listen-addr"].host)
     log.info("Container external IP: {}", local_config["container"]["bind-host"])
     if not local_config["agent"]["region"]:
         local_config["agent"]["region"] = await identity.get_instance_region()
@@ -851,9 +851,11 @@ def main(
     config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
     config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
     config.override_with_env(
-        raw_cfg, ("agent", "rpc-listen-addr", "host"), "BACKEND_AGENT_HOST_OVERRIDE"
+        raw_cfg, ("agent", "bind-rpc-listen-addr", "host"), "BACKEND_AGENT_HOST_OVERRIDE"
     )
-    config.override_with_env(raw_cfg, ("agent", "rpc-listen-addr", "port"), "BACKEND_AGENT_PORT")
+    config.override_with_env(
+        raw_cfg, ("agent", "bind-rpc-listen-addr", "port"), "BACKEND_AGENT_PORT"
+    )
     config.override_with_env(raw_cfg, ("agent", "pid-file"), "BACKEND_PID_FILE")
     config.override_with_env(raw_cfg, ("container", "port-range"), "BACKEND_CONTAINER_PORT_RANGE")
     config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
@@ -893,7 +895,7 @@ def main(
         print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
-    rpc_host = cfg["agent"]["rpc-listen-addr"].host
+    rpc_host = cfg["agent"]["bind-rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
             "ConfigurationError: "
