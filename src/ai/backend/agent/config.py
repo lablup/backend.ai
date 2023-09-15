@@ -26,7 +26,6 @@ agent_local_config_iv = (
                         allow_blank_host=True
                     ),
                     t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
-                    t.Key("rpc-auth-enabled", default=False): t.ToBool,
                     t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(
                         type="file"
                     ),

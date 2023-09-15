@@ -225,7 +225,7 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
-        if rpc_auth_enabled := self.local_config["agent"]["rpc-auth-enabled"]:
+        if rpc_auth_enabled := (self.local_config["agent"]["rpc-auth-agent-keypair"] is not None):
             manager_pkey, _ = load_certificate(
                 self.local_config["agent"]["rpc-auth-manager-public-key"]
             )

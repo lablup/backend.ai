@@ -22,17 +22,15 @@ advertised-rpc-addr = { host = "", port = 6001 }
 # env: BACKEND_AGENT_HOST_OVERRIDE
 # env: BACKEND_AGENT_PORT
 
-# Enable the encryption and authentication of the RPC channel.
-rpc-auth-enabled = false
-
-# Set the manager's public key to validate and accept RPC calls from the manager.
-# Only effective when rpc-auth-enabled is set.
-# rpc-auth-manager-public-key = "manager.key"
-
 # Set the agent's private and public keypair to sign the RPC responses.
 # The agent's public key is sent to the manager via heartbeats.
-# Only effective when rpc-auth-enabled is set.
+# [default: unset]
 # rpc-auth-agent-keypair = "agent.key_secret"
+
+# Set the manager's public key to validate and accept RPC calls from the manager.
+# Only effective when rpc-auth-agent-keypair is set.
+# [default: unset]
+# rpc-auth-manager-public-key = "manager.key"
 
 # The port number of agent socket which provides access to host-side information
 # to the containers (such as PID conversion).
