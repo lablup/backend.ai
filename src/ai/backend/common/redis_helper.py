@@ -464,7 +464,9 @@ def get_redis_object(
         )
 
         return RedisConnectionInfo(
-            client=sentinel.master_for(service_name=service_name, **_default_conn_opts),
+            client=sentinel.master_for(
+                service_name=service_name, password=password, **_default_conn_opts
+            ),
             sentinel=sentinel,
             service_name=service_name,
         )
