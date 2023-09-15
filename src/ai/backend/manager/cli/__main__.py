@@ -144,16 +144,45 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
 
 @main.command()
 @click.pass_obj
-def generate_keypair(cli_ctx: CLIContext):
+def generate_keypair(cli_ctx: CLIContext) -> None:
     """
-    Generate a random keypair and print it out to stdout.
+    Generate a random user keypair and print it out to stdout.
     """
     from ..models.keypair import generate_keypair as _gen_keypair
 
-    log.info("generating keypair...")
+    log.info("generating a user keypair...")
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
+
+
+@main.command()
+@click.argument(
+    "dst_dir",
+    type=click.Path(
+        file_okay=False,
+        dir_okay=True,
+        writable=True,
+        path_type=Path,
+    ),
+)
+@click.argument(
+    "name",
+    type=str,
+)
+@click.pass_obj
+def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: Path, name: str) -> None:
+    """
+    Generate a random ZeroMQ CURVE keypair for use in manager-agent RPC and print it out to stdout.
+    """
+    from zmq.auth.certs import create_certificates, load_certificate
+
+    log.info("generating a curve keypair...")
+    public_key_path, secret_key_path = create_certificates(dst_dir, name)
+    public_key, secret_key = load_certificate(secret_key_path)
+    assert secret_key is not None
+    print(f"Public Key: {public_key.decode('ascii')} (stored at {public_key_path})")
+    print(f"Secret Key: {secret_key.decode('ascii')} (stored at {secret_key_path})")
 
 
 @main.command()
