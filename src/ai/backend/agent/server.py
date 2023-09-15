@@ -46,7 +46,7 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
-from ai.backend.common.auth import AgentAuthHandler
+from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -184,9 +184,9 @@ class RPCFunctionRegistry:
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
     rpc_auth_enabled: bool
-    rpc_auth_manager_public_id: Optional[bytes]
-    rpc_auth_agent_public_id: Optional[bytes]
-    rpc_auth_agent_private_id: Optional[bytes]
+    rpc_auth_manager_public_key: Optional[PublicKey]
+    rpc_auth_agent_public_key: Optional[PublicKey]
+    rpc_auth_agent_secret_key: Optional[SecretKey]
 
     loop: asyncio.AbstractEventLoop
     agent: AbstractAgent
@@ -225,6 +225,36 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
+        if rpc_auth_enabled := self.local_config["agent"]["rpc-auth-enabled"]:
+            manager_pkey, _ = load_certificate(
+                self.local_config["agent"]["rpc-auth-manager-public-key"]
+            )
+            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+            agent_pkey, agent_skey = load_certificate(
+                self.local_config["agent"]["rpc-auth-agent-keypair"]
+            )
+            assert agent_skey is not None
+            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+            log.info(
+                "RPC encryption and authentication is enabled. "
+                "(agent_public_key = '{}', manager_public_key='{}')",
+                self.rpc_auth_agent_public_key.decode("ascii"),
+                self.rpc_auth_manager_public_key.decode("ascii"),
+            )
+            auth_handler = AgentAuthHandler(
+                "local",
+                self.rpc_auth_manager_public_key,
+                self.rpc_auth_agent_public_key,
+                self.rpc_auth_agent_secret_key,
+            )
+        else:
+            self.rpc_auth_manager_public_key = None
+            self.rpc_auth_agent_public_key = None
+            self.rpc_auth_agent_secret_key = None
+            auth_handler = None
+        self.rpc_auth_enabled = rpc_auth_enabled
+
         backend = self.local_config["agent"]["backend"]
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         self.agent = await agent_mod.get_agent_cls().new(  # type: ignore
@@ -232,33 +262,11 @@ class AgentRPCServer(aobject):
             self.local_config,
             stats_monitor=self.stats_monitor,
             error_monitor=self.error_monitor,
+            agent_public_key=self.rpc_auth_agent_public_key,
         )
-        if rpc_auth_enabled := self.local_config["agent"]["rpc-auth-enabled"]:
-            log.info("RPC encryption and authentication is enabled.")
-            self.rpc_auth_manager_public_id, _ = load_certificate(
-                self.local_config["agent"]["rpc-auth-manager-public-key"]
-            )
-            self.rpc_auth_agent_public_id, self.rpc_auth_agent_private_id = load_certificate(
-                self.local_config["agent"]["rpc-auth-agent-keypair"]
-            )
-        else:
-            self.rpc_auth_manager_public_id = None
-            self.rpc_auth_agent_public_id = None
-            self.rpc_auth_agent_private_id = None
-        self.rpc_auth_enabled = rpc_auth_enabled
 
         rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
         auth_handler = None
-        if self.rpc_auth_enabled:
-            assert self.rpc_auth_manager_public_id
-            assert self.rpc_auth_agent_public_id
-            assert self.rpc_auth_agent_private_id
-            auth_handler = AgentAuthHandler(
-                "local",
-                self.rpc_auth_manager_public_id,
-                self.rpc_auth_agent_public_id,
-                self.rpc_auth_agent_private_id,
-            )
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,

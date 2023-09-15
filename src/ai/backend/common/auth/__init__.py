@@ -1,3 +1,5 @@
+from typing import NewType
+
 from callosum.auth import (
     AbstractClientAuthenticator,
     AbstractServerAuthenticator,
@@ -6,52 +8,55 @@ from callosum.auth import (
     Identity,
 )
 
+PublicKey = NewType("PublicKey", bytes)
+SecretKey = NewType("SecretKey", bytes)
+
 
 class ManagerAuthHandler(AbstractClientAuthenticator):
     def __init__(
         self,
         domain: str,
-        agent_pub_id: bytes,
-        manager_pub_id: bytes,
-        manager_id: bytes,
+        agent_public_key: PublicKey,
+        manager_public_key: PublicKey,
+        manager_secret_key: SecretKey,
     ) -> None:
         self.domain = domain
-        self.agent_pub_id = agent_pub_id
-        self.manager_pub_id = manager_pub_id
-        self.manager_id = manager_id
+        self._agent_public_key = agent_public_key
+        self._manager_public_key = manager_public_key
+        self._manager_secret_key = manager_secret_key
 
     async def server_public_key(self) -> bytes:
-        return self.agent_pub_id
+        return self._agent_public_key
 
     async def client_public_key(self) -> bytes:
-        return self.manager_pub_id
+        return self._manager_public_key
 
     async def client_identity(self) -> Identity:
-        assert self.manager_id is not None
-        return Identity(self.domain, self.manager_id)
+        assert self._manager_secret_key is not None
+        return Identity(self.domain, self._manager_secret_key)
 
 
 class AgentAuthHandler(AbstractServerAuthenticator):
     def __init__(
         self,
         domain: str,
-        manager_pub_id: bytes,
-        agent_pub_id: bytes,
-        agent_id: bytes,
+        manager_public_key: PublicKey,
+        agent_public_key: PublicKey,
+        agent_secret_key: SecretKey,
     ) -> None:
         self.domain = domain
-        self.manager_pub_id = manager_pub_id
-        self.agent_pub_id = agent_pub_id
-        self.agent_id = agent_id
+        self._manager_public_key = manager_public_key
+        self._agent_public_key = agent_public_key
+        self._agent_secret_key = agent_secret_key
 
     async def server_public_key(self) -> bytes:
-        return self.agent_pub_id
+        return self._agent_public_key
 
     async def server_identity(self) -> Identity:
-        assert self.agent_id is not None
-        return Identity(self.domain, self.agent_id)
+        assert self._agent_secret_key is not None
+        return Identity(self.domain, self._agent_secret_key)
 
     async def check_client(self, creds: Credential) -> AuthResult:
-        if creds.domain == self.domain and creds.public_key == self.manager_pub_id:
+        if creds.domain == self.domain and creds.public_key == self._manager_public_key:
             return AuthResult(success=True, user_id="manager")
         return AuthResult(success=False)

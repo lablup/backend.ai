@@ -34,6 +34,7 @@ from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
@@ -51,6 +52,7 @@ from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
+from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
@@ -445,12 +447,22 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from zmq.auth.certs import load_certificate
+
     from .registry import AgentRegistry
 
+    manager_pkey, manager_skey = load_certificate(
+        root_ctx.local_config["manager"]["rpc-auth-manager-keypair"]
+    )
+    assert manager_skey is not None
+    manager_public_key = PublicKey(manager_pkey)
+    manager_secret_key = SecretKey(manager_skey)
+    root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
     root_ctx.registry = AgentRegistry(
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.db,
+        root_ctx.agent_cache,
         root_ctx.redis_stat,
         root_ctx.redis_live,
         root_ctx.redis_image,
@@ -459,6 +471,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
+        manager_public_key=manager_public_key,
+        manager_secret_key=manager_secret_key,
     )
     await root_ctx.registry.init()
     yield
