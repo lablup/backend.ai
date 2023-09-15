@@ -14,9 +14,16 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ..exception import InvalidQuotaScopeError
+from ..exception import (
+    ExternalError,
+    InvalidQuotaConfig,
+    QuotaScopeAlreadyExists,
+    QuotaScopeNotFoundError,
+    StorageProxyError,
+)
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
+from .exceptions import VastInvalidParameterError, VastNotFoundError, VastUnknownError
 from .vastdata_client import VastAPIClient, VastQuotaID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -58,6 +65,14 @@ class VastQuotaModel(BaseQuotaModel):
 
         await asyncio.get_running_loop().run_in_executor(None, _write)
 
+    async def _rm_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> None:
+        qs_path = self.mangle_qspath(quota_scope_id)
+
+        try:
+            await aiofiles.os.remove(qs_path / VAST_QUOTA_ID_FILE_NAME)
+        except FileNotFoundError:
+            log.warning(f"vast quota id file not found (qid: {quota_scope_id}). skip")
+
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -65,33 +80,50 @@ class VastQuotaModel(BaseQuotaModel):
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        await aiofiles.os.makedirs(qspath)
+        try:
+            await aiofiles.os.makedirs(qspath)
+        except FileExistsError:
+            vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
+            if vast_quota_id is not None:
+                quota = await self.api_client.get_quota(vast_quota_id)
+                if quota is not None:
+                    raise QuotaScopeAlreadyExists
         if options is not None:
-            quota = await self.api_client.set_quota(
-                qspath,
-                soft_limit=options.limit_bytes,
-                hard_limit=options.limit_bytes,
-            )
+            try:
+                quota = await self.api_client.set_quota(
+                    qspath,
+                    soft_limit=options.limit_bytes,
+                    hard_limit=options.limit_bytes,
+                )
+            except VastInvalidParameterError:
+                raise InvalidQuotaConfig
+            except VastUnknownError as e:
+                raise ExternalError(str(e))
             await self._set_vast_quota_id(quota_scope_id, quota.id)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
         vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
         if vast_quota_id is None:
-            raise InvalidQuotaScopeError
-        await self.api_client.modify_quota(
-            vast_quota_id,
-            soft_limit=config.limit_bytes,
-            hard_limit=config.limit_bytes,
-        )
+            raise QuotaScopeNotFoundError
+        try:
+            await self.api_client.modify_quota(
+                vast_quota_id,
+                soft_limit=config.limit_bytes,
+                hard_limit=config.limit_bytes,
+            )
+        except VastInvalidParameterError:
+            raise InvalidQuotaConfig
+        except VastUnknownError as e:
+            raise ExternalError(str(e))
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
-        vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
-        if vast_quota_id is None:
-            return QuotaUsage(-1, -1)
-        quota = await self.api_client.get_quota(vast_quota_id)
+        if (vast_quota_id := await self._get_vast_quota_id(quota_scope_id)) is None:
+            return None
+        if (quota := await self.api_client.get_quota(vast_quota_id)) is None:
+            return None
         return QuotaUsage(
             used_bytes=quota.used_capacity,
             limit_bytes=quota.hard_limit,
@@ -100,8 +132,12 @@ class VastQuotaModel(BaseQuotaModel):
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
         if vast_quota_id is None:
-            return
-        await self.api_client.remove_quota(vast_quota_id)
+            raise QuotaScopeNotFoundError
+        try:
+            await self.api_client.remove_quota(vast_quota_id)
+        except VastNotFoundError:
+            raise QuotaScopeNotFoundError
+        await self._rm_vast_quota_id(quota_scope_id)
 
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
         await self.unset_quota(quota_scope_id)
@@ -150,17 +186,19 @@ class VastVolume(BaseVolume):
         )
 
     async def get_hwinfo(self) -> HardwareMetadata:
-        clsuter_infos = await self.api_client.get_cluster_info()
+        cluster_id: int = self.local_config["vast_cluster_id"]
         try:
-            default_cluster = clsuter_infos[0]
-        except IndexError:
+            clsuter_info = await self.api_client.get_cluster_info(cluster_id)
+        except VastUnknownError:
             return {
                 "status": "unavailable",
                 "status_info": None,
                 "metadata": {},
             }
+        if clsuter_info is None:
+            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
         healthy_status: Literal["healthy", "degraded", "unavailable"] = "unavailable"
-        match default_cluster.state.lower():
+        match clsuter_info.state.lower():
             case "online" | "healthy":
                 healthy_status = "healthy"
             case "init":
@@ -170,18 +208,18 @@ class VastVolume(BaseVolume):
         quotas = await self.api_client.list_quotas()
         return {
             "status": healthy_status,
-            "status_info": default_cluster.state,
+            "status_info": clsuter_info.state,
             "metadata": {
                 "quota": json.dumps([asdict(q) for q in quotas]),
-                "cluster_info": json.dumps(asdict(default_cluster)),
+                "cluster_info": json.dumps(asdict(clsuter_info)),
             },
         }
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        clsuter_infos = await self.api_client.get_cluster_info()
+        cluster_id: int = self.local_config["vast_cluster_id"]
         try:
-            default_cluster = clsuter_infos[0]
-        except IndexError:
+            clsuter_info = await self.api_client.get_cluster_info(cluster_id)
+        except VastUnknownError:
             return FSPerfMetric(
                 iops_read=-1,
                 iops_write=-1,
@@ -190,13 +228,15 @@ class VastVolume(BaseVolume):
                 io_usec_read=-1,
                 io_usec_write=-1,
             )
+        if clsuter_info is None:
+            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
         return FSPerfMetric(
-            iops_read=default_cluster.rd_iops,
-            iops_write=default_cluster.wr_iops,
-            io_usec_read=default_cluster.rd_latency,
-            io_usec_write=default_cluster.wr_latency,
-            io_bytes_read=default_cluster.rd_bw,
-            io_bytes_write=default_cluster.wr_bw,
+            iops_read=clsuter_info.rd_iops,
+            iops_write=clsuter_info.wr_iops,
+            io_usec_read=clsuter_info.rd_latency,
+            io_usec_write=clsuter_info.wr_latency,
+            io_bytes_read=clsuter_info.rd_bw,
+            io_bytes_write=clsuter_info.wr_bw,
         )
 
     async def get_fs_usage(self) -> CapacityUsage:

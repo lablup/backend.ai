@@ -31,3 +31,7 @@ class VastNotFoundError(VastAPIError):
 
 class VastClusterNotFoundError(VastAPIError):
     pass
+
+
+class VastUnknownError(VastAPIError):
+    pass

@@ -13,6 +13,7 @@ from yarl import URL
 
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..exception import ExternalError
 from ..types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
@@ -20,6 +21,7 @@ from .exceptions import (
     VastInvalidParameterError,
     VastNotFoundError,
     VastUnauthorizedError,
+    VastUnknownError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -223,7 +225,7 @@ class VastAPIClient:
             data: list[Mapping[str, Any]] = await response.json()
         return [VastQuota.from_json(info) for info in data]
 
-    async def get_quota(self, vast_quota_id: VastQuotaID) -> VastQuota:
+    async def get_quota(self, vast_quota_id: VastQuotaID) -> VastQuota | None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -233,10 +235,10 @@ class VastAPIClient:
                 f"/quotas/{str(vast_quota_id)}/",
             )
             if response.status == 404:
-                raise VastNotFoundError
+                return None
             data: Mapping[str, Any] = await response.json()
         if data.get("detail") == "Not found." or "id" not in data:
-            raise VastNotFoundError
+            return None
 
         return VastQuota.from_json(data)
 
@@ -278,7 +280,7 @@ class VastAPIClient:
                     err_msg = data.get("detail", "Unkown error from vast API")
                     raise VastInvalidParameterError(err_msg)
                 case _:
-                    raise VastInvalidParameterError(
+                    raise VastUnknownError(
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
         return VastQuota.from_json(data)
@@ -291,7 +293,7 @@ class VastAPIClient:
         soft_limit_inodes: int | None = None,
         hard_limit_inodes: int | None = None,
         grace_period: str | None = None,
-    ) -> None:
+    ) -> VastQuota:
         body: dict[str, Any] = {}
         if soft_limit is not None:
             body["soft_limit"] = soft_limit
@@ -321,27 +323,38 @@ class VastAPIClient:
                     err_msg = data.get("detail", "Unkown error from vast API")
                     raise VastInvalidParameterError(err_msg)
                 case _:
-                    raise VastInvalidParameterError(
+                    raise VastUnknownError(
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
+        return VastQuota.from_json(data)
 
     async def remove_quota(self, vast_quota_id: VastQuotaID) -> None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
-            await self._build_request(
+            response = await self._build_request(
                 sess,
                 DELETE,
                 f"/quotas/{vast_quota_id}",
             )
+            if response.status == 404:
+                raise VastNotFoundError
 
-    async def get_cluster_info(self) -> list[VastClusterInfo]:
+    async def get_cluster_info(self, cluster_id: int) -> VastClusterInfo | None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
-            response = await self._build_request(sess, GET, "/cluster/")
-            data: list[Mapping[str, Any]] = await response.json()
-            return [VastClusterInfo.from_json(info) for info in data]
+            response = await self._build_request(sess, GET, f"/cluster/{cluster_id}/")
+            data: Mapping[str, Any] = await response.json()
+            match response.status:
+                case 200:
+                    return VastClusterInfo.from_json(data)
+                case 404:
+                    return None
+                case _:
+                    raise VastUnknownError(
+                        f"Unkwon error from vast API. status code: {response.status}"
+                    )
 
     async def get_capacity_info(self) -> CapacityUsage:
         async with aiohttp.ClientSession(
@@ -350,20 +363,21 @@ class VastAPIClient:
             response = await self._build_request(sess, GET, "/capacity/")
             data: Mapping[str, Any] = await response.json()
 
+        def _parse(detail_info: Mapping[str, Any]) -> CapacityUsage:
+            usable, unique, logical = detail_info["data"]
+            capacity_bytes = usable
+            usable_percent = detail_info["percent"]
+            return CapacityUsage(
+                capacity_bytes=capacity_bytes,
+                used_bytes=int((100 - usable_percent) * capacity_bytes),
+            )
+
         infos = data["details"]
         root_dir = "/"
-        capacity_bytes, percent = None, None
         for path, info in infos:
             if path == root_dir:
-                capacity_bytes = info["data"][0]
-                percent = info["percent"]
-        else:
-            capacity_bytes = info["data"][0]
-            percent = info["percent"]
-        return CapacityUsage(
-            capacity_bytes=capacity_bytes,
-            used_bytes=(100 - percent) * capacity_bytes,
-        )
+                return _parse(info)
+        raise ExternalError("No capacity data found from vast API")
 
 
 # GET /capacity/
