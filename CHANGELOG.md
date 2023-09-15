@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0a4 (2023-09-09)
+
+### Features
+* Add support for handling OpenID Connect authentication responses ([#1545](https://github.com/lablup/backend.ai/issues/1545))
+* Update both agent socket listener and metadata server to let container check what kind of sandbox it is being executed ([#1549](https://github.com/lablup/backend.ai/issues/1549))
+* Periodically scan and update available slots of all compute plugins ([#1551](https://github.com/lablup/backend.ai/issues/1551))
+* Add `task_name` to all `GlobalTimer._tick_task` for better debugging. ([#1553](https://github.com/lablup/backend.ai/issues/1553))
+
+### Fixes
+* Fix storage proxy watcher process always being started event if it is not enabled ([#1547](https://github.com/lablup/backend.ai/issues/1547))
+* Fix install-dev.sh failing to run when both trying to run the script from main branch and Node.js is not installed on the system ([#1548](https://github.com/lablup/backend.ai/issues/1548))
+* Let `RedisLock` raise `LockError` when it fails to acquire a lock instead of skipping lock. ([#1554](https://github.com/lablup/backend.ai/issues/1554))
+* Fix metadata server not started with given port number ([#1555](https://github.com/lablup/backend.ai/issues/1555))
+
+
 ## 23.09.0a3 (2023-09-07)
 ### Fixes
 * Hotfix: DB migration failing ([#1544](https://github.com/lablup/backend.ai/issues/1544))
