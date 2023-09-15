@@ -115,7 +115,6 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.manager.models.routing import RouteStatus
 
 from .api.exceptions import (
     AgentError,
@@ -146,6 +145,7 @@ from .models import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
+    EndpointLifecycle,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
@@ -154,6 +154,7 @@ from .models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    RouteStatus,
     RoutingRow,
     SessionDependencyRow,
     SessionRow,
@@ -2093,15 +2094,25 @@ class AgentRegistry:
         async def _update_by_fullscan(r: Redis):
             updates = {}
             keys = await r.keys(f"{kp_key}.*")
-            for ak in keys:
+            for stat_key in keys:
+                if isinstance(stat_key, bytes):
+                    _stat_key = stat_key.decode("utf-8")
+                else:
+                    _stat_key = stat_key
+                ak = _stat_key.replace(f"{kp_key}.", "")
                 session_concurrency = concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
-                updates[f"{kp_key}.{ak}"] = usage
+                updates[_stat_key] = usage
             keys = await r.keys(f"{sftp_kp_key}.*")
-            for ak in keys:
+            for stat_key in keys:
+                if isinstance(stat_key, bytes):
+                    _stat_key = stat_key.decode("utf-8")
+                else:
+                    _stat_key = stat_key
+                ak = _stat_key.replace(f"{sftp_kp_key}.", "")
                 session_concurrency = sftp_concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
-                updates[f"{sftp_kp_key}.{ak}"] = usage
+                updates[_stat_key] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2575,7 +2586,7 @@ class AgentRegistry:
                     keepalive_timeout=self.rpc_keepalive_timeout,
                 ) as rpc:
                     updated_config: Dict[str, Any] = {
-                        # TODO: support resacling of sub-containers
+                        # TODO: support rescaling of sub-containers
                     }
                     kernel_info = await rpc.call.restart_kernel(
                         str(kernel.session_id),
@@ -3619,7 +3630,7 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
-            async with context.db.begin_session() as db_sess:
+            async with context.db.begin_readonly_session() as db_sess:
                 route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                 endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
@@ -3642,17 +3653,7 @@ async def invoke_session_callback(
                     elif isinstance(event, SessionTerminatedEvent):
                         query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                         await db_sess.execute(query)
-                        if (
-                            len(endpoint.routings) == 1
-                            and endpoint.desired_session_count < 0  # we just removed last one
-                        ):
-                            query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint.id)
-                            await db_sess.execute(query)
-                            try:
-                                await context.delete_appproxy_endpoint(db_sess, endpoint)
-                            except Exception as e:
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-                        else:
+                        if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
                             new_routes = [
                                 r
                                 for r in endpoint.routings
