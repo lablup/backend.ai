@@ -17,6 +17,9 @@ def get_tag():
 def get_prev_tag():
     tag = get_tag()
     p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', tag + '^'], capture_output=True)
+    prev_tag = p.stdout.decode().strip()
+
+    return prev_tag
 
 def main():
     parser = argparse.ArgumentParser()
