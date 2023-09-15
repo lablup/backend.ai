@@ -5,26 +5,23 @@ from callosum.auth import (
     Credential,
     Identity,
 )
-from zmq.auth.certs import load_certificate
 
 
 class ManagerAuthHandler(AbstractClientAuthenticator):
-    def __init__(self, domain: str) -> None:
+    def __init__(
+        self,
+        domain: str,
+        agent_pub_id: bytes,
+        manager_pub_id: bytes,
+        manager_id: bytes,
+    ) -> None:
         self.domain = domain
-        # TODO: load manager identity from a local certificate
-        # TODO: expose the manager certificate in the admin UI
-        self.manager_pub_id, self.manager_id = load_certificate(
-            "fixtures/manager/manager.key_secret"
-        )
+        self.agent_pub_id = agent_pub_id
+        self.manager_pub_id = manager_pub_id
+        self.manager_id = manager_id
 
     async def server_public_key(self) -> bytes:
-        # TODO: load per-agent public key from database
-        #       (need to extend the "agents" table)
-        # NOTE: we need to use contextvars to localize the target agent
-        #       without altering the authenticator interface.
-        # TODO: implement the per-agent certificate mgmt UI
-        pub, _ = load_certificate("fixtures/agent/agent.key")
-        return pub
+        return self.agent_pub_id
 
     async def client_public_key(self) -> bytes:
         return self.manager_pub_id
@@ -35,12 +32,17 @@ class ManagerAuthHandler(AbstractClientAuthenticator):
 
 
 class AgentAuthHandler(AbstractServerAuthenticator):
-    def __init__(self, domain: str) -> None:
+    def __init__(
+        self,
+        domain: str,
+        manager_pub_id: bytes,
+        agent_pub_id: bytes,
+        agent_id: bytes,
+    ) -> None:
         self.domain = domain
-        # TODO: load known manager public key from local_config
-        self.manager_pub_id, _ = load_certificate("fixtures/manager/manager.key")
-        # TODO: load agent identity from a local certificate
-        self.agent_pub_id, self.agent_id = load_certificate("fixtures/agent/agent.key_secret")
+        self.manager_pub_id = manager_pub_id
+        self.agent_pub_id = agent_pub_id
+        self.agent_id = agent_id
 
     async def server_public_key(self) -> bytes:
         return self.agent_pub_id

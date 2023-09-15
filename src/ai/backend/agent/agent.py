@@ -64,6 +64,7 @@ from tenacity import (
     wait_fixed,
 )
 from trafaret import DataError
+from zmq.auth.certs import load_certificate
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
@@ -554,6 +555,11 @@ class AbstractAgent(
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
+    rpc_auth_enabled: bool
+    rpc_auth_manager_public_id: Optional[bytes]
+    rpc_auth_agent_public_id: Optional[bytes]
+    rpc_auth_agent_private_id: Optional[bytes]
+
     stat_ctx: StatContext
     stat_sync_sockpath: Path
     stat_sync_task: asyncio.Task
@@ -580,6 +586,19 @@ class AbstractAgent(
         self.local_config = local_config
         self.id = AgentId(local_config["agent"]["id"])
         self.local_instance_id = generate_local_instance_id(__file__)
+        if rpc_auth_enabled := self.local_config["agent"]["rpc-auth-enabled"]:
+            log.info("RPC encryption and authentication is enabled.")
+            self.rpc_auth_manager_public_id, _ = load_certificate(
+                self.local_config["agent"]["rpc-auth-manager-public-key"]
+            )
+            self.rpc_auth_agent_public_id, self.rpc_auth_agent_private_id = load_certificate(
+                self.local_config["agent"]["rpc-auth-agent-keypair"]
+            )
+        else:
+            self.rpc_auth_manager_public_id = None
+            self.rpc_auth_agent_public_id = None
+            self.rpc_auth_agent_private_id = None
+        self.rpc_auth_enabled = rpc_auth_enabled
         self.kernel_registry = {}
         self.computers = {}
         self.images = {}  # repoTag -> digest
@@ -833,6 +852,8 @@ class AbstractAgent(
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
                 "addr": f"tcp://{rpc_addr}",
+                "rpc_auth_enabled": self.rpc_auth_enabled,
+                "rpc_auth_agent_public_id": self.rpc_auth_agent_public_id,
                 "public_host": str(self._get_public_host()),
                 "resource_slots": res_slots,
                 "version": VERSION,
