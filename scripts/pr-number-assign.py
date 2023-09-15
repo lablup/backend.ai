@@ -7,7 +7,6 @@ from pathlib import Path
 
 import tomlkit
 
-exempted_files = ["README.md", "template.md"]
 
 def read_news_types() -> set[str]:
     with open("./pyproject.toml", "r") as f:
@@ -26,7 +25,7 @@ def main(pr_number: str) -> None:
         r"^\d+\.(?P<type>" + "|".join(map(re.escape, news_types)) + r")(\.)?(md)?$"
     )
 
-    files = [f.name for f in base_path.iterdir() if f.is_file() and f.name not in exempted_files]
+    files = [f.name for f in base_path.iterdir() if f.is_file()]
     existing_fragments = []
     for file in files:
         if rx_numbered_fragment.search(file):
@@ -69,7 +68,7 @@ def main(pr_number: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(f"Usage: python {sys.argv[0]} <PR Number>")
+        print(f"Usage: python ${sys.argv[0]} <PR Number>")
         sys.exit(1)
     pr_number = sys.argv[1]
     main(pr_number)
