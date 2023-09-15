@@ -373,6 +373,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
 
 class NetAppVolume(BaseVolume):
+    name = "netapp"
     ontap_endpoint: str
     netapp_user: str
     netapp_password: str

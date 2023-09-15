@@ -140,32 +140,28 @@ T4 = TypeVar("T4")
 def check_typed_tuple(
     value: Tuple[Any],
     types: Tuple[Type[T1]],
-) -> Tuple[T1]:
-    ...
+) -> Tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any],
     types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]:
-    ...
+) -> Tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]:
-    ...
+) -> Tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]:
-    ...
+) -> Tuple[T1, T2, T3, T4]: ...
 
 
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
@@ -1135,3 +1131,8 @@ class AgentSelectionStrategy(enum.StrEnum):
     CONCENTRATED = "concentrated"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
+
+
+class VolumeMountableNodeType(enum.StrEnum):
+    AGENT = enum.auto()
+    STORAGE_PROXY = enum.auto()

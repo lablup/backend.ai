@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    allow:
+      - dependency-name: actions/*
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"

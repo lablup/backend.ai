@@ -25,6 +25,7 @@ agent_local_config_iv = (
                     t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
                         allow_blank_host=True
                     ),
+                    t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
                     t.Key("agent-sock-port", default=6007): t.ToInt[1024:65535],
                     t.Key("id", default=None): t.Null | t.String,
                     t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
@@ -33,6 +34,10 @@ agent_local_config_iv = (
                     t.Key("var-base-path", default="./var/lib/backend.ai"): tx.Path(
                         type="dir", auto_create=True
                     ),
+                    t.Key("mount-path", default=None): t.Null | tx.Path(
+                        type="dir", auto_create=True
+                    ),
+                    t.Key("cohabiting-storage-proxy", default=True): t.Bool(),
                     t.Key("public-host", default=None): t.Null | t.String,
                     t.Key("region", default=None): t.Null | t.String,
                     t.Key("instance-type", default=None): t.Null | t.String,
@@ -46,6 +51,7 @@ agent_local_config_iv = (
                         ["aiomonitor-termui-port", "aiomonitor-port"], default=48200
                     ): t.ToInt[1:65535],
                     t.Key("aiomonitor-webui-port", default=49200): t.ToInt[1:65535],
+                    t.Key("metadata-server-bind-host", default="0.0.0.0"): t.String,
                     t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,

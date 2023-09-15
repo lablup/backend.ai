@@ -641,7 +641,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("id"): t.String,
+            t.Key("id"): tx.UUID,
         }
     ),
 )
@@ -672,7 +672,8 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             .select_from(vfolders)
             .where(vfolders.c.id == params["id"])
         )
-        quota_scope_id, folder_host = await conn.scalar(query)
+        result = await conn.execute(query)
+        quota_scope_id, folder_host = result.first()
         await ensure_host_permission_allowed(
             conn,
             folder_host,
@@ -682,7 +683,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             domain_name=domain_name,
             permission=VFolderHostPermission.DELETE,
         )
-    folder_id = VFolderID(quota_scope_id, uuid.UUID(params["id"]))
+    folder_id = VFolderID(quota_scope_id, params["id"])
     await initiate_vfolder_removal(
         root_ctx.db,
         [VFolderDeletionInfo(folder_id, folder_host)],
