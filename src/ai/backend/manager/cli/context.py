@@ -6,6 +6,7 @@ import os
 from typing import TYPE_CHECKING, AsyncIterator
 
 import attrs
+import click
 
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
@@ -20,8 +21,20 @@ if TYPE_CHECKING:
 
 @attrs.define(auto_attribs=True, frozen=True, slots=True)
 class CLIContext:
+    click_ctx: click.Context
     logger: AbstractLogger
     local_config: LocalConfig
+
+    def __enter__(self) -> None:
+        # The "start-server" command is injected by ai.backend.cli from the entrypoint
+        # and it has its own multi-process-aware logging initialization.
+        # If we duplicate the local logging with it, the process termination may hang.
+        if self.click_ctx.invoked_subcommand != "start-server":
+            self.logger.__enter__()
+
+    def __exit__(self, *exc_info) -> None:
+        if self.click_ctx.invoked_subcommand != "start-server":
+            self.logger.__exit__()
 
 
 @attrs.define(auto_attribs=True, frozen=True, slots=True)

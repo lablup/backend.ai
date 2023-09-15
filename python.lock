@@ -88,7 +88,6 @@
 //     "types-PyYAML",
 //     "types-aiofiles",
 //     "types-cachetools",
-//     "types-click",
 //     "types-python-dateutil",
 //     "types-redis",
 //     "types-setuptools",
@@ -3939,24 +3938,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8cb030a669e2e927461be9827375f83c16b8178c365852c060a34e24871e7e81",
-              "url": "https://files.pythonhosted.org/packages/ee/ad/607454a5f991c5b3e14693a7113926758f889138371058a5f72f567fa131/types_click-7.1.8-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "b6604968be6401dc516311ca50708a0a28baa7a0cb840efd7412f0dbbff4e092",
-              "url": "https://files.pythonhosted.org/packages/00/ff/0e6a56108d45c80c61cdd4743312d0304d8192482aea4cce96c554aaa90d/types-click-7.1.8.tar.gz"
-            }
-          ],
-          "project_name": "types-click",
-          "requires_dists": [],
-          "requires_python": null,
-          "version": "7.1.8"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "60a1e21e8296979db32f9374d8a239af4cb541ff66447bb915d8ad398f9c63b2",
               "url": "https://files.pythonhosted.org/packages/b7/b0/e79d84748f1d34304f13191424348a719c3febaa3493835370fe9528e1e6/types_Jinja2-2.11.9-py3-none-any.whl"
             },
@@ -4488,7 +4469,6 @@
     "types-PyYAML",
     "types-aiofiles",
     "types-cachetools",
-    "types-click",
     "types-python-dateutil",
     "types-redis",
     "types-setuptools",

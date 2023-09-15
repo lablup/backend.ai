@@ -83,7 +83,6 @@ types-six
 types-setuptools
 types-python-dateutil
 types-aiofiles
-types-click
 types-cachetools
 types-Jinja2
 types-PyYAML
