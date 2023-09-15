@@ -13,7 +13,7 @@ from yarl import URL
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..exception import ExternalError
+from ..exception import ExternalError, QuotaScopeAlreadyExists
 from ..types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
@@ -122,6 +122,7 @@ class VastAPIClient:
     username: str
     password: str
     ssl_context: ssl.SSLContext | bool | None
+    storage_base_dir: Path
 
     _auth_token: TokenPair | None
 
@@ -132,11 +133,13 @@ class VastAPIClient:
         password: str,
         *,
         api_version: APIVersion,
+        storage_base_dir: Path,
         ssl: ssl.SSLContext | bool | None = None,
     ) -> None:
         self.api_endpoint = URL(endpoint) / "api" / str(api_version)
         self.username = username
         self.password = password
+        self.storage_base_dir = storage_base_dir
 
         self._auth_token = None
         self.ssl_context = ssl
@@ -251,7 +254,11 @@ class VastAPIClient:
         hard_limit_inodes: int | None = None,
         grace_period: str | None = None,
     ) -> VastQuota:
-        body: dict[str, Any] = {"path": path}
+        body: dict[str, Any] = {
+            "name": str(path),
+            "path": self.storage_base_dir / path.name,
+            "create_dir": False,  # Explicitly disable to create directory owned by root.
+        }
         if soft_limit is not None:
             body["soft_limit"] = soft_limit
         if hard_limit is not None:
@@ -273,12 +280,15 @@ class VastAPIClient:
                 body,
             )
             data: Mapping[str, Any] = await response.json()
-            match response.status // 100:
-                case 2:
+            match response.status:
+                case 201 | 200:
                     pass
-                case 4 | 5:
-                    err_msg = data.get("detail", "Unkown error from vast API")
-                    raise VastInvalidParameterError(err_msg)
+                case 400 | 401:
+                    raise VastInvalidParameterError
+                case 403:
+                    raise VastUnauthorizedError
+                case 503:
+                    raise QuotaScopeAlreadyExists
                 case _:
                     raise VastUnknownError(
                         f"Unkwon error from vast API. status code: {response.status}"

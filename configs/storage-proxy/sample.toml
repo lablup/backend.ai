@@ -208,3 +208,4 @@ vast_password = ""  # Vast mgmt system Password
 vast_verify_ssl = false # If set to true, allow to communicate to server with insecure ssl context. Defaults to false.
 vast_api_version = "v2" # Vast mgmt system API version. Defaults to `v2`
 vast_cluster_id = 1 # Vast mgmt system Cluster ID
+vast_storage_base_dir = "/" # Vast storage base directory that is mounted to our volume base path

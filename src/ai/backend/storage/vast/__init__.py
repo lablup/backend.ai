@@ -173,6 +173,7 @@ class VastVolume(BaseVolume):
             self.config["vast_endpoint"],
             self.config["vast_username"],
             self.config["vast_password"],
+            storage_base_dir=self.config["vast_storage_base_dir"],
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
         )
