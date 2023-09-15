@@ -26,6 +26,11 @@ agent_local_config_iv = (
                         allow_blank_host=True
                     ),
                     t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
+                    t.Key("rpc-auth-enabled", default=False): t.ToBool,
+                    t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(
+                        type="file"
+                    ),
+                    t.Key("rpc-auth-agent-keypair", default=None): t.Null | tx.Path(type="file"),
                     t.Key("agent-sock-port", default=6007): t.ToInt[1024:65535],
                     t.Key("id", default=None): t.Null | t.String,
                     t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
