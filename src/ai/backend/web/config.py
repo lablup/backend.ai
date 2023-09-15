@@ -85,9 +85,9 @@ config_iv = t.Dict(
                 t.Key("page", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
             }
         ).allow_extra("*"),
-        t.Key("pipeline"): t.Dict(
+        t.Key("pipeline", default=None): t.Null | t.Dict(
             {
-                t.Key("endpoint", default=None): t.Null | tx.URL,
+                t.Key("endpoint"): tx.URL,
                 t.Key("jwt"): t.Dict(
                     {
                         t.Key("secret"): t.String,

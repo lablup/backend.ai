@@ -157,10 +157,11 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
     path = request.match_info.get("path", "")
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := config["pipeline"]["endpoint"]):
-            log.error("WEB_HANDLER: 'pipeline.endpoint' has not been set.")
-        else:
-            log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
+        pipeline_config = config["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"]
+        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
         api_session = await asyncio.shield(get_api_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
@@ -378,11 +379,11 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
 
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
-            log.error("WEBSOCKET_HANDLER: 'pipeline.endpoint' has not been set.")
-        else:
-            endpoint = endpoint.with_scheme("ws")
-            log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
+        pipeline_config = request.app["config"]["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' has not been set.")
+        endpoint = pipeline_config["endpoint"].with_scheme("ws")
+        log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
         api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
