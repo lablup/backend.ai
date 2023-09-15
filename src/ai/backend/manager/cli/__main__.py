@@ -20,7 +20,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
 from ..config import load as load_config
-from .context import CLIContext, init_logger, redis_ctx
+from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
@@ -59,8 +59,6 @@ def main(ctx, config_path: pathlib.Path, log_level: str, debug: bool):
     setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
     ctx.obj = ctx.with_resource(
         CLIContext(
-            click_ctx=ctx,
-            logger=init_logger(local_config),
             local_config=local_config,
         )
     )
