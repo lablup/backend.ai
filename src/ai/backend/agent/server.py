@@ -266,7 +266,6 @@ class AgentRPCServer(aobject):
         )
 
         rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
-        auth_handler = None
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
