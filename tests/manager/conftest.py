@@ -759,6 +759,7 @@ async def registry_ctx(mocker):
     mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
+    mock_agent_cache = MagicMock()
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
@@ -792,6 +793,7 @@ async def registry_ctx(mocker):
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
+        agent_cache=mock_agent_cache,
     )
     await registry.init()
     try:
