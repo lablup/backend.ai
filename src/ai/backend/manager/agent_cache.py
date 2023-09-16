@@ -135,7 +135,7 @@ class AgentRPCCache:
         else:
             auth_handler = None
         log.debug(
-            "AgentRPCCache.rpc_context(): calling ag:{} with addr:{}, public_key:{!r}",
+            "rpc_context(): calling ag:{} via {}, with agent_public_key:{!r}",
             agent_id,
             agent_addr,
             agent_public_key.decode() if agent_public_key else None,
