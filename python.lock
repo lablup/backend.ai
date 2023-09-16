@@ -38,7 +38,7 @@
 //     "cachetools~=5.2.0",
 //     "callosum~=1.0.0",
 //     "cattrs~=22.2.0",
-//     "click>=7.1.2",
+//     "click~=8.1.7",
 //     "colorama>=0.4.4",
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
@@ -863,36 +863,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "27560da44099e7e2ee961d3971d8ea659de2e0dc24e78043d1c3027d89b2d8a2",
-              "url": "https://files.pythonhosted.org/packages/bf/b1/8c254dbb9e315f3b2f5a2a30667a08aed13fd9a00e07028eee701c7ce00d/boto3-1.28.47-py3-none-any.whl"
+              "hash": "519639859a3c829ccf7073a58b3716cb26cb5906e306fe63eb4beab68bf9bfab",
+              "url": "https://files.pythonhosted.org/packages/84/85/e895e6ca369f406432c5f5f186b107f1e1a6a2408b60a081de32021fd818/boto3-1.28.49-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "be69cd28e3732b63ad61f6d2429b1eac92428588911a5a7367faa4e129a4738d",
-              "url": "https://files.pythonhosted.org/packages/1c/7d/392f2c98154721bfbaf1b72d448f71c7d268967005a34a6d1436ab2d198d/boto3-1.28.47.tar.gz"
+              "hash": "c9fad1b01a1d7e7bd51150b3175b4c32b79d699ce94708082611f59fde2e097a",
+              "url": "https://files.pythonhosted.org/packages/c7/e5/1616432f43cb1766fde3025160ce25fb12e91789fdddd8f01948075356e2/boto3-1.28.49.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.32.0,>=1.31.47",
+            "botocore<1.32.0,>=1.31.49",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.28.47"
+          "version": "1.28.49"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6a60f9601270458102529b17fdcba5551b918f9eedc32bbc2f467e63edfb2662",
-              "url": "https://files.pythonhosted.org/packages/16/e7/5b9339e7d076ddacafe51614e1e48100a52ed3ef16465a6cd625e16bde86/botocore-1.31.47-py3-none-any.whl"
+              "hash": "7d64cb45154e4f34f3a45f551e118caad7379ae831565639e0afe5b2af126c61",
+              "url": "https://files.pythonhosted.org/packages/1e/13/efec7af5071e9a385a85deb3b31edd290374df7e24177cdf42ce00130b54/botocore-1.31.49-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a0ba5629eb17a37bf449bccda9df6ae652d5755f73145519d5eb244f6963b31b",
-              "url": "https://files.pythonhosted.org/packages/1c/6d/38f6ef84392f198aae2543d5273b62c56bc12316730049e7f3dc9e30790d/botocore-1.31.47.tar.gz"
+              "hash": "95e9716f27f67d4207f260ab0ea157603ca544d3b82c5f21728b1c732bec1817",
+              "url": "https://files.pythonhosted.org/packages/11/b3/c92f556cf3d5004e7fcbbf044c155b7dfa18e1e6cd3c7ca47324f577b10b/botocore-1.31.49.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -903,7 +903,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.31.47"
+          "version": "1.31.49"
         },
         {
           "artifacts": [
@@ -2904,54 +2904,54 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "957b221d062d5752716923d14e0926f47670e95fead9d240fa4d4862214b9b2f",
-              "url": "https://files.pythonhosted.org/packages/92/d7/df2bf45a1bcc7f2983a22c05f77ecd04bb8252a734219b0a6f089121dfa3/pycryptodome-3.18.0-cp35-abi3-musllinux_1_1_x86_64.whl"
+              "hash": "5b1986c761258a5b4332a7f94a83f631c1ffca8747d75ab8395bf2e1b93283d9",
+              "url": "https://files.pythonhosted.org/packages/38/84/d429fafe45c0a32dc7d759fbb9b917282944d6852cdaf9e5dc743ea7b0aa/pycryptodome-3.19.0-cp35-abi3-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4944defabe2ace4803f99543445c27dd1edbe86d7d4edb87b256476a91e9ffa4",
-              "url": "https://files.pythonhosted.org/packages/02/93/4822844082b641e7d1983e4a7e8eb1fa4ed206d7af182404cd1cd7fb10d5/pycryptodome-3.18.0-cp35-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "e249a784cc98a29c77cea9df54284a44b40cafbfae57636dd2f8775b48af2434",
+              "url": "https://files.pythonhosted.org/packages/00/e6/73931df4046e34a6354d323b4a5b5c18e5184f4a08687806ee3353c81a6b/pycryptodome-3.19.0-cp35-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "10da29526a2a927c7d64b8f34592f461d92ae55fc97981aab5bbcde8cb465bb6",
-              "url": "https://files.pythonhosted.org/packages/0d/27/1fb1d3d7fe3e6af2586b7e4a4a24c687a1f5cacdd82e435fd62bd4fb6af0/pycryptodome-3.18.0-cp35-abi3-manylinux2014_aarch64.whl"
+              "hash": "bc35d463222cdb4dbebd35e0784155c81e161b9284e567e7e933d722e533331e",
+              "url": "https://files.pythonhosted.org/packages/1a/72/acc37a491b95849b51a2cced64df62aaff6a5c82d26aca10bc99dbda025b/pycryptodome-3.19.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "53aee6be8b9b6da25ccd9028caf17dcdce3604f2c7862f5167777b707fbfb6cb",
-              "url": "https://files.pythonhosted.org/packages/2c/bb/bfbb160bc50455767178192eed66dc595912ba24c09551fe908c5269019d/pycryptodome-3.18.0-cp35-abi3-macosx_10_9_x86_64.whl"
+              "hash": "61bb3ccbf4bf32ad9af32da8badc24e888ae5231c617947e0f5401077f8b091f",
+              "url": "https://files.pythonhosted.org/packages/20/03/bd639213eba37d29a16d359b42def13def905a456358f8af52107fc4e8a4/pycryptodome-3.19.0-cp35-abi3-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "83c75952dcf4a4cebaa850fa257d7a860644c70a7cd54262c237c9f2be26f76e",
-              "url": "https://files.pythonhosted.org/packages/38/ee/99d66c28b2baf40a68053191e4f99ffd62639000efe7cc799f75843164c4/pycryptodome-3.18.0-cp35-abi3-musllinux_1_1_i686.whl"
+              "hash": "d49a6c715d8cceffedabb6adb7e0cbf41ae1a2ff4adaeec9432074a80627dea1",
+              "url": "https://files.pythonhosted.org/packages/2d/8a/a05cb7434cda97da2491bee1418be9651ce99fec74bfe95320e153845853/pycryptodome-3.19.0-cp35-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f21efb8438971aa16924790e1c3dba3a33164eb4000106a55baaed522c261acf",
-              "url": "https://files.pythonhosted.org/packages/40/88/89623388754162ddb82c62814ccbfdbfcc8ed9bd6d5f7412d2479bdca3a7/pycryptodome-3.18.0-cp35-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "139ae2c6161b9dd5d829c9645d781509a810ef50ea8b657e2257c25ca20efe33",
+              "url": "https://files.pythonhosted.org/packages/82/b7/876ced7a574843bf6358da5a2faa910925a8b9eb79bb7f164d070dbf72ae/pycryptodome-3.19.0-cp35-abi3-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "51eae079ddb9c5f10376b4131be9589a6554f6fd84f7f655180937f611cd99a2",
-              "url": "https://files.pythonhosted.org/packages/89/2b/4113d7124603ca258ba874633f1410760771c5313dfd73931fef4f272d63/pycryptodome-3.18.0-cp35-abi3-musllinux_1_1_aarch64.whl"
+              "hash": "84c3e4fffad0c4988aef0d5591be3cad4e10aa7db264c65fadbc633318d20bde",
+              "url": "https://files.pythonhosted.org/packages/b8/97/243bc2019517abb13051e197f33deaf69493bbe020846e6571c7a485a428/pycryptodome-3.19.0-cp35-abi3-musllinux_1_1_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c9adee653fc882d98956e33ca2c1fb582e23a8af7ac82fee75bd6113c55a0413",
-              "url": "https://files.pythonhosted.org/packages/b9/05/0e7547c445bbbc96c538d870e6c5c5a69a9fa5df0a9df3e27cb126527196/pycryptodome-3.18.0.tar.gz"
+              "hash": "542f99d5026ac5f0ef391ba0602f3d11beef8e65aae135fa5b762f5ebd9d3bfb",
+              "url": "https://files.pythonhosted.org/packages/d6/df/295e56dca0b4834665626326359c5a1f3092287be56db4b316926df7ad0c/pycryptodome-3.19.0-cp35-abi3-macosx_10_9_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9ad6f09f670c466aac94a40798e0e8d1ef2aa04589c29faa5b9b97566611d1d1",
-              "url": "https://files.pythonhosted.org/packages/ea/a8/79c30c277edae8450c28a18b33f0499414f023b1f45b75c6ea5f738f0955/pycryptodome-3.18.0-cp35-abi3-macosx_10_9_universal2.whl"
+              "hash": "d033947e7fd3e2ba9a031cb2d267251620964705a013c5a461fa5233cc025270",
+              "url": "https://files.pythonhosted.org/packages/da/63/43feb85e3183e4bcd0d3780579c8006f37e8bd2438812a210a4738728244/pycryptodome-3.19.0-cp35-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             }
           ],
           "project_name": "pycryptodome",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "3.18.0"
+          "version": "3.19.0"
         },
         {
           "artifacts": [
@@ -4424,7 +4424,7 @@
     "cachetools~=5.2.0",
     "callosum~=1.0.0",
     "cattrs~=22.2.0",
-    "click>=7.1.2",
+    "click~=8.1.7",
     "colorama>=0.4.4",
     "coloredlogs~=15.0",
     "cryptography>=2.8",
