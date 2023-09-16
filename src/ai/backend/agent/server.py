@@ -183,8 +183,7 @@ class RPCFunctionRegistry:
 
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
-    rpc_auth_enabled: bool
-    rpc_auth_manager_public_key: Optional[PublicKey]
+    ppc_auth_manager_public_key: Optional[PublicKey]
     rpc_auth_agent_public_key: Optional[PublicKey]
     rpc_auth_agent_secret_key: Optional[SecretKey]
 
@@ -225,7 +224,7 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
-        if rpc_auth_enabled := (self.local_config["agent"]["rpc-auth-agent-keypair"] is not None):
+        if self.local_config["agent"]["rpc-auth-agent-keypair"] is not None:
             manager_pkey, _ = load_certificate(
                 self.local_config["agent"]["rpc-auth-manager-public-key"]
             )
@@ -253,7 +252,6 @@ class AgentRPCServer(aobject):
             self.rpc_auth_agent_public_key = None
             self.rpc_auth_agent_secret_key = None
             auth_handler = None
-        self.rpc_auth_enabled = rpc_auth_enabled
 
         backend = self.local_config["agent"]["backend"]
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
