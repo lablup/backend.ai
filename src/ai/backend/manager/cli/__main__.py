@@ -42,7 +42,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",

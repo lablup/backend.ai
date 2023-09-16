@@ -750,32 +750,38 @@ async def server_main(
     "-f",
     "--config",
     "config_path",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False),
+    path_type=Path,
     default="webserver.conf",
     help="The configuration file to use.",
 )
-@click.option("--debug", is_flag=True, default=False, help="Use more verbose logging.")
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Set the logging level to DEBUG",
+)
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+    ctx: click.Context,
+    config_path: Path,
+    log_level: str,
+    debug: bool,
 ) -> None:
     # Delete this part when you remove --debug option
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+    if debug:
+        log_level = "DEBUG"
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     cfg = config.check(raw_cfg, config_iv)
 
