@@ -60,6 +60,10 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     It uses AgentRPCCache to make the actual RPC call, which reads the agent address and public key
     from the PostgreSQL database.  If the target agent have changed its address or public key while
     the manager is *not* running, it may fail even when the agent is alive.
+
+    This command temporarily enables the DEBUG-level logging for ai.backend.manager.agent_cache
+    and callosum to help debugging for when there are connection issues, regardless of the logging
+    configuration in manager.toml.
     """
     from zmq.auth.certs import load_certificate
 
