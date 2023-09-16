@@ -97,11 +97,12 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     """
     Run the database shell.
 
-    All arguments except `--psql-container` and `--psql-help` are transparently
-    forwarded to the psql command.  For instance, you can use `-c` to execute a
-    psql/SQL statement on the command line.  Note that you do not have to specify
-    connection-related options because the dbshell command fills out them from the
-    manager configuration.
+    All additional arguments and options except `--psql-container` and `--psql-help` are
+    transparently forwarded to the psql command.
+    For instance, you can use `-c` to execute a psql/SQL statement on the command line.
+
+    Note that you do not have to specify connection-related options
+    because the dbshell command fills out them from the manager configuration.
     """
     local_config = cli_ctx.local_config
     if psql_help:
@@ -182,6 +183,10 @@ def generate_api_keypair(cli_ctx: CLIContext) -> None:
 def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) -> None:
     """
     Generate a ZeroMQ CURVE keypair for use in manager-agent RPC and print it out to stdout.
+
+    \b
+    DST_DIR: The target directory to store .key/.key_secret files
+    NAME: The name of generated key files
     """
     from zmq.auth.certs import create_certificates, load_certificate
 
