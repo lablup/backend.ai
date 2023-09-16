@@ -3,7 +3,7 @@ from __future__ import annotations
 import atexit
 import contextlib
 import os
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator, Self
 
 import attrs
 import click
@@ -27,7 +27,7 @@ class CLIContext:
     def __init__(self, local_config: LocalConfig) -> None:
         self.local_config = local_config
 
-    def __enter__(self) -> None:
+    def __enter__(self) -> Self:
         # The "start-server" command is injected by ai.backend.cli from the entrypoint
         # and it has its own multi-process-aware logging initialization.
         # If we duplicate the local logging with it, the process termination may hang.
@@ -56,6 +56,7 @@ class CLIContext:
                 log_endpoint=log_endpoint,
             )
             self._logger.__enter__()
+        return self
 
     def __exit__(self, *exc_info) -> None:
         click_ctx = click.get_current_context()

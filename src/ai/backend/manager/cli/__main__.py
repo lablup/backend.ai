@@ -51,17 +51,18 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx, config_path: pathlib.Path, log_level: str, debug: bool):
+def main(
+    ctx: click.Context,
+    config_path: pathlib.Path,
+    log_level: str,
+    debug: bool,
+) -> None:
     """
     Manager Administration CLI
     """
     local_config = load_config(config_path, "DEBUG" if debug else log_level)
     setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
-    ctx.obj = ctx.with_resource(
-        CLIContext(
-            local_config=local_config,
-        )
-    )
+    ctx.obj = ctx.with_resource(CLIContext(local_config=local_config))
 
 
 @main.command(
