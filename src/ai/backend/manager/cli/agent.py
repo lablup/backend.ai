@@ -9,6 +9,7 @@ import click
 from alembic.config import Config
 
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.logging_utils import enforce_debug_logging
 from ai.backend.common.types import AgentId
 
 if TYPE_CHECKING:
@@ -20,19 +21,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 @click.group()
 def cli() -> None:
     pass
-
-
-def _override_logger_level(loggers: list[logging.Logger]) -> None:
-    # Backend.AI's daemon logging:
-    # - All handlers are added to the root logger only.
-    #   -> Need to override the log level of the root logger itself and its handlers.
-    # - Each logger has separate logging level.
-    #   -> Need to override the log level of the individual loggers.
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers:
-        handler.setLevel(logging.DEBUG)
-    for logger in loggers:
-        logger.setLevel(logging.DEBUG)
 
 
 @cli.command()
@@ -87,10 +75,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
         )
         try:
             log.info("Contacting ag:{} ...", agent_id)
-            # Temporarily override the logging verbosity for related modules
-            callosum_logger = logging.getLogger("callosum")
-            agent_cache_logger = logging.getLogger("ai.backend.manager.agent_cache")
-            _override_logger_level([callosum_logger, agent_cache_logger])
+            enforce_debug_logging(["callosum", "ai.backend.manager.agent_cache"])
             async with agent_cache.rpc_context(
                 AgentId(agent_id),
                 invoke_timeout=timeout,
@@ -100,6 +85,8 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 pprint(result)
         except asyncio.TimeoutError:
             log.error("Timeout occurred while reading the response from ag:{}", agent_id)
+        except Exception:
+            log.exception("Exception occurred while reading the response from ag:{}", agent_id)
         finally:
             await db.dispose()
 
