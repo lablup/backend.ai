@@ -354,7 +354,12 @@ def image():
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
 def redis():
-    """Command set for putting/getting data to/from redis."""
+    """Command set for Redis related operations."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.agent:cli")
+def agent():
+    """Command set for agent related operations."""
 
 
 if __name__ == "__main__":

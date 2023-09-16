@@ -26,8 +26,8 @@ def cli() -> None:
 async def _ping(redis_conn: RedisConnectionInfo) -> None:
     try:
         await redis_helper.execute(redis_conn, lambda r: r.execute_command("PING"))
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        log.exception(f"ping(): Redis ping failed: {e}")
+    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
+        log.exception("ping(): Redis ping failed")
 
 
 @cli.command()
@@ -43,6 +43,6 @@ def ping(cli_ctx: CLIContext) -> None:
             await _ping(redis_conn_set.stat)
             await _ping(redis_conn_set.image)
             await _ping(redis_conn_set.stream)
-            log.info("Redis is healthy")
+            print("Redis is healthy")
 
     asyncio.run(_impl())

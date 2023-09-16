@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
@@ -14,6 +15,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import ManagerAuthHandler, PublicKey, SecretKey
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
 from .api.exceptions import (
@@ -21,6 +23,8 @@ from .api.exceptions import (
 )
 from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class PeerInvoker(Peer):
@@ -122,7 +126,6 @@ class AgentRPCCache:
         if keepalive_interval < 2:
             keepalive_interval = 2
         if agent_public_key:
-            print(f"rpc_context: auth_handler with {agent_public_key=} {self.manager_public_key=}")
             auth_handler = ManagerAuthHandler(
                 "local",
                 agent_public_key,
@@ -131,6 +134,12 @@ class AgentRPCCache:
             )
         else:
             auth_handler = None
+        log.debug(
+            "AgentRPCCache.rpc_context(): calling ag:{} with addr:{}, public_key:{!r}",
+            agent_id,
+            agent_addr,
+            agent_public_key.decode() if agent_public_key else None,
+        )
         peer = PeerInvoker(
             connect=ZeroMQAddress(agent_addr),
             transport=ZeroMQRPCTransport,
