@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import atexit
 import contextlib
-import os
 from typing import TYPE_CHECKING, AsyncIterator, Self
 
 import attrs
@@ -11,7 +9,7 @@ import click
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
-from ai.backend.common.logging import AbstractLogger, Logger
+from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.config import SharedConfig
 
@@ -38,23 +36,7 @@ class CLIContext:
                 and "file" in self.local_config["logging"]["drivers"]
             ):
                 self.local_config["logging"]["drivers"].remove("file")
-            # log_endpoint = f'tcp://127.0.0.1:{find_free_port()}'
-            ipc_base_path = self.local_config["manager"]["ipc-base-path"]
-            log_sockpath = ipc_base_path / f"manager-cli-{os.getpid()}.sock"
-            log_endpoint = f"ipc://{log_sockpath}"
-
-            def _clean_logger():
-                try:
-                    os.unlink(log_sockpath)
-                except FileNotFoundError:
-                    pass
-
-            atexit.register(_clean_logger)
-            self._logger = Logger(
-                self.local_config["logging"],
-                is_master=True,
-                log_endpoint=log_endpoint,
-            )
+            self._logger = LocalLogger(self.local_config["logging"])
             self._logger.__enter__()
         return self
 
