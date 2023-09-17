@@ -931,7 +931,8 @@ async def initiate_vfolder_removal(
                     pass
             except aiohttp.ClientResponseError:
                 failed_deletion.append(vfolder_info)
-            successful_deletion.append(vfolder_info)
+            else:
+                successful_deletion.append(vfolder_info)
         vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in successful_deletion)
         cond = vfolders.c.id.in_(vfolder_ids)
 
