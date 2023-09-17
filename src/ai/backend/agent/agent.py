@@ -824,11 +824,15 @@ class AbstractAgent(
                         slot_type,
                         str(self.slots.get(slot_key, 0)),
                     )
+            if self.local_config["agent"]["advertised-rpc-addr"]:
+                rpc_addr = self.local_config["agent"]["advertised-rpc-addr"]
+            else:
+                rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
             agent_info = {
-                "ip": str(self.local_config["agent"]["rpc-listen-addr"].host),
+                "ip": str(rpc_addr.host),
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
-                "addr": f"tcp://{self.local_config['agent']['rpc-listen-addr']}",
+                "addr": f"tcp://{rpc_addr}",
                 "public_host": str(self._get_public_host()),
                 "resource_slots": res_slots,
                 "version": VERSION,
@@ -2364,6 +2368,14 @@ async def handle_volume_mount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                "",
+                event.quota_scope_id,
+            )
+        )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
@@ -2401,6 +2413,14 @@ async def handle_volume_umount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeUnmounted(
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                "",
+                event.quota_scope_id,
+            )
+        )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")
