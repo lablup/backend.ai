@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import pathlib
 import subprocess
 import sys
 from datetime import datetime
 from functools import partial
-from pathlib import Path
 
 import click
 from more_itertools import chunked
@@ -20,7 +20,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
 from ..config import load as load_config
-from .context import CLIContext, init_logger, redis_ctx
+from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
@@ -30,32 +30,39 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(
+        file_okay=True,
+        dir_okay=False,
+        exists=True,
+        path_type=pathlib.Path,
+    ),
     default=None,
     help="The config file path. (default: ./manager.conf and /etc/backend.ai/manager.conf)",
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx, config_path, log_level, debug):
+def main(
+    ctx: click.Context,
+    config_path: pathlib.Path,
+    log_level: str,
+    debug: bool,
+) -> None:
     """
     Manager Administration CLI
     """
-    local_config = load_config(config_path)
+    local_config = load_config(config_path, "DEBUG" if debug else log_level)
     setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
-    ctx.obj = CLIContext(
-        logger=init_logger(local_config),
-        local_config=local_config,
-    )
+    ctx.obj = ctx.with_resource(CLIContext(local_config=local_config))
 
 
 @main.command(
@@ -90,11 +97,12 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     """
     Run the database shell.
 
-    All arguments except `--psql-container` and `--psql-help` are transparently
-    forwarded to the psql command.  For instance, you can use `-c` to execute a
-    psql/SQL statement on the command line.  Note that you do not have to specify
-    connection-related options because the dbshell command fills out them from the
-    manager configuration.
+    All additional arguments and options except `--psql-container` and `--psql-help` are
+    transparently forwarded to the psql command.
+    For instance, you can use `-c` to execute a psql/SQL statement on the command line.
+
+    Note that you do not have to specify connection-related options
+    because the dbshell command fills out them from the manager configuration.
     """
     local_config = cli_ctx.local_config
     if psql_help:
@@ -125,7 +133,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         subprocess.call(cmd)
         return
     # Use the container to start the psql client command
-    print(f"using the db container {container_name} ...")
+    log.info(f"using the db container {container_name} ...")
     cmd = [
         "docker",
         "exec",
@@ -150,7 +158,7 @@ def generate_keypair(cli_ctx: CLIContext):
     """
     from ..models.keypair import generate_keypair as _gen_keypair
 
-    log.info("generating keypair...")
+    log.info("Generating a manager API keypair...")
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
@@ -190,100 +198,99 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     from ai.backend.manager.models import kernels
     from ai.backend.manager.models.utils import connect_database
 
-    with cli_ctx.logger:
-        today = datetime.now()
-        duration = TimeDuration()
-        expiration_date = today - duration.check_and_return(retention)
+    today = datetime.now()
+    duration = TimeDuration()
+    expiration_date = today - duration.check_and_return(retention)
 
-        async def _clear_redis_history():
-            try:
-                async with connect_database(cli_ctx.local_config) as db:
-                    async with db.begin_readonly() as conn:
-                        query = (
-                            sa.select([kernels.c.id])
-                            .select_from(kernels)
-                            .where(
-                                (kernels.c.terminated_at < expiration_date),
-                            )
+    async def _clear_redis_history():
+        try:
+            async with connect_database(cli_ctx.local_config) as db:
+                async with db.begin_readonly() as conn:
+                    query = (
+                        sa.select([kernels.c.id])
+                        .select_from(kernels)
+                        .where(
+                            (kernels.c.terminated_at < expiration_date),
                         )
-                        result = await conn.execute(query)
-                        target_kernels = [str(x["id"]) for x in result.all()]
+                    )
+                    result = await conn.execute(query)
+                    target_kernels = [str(x["id"]) for x in result.all()]
 
-                delete_count = 0
-                async with redis_ctx(cli_ctx) as redis_conn_set:
+            delete_count = 0
+            async with redis_ctx(cli_ctx) as redis_conn_set:
 
-                    async def _build_pipe(
-                        r: Redis,
-                        kernel_ids: list[str],
-                    ) -> Pipeline:
-                        pipe = r.pipeline(transaction=False)
-                        await pipe.delete(*kernel_ids)
-                        return pipe
+                async def _build_pipe(
+                    r: Redis,
+                    kernel_ids: list[str],
+                ) -> Pipeline:
+                    pipe = r.pipeline(transaction=False)
+                    await pipe.delete(*kernel_ids)
+                    return pipe
 
-                    if len(target_kernels) > 0:
-                        # Apply chunking to avoid excessive length of command params
-                        # and indefinite blocking of the Redis server.
-                        for kernel_ids in chunked(target_kernels, 32):
-                            results = await redis_helper.execute(
-                                redis_conn_set.stat,
-                                partial(_build_pipe, kernel_ids=kernel_ids),
-                            )
-                        # Each DEL command returns the number of keys deleted.
-                        delete_count += sum(results)
-                        log.info(
-                            "Cleaned up {:,} redis statistics records older than {:}.",
-                            delete_count,
-                            expiration_date,
+                if len(target_kernels) > 0:
+                    # Apply chunking to avoid excessive length of command params
+                    # and indefinite blocking of the Redis server.
+                    for kernel_ids in chunked(target_kernels, 32):
+                        results = await redis_helper.execute(
+                            redis_conn_set.stat,
+                            partial(_build_pipe, kernel_ids=kernel_ids),
                         )
+                    # Each DEL command returns the number of keys deleted.
+                    delete_count += sum(results)
+                    log.info(
+                        "Cleaned up {:,} redis statistics records older than {:}.",
+                        delete_count,
+                        expiration_date,
+                    )
 
-                    # Sync and compact the persistent database of Redis
-                    redis_config = await redis_helper.execute(
+                # Sync and compact the persistent database of Redis
+                redis_config = await redis_helper.execute(
+                    redis_conn_set.stat,
+                    lambda r: r.config_get("appendonly"),
+                )
+                if redis_config["appendonly"] == "yes":
+                    await redis_helper.execute(
                         redis_conn_set.stat,
-                        lambda r: r.config_get("appendonly"),
+                        lambda r: r.bgrewriteaof(),
                     )
-                    if redis_config["appendonly"] == "yes":
-                        await redis_helper.execute(
-                            redis_conn_set.stat,
-                            lambda r: r.bgrewriteaof(),
-                        )
-                        log.info("Issued BGREWRITEAOF to the Redis database.")
-                    else:
-                        await redis_helper.execute(
-                            redis_conn_set.stat,
-                            lambda r: r.execute_command("BGSAVE SCHEDULE"),
-                        )
-                        log.info("Issued BGSAVE to the Redis database.")
-            except Exception:
-                log.exception("Unexpected error while cleaning up redis history")
-
-        async def _clear_terminated_sessions():
-            async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
-                async with db.begin() as conn:
-                    log.info("Deleting old records...")
-                    result = await conn.execute(
-                        sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
+                    log.info("Issued BGREWRITEAOF to the Redis database.")
+                else:
+                    await redis_helper.execute(
+                        redis_conn_set.stat,
+                        lambda r: r.execute_command("BGSAVE SCHEDULE"),
                     )
-                    deleted_count = result.rowcount
+                    log.info("Issued BGSAVE to the Redis database.")
+        except Exception:
+            log.exception("Unexpected error while cleaning up redis history")
 
-                    vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
-                    log.info(f"Perfoming {vacuum_sql} operation...")
-                    await conn.exec_driver_sql(vacuum_sql)
+    async def _clear_terminated_sessions():
+        async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+            async with db.begin() as conn:
+                log.info("Deleting old records...")
+                result = await conn.execute(
+                    sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
+                )
+                deleted_count = result.rowcount
 
-                    curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
-                    if ret := curs.fetchone():
-                        table_size = ret[0]
-                        log.info(
-                            "The number of rows of the `kernels` tables after cleanup: {}",
-                            table_size,
-                        )
-            log.info(
-                "Cleaned up {:,} database records older than {}.",
-                deleted_count,
-                expiration_date,
-            )
+                vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
+                log.info(f"Perfoming {vacuum_sql} operation...")
+                await conn.exec_driver_sql(vacuum_sql)
 
-        asyncio.run(_clear_redis_history())
-        asyncio.run(_clear_terminated_sessions())
+                curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
+                if ret := curs.fetchone():
+                    table_size = ret[0]
+                    log.info(
+                        "The number of rows of the `kernels` tables after cleanup: {}",
+                        table_size,
+                    )
+        log.info(
+            "Cleaned up {:,} database records older than {}.",
+            deleted_count,
+            expiration_date,
+        )
+
+    asyncio.run(_clear_redis_history())
+    asyncio.run(_clear_terminated_sessions())
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
