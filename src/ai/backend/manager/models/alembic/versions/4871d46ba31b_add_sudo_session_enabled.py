@@ -27,9 +27,7 @@ def upgrade():
             server_default=false(),
         ),
     )
-    pass
 
 
 def downgrade():
     op.drop_column("users", "sudo_session_enabled")
-    pass
