@@ -207,7 +207,6 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
-    LogSeverity,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -548,7 +547,7 @@ class LocalConfig(AbstractConfig):
         raise NotImplementedError
 
 
-def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
+def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalConfig:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
@@ -579,7 +578,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
     config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
@@ -588,7 +587,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
-        if "debug" in cfg and cfg["debug"]["enabled"]:
+        if cfg["debug"]["enabled"]:
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
         cfg["_src"] = cfg_src_path

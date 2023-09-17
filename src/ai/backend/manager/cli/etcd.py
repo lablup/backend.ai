@@ -102,8 +102,7 @@ def put(cli_ctx: CLIContext, key, value, scope) -> None:
             except Exception:
                 log.exception("An error occurred.")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
@@ -131,8 +130,7 @@ def put_json(cli_ctx: CLIContext, key, file, scope) -> None:
             except Exception:
                 log.exception("An error occurred.")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
@@ -164,8 +162,7 @@ def move_subtree(cli_ctx: CLIContext, src_prefix, dst_prefix, scope) -> None:
             except Exception:
                 log.exception("An error occurred.")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
@@ -202,8 +199,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
             except Exception:
                 log.exception("An error occurred.")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
@@ -230,8 +226,7 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
             except Exception:
                 log.exception("An error occurred.")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
@@ -240,9 +235,8 @@ def delete(cli_ctx: CLIContext, key, prefix, scope) -> None:
 @click.pass_obj
 def list_images(cli_ctx, short, installed) -> None:
     """List all configured images."""
-    with cli_ctx.logger:
-        log.warn("etcd list-images command is deprecated, use image list instead")
-        asyncio.run(list_images_impl(cli_ctx, short, installed))
+    log.warn("etcd list-images command is deprecated, use image list instead")
+    asyncio.run(list_images_impl(cli_ctx, short, installed))
 
 
 @cli.command()
@@ -251,9 +245,8 @@ def list_images(cli_ctx, short, installed) -> None:
 @click.pass_obj
 def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
     """Show the details of the given image or alias."""
-    with cli_ctx.logger:
-        log.warn("etcd inspect-image command is deprecated, use image inspect instead")
-        asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
+    log.warn("etcd inspect-image command is deprecated, use image inspect instead")
+    asyncio.run(inspect_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
 @cli.command()
@@ -262,9 +255,8 @@ def inspect_image(cli_ctx, canonical_or_alias, architecture) -> None:
 @click.pass_obj
 def forget_image(cli_ctx, canonical_or_alias, architecture) -> None:
     """Forget (delete) a specific image."""
-    with cli_ctx.logger:
-        log.warn("etcd forget-image command is deprecated, use image forget instead")
-        asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
+    log.warn("etcd forget-image command is deprecated, use image forget instead")
+    asyncio.run(forget_image_impl(cli_ctx, canonical_or_alias, architecture))
 
 
 @cli.command()
@@ -281,20 +273,18 @@ def set_image_resource_limit(
     architecture,
 ) -> None:
     """Set the MIN:MAX values of a SLOT_TYPE limit for the given image REFERENCE."""
-    with cli_ctx.logger:
-        log.warn(
-            "etcd set-image-resource-limit command is deprecated, "
-            "use image set-resource-limit instead"
+    log.warn(
+        "etcd set-image-resource-limit command is deprecated, use image set-resource-limit instead"
+    )
+    asyncio.run(
+        set_image_resource_limit_impl(
+            cli_ctx,
+            canonical_or_alias,
+            slot_type,
+            range_value,
+            architecture,
         )
-        asyncio.run(
-            set_image_resource_limit_impl(
-                cli_ctx,
-                canonical_or_alias,
-                slot_type,
-                range_value,
-                architecture,
-            )
-        )
+    )
 
 
 @cli.command()
@@ -306,9 +296,8 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
-    with cli_ctx.logger:
-        log.warn("etcd rescan-images command is deprecated, use image rescan instead")
-        asyncio.run(rescan_images_impl(cli_ctx, registry, False))
+    log.warn("etcd rescan-images command is deprecated, use image rescan instead")
+    asyncio.run(rescan_images_impl(cli_ctx, registry, False))
 
 
 @cli.command()
@@ -318,9 +307,8 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
 @click.pass_obj
 def alias(cli_ctx, alias, target, architecture) -> None:
     """Add an image alias from the given alias to the target image reference."""
-    with cli_ctx.logger:
-        log.warn("etcd alias command is deprecated, use image alias instead")
-        asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
+    log.warn("etcd alias command is deprecated, use image alias instead")
+    asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
 
 
 @cli.command()
@@ -328,9 +316,8 @@ def alias(cli_ctx, alias, target, architecture) -> None:
 @click.pass_obj
 def dealias(cli_ctx, alias) -> None:
     """Remove an alias."""
-    with cli_ctx.logger:
-        log.warn("etcd dealias command is deprecated, use image dealias instead")
-        asyncio.run(dealias_impl(cli_ctx, alias))
+    log.warn("etcd dealias command is deprecated, use image dealias instead")
+    asyncio.run(dealias_impl(cli_ctx, alias))
 
 
 @cli.command()
@@ -382,8 +369,7 @@ def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, s
                 ",".join([x.strip() for x in scaling_groups.split(",")]),
             )
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
@@ -409,5 +395,4 @@ def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scope) -> None
                 sys.exit(ExitCode.FAILURE)
             await etcd.delete(f"volumes/proxies/{proxy}/sftp_scaling_groups")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())

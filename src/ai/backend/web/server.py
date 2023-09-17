@@ -728,7 +728,7 @@ async def server_main(
     "-f",
     "--config",
     "config_path",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default="webserver.conf",
     help="The configuration file to use.",
 )
