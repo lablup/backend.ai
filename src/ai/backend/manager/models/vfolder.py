@@ -943,7 +943,7 @@ async def initiate_vfolder_removal(
                     )
 
             await execute_with_retry(_delete_row)
-            log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
             folder_ids = [str(vid) for vid in vfolder_ids]
             raise VFolderOperationFailed(extra_data={"folder_ids": folder_ids})
