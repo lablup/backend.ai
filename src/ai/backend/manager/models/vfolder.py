@@ -911,8 +911,12 @@ async def initiate_vfolder_removal(
 
     await execute_with_retry(_update_vfolder_status)
 
+    successful_deletion: list[VFolderDeletionInfo] = []
+    failed_deletion: list[VFolderDeletionInfo] = []
+
     async def _delete():
-        for folder_id, host_name in requested_vfolders:
+        for vfolder_info in requested_vfolders:
+            folder_id, host_name = vfolder_info
             proxy_name, volume_name = storage_manager.split_host(host_name)
             try:
                 async with storage_manager.request(
@@ -926,16 +930,24 @@ async def initiate_vfolder_removal(
                 ):
                     pass
             except aiohttp.ClientResponseError:
-                raise VFolderOperationFailed(extra_msg=str(folder_id))
+                failed_deletion.append(vfolder_info)
+            else:
+                successful_deletion.append(vfolder_info)
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in successful_deletion)
+        cond = vfolders.c.id.in_(vfolder_ids)
 
         async def _delete_row() -> None:
             async with db_engine.begin_session() as db_session:
                 await db_session.execute(sa.delete(vfolders).where(cond))
 
         await execute_with_retry(_delete_row)
-        log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+        if failed_deletion:
+            folder_ids = [str(vid) for vid in vfolder_ids]
+            raise VFolderOperationFailed(extra_data={"folder_ids": folder_ids})
+        else:
+            log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
 
-    storage_ptask_group.create_task(_delete())
+    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
     log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
 
     return vfolder_info_len
