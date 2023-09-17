@@ -217,8 +217,7 @@ async def server_main(
     "-f",
     "--config-path",
     "--config",
-    type=click.Path(exists=True, dir_okay=False),
-    path_type=Path,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
     help=(
         "The config file path. "
