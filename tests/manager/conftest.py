@@ -39,7 +39,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
-from ai.backend.manager.cli.context import CLIContext, init_logger
+from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
@@ -228,7 +228,6 @@ def etcd_fixture(
     # Clear and reset etcd namespace using CLI functions.
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
-        logger=init_logger(local_config, nested=True),
         local_config=local_config,
     )
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
@@ -380,7 +379,6 @@ def database(request, local_config, test_db):
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
-        logger=init_logger(local_config, nested=True),
         local_config=local_config,
     )
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"

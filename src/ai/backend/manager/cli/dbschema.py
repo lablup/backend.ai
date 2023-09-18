@@ -55,12 +55,11 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
         print(f"Current database revision: {current_rev}")
         print(f"The head revision of available migrations: {head_rev}")
 
-    with cli_ctx.logger:
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        assert sa_url is not None
-        sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
-        asyncio.run(_show(sa_url))
+    alembic_cfg = Config(alembic_config)
+    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    assert sa_url is not None
+    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+    asyncio.run(_show(sa_url))
 
 
 @cli.command()
@@ -124,9 +123,8 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
             '"down_revision" value in the earliest migration to "None".'
         )
 
-    with cli_ctx.logger:
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        assert sa_url is not None
-        sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
-        asyncio.run(_oneshot(sa_url))
+    alembic_cfg = Config(alembic_config)
+    sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+    assert sa_url is not None
+    sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+    asyncio.run(_oneshot(sa_url))
