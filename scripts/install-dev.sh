@@ -122,7 +122,7 @@ usage() {
   echo "    The base path for shared data files."
   echo "    (default: ./var/lib/backend.ai)"
   echo ""
-  echo "  ${LWHITE}--configure-ha ${NC}"
+  echo "  ${LWHITE}--configure-ha${NC}"
   echo "    Configure HA dev environment."
   echo "    (default: false)"
 }
