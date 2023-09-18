@@ -32,7 +32,7 @@ async def test_pubsub(redis_container: Tuple[str, HostPortPair], disruption_meth
     async def subscribe(pubsub: PubSub) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.subscribe(pubsub, reconnect_poll_interval=0.3),
+                redis_helper.subscribe(pubsub),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -120,7 +120,7 @@ async def test_pubsub_with_retrying_pub(
     async def subscribe(pubsub: PubSub) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.subscribe(pubsub, reconnect_poll_interval=0.3),
+                redis_helper.subscribe(pubsub),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()

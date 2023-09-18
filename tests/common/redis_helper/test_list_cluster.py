@@ -35,7 +35,6 @@ async def test_blist_cluster_sentinel(
                 redis_helper.blpop(
                     s,
                     key,
-                    reconnect_poll_interval=0.2,
                     service_name="mymaster",
                 ),
             ) as agen:

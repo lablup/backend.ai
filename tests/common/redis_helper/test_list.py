@@ -31,7 +31,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.blpop(r, key, reconnect_poll_interval=0.2),
+                redis_helper.blpop(r, key),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -113,7 +113,7 @@ async def test_blist_with_retrying_rpush(
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.blpop(r, key, reconnect_poll_interval=0.2),
+                redis_helper.blpop(r, key),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()

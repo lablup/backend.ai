@@ -67,7 +67,7 @@ async def test_pipeline_single_instance_retries(redis_container: Tuple[str, Host
         await pipe.incr("abc")
         return pipe
 
-    results = await execute(rconn, _build_pipeline_async, reconnect_poll_interval=0.01)
+    results = await execute(rconn, _build_pipeline_async)
     assert build_count == 3
     assert results[0] is True
     assert results[1] == 457
