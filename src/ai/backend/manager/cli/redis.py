@@ -45,5 +45,4 @@ def ping(cli_ctx: CLIContext) -> None:
             await _ping(redis_conn_set.stream)
             log.info("Redis is healthy")
 
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
