@@ -257,6 +257,9 @@ manager_local_config_iv = (
                     t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
                     t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
                     t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
+                    t.Key(
+                        "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
+                    ): tx.Path(type="file"),
                     t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
                     t.Key("secret", default=None): t.Null | t.String,
                     t.Key("ssl-enabled", default=False): t.ToBool,

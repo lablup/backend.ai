@@ -67,11 +67,12 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
     "-f",
     "--alembic-config",
     default="alembic.ini",
+    type=click.Path(exists=True, dir_okay=False),
     metavar="PATH",
     help="The path to Alembic config file. [default: alembic.ini]",
 )
 @click.pass_obj
-def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
+def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     """
     Set up your database with one-shot schema migration instead of
     iterating over multiple revisions if there is no existing database.

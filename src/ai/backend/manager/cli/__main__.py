@@ -152,9 +152,9 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
 
 @main.command()
 @click.pass_obj
-def generate_keypair(cli_ctx: CLIContext):
+def generate_api_keypair(cli_ctx: CLIContext) -> None:
     """
-    Generate a random keypair and print it out to stdout.
+    Generate a manager API keypair and print it out to stdout.
     """
     from ..models.keypair import generate_keypair as _gen_keypair
 
@@ -162,6 +162,40 @@ def generate_keypair(cli_ctx: CLIContext):
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
     print(f"Secret Key: {sk} ({len(sk)} bytes)")
+
+
+@main.command()
+@click.argument(
+    "dst_dir",
+    type=click.Path(
+        file_okay=False,
+        dir_okay=True,
+        exists=True,
+        writable=True,
+        path_type=pathlib.Path,
+    ),
+)
+@click.argument(
+    "name",
+    type=str,
+)
+@click.pass_obj
+def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) -> None:
+    """
+    Generate a ZeroMQ CURVE keypair for use in manager-agent RPC and print it out to stdout.
+
+    \b
+    DST_DIR: The target directory to store .key/.key_secret files
+    NAME: The name of generated key files
+    """
+    from zmq.auth.certs import create_certificates, load_certificate
+
+    log.info("Generating a RPC keypair...")
+    public_key_path, secret_key_path = create_certificates(dst_dir, name)
+    public_key, secret_key = load_certificate(secret_key_path)
+    assert secret_key is not None
+    print(f"Public Key: {public_key.decode('ascii')} (stored at {public_key_path})")
+    print(f"Secret Key: {secret_key.decode('ascii')} (stored at {secret_key_path})")
 
 
 @main.command()
@@ -320,7 +354,12 @@ def image():
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.redis:cli")
 def redis():
-    """Command set for putting/getting data to/from redis."""
+    """Command set for Redis related operations."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.agent:cli")
+def agent():
+    """Command set for agent related operations."""
 
 
 if __name__ == "__main__":

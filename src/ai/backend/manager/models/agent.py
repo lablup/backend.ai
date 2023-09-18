@@ -20,6 +20,7 @@ from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, Resou
 
 from .base import (
     Base,
+    CurvePublicKeyColumn,
     EnumType,
     Item,
     PaginatedList,
@@ -84,6 +85,7 @@ agents = sa.Table(
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("addr", sa.String(length=128), nullable=False),
     sa.Column("public_host", sa.String(length=256), nullable=True),
+    sa.Column("public_key", CurvePublicKeyColumn(), nullable=True),
     sa.Column("first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("version", sa.String(length=64), nullable=False),
@@ -130,7 +132,7 @@ class Agent(graphene.ObjectType):
     schedulable = graphene.Boolean()
     available_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()
-    addr = graphene.String()
+    addr = graphene.String()  # bind/advertised host:port
     architecture = graphene.String()
     first_contact = GQLDateTime()
     lost_at = GQLDateTime()
