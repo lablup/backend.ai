@@ -7,17 +7,7 @@ import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Final,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
 import aiotools
 import async_timeout
@@ -44,6 +34,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -52,7 +43,6 @@ from ai.backend.common.types import (
     SessionTypes,
     aobject,
 )
-from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory, UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -62,7 +52,9 @@ from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
+    AgentRow,
     AgentStatus,
+    EndpointLifecycle,
     EndpointRow,
     KernelRow,
     KernelStatus,
@@ -187,6 +179,7 @@ class SchedulerDispatcher(aobject):
             self.event_producer,
             lambda: DoScheduleEvent(),
             interval=10.0,
+            task_name="schedule_timer",
         )
         self.prepare_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
@@ -194,6 +187,7 @@ class SchedulerDispatcher(aobject):
             lambda: DoPrepareEvent(),
             interval=10.0,
             initial_delay=5.0,
+            task_name="prepare_timer",
         )
         self.scale_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
@@ -201,6 +195,7 @@ class SchedulerDispatcher(aobject):
             lambda: DoScaleEvent(),
             interval=10.0,
             initial_delay=7.0,
+            task_name="scale_timer",
         )
         await self.schedule_timer.join()
         await self.prepare_timer.join()
@@ -443,12 +438,10 @@ class SchedulerDispatcher(aobject):
                 return check_results
 
             check_results = await execute_with_retry(_check_predicates)
-            has_failure = False
             failed_predicates = []
             passed_predicates = []
             for predicate_name, result in check_results:
                 if isinstance(result, Exception):
-                    has_failure = True
                     failed_predicates.append(
                         {
                             "name": predicate_name,
@@ -469,14 +462,45 @@ class SchedulerDispatcher(aobject):
                             "msg": result.message or "",
                         }
                     )
-                    has_failure = True
+
+            async def _check_predicates_hook() -> HookResult:
+                async with self.db.begin_readonly_session() as db_sess:
+                    return await self.registry.hook_plugin_ctx.dispatch(
+                        "PREDICATE",
+                        (
+                            db_sess,
+                            sched_ctx,
+                            sess_ctx,
+                        ),
+                    )
+
+            hook_result = await execute_with_retry(_check_predicates_hook)
+            match hook_result.src_plugin:
+                case str():
+                    hook_name = hook_result.src_plugin
+                case list():
+                    hook_name = f"({', '.join(hook_result.src_plugin)})"
+                case _:
+                    hook_name = ""
+
+            if hook_result.status == PASSED:
+                if hook_result.src_plugin:
+                    # Append result only when plugin exists.
+                    passed_predicates.append({"name": hook_name})
+            else:
+                failed_predicates.append(
+                    {
+                        "name": hook_name,
+                        "msg": hook_result.reason or "",
+                    }
+                )
 
             status_update_data = {
                 "last_try": datetime.now(tzutc()).isoformat(),
                 "failed_predicates": failed_predicates,
                 "passed_predicates": passed_predicates,
             }
-            if has_failure:
+            if failed_predicates:
                 log.debug(log_fmt + "predicate-checks-failed (temporary)", *log_args)
 
                 async def _cancel_failed_system_session() -> None:
@@ -1114,27 +1138,25 @@ class SchedulerDispatcher(aobject):
         # Altering inference sessions should only be done by this method
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
-        endpoints_to_remove: set[EndpointRow] = set()
+        endpoints_to_mark_terminated: set[EndpointRow] = set()
         async with self.db.begin_readonly_session() as session:
-            endpoints = await EndpointRow.list(session, load_image=True, load_routes=True)
-        # endpoints_to_flush = [
-        #     endpoint.id
-        #     for endpoint in endpoints
-        #     if endpoint.desired_session_count < 0 and len(endpoint.routings) == 0
-        # ]
-        # async with self.db.begin_session() as session:
-        #     query = sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoints_to_flush))
-        #     await session.execute(query)
+            endpoints = await EndpointRow.list(
+                session,
+                load_image=True,
+                load_routes=True,
+                status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
+            )
         for endpoint in endpoints:
             non_error_routings = [
                 r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
             ]
             desired_session_count = endpoint.desired_session_count
-            if desired_session_count < 0:
-                desired_session_count = 0
-                if len(endpoint.routings) == 0:
-                    endpoints_to_remove.add(endpoint)
-                    continue
+            if (
+                endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
+                and len(endpoint.routings) == 0
+            ):
+                endpoints_to_mark_terminated.add(endpoint)
+                continue
 
             if len(non_error_routings) > desired_session_count:
                 # We need to scale down!
@@ -1208,6 +1230,7 @@ class SchedulerDispatcher(aobject):
                         users.c.uuid,
                         users.c.role,
                         users.c.domain_name,
+                        users.c.sudo_session_enabled,
                         keypairs.c.access_key,
                         keypairs.c.resource_policy,
                     ]
@@ -1279,16 +1302,39 @@ class SchedulerDispatcher(aobject):
                         callback_url=endpoint.callback_url,
                         enqueue_only=True,
                         endpoint_id=endpoint.id,
+                        sudo_session_enabled=user_id_row_mapping[
+                            endpoint.session_owner
+                        ].sudo_session_enabled,
                     )
                 except Exception:
                     # TODO: Handle
                     log.exception("error while creating session:")
 
-        async with self.db.begin_session() as sess:
-            query = sa.delete(EndpointRow).where(
-                EndpointRow.id.in_([e.id for e in endpoints_to_remove])
-            )
-            await sess.execute(query)
+        async def _delete():
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.update(EndpointRow)
+                    .values(
+                        {
+                            "destroyed_at": sa.func.now(),
+                            "lifecycle_stage": EndpointLifecycle.DESTROYED,
+                        }
+                    )
+                    .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
+                )
+                await db_sess.execute(query)
+
+        await execute_with_retry(_delete)
+
+        async with self.db.begin_readonly_session() as db_sess:
+            for endpoint in endpoints_to_mark_terminated:
+                try:
+                    await self.registry.delete_appproxy_endpoint(
+                        db_sess,
+                        endpoint,
+                    )
+                except Exception as e:
+                    log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
 
     async def start_session(
         self,

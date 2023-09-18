@@ -54,13 +54,11 @@ def populate(cli_ctx: CLIContext, fixture_path) -> None:
             await engine.dispose()
 
     """Populate fixtures."""
-    with cli_ctx.logger:
-        asyncio.run(_impl())
+    asyncio.run(_impl())
 
 
 @cli.command()
 @click.pass_obj
 def list(cli_ctx: CLIContext) -> None:
     """List all available fixtures."""
-    with cli_ctx.logger:
-        log.warning("This command is deprecated.")
+    log.warning("This command is deprecated.")

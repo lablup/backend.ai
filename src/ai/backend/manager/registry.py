@@ -115,7 +115,6 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.manager.models.routing import RouteStatus
 
 from .api.exceptions import (
     AgentError,
@@ -132,11 +131,7 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import (
-    DEFAULT_IMAGE_ARCH,
-    DEFAULT_ROLE,
-    INTRINSIC_SLOTS,
-)
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -146,6 +141,7 @@ from .models import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
+    EndpointLifecycle,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,
@@ -154,6 +150,7 @@ from .models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    RouteStatus,
     RoutingRow,
     SessionDependencyRow,
     SessionRow,
@@ -502,6 +499,7 @@ class AgentRegistry:
         callback_url: Optional[yarl.URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
+        sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
         resp: MutableMapping[str, Any] = {}
@@ -660,6 +658,7 @@ class AgentRegistry:
                         public_sgroup_only=public_sgroup_only,
                         endpoint_id=endpoint_id,
                         traffic_ratio=traffic_ratio,
+                        sudo_session_enabled=sudo_session_enabled,
                     )
                 ),
             )
@@ -726,6 +725,7 @@ class AgentRegistry:
         tag: str,
         enqueue_only=False,
         max_wait_seconds=0,
+        sudo_session_enabled=False,
     ) -> Mapping[str, Any]:
         resp: MutableMapping[str, Any] = {}
 
@@ -874,6 +874,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         session_tag=tag,
+                        sudo_session_enabled=sudo_session_enabled,
                     ),
                 )
             )
@@ -956,6 +957,7 @@ class AgentRegistry:
         callback_url: Optional[URL] = None,
         endpoint_id: Optional[uuid.UUID] = None,
         traffic_ratio: Optional[float] = None,
+        sudo_session_enabled: bool = False,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
 
@@ -1299,6 +1301,9 @@ class AgentRegistry:
 
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
+                    if sudo_session_enabled:
+                        environ["SUDO_SESSION_ENABLED"] = "1"
+
                     session_data["environ"] = environ
                     session_data["requested_slots"] = session_requested_slots
                     session = SessionRow(**session_data)
@@ -2093,15 +2098,25 @@ class AgentRegistry:
         async def _update_by_fullscan(r: Redis):
             updates = {}
             keys = await r.keys(f"{kp_key}.*")
-            for ak in keys:
+            for stat_key in keys:
+                if isinstance(stat_key, bytes):
+                    _stat_key = stat_key.decode("utf-8")
+                else:
+                    _stat_key = stat_key
+                ak = _stat_key.replace(f"{kp_key}.", "")
                 session_concurrency = concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
-                updates[f"{kp_key}.{ak}"] = usage
+                updates[_stat_key] = usage
             keys = await r.keys(f"{sftp_kp_key}.*")
-            for ak in keys:
+            for stat_key in keys:
+                if isinstance(stat_key, bytes):
+                    _stat_key = stat_key.decode("utf-8")
+                else:
+                    _stat_key = stat_key
+                ak = _stat_key.replace(f"{sftp_kp_key}.", "")
                 session_concurrency = sftp_concurrency_used_per_key.get(ak)
                 usage = len(session_concurrency) if session_concurrency is not None else 0
-                updates[f"{sftp_kp_key}.{ak}"] = usage
+                updates[_stat_key] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
 
@@ -2575,7 +2590,7 @@ class AgentRegistry:
                     keepalive_timeout=self.rpc_keepalive_timeout,
                 ) as rpc:
                     updated_config: Dict[str, Any] = {
-                        # TODO: support resacling of sub-containers
+                        # TODO: support rescaling of sub-containers
                     }
                     kernel_info = await rpc.call.restart_kernel(
                         str(kernel.session_id),
@@ -3619,7 +3634,7 @@ async def invoke_session_callback(
         # Update routing status
         # TODO: Check session health
         if session.session_type == SessionTypes.INFERENCE:
-            async with context.db.begin_session() as db_sess:
+            async with context.db.begin_readonly_session() as db_sess:
                 route = await RoutingRow.get_by_session(db_sess, session.id, load_endpoint=True)
                 endpoint = await EndpointRow.get(db_sess, route.endpoint, load_routes=True)
 
@@ -3642,17 +3657,7 @@ async def invoke_session_callback(
                     elif isinstance(event, SessionTerminatedEvent):
                         query = sa.delete(RoutingRow).where(RoutingRow.id == route.id)
                         await db_sess.execute(query)
-                        if (
-                            len(endpoint.routings) == 1
-                            and endpoint.desired_session_count < 0  # we just removed last one
-                        ):
-                            query = sa.delete(EndpointRow).where(EndpointRow.id == endpoint.id)
-                            await db_sess.execute(query)
-                            try:
-                                await context.delete_appproxy_endpoint(db_sess, endpoint)
-                            except Exception as e:
-                                log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
-                        else:
+                        if endpoint.lifecycle_stage == EndpointLifecycle.CREATED:
                             new_routes = [
                                 r
                                 for r in endpoint.routings

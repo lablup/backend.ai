@@ -66,7 +66,8 @@
       "Tasks": "__NOT_TRANSLATED__",
       "YouMushChangeYourPassword": "__NOT_TRANSLATED__",
       "NewPasswordCannotBeSame": "__NOT_TRANSLATED__",
-      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__"
+      "PleaseConfirmYourPassword": "__NOT_TRANSLATED__",
+      "InputNewPassword": "__NOT_TRANSLATED__"
     },
     "LOGINREQUIRED": "НЭВТРЭХ ШААРДЛАГАТАЙ",
     "YouAreOffline": "Та одоо офлайн байна",
@@ -208,6 +209,7 @@
       "ProxyConfiguratorNotResponding": "Прокси тохируулагч хариу өгөхгүй байна.",
       "SettingUpProxyForApp": "Апп-д прокси тохируулж байна ...",
       "AddingKernelToSocketQueue": "Цөмийг сокет дараалалд нэмж оруулах ...",
+      "FailedToConnectCoordinator": "Өргөдлийн аппликейшнтай холбогдох амжилтгүй боллоо. Сүлжээний холболт болон цахилгаан хорогдлын тохиргоог шалгана уу.",
       "ManualImageName": "Image нэр (гар арга)",
       "NotEnoughResource": "Нөөц хангалттай биш байна",
       "ResourceAllocationTemplate": "Нөөцийг хуваарилах загвар",
@@ -263,7 +265,8 @@
       "PortsTitleWithRange": "__NOT_TRANSLATED__",
       "PrePortConfigWillDisappear": "__NOT_TRANSLATED__",
       "PreOpenPortPanelTitle": "__NOT_TRANSLATED__",
-      "PreOpenPortRange": "__NOT_TRANSLATED__"
+      "PreOpenPortRange": "__NOT_TRANSLATED__",
+      "MinMemory": "__NOT_TRANSLATED__"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -300,7 +303,9 @@
       "AppMustBeRunDialog": "Энэ програмыг зөвхөн терминал дээр ажиллаж байгаа тохиолдолд л нэвтрэх, ашиглах боломжтой. Хэрэв тийм биш бол програм ажиллахгүй байх үед гарах алдааны хуудас руу чиглүүлэх болно.",
       "ConfirmAndRun": "Шалгасан тул эхлүүлж болно",
       "Prepared": "Бэлтгэсэн",
-      "App": "__NOT_TRANSLATED__"
+      "App": "__NOT_TRANSLATED__",
+      "NoExistingConnectionExample": "Хуулбарлах холболтын жишээ байхгүй.",
+      "SSHConnectionExampleClipboardCopy": "SSH холболтын жишээг санах ой руу хуулсан."
     },
     "TensorboardPath": "TensorBoard-ийн бүртгэлийн лавлах",
     "InputTensorboardPath": "TensorBoard-ийн лавлах лавлах санг оруулна уу. Бүртгэлийн лавлах автоматаар үүсгэхгүй гэдгийг анхаарна уу.",
@@ -736,13 +741,16 @@
     "ProjectFolder": "__NOT_TRANSLATED__",
     "QuotaPerStorageVolume": "__NOT_TRANSLATED__",
     "HostDetails": "__NOT_TRANSLATED__",
-    "Used": "__NOT_TRANSLATED__"
+    "Used": "__NOT_TRANSLATED__",
+    "Pipeline": "__NOT_TRANSLATED__",
+    "DialogDataFolder": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "АНХААРУУЛГА: үүнийг буцаах боломжгүй!",
       "LogDeletion": "Бүртгэлийн бүх мессежийг устгахдаа итгэлтэй байна уу?",
-      "WillBeAppliedToNewSessions": "Энэхүү шинэчлэлтийг шинэ Sessionүүдэд ашиглах болно."
+      "WillBeAppliedToNewSessions": "Энэхүү шинэчлэлтийг шинэ Sessionүүдэд ашиглах болно.",
+      "Required": "__NOT_TRANSLATED__"
     },
     "ask": {
       "DoYouWantToProceed": "Та үргэлжлүүлэхийг хүсч байна уу?"
@@ -1363,7 +1371,8 @@
     "CreatingComputeSession": "Тооцоолох session үүсгэж байна ...",
     "SessionStillPreparing": "Session бэлтгэл ажил үргэлжилж байна. Хэсэг хугацааны дараа дахин ажиллуулна уу",
     "ComputeSessionPrepared": "Тооцоолох хэсгийг бэлтгэсэн",
-    "sessionStatusIs": "Session-ий байдал"
+    "sessionStatusIs": "Session-ий байдал",
+    "EmptyProject": "__NOT_TRANSLATED__"
   },
   "error": {
     "UpdateError": "Шинэчлэлтийн алдаа",
@@ -1493,6 +1502,28 @@
     "YouAreAboutToTerminate": "__NOT_TRANSLATED__",
     "FailedToStartService": "__NOT_TRANSLATED__",
     "ServingRouteErrorModalTitle": "__NOT_TRANSLATED__",
-    "ClearErrors": "__NOT_TRANSLATED__"
+    "ClearErrors": "__NOT_TRANSLATED__",
+    "GeneratedTokens": "__NOT_TRANSLATED__",
+    "CurrentTime": "__NOT_TRANSLATED__",
+    "ExpiredTime": "__NOT_TRANSLATED__",
+    "GenerateNewToken": "__NOT_TRANSLATED__",
+    "GenerateToken": "__NOT_TRANSLATED__",
+    "Generate": "__NOT_TRANSLATED__",
+    "CreatedAt": "__NOT_TRANSLATED__",
+    "TokenGenerated": "__NOT_TRANSLATED__",
+    "TokenGenerationFailed": "__NOT_TRANSLATED__",
+    "PleaseSelectTime": "__NOT_TRANSLATED__",
+    "ExpiredDate": "__NOT_TRANSLATED__",
+    "TokenExpiredDateHelp": "__NOT_TRANSLATED__",
+    "TokenExpiredDateError": "__NOT_TRANSLATED__",
+    "FormValidationFailed": "__NOT_TRANSLATED__",
+    "ServiceNameRule": "__NOT_TRANSLATED__",
+    "resources": "__NOT_TRANSLATED__"
+  },
+  "ErrorBoundary": {
+    "title": "__NOT_TRANSLATED__",
+    "reloadPage": "__NOT_TRANSLATED__",
+    "resetErrorBoundary": "__NOT_TRANSLATED__",
+    "displayOnlyDevEnv": "__NOT_TRANSLATED__"
   }
 }

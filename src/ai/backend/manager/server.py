@@ -254,7 +254,9 @@ async def exception_middleware(
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
-            raise MethodNotAllowed(concrete_ex.method, concrete_ex.allowed_methods)
+            raise MethodNotAllowed(
+                method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
+            )
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
@@ -920,23 +922,16 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
-) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = False) -> None:
     """
     Start the manager service as a foreground process.
     """
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
-    cfg = load_config(config_path, log_level.value)
+    cfg = load_config(config_path, "DEBUG" if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

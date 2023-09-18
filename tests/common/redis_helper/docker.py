@@ -11,6 +11,8 @@ from typing import AsyncIterator, Tuple
 import aiohttp
 import async_timeout
 import pytest
+from packaging.version import Version
+from packaging.version import parse as parse_version
 
 from ai.backend.testutils.pants import get_parallel_slot
 
@@ -116,21 +118,28 @@ async def is_snap_docker():
 
 
 class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
-    async def probe_docker_compose(self) -> list[str]:
+    async def probe_docker_compose(self) -> tuple[tuple[str, ...], Version]:
         # Try v2 first and fallback to v1
-        p = await asyncio.create_subprocess_exec(
-            "docker",
-            "compose",
-            "version",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        exit_code = await p.wait()
-        if exit_code == 0:
-            compose_cmd = ["docker", "compose"]
+        for compose_cmd in [("docker", "compose"), ("docker-compose",)]:
+            try:
+                p = await asyncio.create_subprocess_exec(
+                    *compose_cmd,
+                    "version",
+                    "--format=json",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                assert p.stdout is not None
+                stdout = await p.stdout.read()
+                version_data = json.loads(stdout)
+                compose_version = parse_version(version_data["version"])
+                exit_code = await p.wait()
+                if exit_code == 0:
+                    return compose_cmd, compose_version
+            except FileNotFoundError:
+                continue
         else:
-            compose_cmd = ["docker-compose"]
-        return compose_cmd
+            raise RuntimeError("Could not detect the docker compose version")
 
     @contextlib.asynccontextmanager
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
@@ -138,7 +147,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         template_compose_file = template_cfg_dir / "redis-cluster.yml"
         assert template_compose_file.exists()
         project_name = f"{self.test_ns}_{self.test_case_ns}"
-        compose_cmd = await self.probe_docker_compose()
+        compose_cmd, compose_version = await self.probe_docker_compose()
 
         template_cfg_files = [
             "redis-cluster.yml",
@@ -230,7 +239,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             )
             try:
                 assert p.stdout is not None
-                ps_output = json.loads(await p.stdout.read())
+                ps_output = []
+                if compose_version >= Version("2.21.0"):
+                    # Adapt to a breaking change in docker/compose#10918!
+                    # Fortunately we only use the "ID" field from each container object.
+                    while True:
+                        line = await p.stdout.readline()
+                        if not line:
+                            break
+                        ps_output.append(json.loads(line))
+                else:
+                    ps_output = json.loads(await p.stdout.read())
                 pprint(f"{ps_output=}")
             except json.JSONDecodeError:
                 pytest.fail(
