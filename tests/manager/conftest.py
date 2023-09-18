@@ -33,6 +33,7 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -759,6 +760,7 @@ async def registry_ctx(mocker):
     mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
+    mock_agent_cache = MagicMock()
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
@@ -792,6 +794,9 @@ async def registry_ctx(mocker):
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
+        agent_cache=mock_agent_cache,
+        manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
+        manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )
     await registry.init()
     try:
