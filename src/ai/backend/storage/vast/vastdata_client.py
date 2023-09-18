@@ -42,9 +42,9 @@ class RequestMethod(Enum):
 
 
 GET = RequestMethod.GET
-POST = RequestMethod.GET
-PATCH = RequestMethod.GET
-DELETE = RequestMethod.GET
+POST = RequestMethod.POST
+PATCH = RequestMethod.PATCH
+DELETE = RequestMethod.DELETE
 
 
 class TokenData(TypedDict):
@@ -119,6 +119,7 @@ class VastQuota:
 
 class VastAPIClient:
     api_endpoint: URL
+    api_version: APIVersion
     username: str
     password: str
     ssl_context: ssl.SSLContext | bool | None
@@ -133,13 +134,14 @@ class VastAPIClient:
         password: str,
         *,
         api_version: APIVersion,
-        storage_base_dir: Path,
+        storage_base_dir: str,
         ssl: ssl.SSLContext | bool | None = None,
     ) -> None:
-        self.api_endpoint = URL(endpoint) / "api" / str(api_version)
+        self.api_endpoint = URL(endpoint)
+        self.api_version = api_version
         self.username = username
         self.password = password
-        self.storage_base_dir = storage_base_dir
+        self.storage_base_dir = Path(storage_base_dir)
 
         self._auth_token = None
         self.ssl_context = ssl
@@ -152,17 +154,17 @@ class VastAPIClient:
             "Content-Type": "application/json",
         }
 
-    async def _validate_token(self, sess: aiohttp.ClientSession) -> None:
+    async def _validate_token(self) -> None:
         current_dt = datetime.now()
         if self._auth_token is None:
-            return await self._login(sess)
+            return await self._login()
         elif self._auth_token["access_token"]["issued_dt"] + DEFAULT_ACCESS_TOKEN_SPAN > current_dt:
             return
         elif (
             self._auth_token["refresh_token"]["issued_dt"] + DEFAULT_REFRESH_TOKEN_SPAN > current_dt
         ):
-            return await self._refresh(sess)
-        return await self._login(sess)
+            return await self._refresh()
+        return await self._login()
 
     def _parse_token(self, data: Mapping[str, Any]) -> None:
         current_dt = datetime.now()
@@ -170,27 +172,39 @@ class VastAPIClient:
         refresh_token = TokenData(token=data["refresh"], issued_dt=current_dt)
         self._auth_token = TokenPair(access_token=access_token, refresh_token=refresh_token)
 
-    async def _refresh(self, sess: aiohttp.ClientSession) -> None:
+    async def _refresh(self) -> None:
         if self._auth_token is None:
             raise VastUnauthorizedError("Cannot refresh without refresh token.")
-        response = await sess.post(
-            "/api/token/refresh",
-            data={"refresh_token": self._auth_token["refresh_token"]["token"]},
-            ssl=self.ssl_context,
-        )
+        async with aiohttp.ClientSession(
+            base_url=self.api_endpoint,
+        ) as sess:
+            response = await sess.post(
+                f"/api/{str(self.api_version)}/token/refresh/",
+                headers={
+                    "Accept": "*/*",
+                },
+                data={"refresh_token": self._auth_token["refresh_token"]["token"]},
+                ssl=self.ssl_context,
+            )
         data = await response.json()
         self._parse_token(data)
 
-    async def _login(self, sess: aiohttp.ClientSession) -> None:
-        response = await sess.post(
-            "/api/token",
-            data={
-                "username": self.username,
-                "password": self.password,
-            },
-            ssl=self.ssl_context,
-        )
-        data = await response.json()
+    async def _login(self) -> None:
+        async with aiohttp.ClientSession(
+            base_url=self.api_endpoint,
+        ) as sess:
+            response = await sess.post(
+                f"/api/{str(self.api_version)}/token/",
+                headers={
+                    "Accept": "*/*",
+                },
+                data={
+                    "username": self.username,
+                    "password": self.password,
+                },
+                ssl=self.ssl_context,
+            )
+            data = await response.json()
         self._parse_token(data)
 
     async def _build_request(
@@ -200,7 +214,7 @@ class VastAPIClient:
         path: str,
         body: Mapping[str, Any] | None = None,
     ) -> aiohttp.ClientResponse:
-        await self._validate_token(sess)
+        await self._validate_token()
 
         match method:
             case RequestMethod.GET:
@@ -214,7 +228,8 @@ class VastAPIClient:
             case _:
                 raise VastAPIError(f"Unsupported request method {method}")
 
-        return await func(path, headers=self._req_header, json=body, ssl=self.ssl_context)
+        real_rel_path = URL("/api/") / str(self.api_version) / path
+        return await func(real_rel_path, headers=self._req_header, json=body, ssl=self.ssl_context)
 
     async def list_quotas(self) -> list[VastQuota]:
         async with aiohttp.ClientSession(
@@ -223,7 +238,7 @@ class VastAPIClient:
             response = await self._build_request(
                 sess,
                 GET,
-                "/quotas/",
+                "quotas/",
             )
             data: list[Mapping[str, Any]] = await response.json()
         return [VastQuota.from_json(info) for info in data]
@@ -235,7 +250,7 @@ class VastAPIClient:
             response = await self._build_request(
                 sess,
                 GET,
-                f"/quotas/{str(vast_quota_id)}/",
+                f"quotas/{str(vast_quota_id)}/",
             )
             if response.status == 404:
                 return None
@@ -256,7 +271,7 @@ class VastAPIClient:
     ) -> VastQuota:
         body: dict[str, Any] = {
             "name": str(path),
-            "path": self.storage_base_dir / path.name,
+            "path": str(self.storage_base_dir / path.name),
             "create_dir": False,  # Explicitly disable to create directory owned by root.
         }
         if soft_limit is not None:
@@ -276,7 +291,7 @@ class VastAPIClient:
             response = await self._build_request(
                 sess,
                 POST,
-                "/quotas/",
+                "quotas/",
                 body,
             )
             data: Mapping[str, Any] = await response.json()
@@ -322,7 +337,7 @@ class VastAPIClient:
             response = await self._build_request(
                 sess,
                 PATCH,
-                f"/quotas/{vast_quota_id}/",
+                f"quotas/{vast_quota_id}/",
                 body,
             )
             data: Mapping[str, Any] = await response.json()
@@ -345,7 +360,7 @@ class VastAPIClient:
             response = await self._build_request(
                 sess,
                 DELETE,
-                f"/quotas/{vast_quota_id}",
+                f"quotas/{vast_quota_id}/",
             )
             if response.status == 404:
                 raise VastNotFoundError
@@ -354,7 +369,7 @@ class VastAPIClient:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
-            response = await self._build_request(sess, GET, f"/cluster/{cluster_id}/")
+            response = await self._build_request(sess, GET, f"cluster/{cluster_id}/")
             data: Mapping[str, Any] = await response.json()
             match response.status:
                 case 200:
@@ -370,7 +385,7 @@ class VastAPIClient:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
-            response = await self._build_request(sess, GET, "/capacity/")
+            response = await self._build_request(sess, GET, "capacity/")
             data: Mapping[str, Any] = await response.json()
 
         def _parse(detail_info: Mapping[str, Any]) -> CapacityUsage:
