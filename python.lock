@@ -36,7 +36,7 @@
 //     "backend.ai-krunner-static-gnu==4.1.0",
 //     "boto3~=1.26",
 //     "cachetools~=5.2.0",
-//     "callosum~=0.9.10",
+//     "callosum~=1.0.1",
 //     "cattrs~=22.2.0",
 //     "click~=8.1.7",
 //     "colorama>=0.4.4",
@@ -927,44 +927,47 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3f17e34abc01ae71fef9d30bbea86a1e8eb155e24f23ae8121196a59964c6f04",
-              "url": "https://files.pythonhosted.org/packages/3b/bf/54362d591b09948f707e4066baade96e7014b8f7af1d1672dcc7e05d6fdd/callosum-0.9.10-py3-none-any.whl"
+              "hash": "09b7c7d3f697d5252cca8e200fcdc6710ed53be608905f6b8fa9ef7e04d43b7c",
+              "url": "https://files.pythonhosted.org/packages/48/71/0eedc7f84de70e67d286055960c3b617371e6b47072689e6ed8afd3f4599/callosum-1.0.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f8b48397a768511cdf8c290b727e4adc6300831d3f82679b8b1b55278fce634c",
-              "url": "https://files.pythonhosted.org/packages/18/6e/a5fdcd76e6aaa52f13721046470139ca1b8beab8f3a5feed8800b1181f17/callosum-0.9.10.tar.gz"
+              "hash": "da0f1960be20afaae95b02d4387b841d050f18f2e708a823e140777cd365ccb5",
+              "url": "https://files.pythonhosted.org/packages/b6/6a/441d605d34a029c4690a5ca97bd58384ea272b2708bfd72c191b5d7208db/callosum-1.0.1.tar.gz"
             }
           ],
           "project_name": "callosum",
           "requires_dists": [
             "Click>=8.0; extra == \"test\"",
-            "aioredis<2.0,>=1.3.0; extra == \"redis\"",
-            "aiotools>=0.9.1",
-            "async-timeout>=3.0.1",
-            "attrs>=21.2.0",
-            "codecov; extra == \"test\"",
-            "flake8>=3.9; extra == \"lint\"",
-            "msgpack>=1.0.0",
-            "mypy>=0.910; extra == \"typecheck\"",
-            "pytest-asyncio>=0.15.0; extra == \"test\"",
-            "pytest-cov; extra == \"test\"",
-            "pytest-mock; extra == \"test\"",
-            "pytest~=6.2; extra == \"test\"",
-            "python-dateutil>=2.8.1",
-            "python-snappy>=0.5.4; extra == \"snappy\"",
-            "pyzmq>=19.0.0; extra == \"zeromq\"",
+            "attrs>=21.3.0",
+            "black~=23.9.1; extra == \"lint\"",
+            "build>=1.0.3; extra == \"build\"",
+            "codecov>=2.1; extra == \"test\"",
+            "msgpack>=1.0.4",
+            "mypy~=1.5.1; extra == \"typecheck\"",
+            "pre-commit; extra == \"dev\"",
+            "pytest-asyncio~=0.21; extra == \"test\"",
+            "pytest-cov>=4.0; extra == \"test\"",
+            "pytest-mock>=3.10; extra == \"test\"",
+            "pytest~=7.2.2; extra == \"test\"",
+            "python-dateutil>=2.8.2",
+            "python-snappy>=0.6.1; extra == \"snappy\"",
+            "pyzmq>=23.0.0; extra == \"zeromq\"",
+            "redis>=4.6.0; extra == \"redis\"",
+            "ruff-lsp>=0.0.38; extra == \"lint\"",
+            "ruff>=0.0.287; extra == \"lint\"",
             "sphinx-autodoc-typehints; extra == \"docs\"",
-            "sphinx; extra == \"docs\"",
+            "sphinx~=4.3; extra == \"docs\"",
             "temporenc>=0.1",
-            "thriftpy2>=0.4.9; extra == \"thrift\"",
-            "towncrier>=19.2.0; extra == \"build\"",
-            "twine>=3.1.0; extra == \"build\"",
+            "thriftpy2>=0.4.16; extra == \"thrift\"",
+            "towncrier~=22.12; extra == \"build\"",
+            "twine~=4.0; extra == \"build\"",
             "types-python-dateutil; extra == \"typecheck\"",
-            "wheel>=0.33.6; extra == \"build\""
+            "wheel>=0.41.0; extra == \"build\"",
+            "yarl>=1.8.2"
           ],
-          "requires_python": ">=3.8",
-          "version": "0.9.10"
+          "requires_python": ">=3.11",
+          "version": "1.0.1"
         },
         {
           "artifacts": [
@@ -4109,19 +4112,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "440d5dd3af93b060174bf433bccd69b0babc3b15b1a8dca43789fd7f61514b36",
-              "url": "https://files.pythonhosted.org/packages/ec/6b/63cc3df74987c36fe26157ee12e09e8f9db4de771e0f3404263117e75b95/typing_extensions-4.7.1-py3-none-any.whl"
+              "hash": "8f92fc8806f9a6b641eaa5318da32b44d401efaac0f6678c9bc448ba3605faa0",
+              "url": "https://files.pythonhosted.org/packages/24/21/7d397a4b7934ff4028987914ac1044d3b7d52712f30e2ac7a2ae5bc86dd0/typing_extensions-4.8.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b75ddc264f0ba5615db7ba217daeb99701ad295353c45f9e95963337ceeeffb2",
-              "url": "https://files.pythonhosted.org/packages/3c/8b/0111dd7d6c1478bf83baa1cab85c686426c7a6274119aceb2bd9d35395ad/typing_extensions-4.7.1.tar.gz"
+              "hash": "df8e4339e9cb77357558cbdbceca33c303714cf861d1eef15e1070055ae8b7ef",
+              "url": "https://files.pythonhosted.org/packages/1f/7a/8b94bb016069caa12fc9f587b28080ac33b4fbb8ca369b98bc0a4828543e/typing_extensions-4.8.0.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "4.7.1"
+          "requires_python": ">=3.8",
+          "version": "4.8.0"
         },
         {
           "artifacts": [
@@ -4419,7 +4422,7 @@
     "backend.ai-krunner-static-gnu==4.1.0",
     "boto3~=1.26",
     "cachetools~=5.2.0",
-    "callosum~=0.9.10",
+    "callosum~=1.0.1",
     "cattrs~=22.2.0",
     "click~=8.1.7",
     "colorama>=0.4.4",
