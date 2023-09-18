@@ -12,7 +12,6 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-from aiomonitor.task import preserve_termination_log
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
@@ -891,7 +890,6 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
-@preserve_termination_log
 async def initiate_vfolder_removal(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
@@ -932,7 +930,7 @@ async def initiate_vfolder_removal(
                 ) as (_, resp):
                     pass
             except (VFolderOperationFailed, InvalidAPIParameters) as e:
-                if resp.status == 404:
+                if e.status == 404:
                     row_deletion_infos.append(vfolder_info)
                 else:
                     failed_deletion.append((vfolder_info, repr(e)))
