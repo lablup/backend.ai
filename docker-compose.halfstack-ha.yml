@@ -27,7 +27,7 @@ services:
       --port ${REDIS_MASTER_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --replica-announce-ip 192.168.0.18
+      --replica-announce-ip IP_ADDR
       --replica-announce-port ${REDIS_MASTER_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
@@ -46,8 +46,8 @@ services:
       --port ${REDIS_SLAVE1_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof 192.168.0.18 ${REDIS_MASTER_PORT}
-      --replica-announce-ip 192.168.0.18
+      --slaveof IP_ADDR ${REDIS_MASTER_PORT}
+      --replica-announce-ip IP_ADDR
       --replica-announce-port ${REDIS_SLAVE1_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
@@ -63,8 +63,8 @@ services:
       --port ${REDIS_SLAVE2_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof 192.168.0.18 ${REDIS_MASTER_PORT}
-      --replica-announce-ip 192.168.0.18
+      --slaveof IP_ADDR ${REDIS_MASTER_PORT}
+      --replica-announce-ip IP_ADDR
       --replica-announce-port ${REDIS_SLAVE2_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
@@ -216,6 +216,11 @@ services:
       --initial-cluster-token $${TOKEN}
       --initial-cluster-state $${STATE}"
 
+# In the production environment, the redis cluster and the sentinel cluster might be on the same host, but this is usually not the case.
+# In this configuration, network separtion is implemented by placing the sentinel and redis cluster components on separate docker networks.
+# Therefore, communication should not be done via the docker network's address range, but rather through the exposed address.
+# 'IP_ADDR' is resolved to a specific hostname and printed on the console at the time of installation.
+# After running install-dev.sh, the user must manually add this hostname to the /etc/hosts file.
 networks:
   net_redis_node01:
     driver: bridge
