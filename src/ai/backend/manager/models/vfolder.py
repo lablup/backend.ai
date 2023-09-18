@@ -12,6 +12,7 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
+from aiomonitor.task import preserve_termination_log
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
@@ -890,6 +891,7 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
+@preserve_termination_log
 async def initiate_vfolder_removal(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
@@ -911,8 +913,8 @@ async def initiate_vfolder_removal(
 
     await execute_with_retry(_update_vfolder_status)
 
-    successful_deletion: list[VFolderDeletionInfo] = []
-    failed_deletion: list[VFolderDeletionInfo] = []
+    row_deletion_infos: list[VFolderDeletionInfo] = []
+    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
 
     async def _delete():
         for vfolder_info in requested_vfolders:
@@ -927,14 +929,19 @@ async def initiate_vfolder_removal(
                         "volume": volume_name,
                         "vfid": str(folder_id),
                     },
-                ):
+                ) as (_, resp):
                     pass
-            except aiohttp.ClientResponseError:
-                failed_deletion.append(vfolder_info)
+            except (VFolderOperationFailed, InvalidAPIParameters) as e:
+                if resp.status == 404:
+                    row_deletion_infos.append(vfolder_info)
+                else:
+                    failed_deletion.append((vfolder_info, repr(e)))
+            except Exception as e:
+                failed_deletion.append((vfolder_info, repr(e)))
             else:
-                successful_deletion.append(vfolder_info)
-        if successful_deletion:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in successful_deletion)
+                row_deletion_infos.append(vfolder_info)
+        if row_deletion_infos:
+            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
             async def _delete_row() -> None:
                 async with db_engine.begin_session() as db_session:
@@ -945,8 +952,8 @@ async def initiate_vfolder_removal(
             await execute_with_retry(_delete_row)
             log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
         if failed_deletion:
-            folder_ids = [str(vid) for vid in vfolder_ids]
-            raise VFolderOperationFailed(extra_data={"folder_ids": folder_ids})
+            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
+            raise VFolderOperationFailed(extra_data=extra_data)
 
     storage_ptask_group.create_task(_delete(), name="delete_vfolders")
     log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
