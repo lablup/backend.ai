@@ -84,8 +84,6 @@ def _parse_stream_msg_id(msg_id: bytes) -> Tuple[int, int]:
 
 async def subscribe(
     channel: PubSub,
-    *,
-    reconnect_poll_interval: float = 0.3,
 ) -> AsyncIterator[Any]:
     """
     An async-generator wrapper for pub-sub channel subscription.
@@ -101,6 +99,10 @@ async def subscribe(
         else:
             assert channel.connection is not None
             await channel.on_connect(channel.connection)
+
+    reconnect_poll_interval = channel.connection_pool.connection_kwargs.get(
+        "socket_connect_timeout", _default_conn_opts["socket_connect_timeout"]
+    )
 
     while True:
         try:
@@ -139,7 +141,6 @@ async def blpop(
     key: str,
     *,
     service_name: str = None,
-    reconnect_poll_interval: float = 0.3,
 ) -> AsyncIterator[Any]:
     """
     An async-generator wrapper for blpop (blocking left pop).
@@ -153,6 +154,10 @@ async def blpop(
         redis_client = redis_obj
 
     r = redis_client
+    reconnect_poll_interval = r.connection_pool.connection_kwargs.get(
+        "socket_connect_timeout", _default_conn_opts["socket_connect_timeout"]
+    )
+
     while True:
         try:
             raw_msg = await r.blpop(key, timeout=10.0)
@@ -186,7 +191,6 @@ async def execute(
     func: Callable[[Redis], Awaitable[Any]],
     *,
     service_name: str = None,
-    reconnect_poll_interval: float = 0.3,
     encoding: Optional[str] = None,
 ) -> Any:
     """
@@ -203,6 +207,9 @@ async def execute(
         redis_client = redis_obj
 
     r = redis_client
+    reconnect_poll_interval = r.connection_pool.connection_kwargs.get(
+        "socket_connect_timeout", _default_conn_opts["socket_connect_timeout"]
+    )
 
     while True:
         try:
@@ -436,6 +443,7 @@ async def read_stream_by_group(
 def get_redis_object(
     redis_config: EtcdRedisConfig,
     db: int = 0,
+    reconnect_poll_interval: float = 0.3,
     **kwargs,
 ) -> RedisConnectionInfo:
     if _sentinel_addresses := redis_config.get("sentinel"):
@@ -463,10 +471,14 @@ def get_redis_object(
             },
         )
 
+        conn_opts = {
+            **_default_conn_opts,
+            **kwargs,
+            "socket_connect_timeout": reconnect_poll_interval,
+        }
+
         return RedisConnectionInfo(
-            client=sentinel.master_for(
-                service_name=service_name, password=password, **_default_conn_opts
-            ),
+            client=sentinel.master_for(service_name=service_name, password=password, **conn_opts),
             sentinel=sentinel,
             service_name=service_name,
         )
