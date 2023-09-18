@@ -253,10 +253,10 @@ class RedisLock(AbstractDistributedLock):
         try:
             val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
         except LockNotOwnedError:
-            log.exception("Did not own RedisLock. Skip.")
+            log.exception("Lock no longer owned. Skip.")
             return None
         except LockError:
-            log.exception("Lock already released.")
+            log.exception("Already unlocked. Skip.")
             return None
         if self._debug:
             log.debug("RedisLock.__aexit__(): lock released")
