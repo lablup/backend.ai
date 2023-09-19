@@ -148,6 +148,7 @@ users = sa.Table(
         "sudo_session_enabled",
         sa.Boolean,
         default=False,
+        nullable=False,
     ),
 )
 

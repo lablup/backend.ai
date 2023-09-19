@@ -61,7 +61,7 @@ class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     id = EndpointIDColumn()
-    name = sa.Column("name", sa.String(length=512), nullable=False, unique=True)
+    name = sa.Column("name", sa.String(length=512), nullable=False)
     created_user = sa.Column(
         "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
