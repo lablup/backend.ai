@@ -144,6 +144,12 @@ users = sa.Table(
         sa.ForeignKey("user_resource_policies.name"),
         nullable=False,
     ),
+    sa.Column(
+        "sudo_session_enabled",
+        sa.Boolean,
+        default=False,
+        nullable=False,
+    ),
 )
 
 
@@ -211,6 +217,7 @@ class User(graphene.ObjectType):
     allowed_client_ip = graphene.List(lambda: graphene.String)
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
+    sudo_session_enabled = graphene.Boolean()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -248,6 +255,7 @@ class User(graphene.ObjectType):
             allowed_client_ip=row["allowed_client_ip"],
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
+            sudo_session_enabled=row["sudo_session_enabled"],
         )
 
     @classmethod
@@ -303,6 +311,7 @@ class User(graphene.ObjectType):
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -321,6 +330,7 @@ class User(graphene.ObjectType):
         "resource_policy": ("resource_policy", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
     }
 
     @classmethod
@@ -511,7 +521,7 @@ class UserInput(graphene.InputObjectType):
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False, default="default")
-
+    sudo_session_enabled = graphene.Boolean(required=False, default=False)
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -530,6 +540,7 @@ class ModifyUserInput(graphene.InputObjectType):
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False)
+    sudo_session_enabled = graphene.Boolean(required=False, default=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -575,6 +586,7 @@ class CreateUser(graphene.Mutation):
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
             "resource_policy": props.resource_policy or "default",
+            "sudo_session_enabled": props.sudo_session_enabled or False,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -664,6 +676,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "allowed_client_ip")
         set_if_set(props, data, "totp_activated")
         set_if_set(props, data, "resource_policy")
+        set_if_set(props, data, "sudo_session_enabled")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:

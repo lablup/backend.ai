@@ -958,40 +958,60 @@ async def initiate_vfolder_clone(
 
 async def initiate_vfolder_purge(
     db_engine: ExtendedAsyncSAEngine,
-    requested_vfolder: VFolderDeletionInfo,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
     storage_ptask_group: aiotools.PersistentTaskGroup,
 ) -> None:
-    folder_id = requested_vfolder.vfolder_id
-
+    vfolder_info_len = len(requested_vfolders)
+    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return 0
+    elif vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
     await update_vfolder_status(
-        db_engine, [folder_id.folder_id], VFolderOperationStatus.PURGE_ONGOING, do_log=False
+        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
     )
-    proxy_name, volume_name = storage_manager.split_host(requested_vfolder.host)
-    try:
-        async with storage_manager.request(
-            proxy_name,
-            "POST",
-            "folder/delete",
-            json={
-                "volume": volume_name,
-                "vfid": str(folder_id),
-            },
-        ):
-            pass
-    except aiohttp.ClientResponseError:
-        raise VFolderOperationFailed(extra_msg=str(folder_id))
+
+    successful_deletion: list[VFolderDeletionInfo] = []
+    failed_deletion: list[VFolderDeletionInfo] = []
 
     async def _delete():
+        for vfolder_info in requested_vfolders:
+            folder_id, host_name = vfolder_info
+            proxy_name, volume_name = storage_manager.split_host(host_name)
+            try:
+                async with storage_manager.request(
+                    proxy_name,
+                    "POST",
+                    "folder/delete",
+                    json={
+                        "volume": volume_name,
+                        "vfid": str(folder_id),
+                    },
+                ):
+                    pass
+            except aiohttp.ClientResponseError:
+                failed_deletion.append(vfolder_info)
+            else:
+                successful_deletion.append(vfolder_info)
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in successful_deletion)
+
         async def _delete_row() -> None:
             async with db_engine.begin_session() as db_session:
-                await db_session.execute(sa.delete(vfolders).where(vfolders.c.id == folder_id))
+                await db_session.execute(sa.delete(vfolders).where(cond))
 
         await execute_with_retry(_delete_row)
-        log.debug(f"Successfully purged vFolder (id: {folder_id})")
+        if failed_deletion:
+            folder_ids = [str(vid) for vid in vfolder_ids]
+            raise VFolderOperationFailed(extra_data={"folder_ids": folder_ids})
+        else:
+            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
 
-    storage_ptask_group.create_task(_delete())
-    log.debug(f"Started purging vFolders  (id: {folder_id})")
+    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
+    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+
+    return vfolder_info_len
 
 
 async def ensure_quota_scope_accessible_by_user(

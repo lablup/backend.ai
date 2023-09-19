@@ -818,6 +818,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             "role": UserRole.USER,
             "integration_id": None,
             "resource_policy": "default",
+            "sudo_session_enabled": False,
         }
         if user_data_overriden:
             for key, val in user_data_overriden.items():

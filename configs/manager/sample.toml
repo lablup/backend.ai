@@ -74,6 +74,12 @@ heartbeat-timeout = 40.0
 # This affects the per-node configuration scope.
 # id = ""
 
+# Set the manager's RPC client certificate (public key and secret key).
+# This is a mandatory option even when no agents require authentication.
+# It must be generated for any new setup for security using
+# the `backend.ai mgr generate-rpc-keypair` command.
+# rpc-auth-manager-keypair = "fixtures/manager/manager.key_secret"
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
