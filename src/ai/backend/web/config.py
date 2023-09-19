@@ -5,6 +5,7 @@ import pkg_resources
 import trafaret as t
 import yarl
 
+from ai.backend.common import config
 from ai.backend.common import validators as tx
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
@@ -118,10 +119,15 @@ config_iv = t.Dict(
             {
                 t.Key("redis"): t.Dict(
                     {
-                        t.Key("host", default="localhost"): t.String,
-                        t.Key("port", default=6379): t.ToInt[1:65535],
+                        t.Key("host", default=None): t.Null | t.String,
+                        t.Key("port", default=None): t.Null | t.ToInt[1:65535],
                         t.Key("db", default=0): t.ToInt,
+                        t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                            tx.HostPortPair
+                        ),
+                        t.Key("service_name", default=None): t.Null | t.String,
                         t.Key("password", default=None): t.Null | t.String,
+                        t.Key("redis_helper_config"): config.redis_helper_config_iv,
                     }
                 ),
                 t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)
