@@ -86,6 +86,7 @@ __all__ = (
     "determine_session_status",
     "handle_session_exception",
     "SessionStatus",
+    "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -161,6 +162,8 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
         SessionStatus.CANCELLED,
     )
 )
+
+PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
 
 OP_EXC = {
     "create_session": KernelCreationFailed,

@@ -89,7 +89,6 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
-    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -99,7 +98,6 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
-    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
@@ -126,15 +124,6 @@ class KernelStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
-
-
-class KernelRole(enum.Enum):
-    INFERENCE = "INFERENCE"
-    COMPUTE = "COMPUTE"
-    SYSTEM = "SYSTEM"
-
-
-PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
 
 
 # statuses to consider when calculating current resource usage
@@ -462,13 +451,6 @@ kernels = sa.Table(
         nullable=False,
         index=True,
     ),
-    sa.Column(
-        "role",
-        EnumType(KernelRole),
-        default=KernelRole.COMPUTE,
-        server_default=KernelRole.COMPUTE.name,
-        nullable=False,
-    ),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
@@ -559,10 +541,6 @@ class KernelRow(Base):
         if self.cluster_role == DEFAULT_ROLE:
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
-
-    @property
-    def is_private(self) -> bool:
-        return self.role in PRIVATE_KERNEL_ROLES
 
     @staticmethod
     async def get_kernel(
@@ -1445,24 +1423,27 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
+    from .session import SessionRow
+
+    j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
-            .select_from(KernelRow)
+            .select_from(j)
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                & (SessionRow.session_type != SessionTypes.SYSTEM)
             ),
         )
         concurrency_used = result.scalar()
         result = await db_sess.execute(
             sa.select(sa.func.count())
-            .select_from(KernelRow)
+            .select_from(j)
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+                & (SessionRow.session_type != SessionTypes.SYSTEM)
             ),
         )
         sftp_concurrency_used = result.scalar()
