@@ -755,10 +755,6 @@ setup_environment() {
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.
 
-  current_dir=$(pwd)
-  hash_value=$(echo -n "$current_dir" | md5sum | awk '{print $1}')
-  bai_hostname="bai-hostname-$hash_value"
-
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
   mkdir -p "$HALFSTACK_VOLUME_PATH"
@@ -788,28 +784,24 @@ setup_environment() {
     cp ./configs/redis/sentinel.conf $sentinel03_cfg_path
 
     sed_inplace "s/\${COMPOSE_PATH}/${ROOT_PATH//\//\\/}\/tmp\/backend\.ai-halfstack-ha\/configs\//g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/IP_ADDR/${bai_hostname}/g" "docker-compose.halfstack.current.yml"
 
     # Appends the given text to sentinel01.conf
     echo "" >> $sentinel01_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel01/g" "$sentinel01_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel01_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9503/g" "$sentinel01_cfg_path"
-    sed_inplace "s/IP_ADDR/${bai_hostname}/g" "$sentinel01_cfg_path"
 
     # Appends the given text to sentinel02.conf
     echo "" >> $sentinel02_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel02/g" "$sentinel02_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel02_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9504/g" "$sentinel02_cfg_path"
-    sed_inplace "s/IP_ADDR/${bai_hostname}/g" "$sentinel02_cfg_path"
 
     # Appends the given text to sentinel03.conf
     echo "" >> $sentinel03_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
-    sed_inplace "s/IP_ADDR/${bai_hostname}/g" "$sentinel03_cfg_path"
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
     if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
@@ -1087,8 +1079,12 @@ configure_backendai() {
   show_info "Installation finished."
   echo "${GREEN}Development environment is now ready.${NC}"
 
+  # TODO: Automate the following steps
   if [ $CONFIGURE_HA -eq 1 ]; then
-    echo "${RED}Please add your ip address config with this hostname \"${bai_hostname}\" to your /etc/hosts file.${NC}"
+    echo "${RED}[NOTE] Please add the following lines to \"/etc/hosts\" file in your host OS.${NC}"
+    echo "${RED}127.0.0.1 node01${NC}"
+    echo "${RED}127.0.0.1 node02${NC}"
+    echo "${RED}127.0.0.1 node03${NC}"
   fi
 }
 

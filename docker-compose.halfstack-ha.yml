@@ -18,8 +18,9 @@ services:
   # Initial master is redis-node01.
   backendai-half-redis-node01:
     image: redis:7.0.5-alpine
+    hostname: node01
     networks:
-    - net_redis_node01
+    - half
     ports:
     - 0.0.0.0:${REDIS_MASTER_PORT}:${REDIS_MASTER_PORT}
     command: >
@@ -27,7 +28,7 @@ services:
       --port ${REDIS_MASTER_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --replica-announce-ip IP_ADDR
+      --replica-announce-ip node01
       --replica-announce-port ${REDIS_MASTER_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
@@ -37,8 +38,9 @@ services:
 
   backendai-half-redis-node02:
     image: redis:7.0.5-alpine
+    hostname: node02
     networks:
-    - net_redis_node02
+    - half
     ports:
     - 0.0.0.0:${REDIS_SLAVE1_PORT}:${REDIS_SLAVE1_PORT}
     command: >
@@ -46,33 +48,35 @@ services:
       --port ${REDIS_SLAVE1_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof IP_ADDR ${REDIS_MASTER_PORT}
-      --replica-announce-ip IP_ADDR
+      --slaveof node01 ${REDIS_MASTER_PORT}
+      --replica-announce-ip node02
       --replica-announce-port ${REDIS_SLAVE1_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
     image: redis:7.0.5-alpine
+    hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
     networks:
-    - net_redis_node03
+    - half
     command: >
       redis-server
       --port ${REDIS_SLAVE2_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof IP_ADDR ${REDIS_MASTER_PORT}
-      --replica-announce-ip IP_ADDR
+      --slaveof node01 ${REDIS_MASTER_PORT}
+      --replica-announce-ip node03
       --replica-announce-port ${REDIS_SLAVE2_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
     image: redis:7.0.5-alpine
+    hostname: sentinel01
     networks:
-    - net_sentinel01
+    - half
     volumes:
     - type: bind
       source: ${COMPOSE_PATH}
@@ -90,8 +94,9 @@ services:
 
   backendai-half-redis-sentinel02:
     image: redis:7.0.5-alpine
+    hostname: sentinel02
     networks:
-    - net_sentinel02
+    - half
     volumes:
     - type: bind
       source: ${COMPOSE_PATH}
@@ -109,8 +114,9 @@ services:
 
   backendai-half-redis-sentinel03:
     image: redis:7.0.5-alpine
+    hostname: sentinel03
     networks:
-    - net_sentinel03
+    - half
     volumes:
     - type: bind
       source: ${COMPOSE_PATH}
@@ -216,22 +222,5 @@ services:
       --initial-cluster-token $${TOKEN}
       --initial-cluster-state $${STATE}"
 
-# In the production environment, the redis cluster and the sentinel cluster might be on the same host, but this is usually not the case.
-# In this configuration, network separtion is implemented by placing the sentinel and redis cluster components on separate docker networks.
-# Therefore, communication should not be done via the docker network's address range, but rather through the exposed address.
-# 'IP_ADDR' is resolved to a specific hostname and printed on the console at the time of installation.
-# After running install-dev.sh, the user must manually add this hostname to the /etc/hosts file.
 networks:
-  net_redis_node01:
-    driver: bridge
-  net_redis_node02:
-    driver: bridge
-  net_redis_node03:
-    driver: bridge
-  net_sentinel01:
-    driver: bridge
-  net_sentinel02:
-    driver: bridge
-  net_sentinel03:
-    driver: bridge
   half:
