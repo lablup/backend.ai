@@ -1286,9 +1286,6 @@ class AgentRegistry:
     ) -> ImageTaskResponse:
         async with self.agent_cache.rpc_context(
             agent_id,
-            agent_addr,
-            invoke_timeout=None,
-            keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
             resp: dict[str, Any] = await rpc.call.pull_image(image_maps, force)
             return cast(ImageTaskResponse, resp)
@@ -1298,9 +1295,6 @@ class AgentRegistry:
     ) -> ImageTaskResponse:
         async with self.agent_cache.rpc_context(
             agent_id,
-            agent_addr,
-            invoke_timeout=None,
-            keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
             resp: dict[str, Any] = await rpc.call.remove_image(image_maps)
             return cast(ImageTaskResponse, resp)
