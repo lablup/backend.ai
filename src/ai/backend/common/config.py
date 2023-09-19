@@ -16,6 +16,7 @@ __all__ = (
     "ConfigurationError",
     "etcd_config_iv",
     "redis_config_iv",
+    "redis_helper_config_iv",
     "vfolder_config_iv",
     "model_definition_iv",
     "read_from_file",
@@ -44,6 +45,14 @@ redis_config_iv = t.Dict(
     {
         t.Key("addr", default=None): t.Null | tx.HostPortPair,
         t.Key("password", default=None): t.Null | t.String,
+    }
+).allow_extra("*")
+
+redis_helper_config_iv = t.Dict(
+    {
+        t.Key("socket_timeout", default=5.0): t.Null | t.Float,
+        t.Key("socket_connect_timeout", default=2.0): t.Null | t.Float,
+        t.Key("reconnect_poll_timeout", default=0.3): t.Null | t.Float,
     }
 ).allow_extra("*")
 

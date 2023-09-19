@@ -328,25 +328,31 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_config = root_ctx.shared_config.data["redis"]
+    redis_helper_config = root_ctx.shared_config.data["redis_helper"]
 
     root_ctx.redis_live = redis_helper.get_redis_object(
         redis_config,
+        redis_helper_config,
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
         redis_config,
+        redis_helper_config,
         db=REDIS_STAT_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
         redis_config,
+        redis_helper_config,
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
         redis_config,
+        redis_helper_config,
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
         redis_config,
+        redis_helper_config,
         db=REDIS_STREAM_LOCK,
     )
 
@@ -386,10 +392,12 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_producer = await EventProducer.new(
         root_ctx.shared_config.data["redis"],
+        root_ctx.shared_config.data["redis_helper"],
         db=REDIS_STREAM_DB,
     )
     root_ctx.event_dispatcher = await EventDispatcher.new(
         root_ctx.shared_config.data["redis"],
+        root_ctx.shared_config.data["redis_helper"],
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,

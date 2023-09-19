@@ -5,6 +5,7 @@ import pkg_resources
 import trafaret as t
 import yarl
 
+from ai.backend.common import config
 from ai.backend.common import validators as tx
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
@@ -128,6 +129,7 @@ config_iv = t.Dict(
                         t.Key("password", default=None): t.Null | t.String,
                     }
                 ),
+                t.Key("redis_helper"): config.redis_helper_config_iv,
                 t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)
                 t.Key("flush_on_startup", default=False): t.ToBool,
                 t.Key("login_block_time", default=1200): t.ToInt,  # seconds (default: 20 min)

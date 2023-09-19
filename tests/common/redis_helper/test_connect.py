@@ -77,7 +77,12 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": sentinels,
             "service_name": "mymaster",
             "password": "develove",
-        }
+        },
+        {
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
     )
 
     assert isinstance(r1.client, Redis)
@@ -94,7 +99,12 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": parsed_addresses,
             "service_name": "mymaster",
             "password": "develove",
-        }
+        },
+        {
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
     )
 
     assert isinstance(r2.client, Redis)

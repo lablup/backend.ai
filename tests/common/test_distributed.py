@@ -21,7 +21,13 @@ from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
 from ai.backend.common.lock import AbstractDistributedLock, EtcdLock, FileLock, RedisLock
-from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair, RedisConnectionInfo
+from ai.backend.common.types import (
+    AgentId,
+    EtcdRedisConfig,
+    HostPortPair,
+    RedisConnectionInfo,
+    RedisHelperConfig,
+)
 
 
 @dataclass
@@ -83,6 +89,9 @@ async def run_timer(
         event_records.append(time.monotonic())
 
     redis_config = EtcdRedisConfig(addr=redis_addr)
+    # TODO: fill default value
+    RedisHelperConfig()
+
     event_dispatcher = await EventDispatcher.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,

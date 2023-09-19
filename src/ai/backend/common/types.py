@@ -1102,21 +1102,18 @@ class EtcdRedisConfig(TypedDict, total=False):
     password: Optional[str]
 
 
+class RedisHelperConfig(TypedDict):
+    socket_timeout: float
+    socket_connect_timeout: float
+    reconnect_poll_timeout: float
+
+
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
     client: Redis
     service_name: Optional[str]
     sentinel: Optional[redis.asyncio.sentinel.Sentinel]
-
-    def __init__(
-        self,
-        client: Redis,
-        service_name: Optional[str] = None,
-        sentinel: Optional[redis.asyncio.sentinel.Sentinel] = None,
-    ) -> None:
-        self.client = client
-        self.service_name = service_name
-        self.sentinel = sentinel
+    redis_helper_config: RedisHelperConfig
 
     async def close(self, close_connection_pool: Optional[bool] = None) -> None:
         await self.client.close(close_connection_pool)

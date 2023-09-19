@@ -425,6 +425,7 @@ shared_config_iv = t.Dict(
                 t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
             }
         ).allow_extra("*"),
+        t.Key("redis_helper"): config.redis_helper_config_iv,
         t.Key("docker", default=_config_defaults["docker"]): t.Dict(
             {
                 t.Key("registry"): t.Mapping(t.String, container_registry_iv),

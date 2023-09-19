@@ -44,6 +44,7 @@ from .types import (
     LogSeverity,
     QuotaScopeID,
     RedisConnectionInfo,
+    RedisHelperConfig,
     SessionId,
     VolumeMountableNodeType,
     aobject,
@@ -808,6 +809,7 @@ class EventDispatcher(aobject):
     def __init__(
         self,
         redis_config: EtcdRedisConfig,
+        redis_helper_config: RedisHelperConfig,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -821,7 +823,7 @@ class EventDispatcher(aobject):
         _redis_config = redis_config.copy()
         if service_name:
             _redis_config["service_name"] = service_name
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(_redis_config, redis_helper_config, db=db)
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -1014,6 +1016,7 @@ class EventProducer(aobject):
     def __init__(
         self,
         redis_config: EtcdRedisConfig,
+        redis_helper_config: RedisHelperConfig,
         db: int = 0,
         *,
         service_name: str = None,
@@ -1024,7 +1027,7 @@ class EventProducer(aobject):
         if service_name:
             _redis_config["service_name"] = service_name
         self._closed = False
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(_redis_config, redis_helper_config, db=db)
         self._log_events = log_events
         self._stream_key = stream_key
 

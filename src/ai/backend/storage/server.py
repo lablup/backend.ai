@@ -4,6 +4,7 @@ import grp
 import logging
 import multiprocessing
 import os
+import pickle
 import pwd
 import ssl
 import sys
@@ -64,6 +65,14 @@ async def check_migration(ctx: RootContext) -> None:
     await check_latest(ctx)
 
 
+def is_pickable(obj: Any) -> bool:
+    try:
+        pickle.dumps(obj)
+        return True
+    except (pickle.PickleError, TypeError):
+        return False
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -94,6 +103,11 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
+            redis_helper_config = redis_config_iv.check(
+                await etcd.get_prefix("config/redis_helper"),
+            )
+
+            assert is_pickable(redis_config)
             log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
         except Exception as e:
             log.exception("Unable to read config from etcd")
@@ -101,12 +115,14 @@ async def server_main(
 
         event_producer = await EventProducer.new(
             redis_config,
+            redis_helper_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
         log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
+            redis_helper_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
