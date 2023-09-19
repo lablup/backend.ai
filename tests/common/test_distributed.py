@@ -26,9 +26,10 @@ from ai.backend.common.types import (
     EtcdRedisConfig,
     HostPortPair,
     RedisConnectionInfo,
+    RedisHelperConfig,
 )
 
-redis_helper_config = {
+redis_helper_config: RedisHelperConfig = {
     "socket_timeout": 5.0,
     "socket_connect_timeout": 2.0,
     "reconnect_poll_timeout": 0.3,
