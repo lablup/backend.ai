@@ -16,6 +16,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    cast,
 )
 
 import redis.exceptions
@@ -146,7 +147,9 @@ async def blpop(
 
     redis_client = redis_obj.client
     service_name = service_name or redis_obj.service_name
-    reconnect_poll_interval = float(redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
+    reconnect_poll_interval = float(
+        cast(str, redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
+    )
 
     while True:
         try:
@@ -192,7 +195,9 @@ async def execute(
     """
     redis_client = redis_obj.client
     service_name = service_name or redis_obj.service_name
-    reconnect_poll_interval = float(redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
+    reconnect_poll_interval = float(
+        cast(str, redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
+    )
 
     while True:
         try:
@@ -427,7 +432,6 @@ def get_redis_object(
     redis_config: EtcdRedisConfig,
     redis_helper_config: RedisHelperConfig,
     db: int = 0,
-    reconnect_poll_interval: float = 0.3,
     **kwargs,
 ) -> RedisConnectionInfo:
     if _sentinel_addresses := redis_config.get("sentinel"):
@@ -458,8 +462,10 @@ def get_redis_object(
         conn_opts = {
             **_default_conn_opts,
             **kwargs,
-            "socket_timeout": float(redis_helper_config.get("socket_timeout")),
-            "socket_connect_timeout": float(redis_helper_config.get("socket_connect_timeout")),
+            "socket_timeout": float(cast(str, redis_helper_config.get("socket_timeout"))),
+            "socket_connect_timeout": float(
+                cast(str, redis_helper_config.get("socket_connect_timeout"))
+            ),
         }
 
         return RedisConnectionInfo(
