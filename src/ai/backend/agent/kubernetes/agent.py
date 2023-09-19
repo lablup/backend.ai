@@ -10,6 +10,7 @@ from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     FrozenSet,
     List,
@@ -72,6 +73,9 @@ from .kube_object import (
     Service,
 )
 from .resources import load_resources, scan_available_resources
+
+if TYPE_CHECKING:
+    from ai.backend.common.auth import PublicKey
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -749,6 +753,7 @@ class KubernetesAgent(
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
+        agent_public_key: Optional[PublicKey],
     ) -> None:
         super().__init__(
             etcd,
@@ -756,6 +761,7 @@ class KubernetesAgent(
             stats_monitor=stats_monitor,
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
+            agent_public_key=agent_public_key,
         )
 
     async def __ainit__(self) -> None:
