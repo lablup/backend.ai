@@ -34,7 +34,6 @@ from typing import (
 )
 
 import attrs
-import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from redis.asyncio import Redis
@@ -1104,12 +1103,11 @@ class EtcdRedisConfig(TypedDict, total=False):
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | redis.asyncio.sentinel.Sentinel
+    client: Redis
     service_name: Optional[str]
 
-    async def close(self) -> None:
-        if isinstance(self.client, Redis):
-            await self.client.close()
+    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):

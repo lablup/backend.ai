@@ -23,17 +23,12 @@ import redis.exceptions
 import yarl
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline, PubSub
-from redis.asyncio.sentinel import (
-    MasterNotFoundError,
-    Sentinel,
-    SentinelConnectionPool,
-    SlaveNotFoundError,
-)
+from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
 from .logging import BraceStyleAdapter
-from .types import EtcdRedisConfig, RedisConnectionInfo, SentinelRedisConnection
+from .types import EtcdRedisConfig, RedisConnectionInfo
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -141,7 +136,7 @@ async def subscribe(
 
 
 async def blpop(
-    redis_obj: RedisConnectionInfo | Redis | Sentinel,
+    redis_obj: RedisConnectionInfo | Redis,
     key: str,
     *,
     service_name: str = None,
@@ -151,26 +146,14 @@ async def blpop(
     An async-generator wrapper for blpop (blocking left pop).
     It automatically recovers from server shutdowns until explicitly cancelled.
     """
-    _conn_opts = {
-        **_default_conn_opts,
-        "socket_connect_timeout": reconnect_poll_interval,
-    }
+
     if isinstance(redis_obj, RedisConnectionInfo):
         redis_client = redis_obj.client
         service_name = service_name or redis_obj.service_name
     else:
         redis_client = redis_obj
 
-    if isinstance(redis_client, Sentinel):
-        assert service_name is not None
-        r = redis_client.master_for(
-            service_name,
-            redis_class=SentinelRedisConnection,
-            connection_pool_class=SentinelConnectionPool,
-            **_conn_opts,
-        )
-    else:
-        r = redis_client
+    r = redis_client
     while True:
         try:
             raw_msg = await r.blpop(key, timeout=10.0)
@@ -211,11 +194,10 @@ def count_open_sockets():
 
 
 async def execute(
-    redis_obj: RedisConnectionInfo | Redis | Sentinel,
+    redis_obj: RedisConnectionInfo | Redis,
     func: Callable[[Redis], Awaitable[Any]],
     *,
     service_name: str = None,
-    read_only: bool = False,
     reconnect_poll_interval: float = 0.3,
     encoding: Optional[str] = None,
 ) -> Any:
@@ -226,34 +208,14 @@ async def execute(
     Note that when retried, the given function may be executed *multiple* times, so the caller
     should take care of side-effects of it.
     """
-    _conn_opts = {
-        **_default_conn_opts,
-        "socket_connect_timeout": reconnect_poll_interval,
-    }
+
     if isinstance(redis_obj, RedisConnectionInfo):
         redis_client = redis_obj.client
         service_name = service_name or redis_obj.service_name
     else:
         redis_client = redis_obj
 
-    if isinstance(redis_client, Sentinel):
-        assert service_name is not None
-        if read_only:
-            r = redis_client.slave_for(
-                service_name,
-                redis_class=SentinelRedisConnection,
-                connection_pool_class=SentinelConnectionPool,
-                **_conn_opts,
-            )
-        else:
-            r = redis_client.master_for(
-                service_name,
-                redis_class=SentinelRedisConnection,
-                connection_pool_class=SentinelConnectionPool,
-                **_conn_opts,
-            )
-    else:
-        r = redis_client
+    r = redis_client
 
     while True:
         try:
@@ -314,7 +276,7 @@ async def execute(
 
 
 async def execute_script(
-    redis_obj: RedisConnectionInfo | Redis | Sentinel,
+    redis_obj: RedisConnectionInfo | Redis,
     script_id: str,
     script: str,
     keys: Sequence[str],
@@ -515,7 +477,7 @@ def get_redis_object(
         )
 
         return RedisConnectionInfo(
-            client=sentinel,
+            client=sentinel.master_for(service_name=service_name, **_default_conn_opts),
             service_name=service_name,
         )
     else:
@@ -531,22 +493,9 @@ def get_redis_object(
         )
 
 
-async def ping_redis_connection(
-    redis_config: EtcdRedisConfig, redis_client: Redis | Sentinel
-) -> bool:
+async def ping_redis_connection(redis_client: Redis) -> bool:
     try:
-        if isinstance(redis_client, Redis):
-            return await redis_client.ping()
-        else:
-            service_name = redis_config.get("service_name")
-            assert service_name is not None
-            r = redis_client.master_for(
-                service_name,
-                redis_class=SentinelRedisConnection,
-                connection_pool_class=SentinelConnectionPool,
-                **_default_conn_opts,
-            )
-            return await r.ping()
+        return await redis_client.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
         log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e

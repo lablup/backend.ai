@@ -357,7 +357,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
-        await redis_helper.ping_redis_connection(redis_config, redis_info.client)
+        await redis_helper.ping_redis_connection(redis_info.client)
 
     yield
     await root_ctx.redis_stream.close()

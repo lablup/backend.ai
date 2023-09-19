@@ -11,7 +11,6 @@ from typing import Any, Optional
 from etcetra.client import EtcdCommunicator, EtcdConnectionManager
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
-from redis.asyncio.sentinel import SentinelConnectionPool
 from redis.exceptions import LockError, LockNotOwnedError
 from tenacity import (
     AsyncRetrying,
@@ -25,7 +24,7 @@ from tenacity import (
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.redis_helper import _default_conn_opts
-from ai.backend.common.types import RedisConnectionInfo, SentinelRedisConnection
+from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
 
@@ -194,7 +193,7 @@ class EtcdLock(AbstractDistributedLock):
 
 class RedisLock(AbstractDistributedLock):
     debug: bool
-    _redis: Redis | SentinelRedisConnection
+    _redis: Redis
     redis_service_name: str
     _timeout: Optional[float]
     _lock: Optional[AsyncRedisLock]
@@ -226,8 +225,6 @@ class RedisLock(AbstractDistributedLock):
             }
             self._redis = redis.client.master_for(
                 redis.service_name,
-                redis_class=SentinelRedisConnection,
-                connection_pool_class=SentinelConnectionPool,
                 **_conn_opts,
             )
         self._timeout = timeout if timeout is not None else self.default_timeout
@@ -264,4 +261,3 @@ class RedisLock(AbstractDistributedLock):
             log.debug("RedisLock.__aexit__(): lock released")
 
         return val
-
