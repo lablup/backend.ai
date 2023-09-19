@@ -1,8 +1,8 @@
 """add_vfolder_purge_status
 
-Revision ID: 087e17b239c2
-Revises: d04592473df7
-Create Date: 2023-09-07 11:29:54.530460
+Revision ID: 5ba7fde56ddb
+Revises: a083c6c962e5
+Create Date: 2023-09-19 16:29:20.893345
 
 """
 import sqlalchemy as sa
@@ -14,8 +14,8 @@ from sqlalchemy.sql import text
 from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
-revision = "087e17b239c2"
-down_revision = "d04592473df7"
+revision = "5ba7fde56ddb"
+down_revision = "a083c6c962e5"
 branch_labels = None
 depends_on = None
 
