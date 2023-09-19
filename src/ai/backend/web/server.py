@@ -630,7 +630,6 @@ async def server_main(
 
     app["redis"] = redis_helper.get_redis_object(
         config["session"]["redis"],
-        config["session"]["redis_helper"],
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
     ).client

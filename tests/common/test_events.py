@@ -47,10 +47,9 @@ async def test_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
-        redis_helper_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
-    producer = await EventProducer.new(redis_config, redis_helper_config)
+    producer = await EventProducer.new(redis_config)
 
     records = set()
 
@@ -100,12 +99,11 @@ async def test_error_on_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
-        redis_helper_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         consumer_exception_handler=handle_exception,
         subscriber_exception_handler=handle_exception,
     )
-    producer = await EventProducer.new(redis_config, redis_helper_config)
+    producer = await EventProducer.new(redis_config)
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app

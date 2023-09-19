@@ -326,11 +326,11 @@ _config_defaults: Mapping[str, Any] = {
     "redis": {
         "addr": None,
         "password": None,
-    },
-    "redis_helper": {
-        "socket_timeout": 5.0,
-        "socket_connect_timeout": 2.0,
-        "reconnect_poll_timeout": 0.3,
+        "redis_helper_config": {
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
     },
     "docker": {
         "registry": {},
@@ -428,11 +428,11 @@ shared_config_iv = t.Dict(
                 ),
                 t.Key("service_name", default=None): t.Null | t.String,
                 t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
+                t.Key(
+                    "redis_helper_config", default=_config_defaults["redis"]["redis_helper_config"]
+                ): config.redis_helper_config_iv,
             }
         ).allow_extra("*"),
-        t.Key(
-            "redis_helper", default=_config_defaults["redis_helper"]
-        ): config.redis_helper_config_iv,
         t.Key("docker", default=_config_defaults["docker"]): t.Dict(
             {
                 t.Key("registry"): t.Mapping(t.String, container_registry_iv),

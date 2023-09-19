@@ -188,12 +188,10 @@ class IdleCheckerHost:
         self._lock_factory = lock_factory
         self._redis_live = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
-            self._shared_config.data["redis_helper"],
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
-            self._shared_config.data["redis_helper"],
             db=REDIS_STAT_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(

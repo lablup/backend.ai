@@ -80,9 +80,7 @@ def _parse_stream_msg_id(msg_id: bytes) -> Tuple[int, int]:
     return int(timestamp), int(sequence)
 
 
-async def subscribe(
-    channel: PubSub,
-) -> AsyncIterator[Any]:
+async def subscribe(channel: PubSub, *, reconnect_poll_interval: float = 0.3) -> AsyncIterator[Any]:
     """
     An async-generator wrapper for pub-sub channel subscription.
     It automatically recovers from server shutdowns until explicitly cancelled.
@@ -97,10 +95,6 @@ async def subscribe(
         else:
             assert channel.connection is not None
             await channel.on_connect(channel.connection)
-
-    reconnect_poll_interval = channel.connection_pool.connection_kwargs.get(
-        "socket_connect_timeout", _default_conn_opts["socket_connect_timeout"]
-    )
 
     while True:
         try:
@@ -430,10 +424,13 @@ async def read_stream_by_group(
 
 def get_redis_object(
     redis_config: EtcdRedisConfig,
-    redis_helper_config: RedisHelperConfig,
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
+    redis_helper_config: RedisHelperConfig = cast(
+        RedisHelperConfig, redis_config.get("redis_helper_config")
+    )
+
     if _sentinel_addresses := redis_config.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):

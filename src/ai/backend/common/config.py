@@ -41,20 +41,22 @@ etcd_config_iv = t.Dict(
     }
 ).allow_extra("*")
 
+redis_helper_config_iv = t.Dict(
+    {
+        t.Key("socket_timeout", default=5.0): t.Float,
+        t.Key("socket_connect_timeout", default=2.0): t.Float,
+        t.Key("reconnect_poll_timeout", default=0.3): t.Float,
+    }
+).allow_extra("*")
+
 redis_config_iv = t.Dict(
     {
         t.Key("addr", default=None): t.Null | tx.HostPortPair,
         t.Key("password", default=None): t.Null | t.String,
+        t.Key("redis_helper_config"): redis_helper_config_iv,
     }
 ).allow_extra("*")
 
-redis_helper_config_iv = t.Dict(
-    {
-        t.Key("socket_timeout", default=5.0): t.Null | t.Float,
-        t.Key("socket_connect_timeout", default=2.0): t.Null | t.Float,
-        t.Key("reconnect_poll_timeout", default=0.3): t.Null | t.Float,
-    }
-).allow_extra("*")
 
 vfolder_config_iv = t.Dict(
     {

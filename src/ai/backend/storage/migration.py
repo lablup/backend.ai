@@ -229,18 +229,13 @@ async def check_and_upgrade(
     redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
-    redis_helper_config = redis_config_iv.check(
-        await etcd.get_prefix("config/redis_helper"),
-    )
     event_producer = await EventProducer.new(
         redis_config,
-        redis_helper_config,
         db=REDIS_STREAM_DB,
         log_events=local_config["debug"]["log-events"],
     )
     event_dispatcher = await EventDispatcher.new(
         redis_config,
-        redis_helper_config,
         db=REDIS_STREAM_DB,
         log_events=local_config["debug"]["log-events"],
         node_id=local_config["storage-proxy"]["node-id"],

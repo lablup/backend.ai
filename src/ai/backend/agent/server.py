@@ -304,10 +304,6 @@ class AgentRPCServer(aobject):
         self.local_config["redis"] = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
         )
-        self.local_config["redis_helper"] = config.redis_helper_config_iv.check(
-            await self.etcd.get_prefix("config/redis_helper"),
-        )
-
         log.info("configured redis: {0}", self.local_config["redis"])
 
         # Fill up vfolder configs from etcd.
@@ -345,7 +341,6 @@ class AgentRPCServer(aobject):
     async def init_background_task_manager(self):
         event_producer = await EventProducer.new(
             cast(EtcdRedisConfig, self.local_config["redis"]),
-            self.local_config["redis_helper"],
             db=REDIS_STREAM_DB,
         )
         self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)

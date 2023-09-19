@@ -1100,6 +1100,7 @@ class EtcdRedisConfig(TypedDict, total=False):
     sentinel: Optional[Union[str, List[HostPortPair]]]
     service_name: Optional[str]
     password: Optional[str]
+    redis_helper_config: RedisHelperConfig
 
 
 class RedisHelperConfig(TypedDict):

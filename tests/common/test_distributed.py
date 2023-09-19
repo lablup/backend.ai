@@ -95,17 +95,14 @@ async def run_timer(
         event_records.append(time.monotonic())
 
     redis_config = EtcdRedisConfig(addr=redis_addr)
-
     event_dispatcher = await EventDispatcher.new(
         redis_config,
-        redis_helper_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
         stream_key=f"events-{test_case_ns}",
     )
     event_producer = await EventProducer.new(
         redis_config,
-        redis_helper_config,
         stream_key=f"events-{test_case_ns}",
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
@@ -141,14 +138,12 @@ def etcd_timer_node_process(
         redis_config = EtcdRedisConfig(addr=timer_ctx.redis_addr)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
-            redis_helper_config,
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=timer_ctx.test_case_ns,
             stream_key=f"events-{timer_ctx.test_case_ns}",
         )
         event_producer = await EventProducer.new(
             redis_config,
-            redis_helper_config,
             stream_key=f"events-{timer_ctx.test_case_ns}",
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
@@ -207,14 +202,12 @@ class TimerNode(threading.Thread):
         redis_config = EtcdRedisConfig(addr=self.redis_addr)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
-            redis_helper_config,
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=self.test_case_ns,
             stream_key=f"events-{self.test_case_ns}",
         )
         event_producer = await EventProducer.new(
             redis_config,
-            redis_helper_config,
             stream_key=f"events-{self.test_case_ns}",
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
@@ -285,9 +278,9 @@ async def test_gloal_timer_redlock(test_case_ns, redis_container) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(f"redis://{redis_addr.host}:{redis_addr.port}"),
-        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
+        redis_helper_config=redis_helper_config,
     )
     lock_factory = lambda: RedisLock(f"{test_case_ns}lock", r, debug=True)
 
@@ -394,14 +387,12 @@ async def test_global_timer_join_leave(request, test_case_ns, redis_container) -
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     event_dispatcher = await EventDispatcher.new(
         redis_config,
-        redis_helper_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
         stream_key=f"events-{test_case_ns}",
     )
     event_producer = await EventProducer.new(
         redis_config,
-        redis_helper_config,
         stream_key=f"events-{test_case_ns}",
     )
     event_dispatcher.consume(NoopEvent, None, _tick)

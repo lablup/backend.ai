@@ -22,7 +22,6 @@ from ai.backend.common.config import (
     ConfigurationError,
     override_key,
     redis_config_iv,
-    redis_helper_config_iv,
 )
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
@@ -96,10 +95,6 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            redis_helper_config = redis_helper_config_iv.check(
-                await etcd.get_prefix("config/redis_helper"),
-            )
-
             log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
         except Exception as e:
             log.exception("Unable to read config from etcd")
@@ -107,14 +102,12 @@ async def server_main(
 
         event_producer = await EventProducer.new(
             redis_config,
-            redis_helper_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
         log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
-            redis_helper_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],

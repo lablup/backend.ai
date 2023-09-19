@@ -253,7 +253,6 @@ async def init(app: web.Application) -> None:
     )
     app_ctx.log_cleanup_timer_redis = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
-        root_ctx.shared_config.data["redis_helper"],
         db=REDIS_LIVE_DB,
     )
     app_ctx.log_cleanup_timer = GlobalTimer(

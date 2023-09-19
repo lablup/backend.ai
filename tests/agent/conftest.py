@@ -99,12 +99,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             sentinel=None,
             service_name=None,
             password=None,
+            redis_helper_config={
+                "socket_timeout": 5.0,
+                "socket_connect_timeout": 2.0,
+                "reconnect_poll_timeout": 0.3,
+            },
         ),
-        "redis_helper": {
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
         "plugins": {},
     }
     cfg = agent_local_config_iv.check(cfg)
