@@ -759,6 +759,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
                     "IPC_LOCK",  # for hugepages and RDMA
+                    "SYS_NICE",
                 ],
                 "Ulimits": [
                     {"Name": "nofile", "Soft": 1048576, "Hard": 1048576},
