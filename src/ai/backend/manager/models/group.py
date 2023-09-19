@@ -627,13 +627,12 @@ class PurgeGroup(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            for vf in target_vfs:
-                await initiate_vfolder_purge(
-                    engine,
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]),
-                    storage_manager,
-                    storage_ptask_group,
-                )
+            await initiate_vfolder_purge(
+                engine,
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                storage_manager,
+                storage_ptask_group,
+            )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
             raise

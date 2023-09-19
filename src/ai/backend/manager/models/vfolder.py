@@ -961,7 +961,7 @@ async def initiate_vfolder_purge(
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
     storage_ptask_group: aiotools.PersistentTaskGroup,
-) -> None:
+) -> int:
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
     cond = vfolders.c.id.in_(vfolder_ids)

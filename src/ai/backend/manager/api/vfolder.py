@@ -2372,7 +2372,7 @@ async def purge(request: web.Request) -> web.Response:
     # but let's complete the db transaction to reflect that it's deleted.
     await initiate_vfolder_purge(
         root_ctx.db,
-        VFolderDeletionInfo(VFolderID.from_row(entry), folder_host),
+        [VFolderDeletionInfo(VFolderID.from_row(entry), folder_host)],
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
