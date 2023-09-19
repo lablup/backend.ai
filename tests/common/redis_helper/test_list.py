@@ -14,7 +14,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
-from .utils import interrupt
+from .utils import interrupt, redis_helper_config
 
 
 @pytest.mark.redis
@@ -44,6 +44,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )
@@ -124,6 +125,7 @@ async def test_blist_with_retrying_rpush(
     addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )

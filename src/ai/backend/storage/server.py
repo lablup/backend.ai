@@ -19,7 +19,12 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
+from ai.backend.common.config import (
+    ConfigurationError,
+    override_key,
+    redis_config_iv,
+    redis_helper_config_iv,
+)
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import (
     EventDispatcher,
@@ -103,7 +108,7 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            redis_helper_config = redis_config_iv.check(
+            redis_helper_config = redis_helper_config_iv.check(
                 await etcd.get_prefix("config/redis_helper"),
             )
 

@@ -12,6 +12,7 @@ from ai.backend.common.redis_helper import execute
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .types import RedisClusterInfo
+from .utils import redis_helper_config
 
 
 @pytest.mark.redis
@@ -20,6 +21,7 @@ async def test_pipeline_single_instance(redis_container: Tuple[str, HostPortPair
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )
@@ -44,6 +46,7 @@ async def test_pipeline_single_instance_retries(redis_container: Tuple[str, Host
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )
@@ -82,11 +85,12 @@ async def test_pipeline_sentinel_cluster(redis_cluster: RedisClusterInfo) -> Non
     s = Sentinel(
         redis_cluster.sentinel_addrs,
         password="develove",
-        socket_timeout=0.5,
+        socket_timeout=5.0,
     )
 
     rconn = RedisConnectionInfo(
         s.master_for(service_name="mymaster"),
+        redis_helper_config=redis_helper_config,
         sentinel=s,
         service_name="mymaster",
     )

@@ -35,6 +35,12 @@ disruptions: Final = {
     },
 }
 
+redis_helper_config = {
+    "socket_timeout": 5.0,
+    "socket_connect_timeout": 2.0,
+    "reconnect_poll_timeout": 0.3,
+}
+
 
 async def simple_run_cmd(
     cmdargs: Sequence[Union[str, bytes]], **kwargs

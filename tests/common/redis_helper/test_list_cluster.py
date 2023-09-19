@@ -11,7 +11,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo
 
 from .types import RedisClusterInfo
-from .utils import interrupt, with_timeout
+from .utils import interrupt, redis_helper_config, with_timeout
 
 
 @pytest.mark.redis
@@ -52,6 +52,7 @@ async def test_blist_cluster_sentinel(
 
     r = RedisConnectionInfo(
         s.master_for(service_name="mymaster"),
+        redis_helper_config=redis_helper_config,
         sentinel=s,
         service_name="mymaster",
     )

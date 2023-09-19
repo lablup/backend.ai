@@ -121,13 +121,10 @@ usage() {
   echo "  ${LWHITE}--var-base-path PATH${NC}"
   echo "    The base path for shared data files."
   echo "    (default: ./var/lib/backend.ai)"
-<<<<<<< Updated upstream
-=======
   echo ""
   echo "  ${LWHITE}--configure-ha${NC}"
   echo "    Configure HA dev environment."
   echo "    (default: false)"
->>>>>>> Stashed changes
 }
 
 show_error() {
@@ -287,10 +284,12 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
+CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
-REDIS_PORT="8111"
-ETCD_PORT="8121"
+[[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
+[[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
+
 MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
@@ -307,8 +306,6 @@ CODESPACES_POST_CREATE=0
 CODESPACES=${CODESPACES:-"false"}
 _INSTALLED_PYENV=0
 
-<<<<<<< Updated upstream
-=======
 # Only Used in HA mode
 REDIS_MASTER_PORT="9500"
 REDIS_SLAVE1_PORT="9501"
@@ -317,7 +314,6 @@ REDIS_SENTINEL1_PORT="9503"
 REDIS_SENTINEL2_PORT="9504"
 REDIS_SENTINEL3_PORT="9505"
 
->>>>>>> Stashed changes
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
@@ -347,6 +343,7 @@ while [ $# -gt 0 ]; do
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
     --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
     --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
+    --configure-ha)         CONFIGURE_HA=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -765,11 +762,6 @@ setup_environment() {
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
   mkdir -p "$HALFSTACK_VOLUME_PATH"
-<<<<<<< Updated upstream
-  SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-  if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
-=======
   if [ $CONFIGURE_HA -eq 1 ]; then
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
 
@@ -824,15 +816,16 @@ setup_environment() {
       SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     fi
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
->>>>>>> Stashed changes
   fi
-  cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -872,7 +865,7 @@ configure_backendai() {
     ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   fi
 
-  ./backend.ai mgr etcd put-json config/redis_helper configs/manager/sample.etcd.redis-helper.json
+  ./backend.ai mgr etcd put-json config/redis-helper ./configs/manager/sample.etcd.redis-helper.json
 
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
@@ -920,9 +913,6 @@ configure_backendai() {
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-<<<<<<< Updated upstream
-  sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
-=======
 
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.host = \"localhost\"/# redis.host = \"localhost\"/" ./webserver.conf
@@ -934,7 +924,6 @@ configure_backendai() {
     sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
   fi
 
->>>>>>> Stashed changes
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui

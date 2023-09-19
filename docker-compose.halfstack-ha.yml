@@ -3,12 +3,12 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:13.7-alpine
+    image: postgres:15.1-alpine
     command: postgres -c 'max_connections=256'
     networks:
       - half
     ports:
-      - "8200:5432"
+      - "8100:5432"
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-develove}
       - POSTGRES_DB=${POSTGRES_DBNAME:-backend}
@@ -80,92 +80,51 @@ services:
     ports:
     - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
     depends_on:
-      - "backendai-half-redis-node01"
-      - "backendai-half-redis-node02"
-      - "backendai-half-redis-node03"
-    volumes:
-      - ./configs/redis/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-sentinel /config/sentinel01.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    ports:
-      - "8210:6379"
-    networks:
-      - half
-
-  # Initial master is node01.
-  backendai-half-redis-node01:
-    image: redis:6.2.7-alpine
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-develove}
-      --masterauth ${REDIS_PASSWORD:-develove}
-      --min-slaves-to-write 1
-      --min-slaves-max-lag 10
-    networks:
-      - half
-    cpu_count: 1
-
-  backendai-half-redis-sentinel01:
-    build:
-      context: .
-      dockerfile: redis-sentinel.Dockerfile
-      cache_from:
-        - redis:5-alpine
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
-    networks:
-      - half
-    cpu_count: 1
-
-  backendai-half-redis-node02:
-    image: redis:6.2.7-alpine
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-develove}
-      --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof backendai-half-redis-node01 6379
-      --min-slaves-to-write 1
-      --min-slaves-max-lag 10
-    networks:
-      - half
-    cpu_count: 1
 
   backendai-half-redis-sentinel02:
-    build:
-      context: .
-      dockerfile: redis-sentinel.Dockerfile
-      cache_from:
-        - redis:6.2.7-alpine
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+    image: redis:7.0.5-alpine
     networks:
-      - half
-    cpu_count: 1
-
-  backendai-half-redis-node03:
-    image: redis:6.2.7-alpine
+    - net_sentinel02
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
     command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-develove}
-      --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof backendai-half-redis-node01 6379
-      --min-slaves-to-write 1
-      --min-slaves-max-lag 10
-    networks:
-      - half
-    cpu_count: 1
+      redis-sentinel /config/sentinel02.conf
+    environment:
+    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    build:
-      context: .
-      dockerfile: redis-sentinel.Dockerfile
-      cache_from:
-        - redis:6.2.7-alpine
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+    image: redis:7.0.5-alpine
     networks:
-      - half
-    cpu_count: 1
+    - net_sentinel03
+    volumes:
+    - type: bind
+      source: ${COMPOSE_PATH}
+      target: /config
+    ports:
+    - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
+    depends_on:
+    - backendai-half-redis-node01
+    - backendai-half-redis-node02
+    - backendai-half-redis-node03
+    command: >
+      redis-sentinel /config/sentinel03.conf
+    environment:
+    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-etcd-proxy:
     image: quay.io/coreos/etcd:v3.5.4
@@ -257,5 +216,22 @@ services:
       --initial-cluster-token $${TOKEN}
       --initial-cluster-state $${STATE}"
 
+# In the production environment, the redis cluster and the sentinel cluster might be on the same host, but this is usually not the case.
+# In this configuration, network separtion is implemented by placing the sentinel and redis cluster components on separate docker networks.
+# Therefore, communication should not be done via the docker network's address range, but rather through the exposed address.
+# 'IP_ADDR' is resolved to a specific hostname and printed on the console at the time of installation.
+# After running install-dev.sh, the user must manually add this hostname to the /etc/hosts file.
 networks:
+  net_redis_node01:
+    driver: bridge
+  net_redis_node02:
+    driver: bridge
+  net_redis_node03:
+    driver: bridge
+  net_sentinel01:
+    driver: bridge
+  net_sentinel02:
+    driver: bridge
+  net_sentinel03:
+    driver: bridge
   half:

@@ -22,7 +22,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import HostPortPair
 
 from .types import RedisClusterInfo
-from .utils import interrupt, with_timeout
+from .utils import interrupt, redis_helper_config, with_timeout
 
 if TYPE_CHECKING:
     from typing import Any
@@ -100,11 +100,7 @@ async def test_instantiate_redisconninfo() -> None:
             "service_name": "mymaster",
             "password": "develove",
         },
-        {
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
+        redis_helper_config=redis_helper_config,
     )
 
     assert isinstance(r2.client, Redis)

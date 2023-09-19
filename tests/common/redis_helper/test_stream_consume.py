@@ -15,7 +15,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
-from .utils import interrupt, with_timeout
+from .utils import interrupt, redis_helper_config, with_timeout
 
 
 @pytest.mark.redis
@@ -64,6 +64,7 @@ async def test_stream_loadbalance(
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )

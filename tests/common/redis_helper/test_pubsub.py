@@ -14,7 +14,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
-from .utils import interrupt
+from .utils import interrupt, redis_helper_config
 
 
 @pytest.mark.redis
@@ -42,6 +42,7 @@ async def test_pubsub(redis_container: Tuple[str, HostPortPair], disruption_meth
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )
@@ -130,6 +131,7 @@ async def test_pubsub_with_retrying_pub(
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        redis_helper_config=redis_helper_config,
         sentinel=None,
         service_name=None,
     )

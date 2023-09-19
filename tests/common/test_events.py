@@ -16,6 +16,12 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.types import AgentId, EtcdRedisConfig
 
+redis_helper_config = {
+    "socket_timeout": 5.0,
+    "socket_connect_timeout": 2.0,
+    "reconnect_poll_timeout": 0.3,
+}
+
 
 @attrs.define(slots=True, frozen=True)
 class DummyEvent(AbstractEvent):
@@ -41,9 +47,10 @@ async def test_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
+        redis_helper_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
     )
-    producer = await EventProducer.new(redis_config)
+    producer = await EventProducer.new(redis_config, redis_helper_config)
 
     records = set()
 
@@ -93,11 +100,12 @@ async def test_error_on_dispatch(redis_container) -> None:
     redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
+        redis_helper_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         consumer_exception_handler=handle_exception,
         subscriber_exception_handler=handle_exception,
     )
-    producer = await EventProducer.new(redis_config)
+    producer = await EventProducer.new(redis_config, redis_helper_config)
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
