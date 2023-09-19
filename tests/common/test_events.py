@@ -44,7 +44,7 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 async def test_dispatch(redis_container) -> None:
     app = object()
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1])
+    redis_config = EtcdRedisConfig(addr=redis_container[1], redis_helper_config=redis_helper_config)
     dispatcher = await EventDispatcher.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
@@ -96,7 +96,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1])
+    redis_config = EtcdRedisConfig(addr=redis_container[1], redis_helper_config=redis_helper_config)
     dispatcher = await EventDispatcher.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
