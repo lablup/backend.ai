@@ -12,7 +12,7 @@ from etcetra.client import EtcdCommunicator, EtcdConnectionManager
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
 from redis.asyncio.sentinel import SentinelConnectionPool
-from redis.exceptions import LockError
+from redis.exceptions import LockError, LockNotOwnedError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -250,7 +250,14 @@ class RedisLock(AbstractDistributedLock):
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._lock is not None
-        val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
+        try:
+            val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
+        except LockNotOwnedError:
+            log.exception("Lock no longer owned. Skip.")
+            return True
+        except LockError:
+            log.exception("Already unlocked. Skip.")
+            return True
         if self._debug:
             log.debug("RedisLock.__aexit__(): lock released")
 
