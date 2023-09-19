@@ -241,7 +241,7 @@ async def execute(
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except redis.exceptions.ConnectionError as e:
-            log.exception(f"execute(): Connecting to redis failed: {e}")
+            log.error(f"execute(): Connecting to redis failed: {e}")
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except redis.exceptions.ResponseError as e:
