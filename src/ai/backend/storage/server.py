@@ -4,7 +4,6 @@ import grp
 import logging
 import multiprocessing
 import os
-import pickle
 import pwd
 import ssl
 import sys
@@ -26,10 +25,7 @@ from ai.backend.common.config import (
     redis_helper_config_iv,
 )
 from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.events import (
-    EventDispatcher,
-    EventProducer,
-)
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -70,14 +66,6 @@ async def check_migration(ctx: RootContext) -> None:
     await check_latest(ctx)
 
 
-def is_pickable(obj: Any) -> bool:
-    try:
-        pickle.dumps(obj)
-        return True
-    except (pickle.PickleError, TypeError):
-        return False
-
-
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -112,7 +100,6 @@ async def server_main(
                 await etcd.get_prefix("config/redis_helper"),
             )
 
-            assert is_pickable(redis_config)
             log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
         except Exception as e:
             log.exception("Unable to read config from etcd")
