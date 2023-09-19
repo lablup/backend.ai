@@ -53,7 +53,14 @@ redis_config_iv = t.Dict(
     {
         t.Key("addr", default=None): t.Null | tx.HostPortPair,
         t.Key("password", default=None): t.Null | t.String,
-        t.Key("redis_helper_config"): redis_helper_config_iv,
+        t.Key(
+            "redis_helper_config",
+            {
+                "socket_timeout": 5.0,
+                "socket_connect_timeout": 2.0,
+                "reconnect_poll_timeout": 0.3,
+            },
+        ): redis_helper_config_iv,
     }
 ).allow_extra("*")
 
