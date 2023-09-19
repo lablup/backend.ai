@@ -865,6 +865,8 @@ configure_backendai() {
     ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   fi
 
+  ./backend.ai mgr etcd put-json config/redis-helper ./configs/common/sample.etcd.redis-helper.json
+
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
