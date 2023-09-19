@@ -167,7 +167,15 @@ def local_config(
             ),
             "redis": redis_config_iv.check(
                 {
-                    "addr": {"host": redis_addr.host, "port": redis_addr.port},
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": {
+                        "socket_timeout": 5.0,
+                        "socket_connect_timeout": 2.0,
+                        "reconnect_poll_timeout": 0.3,
+                    },
                 }
             ),
             "db": {
