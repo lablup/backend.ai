@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0b2 (2023-09-20)
+
+### Fixes
+* Fix webserver not working ([#1588](https://github.com/lablup/backend.ai/issues/1588))
+
+
 ## 23.09.0b1 (2023-09-20)
 
 ### Features
