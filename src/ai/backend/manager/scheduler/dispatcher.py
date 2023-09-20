@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import itertools
+import json
 import logging
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Dict,
+    Final,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import aiotools
 import async_timeout
@@ -104,6 +118,11 @@ _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")
 
 _key_schedule_prep_tasks: Final = "scheduler.preptasks"
+
+
+def get_hash(value: str) -> str:
+    result = hashlib.md5(value.encode())
+    return result.hexdigest()
 
 
 def load_scheduler(
@@ -651,27 +670,88 @@ class SchedulerDispatcher(aobject):
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent = sess_ctx.main_kernel.agent_row
-            agent_id: AgentId
+            agent_id: AgentId | None = None
             if agent is not None:
                 agent_id = agent.id
             else:
-                # Let the scheduler check the resource availability and decide the target agent
-                cand_agent = scheduler.assign_agent_for_session(
-                    compatible_candidate_agents,
-                    sess_ctx,
-                    scheduler.sgroup_opts.agent_selection_strategy,
-                    agent_selection_resource_priority,
-                )
-                if cand_agent is None:
-                    raise InstanceNotAvailable(
-                        extra_msg=(
-                            "Could not find a contiguous resource region in any agent "
-                            "big enough to host the session "
-                            f"(id: {sess_ctx.id}, resource group: {sess_ctx.scaling_group_name})"
-                        ),
+                sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
+
+                if scheduler.sgroup_opts.roundrobin:
+                    roundrobin_state_str: str | None = await sched_ctx.registry.shared_config.get(
+                        "roundrobin_state", None
                     )
-                assert cand_agent is not None
-                agent_id = cand_agent
+
+                    if roundrobin_state_str is not None:
+                        roundrobin_state: Dict[str, Any] = json.loads(roundrobin_state_str)
+
+                        if requested_architecture in roundrobin_state:
+                            schedulable_group_id = get_hash(
+                                "#".join(list(map(lambda agent: agent.id, sorted_agents)))
+                            )
+
+                            if schedulable_group_id == roundrobin_state.get("schedulable_group_id"):
+                                rr_index = cast(int, roundrobin_state.get("next_index"))
+
+                                for i, agent in enumerate(sorted_agents):
+                                    idx = (rr_index + i) % len(sorted_agents)
+
+                                    if (
+                                        agent.available_slots - agent.occupied_slots
+                                        > sess_ctx.requested_slots
+                                    ):
+                                        agent_id = sorted_agents[idx].id
+
+                                        roundrobin_state[requested_architecture] = {
+                                            "schedulable_group_id": schedulable_group_id,
+                                            "next_index": (rr_index + i + 1) % len(sorted_agents),
+                                        }
+
+                                        await sched_ctx.registry.shared_config.etcd.put(
+                                            "roundrobin_state", json.dumps(roundrobin_state)
+                                        )
+                                        break
+                                else:
+                                    # fallback to the default behavior instead of raising an error for reducing code complexity
+                                    pass
+
+                if agent_id is None:
+                    # Let the scheduler check the resource availability and decide the target agent
+                    cand_agent = scheduler.assign_agent_for_session(
+                        compatible_candidate_agents,
+                        sess_ctx,
+                        scheduler.sgroup_opts.agent_selection_strategy,
+                        agent_selection_resource_priority,
+                    )
+                    if cand_agent is None:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                "Could not find a contiguous resource region in any agent big"
+                                f" enough to host the session (id: {sess_ctx.id}, resource group:"
+                                f" {sess_ctx.scaling_group_name})"
+                            ),
+                        )
+                    assert cand_agent is not None
+                    agent_id = cand_agent
+
+                    if scheduler.sgroup_opts.roundrobin:
+                        new_metadata = json.load(
+                            await sched_ctx.registry.shared_config.get("roundrobin_state", {})
+                        )
+                        new_metadata[requested_architecture] = {
+                            "schedulable_group_id": get_hash(
+                                "#".join(list(map(lambda agent: agent.id, sorted_agents)))
+                            ),
+                            "next_index": [
+                                idx
+                                for idx, agent in enumerate(sorted_agents)
+                                if agent.id == agent_id
+                            ][0],
+                        }
+
+                        await sched_ctx.registry.shared_config.etcd.put(
+                            "roundrobin_state", json.dumps(new_metadata)
+                        )
+
             async with self.db.begin_session() as agent_db_sess:
                 query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
                 available_agent_slots = (await agent_db_sess.execute(query)).scalar()

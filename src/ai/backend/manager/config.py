@@ -499,6 +499,7 @@ shared_config_iv = t.Dict(
                 ): session_hang_tolerance_iv,
             },
         ).allow_extra("*"),
+        t.Key("roundrobin_state", default=None): t.Null | t.String,
     }
 ).allow_extra("*")
 
