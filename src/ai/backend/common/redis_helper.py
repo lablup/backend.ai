@@ -472,7 +472,7 @@ def get_redis_object(
             redis_helper_config=redis_helper_config,
         )
     else:
-        host, port = redis_config.get("host"), redis_config.get("port")
+        host, port = cast(str, redis_config.get("host")), cast(int, redis_config.get("port"))
         assert host is not None
         assert port is not None
 
