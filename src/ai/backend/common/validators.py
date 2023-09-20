@@ -700,10 +700,8 @@ class RoundRobinStatesJSONString(t.Trafaret):
             rr_states_dict: dict[str, dict[str, Any]] = json.loads(value)
         except (KeyError, ValueError, json.decoder.JSONDecodeError):
             self._failure(
-                (
-                    f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
-                    " be a valid JSON string"
-                ),
+                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
+                " be a valid JSON string",
                 value=value,
             )
 
