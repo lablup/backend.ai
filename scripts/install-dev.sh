@@ -907,13 +907,12 @@ configure_backendai() {
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
   if [ $CONFIGURE_HA -eq 1 ]; then
-    sed_inplace "s/redis.host = \"localhost\"/# redis.host = \"localhost\"/" ./webserver.conf
-    sed_inplace "s/redis.port = 6379/# redis.port = 6379/" ./webserver.conf
+    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
     sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
     sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
     sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
   else
-    sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
+    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
   fi
 
   # install and configure webui

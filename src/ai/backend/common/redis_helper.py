@@ -472,13 +472,11 @@ def get_redis_object(
             redis_helper_config=redis_helper_config,
         )
     else:
-        host, port = cast(str, redis_config.get("host")), cast(int, redis_config.get("port"))
-        assert host is not None
-        assert port is not None
-
-        url = yarl.URL("redis://host").with_host(host).with_port(port).with_password(
-            redis_config.get("password")
-        ) / str(db)
+        redis_url = redis_config.get("addr")
+        assert redis_url is not None
+        url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
+            redis_url[1]
+        ).with_password(redis_config.get("password")) / str(db)
 
         return RedisConnectionInfo(
             client=Redis.from_url(str(url), **kwargs),
