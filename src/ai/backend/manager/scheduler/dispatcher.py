@@ -676,7 +676,7 @@ class SchedulerDispatcher(aobject):
                 if scheduler.sgroup_opts.roundrobin:
                     rr_state: RoundRobinState | None = (
                         await sched_ctx.registry.shared_config.get_roundrobin_state(
-                            requested_architecture
+                            sgroup_name, requested_architecture
                         )
                     )
 
@@ -698,7 +698,7 @@ class SchedulerDispatcher(aobject):
                                     )
 
                                     await sched_ctx.registry.shared_config.put_roundrobin_state(
-                                        requested_architecture, rr_state
+                                        sgroup_name, requested_architecture, rr_state
                                     )
                                     break
                             else:
@@ -725,6 +725,7 @@ class SchedulerDispatcher(aobject):
 
                     if scheduler.sgroup_opts.roundrobin:
                         await sched_ctx.registry.shared_config.put_roundrobin_state(
+                            sgroup_name,
                             requested_architecture,
                             RoundRobinState(
                                 schedulable_group_id=get_schedulable_group_id(

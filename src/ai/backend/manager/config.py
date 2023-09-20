@@ -883,27 +883,37 @@ class SharedConfig(AbstractConfig):
         ).with_password(self.data["redis"]["password"]) / str(db)
         return url
 
-    async def get_roundrobin_state(self, architecture: str) -> RoundRobinState | None:
+    async def get_roundrobin_state(
+        self, resource_group_name: str, architecture: str
+    ) -> RoundRobinState | None:
         """
-        Return the roundrobin state for the given architecture.
-        If roundrobin states or roundrobin state of the given architecture is not found, return None.
+        Return the roundrobin state for the given resource group and architecture.
+        If given resource group's roundrobin states or roundrobin state of the given architecture is not found, return None.
         """
         if (rr_state_str := await self.get_raw("roundrobin_states")) is not None:
             rr_states_dict: dict[str, dict[str, Any]] = json.loads(rr_state_str)
-            rr_state_dict = rr_states_dict.get(architecture, None)
+            resource_group_rr_states_dict = rr_states_dict.get(resource_group_name, None)
 
-            if rr_state_dict is not None:
-                return RoundRobinState(
-                    schedulable_group_id=rr_state_dict["schedulable_group_id"],
-                    next_index=rr_state_dict["next_index"],
-                )
+            if resource_group_rr_states_dict is not None:
+                rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
+
+                if rr_state_dict is not None:
+                    return RoundRobinState(
+                        schedulable_group_id=rr_state_dict["schedulable_group_id"],
+                        next_index=rr_state_dict["next_index"],
+                    )
 
         return None
 
-    async def put_roundrobin_state(self, architecture: str, state: RoundRobinState) -> None:
+    async def put_roundrobin_state(
+        self, resource_group_name: str, architecture: str, state: RoundRobinState
+    ) -> None:
         """
-        Update the roundrobin states using the given architecture key.
+        Update the roundrobin states using the given resource group and architecture key.
         """
         rr_states_dict = json.loads(await self.get_raw("roundrobin_states") or "{}")
-        rr_states_dict[architecture] = state.to_json()
+        if resource_group_name not in rr_states_dict:
+            rr_states_dict[resource_group_name] = {}
+
+        rr_states_dict[resource_group_name][architecture] = state.to_json()
         await self.etcd.put("roundrobin_states", json.dumps(rr_states_dict))

@@ -697,7 +697,7 @@ class Delay(t.Trafaret):
 class RoundRobinStatesJSONString(t.Trafaret):
     def check_and_return(self, value: Any) -> RoundRobinStates:
         try:
-            rr_states_dict: dict[str, dict[str, Any]] = json.loads(value)
+            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
         except (KeyError, ValueError, json.decoder.JSONDecodeError):
             self._failure(
                 f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
@@ -705,11 +705,12 @@ class RoundRobinStatesJSONString(t.Trafaret):
                 value=value,
             )
 
-        rr_states: dict[str, RoundRobinState] = {}
-        for arch, rr_state_dict in rr_states_dict.items():
-            if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
-                self._failure("Invalid roundrobin states")
-
-            rr_states[arch] = RoundRobinState.from_json(rr_state_dict)
+        rr_states: RoundRobinStates = {}
+        for resource_group, arch_rr_states_dict in rr_states_dict.items():
+            rr_states[resource_group] = {}
+            for arch, rr_state_dict in arch_rr_states_dict.items():
+                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
+                    self._failure("Invalid roundrobin states")
+                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
 
         return rr_states

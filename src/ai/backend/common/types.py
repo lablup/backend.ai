@@ -1171,5 +1171,5 @@ class RoundRobinState(JSONSerializableMixin):
         )
 
 
-# Store the states of the round-robin scheduler for each architecture.
-RoundRobinStates: TypeAlias = dict[str, RoundRobinState]
+# States of the round-robin scheduler for each resource group and architecture.
+RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
