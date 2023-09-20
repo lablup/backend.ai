@@ -119,8 +119,7 @@ config_iv = t.Dict(
             {
                 t.Key("redis"): t.Dict(
                     {
-                        t.Key("host", default=None): t.Null | t.String,
-                        t.Key("port", default=None): t.Null | t.ToInt[1:65535],
+                        t.Key("addr", default=None): t.Null | tx.HostPortPair,
                         t.Key("db", default=0): t.ToInt,
                         t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
                             tx.HostPortPair
