@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 import ipaddress
 import itertools
@@ -10,6 +11,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
+from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import PurePosixPath
@@ -26,6 +28,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
@@ -1144,3 +1147,16 @@ class AgentSelectionStrategy(enum.StrEnum):
 class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()
+
+
+@dataclass
+class RoundRobinState:
+    schedulable_group_id: str
+    next_index: int
+
+    def as_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+# Store the states of the round-robin scheduler for each architecture.
+RoundRobinStates: TypeAlias = dict[str, RoundRobinState]

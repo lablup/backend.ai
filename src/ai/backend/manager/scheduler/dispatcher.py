@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import itertools
-import json
 import logging
 import uuid
 from contextvars import ContextVar
@@ -13,14 +12,12 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
-    Dict,
     Final,
     List,
     Optional,
     Sequence,
     Tuple,
     Union,
-    cast,
 )
 
 import aiotools
@@ -53,6 +50,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ResourceSlot,
+    RoundRobinState,
     SessionId,
     SessionTypes,
     aobject,
@@ -120,9 +118,8 @@ _log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")
 _key_schedule_prep_tasks: Final = "scheduler.preptasks"
 
 
-def get_hash(value: str) -> str:
-    result = hashlib.md5(value.encode())
-    return result.hexdigest()
+def get_schedulable_group_id(agents: list[AgentRow]) -> str:
+    return hashlib.md5("#".join(list(map(lambda agent: agent.id, agents))).encode()).hexdigest()
 
 
 def load_scheduler(
@@ -677,60 +674,46 @@ class SchedulerDispatcher(aobject):
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
                 if scheduler.sgroup_opts.roundrobin:
-                    rr_state_str: str | None = await sched_ctx.registry.shared_config.get_raw(
-                        "roundrobin_state"
+                    rr_state: RoundRobinState | None = (
+                        await sched_ctx.registry.shared_config.get_roundrobin_state(
+                            requested_architecture
+                        )
                     )
 
-                    if rr_state_str is not None:
-                        rr_state: Dict[str, Any] = json.loads(rr_state_str)
+                    if rr_state is not None:
+                        schedulable_group_id = get_schedulable_group_id(sorted_agents)
 
-                        if requested_architecture in rr_state:
-                            schedulable_group_id = get_hash(
-                                "#".join(list(map(lambda agent: agent.id, sorted_agents)))
-                            )
+                        if schedulable_group_id == rr_state.schedulable_group_id:
+                            for i in range(len(sorted_agents)):
+                                idx = (rr_state.next_index + i) % len(sorted_agents)
+                                agent = sorted_agents[idx]
 
-                            if schedulable_group_id == cast(
-                                Dict[str, Any], rr_state.get(requested_architecture)
-                            ).get("schedulable_group_id"):
-                                rr_index = cast(
-                                    int,
-                                    cast(Dict[str, Any], rr_state.get(requested_architecture)).get(
-                                        "next_index"
-                                    ),
-                                )
+                                if (
+                                    agent.available_slots - agent.occupied_slots
+                                    > sess_ctx.requested_slots
+                                ):
+                                    agent_id = agent.id
+                                    rr_state.next_index = (rr_state.next_index + i + 1) % len(
+                                        sorted_agents
+                                    )
 
-                                for i in range(len(sorted_agents)):
-                                    idx = (rr_index + i) % len(sorted_agents)
-                                    agent = sorted_agents[idx]
-
-                                    if (
-                                        agent.available_slots - agent.occupied_slots
-                                        > sess_ctx.requested_slots
-                                    ):
-                                        agent_id = agent.id
-
-                                        rr_state[requested_architecture] = {
-                                            "schedulable_group_id": schedulable_group_id,
-                                            "next_index": (rr_index + i + 1) % len(sorted_agents),
-                                        }
-
-                                        await sched_ctx.registry.shared_config.etcd.put(
-                                            "roundrobin_state", json.dumps(rr_state)
-                                        )
-                                        break
-                                else:
-                                    # fallback to the default behavior instead of raising an error for reducing code complexity
-                                    pass
+                                    await sched_ctx.registry.shared_config.put_roundrobin_state(
+                                        requested_architecture, rr_state
+                                    )
+                                    break
+                            else:
+                                # fallback to the default behavior instead of raising an error for reducing code complexity
+                                pass
 
                 if agent_id is None:
                     # Let the scheduler check the resource availability and decide the target agent
-                    cand_agent = scheduler.assign_agent_for_session(
+                    cand_agent_id = scheduler.assign_agent_for_session(
                         compatible_candidate_agents,
                         sess_ctx,
                         scheduler.sgroup_opts.agent_selection_strategy,
                         agent_selection_resource_priority,
                     )
-                    if cand_agent is None:
+                    if cand_agent_id is None:
                         raise InstanceNotAvailable(
                             extra_msg=(
                                 "Could not find a contiguous resource region in any agent big"
@@ -738,27 +721,21 @@ class SchedulerDispatcher(aobject):
                                 f" {sess_ctx.scaling_group_name})"
                             ),
                         )
-                    assert cand_agent is not None
-                    agent_id = cand_agent
+                    agent_id = cand_agent_id
 
                     if scheduler.sgroup_opts.roundrobin:
-                        new_rr_state = json.loads(
-                            (await sched_ctx.registry.shared_config.get_raw("roundrobin_state"))
-                            or "{}"
-                        )
-                        new_rr_state[requested_architecture] = {
-                            "schedulable_group_id": get_hash(
-                                "#".join(list(map(lambda agent: agent.id, sorted_agents)))
+                        await sched_ctx.registry.shared_config.put_roundrobin_state(
+                            requested_architecture,
+                            RoundRobinState(
+                                schedulable_group_id=get_schedulable_group_id(
+                                    sorted_agents,
+                                ),
+                                next_index=[
+                                    (idx + 1) % len(sorted_agents)
+                                    for idx, agent in enumerate(sorted_agents)
+                                    if agent.id == agent_id
+                                ][0],
                             ),
-                            "next_index": [
-                                (idx + 1) % len(sorted_agents)
-                                for idx, agent in enumerate(sorted_agents)
-                                if agent.id == agent_id
-                            ][0],
-                        }
-
-                        await sched_ctx.registry.shared_config.etcd.put(
-                            "roundrobin_state", json.dumps(new_rr_state)
                         )
 
             async with self.db.begin_session() as agent_db_sess:

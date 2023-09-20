@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Mapping,
+    Sequence,
+    Set,
+    cast,
+    overload,
+)
 
 import attr
 import graphene
