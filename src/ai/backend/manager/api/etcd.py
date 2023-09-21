@@ -131,10 +131,9 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
         available_slot_keys = set()
         async with root_ctx.db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).where(
-                AgentRow.status
-                == AgentStatus.ALIVE & AgentRow.scaling_group
-                == params["sgroup"] & AgentRow.schedulable
-                == sa.true()
+                (AgentRow.status == AgentStatus.ALIVE)
+                & (AgentRow.scaling_group == params["sgroup"])
+                & (AgentRow.schedulable == sa.true())
             )
             result = await db_sess.execute(query)
             for agent in result.scalars().all():
