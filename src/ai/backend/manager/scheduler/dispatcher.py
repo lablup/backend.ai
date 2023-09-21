@@ -1207,11 +1207,11 @@ class SchedulerDispatcher(aobject):
                 SessionRow.id.in_(ids_of_session_to_destroy), eager_loading_op=kernel_loading_op
             )
             result = await db_session.execute(query)
-            target_sessions_to_destory = result.scalars().all()
+            target_sessions_to_destroy = result.scalars().all()
 
         already_destroyed_sessions = []
         # TODO: Update logic to not to wait for sessions to actually terminate
-        for session in target_sessions_to_destory:
+        for session in target_sessions_to_destroy:
             try:
                 await self.registry.destroy_session(
                     session,
