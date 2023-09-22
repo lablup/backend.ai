@@ -308,7 +308,7 @@ class AgentRPCServer(aobject):
         self.local_config["redis"] = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
         )
-        log.info("configured redis_addr: {0}", self.local_config["redis"]["addr"])
+        log.info("configured redis: {0}", self.local_config["redis"])
 
         # Fill up vfolder configs from etcd.
         self.local_config["vfolder"] = config.vfolder_config_iv.check(

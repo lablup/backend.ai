@@ -3752,7 +3752,8 @@ async def handle_kernel_log(
     event: DoSyncKernelLogsEvent,
 ) -> None:
     redis_conn = redis_helper.get_redis_object(
-        context.shared_config.data["redis"], db=REDIS_STREAM_DB
+        context.shared_config.data["redis"],
+        db=REDIS_STREAM_DB,
     )
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()
