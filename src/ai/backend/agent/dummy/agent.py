@@ -1,7 +1,16 @@
 import asyncio
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, FrozenSet, Literal, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    FrozenSet,
+    Literal,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef

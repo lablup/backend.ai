@@ -154,6 +154,7 @@ from .types import Container, ContainerLifecycleEvent, ContainerStatus, Lifecycl
 from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
+    from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -573,6 +574,8 @@ class AbstractAgent(
     timer_tasks: MutableSequence[asyncio.Task]
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
+    agent_public_key: Optional[PublicKey]
+
     stat_ctx: StatContext
     stat_sync_sockpath: Path
     stat_sync_task: asyncio.Task
@@ -592,6 +595,7 @@ class AbstractAgent(
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
+        agent_public_key: Optional[PublicKey],
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -599,6 +603,7 @@ class AbstractAgent(
         self.local_config = local_config
         self.id = AgentId(local_config["agent"]["id"])
         self.local_instance_id = generate_local_instance_id(__file__)
+        self.agent_public_key = agent_public_key
         self.kernel_registry = {}
         self.computers = {}
         self.images = {}  # repoTag -> digest
@@ -843,11 +848,16 @@ class AbstractAgent(
                         slot_type,
                         str(self.slots.get(slot_key, 0)),
                     )
+            if self.local_config["agent"]["advertised-rpc-addr"]:
+                rpc_addr = self.local_config["agent"]["advertised-rpc-addr"]
+            else:
+                rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
             agent_info = {
-                "ip": str(self.local_config["agent"]["rpc-listen-addr"].host),
+                "ip": str(rpc_addr.host),
                 "region": self.local_config["agent"]["region"],
                 "scaling_group": self.local_config["agent"]["scaling-group"],
-                "addr": f"tcp://{self.local_config['agent']['rpc-listen-addr']}",
+                "addr": f"tcp://{rpc_addr}",
+                "public_key": self.agent_public_key,
                 "public_host": str(self._get_public_host()),
                 "resource_slots": res_slots,
                 "version": VERSION,
@@ -2434,6 +2444,14 @@ async def handle_volume_mount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeMounted(
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                "",
+                event.quota_scope_id,
+            )
+        )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     volume_mount_prefix: str | None = context.local_config["agent"]["mount-path"]
@@ -2471,6 +2489,14 @@ async def handle_volume_umount(
 ) -> None:
     if context.local_config["agent"]["cohabiting-storage-proxy"]:
         log.debug("Storage proxy is in the same node. Skip the volume task.")
+        await context.event_producer.produce_event(
+            VolumeUnmounted(
+                str(context.id),
+                VolumeMountableNodeType.AGENT,
+                "",
+                event.quota_scope_id,
+            )
+        )
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")

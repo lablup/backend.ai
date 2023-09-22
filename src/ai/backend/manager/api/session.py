@@ -329,6 +329,8 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
+
     try:
         resp = await root_ctx.registry.create_session(
             params["session_name"],
@@ -355,6 +357,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             starts_at_timestamp=params["starts_at"],
             tag=params["tag"],
             callback_url=params["callback_url"],
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
@@ -685,6 +688,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         if not template:
             raise TaskTemplateNotFound
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
         resp = await root_ctx.registry.create_cluster(
@@ -703,6 +707,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             params["tag"],
             enqueue_only=params["enqueue_only"],
             max_wait_seconds=params["max_wait_seconds"],
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except TooManySessionsMatched:
