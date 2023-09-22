@@ -33,6 +33,7 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.logging import LocalLogger
@@ -69,10 +70,8 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
-from ai.backend.testutils.bootstrap import (  # noqa: F401
-    etcd_container,
-    postgres_container,
-    redis_container,
+from ai.backend.testutils.bootstrap import (
+    postgres_container,  # noqa: F401
 )
 from ai.backend.testutils.pants import get_parallel_slot
 
@@ -171,11 +170,7 @@ def local_config(
                         "host": redis_addr.host,
                         "port": redis_addr.port,
                     },
-                    "redis_helper_config": {
-                        "socket_timeout": 5.0,
-                        "socket_connect_timeout": 2.0,
-                        "reconnect_poll_timeout": 0.3,
-                    },
+                    "redis_helper_config": config.redis_helper_default_config,
                 }
             ),
             "db": {

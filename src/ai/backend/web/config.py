@@ -126,7 +126,9 @@ config_iv = t.Dict(
                         ),
                         t.Key("service_name", default=None): t.Null | t.String,
                         t.Key("password", default=None): t.Null | t.String,
-                        t.Key("redis_helper_config"): config.redis_helper_config_iv,
+                        t.Key(
+                            "redis_helper_config", default=config.redis_helper_default_config
+                        ): config.redis_helper_config_iv,
                     }
                 ),
                 t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)
