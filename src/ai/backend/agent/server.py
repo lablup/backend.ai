@@ -43,9 +43,12 @@ from callosum.rpc import Peer, RPCMessage
 from etcetra.types import WatchEventType
 from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
+from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
+from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     EventProducer,
@@ -62,6 +65,7 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     LogSeverity,
+    QueueSentinel,
     SessionId,
     aobject,
 )
@@ -179,6 +183,9 @@ class RPCFunctionRegistry:
 
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
+    rpc_auth_manager_public_key: Optional[PublicKey]
+    rpc_auth_agent_public_key: Optional[PublicKey]
+    rpc_auth_agent_secret_key: Optional[SecretKey]
 
     loop: asyncio.AbstractEventLoop
     agent: AbstractAgent
@@ -217,6 +224,35 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
+        if self.local_config["agent"]["rpc-auth-agent-keypair"] is not None:
+            manager_pkey, _ = load_certificate(
+                self.local_config["agent"]["rpc-auth-manager-public-key"]
+            )
+            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+            agent_pkey, agent_skey = load_certificate(
+                self.local_config["agent"]["rpc-auth-agent-keypair"]
+            )
+            assert agent_skey is not None
+            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+            log.info(
+                "RPC encryption and authentication is enabled. "
+                "(agent_public_key = '{}', manager_public_key='{}')",
+                self.rpc_auth_agent_public_key.decode("ascii"),
+                self.rpc_auth_manager_public_key.decode("ascii"),
+            )
+            auth_handler = AgentAuthHandler(
+                "local",
+                self.rpc_auth_manager_public_key,
+                self.rpc_auth_agent_public_key,
+                self.rpc_auth_agent_secret_key,
+            )
+        else:
+            self.rpc_auth_manager_public_key = None
+            self.rpc_auth_agent_public_key = None
+            self.rpc_auth_agent_secret_key = None
+            auth_handler = None
+
         backend = self.local_config["agent"]["backend"]
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         self.agent = await agent_mod.get_agent_cls().new(  # type: ignore
@@ -224,12 +260,14 @@ class AgentRPCServer(aobject):
             self.local_config,
             stats_monitor=self.stats_monitor,
             error_monitor=self.error_monitor,
+            agent_public_key=self.rpc_auth_agent_public_key,
         )
 
         rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
+            authenticator=auth_handler,
             scheduler=ExitOrderedAsyncScheduler(),
             serializer=msgpack.packb,
             deserializer=msgpack.unpackb,
@@ -253,8 +291,12 @@ class AgentRPCServer(aobject):
             log.warning("watching etcd to wait for the manager being available")
             async with aclosing(self.etcd.watch_prefix("nodes/manager")) as agen:
                 async for ev in agen:
-                    if ev.event == WatchEventType.PUT and ev.value == "up":
-                        break
+                    match ev:
+                        case QueueSentinel.CLOSED | QueueSentinel.TIMEOUT:
+                            break
+                        case _:
+                            if ev.event == WatchEventType.PUT and ev.value == "up":
+                                break
         log.info("detected at least one manager running")
 
     async def read_agent_config(self):
@@ -262,7 +304,7 @@ class AgentRPCServer(aobject):
         self.local_config["redis"] = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
         )
-        log.info("configured redis_addr: {0}", self.local_config["redis"]["addr"])
+        log.info("configured redis: {0}", self.local_config["redis"])
 
         # Fill up vfolder configs from etcd.
         self.local_config["vfolder"] = config.vfolder_config_iv.check(
@@ -299,7 +341,7 @@ class AgentRPCServer(aobject):
     async def init_background_task_manager(self):
         event_producer = await EventProducer.new(
             cast(EtcdRedisConfig, self.local_config["redis"]),
-            db=4,  # Identical to manager's REDIS_STREAM_DB
+            db=REDIS_STREAM_DB,
         )
         self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
 
@@ -347,8 +389,9 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def ping_kernel(self, kernel_id: str):
-        log.debug("rpc::ping_kernel({0})", kernel_id)
+    async def ping_kernel(self, kernel_id: str) -> dict[str, float] | None:
+        log.debug("rpc::ping_kernel(k:{})", kernel_id)
+        return await self.agent.ping_kernel(KernelId(UUID(kernel_id)))
 
     @rpc_function
     @collect_error
@@ -699,7 +742,8 @@ async def server_main(
     loop.set_debug(local_config["debug"]["asyncio"])
     monitor = aiomonitor.Monitor(
         loop,
-        port=local_config["agent"]["aiomonitor-port"],
+        termui_port=local_config["agent"]["aiomonitor-termui-port"] + pidx,
+        webui_port=local_config["agent"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
@@ -811,34 +855,28 @@ async def server_main(
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
     help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: str,
     debug: bool = False,
 ) -> int:
-    # Delete this part when you remove --debug option
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
@@ -857,9 +895,11 @@ def main(
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+    if debug:
+        log_level = "DEBUG"
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -942,7 +982,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if log_level == LogSeverity.DEBUG:
+                if log_level == "DEBUG":
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":

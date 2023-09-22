@@ -16,7 +16,9 @@ __all__ = (
     "ConfigurationError",
     "etcd_config_iv",
     "redis_config_iv",
+    "redis_helper_config_iv",
     "vfolder_config_iv",
+    "model_definition_iv",
     "read_from_file",
     "read_from_etcd",
     "override_key",
@@ -39,12 +41,29 @@ etcd_config_iv = t.Dict(
     }
 ).allow_extra("*")
 
-redis_config_iv = t.Dict(
+redis_helper_config_iv = t.Dict(
     {
-        t.Key("addr", default=("127.0.0.1", 6379)): tx.HostPortPair,
-        t.Key("password", default=None): t.Null | t.String,
+        t.Key("socket_timeout", default=5.0): t.Float,
+        t.Key("socket_connect_timeout", default=2.0): t.Float,
+        t.Key("reconnect_poll_timeout", default=0.3): t.Float,
     }
 ).allow_extra("*")
+
+redis_config_iv = t.Dict(
+    {
+        t.Key("addr", default=None): t.Null | tx.HostPortPair,
+        t.Key("password", default=None): t.Null | t.String,
+        t.Key(
+            "redis_helper_config",
+            {
+                "socket_timeout": 5.0,
+                "socket_connect_timeout": 2.0,
+                "reconnect_poll_timeout": 0.3,
+            },
+        ): redis_helper_config_iv,
+    }
+).allow_extra("*")
+
 
 vfolder_config_iv = t.Dict(
     {
@@ -54,6 +73,45 @@ vfolder_config_iv = t.Dict(
         ),
     }
 ).allow_extra("*")
+
+model_definition_iv = t.Dict(
+    {
+        t.Key("models"): t.List(
+            t.Dict(
+                {
+                    t.Key("name"): t.String,
+                    t.Key("model_path"): t.String,
+                    t.Key("service", default=None): t.Null | t.Dict(
+                        {
+                            # ai.backend.kernel.service.ServiceParser.start_service()
+                            # ai.backend.kernel.service_actions
+                            t.Key("pre_start_actions", default=[]): t.Null | t.List(
+                                t.Dict(
+                                    {
+                                        t.Key("action"): t.String,
+                                        t.Key("args"): t.Dict().allow_extra("*"),
+                                    }
+                                )
+                            ),
+                            t.Key("start_command"): t.List(t.String),
+                            t.Key("port"): t.ToInt[1:],
+                            t.Key("health_check", default=None): t.Null | t.Dict(
+                                {
+                                    t.Key("path"): t.String,
+                                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
+                                    t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
+                                    t.Key("expected_status_code", default=200): (
+                                        t.Null | t.ToInt[100:]
+                                    ),
+                                }
+                            ),
+                        }
+                    ),
+                }
+            )
+        )
+    }
+)
 
 
 def find_config_file(daemon_name: str) -> Path:

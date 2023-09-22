@@ -858,7 +858,7 @@
     "DescAllowAgentSideRegistration": "Επιτρέψτε στον πράκτορα να εγγραφεί στον διαχειριστή. <br/> Χρησιμοποιήστε μόνο εάν το σύμπλεγμα Backend.AI διαχειρίζεται σε ασφαλή τοποθεσία.",
     "Plugins": "Πρόσθετα",
     "CUDAGPUsupport": "Υποστήριξη CUDA GPU",
-    "DescCUDAGPUsupport": "Υποστήριξη NVidia CUDA GPU. <br/> Απαιτείται πρόσθετο Backend.AI CUDA.",
+    "DescCUDAGPUsupport": "Υποστήριξη NVIDIA CUDA GPU. <br/> Απαιτείται πρόσθετο Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Απενεργοποιήθηκε επειδή το σύστημα χρησιμοποιεί Fractional GPU plugin",
     "ROCMGPUsupport": "Υποστήριξη ROCm GPU",
     "DescROCMGPUsupport": "Υποστήριξη AMD ROCm GPU. <br/> Απαιτείται πρόσθετο Backend.AI ROCm.",

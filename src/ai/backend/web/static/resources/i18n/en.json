@@ -5,6 +5,7 @@
       "WelcomeMessage_2": " .",
       "Summary": "Summary",
       "Sessions": "Sessions",
+      "Serving": "Serving",
       "Import&Run": "Import & Run",
       "Data&Storage": "Data & Storage",
       "Pipeline": "Pipeline (Beta)",
@@ -36,9 +37,11 @@
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
       "InputOriginalPassword": "Please Input Original Password",
+      "InputNewPassword": "Please Input Original Password",
       "InvalidPasswordMessage": "At least 1 alphabet, 1 number and 1 special character is required with at least 8 chars.",
       "NewPasswordMismatch": "Two new passwords do not match.",
       "PasswordMismatch": "Password mismatch",
+      "PleaseConfirmYourPassword": "Please confirm your password",
       "PasswordUpdated": "Password is successfully updated.",
       "FullnameUpdated": "Full name is successfully updated.",
       "TermsOfService": "Terms of Service",
@@ -63,7 +66,9 @@
       "AIAccelerator": "AI Accelerator",
       "YouMushChangeYourPassword": "It is recommended to periodically change your password for security reasons. Since a certain amount of time has passed since you last changed your password, you must change it in order to continue using the service.",
       "CurrentPassword": "Current Password",
-      "NewPasswordCannotBeSame": "Please enter a password that is different from your current password."
+      "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",
+      "Notifications": "Notifications",
+      "Tasks": "Tasks"
     },
     "LOGINREQUIRED": "LOGIN REQUIRED",
     "YouAreOffline": "You are now offline",
@@ -83,7 +88,10 @@
     "TotpRemoved": "Successfully disabled 2FA",
     "TotpSetupCompleted": "Enabled 2FA",
     "InvalidTotpCode": "Invalid OTP",
-    "ConfirmTotpRemovalBody": "Are you sure to opt out from using two-factor authentication?"
+    "ConfirmTotpRemovalBody": "Are you sure to opt out from using two-factor authentication?",
+    "TotpSetupNotAvailable": "Two-factor authentication cannot be set up.",
+    "RemoveTotpSetupCompleted": "Disabled 2FA",
+    "TurnOffTotp": "Turn off two-factor authentication"
   },
   "summary": {
     "Dashboard": "Dashboard",
@@ -127,7 +135,8 @@
     "connectingToCluster": "Connecting to Backend.AI Cluster...",
     "DownloadWebUIApp": "Download Backend.AI Web UI App",
     "IPUEnabled": "IPU NPU Enabled",
-    "ATOMEnabled": "ATOM NPU Enabled"
+    "ATOMEnabled": "ATOM NPU Enabled",
+    "WarboyEnabled": "Warboy NPU Enabled"
   },
   "session": {
     "launcher": {
@@ -150,7 +159,8 @@
       "SessionStartTime": "Session Starts: ",
       "ResetStartTime": "Please reset the start time.",
       "InfiniteTime": "Infinite",
-      "SetEnvironmentVariable": "Set Environment Variable (optional)",
+      "SetEnvironmentVariable": "Environment Variable (optional)",
+      "SetPreopenPorts": "Preopen Ports (optional)",
       "Config": "Config",
       "ChooseEnvironment": "Choose Environment",
       "Version": "Version",
@@ -204,6 +214,7 @@
       "NoFolderMounted": "No storage folder is mounted",
       "NoAvailableFolderToMount": "There's no available folder to mount.",
       "NoEnvConfigured": "No additional environment variable is configured",
+      "NoPreOpenPortsConfigured": "No additional preopen ports configured",
       "HomeDirectoryDeletionDialog": "The home directory in the session is automatically deleted when the session ends.",
       "LaunchConfirmationDialog": "To keep your code and data, or share it with other collaborators, simply create a storage folder in the data & storage sidebar, then mount that folder when you start the resource and keep it there.",
       "Launch": "Launch",
@@ -229,6 +240,7 @@
       "ProxyConfiguratorNotResponding": "Proxy configurator is not responding.",
       "SettingUpProxyForApp": "Setting up proxy for the app...",
       "AddingKernelToSocketQueue": "Adding kernel to socket queue...",
+      "FailedToConnectCoordinator": "Failed to connect to the app administration. Please check your network connection and firewall settings.",
       "ManualImageName": "Image Name (Manual)",
       "NotEnoughResource": "Not enough resource",
       "ResourceAllocationTemplate": "Resource Allocation Template",
@@ -259,7 +271,16 @@
       "InferenceMode": "Inference",
       "ImageDoesNotProvideModelPath": "Container image does not provide model path. It should be modified.",
       "AIAccelerator": "AI Accelerator",
-      "DescAIAccelerator": "<p>AI accelerators (GPUs or NPUs) are well-suited for the matrix/vector computations involved in machine learning. AI accelerators speed up training / inference algorithms by orders of magnitude, reducing running times from weeks to days.</p>"
+      "DescAIAccelerator": "<p>AI accelerators (GPUs or NPUs) are well-suited for the matrix/vector computations involved in machine learning. AI accelerators speed up training / inference algorithms by orders of magnitude, reducing running times from weeks to days.</p>",
+      "PreOpenPortTitle": "Preopen Ports",
+      "NotePreOpenPort": "These ports are the container internal ports.",
+      "DescSetPreOpenPort": "'Preopen Ports' refers to a specific <span style='color:var(--paper-red-400);'>internal container port</span> that allows incoming connections from external devices or computers on a network device or computer.",
+      "PortsTitleWithRange": "Port value (between 1024 ~ 65535)",
+      "PrePortConfigWillDisappear": "Any unsaved preopen ports will be disappeared.",
+      "PreOpenPortConfigurationDone": "Preopen ports configured successfully.",
+      "PreOpenPortPanelTitle": "Preopen ports to set (optional)",
+      "PreOpenPortRange": "Preopen ports are only available from 1024 to 65535.",
+      "MinMemory": "The minimum memory capacity for the currently selected runtime environment is {{size}}iB."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -294,7 +315,10 @@
     "AllowedClientIps": "Allowed client IPs",
     "CommaSeparated": "comma-separated",
     "TryPreferredPort": "Try preferred port",
-    "SFTPDescription": "Use your favorite SSH/SFTP application to connect.",
+    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"SSH Key Download\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
+    "SFTPExtraNotification": "It is recommended to delete sessions after they have been used, as there is a limit on the number of sessions. Sessions that are not used for uploading files within a certain period of time may be automatically deleted.",
+    "Readmore": "Read More...",
+    "Readless": "Read less",
     "ConnectionInformation": "Connection Information",
     "DownloadSSHKey": "Download SSH key file (id_container)",
     "VNCconnection": "VNC connection",
@@ -312,7 +336,9 @@
       "AppMustBeRunDialog": "This app can only be accessed and used if it is already running through the terminal. If not, you will be directed to an error page that occurs when the app is not running.",
       "ConfirmAndRun": "I checked and I'll start",
       "Prepared": "Prepared",
-      "App": "App"
+      "App": "App",
+      "NoExistingConnectionExample": "No Connection Example to be copied.",
+      "SSHConnectionExampleClipboardCopy": "SSH Connection Example has been copied to the clipboard."
     },
     "TensorboardPath": "Log directory for TensorBoard",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",
@@ -374,11 +400,65 @@
     "GracePeriodDesc": "Utilization idle checker will be activated after this initial grace time. During this time, sessions are not terminated even if utilization is low.",
     "UtilizationThresholdDesc": "Threshold criteria of each compute resource. When one or more resource of a compute session does not exceed the configured threshold criteria for a certain time, the session will be garbage collected (terminated). For example, if you set 1% of CUDA utilization threshold, compute sessions that show less than 1% CUDA GPU utilization, for a certain duration of time, will be destroyed. Resources with empty values are excluded from the garbage collection criteria.",
     "ConnectionExample": "Connection Example",
-    "System": "Upload Sessions"
+    "ConnectionNotice": "Notice",
+    "System": "Upload Sessions",
+    "SessionType": "SessionType"
+  },
+  "modelService": {
+    "Running": "Running",
+    "Finished": "Finished",
+    "Others": "Others",
+    "Services": "Services",
+    "StartNewServing": "Start new serving",
+    "ServiceName": "Service Name",
+    "OpenToPublic": "Open To Public",
+    "DesiredRoutingCount": "Desired Routing Count",
+    "DesiredSessionCount": "Desired Session Count",
+    "EndpointName": "Endpoint Name",
+    "EndpointId": "Endpoint ID",
+    "Controls": "Controls",
+    "Status": "Status",
+    "RoutingsCount": "Routings Count",
+    "Active/Total": "Active/Total",
+    "Public": "Public",
+    "EditModelService": "Edit Model Service",
+    "OnlyAllowsNonNegativeIntegers": "Only allows non-negative integers",
+    "RoutingInfo": "Routing Info",
+    "ServiceInfo": "Service Info",
+    "CreatedAt": "Created At",
+    "StartService": "Start Service",
+    "GenerateToken": "Generate Token",
+    "GenerateNewToken": "Generate new token",
+    "SessionOwner": "Session Owner",
+    "ServiceEndpoint": "Service Endpoint",
+    "NoServiceEndpoint": "No Service Endpoint",
+    "RoutesInfo": "Routes Info",
+    "GeneratedTokens": "Generated Tokens",
+    "RouteId": "Route ID",
+    "SessionId": "Session ID",
+    "TrafficRatio": "Traffic Ratio",
+    "YouAreAboutToTerminate": "You are about to terminate ",
+    "ClearErrors": "Clear error and retry",
+    "ServingRouteErrorModalTitle": "Serving Route Error",
+    "FailedToStartService": "Failed to create service.",
+    "CurrentTime": "Current time",
+    "ExpiredTime": "Expired time",
+    "ValidTimeInfo": "Valid time info",
+    "Generate": "Generate",
+    "TokenGenerated": "Token generated",
+    "TokenGenerationFailed": "Token generation failed. please try again.",
+    "PleaseSelectTime": "Please select time!",
+    "ExpiredDate": "Expired Date",
+    "TokenExpiredDateHelp": "The default token expiration time is 24 hours later.",
+    "TokenExpiredDateError": "The token expiration time must be after the current time",
+    "ServiceNameRule": "Only allow 4 to 64 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
+    "FormValidationFailed": "Form validation failed",
+    "resources": "Resources"
   },
   "button": {
     "Cancel": "Cancel",
     "Okay": "Okay",
+    "OK": "OK",
     "Create": "Create",
     "View": "View",
     "Edit": "Edit",
@@ -409,7 +489,8 @@
     "Reset": "Reset",
     "EnterManually": "Enter Manually",
     "Activate": "Activate",
-    "OptOut": "Opt Out"
+    "OptOut": "Opt Out",
+    "Unset": "Unset"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -435,6 +516,56 @@
     "NoAgentToDisplay": "No Agents to display",
     "NoNetworkSignal": "No network signals.",
     "DiskPerc": "Disk %"
+  },
+  "storageHost": {
+    "Resource": "Resource",
+    "Control": "Control",
+    "Usage": "Usage",
+    "Total": "Total",
+    "Used": "Used",
+    "Detail": "Detail",
+    "QuotaSettings": "Quota Settings",
+    "ForProject": "For Project",
+    "ForUser": "For User",
+    "ResourcePolicy": "Resource Policy",
+    "PolicyName": "Policy Name",
+    "ResourcePolicySettings": "Resource Policy Settings",
+    "Name": "Name",
+    "MaxFolderSize": "Max Folder Size",
+    "SoftLimit": "Soft Limit",
+    "HardLimit": "Hard Limit",
+    "Search": "Search",
+    "VendorOptions": "Vendor Options",
+    "CannotRead": "Cannot Read",
+    "NoConfigs": "No Configs",
+    "DeleteResourcePolicy": "Delete Resource Policy",
+    "AreYouSureYouWantToDelete": "Are you sure you want to delete?",
+    "UnsetResourcePolicy": "Unset Resource Policy",
+    "DoYouWantToUseDefaultValue": "Do you want to use default value?",
+    "SelectProjectOrUserFirst": "Select Project or User first",
+    "BeCarefulToSetProjectResourcePolicy": "Changing a resource policy can affect all projects that use that project resource policy, so use it with care.",
+    "BeCarefulToSetUserResourcePolicy": "Changing a resource policy can affect all users that use that user resource policy, so use it with care.",
+    "ResourcePolicySuccessfullyCreated": "Resource Policy successfully created",
+    "ResourcePolicySuccessfullyUpdated": "Resource Policy successfully updated",
+    "ResourcePolicySuccessfullyDeleted": "Resource Policy successfully deleted",
+    "QuotaDoesNotSupported": "This storage backend does not support quota.",
+    "quotaSettings": {
+      "QuotaScopeId": "Quota Scope ID",
+      "QuotaSettings": "Quota Settings",
+      "Type": "Type",
+      "Host": "Host",
+      "SelectFirst": "Please select a project or user first from the selector at the top left.",
+      "ClickSettingButton": "No quota settings. If you want to set quota configs, click the button below.",
+      "AddQuotaConfigs": "Add Quota Configs",
+      "UnsetCustomSettings": "Unset custom settings",
+      "ConfirmUnsetCustomQuota": "Are you sure you want to unset? \nIf you unset, the quota of this user or project will use default value.",
+      "SelectDomain": "Select Domain",
+      "SelectProject": "Select Project",
+      "SelectUser": "Search and select User",
+      "QuotaScopeSuccessfullyUpdated": "Quota Scope successfully updated",
+      "LessThanResourcePolicy": "Hard limit should be less than resource policy.",
+      "AllowNumberAndDot": "Allows positive numbers and .(dot) only"
+    }
   },
   "general": {
     "cores": "cores",
@@ -498,6 +629,7 @@
     "Status": "Status",
     "Name": "Name",
     "UserDetail": "User Detail",
+    "ModifyUserDetail": "Modify User Detail",
     "DescRequirePasswordChange": "Require password change?",
     "Association": "Association",
     "Domain": "Domain",
@@ -577,8 +709,9 @@
     "UsageMode": "Usage Mode",
     "Permission": "Permission",
     "StorageStatus": "Storage Status",
-    "Created": "created",
-    "Invited": "invited",
+    "Created": "Created",
+    "Shared": "Shared",
+    "Invited": "Invited",
     "Capacity": "capacity",
     "folders": {
       "Location": "Location",
@@ -627,7 +760,11 @@
       "FolderUsing": "Using",
       "FolderQuota": "Capacity",
       "MaxFolderQuota": "Max Folder Quota",
-      "Serve": "Serve"
+      "Serve": "Model serving",
+      "CloneFolder": "Clone folder",
+      "LeaveFolder": "Leave folder",
+      "ShareFolder": "Share folder",
+      "ModifyPermissions": "Modify permissions"
     },
     "explorer": {
       "Delete": "Delete",
@@ -684,7 +821,13 @@
       "StartingSSH/SFTPSession": "Starting SFTP session...",
       "EmptyFilesAndFoldersAreNotUploaded": "Empty files and empty folders are not uploaded",
       "NumberOfSFTPSessionsExceededTitle": "Reached limit of running upload session count",
-      "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session."
+      "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session.",
+      "Serve": "Serve",
+      "FolderInfo": "Folder information",
+      "CloneFolder": "Clone this folder",
+      "Rename": "Rename folder",
+      "FolderOptionUpdate": "Update folder options",
+      "LeaveFolder": "Leave a folder"
     },
     "invitation": {
       "EnterEmail": "Enter email address",
@@ -702,13 +845,23 @@
       "PermissionModified": "Permission updated"
     },
     "NoStorageDescriptionFound": "No description.",
-    "DialogModelFolder": "You can serve and manage models."
+    "DialogModelFolder": "You can serve and manage models.",
+    "QuotaPerStorageVolume": "Quota per storage volume",
+    "NumberOfFolders": "Number of folders",
+    "SelectStorageHost": "Select storage host",
+    "Used": "Used",
+    "Limit": "Limit",
+    "HostDetails": "Displays quota information for the selected storage host.",
+    "ProjectFolder": "Project Folder",
+    "Pipeline": "Pipeline Folders",
+    "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack."
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "WARNING: this cannot be undone!",
       "LogDeletion": "Are you sure you want to delete all of the log messages?",
-      "WillBeAppliedToNewSessions": "This update will be applied to new sessions."
+      "WillBeAppliedToNewSessions": "This update will be applied to new sessions.",
+      "Required": "Required"
     },
     "ask": {
       "DoYouWantToProceed": "Do you want to proceed?"
@@ -968,7 +1121,9 @@
     "RetriesToSkip": "Times",
     "NoGroupToDisplay": "NoGroupToDisplay",
     "AllowedSessionTypes": "Allowed session types",
-    "Domain": "Domain"
+    "Domain": "Domain",
+    "Public": "Public",
+    "PublicStatus": "Public Status"
   },
   "maintenance": {
     "General": "General",
@@ -1071,7 +1226,7 @@
     "DescAllowAgentSideRegistration": "Allow agent to register itself to manager.<br/>Use only if Backend.AI cluster is managed on secure location.",
     "Plugins": "Plugins",
     "CUDAGPUsupport": "CUDA GPU support",
-    "DescCUDAGPUsupport": "NVidia CUDA GPU support. <br/>Requires Backend.AI CUDA Plugin.",
+    "DescCUDAGPUsupport": "NVIDIA CUDA GPU support. <br/>Requires Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Disabled because system uses Fractional GPU plugin",
     "ROCMGPUsupport": "ROCm GPU support",
     "DescROCMGPUsupport": "AMD ROCm GPU support. <br/>Requires Backend.AI ROCm Plugin.",
@@ -1120,7 +1275,10 @@
     "ATOMsupport": "ATOM",
     "DescATOMsupport": "Use Rebellions ATOM accelerator",
     "RequireIPUPlugin": "Requires Backend.AI IPU Plugin.",
-    "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin."
+    "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin.",
+    "Warboysupport": "Warboy",
+    "DescWarboysupport": "Use Furiosa Warboy support",
+    "RequireWarboyPlugin": "Requires Backend.AI Warboy Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1325,7 +1483,8 @@
     "CreatingComputeSession": "Creating compute session ...",
     "SessionStillPreparing": "Session is still in preparing. Reload after a while",
     "ComputeSessionPrepared": "Compute session prepared",
-    "sessionStatusIs": "Session status is"
+    "sessionStatusIs": "Session status is",
+    "EmptyProject": "EmptyProject"
   },
   "error": {
     "UpdateError": "Update error",
@@ -1374,8 +1533,17 @@
     "1024": "(<= 1024)",
     "2048": "(<= 2048)"
   },
+  "inputLimit": {
+    "4to64chars": "(4~64 chars)"
+  },
   "explorer": {
     "ValueRequired": "ValueRequired",
     "InputTooShort": "InputTooShort"
+  },
+  "ErrorBoundary": {
+    "title": "An error has occurred.",
+    "reloadPage": "Reload the page",
+    "resetErrorBoundary": "Reset ErrorBoundary",
+    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment."
   }
 }

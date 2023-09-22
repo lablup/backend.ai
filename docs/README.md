@@ -22,11 +22,11 @@ $ cd ./bai-dev/docs
 $ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
 $ pip install -U \
->     --find-links=https://dist.backend.ai/pypi/simple/grpcio \
->     --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
->     --find-links=https://dist.backend.ai/pypi/simple/hiredis \
->     --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
->     -r requirements.txt
+    --find-links=https://dist.backend.ai/pypi/simple/grpcio \
+    --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
+    --find-links=https://dist.backend.ai/pypi/simple/hiredis \
+    --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
+    -r requirements.txt
 ```
 
 ## Building API Reference JSON file
@@ -74,12 +74,30 @@ $ make -e SPHINXOPTS="-D language='ko'" html
 ```
 
 
-## 🚧 Building PDF document (WIP) 🚧
+## Building PDF document
 
-> Help wanted!
+```console
+$ make latexpdf
+```
 
-We are looking for people to help with a short guide for building PDF document based on html files derived from sphinx.
+The compiled documentation is under `_build/latex/BackendAIDoc.pdf`.
 
+Building PDF requires following libraries to be present on your system.
+
+* TeX Live 
+  - ko.TeX (texlive-lang-korean)
+  - latexmk
+* ImageMagick
+* Font files (All required font files must be installed)
+
+### Installing dependencies on macOS
+1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
+2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
+3. Exceute following command to install missing dependencies.   
+```console
+sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
+```
+4. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts on your system.
 
 ## Advanced Settings
 

@@ -9,7 +9,7 @@
 //     "CPython==3.11.4"
 //   ],
 //   "generated_with_requirements": [
-//     "mypy==1.4.1"
+//     "mypy==1.5.1"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -31,33 +31,43 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "45d32cec14e7b97af848bddd97d85ea4f0db4d5a149ed9676caa4eb2f7402bb4",
-              "url": "https://files.pythonhosted.org/packages/3d/9a/e13addb8d652cb068f835ac2746d9d42f85b730092f581bb17e2059c28f1/mypy-1.4.1-py3-none-any.whl"
+              "hash": "f757063a83970d67c444f6e01d9550a7402322af3557ce7630d3c957386fa8f5",
+              "url": "https://files.pythonhosted.org/packages/d7/e0/4f80f9d3a7dffb97d7ba3b2eb6b06011d311bfd645727e51b003db482d48/mypy-1.5.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8207b7105829eca6f3d774f64a904190bb2231de91b8b186d21ffd98005f14a7",
-              "url": "https://files.pythonhosted.org/packages/66/f4/60739a2d336f3adf5628e7c9b920d16e8af6dc078550d615e4ba2a1d7759/mypy-1.4.1-cp311-cp311-musllinux_1_1_x86_64.whl"
+              "hash": "32cb59609b0534f0bd67faebb6e022fe534bdb0e2ecab4290d683d248be1b275",
+              "url": "https://files.pythonhosted.org/packages/04/ba/117a7497a714a8a62867e752fd8ba63eeac8e9a46bc9fc24bd85b00c2c84/mypy-1.5.1-cp311-cp311-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "141dedfdbfe8a04142881ff30ce6e6653c9685b354876b12e4fe6c78598b45e2",
-              "url": "https://files.pythonhosted.org/packages/73/72/dfc0b46e6905eafd598e7c48c0c4f2e232647e4e36547425c64e6c850495/mypy-1.4.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "b031b9601f1060bf1281feab89697324726ba0c0bae9d7cd7ab4b690940f0b92",
+              "url": "https://files.pythonhosted.org/packages/33/f9/c84b68e4a754f5ce200dcf0786aa489164fa9d9dee84e375bd7d99caf637/mypy-1.5.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "98324ec3ecf12296e6422939e54763faedbfcc502ea4a4c38502082711867258",
-              "url": "https://files.pythonhosted.org/packages/92/58/ccc0b714ecbd1a64b34d8ce1c38763ff6431de1d82551904ecc3711fbe05/mypy-1.4.1-cp311-cp311-macosx_11_0_arm64.whl"
+              "hash": "51cb1323064b1099e177098cb939eab2da42fea5d818d40113957ec954fc85f4",
+              "url": "https://files.pythonhosted.org/packages/3b/62/e4a096ff55326bddc51f2a532cede2fa2f5d02930e1085aaa4e46bf64dd7/mypy-1.5.1-cp311-cp311-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7549fbf655e5825d787bbc9ecf6028731973f78088fbca3a1f4145c39ef09462",
-              "url": "https://files.pythonhosted.org/packages/94/01/e34e37a044325af4d4af9825c15e8a0d26d89b5a9624b4d0908449d3411b/mypy-1.4.1-cp311-cp311-macosx_10_9_x86_64.whl"
+              "hash": "596fae69f2bfcb7305808c75c00f81fe2829b6236eadda536f00610ac5ec2243",
+              "url": "https://files.pythonhosted.org/packages/66/51/6ef9d704c9d1f2197e2b966d0e50948879b97c6057f2652a9ba28e563c08/mypy-1.5.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9bbcd9ab8ea1f2e1c8031c21445b511442cc45c89951e49bbf852cbb70755b1b",
-              "url": "https://files.pythonhosted.org/packages/b3/28/d8a8233ff167d06108e53b7aefb4a8d7350adbbf9d7abd980f17fdb7a3a6/mypy-1.4.1.tar.gz"
+              "hash": "6ac9c21bfe7bc9f7f1b6fae441746e6a106e48fc9de530dea29e8cd37a2c0cc4",
+              "url": "https://files.pythonhosted.org/packages/f5/e9/0207b4be5f20b15a2a8fc5507941cbf18887c026d21486ad62dd65054dc1/mypy-1.5.1-cp311-cp311-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "021326f464fd3da2f37d9727bd2fdce249fce38f91a48badf5f9331f4c7d3e74",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/mypy/mypy-1.5.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "c6f83a0a38d0fa68c593997bb62d7c0cc0b5ded5e74a4885b625fb20cf339b07",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/mypy/mypy-1.5.1-cp311-cp311-musllinux_1_1_aarch64.whl"
             }
           ],
           "project_name": "mypy",
@@ -67,12 +77,10 @@
             "pip; extra == \"install-types\"",
             "psutil>=4.0; extra == \"dmypy\"",
             "tomli>=1.1.0; python_version < \"3.11\"",
-            "typed-ast<2,>=1.4.0; extra == \"python2\"",
-            "typed-ast<2,>=1.4.0; python_version < \"3.8\"",
             "typing-extensions>=4.1.0"
           ],
-          "requires_python": ">=3.7",
-          "version": "1.4.1"
+          "requires_python": ">=3.8",
+          "version": "1.5.1"
         },
         {
           "artifacts": [
@@ -119,7 +127,7 @@
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "mypy==1.4.1"
+    "mypy==1.5.1"
   ],
   "requires_python": [
     "==3.11.4"

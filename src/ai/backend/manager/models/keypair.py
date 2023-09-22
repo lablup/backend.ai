@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import secrets
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import graphene
@@ -209,7 +210,6 @@ class KeyPair(graphene.ObjectType):
             is_admin=row["is_admin"],
             resource_policy=row["resource_policy"],
             created_at=row["created_at"],
-            last_used=row["last_used"],
             rate_limit=row["rate_limit"],
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
@@ -250,6 +250,14 @@ class KeyPair(graphene.ObjectType):
         if concurrency_used is not None:
             return int(concurrency_used)
         return 0
+
+    async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
+        ctx: GraphQueryContext = info.context
+        last_call_time_key = f"kp:{self.access_key}:last_call_time"
+        row_ts = await redis_helper.execute(ctx.redis_stat, lambda r: r.get(last_call_time_key))
+        if row_ts is None:
+            return None
+        return datetime.fromtimestamp(float(row_ts))
 
     @classmethod
     async def load_all(

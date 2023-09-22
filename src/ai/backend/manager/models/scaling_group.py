@@ -16,7 +16,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import JSONSerializableMixin, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixin, SessionTypes
 
 from .base import (
     Base,
@@ -67,12 +67,14 @@ class ScalingGroupOpts(JSONSerializableMixin):
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
+    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
 
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
+            "agent_selection_strategy": self.agent_selection_strategy,
         }
 
     @classmethod
@@ -89,6 +91,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
                 # Each scheduler impl refers an additional "config" key.
                 t.Key("config", default={}): t.Mapping(t.String, t.Any),
+                t.Key(
+                    "agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED
+                ): tx.Enum(AgentSelectionStrategy),
             }
         ).allow_extra("*")
 
@@ -209,8 +214,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -219,8 +223,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[uuid.UUID],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -229,8 +232,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: str,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -239,8 +241,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[str],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 async def query_allowed_sgroups(
