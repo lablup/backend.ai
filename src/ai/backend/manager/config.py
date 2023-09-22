@@ -208,7 +208,6 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
-    LogSeverity,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -258,6 +257,9 @@ manager_local_config_iv = (
                     t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
                     t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
                     t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
+                    t.Key(
+                        "rpc-auth-manager-keypair", default="fixtures/manager/manager.key_secret"
+                    ): tx.Path(type="file"),
                     t.Key("heartbeat-timeout", default=40.0): t.Float[1.0:],  # type: ignore
                     t.Key("secret", default=None): t.Null | t.String,
                     t.Key("ssl-enabled", default=False): t.ToBool,
@@ -322,8 +324,13 @@ _config_defaults: Mapping[str, Any] = {
         "allow-origins": "*",
     },
     "redis": {
-        "addr": "127.0.0.1:6379",
+        "addr": None,
         "password": None,
+        "redis_helper_config": {
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
     },
     "docker": {
         "registry": {},
@@ -421,6 +428,9 @@ shared_config_iv = t.Dict(
                 ),
                 t.Key("service_name", default=None): t.Null | t.String,
                 t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
+                t.Key(
+                    "redis_helper_config", default=_config_defaults["redis"]["redis_helper_config"]
+                ): config.redis_helper_config_iv,
             }
         ).allow_extra("*"),
         t.Key("docker", default=_config_defaults["docker"]): t.Dict(
@@ -557,7 +567,7 @@ class LocalConfig(AbstractConfig):
         raise NotImplementedError
 
 
-def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
+def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalConfig:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
@@ -588,7 +598,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
     config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
@@ -597,7 +607,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
-        if "debug" in cfg and cfg["debug"]["enabled"]:
+        if cfg["debug"]["enabled"]:
             print("== Manager configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
         cfg["_src"] = cfg_src_path

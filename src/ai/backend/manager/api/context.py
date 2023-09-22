@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
 
+    from ..agent_cache import AgentRPCCache
     from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
@@ -47,6 +48,7 @@ class RootContext(BaseContext):
     hook_plugin_ctx: HookPluginContext
 
     registry: AgentRegistry
+    agent_cache: AgentRPCCache
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
