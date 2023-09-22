@@ -1393,7 +1393,7 @@ class Queries(graphene.ObjectType):
         return StorageVolumeList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="user_id")
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_vfolder(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
