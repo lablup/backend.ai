@@ -905,10 +905,10 @@ class SchedulerDispatcher(aobject):
                             else:
                                 raise InstanceNotAvailable(
                                     extra_msg=(
-                                        f"The designated agent ({agent.id}) does not have the"
-                                        f" enough remaining capacity ({key}, requested:"
-                                        f" {sess_ctx.requested_slots[key]}, remaining:"
-                                        f" {available_slots[key] - occupied_slots[key]})."
+                                        f"The designated agent ({agent.id}) does not have "
+                                        f"the enough remaining capacity ({key}, "
+                                        f"requested: {sess_ctx.requested_slots[key]}, "
+                                        f"remaining: {available_slots[key] - occupied_slots[key]})."
                                     ),
                                 )
                         agent_id = agent.id
