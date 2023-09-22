@@ -1209,7 +1209,7 @@ class SchedulerDispatcher(aobject):
             result = await db_session.execute(query)
             target_sessions_to_destroy = result.scalars().all()
 
-        already_destroyed_sessions = []
+        already_destroyed_sessions: list[SessionId] = []
         # TODO: Update logic to not to wait for sessions to actually terminate
         for session in target_sessions_to_destroy:
             try:
