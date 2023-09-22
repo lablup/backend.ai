@@ -33,6 +33,7 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.logging import LocalLogger
@@ -171,11 +172,7 @@ def local_config(
                         "host": redis_addr.host,
                         "port": redis_addr.port,
                     },
-                    "redis_helper_config": {
-                        "socket_timeout": 5.0,
-                        "socket_connect_timeout": 2.0,
-                        "reconnect_poll_timeout": 0.3,
-                    },
+                    "redis_helper_config": config.redis_helper_default_config,
                 }
             ),
             "db": {
