@@ -634,7 +634,7 @@ class SchedulerDispatcher(aobject):
         return [
             ag
             for ag, count in zip(candidate_agents, raw_counts)
-            if max_container_count > int(count)
+            if count is not None and max_container_count > int(count)
         ]
 
     async def _schedule_single_node_session(
