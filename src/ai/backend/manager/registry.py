@@ -2398,7 +2398,7 @@ class AgentRegistry:
                     .select_from(kernels)
                     .where(
                         (kernels.c.session_id == session_id)
-                        & (kernels.c.cluster_role == DEFAULT_ROLE),
+                        & (kernels.c.cluster_role == DEFAULT_ROLE)
                     )
                 )
                 result = await conn.execute(query)
