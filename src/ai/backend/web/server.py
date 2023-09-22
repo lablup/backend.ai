@@ -19,15 +19,13 @@ import aiotools
 import click
 import jinja2
 import tomli
-import yarl
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
-from ai.backend.common import config
+from ai.backend.common import config, redis_helper
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
@@ -622,9 +620,6 @@ async def server_main(
     j2env.filters["toml_scalar"] = toml_scalar
     app["j2env"] = j2env
 
-    redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
-        config["session"]["redis"]["port"]
-    ).with_password(config["session"]["redis"]["password"]) / str(config["session"]["redis"]["db"])
     keepalive_options = {}
     if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
         keepalive_options[_TCP_KEEPIDLE] = 20
@@ -632,15 +627,17 @@ async def server_main(
         keepalive_options[_TCP_KEEPINTVL] = 5
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
-    app["redis"] = await Redis.from_url(
-        str(redis_url),
+
+    app["redis"] = redis_helper.get_redis_object(
+        config["session"]["redis"],
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
-    )
+    ).client
 
     if pidx == 0 and config["session"]["flush_on_startup"]:
         await app["redis"].flushdb()
         log.info("flushed session storage.")
+
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
