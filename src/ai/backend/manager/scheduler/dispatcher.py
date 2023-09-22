@@ -631,11 +631,12 @@ class SchedulerDispatcher(aobject):
             return pipe
 
         raw_counts = await redis_helper.execute(self.registry.redis_stat, _pipe_builder)
-        return [
-            ag
-            for ag, count in zip(candidate_agents, raw_counts)
-            if count is not None and max_container_count > int(count)
-        ]
+
+        def _check(cnt: str | None) -> bool:
+            _cnt = int(cnt) if cnt is not None else 0
+            return max_container_count > _cnt
+
+        return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
 
     async def _schedule_single_node_session(
         self,
