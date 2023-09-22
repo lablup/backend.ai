@@ -51,7 +51,7 @@ from ai.backend.manager.types import DistributedLockFactory, UserScope
 from ai.backend.manager.utils import query_userinfo
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
+from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
@@ -62,6 +62,8 @@ from ..models import (
     KernelRow,
     KernelStatus,
     RouteStatus,
+    RoutingRow,
+    ScalingGroupOpts,
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
@@ -72,7 +74,6 @@ from ..models import (
     recalc_concurrency_used,
     users,
 )
-from ..models.scaling_group import ScalingGroupOpts
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
 from .predicates import (
@@ -1250,14 +1251,20 @@ class SchedulerDispatcher(aobject):
                 SessionRow.id.in_(ids_of_session_to_destroy), eager_loading_op=kernel_loading_op
             )
             result = await db_session.execute(query)
-            target_sessions_to_destory = result.scalars().all()
+            target_sessions_to_destroy = result.scalars().all()
+
+        already_destroyed_sessions: list[SessionId] = []
         # TODO: Update logic to not to wait for sessions to actually terminate
-        for session in target_sessions_to_destory:
-            await self.registry.destroy_session(
-                session,
-                forced=False,
-                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
-            )
+        for session in target_sessions_to_destroy:
+            try:
+                await self.registry.destroy_session(
+                    session,
+                    forced=False,
+                    reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+                )
+            except SessionNotFound:
+                # Session already terminated while leaving routing alive
+                already_destroyed_sessions.append(session.id)
 
         user_ids = tuple(
             {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
@@ -1365,6 +1372,10 @@ class SchedulerDispatcher(aobject):
                         }
                     )
                     .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
+                )
+                await db_sess.execute(query)
+                query = sa.delete(RoutingRow).where(
+                    RoutingRow.session.in_(already_destroyed_sessions)
                 )
                 await db_sess.execute(query)
 

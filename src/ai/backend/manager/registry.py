@@ -2125,6 +2125,8 @@ class AgentRegistry:
             )
             async with self.db.begin_readonly_session() as db_session:
                 target_session = (await db_session.scalars(query)).first()
+            if not target_session:
+                raise SessionNotFound
 
             match target_session.status:
                 case SessionStatus.PENDING:
