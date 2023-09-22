@@ -47,6 +47,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -173,6 +174,33 @@ class EnumValueType(TypeDecorator, SchemaType):
         return self._enum_class
 
 
+class CurvePublicKeyColumn(TypeDecorator):
+    """
+    A column type wrapper for string-based Z85-encoded CURVE public key.
+
+    In the database, it resides as a string but it's safe to just convert them to PublicKey (bytes)
+    because zmq uses Z85 encoding to use printable characters only in the key while the pyzmq API
+    treats them as bytes.
+
+    The pure binary representation of a public key is 32 bytes and its Z85-encoded form used in the
+    pyzmq APIs is 40 ASCII characters.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(40))
+
+    def process_bind_param(self, value: Optional[PublicKey], dialect) -> Optional[str]:
+        return value.decode("ascii") if value else None
+
+    def process_result_value(self, raw_value: str | None, dialect) -> Optional[PublicKey]:
+        if raw_value is None:
+            return None
+        return PublicKey(raw_value.encode("ascii"))
+
+
 class QuotaScopeIDType(TypeDecorator):
     """
     A column type wrapper for string-based quota scope ID.
@@ -208,9 +236,11 @@ class ResourceSlotColumn(TypeDecorator):
             return value.to_json()
         return value
 
-    def process_result_value(self, raw_value: Dict[str, str], dialect) -> ResourceSlot:
+    def process_result_value(
+        self, raw_value: dict[str, str] | None, dialect
+    ) -> ResourceSlot | None:
         if raw_value is None:
-            return ResourceSlot()
+            return None
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get("mem")

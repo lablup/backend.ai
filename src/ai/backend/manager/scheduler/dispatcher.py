@@ -7,26 +7,19 @@ import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Final,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
 import aiotools
 import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
+from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -628,6 +621,28 @@ class SchedulerDispatcher(aobject):
         if num_scheduled > 0:
             await self.event_producer.produce_event(DoPrepareEvent())
 
+    async def _filter_agent_by_container_limit(
+        self, candidate_agents: list[AgentRow]
+    ) -> list[AgentRow]:
+        raw_value = await self.shared_config.etcd.get("config/agent/max-container-count")
+        if raw_value is None:
+            return candidate_agents
+        max_container_count = int(raw_value)
+
+        async def _pipe_builder(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            for ag in candidate_agents:
+                await pipe.get(f"container_count.{ag.id}")
+            return pipe
+
+        raw_counts = await redis_helper.execute(self.registry.redis_stat, _pipe_builder)
+
+        def _check(cnt: str | None) -> bool:
+            _cnt = int(cnt) if cnt is not None else 0
+            return max_container_count > _cnt
+
+        return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
+
     async def _schedule_single_node_session(
         self,
         sched_ctx: SchedulingContext,
@@ -662,6 +677,16 @@ class SchedulerDispatcher(aobject):
                         f"arch: {requested_architecture})"
                     ),
                 )
+            available_candidate_agents = await self._filter_agent_by_container_limit(
+                compatible_candidate_agents
+            )
+            if not available_candidate_agents:
+                raise InstanceNotAvailable(
+                    extra_msg=(
+                        "No agents found to be available because all agents have reached the hard"
+                        " limit of the number of containers."
+                    ),
+                )
 
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
@@ -672,7 +697,7 @@ class SchedulerDispatcher(aobject):
             else:
                 # Let the scheduler check the resource availability and decide the target agent
                 cand_agent = scheduler.assign_agent_for_session(
-                    compatible_candidate_agents,
+                    available_candidate_agents,
                     sess_ctx,
                     scheduler.sgroup_opts.agent_selection_strategy,
                     agent_selection_resource_priority,
@@ -882,10 +907,19 @@ class SchedulerDispatcher(aobject):
                                     f"arch: {kernel.architecture})"
                                 ),
                             )
-
+                        available_candidate_agents = await self._filter_agent_by_container_limit(
+                            compatible_candidate_agents
+                        )
+                        if not available_candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    "No agents found to be available because all agents have"
+                                    " reached the hard limit of the number of containers."
+                                ),
+                            )
                         # Let the scheduler check the resource availability and decide the target agent
                         agent_id = scheduler.assign_agent_for_kernel(
-                            compatible_candidate_agents,
+                            available_candidate_agents,
                             kernel,
                             scheduler.sgroup_opts.agent_selection_strategy,
                             agent_selection_resource_priority,
@@ -1245,6 +1279,7 @@ class SchedulerDispatcher(aobject):
                         users.c.uuid,
                         users.c.role,
                         users.c.domain_name,
+                        users.c.sudo_session_enabled,
                         keypairs.c.access_key,
                         keypairs.c.resource_policy,
                     ]
@@ -1316,6 +1351,9 @@ class SchedulerDispatcher(aobject):
                         callback_url=endpoint.callback_url,
                         enqueue_only=True,
                         endpoint_id=endpoint.id,
+                        sudo_session_enabled=user_id_row_mapping[
+                            endpoint.session_owner
+                        ].sudo_session_enabled,
                     )
                 except Exception:
                     # TODO: Handle
