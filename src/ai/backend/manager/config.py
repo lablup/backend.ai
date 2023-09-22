@@ -289,11 +289,6 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
                 }
             ).allow_extra("*"),
-            t.Key("pipeline", default=None): t.Null | t.Dict(
-                {
-                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
-                },
-            ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
                     t.Key("ssl-verify", default=True): t.ToBool,
