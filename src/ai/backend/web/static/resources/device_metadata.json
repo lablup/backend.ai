@@ -11,7 +11,7 @@
       },
       "display_icon": "cpu"
     },
-    "ram": {
+    "mem": {
       "slot_name": "ram",
       "description": "Memory",
       "human_readable_name": "RAM",
@@ -87,6 +87,17 @@
         "round_length": 0
       },
       "display_icon": "rebel"
+    },
+    "warboy": {
+      "slot_name": "warboy.device",
+      "description": "Furiosa Warboy",
+      "human_readable_name": "Warboy Device",
+      "display_unit": "Warboy",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "furiosa"
     }
   }
 }

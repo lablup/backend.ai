@@ -9,8 +9,17 @@ import graphene
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from .etcd import (
+    ContainerRegistry,
+    CreateContainerRegistry,
+    DeleteContainerRegistry,
+    ModifyContainerRegistry,
+)
+
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+    from graphql.execution.executors.asyncio import (
+        AsyncioExecutor,
+    )
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
@@ -41,7 +50,7 @@ from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList
+from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
 from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
 from .image import (
     AliasImage,
@@ -218,11 +227,17 @@ class Mutations(graphene.ObjectType):
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
+    create_container_registry = CreateContainerRegistry.Field()
+    modify_container_registry = ModifyContainerRegistry.Field()
+    delete_container_registry = DeleteContainerRegistry.Field()
+
 
 class Queries(graphene.ObjectType):
     """
     All available GraphQL queries.
     """
+
+    node = graphene.relay.Node.Field()
 
     # super-admin only
     agent = graphene.Field(
@@ -444,6 +459,11 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
     )
 
+    vfolder = graphene.Field(
+        VirtualFolder,
+        id=graphene.String(),
+    )
+
     vfolder_list = graphene.Field(  # legacy non-paginated list
         VirtualFolderList,
         limit=graphene.Int(required=True),
@@ -463,6 +483,39 @@ class Queries(graphene.ObjectType):
         offset=graphene.Int(required=True),
         filter=graphene.String(),
         order=graphene.String(),
+    )
+
+    vfolder_own_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    vfolder_invited_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    vfolder_project_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # intrinsic filters
+        domain_name=graphene.String(),
+        access_key=graphene.String(),  # must be empty for user requests
     )
 
     vfolders = graphene.List(  # legacy non-paginated list
@@ -564,11 +617,30 @@ class Queries(graphene.ObjectType):
         endpoint_id=graphene.UUID(),
     )
 
+    endpoint_token = graphene.Field(
+        EndpointToken,
+        token=graphene.String(required=True),
+    )
+
+    endpoint_token_list = graphene.Field(
+        EndpointTokenList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
+        endpoint_id=graphene.UUID(),
+    )
+
     quota_scope = graphene.Field(
         QuotaScope,
         storage_host_name=graphene.String(required=True),
         quota_scope_id=graphene.String(required=True),
     )
+
+    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+
+    container_registries = graphene.List(ContainerRegistry)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -1321,6 +1393,29 @@ class Queries(graphene.ObjectType):
         return StorageVolumeList(items, total_count)
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_vfolder(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        id: str,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+    ) -> Optional[VirtualFolder]:
+        graph_ctx: GraphQueryContext = info.context
+        user_role = graph_ctx.user["role"]
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx,
+            "VirtualFolder.by_id",
+            user_uuid=user_id,
+            user_role=user_role,
+            domain_name=domain_name,
+            group_id=group_id,
+        )
+        return await loader.load(id)
+
+    @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder_list(
         executor: AsyncioExecutor,
@@ -1380,6 +1475,96 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderPermissionList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_own_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_invited_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_invited(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_invited(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_id")
+    async def resolve_vfolder_project_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        user_id: uuid.UUID = None,  # not used, fixed
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_project(
+            info.context,
+            domain_name=domain_name,  # scope
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_project(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scopes
+            user_id=info.context.user["uuid"],  # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
@@ -1675,6 +1860,60 @@ class Queries(graphene.ObjectType):
         return RoutingList(routing_list, total_count)
 
     @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
+    async def resolve_endpoint_token(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        token: str,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> EndpointToken:
+        graph_ctx: GraphQueryContext = info.context
+        return await EndpointToken.load_item(
+            graph_ctx,
+            token,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
+    async def resolve_endpoint_token_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> EndpointTokenList:
+        total_count = await EndpointToken.load_count(
+            info.context,
+            endpoint_id=endpoint_id,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+        token_list = await EndpointToken.load_slice(
+            info.context,
+            limit,
+            offset,
+            endpoint_id=endpoint_id,
+            filter=filter,
+            order=order,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+        return EndpointTokenList(token_list, total_count)
+
+    @staticmethod
     async def resolve_quota_scope(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
@@ -1698,6 +1937,29 @@ class Queries(graphene.ObjectType):
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_container_registry(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        hostname: str,
+        domain_name: Optional[str] = None,
+        access_key: AccessKey = None,
+    ) -> ContainerRegistry:
+        ctx: GraphQueryContext = info.context
+        return await ContainerRegistry.load_registry(ctx, hostname)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="access_key")
+    async def resolve_container_registries(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        domain_name: Optional[str] = None,
+        access_key: AccessKey = None,
+    ) -> Sequence[ContainerRegistry]:
+        ctx: GraphQueryContext = info.context
+        return await ContainerRegistry.load_all(ctx)
 
 
 class GQLMutationPrivilegeCheckMiddleware:

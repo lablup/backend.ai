@@ -8,6 +8,7 @@ import socket
 import ssl
 import sys
 import time
+import traceback
 from functools import partial
 from pathlib import Path
 from pprint import pprint
@@ -18,15 +19,15 @@ import aiotools
 import click
 import jinja2
 import tomli
-import uvloop
-import yarl
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common import config, redis_helper
+from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
@@ -34,12 +35,12 @@ from ai.backend.common.web.session.redis_storage import RedisStorage
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
-from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
 
 cache_patterns = {
     r"\.(?:manifest|appcache|html?|xml|json|ini|toml)$": {
@@ -487,9 +488,12 @@ async def token_login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
 
-    # Check if auth token is delivered through cookie.
+    # Check if auth token is delivered via request body or cookie.
+    rqst_data: dict[str, Any] = await request.json()
     auth_token_name = config["api"]["auth_token_name"]
-    auth_token = request.cookies.get(auth_token_name)
+    auth_token = rqst_data.get(auth_token_name)
+    if not auth_token:
+        auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
         return web.HTTPBadRequest(
             text=json.dumps(
@@ -520,9 +524,19 @@ async def token_login_handler(request: web.Request) -> web.Response:
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            # Instead of email and password, cookie token will be used for auth.
+            # Instead of email and password, token will be used for user auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            token = await api_session.User.authorize("fake-email", "fake-pwd")
+            extra_args = {**rqst_data, auth_token_name: auth_token}
+            # The purpose of token login is to authenticate a client, typically a browser, using a
+            # separate token referred to as `sToken`, rather than using user's email and password.
+            # However, the `api_session.User.authorize` SDK requires email and password as
+            # parameters, so we just pass fake (arbitrary) email and password which are placeholders
+            # in token-based login. Each authorize hook plugin will deal with various type of
+            # `sToken` and related parameters to authorize a user. In this process, email and
+            # password do not play any role.
+            token = await api_session.User.authorize(
+                "fake-email", "fake-pwd", extra_args=extra_args
+            )
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],
@@ -571,6 +585,23 @@ async def server_cleanup(app) -> None:
 
 
 @aiotools.server
+async def server_main_logwrapper(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    _args: Tuple[Any, ...],
+) -> AsyncIterator[None]:
+    setproctitle(f"backend.ai: webserver worker-{pidx}")
+    log_endpoint = _args[1]
+    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    try:
+        with logger:
+            async with server_main(loop, pidx, _args):
+                yield
+    except Exception:
+        traceback.print_exc()
+
+
+@aiotools.server
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -589,9 +620,6 @@ async def server_main(
     j2env.filters["toml_scalar"] = toml_scalar
     app["j2env"] = j2env
 
-    redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
-        config["session"]["redis"]["port"]
-    ).with_password(config["session"]["redis"]["password"]) / str(config["session"]["redis"]["db"])
     keepalive_options = {}
     if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
         keepalive_options[_TCP_KEEPIDLE] = 20
@@ -599,15 +627,17 @@ async def server_main(
         keepalive_options[_TCP_KEEPINTVL] = 5
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
-    app["redis"] = await Redis.from_url(
-        str(redis_url),
+
+    app["redis"] = redis_helper.get_redis_object(
+        config["session"]["redis"],
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
-    )
+    ).client
 
     if pidx == 0 and config["session"]["flush_on_startup"]:
         await app["redis"].flushdb()
         log.info("flushed session storage.")
+
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
@@ -644,6 +674,8 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("GET", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("GET", "/func/{path:openid/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:openid/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
@@ -715,74 +747,82 @@ async def server_main(
     "-f",
     "--config",
     "config_path",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default="webserver.conf",
     help="The configuration file to use.",
 )
-@click.option("--debug", is_flag=True, default=False, help="Use more verbose logging.")
-def main(config_path: str, debug: bool) -> None:
-    raw_config = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
-    config = config_iv.check(raw_config)
-    config["debug"] = debug
-    if config["debug"]:
-        debugFlag = "DEBUG"
-    else:
-        debugFlag = "INFO"
-    setproctitle(f"backend.ai: webserver {config['service']['ip']}:{config['service']['port']}")
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Set the logging level to DEBUG",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
+)
+@click.pass_context
+def main(
+    ctx: click.Context,
+    config_path: Path,
+    log_level: str,
+    debug: bool,
+) -> None:
+    # Delete this part when you remove --debug option
+    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
-    logging.config.dictConfig(
-        {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "formatters": {
-                "colored": {
-                    "()": "coloredlogs.ColoredFormatter",
-                    "format": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
-                    "field_styles": {
-                        "levelname": {"color": 248, "bold": True},
-                        "name": {"color": 246, "bold": False},
-                        "process": {"color": "cyan"},
-                        "asctime": {"color": 240},
-                    },
-                },
-            },
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "level": "DEBUG",
-                    "formatter": "colored",
-                    "stream": "ext://sys.stderr",
-                },
-                "null": {
-                    "class": "logging.NullHandler",
-                },
-            },
-            "loggers": {
-                "": {
-                    "handlers": ["console"],
-                    "level": debugFlag,
-                },
-            },
-        }
-    )
-    log.info("Backend.AI Web Server {0}", __version__)
-    log.info("runtime: {0}", sys.prefix)
-    log_config = logging.getLogger("ai.backend.web.config")
-    log_config.debug("debug mode enabled.")
     if debug:
-        print("== Web Server configuration ==")
-        pprint(config)
-    log.info("serving at {0}:{1}", config["service"]["ip"], config["service"]["port"])
+        log_level = "DEBUG"
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
-    try:
-        uvloop.install()
-        aiotools.start_server(
-            server_main,
-            num_workers=min(4, os.cpu_count() or 1),
-            args=(config,),
-        )
-    finally:
-        log.info("terminated.")
+    cfg = config.check(raw_cfg, config_iv)
+
+    if ctx.invoked_subcommand is None:
+        cfg["webserver"]["pid-file"].write_text(str(os.getpid()))
+        ipc_base_path = cfg["webserver"]["ipc-base-path"]
+        log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
+        log_sockpath.parent.mkdir(parents=True, exist_ok=True)
+        log_endpoint = f"ipc://{log_sockpath}"
+        cfg["logging"]["endpoint"] = log_endpoint
+        try:
+            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            with logger:
+                setproctitle(
+                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
+                )
+                log.info("Backend.AI Web Server {0}", __version__)
+                log.info("runtime: {0}", sys.prefix)
+
+                log_config = logging.getLogger("ai.backend.web.config")
+                if log_level == LogSeverity.DEBUG:
+                    log_config.debug("debug mode enabled.")
+                    print("== Web Server configuration ==")
+                    pprint(cfg)
+                log.info("serving at {0}:{1}", cfg["service"]["ip"], cfg["service"]["port"])
+                if cfg["webserver"]["event-loop"] == "uvloop":
+                    import uvloop
+
+                    uvloop.install()
+                    log.info("Using uvloop as the event loop backend")
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=min(4, os.cpu_count() or 1),
+                        args=(cfg, log_endpoint),
+                    )
+                finally:
+                    log.info("terminated.")
+        finally:
+            if cfg["webserver"]["pid-file"].is_file():
+                # check is_file() to prevent deleting /dev/null!
+                cfg["webserver"]["pid-file"].unlink()
+    else:
+        # Click is going to invoke a subcommand.
+        pass
 
 
 if __name__ == "__main__":

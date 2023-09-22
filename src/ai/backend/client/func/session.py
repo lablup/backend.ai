@@ -358,6 +358,7 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
         dependencies: Sequence[str] = None,  # cannot be stored in templates
+        callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: Union[List[str], Undefined] = undefined,
@@ -468,6 +469,8 @@ class ComputeSession(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "enqueueOnly": enqueue_only,
             "maxWaitSeconds": max_wait,
+            "dependencies": dependencies,
+            "callbackURL": callback_url,
             "reuseIfExists": not no_reuse,
             "startupCommand": startup_command,
             "owner_access_key": owner_access_key,
@@ -694,6 +697,27 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/logs",
             params=params,
         )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def get_dependency_graph(self):
+        """
+        Retrieves the root node of dependency graph of the compute session.
+        """
+        params = {}
+
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+
+        prefix = get_naming(api_session.get().api_version, "path")
+
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/dependency-graph",
+            params=params,
+        )
+
         async with rqst.fetch() as resp:
             return await resp.json()
 

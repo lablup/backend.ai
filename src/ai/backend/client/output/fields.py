@@ -32,6 +32,7 @@ container_fields = FieldSet(
         FieldSpec("container_id"),
         FieldSpec("resource_opts", formatter=nested_dict_formatter),
         FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("preopen_ports", "Preopen Ports"),
         FieldSpec("live_stat", formatter=KernelStatFormatter()),
         FieldSpec("last_stat", formatter=KernelStatFormatter()),
     ]
@@ -278,6 +279,7 @@ user_fields = FieldSet(
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
         FieldSpec("allowed_client_ip"),
         FieldSpec("totp_activated"),
+        FieldSpec("sudo_session_enabled"),
     ]
 )
 

@@ -17,7 +17,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.types import HostPortPair
 
@@ -77,15 +77,17 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": sentinels,
             "service_name": "mymaster",
             "password": "develove",
+            "redis_helper_config": config.redis_helper_default_config,
         }
     )
 
-    assert isinstance(r1.client, Sentinel)
+    assert isinstance(r1.client, Redis)
+    assert isinstance(r1.sentinel, Sentinel)
 
     for i in range(3):
-        assert r1.client.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
-        assert r1.client.sentinels[i].connection_pool.connection_kwargs["port"] == (26379 + i)
-        assert r1.client.sentinels[i].connection_pool.connection_kwargs["db"] == 0
+        assert r1.sentinel.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
+        assert r1.sentinel.sentinels[i].connection_pool.connection_kwargs["port"] == (26379 + i)
+        assert r1.sentinel.sentinels[i].connection_pool.connection_kwargs["db"] == 0
 
     parsed_addresses: Any = tx.DelimiterSeperatedList(tx.HostPortPair).check_and_return(sentinels)
     r2 = redis_helper.get_redis_object(
@@ -93,15 +95,17 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": parsed_addresses,
             "service_name": "mymaster",
             "password": "develove",
-        }
+            "redis_helper_config": config.redis_helper_default_config,
+        },
     )
 
-    assert isinstance(r2.client, Sentinel)
+    assert isinstance(r2.client, Redis)
+    assert isinstance(r2.sentinel, Sentinel)
 
     for i in range(3):
-        assert r2.client.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
-        assert r2.client.sentinels[i].connection_pool.connection_kwargs["port"] == (26379 + i)
-        assert r2.client.sentinels[i].connection_pool.connection_kwargs["db"] == 0
+        assert r2.sentinel.sentinels[i].connection_pool.connection_kwargs["host"] == "127.0.0.1"
+        assert r2.sentinel.sentinels[i].connection_pool.connection_kwargs["port"] == (26379 + i)
+        assert r2.sentinel.sentinels[i].connection_pool.connection_kwargs["db"] == 0
 
 
 @pytest.mark.redis

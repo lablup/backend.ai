@@ -4,11 +4,13 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
 from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.config import load_local_config
 from ai.backend.storage.types import VFolderID
@@ -30,6 +32,17 @@ def local_volume(vfroot) -> Iterator[Path]:
     volume = vfroot / "local"
     volume.mkdir(parents=True, exist_ok=True)
     yield volume
+
+
+@pytest.fixture
+def mock_etcd() -> Iterator[AsyncEtcd]:
+    yield AsyncEtcd(
+        addr=HostPortPair("", 0),
+        namespace="",
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: "",
+        },
+    )
 
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:
@@ -54,7 +67,11 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
         "xfs",
     ]
 )
-async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
+async def volume(
+    request,
+    local_volume,
+    mock_etcd,
+) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
     backend_options = {}
     volume_path = local_volume
@@ -95,6 +112,8 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
             volume_cls = XfsVolume
         case _:
             raise RuntimeError(f"Unknown volume backend: {request.param}")
+    mock_event_dispatcher = MagicMock()
+    mock_event_producer = MagicMock()
     volume = volume_cls(
         {
             "storage-proxy": {
@@ -102,7 +121,10 @@ async def volume(request, local_volume) -> AsyncIterator[AbstractVolume]:
             },
         },
         volume_path,
+        etcd=mock_etcd,
         options=backend_options,
+        event_dispathcer=mock_event_dispatcher,
+        event_producer=mock_event_producer,
     )
     await volume.init()
     try:

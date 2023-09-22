@@ -26,6 +26,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    get_args,
 )
 from urllib.parse import urlparse
 
@@ -49,19 +50,11 @@ if TYPE_CHECKING:
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import (
-    AgentTerminatedEvent,
-)
+from ai.backend.common.events import AgentTerminatedEvent
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    ClusterMode,
-    SessionTypes,
-    VFolderID,
-)
+from ai.backend.common.types import AccessKey, AgentId, ClusterMode, SessionTypes, VFolderID
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
@@ -298,8 +291,8 @@ async def query_userinfo(
         return await _query_userinfo(
             conn,
             request["user"]["uuid"],
-            request["user"]["role"],
             request["keypair"]["access_key"],
+            request["user"]["role"],
             request["user"]["domain_name"],
             request["keypair"]["resource_policy"],
             params["domain"] or request["user"]["domain_name"],
@@ -336,6 +329,8 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
+
     try:
         resp = await root_ctx.registry.create_session(
             params["session_name"],
@@ -362,6 +357,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             starts_at_timestamp=params["starts_at"],
             tag=params["tag"],
             callback_url=params["callback_url"],
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
@@ -384,10 +380,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
             >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
             tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
-            >> "architecture": t.String,
-            tx.AliasedKey(["type", "sessionType"], default="interactive")
-            >> "session_type": tx.Enum(SessionTypes),
+            tx.AliasedKey(["arch", "architecture"], default=undefined)
+            >> "architecture": t.String | UndefChecker,
+            tx.AliasedKey(["type", "sessionType"], default=undefined)
+            >> "session_type": tx.Enum(SessionTypes) | UndefChecker,
             tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
                 UndefChecker | t.Null | t.String
             ),
@@ -470,7 +466,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     param_from_template = {
         "image": template["spec"]["kernel"]["image"],
-        "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
+        "architecture": template["spec"]["kernel"]["architecture"],
     }
     if "domain_name" in template_info:
         param_from_template["domain"] = template_info["domain_name"]
@@ -692,6 +688,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         if not template:
             raise TaskTemplateNotFound
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
+        sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
         resp = await root_ctx.registry.create_cluster(
@@ -710,6 +707,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             params["tag"],
             enqueue_only=params["enqueue_only"],
             max_wait_seconds=params["max_wait_seconds"],
+            sudo_session_enabled=sudo_session_enabled,
         )
         return web.json_response(resp, status=201)
     except TooManySessionsMatched:
@@ -852,10 +850,6 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             "domain_name": session.domain_name,
         },
     }
-    if session.routing:
-        body["endpoint"] = {
-            "id": str(session.routing.endpoint),
-        }
 
     async with aiohttp.ClientSession() as req:
         async with req.post(
@@ -1597,6 +1591,94 @@ async def find_dependent_sessions(
     return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
 
 
+@aiotools.lru_cache(maxsize=100)
+async def _find_dependency_sessions(
+    session_name_or_id: uuid.UUID | str,
+    db_session: SASession,
+    access_key: AccessKey,
+):
+    sessions = await SessionRow.match_sessions(
+        db_session,
+        session_name_or_id,
+        access_key=access_key,
+    )
+
+    assert len(sessions) >= 1, "session not found!"
+
+    session_id = str(sessions[0].id)
+    session_name = sessions[0].name
+
+    assert isinstance(session_id, get_args(uuid.UUID | str))
+    assert isinstance(session_name, str)
+
+    kernel_query = (
+        sa.select(
+            [
+                kernels.c.status,
+                kernels.c.status_changed,
+            ]
+        )
+        .select_from(kernels)
+        .where(kernels.c.session_id == session_id)
+    )
+
+    dependency_session_ids: list[SessionDependencyRow] = (
+        await db_session.execute(
+            sa.select(SessionDependencyRow.depends_on).where(
+                SessionDependencyRow.session_id == session_id
+            )
+        )
+    ).first()
+
+    if not dependency_session_ids:
+        dependency_session_ids = []
+
+    kernel_query_result = (await db_session.execute(kernel_query)).first()
+
+    session_info: Dict[str, Union[List, str]] = {
+        "session_id": session_id,
+        "session_name": session_name,
+        "status": str(kernel_query_result[0]),
+        "status_changed": str(kernel_query_result[1]),
+        "depends_on": [
+            await _find_dependency_sessions(dependency_session_id, db_session, access_key)
+            for dependency_session_id in dependency_session_ids
+        ],
+    }
+
+    return session_info
+
+
+async def find_dependency_sessions(
+    session_name_or_id: uuid.UUID | str,
+    db_session: SASession,
+    access_key: AccessKey,
+):
+    return await _find_dependency_sessions(session_name_or_id, db_session, access_key)
+
+
+@server_status_required(READ_ALLOWED)
+@auth_required
+async def get_dependency_graph(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    root_session_name = request.match_info["session_name"]
+
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    log.info(
+        "GET_DEPENDENCY_GRAPH (ak:{0}/{1}, s:{2})",
+        requester_access_key,
+        owner_access_key,
+        root_session_name,
+    )
+
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        return web.json_response(
+            await find_dependency_sessions(root_session_name, db_session, owner_access_key),
+            status=200,
+        )
+
+
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def upload_files(request: web.Request) -> web.Response:
@@ -2025,4 +2107,5 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
+    cors.add(app.router.add_route("GET", "/{session_name}/dependency-graph", get_dependency_graph))
     return app, []
