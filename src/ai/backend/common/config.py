@@ -8,11 +8,10 @@ from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, c
 import tomli
 import trafaret as t
 
-from ai.backend.common.types import RedisHelperConfig
-
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import ConfigurationError
+from .types import RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
@@ -29,7 +28,6 @@ __all__ = (
     "check",
     "merge",
 )
-
 
 etcd_config_iv = t.Dict(
     {
@@ -68,7 +66,6 @@ redis_config_iv = t.Dict(
         ): redis_helper_config_iv,
     }
 ).allow_extra("*")
-
 
 vfolder_config_iv = t.Dict(
     {
