@@ -150,13 +150,30 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     return await handler(request)
 
 
+# async def supergraph_handler(request: web.Request) -> web.Response:
+#     stats: WebStats = request.app["stats"]
+#     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
+#     endpoint = "http://127.0.0.1:4000"
+#     api_session = await asyncio.shield(get_anonymous_session(request))
+#     async with api_session:
+#         api_rqst = Request(
+#             request.method,  # POST
+#             request.match_info.get("path", ""),
+#         )
+
+
 async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     config = request.app["config"]
     path = request.match_info.get("path", "")
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
-    if proxy_path == "pipeline":
+    log.warning(f"WEB_HANDLER(is_anonymous={is_anonymous}, method={request.method}, path={path})")
+    if proxy_path == "supergraph":
+        endpoint = "http://127.0.0.1:4000"
+        log.warning(f"WEB_HANDLER: supergraph={endpoint}")
+        api_session = await asyncio.shield(get_api_session(request, endpoint))
+    elif proxy_path == "pipeline":
         pipeline_config = config["pipeline"]
         if not pipeline_config:
             raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
@@ -205,7 +222,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
-            if proxy_path == "pipeline":
+            if proxy_path in ("pipeline", "supergraph"):
                 aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
                 if not (sso_token := request.headers.get("X-BackendAI-SSO")):
                     jwt_secret = config["pipeline"]["jwt"]["secret"]
@@ -230,6 +247,9 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 down_resp = web.StreamResponse()
                 down_resp.set_status(up_resp.status, up_resp.reason)
                 down_resp.headers.update(up_resp.headers)
+                if proxy_path == "supergraph":
+                    down_resp.headers.pop("Content-Encoding", None)
+                # log.warning("down_resp(status:{}, headers:{})", up_resp.status, up_resp.headers)
                 # We already have configured CORS handlers and the API server
                 # also provides those headers.  Just let them as-is.
                 await down_resp.prepare(request)
@@ -237,6 +257,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                     chunk = await up_resp.read(8192)
                     if not chunk:
                         break
+                    # log.warning("chunk: {}", chunk.decode())
                     await down_resp.write(chunk)
                 return down_resp
     except asyncio.CancelledError:
