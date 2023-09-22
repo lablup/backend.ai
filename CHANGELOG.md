@@ -16,6 +16,38 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0b2 (2023-09-20)
+
+### Fixes
+* Fix webserver not working ([#1588](https://github.com/lablup/backend.ai/issues/1588))
+
+
+## 23.09.0b1 (2023-09-20)
+
+### Features
+* Implement optional encryption of manager-to-agent RPC channels via CURVE asymmetric keypairs using updated Callosum ([#887](https://github.com/lablup/backend.ai/issues/887))
+* Feature to enable/disable passwordless sudo for a user (work account) inside a compute session ([#1530](https://github.com/lablup/backend.ai/issues/1530))
+* Use `session.max_age` from webserver.conf to set the expiration for the pipeline authentication token ([#1556](https://github.com/lablup/backend.ai/issues/1556))
+* Add new config directive `agent.advertised-rpc-addr` under agent.toml so that agent can be operated under NAT situation ([#1575](https://github.com/lablup/backend.ai/issues/1575))
+* Add pipeline option to the `config.toml.j2` so that webui can access it. ([#1576](https://github.com/lablup/backend.ai/issues/1576))
+
+### Fixes
+* Fix sentinel connection pool usage and improve Redis sentinel support ([#1513](https://github.com/lablup/backend.ai/issues/1513))
+* Fix a mismatch of the list of session status in the CLI and the manager (e.g., missing `PULLING` in the CLI) ([#1557](https://github.com/lablup/backend.ai/issues/1557))
+* Let `RedisLock` retry until it acquires lock. ([#1559](https://github.com/lablup/backend.ai/issues/1559))
+* Fix vFolder removal failing due to repeated type casting ([#1561](https://github.com/lablup/backend.ai/issues/1561))
+* Let agents skip mount/umount task and just produce task succeeded event rather than just return. ([#1570](https://github.com/lablup/backend.ai/issues/1570))
+* Resolve `last_used` field of `KeyPair` Gql object from Redis. ([#1571](https://github.com/lablup/backend.ai/issues/1571))
+* Fix vFolder bulk deletion to finish any successful deletion task in a bulk. ([#1579](https://github.com/lablup/backend.ai/issues/1579))
+* Fix duplicate logger initialization when using `mgr start-server` command and let the CLI commands to use local logger without relaying log records via ZMQ sockets ([#1581](https://github.com/lablup/backend.ai/issues/1581))
+* Remove rows corresponding to `vfolders` not found by storage proxy. ([#1582](https://github.com/lablup/backend.ai/issues/1582))
+* Handle redis `LockError` when release. ([#1583](https://github.com/lablup/backend.ai/issues/1583))
+* Add new alembic migration to remove mismatches between software defined schema and actual DB schema ([#1584](https://github.com/lablup/backend.ai/issues/1584))
+
+### External Dependency Updates
+* Upgrade alembic (1.8.1 -> 1.12.0) to add `alembic check` command for ease of database branch/schema management ([#1585](https://github.com/lablup/backend.ai/issues/1585))
+
+
 ## 23.09.0a4 (2023-09-09)
 
 ### Features
@@ -167,7 +199,5 @@ Changes
 
 
 ## 23.03 and earlier
-
-Please refer the following per-package changelogs.
 
 * [Unified changelog for the core components](https://github.com/lablup/backend.ai/blob/23.03/CHANGELOG.md)

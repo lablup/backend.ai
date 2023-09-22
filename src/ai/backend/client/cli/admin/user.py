@@ -46,6 +46,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
+        user_fields["sudo_session_enabled"],
     ]
     with Session() as session:
         try:
@@ -146,6 +147,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
+        user_fields["sudo_session_enabled"],
     ]
     try:
         with Session() as session:
@@ -207,6 +209,15 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     ),
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--sudo-session-enabled",
+    is_flag=True,
+    default=False,
+    help=(
+        "Enable passwordless sudo for a user inside a compute session. "
+        "Note that this feature does not automatically install sudo for the session."
+    ),
+)
 def add(
     ctx: CLIContext,
     domain_name,
@@ -219,6 +230,7 @@ def add(
     need_password_change,
     allowed_ip,
     description,
+    sudo_session_enabled,
 ):
     """
     Add new user. A user must belong to a domain, so DOMAIN_NAME should be provided.
@@ -241,6 +253,7 @@ def add(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
+                sudo_session_enabled=sudo_session_enabled,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -299,6 +312,15 @@ def add(
     ),
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--sudo-session-enabled",
+    is_flag=True,
+    default=False,
+    help=(
+        "Enable passwordless sudo for a user inside a compute session. "
+        "Note that this feature does not automatically install sudo for the session."
+    ),
+)
 def update(
     ctx: CLIContext,
     email,
@@ -311,6 +333,7 @@ def update(
     need_password_change,
     allowed_ip,
     description,
+    sudo_session_enabled,
 ):
     """
     Update an existing user.
@@ -331,6 +354,7 @@ def update(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
+                sudo_session_enabled=sudo_session_enabled,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
