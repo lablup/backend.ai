@@ -289,11 +289,6 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
                 }
             ).allow_extra("*"),
-            t.Key("pipeline", default=None): t.Null | t.Dict(
-                {
-                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
-                },
-            ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
                     t.Key("ssl-verify", default=True): t.ToBool,
@@ -324,8 +319,13 @@ _config_defaults: Mapping[str, Any] = {
         "allow-origins": "*",
     },
     "redis": {
-        "addr": "127.0.0.1:6379",
+        "addr": None,
         "password": None,
+        "redis_helper_config": {
+            "socket_timeout": 5.0,
+            "socket_connect_timeout": 2.0,
+            "reconnect_poll_timeout": 0.3,
+        },
     },
     "docker": {
         "registry": {},
@@ -423,6 +423,9 @@ shared_config_iv = t.Dict(
                 ),
                 t.Key("service_name", default=None): t.Null | t.String,
                 t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
+                t.Key(
+                    "redis_helper_config", default=_config_defaults["redis"]["redis_helper_config"]
+                ): config.redis_helper_config_iv,
             }
         ).allow_extra("*"),
         t.Key("docker", default=_config_defaults["docker"]): t.Dict(
