@@ -87,6 +87,7 @@ __all__ = (
     "kernels",
     "KernelRow",
     "KERNEL_STATUS_TRANSITION_MAP",
+    "SESSION_TYPE_IMAGE_ROLE_MAP",
     "KernelStatistics",
     "KernelStatus",
     "ComputeContainer",
@@ -287,6 +288,14 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     KernelStatus.TERMINATED: set(),
     KernelStatus.ERROR: set(),
     KernelStatus.CANCELLED: set(),
+}
+
+
+SESSION_TYPE_IMAGE_ROLE_MAP: Mapping[SessionTypes, str] = {
+    SessionTypes.BATCH: "COMPUTE",
+    SessionTypes.INTERACTIVE: "COMPUTE",
+    SessionTypes.INFERENCE: "INFERENCE",
+    SessionTypes.SYSTEM: "SYSTEM",
 }
 
 

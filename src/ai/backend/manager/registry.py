@@ -129,6 +129,7 @@ from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
+    SESSION_TYPE_IMAGE_ROLE_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
@@ -1046,6 +1047,15 @@ class AgentRegistry:
             known_slot_types = await self.shared_config.get_resource_slots()
 
             labels = image_row.labels
+
+            # Check if the image is available for a given session type.
+            if (_img_role := labels.get("ai.backend.role")) is not None:
+                if _img_role != SESSION_TYPE_IMAGE_ROLE_MAP[session_type]:
+                    raise InvalidAPIParameters(
+                        f"Cannot create {session_type} session with the given image. (img:"
+                        f" {image_ref.name}, img role: {_img_role})"
+                    )
+
             # Parse service ports to check for port errors
             parse_service_ports(
                 labels.get("ai.backend.service-ports", ""),
@@ -1769,14 +1779,13 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
                 query = (
                     sa.select(KernelRow.occupied_slots)
-                    .select_from(j)
+                    .select_from(KernelRow)
                     .where(
                         (KernelRow.access_key == access_key)
                         & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
                     )
                 )
                 zero = ResourceSlot()
@@ -1797,14 +1806,13 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
                 query = (
                     sa.select(KernelRow.occupied_slots)
-                    .select_from(j)
+                    .select_from(KernelRow)
                     .where(
                         (KernelRow.domain_name == domain_name)
                         & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
                     )
                 )
                 zero = ResourceSlot()
@@ -1826,14 +1834,13 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
                 query = (
                     sa.select(KernelRow.occupied_slots)
-                    .select_from(j)
+                    .select_from(KernelRow)
                     .where(
                         (KernelRow.group_id == group_id)
                         & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
                     )
                 )
                 zero = ResourceSlot()
