@@ -37,6 +37,7 @@
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
       "InputOriginalPassword": "Please Input Original Password",
+      "InputNewPassword": "Please Input Original Password",
       "InvalidPasswordMessage": "At least 1 alphabet, 1 number and 1 special character is required with at least 8 chars.",
       "NewPasswordMismatch": "Two new passwords do not match.",
       "PasswordMismatch": "Password mismatch",
@@ -239,6 +240,7 @@
       "ProxyConfiguratorNotResponding": "Proxy configurator is not responding.",
       "SettingUpProxyForApp": "Setting up proxy for the app...",
       "AddingKernelToSocketQueue": "Adding kernel to socket queue...",
+      "FailedToConnectCoordinator": "Failed to connect to the app administration. Please check your network connection and firewall settings.",
       "ManualImageName": "Image Name (Manual)",
       "NotEnoughResource": "Not enough resource",
       "ResourceAllocationTemplate": "Resource Allocation Template",
@@ -277,7 +279,8 @@
       "PrePortConfigWillDisappear": "Any unsaved preopen ports will be disappeared.",
       "PreOpenPortConfigurationDone": "Preopen ports configured successfully.",
       "PreOpenPortPanelTitle": "Preopen ports to set (optional)",
-      "PreOpenPortRange": "Preopen ports are only available from 1024 to 65535."
+      "PreOpenPortRange": "Preopen ports are only available from 1024 to 65535.",
+      "MinMemory": "The minimum memory capacity for the currently selected runtime environment is {{size}}iB."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -333,7 +336,9 @@
       "AppMustBeRunDialog": "This app can only be accessed and used if it is already running through the terminal. If not, you will be directed to an error page that occurs when the app is not running.",
       "ConfirmAndRun": "I checked and I'll start",
       "Prepared": "Prepared",
-      "App": "App"
+      "App": "App",
+      "NoExistingConnectionExample": "No Connection Example to be copied.",
+      "SSHConnectionExampleClipboardCopy": "SSH Connection Example has been copied to the clipboard."
     },
     "TensorboardPath": "Log directory for TensorBoard",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",
@@ -420,18 +425,35 @@
     "OnlyAllowsNonNegativeIntegers": "Only allows non-negative integers",
     "RoutingInfo": "Routing Info",
     "ServiceInfo": "Service Info",
+    "CreatedAt": "Created At",
     "StartService": "Start Service",
+    "GenerateToken": "Generate Token",
+    "GenerateNewToken": "Generate new token",
     "SessionOwner": "Session Owner",
     "ServiceEndpoint": "Service Endpoint",
     "NoServiceEndpoint": "No Service Endpoint",
     "RoutesInfo": "Routes Info",
+    "GeneratedTokens": "Generated Tokens",
     "RouteId": "Route ID",
     "SessionId": "Session ID",
     "TrafficRatio": "Traffic Ratio",
     "YouAreAboutToTerminate": "You are about to terminate ",
     "ClearErrors": "Clear error and retry",
     "ServingRouteErrorModalTitle": "Serving Route Error",
-    "FailedToStartService": "Failed to create service."
+    "FailedToStartService": "Failed to create service.",
+    "CurrentTime": "Current time",
+    "ExpiredTime": "Expired time",
+    "ValidTimeInfo": "Valid time info",
+    "Generate": "Generate",
+    "TokenGenerated": "Token generated",
+    "TokenGenerationFailed": "Token generation failed. please try again.",
+    "PleaseSelectTime": "Please select time!",
+    "ExpiredDate": "Expired Date",
+    "TokenExpiredDateHelp": "The default token expiration time is 24 hours later.",
+    "TokenExpiredDateError": "The token expiration time must be after the current time",
+    "ServiceNameRule": "Only allow 4 to 64 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
+    "FormValidationFailed": "Form validation failed",
+    "resources": "Resources"
   },
   "button": {
     "Cancel": "Cancel",
@@ -830,13 +852,16 @@
     "Used": "Used",
     "Limit": "Limit",
     "HostDetails": "Displays quota information for the selected storage host.",
-    "ProjectFolder": "Project Folder"
+    "ProjectFolder": "Project Folder",
+    "Pipeline": "Pipeline Folders",
+    "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack."
   },
   "dialog": {
     "warning": {
       "CannotBeUndone": "WARNING: this cannot be undone!",
       "LogDeletion": "Are you sure you want to delete all of the log messages?",
-      "WillBeAppliedToNewSessions": "This update will be applied to new sessions."
+      "WillBeAppliedToNewSessions": "This update will be applied to new sessions.",
+      "Required": "Required"
     },
     "ask": {
       "DoYouWantToProceed": "Do you want to proceed?"
@@ -1458,7 +1483,8 @@
     "CreatingComputeSession": "Creating compute session ...",
     "SessionStillPreparing": "Session is still in preparing. Reload after a while",
     "ComputeSessionPrepared": "Compute session prepared",
-    "sessionStatusIs": "Session status is"
+    "sessionStatusIs": "Session status is",
+    "EmptyProject": "EmptyProject"
   },
   "error": {
     "UpdateError": "Update error",
@@ -1513,5 +1539,11 @@
   "explorer": {
     "ValueRequired": "ValueRequired",
     "InputTooShort": "InputTooShort"
+  },
+  "ErrorBoundary": {
+    "title": "An error has occurred.",
+    "reloadPage": "Reload the page",
+    "resetErrorBoundary": "Reset ErrorBoundary",
+    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment."
   }
 }

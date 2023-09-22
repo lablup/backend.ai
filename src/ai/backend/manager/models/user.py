@@ -144,6 +144,12 @@ users = sa.Table(
         sa.ForeignKey("user_resource_policies.name"),
         nullable=False,
     ),
+    sa.Column(
+        "sudo_session_enabled",
+        sa.Boolean,
+        default=False,
+        nullable=False,
+    ),
 )
 
 
@@ -211,6 +217,7 @@ class User(graphene.ObjectType):
     allowed_client_ip = graphene.List(lambda: graphene.String)
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
+    sudo_session_enabled = graphene.Boolean()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -248,6 +255,7 @@ class User(graphene.ObjectType):
             allowed_client_ip=row["allowed_client_ip"],
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
+            sudo_session_enabled=row["sudo_session_enabled"],
         )
 
     @classmethod
@@ -303,6 +311,7 @@ class User(graphene.ObjectType):
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -321,6 +330,7 @@ class User(graphene.ObjectType):
         "resource_policy": ("resource_policy", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
     }
 
     @classmethod
@@ -511,7 +521,7 @@ class UserInput(graphene.InputObjectType):
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False, default="default")
-
+    sudo_session_enabled = graphene.Boolean(required=False, default=False)
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -530,6 +540,7 @@ class ModifyUserInput(graphene.InputObjectType):
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False)
+    sudo_session_enabled = graphene.Boolean(required=False, default=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -575,6 +586,7 @@ class CreateUser(graphene.Mutation):
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
             "resource_policy": props.resource_policy or "default",
+            "sudo_session_enabled": props.sudo_session_enabled or False,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -664,6 +676,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "allowed_client_ip")
         set_if_set(props, data, "totp_activated")
         set_if_set(props, data, "resource_policy")
+        set_if_set(props, data, "sudo_session_enabled")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -905,8 +918,11 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_error_logs(conn, user_uuid)
+            await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
+            await cls.delete_sessions(conn, user_uuid)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -1020,7 +1036,7 @@ class PurgeUser(graphene.Mutation):
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
             result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host])
+                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
                 .select_from(vfolders)
                 .where(vfolders.c.user == user_uuid),
             )
@@ -1104,6 +1120,34 @@ class PurgeUser(graphene.Mutation):
         return active_kernel_count > 0
 
     @classmethod
+    async def delete_endpoint(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all endpoint.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete endpoint
+        :return: number of deleted rows
+        """
+        from .endpoint import EndpointRow, EndpointTokenRow
+
+        result = await conn.execute(
+            sa.delete(EndpointTokenRow).where(EndpointTokenRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint tokens ({1})", result.rowcount, user_uuid)
+
+        result = await conn.execute(
+            sa.delete(EndpointRow).where(EndpointRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
     async def delete_kernels(
         cls,
         conn: SAConnection,
@@ -1123,6 +1167,46 @@ class PurgeUser(graphene.Mutation):
         )
         if result.rowcount > 0:
             log.info("deleted {0} user's kernels ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_error_logs(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all error logs.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete error logs
+        :return: number of deleted rows
+        """
+        from .error_logs import error_logs
+
+        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all sessions.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete sessions
+        :return: number of deleted rows
+        """
+        from .session import SessionRow
+
+        result = await conn.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's sessions ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
     @classmethod

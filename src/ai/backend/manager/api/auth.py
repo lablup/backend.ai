@@ -477,11 +477,17 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if row is None:
                 raise AuthorizationFailed("Access key not found")
 
+            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
+            now = now[0] + (now[1] / (10**6))
+
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f"kp:{access_key}:num_queries"
                 await pipe.incr(num_queries_key)
                 await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                last_call_time_key = f"kp:{access_key}:last_call_time"
+                await pipe.set(last_call_time_key, now)
+                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
@@ -519,11 +525,17 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
 
+            now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
+            now = now[0] + (now[1] / (10**6))
+
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f"kp:{access_key}:num_queries"
                 await pipe.incr(num_queries_key)
                 await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                last_call_time_key = f"kp:{access_key}:last_call_time"
+                await pipe.set(last_call_time_key, now)
+                await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
@@ -806,6 +818,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             "role": UserRole.USER,
             "integration_id": None,
             "resource_policy": "default",
+            "sudo_session_enabled": False,
         }
         if user_data_overriden:
             for key, val in user_data_overriden.items():

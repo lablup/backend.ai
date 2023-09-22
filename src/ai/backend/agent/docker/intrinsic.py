@@ -919,5 +919,5 @@ class MemoryPlugin(AbstractComputePlugin):
             "human_readable_name": "RAM",
             "display_unit": "GiB",
             "number_format": {"binary": True, "round_length": 0},
-            "display_icon": "cpu",
+            "display_icon": "ram",
         }

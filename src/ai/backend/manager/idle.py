@@ -51,7 +51,12 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    RedisConnectionInfo,
+    SessionTypes,
+)
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, LockID
@@ -216,6 +221,7 @@ class IdleCheckerHost:
             self._event_producer,
             lambda: DoIdleCheckEvent(),
             self.check_interval,
+            task_name="idle_checker",
         )
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,

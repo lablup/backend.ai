@@ -25,6 +25,7 @@ from .base import (
     EndpointIDColumn,
     EnumValueType,
     ForeignKeyIDColumn,
+    IDColumn,
     Item,
     PaginatedList,
     ResourceSlotColumn,
@@ -60,7 +61,7 @@ class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     id = EndpointIDColumn()
-    name = sa.Column("name", sa.String(length=512), nullable=False, unique=True)
+    name = sa.Column("name", sa.String(length=512), nullable=False)
     created_user = sa.Column(
         "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
@@ -261,19 +262,20 @@ class EndpointRow(Base):
 class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
-    token = sa.Column("token", sa.VARCHAR(1024), primary_key=True)
+    id = IDColumn()
+    token = sa.Column("token", sa.String(), nullable=False)
     endpoint = ForeignKeyIDColumn("endpoint", "endpoints.id")
     session_owner = ForeignKeyIDColumn("session_owner", "users.uuid")
     domain = sa.Column(
         "domain",
         sa.String(length=64),
-        sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+        sa.ForeignKey("domains.name", ondelete="CASCADE"),
         nullable=False,
     )
     project = sa.Column(
         "project",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
     created_at = sa.Column(
@@ -284,12 +286,14 @@ class EndpointTokenRow(Base):
 
     def __init__(
         self,
+        id: uuid.UUID,
         token: str,
         endpoint: uuid.UUID,
         domain: str,
         project: uuid.UUID,
         session_owner: uuid.UUID,
     ) -> None:
+        self.id = id
         self.token = token
         self.endpoint = endpoint
         self.domain = domain
@@ -629,6 +633,9 @@ class EndpointToken(graphene.ObjectType):
         return cls(
             token=row.token,
             endpoint_id=row.endpoint,
+            domain=row.domain,
+            project=row.project,
+            session_owner=row.session_owner,
             created_at=row.created_at,
         )
 
@@ -642,7 +649,7 @@ class EndpointToken(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from()
+        query = sa.select([sa.func.count()]).select_from(EndpointTokenRow)
         if endpoint_id is not None:
             query = query.where(EndpointTokenRow.endpoint == endpoint_id)
         if project:
