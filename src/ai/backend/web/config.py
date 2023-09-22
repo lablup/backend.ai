@@ -19,7 +19,7 @@ license_defs = {
 
 _config_defaults: Mapping[str, Any] = {
     "pipeline": {
-        "endpoint": "http://127.0.0.1:9500",
+        "endpoint": yarl.URL("http://127.0.0.1:9500"),
         "jwt": {
             "secret": "7<:~[X,^Z1XM!*,Pe:PHR!bv,H~Q#l177<7gf_XHD6.<*<.t<[o|V5W(=0x:jTh-",
         },
