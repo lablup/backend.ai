@@ -70,8 +70,10 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
-from ai.backend.testutils.bootstrap import (
-    postgres_container,  # noqa: F401
+from ai.backend.testutils.bootstrap import (  # noqa: F401
+    etcd_container,
+    postgres_container,
+    redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
 

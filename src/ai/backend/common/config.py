@@ -64,7 +64,7 @@ redis_config_iv = t.Dict(
         t.Key("password", default=None): t.Null | t.String,
         t.Key(
             "redis_helper_config",
-            redis_helper_default_config,
+            default=redis_helper_default_config,
         ): redis_helper_config_iv,
     }
 ).allow_extra("*")
