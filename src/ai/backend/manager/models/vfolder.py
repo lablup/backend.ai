@@ -911,8 +911,12 @@ async def initiate_vfolder_removal(
 
     await execute_with_retry(_update_vfolder_status)
 
+    row_deletion_infos: list[VFolderDeletionInfo] = []
+    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+
     async def _delete():
-        for folder_id, host_name in requested_vfolders:
+        for vfolder_info in requested_vfolders:
+            folder_id, host_name = vfolder_info
             proxy_name, volume_name = storage_manager.split_host(host_name)
             try:
                 async with storage_manager.request(
@@ -923,19 +927,33 @@ async def initiate_vfolder_removal(
                         "volume": volume_name,
                         "vfid": str(folder_id),
                     },
-                ):
+                ) as (_, resp):
                     pass
-            except aiohttp.ClientResponseError:
-                raise VFolderOperationFailed(extra_msg=str(folder_id))
+            except (VFolderOperationFailed, InvalidAPIParameters) as e:
+                if e.status == 404:
+                    row_deletion_infos.append(vfolder_info)
+                else:
+                    failed_deletion.append((vfolder_info, repr(e)))
+            except Exception as e:
+                failed_deletion.append((vfolder_info, repr(e)))
+            else:
+                row_deletion_infos.append(vfolder_info)
+        if row_deletion_infos:
+            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
-        async def _delete_row() -> None:
-            async with db_engine.begin_session() as db_session:
-                await db_session.execute(sa.delete(vfolders).where(cond))
+            async def _delete_row() -> None:
+                async with db_engine.begin_session() as db_session:
+                    await db_session.execute(
+                        sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
+                    )
 
-        await execute_with_retry(_delete_row)
-        log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+            await execute_with_retry(_delete_row)
+            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
+        if failed_deletion:
+            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
+            raise VFolderOperationFailed(extra_data=extra_data)
 
-    storage_ptask_group.create_task(_delete())
+    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
     log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
 
     return vfolder_info_len
@@ -1177,6 +1195,45 @@ class VirtualFolder(graphene.ObjectType):
                 async for r in (await conn.stream(query))
                 if (obj := cls.from_row(graph_ctx, r)) is not None
             ]
+
+    @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        ids: list[str],
+        *,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[Sequence[VirtualFolder]]:
+        from .user import UserRow
+
+        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        query = (
+            sa.select(VFolderRow)
+            .select_from(j)
+            .where(VFolderRow.id.in_(ids))
+            .order_by(sa.desc(VFolderRow.created_at))
+        )
+        if user_id is not None:
+            query = query.where(VFolderRow.user == user_id)
+            if domain_name is not None:
+                query = query.where(UserRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(VFolderRow.group == group_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                ids,
+                lambda row: row["user"],
+            )
 
     @classmethod
     async def batch_load_by_user(

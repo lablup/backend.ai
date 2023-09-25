@@ -97,6 +97,9 @@ else
   # Correct the ownership of agent socket.
   chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
 
+  # Ensure ownership of agent home directory.
+  chown -R $USER_NAME:$GROUP_NAME /home
+  
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
@@ -104,6 +107,11 @@ else
   if command -v ssh-agent > /dev/null; then
     eval "$(/opt/kernel/su-exec $USER_ID:$GROUP_ID ssh-agent)"
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
+  fi
+
+  # Enable sudo
+  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
+    echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
   fi
 
   echo "Generate random alpha-numeric password"
