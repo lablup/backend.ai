@@ -248,7 +248,7 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
     default=LogSeverity.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
