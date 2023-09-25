@@ -13,7 +13,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 
-from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
+from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ..exception import (
     ExternalError,
     InvalidQuotaConfig,
@@ -23,8 +23,8 @@ from ..exception import (
 )
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
-from .exceptions import VastInvalidParameterError, VastNotFoundError, VastUnknownError
-from .vastdata_client import VastAPIClient, VastQuotaID
+from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
+from .vastdata_client import VASTAPIClient, VASTQuotaID
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -32,29 +32,29 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 VAST_QUOTA_ID_FILE_NAME: Final = ".vast-quota-id"
 
 
-class VastQuotaModel(BaseQuotaModel):
+class VASTQuotaModel(BaseQuotaModel):
     def __init__(
         self,
         mount_path: Path,
-        api_client: VastAPIClient,
+        api_client: VASTAPIClient,
     ) -> None:
         super().__init__(mount_path)
         self.api_client = api_client
 
-    async def _get_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> VastQuotaID | None:
+    async def _get_vast_quota_id(self, quota_scope_id: QuotaScopeID) -> VASTQuotaID | None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
         def _read():
             try:
                 with open(qs_path / VAST_QUOTA_ID_FILE_NAME, "r") as f:
-                    return VastQuotaID(f.read())
+                    return VASTQuotaID(f.read())
             except FileNotFoundError:
                 return None
 
         return await asyncio.get_running_loop().run_in_executor(None, _read)
 
     async def _set_vast_quota_id(
-        self, quota_scope_id: QuotaScopeID, vast_quota_id: VastQuotaID
+        self, quota_scope_id: QuotaScopeID, vast_quota_id: VASTQuotaID
     ) -> None:
         qs_path = self.mangle_qspath(quota_scope_id)
 
@@ -95,9 +95,9 @@ class VastQuotaModel(BaseQuotaModel):
                     soft_limit=options.limit_bytes,
                     hard_limit=options.limit_bytes,
                 )
-            except VastInvalidParameterError:
+            except VASTInvalidParameterError:
                 raise InvalidQuotaConfig
-            except VastUnknownError as e:
+            except VASTUnknownError as e:
                 raise ExternalError(str(e))
             await self._set_vast_quota_id(quota_scope_id, quota.id)
 
@@ -111,9 +111,9 @@ class VastQuotaModel(BaseQuotaModel):
                 soft_limit=config.limit_bytes,
                 hard_limit=config.limit_bytes,
             )
-        except VastInvalidParameterError:
+        except VASTInvalidParameterError:
             raise InvalidQuotaConfig
-        except VastUnknownError as e:
+        except VASTUnknownError as e:
             raise ExternalError(str(e))
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
@@ -135,7 +135,7 @@ class VastQuotaModel(BaseQuotaModel):
             raise QuotaScopeNotFoundError
         try:
             await self.api_client.remove_quota(vast_quota_id)
-        except VastNotFoundError:
+        except VASTNotFoundError:
             raise QuotaScopeNotFoundError
         await self._rm_vast_quota_id(quota_scope_id)
 
@@ -145,8 +145,8 @@ class VastQuotaModel(BaseQuotaModel):
         await aiofiles.os.rmdir(qspath)
 
 
-class VastVolume(BaseVolume):
-    api_client: VastAPIClient
+class VASTVolume(BaseVolume):
+    api_client: VASTAPIClient
 
     name = "vast"
 
@@ -169,7 +169,7 @@ class VastVolume(BaseVolume):
             event_producer=event_producer,
         )
         ssl_verify = self.config.get("vast_verify_ssl", False)
-        self.api_client = VastAPIClient(
+        self.api_client = VASTAPIClient(
             self.config["vast_endpoint"],
             self.config["vast_username"],
             self.config["vast_password"],
@@ -178,19 +178,17 @@ class VastVolume(BaseVolume):
             ssl=ssl_verify,
         )
 
-    async def create_quota_model(self) -> VastQuotaModel:
-        return VastQuotaModel(self.mount_path, self.api_client)
+    async def create_quota_model(self) -> VASTQuotaModel:
+        return VASTQuotaModel(self.mount_path, self.api_client)
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset(
-            [CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_FAST_SIZE]
-        )
+        return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         cluster_id: int = self.local_config["vast_cluster_id"]
         try:
             clsuter_info = await self.api_client.get_cluster_info(cluster_id)
-        except VastUnknownError:
+        except VASTUnknownError:
             return {
                 "status": "unavailable",
                 "status_info": None,
@@ -220,7 +218,7 @@ class VastVolume(BaseVolume):
         cluster_id: int = self.local_config["vast_cluster_id"]
         try:
             clsuter_info = await self.api_client.get_cluster_info(cluster_id)
-        except VastUnknownError:
+        except VASTUnknownError:
             return FSPerfMetric(
                 iops_read=-1,
                 iops_write=-1,

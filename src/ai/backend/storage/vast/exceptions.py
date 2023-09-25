@@ -1,11 +1,11 @@
 from typing import Optional
 
 
-class VastError(Exception):
+class VASTError(Exception):
     pass
 
 
-class VastAPIError(VastError):
+class VASTAPIError(VASTError):
     message: str
 
     def __init__(self, message: Optional[str] = None, *args):
@@ -17,21 +17,21 @@ class VastAPIError(VastError):
         return type(self).__name__
 
 
-class VastUnauthorizedError(VastAPIError):
+class VASTUnauthorizedError(VASTAPIError):
     pass
 
 
-class VastInvalidParameterError(VastAPIError):
+class VASTInvalidParameterError(VASTAPIError):
     pass
 
 
-class VastNotFoundError(VastAPIError):
+class VASTNotFoundError(VASTAPIError):
     pass
 
 
-class VastClusterNotFoundError(VastAPIError):
+class VASTClusterNotFoundError(VASTAPIError):
     pass
 
 
-class VastUnknownError(VastAPIError):
+class VASTUnknownError(VASTAPIError):
     pass

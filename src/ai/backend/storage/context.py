@@ -39,7 +39,7 @@ from .plugin import (
 )
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
-from .vast import VastVolume
+from .vast import VASTVolume
 from .vfs import BaseVolume
 from .watcher import WatcherClient
 from .weka import WekaVolume
@@ -61,7 +61,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
     "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
     CephFSVolume.name: CephFSVolume,
-    VastVolume.name: VastVolume,
+    VASTVolume.name: VASTVolume,
 }
 
 

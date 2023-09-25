@@ -17,11 +17,11 @@ from ..exception import ExternalError, QuotaScopeAlreadyExists
 from ..types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
-    VastAPIError,
-    VastInvalidParameterError,
-    VastNotFoundError,
-    VastUnauthorizedError,
-    VastUnknownError,
+    VASTAPIError,
+    VASTInvalidParameterError,
+    VASTNotFoundError,
+    VASTUnauthorizedError,
+    VASTUnknownError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -31,7 +31,7 @@ DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(hours=1)
 DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(hours=24)
 
 
-VastQuotaID = NewType("VastQuotaID", str)
+VASTQuotaID = NewType("VASTQuotaID", str)
 
 
 class RequestMethod(Enum):
@@ -69,7 +69,7 @@ def default_perf() -> Performance:
 
 
 @dataclass(match_args=True)
-class VastClusterInfo:
+class VASTClusterInfo:
     id: str
     guid: str
     ip: str
@@ -92,14 +92,14 @@ class VastClusterInfo:
     max_performance: Performance = field(default_factory=default_perf)
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> VastClusterInfo:
-        return VastClusterInfo(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
+    def from_json(cls, obj: Mapping[str, Any]) -> VASTClusterInfo:
+        return VASTClusterInfo(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
 
 
 @dataclass(match_args=True)
-class VastQuota:
+class VASTQuota:
     path: str
-    id: VastQuotaID
+    id: VASTQuotaID
     guid: str
     name: str
     state: str
@@ -113,11 +113,11 @@ class VastQuota:
     percent_capacity: int
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> VastQuota:
-        return VastQuota(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
+    def from_json(cls, obj: Mapping[str, Any]) -> VASTQuota:
+        return VASTQuota(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
 
 
-class VastAPIClient:
+class VASTAPIClient:
     api_endpoint: URL
     api_version: APIVersion
     username: str
@@ -174,7 +174,7 @@ class VastAPIClient:
 
     async def _refresh(self) -> None:
         if self._auth_token is None:
-            raise VastUnauthorizedError("Cannot refresh without refresh token.")
+            raise VASTUnauthorizedError("Cannot refresh without refresh token.")
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -226,12 +226,12 @@ class VastAPIClient:
             case RequestMethod.DELETE:
                 func = sess.delete
             case _:
-                raise VastAPIError(f"Unsupported request method {method}")
+                raise VASTAPIError(f"Unsupported request method {method}")
 
         real_rel_path = URL("/api/") / str(self.api_version) / path
         return await func(real_rel_path, headers=self._req_header, json=body, ssl=self.ssl_context)
 
-    async def list_quotas(self) -> list[VastQuota]:
+    async def list_quotas(self) -> list[VASTQuota]:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -241,9 +241,9 @@ class VastAPIClient:
                 "quotas/",
             )
             data: list[Mapping[str, Any]] = await response.json()
-        return [VastQuota.from_json(info) for info in data]
+        return [VASTQuota.from_json(info) for info in data]
 
-    async def get_quota(self, vast_quota_id: VastQuotaID) -> VastQuota | None:
+    async def get_quota(self, vast_quota_id: VASTQuotaID) -> VASTQuota | None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -258,7 +258,7 @@ class VastAPIClient:
         if data.get("detail") == "Not found." or "id" not in data:
             return None
 
-        return VastQuota.from_json(data)
+        return VASTQuota.from_json(data)
 
     async def set_quota(
         self,
@@ -268,7 +268,7 @@ class VastAPIClient:
         soft_limit_inodes: int | None = None,
         hard_limit_inodes: int | None = None,
         grace_period: str | None = None,
-    ) -> VastQuota:
+    ) -> VASTQuota:
         body: dict[str, Any] = {
             "name": str(path),
             "path": str(self.storage_base_dir / path.name),
@@ -299,26 +299,26 @@ class VastAPIClient:
                 case 201 | 200:
                     pass
                 case 400 | 401:
-                    raise VastInvalidParameterError
+                    raise VASTInvalidParameterError
                 case 403:
-                    raise VastUnauthorizedError
+                    raise VASTUnauthorizedError
                 case 503:
                     raise QuotaScopeAlreadyExists
                 case _:
-                    raise VastUnknownError(
+                    raise VASTUnknownError(
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
-        return VastQuota.from_json(data)
+        return VASTQuota.from_json(data)
 
     async def modify_quota(
         self,
-        vast_quota_id: VastQuotaID,
+        vast_quota_id: VASTQuotaID,
         soft_limit: int | None = None,
         hard_limit: int | None = None,
         soft_limit_inodes: int | None = None,
         hard_limit_inodes: int | None = None,
         grace_period: str | None = None,
-    ) -> VastQuota:
+    ) -> VASTQuota:
         body: dict[str, Any] = {}
         if soft_limit is not None:
             body["soft_limit"] = soft_limit
@@ -344,16 +344,19 @@ class VastAPIClient:
             match response.status // 100:
                 case 2:
                     pass
-                case 4 | 5:
-                    err_msg = data.get("detail", "Unkown error from vast API")
-                    raise VastInvalidParameterError(err_msg)
+                case 4:
+                    err_msg = data.get("detail", "Invalid parameter")
+                    raise VASTInvalidParameterError(err_msg)
+                case 5:
+                    err_msg = data.get("detail", "VAST server error")
+                    raise VASTUnknownError(err_msg)
                 case _:
-                    raise VastUnknownError(
+                    raise VASTUnknownError(
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
-        return VastQuota.from_json(data)
+        return VASTQuota.from_json(data)
 
-    async def remove_quota(self, vast_quota_id: VastQuotaID) -> None:
+    async def remove_quota(self, vast_quota_id: VASTQuotaID) -> None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -363,9 +366,9 @@ class VastAPIClient:
                 f"quotas/{vast_quota_id}/",
             )
             if response.status == 404:
-                raise VastNotFoundError
+                raise VASTNotFoundError
 
-    async def get_cluster_info(self, cluster_id: int) -> VastClusterInfo | None:
+    async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -373,11 +376,11 @@ class VastAPIClient:
             data: Mapping[str, Any] = await response.json()
             match response.status:
                 case 200:
-                    return VastClusterInfo.from_json(data)
+                    return VASTClusterInfo.from_json(data)
                 case 404:
                     return None
                 case _:
-                    raise VastUnknownError(
+                    raise VASTUnknownError(
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
 
