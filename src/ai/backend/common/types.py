@@ -1100,16 +1100,24 @@ class EtcdRedisConfig(TypedDict, total=False):
     sentinel: Optional[Union[str, List[HostPortPair]]]
     service_name: Optional[str]
     password: Optional[str]
+    redis_helper_config: RedisHelperConfig
+
+
+class RedisHelperConfig(TypedDict):
+    socket_timeout: float
+    socket_connect_timeout: float
+    reconnect_poll_timeout: float
 
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | redis.asyncio.sentinel.Sentinel
+    client: Redis
     service_name: Optional[str]
+    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+    redis_helper_config: RedisHelperConfig
 
-    async def close(self) -> None:
-        if isinstance(self.client, Redis):
-            await self.client.close()
+    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):

@@ -142,6 +142,7 @@ class Agent(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
+    container_count = graphene.Int()
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -240,6 +241,12 @@ class Agent(graphene.ObjectType):
                 "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,
             },
         }
+
+    async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
+        ctx: GraphQueryContext = info.context
+        rs = ctx.redis_stat
+        cnt = await redis_helper.execute(rs, lambda r: r.get(f"container_count.{self.id}"))
+        return int(cnt) if cnt is not None else 0
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),

@@ -1242,6 +1242,7 @@ class AbstractAgent(
         known_kernels: Dict[KernelId, ContainerId] = {}
         alive_kernels: Dict[KernelId, ContainerId] = {}
         kernel_session_map: Dict[KernelId, SessionId] = {}
+        own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels = {}
 
         async with self.registry_lock:
@@ -1270,6 +1271,7 @@ class AbstractAgent(
                     alive_kernels[kernel_id] = container.id
                     session_id = SessionId(UUID(container.labels["ai.backend.session-id"]))
                     kernel_session_map[kernel_id] = session_id
+                    own_kernels[kernel_id] = container.id
                 for kernel_id, kernel_obj in self.kernel_registry.items():
                     known_kernels[kernel_id] = kernel_obj["container_id"]
                     session_id = kernel_obj.session_id
@@ -1303,6 +1305,14 @@ class AbstractAgent(
                 # Enqueue the events.
                 for kernel_id, ev in terminated_kernels.items():
                     await self.container_lifecycle_queue.put(ev)
+
+                # Set container count
+                await self.set_container_count(len(own_kernels.keys()))
+
+    async def set_container_count(self, container_count: int) -> None:
+        await redis_helper.execute(
+            self.redis_stat_pool, lambda r: r.set(f"container_count.{self.id}", container_count)
+        )
 
     async def clean_all_kernels(self, blocking: bool = False) -> None:
         kernel_ids = [*self.kernel_registry.keys()]
