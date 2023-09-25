@@ -2,6 +2,7 @@ import asyncio
 from decimal import Decimal
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     FrozenSet,
     Literal,
@@ -12,7 +13,6 @@ from typing import (
     Tuple,
 )
 
-from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AgentId,
@@ -38,9 +38,14 @@ from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..types import Container, ContainerStatus, MountInfo
-from .config import DEFAULT_CONFIG_PATH, dummy_local_config
+from .config import dummy_local_config
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
+
+if TYPE_CHECKING:
+    from ai.backend.common.auth import PublicKey
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -203,12 +208,23 @@ class DummyAgent(
 
     def __init__(
         self,
-        *args,
-        **kwargs,
+        etcd: AsyncEtcd,
+        local_config: Mapping[str, Any],
+        *,
+        stats_monitor: StatsPluginContext,
+        error_monitor: ErrorPluginContext,
+        skip_initial_scan: bool = False,
+        agent_public_key: Optional[PublicKey],
     ) -> None:
-        super().__init__(*args, **kwargs)
-        raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
-        self.dummy_config = dummy_local_config.check(raw_config)
+        super().__init__(
+            etcd,
+            local_config,
+            stats_monitor=stats_monitor,
+            error_monitor=error_monitor,
+            skip_initial_scan=skip_initial_scan,
+            agent_public_key=agent_public_key,
+        )
+        self.dummy_config = dummy_local_config.check(local_config["dummy"])
         self.dummy_agent_cfg = self.dummy_config["agent"]
 
     async def execute(

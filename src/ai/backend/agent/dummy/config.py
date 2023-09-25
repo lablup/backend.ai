@@ -1,19 +1,47 @@
-from pathlib import Path
-
 import trafaret as t
 
 from ai.backend.common import validators as tx
+from ai.backend.common.types import SlotTypes
 
-DEFAULT_CONFIG_PATH = Path.cwd() / "agent.dummy.toml"
+from .defs import AllocationModes
 
 RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
 core_idx = {0, 1, 2, 3, 4}
 
 
+dummy_device_config = t.Dict(
+    {
+        t.Key("device-id"): t.String(),
+        t.Key("device-name"): t.String(),
+        t.Key("slot-type", default=SlotTypes.COUNT): tx.Enum(SlotTypes),
+        t.Key("allocation-mode", default=AllocationModes.DISCRETE): tx.Enum(AllocationModes),
+        t.Key("hw-location", default="hw-location"): t.String(),
+        t.Key("memory-size", default=10): t.ToInt(),
+        t.Key("processing-units", default=1): t.ToInt(),
+        t.Key("numa-node", default=None): t.Null | t.ToInt(),
+        t.Key("model-name", default=None): t.Null | t.String(),
+        t.Key("mother-uuid", default=None): t.Null | t.String(),
+    }
+)
+
 dummy_local_config = t.Dict(
     {
         t.Key("agent"): t.Dict(
             {
+                t.Key("devices"): t.List(dummy_device_config),
+                t.Key("device-metadata"): t.Dict(
+                    {
+                        t.Key("display-unit"): t.String(),
+                        t.Key("display-icon"): t.String(),
+                        t.Key("number-format"): t.Dict(
+                            {
+                                t.Key("binary", default=False): t.ToBool(),
+                                t.Key("round-length", default=0): t.ToInt(),
+                            }
+                        ),
+                        t.Key("human-readable-name", default=None): t.Null | t.String(),
+                    }
+                ),
                 t.Key("delay"): t.Dict(
                     {
                         t.Key("scan-image", default=0.1): tx.Delay,
@@ -32,7 +60,7 @@ dummy_local_config = t.Dict(
                         t.Key("missing", default=None): t.Null | t.List(t.String),
                     }
                 ),
-                t.Key("resource"): t.Dict(
+                t.Key("intrinsic"): t.Dict(
                     {
                         t.Key("cpu"): t.Dict(
                             {

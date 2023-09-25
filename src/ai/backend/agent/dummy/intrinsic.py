@@ -18,8 +18,6 @@ from .. import __version__
 from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
-    AbstractComputeDevice,
-    AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
 )
@@ -30,13 +28,14 @@ from ..stats import (
     StatContext,
 )
 from .agent import Container
+from .compute_plugin import DummyComputePlugin, DummyDevice
 
 
-class CPUDevice(AbstractComputeDevice):
+class CPUDevice(DummyDevice):
     pass
 
 
-class CPUPlugin(AbstractComputePlugin):
+class CPUPlugin(DummyComputePlugin):
     """
     Represents the CPU.
     """
@@ -56,8 +55,8 @@ class CPUPlugin(AbstractComputePlugin):
         local_config: Mapping[str, Any],
         dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(plugin_config, local_config)
-        self.resource_config = dummy_config["agent"]["resource"]
+        super().__init__(plugin_config, local_config, key=self.key)
+        self.resource_config = dummy_config["agent"]["intrinsic"]
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -78,10 +77,13 @@ class CPUPlugin(AbstractComputePlugin):
             "display_icon": "cpu",
         }
 
-    async def list_devices(self) -> Collection[AbstractComputeDevice]:
+    async def list_devices(self) -> Collection[CPUDevice]:
         cores = self.resource_config["cpu"]["core-indexes"]
         return [
             CPUDevice(
+                model_name=None,
+                mother_uuid=None,
+                slot_type=SlotTypes.COUNT,
                 device_id=DeviceId(str(core_idx)),
                 hw_location="root",
                 numa_node=None,
@@ -185,11 +187,11 @@ class CPUPlugin(AbstractComputePlugin):
         return []
 
 
-class MemoryDevice(AbstractComputeDevice):
+class MemoryDevice(DummyDevice):
     pass
 
 
-class MemoryPlugin(AbstractComputePlugin):
+class MemoryPlugin(DummyComputePlugin):
     """
     Represents the main memory.
     """
@@ -209,8 +211,8 @@ class MemoryPlugin(AbstractComputePlugin):
         local_config: Mapping[str, Any],
         dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(plugin_config, local_config)
-        self.resource_config = dummy_config["agent"]["resource"]
+        super().__init__(plugin_config, local_config, key=self.key)
+        self.resource_config = dummy_config["agent"]["intrinsic"]
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -231,10 +233,13 @@ class MemoryPlugin(AbstractComputePlugin):
             "display_icon": "cpu",
         }
 
-    async def list_devices(self) -> Collection[AbstractComputeDevice]:
+    async def list_devices(self) -> Collection[MemoryDevice]:
         memory_size = self.resource_config["memory"]["size"]
         return [
             MemoryDevice(
+                model_name=None,
+                mother_uuid=None,
+                slot_type=SlotTypes.BYTES,
                 device_id=DeviceId("root"),
                 device_name=self.key,
                 hw_location="root",

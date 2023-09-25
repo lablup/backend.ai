@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Mapping, MutableMapping, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
@@ -9,9 +9,10 @@ from ai.backend.common.types import DeviceName, SlotName
 from ..exception import InitializationError
 from ..resources import (
     AbstractComputePlugin,
-    ComputePluginContext,
+    BasePluginContext,
     known_slot_types,
 )
+from .compute_plugin import DummyComputePlugin
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -32,7 +33,7 @@ async def load_resources(
     # Initialize intrinsic plugins by ourselves.
     from .intrinsic import CPUPlugin, MemoryPlugin
 
-    compute_plugin_ctx = ComputePluginContext(
+    compute_plugin_ctx = DummyComputePluginContext(
         etcd,
         local_config,
     )
@@ -60,10 +61,9 @@ async def load_resources(
                 plugin_instance.key,
             )
         if plugin_instance.key in compute_device_types:
-            raise InitializationError(
-                f"A plugin defining the same key '{plugin_instance.key}' already exists. "
-                "You may need to uninstall it first."
-            )
+            # Skip the duplicate name of compute plugin
+            # since this is a dummy agent.
+            pass
         compute_device_types[plugin_instance.key] = plugin_instance
 
     return compute_device_types
@@ -97,3 +97,28 @@ async def scan_available_resources(
     log.info("Slot types: {!r}", known_slot_types)
 
     return slots
+
+
+class DummyComputePluginContext(BasePluginContext[DummyComputePlugin]):
+    plugin_group = "backendai_dummy_accelerator_v21"
+
+    async def init(
+        self,
+        context: Any = None,
+        allowlist: Optional[set] = None,
+        blocklist: Optional[set] = None,
+    ) -> None:
+        devices: list[dict[str, Any]] = self.local_config["dummy"]["agent"]["devices"]
+        for dev in devices:
+            dev_name = dev["device-name"]
+            plugin_instance = DummyComputePlugin(
+                plugin_config={},
+                local_config=self.local_config,
+                key=dev_name,
+                allocation_mode=dev["allocation-mode"],
+            )
+            await plugin_instance.init(context=context)
+            self.plugins[dev_name] = plugin_instance
+
+    def attach_intrinsic_device(self, plugin: DummyComputePlugin) -> None:
+        self.plugins[plugin.key] = plugin
