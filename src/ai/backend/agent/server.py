@@ -78,6 +78,7 @@ from .config import (
     container_etcd_config_iv,
     docker_extra_config_iv,
 )
+from .dummy.config import dummy_local_config
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
@@ -913,8 +914,16 @@ def main(
                 raise ValueError(
                     "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
                 )
-        if cfg["agent"]["backend"] == AgentBackend.DOCKER:
-            config.check(raw_cfg, docker_extra_config_iv)
+        match cfg["agent"]["backend"]:
+            case AgentBackend.DOCKER:
+                config.check(raw_cfg, docker_extra_config_iv)
+            case AgentBackend.DUMMY:
+                dummy_local_config.check(raw_cfg["dummy"])
+            case AgentBackend.KUBERNETES:
+                pass
+            case _:
+                # Unable to reach here because trafaret check beforehand.
+                raise click.Abort()
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Agent configuration ==")
             pprint(cfg)

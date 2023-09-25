@@ -53,10 +53,8 @@ class CPUPlugin(DummyComputePlugin):
         self,
         plugin_config: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(plugin_config, local_config, key=self.key)
-        self.resource_config = dummy_config["agent"]["intrinsic"]
+        self.resource_config = local_config["dummy"]["agent"]["intrinsic"]
 
     async def init(self, context: Any = None) -> None:
         pass
@@ -209,10 +207,8 @@ class MemoryPlugin(DummyComputePlugin):
         self,
         plugin_config: Mapping[str, Any],
         local_config: Mapping[str, Any],
-        dummy_config: Mapping[str, Any],
     ) -> None:
-        super().__init__(plugin_config, local_config, key=self.key)
-        self.resource_config = dummy_config["agent"]["intrinsic"]
+        self.resource_config = local_config["dummy"]["agent"]["intrinsic"]
 
     async def init(self, context: Any = None) -> None:
         pass

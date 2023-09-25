@@ -102,6 +102,9 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             redis_helper_config=config.redis_helper_default_config,
         ),
         "plugins": {},
+        "dummy": {
+            "agent": {},
+        },
     }
     cfg = agent_local_config_iv.check(cfg)
 

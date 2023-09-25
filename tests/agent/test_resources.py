@@ -182,20 +182,18 @@ async def test_scan_resource_usage_per_slot():
 
 @pytest.mark.asyncio
 async def test_allocate_rollback(monkeypatch):
-    local_config = {}
+    local_config = {
+        "dummy": {
+            "agent": {"intrinsic": {"cpu": {"core-indexes": [0, 1]}, "memory": {"size": 1024}}},
+        }
+    }
     cpu_plugin = CPUPlugin(
         {},
         local_config,
-        {
-            "agent": {"resource": {"cpu": {"core-indexes": [0, 1]}}},
-        },
     )
     mem_plugin = MemoryPlugin(
         {},
         local_config,
-        {
-            "agent": {"resource": {"memory": {"size": 1024}}},
-        },
     )
     cpu_devices = await cpu_plugin.list_devices()
     mem_devices = await mem_plugin.list_devices()

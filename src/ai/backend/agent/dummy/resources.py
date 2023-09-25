@@ -20,7 +20,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 async def load_resources(
     etcd: AsyncEtcd,
     local_config: Mapping[str, Any],
-    dummy_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
     """
     Detect and load the accelerator plugins.
@@ -43,11 +42,11 @@ async def load_resources(
     )
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
-        cpu_plugin = CPUPlugin(cpu_config, local_config, dummy_config)
+        cpu_plugin = CPUPlugin(cpu_config, local_config)
         compute_plugin_ctx.attach_intrinsic_device(cpu_plugin)
     if "mem" not in compute_plugin_ctx.plugins:
         memory_config = await etcd.get_prefix("config/plugins/memory")
-        memory_plugin = MemoryPlugin(memory_config, local_config, dummy_config)
+        memory_plugin = MemoryPlugin(memory_config, local_config)
         compute_plugin_ctx.attach_intrinsic_device(memory_plugin)
     for plugin_name, plugin_instance in compute_plugin_ctx.plugins.items():
         if not all(
@@ -108,7 +107,11 @@ class DummyComputePluginContext(BasePluginContext[DummyComputePlugin]):
         allowlist: Optional[set] = None,
         blocklist: Optional[set] = None,
     ) -> None:
-        devices: list[dict[str, Any]] = self.local_config["dummy"]["agent"]["devices"]
+        devices: list[dict[str, Any]] | None = self.local_config["dummy"]["agent"].get(
+            "device-plugins"
+        )
+        if devices is None:
+            return
         for dev in devices:
             dev_name = dev["device-name"]
             plugin_instance = DummyComputePlugin(

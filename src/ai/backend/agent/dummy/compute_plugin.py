@@ -62,6 +62,7 @@ class DummyComputePlugin(AbstractComputePlugin):
     ) -> None:
         super().__init__(plugin_config, local_config)
         self.dummy_ag_config: Mapping[str, Any] = self.local_config["dummy"]["agent"]
+        self.device_plugin_configs: Mapping[str, Any] = self.dummy_ag_config["device_plugins"]
         self.key = key
         self._mode = allocation_mode
 
@@ -75,7 +76,7 @@ class DummyComputePlugin(AbstractComputePlugin):
         pass
 
     def get_metadata(self) -> AcceleratorMetadata:
-        device_metadata = self.dummy_ag_config["device-metadata"]
+        device_metadata = self.device_plugin_configs["metadata"]
         return {
             "slot_name": str(self.key),
             "description": f"Dummy {self.key}",
@@ -98,7 +99,7 @@ class DummyComputePlugin(AbstractComputePlugin):
                 processing_units=device["processing-units"],
                 numa_node=device["numa-node"],
             )
-            for device in self.dummy_ag_config["devices"]
+            for device in self.device_plugin_configs["devices"]
         ]
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:

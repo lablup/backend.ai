@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 from decimal import Decimal
 from pathlib import Path
@@ -254,7 +256,7 @@ class DummyAgent(
         return []
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config, self.dummy_config)
+        return await load_resources(self.etcd, self.local_config)
 
     async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
         return await scan_available_resources(
