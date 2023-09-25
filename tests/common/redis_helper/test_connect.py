@@ -17,12 +17,12 @@ from tenacity import (
     wait_exponential,
 )
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.types import HostPortPair
 
 from .types import RedisClusterInfo
-from .utils import interrupt, redis_helper_config, with_timeout
+from .utils import interrupt, with_timeout
 
 if TYPE_CHECKING:
     from typing import Any
@@ -77,7 +77,7 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": sentinels,
             "service_name": "mymaster",
             "password": "develove",
-            "redis_helper_config": redis_helper_config,
+            "redis_helper_config": config.redis_helper_default_config,
         }
     )
 
@@ -95,7 +95,7 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": parsed_addresses,
             "service_name": "mymaster",
             "password": "develove",
-            "redis_helper_config": redis_helper_config,
+            "redis_helper_config": config.redis_helper_default_config,
         },
     )
 

@@ -39,6 +39,7 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -427,7 +428,7 @@ kernels = sa.Table(
     # Resource occupation
     sa.Column("container_id", sa.String(length=64)),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("requested_slots", ResourceSlotColumn(), nullable=True),
+    sa.Column("requested_slots", ResourceSlotColumn(), nullable=False, default=ResourceSlot()),
     sa.Column("occupied_shares", pgsql.JSONB(), nullable=False, default={}),  # legacy
     sa.Column("environ", sa.ARRAY(sa.String), nullable=True),
     sa.Column("mounts", sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03

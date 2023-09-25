@@ -57,4 +57,4 @@ connectionMode = "SESSION"
 {% toml_field "validUntil" config["license"]["valid_until"] %}
 
 [pipeline]
-{% toml_field "endpoint" config["pipeline"]["endpoint"] %}
+{% toml_field "endpoint" config["pipeline"]["endpoint"]|string %}

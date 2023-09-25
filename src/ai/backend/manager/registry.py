@@ -2145,6 +2145,8 @@ class AgentRegistry:
             )
             async with self.db.begin_readonly_session() as db_session:
                 target_session = (await db_session.scalars(query)).first()
+            if not target_session:
+                raise SessionNotFound
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -2418,7 +2420,7 @@ class AgentRegistry:
                     .select_from(kernels)
                     .where(
                         (kernels.c.session_id == session_id)
-                        & (kernels.c.cluster_role == DEFAULT_ROLE),
+                        & (kernels.c.cluster_role == DEFAULT_ROLE)
                     )
                 )
                 result = await conn.execute(query)
