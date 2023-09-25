@@ -1,8 +1,8 @@
 """replace_kernelrole_to_sessiontypes
 
-Revision ID: bc25ec9281ec
-Revises: a083c6c962e5
-Create Date: 2023-09-19 18:58:39.329987
+Revision ID: 6def4cef4706
+Revises: 85615e005fa3
+Create Date: 2023-09-25 15:24:12.292439
 
 """
 import enum
@@ -17,8 +17,8 @@ from sqlalchemy.sql.functions import coalesce
 from ai.backend.manager.models.base import GUID, EnumType, mapper_registry
 
 # revision identifiers, used by Alembic.
-revision = "bc25ec9281ec"
-down_revision = "a083c6c962e5"
+revision = "6def4cef4706"
+down_revision = "85615e005fa3"
 branch_labels = None
 depends_on = None
 

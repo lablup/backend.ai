@@ -1433,27 +1433,26 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
-    from .session import SessionRow
+    from .session import PRIVATE_SESSION_TYPES
 
-    j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
-            .select_from(j)
+            .select_from(KernelRow)
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (SessionRow.session_type != SessionTypes.SYSTEM)
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         concurrency_used = result.scalar()
         result = await db_sess.execute(
             sa.select(sa.func.count())
-            .select_from(j)
+            .select_from(KernelRow)
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (SessionRow.session_type != SessionTypes.SYSTEM)
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()
