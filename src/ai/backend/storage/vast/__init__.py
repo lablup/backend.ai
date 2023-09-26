@@ -185,7 +185,7 @@ class VASTVolume(BaseVolume):
         return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
-        cluster_id: int = self.local_config["vast_cluster_id"]
+        cluster_id: int = self.config["vast_cluster_id"]
         try:
             clsuter_info = await self.api_client.get_cluster_info(cluster_id)
         except VASTUnknownError:
@@ -215,7 +215,7 @@ class VASTVolume(BaseVolume):
         }
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        cluster_id: int = self.local_config["vast_cluster_id"]
+        cluster_id: int = self.config["vast_cluster_id"]
         try:
             clsuter_info = await self.api_client.get_cluster_info(cluster_id)
         except VASTUnknownError:
@@ -239,4 +239,17 @@ class VASTVolume(BaseVolume):
         )
 
     async def get_fs_usage(self) -> CapacityUsage:
-        return await self.api_client.get_capacity_info()
+        cluster_id: int = self.config["vast_cluster_id"]
+        try:
+            clsuter_info = await self.api_client.get_cluster_info(cluster_id)
+        except VASTUnknownError:
+            return CapacityUsage(
+                used_bytes=-1,
+                capacity_bytes=-1,
+            )
+        if clsuter_info is None:
+            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
+        return CapacityUsage(
+            used_bytes=clsuter_info.physical_space_in_use,
+            capacity_bytes=clsuter_info.physical_space,
+        )
