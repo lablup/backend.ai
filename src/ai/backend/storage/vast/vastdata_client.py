@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Final, Mapping, NewType, TypedDict
 
 import aiohttp
+import jwt
 from yarl import URL
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -47,14 +48,9 @@ PATCH = RequestMethod.PATCH
 DELETE = RequestMethod.DELETE
 
 
-class TokenData(TypedDict):
-    token: str
-    issued_dt: datetime
-
-
 class TokenPair(TypedDict):
-    access_token: TokenData
-    refresh_token: TokenData
+    access_token: str
+    refresh_token: str
 
 
 class Performance(TypedDict):
@@ -150,27 +146,35 @@ class VASTAPIClient:
     def _req_header(self) -> Mapping[str, str]:
         assert self._auth_token is not None
         return {
-            "Authorization": f"Bearer {self._auth_token['access_token']['token']}",
+            "Authorization": f"Bearer {self._auth_token['access_token']}",
             "Content-Type": "application/json",
         }
 
     async def _validate_token(self) -> None:
         current_dt = datetime.now()
+
+        def get_exp_dt(token: str) -> datetime:
+            decoded: Mapping[str, Any] = jwt.decode(
+                token,
+                algorithms=["HS256"],
+                options={
+                    "verify_signature": False,
+                },
+            )
+            return datetime.fromtimestamp(decoded["exp"])
+
         if self._auth_token is None:
             return await self._login()
-        elif self._auth_token["access_token"]["issued_dt"] + DEFAULT_ACCESS_TOKEN_SPAN > current_dt:
+        elif get_exp_dt(self._auth_token["access_token"]) + DEFAULT_ACCESS_TOKEN_SPAN > current_dt:
             return
         elif (
-            self._auth_token["refresh_token"]["issued_dt"] + DEFAULT_REFRESH_TOKEN_SPAN > current_dt
+            get_exp_dt(self._auth_token["refresh_token"]) + DEFAULT_REFRESH_TOKEN_SPAN > current_dt
         ):
             return await self._refresh()
         return await self._login()
 
     def _parse_token(self, data: Mapping[str, Any]) -> None:
-        current_dt = datetime.now()
-        access_token = TokenData(token=data["access"], issued_dt=current_dt)
-        refresh_token = TokenData(token=data["refresh"], issued_dt=current_dt)
-        self._auth_token = TokenPair(access_token=access_token, refresh_token=refresh_token)
+        self._auth_token = TokenPair(access_token=data["access"], refresh_token=data["refresh"])
 
     async def _refresh(self) -> None:
         if self._auth_token is None:
@@ -183,7 +187,7 @@ class VASTAPIClient:
                 headers={
                     "Accept": "*/*",
                 },
-                data={"refresh_token": self._auth_token["refresh_token"]["token"]},
+                data={"refresh_token": self._auth_token["refresh_token"]},
                 ssl=self.ssl_context,
             )
         data = await response.json()
