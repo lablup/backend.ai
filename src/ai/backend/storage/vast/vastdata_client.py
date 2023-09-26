@@ -113,6 +113,11 @@ class VASTQuota:
         return VASTQuota(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
 
 
+@dataclass
+class Cache:
+    cluster_info: VASTClusterInfo | None
+
+
 class VASTAPIClient:
     api_endpoint: URL
     api_version: APIVersion
@@ -120,6 +125,7 @@ class VASTAPIClient:
     password: str
     ssl_context: ssl.SSLContext | bool | None
     storage_base_dir: Path
+    cache: Cache
 
     _auth_token: TokenPair | None
 
@@ -138,6 +144,7 @@ class VASTAPIClient:
         self.username = username
         self.password = password
         self.storage_base_dir = Path(storage_base_dir)
+        self.cache = Cache(cluster_info=None)
 
         self._auth_token = None
         self.ssl_context = ssl
@@ -373,6 +380,8 @@ class VASTAPIClient:
                 raise VASTNotFoundError
 
     async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
+        if (_cached := self.cache.cluster_info) is not None:
+            return _cached
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -380,7 +389,9 @@ class VASTAPIClient:
             match response.status:
                 case 200:
                     data: Mapping[str, Any] = await response.json()
-                    return VASTClusterInfo.from_json(data)
+                    result = VASTClusterInfo.from_json(data)
+                    self.cache.cluster_info = result
+                    return result
                 case 404:
                     return None
                 case _:

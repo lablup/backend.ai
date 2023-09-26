@@ -178,6 +178,9 @@ class VASTVolume(BaseVolume):
             ssl=ssl_verify,
         )
 
+    async def shutdown(self) -> None:
+        self.api_client.cache.cluster_info = None
+
     async def create_quota_model(self) -> VASTQuotaModel:
         return VASTQuotaModel(self.mount_path, self.api_client)
 
