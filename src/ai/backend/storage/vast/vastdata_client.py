@@ -376,10 +376,10 @@ class VASTAPIClient:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
-            response = await self._build_request(sess, GET, f"cluster/{cluster_id}/")
-            data: Mapping[str, Any] = await response.json()
+            response = await self._build_request(sess, GET, f"clusters/{cluster_id}/")
             match response.status:
                 case 200:
+                    data: Mapping[str, Any] = await response.json()
                     return VASTClusterInfo.from_json(data)
                 case 404:
                     return None
