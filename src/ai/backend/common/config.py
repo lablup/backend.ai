@@ -11,11 +11,14 @@ import trafaret as t
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import ConfigurationError
+from .types import RedisHelperConfig
 
 __all__ = (
     "ConfigurationError",
     "etcd_config_iv",
     "redis_config_iv",
+    "redis_helper_config_iv",
+    "redis_helper_default_config",
     "vfolder_config_iv",
     "model_definition_iv",
     "read_from_file",
@@ -25,7 +28,6 @@ __all__ = (
     "check",
     "merge",
 )
-
 
 etcd_config_iv = t.Dict(
     {
@@ -40,10 +42,28 @@ etcd_config_iv = t.Dict(
     }
 ).allow_extra("*")
 
+redis_helper_default_config: RedisHelperConfig = {
+    "socket_timeout": 5.0,
+    "socket_connect_timeout": 2.0,
+    "reconnect_poll_timeout": 0.3,
+}
+
+redis_helper_config_iv = t.Dict(
+    {
+        t.Key("socket_timeout", default=5.0): t.Float,
+        t.Key("socket_connect_timeout", default=2.0): t.Float,
+        t.Key("reconnect_poll_timeout", default=0.3): t.Float,
+    }
+).allow_extra("*")
+
 redis_config_iv = t.Dict(
     {
-        t.Key("addr", default=("127.0.0.1", 6379)): tx.HostPortPair,
+        t.Key("addr", default=None): t.Null | tx.HostPortPair,
         t.Key("password", default=None): t.Null | t.String,
+        t.Key(
+            "redis_helper_config",
+            default=redis_helper_default_config,
+        ): redis_helper_config_iv,
     }
 ).allow_extra("*")
 

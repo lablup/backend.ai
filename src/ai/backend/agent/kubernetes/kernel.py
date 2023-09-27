@@ -473,6 +473,9 @@ async def copy_runner_files(scratch_path: Path) -> None:
         "*.so",
         "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
         "extract_dotfiles.py",
+        "fantompass.py",
+        "hash_phrase.py",
+        "words.json",
     ]
 
     for target_glob in target_files:

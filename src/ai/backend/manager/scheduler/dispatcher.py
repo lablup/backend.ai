@@ -7,26 +7,19 @@ import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Final,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
 import aiotools
 import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
+from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -58,7 +51,7 @@ from ai.backend.manager.types import DistributedLockFactory, UserScope
 from ai.backend.manager.utils import query_userinfo
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
+from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
@@ -69,6 +62,8 @@ from ..models import (
     KernelRow,
     KernelStatus,
     RouteStatus,
+    RoutingRow,
+    ScalingGroupOpts,
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
@@ -79,7 +74,6 @@ from ..models import (
     recalc_concurrency_used,
     users,
 )
-from ..models.scaling_group import ScalingGroupOpts
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
 from .predicates import (
@@ -628,6 +622,28 @@ class SchedulerDispatcher(aobject):
         if num_scheduled > 0:
             await self.event_producer.produce_event(DoPrepareEvent())
 
+    async def _filter_agent_by_container_limit(
+        self, candidate_agents: list[AgentRow]
+    ) -> list[AgentRow]:
+        raw_value = await self.shared_config.etcd.get("config/agent/max-container-count")
+        if raw_value is None:
+            return candidate_agents
+        max_container_count = int(raw_value)
+
+        async def _pipe_builder(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            for ag in candidate_agents:
+                await pipe.get(f"container_count.{ag.id}")
+            return pipe
+
+        raw_counts = await redis_helper.execute(self.registry.redis_stat, _pipe_builder)
+
+        def _check(cnt: str | None) -> bool:
+            _cnt = int(cnt) if cnt is not None else 0
+            return max_container_count > _cnt
+
+        return [ag for ag, count in zip(candidate_agents, raw_counts) if _check(count)]
+
     async def _schedule_single_node_session(
         self,
         sched_ctx: SchedulingContext,
@@ -662,6 +678,16 @@ class SchedulerDispatcher(aobject):
                         f"arch: {requested_architecture})"
                     ),
                 )
+            available_candidate_agents = await self._filter_agent_by_container_limit(
+                compatible_candidate_agents
+            )
+            if not available_candidate_agents:
+                raise InstanceNotAvailable(
+                    extra_msg=(
+                        "No agents found to be available because all agents have reached the hard"
+                        " limit of the number of containers."
+                    ),
+                )
 
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
@@ -672,7 +698,7 @@ class SchedulerDispatcher(aobject):
             else:
                 # Let the scheduler check the resource availability and decide the target agent
                 cand_agent = scheduler.assign_agent_for_session(
-                    compatible_candidate_agents,
+                    available_candidate_agents,
                     sess_ctx,
                     scheduler.sgroup_opts.agent_selection_strategy,
                     agent_selection_resource_priority,
@@ -882,10 +908,19 @@ class SchedulerDispatcher(aobject):
                                     f"arch: {kernel.architecture})"
                                 ),
                             )
-
+                        available_candidate_agents = await self._filter_agent_by_container_limit(
+                            compatible_candidate_agents
+                        )
+                        if not available_candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    "No agents found to be available because all agents have"
+                                    " reached the hard limit of the number of containers."
+                                ),
+                            )
                         # Let the scheduler check the resource availability and decide the target agent
                         agent_id = scheduler.assign_agent_for_kernel(
-                            compatible_candidate_agents,
+                            available_candidate_agents,
                             kernel,
                             scheduler.sgroup_opts.agent_selection_strategy,
                             agent_selection_resource_priority,
@@ -1221,14 +1256,20 @@ class SchedulerDispatcher(aobject):
                 SessionRow.id.in_(ids_of_session_to_destroy), eager_loading_op=kernel_loading_op
             )
             result = await db_session.execute(query)
-            target_sessions_to_destory = result.scalars().all()
+            target_sessions_to_destroy = result.scalars().all()
+
+        already_destroyed_sessions: list[SessionId] = []
         # TODO: Update logic to not to wait for sessions to actually terminate
-        for session in target_sessions_to_destory:
-            await self.registry.destroy_session(
-                session,
-                forced=False,
-                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
-            )
+        for session in target_sessions_to_destroy:
+            try:
+                await self.registry.destroy_session(
+                    session,
+                    forced=False,
+                    reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
+                )
+            except SessionNotFound:
+                # Session already terminated while leaving routing alive
+                already_destroyed_sessions.append(session.id)
 
         user_ids = tuple(
             {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
@@ -1245,6 +1286,7 @@ class SchedulerDispatcher(aobject):
                         users.c.uuid,
                         users.c.role,
                         users.c.domain_name,
+                        users.c.sudo_session_enabled,
                         keypairs.c.access_key,
                         keypairs.c.resource_policy,
                     ]
@@ -1316,6 +1358,9 @@ class SchedulerDispatcher(aobject):
                         callback_url=endpoint.callback_url,
                         enqueue_only=True,
                         endpoint_id=endpoint.id,
+                        sudo_session_enabled=user_id_row_mapping[
+                            endpoint.session_owner
+                        ].sudo_session_enabled,
                     )
                 except Exception:
                     # TODO: Handle
@@ -1332,6 +1377,10 @@ class SchedulerDispatcher(aobject):
                         }
                     )
                     .where(EndpointRow.id.in_([e.id for e in endpoints_to_mark_terminated]))
+                )
+                await db_sess.execute(query)
+                query = sa.delete(RoutingRow).where(
+                    RoutingRow.session.in_(already_destroyed_sessions)
                 )
                 await db_sess.execute(query)
 

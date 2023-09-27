@@ -61,7 +61,7 @@ class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     id = EndpointIDColumn()
-    name = sa.Column("name", sa.String(length=512), nullable=False, unique=True)
+    name = sa.Column("name", sa.String(length=512), nullable=False)
     created_user = sa.Column(
         "created_user", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
@@ -269,13 +269,13 @@ class EndpointTokenRow(Base):
     domain = sa.Column(
         "domain",
         sa.String(length=64),
-        sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+        sa.ForeignKey("domains.name", ondelete="CASCADE"),
         nullable=False,
     )
     project = sa.Column(
         "project",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
     created_at = sa.Column(

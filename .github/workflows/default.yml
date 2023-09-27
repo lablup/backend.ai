@@ -145,7 +145,7 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: [ubuntu-latest-8-cores, self-hosted]
+    runs-on: [ubuntu-latest-8-cores]
     steps:
     - name: Calculate the fetch depth
       run: |
@@ -394,6 +394,11 @@ jobs:
           PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
           echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
           echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+      - name: Download wheels
+        uses: actions/download-artifact@v3
+        with:
+          name: wheels
+          path: dist
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
