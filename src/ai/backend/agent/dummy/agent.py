@@ -16,6 +16,7 @@ from typing import (
 )
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -46,7 +47,6 @@ from .resources import load_resources, scan_available_resources
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
-    from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 
 
