@@ -2125,6 +2125,8 @@ class AgentRegistry:
             )
             async with self.db.begin_readonly_session() as db_session:
                 target_session = (await db_session.scalars(query)).first()
+            if not target_session:
+                raise SessionNotFound
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -2398,7 +2400,7 @@ class AgentRegistry:
                     .select_from(kernels)
                     .where(
                         (kernels.c.session_id == session_id)
-                        & (kernels.c.cluster_role == DEFAULT_ROLE),
+                        & (kernels.c.cluster_role == DEFAULT_ROLE)
                     )
                 )
                 result = await conn.execute(query)
@@ -3729,7 +3731,8 @@ async def handle_kernel_log(
     event: DoSyncKernelLogsEvent,
 ) -> None:
     redis_conn = redis_helper.get_redis_object(
-        context.shared_config.data["redis"], db=REDIS_STREAM_DB
+        context.shared_config.data["redis"],
+        db=REDIS_STREAM_DB,
     )
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()

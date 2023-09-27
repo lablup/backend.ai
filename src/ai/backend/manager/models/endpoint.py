@@ -269,13 +269,13 @@ class EndpointTokenRow(Base):
     domain = sa.Column(
         "domain",
         sa.String(length=64),
-        sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+        sa.ForeignKey("domains.name", ondelete="CASCADE"),
         nullable=False,
     )
     project = sa.Column(
         "project",
         GUID,
-        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
+        sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
     created_at = sa.Column(

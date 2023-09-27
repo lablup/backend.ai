@@ -1,10 +1,12 @@
 import os
 from pathlib import Path
+from typing import Any, Mapping
 
 import pkg_resources
 import trafaret as t
 import yarl
 
+from ai.backend.common import config
 from ai.backend.common import validators as tx
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
@@ -13,6 +15,15 @@ license_defs = {
     "edition": "Open Source",
     "valid_since": "",
     "valid_until": "",
+}
+
+_config_defaults: Mapping[str, Any] = {
+    "pipeline": {
+        "endpoint": yarl.URL("http://127.0.0.1:9500"),
+        "jwt": {
+            "secret": "7<:~[X,^Z1XM!*,Pe:PHR!bv,H~Q#l177<7gf_XHD6.<*<.t<[o|V5W(=0x:jTh-",
+        },
+    },
 }
 
 config_iv = t.Dict(
@@ -85,14 +96,16 @@ config_iv = t.Dict(
                 t.Key("page", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
             }
         ).allow_extra("*"),
-        t.Key("pipeline", default=None): t.Null | t.Dict(
+        t.Key("pipeline", default=_config_defaults["pipeline"]): t.Dict(
             {
-                t.Key("endpoint"): tx.URL,
-                t.Key("jwt"): t.Dict(
+                t.Key("endpoint", default=_config_defaults["pipeline"]["endpoint"]): tx.URL,
+                t.Key("jwt", default=_config_defaults["pipeline"]["jwt"]): t.Dict(
                     {
-                        t.Key("secret"): t.String,
+                        t.Key(
+                            "secret", default=_config_defaults["pipeline"]["jwt"]["secret"]
+                        ): t.String,
                     },
-                ),
+                ).allow_extra("*"),
             },
         ).allow_extra("*"),
         t.Key("ui"): t.Dict(
@@ -118,10 +131,16 @@ config_iv = t.Dict(
             {
                 t.Key("redis"): t.Dict(
                     {
-                        t.Key("host", default="localhost"): t.String,
-                        t.Key("port", default=6379): t.ToInt[1:65535],
+                        t.Key("addr", default=None): t.Null | tx.HostPortPair,
                         t.Key("db", default=0): t.ToInt,
+                        t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
+                            tx.HostPortPair
+                        ),
+                        t.Key("service_name", default=None): t.Null | t.String,
                         t.Key("password", default=None): t.Null | t.String,
+                        t.Key(
+                            "redis_helper_config", default=config.redis_helper_default_config
+                        ): config.redis_helper_config_iv,
                     }
                 ),
                 t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)
