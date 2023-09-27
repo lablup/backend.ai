@@ -1150,7 +1150,7 @@ class SchedulerStatus(TypedDict):
     endpoint_name: NotRequired[str]
     action: NotRequired[str]
 
-      
+
 class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()

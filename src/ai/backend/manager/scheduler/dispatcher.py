@@ -1368,7 +1368,7 @@ class SchedulerDispatcher(aobject):
             lambda r: r.hset(
                 redis_key,
                 "down",
-                json.dumps([str(s.id) for s in target_sessions_to_destory]),
+                json.dumps([str(s.id) for s in target_sessions_to_destroy]),
             ),
         )
 
