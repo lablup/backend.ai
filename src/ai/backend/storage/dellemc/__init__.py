@@ -102,6 +102,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
 
 class DellEMCOneFSVolume(BaseVolume):
+    name = "dellemc-onefs"
     endpoint: str
     dell_admin: str
     dell_password: str

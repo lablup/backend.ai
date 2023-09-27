@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import grp
 import logging
 import multiprocessing
@@ -17,12 +18,13 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
-from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.events import (
-    EventDispatcher,
-    EventProducer,
+from ai.backend.common.config import (
+    ConfigurationError,
+    override_key,
+    redis_config_iv,
 )
+from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -30,8 +32,13 @@ from ai.backend.common.utils import env_info
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .watcher import WatcherClient, main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+def _is_root() -> bool:
+    return os.geteuid() == 0
 
 
 @aiotools.server_context
@@ -88,7 +95,7 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            log.info(f"PID: {pidx} - configured redis_addr: {redis_config['addr']}")
+            log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
@@ -98,7 +105,7 @@ async def server_main(
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
-        log.info(f"PID: {pidx} - Event producer created. (addr: {redis_config['addr']})")
+        log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
             db=REDIS_STREAM_DB,
@@ -106,13 +113,34 @@ async def server_main(
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
-        log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
+        log.info("PID: {0} - Event dispatcher created. (redis_config: {1})", pidx, redis_config)
+        if local_config["storage-proxy"]["use-watcher"]:
+            if not _is_root():
+                raise ValueError(
+                    "Storage proxy must be run as root if watcher is enabled. Else, set"
+                    " `use-wathcer` to false in your local config file."
+                )
+            insock_path: str | None = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+            outsock_path: str | None = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+            if insock_path is None or outsock_path is None:
+                raise ValueError(
+                    "Socket path must be not null. Please set valid socket path to"
+                    " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in your local"
+                    " config file."
+                )
+            watcher_client = WatcherClient(pidx, insock_path, outsock_path)
+            await watcher_client.init()
+        else:
+            watcher_client = None
         ctx = RootContext(
             pid=os.getpid(),
+            node_id=local_config["storage-proxy"]["node-id"],
+            pidx=pidx,
             local_config=local_config,
             etcd=etcd,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
+            watcher=watcher_client,
         )
         async with ctx:
             m.console_locals["ctx"] = ctx
@@ -160,7 +188,7 @@ async def server_main(
             )
             await client_api_site.start()
             await manager_api_site.start()
-            if os.geteuid() == 0:
+            if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]
                 os.setgroups(
@@ -178,6 +206,8 @@ async def server_main(
                 await client_api_runner.cleanup()
                 await event_producer.close()
                 await event_dispatcher.close()
+                if watcher_client is not None:
+                    await watcher_client.close()
     finally:
         if aiomon_started:
             m.close()
@@ -188,7 +218,7 @@ async def server_main(
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
     help=(
         "The config file path. "
@@ -198,32 +228,30 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: str,
     debug: bool = False,
 ) -> int:
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
     try:
         local_config = load_local_config(config_path, debug=debug)
     except ConfigurationError:
         raise click.Abort()
-    override_key(local_config, ("logging", "level"), log_level.name)
-    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+    if debug:
+        log_level = "DEBUG"
+    override_key(local_config, ("debug", "enabled"), log_level == "DEBUG")
+    override_key(local_config, ("logging", "level"), log_level.upper())
+    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     multiprocessing.set_start_method("spawn")
 
@@ -258,9 +286,41 @@ def main(
 
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
+                insock_path_prefix = local_config["storage-proxy"]["watcher-insock-path-prefix"]
+                outsock_path_prefix = local_config["storage-proxy"]["watcher-outsock-path-prefix"]
+                num_workers = local_config["storage-proxy"]["num-proc"]
+
+                if local_config["storage-proxy"]["use-watcher"]:
+                    if not _is_root():
+                        raise ValueError(
+                            "Storage proxy must be run as root if watcher is enabled. Else, set"
+                            " `use-wathcer` to false in your local config file."
+                        )
+                    insock_path: str | None = local_config["storage-proxy"][
+                        "watcher-insock-path-prefix"
+                    ]
+                    outsock_path: str | None = local_config["storage-proxy"][
+                        "watcher-outsock-path-prefix"
+                    ]
+                    if insock_path is None or outsock_path is None:
+                        raise ValueError(
+                            "Socket path must be not null. Please set valid socket path to"
+                            " `watcher-insock-path-prefix` and `watcher-outsock-path-prefix` in"
+                            " your local config file."
+                        )
+                    extra_procs = tuple(
+                        functools.partial(
+                            main_job, worker_pidx, insock_path_prefix, outsock_path_prefix
+                        )
+                        for worker_pidx in range(num_workers)
+                    )
+                else:
+                    extra_procs = tuple()
+
                 aiotools.start_server(
                     server_main_logwrapper,
-                    num_workers=local_config["storage-proxy"]["num-proc"],
+                    num_workers=num_workers,
+                    extra_procs=extra_procs,
                     args=(local_config, log_endpoint),
                 )
                 log.info("exit.")
