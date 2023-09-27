@@ -14,15 +14,15 @@ from aiohttp import web
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
-from ..defs import REDIS_LIVE_DB, LockID
-from ..models import UserRole
+from ..defs import LockID
+from ..models import UserRole, error_logs, groups
 from ..models import association_groups_users as agus
-from ..models import error_logs, groups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -261,6 +261,7 @@ async def init(app: web.Application) -> None:
         lambda: DoLogCleanupEvent(),
         20.0,
         initial_delay=17.0,
+        task_name="log_cleanup_task",
     )
     await app_ctx.log_cleanup_timer.join()
 

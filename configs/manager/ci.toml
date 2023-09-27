@@ -29,6 +29,8 @@ importer-image = "lablup/importer:manylinux2010"
 
 event-loop = "asyncio"
 
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 [docker-registry]
 ssl-verify = true

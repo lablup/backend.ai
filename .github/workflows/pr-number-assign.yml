@@ -12,10 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 2
-        token: ${{ secrets.WORKFLOW_PAT }}
 
     - name: Extract Python version from pants.toml
       run: |

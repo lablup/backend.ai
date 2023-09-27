@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
@@ -69,6 +70,12 @@ class RoutingRow(Base):
     )
 
     traffic_ratio = sa.Column("traffic_ratio", sa.Float(), nullable=False)
+    created_at = sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=True,
+    )
 
     endpoint_row = relationship("EndpointRow", back_populates="routings")
     session_row = relationship("SessionRow", back_populates="routing")
@@ -107,6 +114,11 @@ class RoutingRow(Base):
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
         load_endpoint=False,
+        status_filter: list[RouteStatus] = [
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.PROVISIONING,
+        ],
         project: Optional[uuid.UUID] = None,
         domain: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -114,7 +126,12 @@ class RoutingRow(Base):
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
-        query = sa.select(RoutingRow).filter(RoutingRow.endpoint == endpoint_id)
+        query = (
+            sa.select(RoutingRow)
+            .filter(RoutingRow.endpoint == endpoint_id)
+            .filter(RoutingRow.status.in_(status_filter))
+            .order_by(sa.desc(RoutingRow.created_at))
+        )
         if load_endpoint:
             query = query.options(selectinload(RoutingRow.endpoint_row))
         if project:
@@ -186,6 +203,7 @@ class Routing(graphene.ObjectType):
     session = graphene.UUID()
     status = graphene.String()
     traffic_ratio = graphene.Float()
+    created_at = GQLDateTime()
 
     @classmethod
     async def from_row(
@@ -199,6 +217,7 @@ class Routing(graphene.ObjectType):
             session=row.session,
             status=row.status.name,
             traffic_ratio=row.traffic_ratio,
+            created_at=row.created_at,
         )
 
     @classmethod
@@ -238,7 +257,13 @@ class Routing(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> Sequence["Routing"]:
-        query = sa.select(RoutingRow).limit(limit).offset(offset)
+        query = (
+            sa.select(RoutingRow)
+            .limit(limit)
+            .offset(offset)
+            .order_by(sa.desc(RoutingRow.created_at))
+        )
+
         if endpoint_id is not None:
             query = query.where(RoutingRow.endpoint == endpoint_id)
         if project:
@@ -262,16 +287,16 @@ class Routing(graphene.ObjectType):
     async def load_all(
         cls,
         ctx,  # ctx: GraphQueryContext
+        endpoint_id: uuid.UUID,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
     ) -> Sequence["Routing"]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await RoutingRow.list_by_session(
+            rows = await RoutingRow.list(
                 session,
-                endpoint_id=endpoint_id,
+                endpoint_id,
                 project=project,
                 domain=domain_name,
                 user_uuid=user_uuid,

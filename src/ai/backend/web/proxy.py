@@ -153,13 +153,15 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
 async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
+    config = request.app["config"]
     path = request.match_info.get("path", "")
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
-            log.error("WEB_HANDLER: 'pipeline.endpoint' has not been set.")
-        else:
-            log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
+        pipeline_config = config["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"]
+        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
         api_session = await asyncio.shield(get_api_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
@@ -206,11 +208,11 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
             if proxy_path == "pipeline":
                 aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
                 if not (sso_token := request.headers.get("X-BackendAI-SSO")):
-                    jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
+                    jwt_secret = config["pipeline"]["jwt"]["secret"]
                     now = datetime.now().astimezone()
                     claims = {
                         # Registered claims
-                        "exp": now + timedelta(days=1),
+                        "exp": now + timedelta(seconds=config["session"]["max_age"]),
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
@@ -377,12 +379,12 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
 
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
-            log.error("WEBSOCKET_HANDLER: 'pipeline.endpoint' has not been set.")
-        else:
-            endpoint = endpoint.with_scheme("ws")
-            log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
-        api_session = await asyncio.shield(get_api_session(request, endpoint))
+        pipeline_config = request.app["config"]["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"].with_scheme("ws")
+        log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
+        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:

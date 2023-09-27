@@ -36,9 +36,8 @@ from yarl import URL
 
 from .auth import generate_signature
 from .exceptions import BackendAPIError, BackendClientError
-from .session import AsyncSession, BaseSession
+from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
-from .session import api_session
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
@@ -573,6 +572,7 @@ class FetchContextManager:
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
         retry_count = 0
+        raw_resp: Optional[aiohttp.ClientResponse] = None
         while True:
             try:
                 retry_count += 1
@@ -597,7 +597,8 @@ class FetchContextManager:
                     continue
             except aiohttp.ClientResponseError as e:
                 msg = "API endpoint response error.\n\u279c {!r}".format(e)
-                await raw_resp.__aexit__(*sys.exc_info())
+                if raw_resp is not None:
+                    await raw_resp.__aexit__(*sys.exc_info())
                 raise BackendClientError(msg) from e
             finally:
                 self.session.config.load_balance_endpoints()

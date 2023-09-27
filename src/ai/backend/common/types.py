@@ -140,32 +140,28 @@ T4 = TypeVar("T4")
 def check_typed_tuple(
     value: Tuple[Any],
     types: Tuple[Type[T1]],
-) -> Tuple[T1]:
-    ...
+) -> Tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any],
     types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]:
-    ...
+) -> Tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]:
-    ...
+) -> Tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]:
-    ...
+) -> Tuple[T1, T2, T3, T4]: ...
 
 
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
@@ -602,6 +598,9 @@ class ResourceSlot(UserDict):
         assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
+
+    def __neg__(self):
+        return type(self)({k: -v for k, v in self.data.items()})
 
     def __eq__(self, other: object) -> bool:
         if other is self:
@@ -1101,16 +1100,24 @@ class EtcdRedisConfig(TypedDict, total=False):
     sentinel: Optional[Union[str, List[HostPortPair]]]
     service_name: Optional[str]
     password: Optional[str]
+    redis_helper_config: RedisHelperConfig
+
+
+class RedisHelperConfig(TypedDict):
+    socket_timeout: float
+    socket_connect_timeout: float
+    reconnect_poll_timeout: float
 
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | redis.asyncio.sentinel.Sentinel
+    client: Redis
     service_name: Optional[str]
+    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+    redis_helper_config: RedisHelperConfig
 
-    async def close(self) -> None:
-        if isinstance(self.client, Redis):
-            await self.client.close()
+    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):
@@ -1125,3 +1132,15 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class AgentSelectionStrategy(enum.StrEnum):
+    DISPERSED = "dispersed"
+    CONCENTRATED = "concentrated"
+    # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
+    LEGACY = "legacy"
+
+
+class VolumeMountableNodeType(enum.StrEnum):
+    AGENT = enum.auto()
+    STORAGE_PROXY = enum.auto()
