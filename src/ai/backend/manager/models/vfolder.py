@@ -1197,6 +1197,45 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
     @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        ids: list[str],
+        *,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[Sequence[VirtualFolder]]:
+        from .user import UserRow
+
+        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        query = (
+            sa.select(VFolderRow)
+            .select_from(j)
+            .where(VFolderRow.id.in_(ids))
+            .order_by(sa.desc(VFolderRow.created_at))
+        )
+        if user_id is not None:
+            query = query.where(VFolderRow.user == user_id)
+            if domain_name is not None:
+                query = query.where(UserRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(VFolderRow.group == group_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                ids,
+                lambda row: row["user"],
+            )
+
+    @classmethod
     async def batch_load_by_user(
         cls,
         graph_ctx: GraphQueryContext,

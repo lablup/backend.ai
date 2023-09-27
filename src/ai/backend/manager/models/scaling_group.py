@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     # table defs
     "scaling_groups",
+    "ScalingGroupOpts",
     "ScalingGroupRow",
     "sgroups_for_domains",
     "sgroups_for_groups",
