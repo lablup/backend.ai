@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import itertools
+import json
 import logging
 import uuid
 from contextvars import ContextVar
@@ -31,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
+from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -52,6 +54,7 @@ from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
+    RedisConnectionInfo,
     ResourceSlot,
     RoundRobinState,
     SessionId,
@@ -160,6 +163,8 @@ class SchedulerDispatcher(aobject):
     prepare_timer: GlobalTimer
     scale_timer: GlobalTimer
 
+    redis_live: RedisConnectionInfo
+
     def __init__(
         self,
         local_config: LocalConfig,
@@ -176,6 +181,10 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
+        self.redis_live = redis_helper.get_redis_object(
+            self.shared_config.data["redis"],
+            db=REDIS_LIVE_DB,
+        )
 
     async def __ainit__(self) -> None:
         coalescing_opts: CoalescingOptions = {
@@ -227,6 +236,7 @@ class SchedulerDispatcher(aobject):
             tg.create_task(self.scale_timer.leave())
             tg.create_task(self.prepare_timer.leave())
             tg.create_task(self.schedule_timer.leave())
+        await self.redis_live.close()
         log.info("Session scheduler stopped")
 
     async def schedule(
@@ -246,6 +256,25 @@ class SchedulerDispatcher(aobject):
         Session status transition: PENDING -> SCHEDULED
         """
         log.debug("schedule(): triggered")
+        manager_id = self.local_config["manager"]["id"]
+        redis_key = f"manager.{manager_id}.schedule"
+
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
+                redis_key,
+                mapping={
+                    "trigger_event": event.__class__.name,
+                    "execution_time": datetime.now(tzutc()).isoformat(),
+                },
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
+        )
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             registry=self.registry,
@@ -274,6 +303,14 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
+                        await redis_helper.execute(
+                            self.redis_live,
+                            lambda r: r.hset(
+                                redis_key,
+                                "resource_group",
+                                sgroup_name,
+                            ),
+                        )
                     except InstanceNotAvailable as e:
                         # Proceed to the next scaling group and come back later.
                         log.debug(
@@ -283,6 +320,14 @@ class SchedulerDispatcher(aobject):
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
+                await redis_helper.execute(
+                    self.redis_live,
+                    lambda r: r.hset(
+                        redis_key,
+                        "finish_time",
+                        datetime.now(tzutc()).isoformat(),
+                    ),
+                )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
@@ -1144,6 +1189,25 @@ class SchedulerDispatcher(aobject):
 
         Session status transition: SCHEDULED -> PREPARING
         """
+        manager_id = self.local_config["manager"]["id"]
+        redis_key = f"manager.{manager_id}.prepare"
+
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
+                redis_key,
+                mapping={
+                    "trigger_event": event.__class__.name,
+                    "execution_time": datetime.now(tzutc()).isoformat(),
+                },
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
+        )
         known_slot_types = await self.shared_config.get_resource_slots()
         sched_ctx = SchedulingContext(
             self.registry,
@@ -1229,6 +1293,20 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
+                        await redis_helper.execute(
+                            self.redis_live,
+                            lambda r: r.hset(
+                                redis_key, "resource_group", scheduled_session.scaling_group_name
+                            ),
+                        )
+            await redis_helper.execute(
+                self.redis_live,
+                lambda r: r.hset(
+                    redis_key,
+                    "finish_time",
+                    datetime.now(tzutc()).isoformat(),
+                ),
+            )
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
@@ -1248,6 +1326,26 @@ class SchedulerDispatcher(aobject):
     ) -> None:
         log.debug("scale_services(): triggered")
         # Altering inference sessions should only be done by this method
+        manager_id = self.local_config["manager"]["id"]
+        redis_key = f"manager.{manager_id}.scale_services"
+
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
+                redis_key,
+                mapping={
+                    "trigger_event": event.__class__.name,
+                    "execution_time": datetime.now(tzutc()).isoformat(),
+                },
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
+        )
+
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
@@ -1332,6 +1430,14 @@ class SchedulerDispatcher(aobject):
             except SessionNotFound:
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
+        await redis_helper.execute(
+            self.redis_live,
+            lambda r: r.hset(
+                redis_key,
+                "down",
+                json.dumps([str(s.id) for s in target_sessions_to_destroy]),
+            ),
+        )
 
         user_ids = tuple(
             {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
@@ -1427,6 +1533,16 @@ class SchedulerDispatcher(aobject):
                 except Exception:
                     # TODO: Handle
                     log.exception("error while creating session:")
+        await redis_helper.execute(
+            self.redis_live,
+            lambda r: r.hset(
+                redis_key,
+                mapping={
+                    "up": json.dumps([str(e.id) for e in endpoints_to_expand.keys()]),
+                    "finish_time": datetime.now(tzutc()).isoformat(),
+                },
+            ),
+        )
 
         async def _delete():
             async with self.db.begin_session() as db_sess:

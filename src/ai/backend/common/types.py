@@ -24,6 +24,7 @@ from typing import (
     Literal,
     Mapping,
     NewType,
+    NotRequired,
     Optional,
     Sequence,
     Tuple,
@@ -1142,6 +1143,15 @@ class AgentSelectionStrategy(enum.StrEnum):
     CONCENTRATED = "concentrated"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
+
+
+class SchedulerStatus(TypedDict):
+    trigger_event: str
+    execution_time: str
+    finish_time: NotRequired[str]
+    resource_group: NotRequired[str]
+    endpoint_name: NotRequired[str]
+    action: NotRequired[str]
 
 
 class VolumeMountableNodeType(enum.StrEnum):
