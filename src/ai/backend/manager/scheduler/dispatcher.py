@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import itertools
 import logging
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Final,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import aiotools
 import async_timeout
@@ -42,6 +53,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     ResourceSlot,
+    RoundRobinState,
     SessionId,
     SessionTypes,
     aobject,
@@ -108,6 +120,10 @@ _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")
 
 _key_schedule_prep_tasks: Final = "scheduler.preptasks"
+
+
+def get_schedulable_group_id(agents: list[AgentRow]) -> str:
+    return hashlib.md5("#".join(list(map(lambda agent: agent.id, agents))).encode()).hexdigest()
 
 
 def load_scheduler(
@@ -687,27 +703,78 @@ class SchedulerDispatcher(aobject):
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent = sess_ctx.main_kernel.agent_row
-            agent_id: AgentId
+            agent_id: AgentId | None = None
             if agent is not None:
                 agent_id = agent.id
             else:
-                # Let the scheduler check the resource availability and decide the target agent
-                cand_agent = scheduler.assign_agent_for_session(
-                    available_candidate_agents,
-                    sess_ctx,
-                    scheduler.sgroup_opts.agent_selection_strategy,
-                    agent_selection_resource_priority,
-                )
-                if cand_agent is None:
-                    raise InstanceNotAvailable(
-                        extra_msg=(
-                            "Could not find a contiguous resource region in any agent "
-                            "big enough to host the session "
-                            f"(id: {sess_ctx.id}, resource group: {sess_ctx.scaling_group_name})"
-                        ),
+                sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
+
+                if scheduler.sgroup_opts.roundrobin:
+                    rr_state: RoundRobinState | None = (
+                        await sched_ctx.registry.shared_config.get_roundrobin_state(
+                            sgroup_name, requested_architecture
+                        )
                     )
-                assert cand_agent is not None
-                agent_id = cand_agent
+
+                    if rr_state is not None:
+                        schedulable_group_id = get_schedulable_group_id(sorted_agents)
+
+                        if schedulable_group_id == rr_state.schedulable_group_id:
+                            for i in range(len(sorted_agents)):
+                                idx = (rr_state.next_index + i) % len(sorted_agents)
+                                agent = sorted_agents[idx]
+
+                                if (
+                                    agent.available_slots - agent.occupied_slots
+                                    > sess_ctx.requested_slots
+                                ):
+                                    agent_id = agent.id
+                                    rr_state.next_index = (rr_state.next_index + i + 1) % len(
+                                        sorted_agents
+                                    )
+
+                                    await sched_ctx.registry.shared_config.put_roundrobin_state(
+                                        sgroup_name, requested_architecture, rr_state
+                                    )
+                                    break
+                            else:
+                                # fallback to the default behavior instead of raising an error for reducing code complexity
+                                pass
+
+                if agent_id is None:
+                    # Let the scheduler check the resource availability and decide the target agent
+                    cand_agent_id = scheduler.assign_agent_for_session(
+                        compatible_candidate_agents,
+                        sess_ctx,
+                        scheduler.sgroup_opts.agent_selection_strategy,
+                        agent_selection_resource_priority,
+                    )
+                    if cand_agent_id is None:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                "Could not find a contiguous resource region in any agent big"
+                                f" enough to host the session (id: {sess_ctx.id}, resource group:"
+                                f" {sess_ctx.scaling_group_name})"
+                            ),
+                        )
+                    agent_id = cand_agent_id
+
+                    if scheduler.sgroup_opts.roundrobin:
+                        await sched_ctx.registry.shared_config.put_roundrobin_state(
+                            sgroup_name,
+                            requested_architecture,
+                            RoundRobinState(
+                                schedulable_group_id=get_schedulable_group_id(
+                                    sorted_agents,
+                                ),
+                                next_index=[
+                                    (idx + 1) % len(sorted_agents)
+                                    for idx, agent in enumerate(sorted_agents)
+                                    if agent.id == agent_id
+                                ][0],
+                            ),
+                        )
+
             async with self.db.begin_session() as agent_db_sess:
                 query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
                 available_agent_slots = (await agent_db_sess.execute(query)).scalar()
