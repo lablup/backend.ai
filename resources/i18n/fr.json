@@ -60,7 +60,8 @@
       "Tasks": "Tâches",
       "YouMushChangeYourPassword": "Il est recommandé de modifier périodiquement votre mot de passe pour des raisons de sécurité. Étant donné qu'un certain temps s'est écoulé depuis la dernière modification de votre mot de passe, vous devez le modifier pour pouvoir continuer à utiliser le service.",
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
-      "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe"
+      "PleaseConfirmYourPassword": "Veuillez confirmer votre mot de passe",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Vous êtes maintenant hors ligne",
     "YouAreOnline": "Vous êtes maintenant en ligne",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Télécharger l'application Backend.AI Web UI",
     "IPUEnabled": "IPU NPU Activé",
     "ATOMEnabled": "ATOM NPU Activé",
-    "WarboyEnabled": "Warboy NPU activé"
+    "WarboyEnabled": "Warboy NPU activé",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -341,7 +343,12 @@
     "ConnectionNotice": "Avis",
     "Readless": "Lire moins",
     "Readmore": "Lire la suite...",
-    "SessionType": "Type de session"
+    "SessionType": "Type de session",
+    "ExpiresAfter": "Temps restant",
+    "CPU": "UNITÉ CENTRALE",
+    "MEM": "Mémoire",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (mémoire)"
   },
   "button": {
     "Cancel": "Annuler",
@@ -991,14 +998,27 @@
     "UsageHistoryNote": "L'historique d'utilisation présenté ici est basé sur les sessions de calcul terminées. En outre, l'historique d'utilisation d'une semaine peut ne pas être affiché pour les utilisateurs dont le compte n'est pas créé plus d'une semaine."
   },
   "language": {
-    "English": "Anglais",
-    "Korean": "coréen",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Langue",
     "OSDefault": "Système d'exploitation par défaut",
-    "Russian": "Russe",
+    "Russian": "русский",
     "French": "Français",
-    "Mongolian": "Mongol",
-    "Indonesian": "Indonésien"
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Enregistrer de nouvelles images à partir du référentiel",
@@ -1257,7 +1277,28 @@
   "error": {
     "UpdateError": "Erreur de mise à jour",
     "APIEndpointIsEmpty": "Le point de terminaison de l'API est vide. Veuillez spécifier le point de terminaison de l'API Backend.AI pour vous inscrire.",
-    "LoginSucceededManagerNotResponding": "La connexion a réussi mais le gestionnaire ne répond pas."
+    "LoginSucceededManagerNotResponding": "La connexion a réussi mais le gestionnaire ne répond pas.",
+    "NetworkConnectionFailed": "La connexion réseau a échoué. Vérifier l'état du réseau.",
+    "LoginFailed": "La connexion a échoué. Vérifier les informations de connexion.",
+    "AuthenticationFailed": "L'authentification a échoué. Vérifier les informations et le statut du gestionnaire.",
+    "VirtualFolderAlreadyExist": "Un dossier virtuel portant le même nom existe déjà. Supprimez votre propre dossier ou déclinez l'invitation.",
+    "TooManyLoginFailures": "Il y a eu trop d'échecs de connexion en peu de temps. La connexion est bloquée pendant un certain temps.",
+    "MaximumVfolderCreation": "Vous ne pouvez pas créer d'autres dossiers virtuels en raison de la politique de ressources.",
+    "CannotChangeVirtualFolderOption": "Vous ne pouvez pas modifier les options d'un dossier v qui ne m'appartient pas.",
+    "CannotSharePrivateAutomountFolder": "Impossible de partager les dossiers virtuels d'automount conformément à la politique.",
+    "FolderSharingNotAvailableToUser": "Le partage de dossiers n'est pas disponible pour le(s) utilisateur(s) demandé(s).",
+    "ReachedResourceLimit": "Vous avez atteint votre limite de ressources. Vérifiez les ressources et les sessions.",
+    "UserHasNoGroup": "L'utilisateur n'a pas de groupe. Veuillez contacter l'administrateur pour résoudre ce problème.",
+    "InvalidSignupToken": "Jeton d'inscription invalide",
+    "LoginInformationMismatch": "Les informations de connexion ne correspondent pas. Vérifiez vos informations",
+    "ResourcePolicyAlreadyExist": "Une politique de ressources portant le même nom existe déjà.",
+    "ScalingGroupAlreadyExist": "Un groupe de ressources portant le même nom existe déjà.",
+    "UserNameAlreadyExist": "Le nom d'utilisateur existe déjà. Il ne peut pas être dupliqué.",
+    "ResourceLimitExceed": "Limite de ressources dépassée. Vérifiez vos ressources libres.",
+    "ResourcePolicyStillReferenced": "Il existe des paires de clés qui font référence à cette politique de ressources.",
+    "SmallerResourceThenImageRequires": "Votre demande de ressources est inférieure au minimum requis par l'image. Essayez d'autres ressources.",
+    "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
+    "WrongAPIServerAddress": "Mauvaise adresse du serveur API."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",
