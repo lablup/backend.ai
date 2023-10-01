@@ -43,6 +43,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
     KernelLifecycleEventReason,
+    RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -58,12 +59,10 @@ from ai.backend.common.types import (
     ResourceSlot,
     RoundRobinState,
     SessionId,
-    SessionTypes,
     aobject,
 )
 from ai.backend.manager.models.session import _build_session_fetch_query
-from ai.backend.manager.types import DistributedLockFactory, UserScope
-from ai.backend.manager.utils import query_userinfo
+from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
@@ -82,12 +81,9 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    keypair_resource_policies,
-    keypairs,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    users,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
@@ -1325,7 +1321,7 @@ class SchedulerDispatcher(aobject):
         event: DoScaleEvent,
     ) -> None:
         log.debug("scale_services(): triggered")
-        # Altering inference sessions should only be done by this method
+        # Altering inference sessions should only be done by invoking this method
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.scale_services"
 
@@ -1439,100 +1435,25 @@ class SchedulerDispatcher(aobject):
             ),
         )
 
-        user_ids = tuple(
-            {endpoint.created_user for endpoint in endpoints_to_expand.keys()}
-            | {endpoint.session_owner for endpoint in endpoints_to_expand.keys()}
-        )
-
-        async with self.db.begin_readonly() as conn:
-            join = sa.join(
-                users, keypairs, (users.c.uuid == keypairs.c.user) & keypairs.c.is_active.is_(True)
-            )
-            query = (
-                sa.select(
-                    [
-                        users.c.uuid,
-                        users.c.role,
-                        users.c.domain_name,
-                        users.c.sudo_session_enabled,
-                        keypairs.c.access_key,
-                        keypairs.c.resource_policy,
-                    ]
-                )
-                .select_from(join)
-                .where(users.c.uuid.in_(user_ids))
-            )
-            result = await conn.execute(query)
-            user_id_row_mapping = {row.uuid: row for row in result.fetchall()}
-            keypair_resource_policy_names = {
-                row.resource_policy for row in user_id_row_mapping.values()
-            }
-            query = (
-                sa.select([keypair_resource_policies])
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name.in_(keypair_resource_policy_names))
-            )
-            result = await conn.execute(query)
-            keypair_resource_policy_name_policy_mapping = {
-                row.name: row for row in result.fetchall()
-            }
-
-        for endpoint, expand_count in endpoints_to_expand.items():
-            log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
-            async with self.db.begin_readonly() as conn:
-                _, group_id, resource_policy = await query_userinfo(
-                    conn,
-                    user_id_row_mapping[endpoint.created_user].uuid,
-                    user_id_row_mapping[endpoint.created_user].access_key,
-                    user_id_row_mapping[endpoint.created_user].role,
-                    user_id_row_mapping[endpoint.created_user].domain_name,
-                    keypair_resource_policy_name_policy_mapping[
-                        user_id_row_mapping[endpoint.created_user].resource_policy
-                    ],
-                    endpoint.domain,
-                    endpoint.project,
-                    query_on_behalf_of=user_id_row_mapping[endpoint.session_owner]["access_key"],
-                )
-            for _ in range(expand_count):
-                try:
-                    await self.registry.create_session(
-                        f"{endpoint.name}-{uuid.uuid4()}",
-                        endpoint.image_row.name,
-                        endpoint.image_row.architecture,
-                        UserScope(
-                            domain_name=endpoint.domain,
-                            group_id=group_id,
-                            user_uuid=user_id_row_mapping[endpoint.created_user].uuid,
-                            user_role=user_id_row_mapping[endpoint.created_user].role,
-                        ),
-                        user_id_row_mapping[endpoint.session_owner]["access_key"],
-                        resource_policy,
-                        SessionTypes.INFERENCE,
-                        {
-                            "mounts": [endpoint.model],
-                            "mount_map": {endpoint.model: endpoint.model_mount_destiation},
-                            "environ": endpoint.environ,
-                            "scaling_group": endpoint.resource_group,
-                            "resources": endpoint.resource_slots,
-                            "resource_opts": endpoint.resource_opts,
-                            "preopen_ports": None,
-                            "agent_list": None,
-                        },
-                        ClusterMode[endpoint.cluster_mode],
-                        endpoint.cluster_size,
-                        bootstrap_script=endpoint.bootstrap_script,
-                        startup_command=endpoint.startup_command,
-                        tag=endpoint.tag,
-                        callback_url=endpoint.callback_url,
-                        enqueue_only=True,
-                        endpoint_id=endpoint.id,
-                        sudo_session_enabled=user_id_row_mapping[
-                            endpoint.session_owner
-                        ].sudo_session_enabled,
+        created_routes = []
+        async with self.db.begin_session() as db_sess:
+            for endpoint, expand_count in endpoints_to_expand.items():
+                log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
+                for _ in range(expand_count):
+                    route_id = uuid.uuid4()
+                    routing_row = RoutingRow(
+                        route_id,
+                        endpoint.id,
+                        None,
+                        endpoint.session_owner,
+                        endpoint.domain,
+                        endpoint.project,
                     )
-                except Exception:
-                    # TODO: Handle
-                    log.exception("error while creating session:")
+                    db_sess.add(routing_row)
+                    created_routes.append(route_id)
+            await db_sess.commit()
+        for route_id in created_routes:
+            await self.event_producer.produce_event(RouteCreatedEvent(route_id))
         await redis_helper.execute(
             self.redis_live,
             lambda r: r.hset(
