@@ -60,7 +60,8 @@
       "YouMushChangeYourPassword": "보안을 위해 비밀번호를 주기적으로 변경하는 것이 좋습니다. 비밀번호를 변경한 지 일정 시간이 지났으므로, 서비스를 계속 이용하려면 비밀번호를 변경해야 합니다.",
       "NewPasswordCannotBeSame": "기존 비밀번호와 다른 새 비밀번호를 입력해주세요.",
       "Notifications": "알림",
-      "Tasks": "작업"
+      "Tasks": "작업",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "오프라인 상태가 되었습니다",
     "YouAreOnline": "온라인 상태가 되었습니다",
@@ -108,7 +109,8 @@
     "DownloadWebUIApp": "Backend.AI Web UI 앱 다운로드",
     "IPUEnabled": "IPU NPU 사용중",
     "ATOMEnabled": "ATOM NPU 사용중",
-    "WarboyEnabled": "Warboy NPU 사용중"
+    "WarboyEnabled": "Warboy NPU 사용중",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -341,7 +343,12 @@
     "ConnectionNotice": "주의",
     "Readmore": "더 알아보기...",
     "Readless": "내용 접기",
-    "SessionType": "세션 타입"
+    "SessionType": "세션 타입",
+    "ExpiresAfter": "남은 시간",
+    "CPU": "CPU",
+    "MEM": "메모리",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU(메모리)"
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -1076,10 +1083,23 @@
     "Korean": "한국어",
     "Language": "언어",
     "OSDefault": "운영체제 언어",
-    "Russian": "러시아어",
-    "French": "프랑스어",
-    "Mongolian": "몽골어",
-    "Indonesian": "인도네시아어"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "새 계산환경 이미지를 저장소로부터 등록",
@@ -1338,7 +1358,28 @@
   "error": {
     "UpdateError": "업데이트 에러",
     "APIEndpointIsEmpty": "API 엔드포인트가 비어있습니다. 회원 가입하시려면 Backend.AI API 엔드포인트를 입력해주세요.",
-    "LoginSucceededManagerNotResponding": "로그인은 성공하였으나 매니저 서버가 응답하지 않습니다."
+    "LoginSucceededManagerNotResponding": "로그인은 성공하였으나 매니저 서버가 응답하지 않습니다.",
+    "UserHasNoGroup": "사용자가 어떤 그룹에도 속해있지 않습니다. 관리자에게 문의하세요.",
+    "WrongAPIServerAddress": "잘못된 API 서버 주소",
+    "LoginFailed": "로그인 실패. 로그인 정보를 확인하세요.",
+    "VirtualFolderAlreadyExist": "같은 이름의 폴더가 이미 존재합니다. 폴더를 삭제하거나 초대를 거절하세요.",
+    "CannotChangeVirtualFolderOption": "폴더 소유자가 아닌 경우 폴더 옵션을 변경할 수 없습니다.",
+    "MaximumVfolderCreation": "자원 정책에 따라 더 이상의 폴더를 만들 수 없습니다.",
+    "LoginInformationMismatch": "로그인 실패. 로그인 정보를 확인하세요.",
+    "ReachedResourceLimit": "자원 제한에 도달했습니다. 자원 할당량을 확인하세요.",
+    "AuthenticationFailed": "API 인증 실패. 사용자 정보나 Manager 상태를 확인하세요.",
+    "NetworkConnectionFailed": "네트워크 연결 실패. 네트워크 상태를 확인하세요.",
+    "TooManyLoginFailures": "너무 많은 로그인 시도.  시간이 지난 후에 다시 시도해보세요.",
+    "ResourcePolicyAlreadyExist": "같은 이름의 자원 정책이 이미 있습니다.",
+    "ScalingGroupAlreadyExist": "같은 이름의 자원 그룹이 이미 있습니다.",
+    "ResourceLimitExceed": "자원 제한을 초과했습니다. 가용 자원량을 확인하세요.",
+    "SmallerResourceThenImageRequires": "요청한 자원이 이미지가 요구하는 자원보다 적습니다. 자원을 보다 크게 해서 시도해보세요.",
+    "UserNameAlreadyExist": "이미 사용하고 있는 사용자명입니다.",
+    "ResourcePolicyStillReferenced": "이 자원 정책을 사용하고 있는 자격 증명이 있습니다.",
+    "InvalidSignupToken": "잘못된 가입 토큰입니다",
+    "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
+    "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
+    "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",
