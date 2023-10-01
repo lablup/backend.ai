@@ -464,12 +464,12 @@ class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
 class RouteCreationEventArgs:
     route_id: uuid.UUID = attrs.field()
 
-    def serialize(self) -> str:
-        return str(self.route_id)
+    def serialize(self) -> tuple:
+        return (str(self.route_id),)
 
     @classmethod
-    def deserialize(cls, value: str):
-        return cls(uuid.UUID(value))
+    def deserialize(cls, value: tuple):
+        return cls(uuid.UUID(value[0]))
 
 
 class RouteCreatedEvent(RouteCreationEventArgs, AbstractEvent):
