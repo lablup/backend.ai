@@ -3485,7 +3485,7 @@ async def invoke_session_callback(
                 new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
                     if isinstance(event, SessionCancelledEvent):
-                        update_data = {"status": RouteStatus.FAILED_TO_START}
+                        update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
                         if "error" in session.status_data:
                             if session.status_data["error"]["name"] == "MultiAgentError":
                                 errors = session.status_data["error"]["collection"]
