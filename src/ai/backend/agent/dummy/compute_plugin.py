@@ -62,7 +62,7 @@ class DummyComputePlugin(AbstractComputePlugin):
     ) -> None:
         super().__init__(plugin_config, local_config)
         self.dummy_ag_config: Mapping[str, Any] = self.local_config["dummy"]["agent"]
-        self.device_plugin_configs: Mapping[str, Any] = self.dummy_ag_config["device_plugins"]
+        self.device_plugin_configs: Mapping[str, Any] = self.dummy_ag_config["device-plugins"]
         self.key = key
         self._mode = allocation_mode
 
