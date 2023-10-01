@@ -60,7 +60,8 @@
       "Serving": "Obsługa",
       "PasswordChangePlace": "Kliknij ikonę osoby na górnym pasku i przejdź do menu \"Moje konto\".",
       "Notifications": "Powiadomienia",
-      "Tasks": "Zadania"
+      "Tasks": "Zadania",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Jesteś teraz offline",
     "YouAreOnline": "Jesteś teraz online",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU Enabled",
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
-    "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI"
+    "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -341,7 +343,12 @@
     "DescCommitSession": "Za chwilę zatwierdzisz kontener odpowiadający poniższej sesji:",
     "NoSessionToDisplay": "Brak sesji do wyświetlenia",
     "StatusInfo": "Informacje o stanie",
-    "System": "Sesje przesyłania"
+    "System": "Sesje przesyłania",
+    "ExpiresAfter": "Pozostały czas",
+    "CPU": "CPU",
+    "MEM": "Pamięć",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (pamięć)"
   },
   "button": {
     "Cancel": "Anuluj",
@@ -991,14 +998,27 @@
     "IOWriteDesc": "Ilość danych zapisanych z sesji obliczeniowej. (Ilość zapisu danych z urządzeń zamontowanych zewnętrznie, takich jak foldery danych, nie jest uwzględniana)."
   },
   "language": {
-    "English": "język angielski",
-    "Korean": "koreański",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Język",
     "OSDefault": "Domyślny system operacyjny",
-    "Russian": "Rosyjski",
-    "French": "Francuski",
-    "Mongolian": "Mongolski",
-    "Indonesian": "Indonezyjski"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Zarejestruj nowe obrazy z repozytorium",
@@ -1257,7 +1277,28 @@
   "error": {
     "UpdateError": "Błąd aktualizacji",
     "APIEndpointIsEmpty": "Punkt końcowy interfejsu API jest pusty. Aby się zarejestrować, określ punkt końcowy interfejsu API Backend.AI.",
-    "LoginSucceededManagerNotResponding": "Logowanie powiodło się, ale menedżer nie odpowiada."
+    "LoginSucceededManagerNotResponding": "Logowanie powiodło się, ale menedżer nie odpowiada.",
+    "NetworkConnectionFailed": "Połączenie sieciowe nie powiodło się. Sprawdź stan sieci.",
+    "LoginFailed": "Logowanie nie powiodło się. Sprawdź dane logowania.",
+    "AuthenticationFailed": "Uwierzytelnianie nie powiodło się. Sprawdź informacje i status menedżera.",
+    "VirtualFolderAlreadyExist": "Istnieje już folder wirtualny o tej samej nazwie. Usuń własny folder lub odrzuć zaproszenie.",
+    "TooManyLoginFailures": "Wystąpiło zbyt wiele błędów logowania w krótkim czasie. Logowanie jest przez pewien czas zablokowane.",
+    "MaximumVfolderCreation": "Nie można utworzyć więcej folderów wirtualnych ze względu na zasady dotyczące zasobów",
+    "CannotChangeVirtualFolderOption": "Nie można zmienić opcji folderu v, który nie jest moją własnością.",
+    "CannotSharePrivateAutomountFolder": "Nie można udostępniać folderów vfolder automount zgodnie z zasadami.",
+    "FolderSharingNotAvailableToUser": "Udostępnianie folderów nie jest dostępne dla żądanych użytkowników.",
+    "ReachedResourceLimit": "Osiągnięto limit zasobów. Sprawdź zasoby i sesje.",
+    "UserHasNoGroup": "Użytkownik nie ma grupy. Skontaktuj się z administratorem, aby to naprawić.",
+    "InvalidSignupToken": "Nieprawidłowy token rejestracji",
+    "LoginInformationMismatch": "Niezgodność danych logowania. Sprawdź swoje dane",
+    "ResourcePolicyAlreadyExist": "Polityka zasobów o tej samej nazwie już istnieje.",
+    "ScalingGroupAlreadyExist": "Grupa zasobów o tej samej nazwie już istnieje.",
+    "UserNameAlreadyExist": "Nazwa użytkownika już istnieje. Nie można jej zduplikować.",
+    "ResourceLimitExceed": "Przekroczono limit zasobów. Sprawdź wolne zasoby.",
+    "ResourcePolicyStillReferenced": "Istnieją pary kluczy, które odwołują się do tej polityki zasobów.",
+    "SmallerResourceThenImageRequires": "Żądanie zasobów jest mniejsze niż minimum wymagane przez obraz. Spróbuj użyć więcej zasobów.",
+    "APINotSupported": "Interfejs API nie jest obsługiwany. Wymaga najnowszej wersji menedżera Backend.AI.",
+    "WrongAPIServerAddress": "Nieprawidłowy adres serwera API."
   },
   "maxLength": {
     "64chars": "(maksymalnie 64 znaki)",

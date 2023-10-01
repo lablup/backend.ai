@@ -60,7 +60,8 @@
       "Serving": "Melayan",
       "PasswordChangePlace": "Klik ikon orang pada bar atas dan pergi ke menu \"Akaun Saya\".",
       "Notifications": "Pemberitahuan",
-      "Tasks": "Tugasan"
+      "Tasks": "Tugasan",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Anda kini berada di luar talian",
     "YouAreOnline": "Anda kini dalam talian",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU Didayakan",
     "ATOMEnabled": "ATOM NPU Didayakan",
     "WarboyEnabled": "Warboy NPU Didayakan",
-    "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI"
+    "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -341,7 +343,12 @@
     "DescCommitSession": "Anda akan melakukan kontena yang sepadan dengan sesi di bawah:",
     "NoSessionToDisplay": "Tiada sesi untuk dipaparkan",
     "StatusInfo": "Maklumat Status",
-    "System": "Muat Naik Sesi"
+    "System": "Muat Naik Sesi",
+    "ExpiresAfter": "Masa yang tinggal",
+    "CPU": "CPU",
+    "MEM": "Ingatan",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (memori)"
   },
   "button": {
     "Cancel": "Batal",
@@ -991,14 +998,27 @@
     "IOWriteDesc": "Jumlah penulisan data daripada sesi pengiraan. \n(Jumlah penulisan data daripada peranti yang dipasang secara luaran seperti folder data tidak disertakan.)"
   },
   "language": {
-    "English": "Bahasa Inggeris",
-    "Korean": "Orang Korea",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Bahasa",
     "OSDefault": "Lalai OS",
-    "Russian": "bahasa Rusia",
-    "French": "Perancis",
-    "Mongolian": "Mongolia",
-    "Indonesian": "Indonesia"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan gambar baru dari repositori",
@@ -1257,7 +1277,28 @@
   "error": {
     "UpdateError": "Ralat kemas kini",
     "APIEndpointIsEmpty": "Titik Akhir API kosong. Sila nyatakan titik akhir API Backend.AI untuk mendaftar.",
-    "LoginSucceededManagerNotResponding": "Log masuk berjaya tetapi pengurus tidak bertindak balas."
+    "LoginSucceededManagerNotResponding": "Log masuk berjaya tetapi pengurus tidak bertindak balas.",
+    "APINotSupported": "API tidak disokong. \nMemerlukan versi terkini pengurus Backend.AI.",
+    "AuthenticationFailed": "Pengesahan gagal. \nSemak maklumat dan status pengurus.",
+    "CannotChangeVirtualFolderOption": "Anda tidak boleh menukar pilihan vfolder yang bukan milik saya sendiri.",
+    "CannotSharePrivateAutomountFolder": "Tidak boleh berkongsi vfolder automount selaras dengan dasar.",
+    "FolderSharingNotAvailableToUser": "Perkongsian folder tidak tersedia untuk pengguna yang diminta.",
+    "InvalidSignupToken": "Token pendaftaran tidak sah",
+    "LoginFailed": "Daftar masuk gagal. \nSemak maklumat log masuk.",
+    "LoginInformationMismatch": "Maklumat log masuk tidak sepadan. \nSemak maklumat anda",
+    "MaximumVfolderCreation": "Anda tidak boleh membuat lebih banyak vfolder kerana dasar sumber",
+    "NetworkConnectionFailed": "Sambungan rangkaian gagal. \nSemak status rangkaian.",
+    "ReachedResourceLimit": "Mencapai had sumber anda. \nSemak sumber dan sesi.",
+    "ResourceLimitExceed": "Had sumber melebihi. \nSemak sumber percuma anda.",
+    "ResourcePolicyAlreadyExist": "Dasar sumber dengan nama yang sama sudah wujud.",
+    "ResourcePolicyStillReferenced": "Terdapat pasangan kekunci yang merujuk kepada dasar sumber ini.",
+    "ScalingGroupAlreadyExist": "Kumpulan sumber dengan nama yang sama sudah wujud.",
+    "SmallerResourceThenImageRequires": "Permintaan sumber anda lebih kecil daripada minimum yang diperlukan oleh imej. \nCuba lebih banyak sumber.",
+    "TooManyLoginFailures": "Terdapat terlalu banyak kegagalan log masuk dalam masa yang singkat. \nLog masuk disekat untuk seketika.",
+    "UserHasNoGroup": "Pengguna tidak mempunyai kumpulan. \nSila hubungi pentadbir untuk membetulkannya.",
+    "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
+    "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
+    "WrongAPIServerAddress": "Alamat pelayan API salah."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",

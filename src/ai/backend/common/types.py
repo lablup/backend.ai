@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 import ipaddress
 import itertools
@@ -10,6 +11,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
+from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import PurePosixPath
@@ -22,10 +24,12 @@ from typing import (
     Literal,
     Mapping,
     NewType,
+    NotRequired,
     Optional,
     Sequence,
     Tuple,
     Type,
+    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
@@ -1141,6 +1145,41 @@ class AgentSelectionStrategy(enum.StrEnum):
     LEGACY = "legacy"
 
 
+class SchedulerStatus(TypedDict):
+    trigger_event: str
+    execution_time: str
+    finish_time: NotRequired[str]
+    resource_group: NotRequired[str]
+    endpoint_name: NotRequired[str]
+    action: NotRequired[str]
+
+
 class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()
+
+
+@dataclass
+class RoundRobinState(JSONSerializableMixin):
+    schedulable_group_id: str
+    next_index: int
+
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict(
+            {
+                t.Key("schedulable_group_id"): t.String,
+                t.Key("next_index"): t.Int,
+            }
+        )
+
+
+# States of the round-robin scheduler for each resource group and architecture.
+RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]

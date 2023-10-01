@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0 (2023-09-28)
+
+### Features
+* Add option for roundrobin agent selection strategy ([#1405](https://github.com/lablup/backend.ai/issues/1405))
+* Add health check and manual trigger API for the manager scheduler ([#1444](https://github.com/lablup/backend.ai/issues/1444))
+* Implement VAST storage backend. ([#1577](https://github.com/lablup/backend.ai/issues/1577))
+
+### Fixes
+* Apply the jinja `string` filter to a `yarl.URL()`-typed field in webserver.conf to make it serializable ([#1595](https://github.com/lablup/backend.ai/issues/1595))
+
+
 ## 23.09.0b3 (2023-09-22)
 
 ### Features
