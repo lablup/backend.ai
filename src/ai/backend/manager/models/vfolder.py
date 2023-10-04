@@ -816,7 +816,7 @@ async def update_vfolder_status(
     await execute_with_retry(_update)
     if do_log:
         log.debug(
-            "Successfully update status of vFolders {} to {}",
+            "Successfully updated status of VFolder(s) {} to {}",
             [str(x) for x in vfolder_ids],
             update_status.name,
         )

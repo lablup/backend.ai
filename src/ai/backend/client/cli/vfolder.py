@@ -167,8 +167,8 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 @click.argument("name", type=str)
 def delete(name):
     """Delete the given virtual folder.
-    This operation can be irreversible.
-    `recover()` can reverse this operation.
+    This operation can be retracted by
+    calling `recover()`.
 
     \b
     NAME: Name of a virtual folder.

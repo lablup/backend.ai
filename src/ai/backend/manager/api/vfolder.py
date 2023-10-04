@@ -2348,7 +2348,8 @@ async def purge(request: web.Request) -> web.Response:
             allowed_vfolder_types=allowed_vfolder_types,
             extra_vf_conds=(vfolders.c.name == folder_name),
         )
-        # FIXME: For now, multiple entries on purge vfolder will raise an error. Will be fixed in 22.06
+        # FIXME: For now, purging multiple VFolders at once will raise an error.
+        # This behavior should be fixed in 24.03
         if len(entries) > 1:
             log.error(
                 "VFOLDER.PURGE(folder name:{}, hosts:{}",
@@ -2414,7 +2415,7 @@ async def recover(request: web.Request) -> web.Response:
         # FIXME: For now, multiple entries on recover vfolder will raise an error.
         if len(recover_targets) > 1:
             log.error(
-                "VFOLDER.RECOVER(email:{}, folder name:{}, hosts:{}",
+                "VFOLDER.RECOVER(email:{}, folder name:{}, hosts:{})",
                 request["user"]["email"],
                 folder_name,
                 [entry["host"] for entry in recover_targets],
@@ -2433,7 +2434,7 @@ async def recover(request: web.Request) -> web.Response:
             )
             result = await conn.scalar(query)
             if result + len(recover_targets) > resource_policy["max_vfolder_count"]:
-                raise InvalidAPIParameters("You cannot create(or recover) more vfolders.")
+                raise InvalidAPIParameters("You cannot create (or recover) more vfolders.")
 
         # query_accesible_vfolders returns list
         entry = recover_targets[0]
