@@ -60,7 +60,8 @@
       "Serving": "Εξυπηρέτηση",
       "PasswordChangePlace": "Κάντε κλικ στο εικονίδιο προσώπου στην επάνω μπάρα και μεταβείτε στο μενού \"Ο λογαριασμός μου\".",
       "Notifications": "Ειδοποιήσεις",
-      "Tasks": "Εργασίες"
+      "Tasks": "Εργασίες",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "Είστε πλέον εκτός σύνδεσης",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
@@ -108,7 +109,8 @@
     "IPUEnabled": "IPU NPU Ενεργοποιημένη",
     "ATOMEnabled": "ATOM NPU Ενεργοποιημένη",
     "WarboyEnabled": "Ενεργοποιημένη NPU Warboy",
-    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App"
+    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -341,7 +343,12 @@
     "DescCommitSession": "Πρόκειται να δεσμεύσετε το δοχείο που αντιστοιχεί στην παρακάτω συνεδρία:",
     "NoSessionToDisplay": "Δεν υπάρχουν συνεδρίες για εμφάνιση",
     "StatusInfo": "Πληροφορίες κατάστασης",
-    "System": "Upload συνεδριών"
+    "System": "Upload συνεδριών",
+    "ExpiresAfter": "Υπολειπόμενος χρόνος",
+    "CPU": "CPU",
+    "MEM": "Μνήμη",
+    "GPU": "GPU",
+    "GPU(MEM)": "GPU (μνήμη)"
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -991,14 +998,27 @@
     "IOWriteDesc": "Το ποσό της εγγραφής δεδομένων από τη συνεδρία υπολογισμού. (Το ποσό εγγραφής δεδομένων από εξωτερικά τοποθετημένες συσκευές, όπως οι φάκελοι δεδομένων, δεν περιλαμβάνεται)."
   },
   "language": {
-    "English": "Αγγλικά",
-    "Korean": "κορεάτης",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "Γλώσσα",
     "OSDefault": "Προεπιλογή λειτουργικού συστήματος",
-    "Russian": "Ρωσική",
-    "French": "Γαλλικά",
-    "Mongolian": "Μογγολικά",
-    "Indonesian": "Ινδονησιακή"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
@@ -1257,7 +1277,28 @@
   "error": {
     "UpdateError": "Σφάλμα ενημέρωσης",
     "APIEndpointIsEmpty": "Το API Endpoint είναι κενό. Προσδιορίστε το τελικό σημείο του Backend.AI API για εγγραφή.",
-    "LoginSucceededManagerNotResponding": "Η σύνδεση έγινε επιτυχής, αλλά ο διαχειριστής δεν αποκρίνεται."
+    "LoginSucceededManagerNotResponding": "Η σύνδεση έγινε επιτυχής, αλλά ο διαχειριστής δεν αποκρίνεται.",
+    "NetworkConnectionFailed": "Η σύνδεση δικτύου απέτυχε. Ελέγξτε την κατάσταση του δικτύου.",
+    "LoginFailed": "Η σύνδεση απέτυχε. Ελέγξτε τα στοιχεία σύνδεσης.",
+    "AuthenticationFailed": "Ο έλεγχος ταυτότητας απέτυχε. Ελέγξτε τις πληροφορίες και την κατάσταση του διαχειριστή.",
+    "VirtualFolderAlreadyExist": "Ένας εικονικός φάκελος με το ίδιο όνομα υπάρχει ήδη. Διαγράψτε τον δικό σας φάκελο ή απορρίψτε την πρόσκληση.",
+    "TooManyLoginFailures": "Υπήρξαν πάρα πολλές αποτυχίες σύνδεσης σε σύντομο χρονικό διάστημα. Η είσοδος έχει μπλοκαριστεί για λίγο.",
+    "MaximumVfolderCreation": "Δεν μπορείτε να δημιουργήσετε περισσότερους φακέλους v λόγω της πολιτικής πόρων",
+    "CannotChangeVirtualFolderOption": "Δεν μπορείτε να αλλάξετε τις επιλογές ενός φακέλου vfolder που δεν ανήκει στον εαυτό μου.",
+    "CannotSharePrivateAutomountFolder": "Δεν είναι δυνατή η κοινή χρήση φακέλων vfolders με αυτόματη προσάρτηση σύμφωνα με την πολιτική.",
+    "FolderSharingNotAvailableToUser": "Η κοινή χρήση φακέλων δεν είναι διαθέσιμη για τον/τους ζητούμενο/ους χρήστη/ες.",
+    "ReachedResourceLimit": "Έφτασε το όριο των πόρων σας. Ελέγξτε τους πόρους και τις συνεδρίες.",
+    "UserHasNoGroup": "Ο χρήστης δεν έχει ομάδα. Παρακαλούμε επικοινωνήστε με τον διαχειριστή για να το διορθώσετε.",
+    "InvalidSignupToken": "Μη έγκυρο κουπόνι εγγραφής",
+    "LoginInformationMismatch": "Αναντιστοιχία πληροφοριών σύνδεσης. Ελέγξτε τις πληροφορίες σας",
+    "ResourcePolicyAlreadyExist": "Μια πολιτική πόρων με το ίδιο όνομα υπάρχει ήδη.",
+    "ScalingGroupAlreadyExist": "Μια ομάδα πόρων με το ίδιο όνομα υπάρχει ήδη.",
+    "UserNameAlreadyExist": "Το όνομα χρήστη υπάρχει ήδη. Δεν μπορεί να αντιγραφεί.",
+    "ResourceLimitExceed": "Υπέρβαση του ορίου πόρων. Ελέγξτε τους ελεύθερους πόρους σας.",
+    "ResourcePolicyStillReferenced": "Υπάρχουν ζεύγη κλειδιών που παραπέμπουν σε αυτή την πολιτική πόρων.",
+    "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
+    "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
+    "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",
