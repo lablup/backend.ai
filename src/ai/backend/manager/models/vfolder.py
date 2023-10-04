@@ -4,6 +4,7 @@ import enum
 import logging
 import os.path
 import uuid
+from datetime import datetime
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
 
@@ -13,7 +14,9 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -49,7 +52,7 @@ from .base import (
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -67,6 +70,7 @@ __all__: Sequence[str] = (
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
     "VFolderAccessStatus",
+    "DEAD_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
     "VFolderRow",
@@ -75,11 +79,12 @@ __all__: Sequence[str] = (
     "UnsetQuotaScope",
     "query_accessible_vfolders",
     "initiate_vfolder_clone",
-    "initiate_vfolder_removal",
+    "initiate_vfolder_purge",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
+    "update_vfolder_status",
     "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
 )
@@ -135,8 +140,11 @@ class VFolderOperationStatus(str, enum.Enum):
     READY = "ready"
     PERFORMING = "performing"
     CLONING = "cloning"
-    DELETING = "deleting"
     MOUNTED = "mounted"
+    ERROR = "error"
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted
+    DELETE_COMPLETE = "deleted-complete"  # vfolder is deleted
+    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed permanently
 
 
 class VFolderAccessStatus(str, enum.Enum):
@@ -147,7 +155,16 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
+    RECOVERABLE = "recoverable"
     DELETABLE = "deletable"
+    PURGABLE = "purgable"
+
+
+DEAD_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_ONGOING,
+    VFolderOperationStatus.DELETE_COMPLETE,
+    VFolderOperationStatus.PURGE_ONGOING,
+)
 
 
 class VFolderDeletionInfo(NamedTuple):
@@ -211,6 +228,14 @@ vfolders = sa.Table(
         server_default=VFolderOperationStatus.READY.value,
         nullable=False,
     ),
+    # status_history records the most recent status changes for each status
+    # e.g)
+    # {
+    #   "ready": "2022-10-22T10:22:30",
+    #   "delete-pending": "2022-10-22T11:40:30",
+    #   "delete-ongoing": "2022-10-25T10:22:30"
+    # }
+    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -756,6 +781,46 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
+async def update_vfolder_status(
+    engine: ExtendedAsyncSAEngine,
+    vfolder_ids: Sequence[uuid.UUID],
+    update_status: VFolderOperationStatus,
+    do_log: bool = True,
+) -> None:
+    vfolder_info_len = len(vfolder_ids)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return None
+    elif vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
+
+    async def _update() -> None:
+        async with engine.begin_session() as db_session:
+            query = (
+                sa.update(vfolders)
+                .values(
+                    status=update_status,
+                    status_history=sql_json_merge(
+                        vfolders.c.status_history,
+                        (),
+                        {
+                            update_status.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
+                )
+                .where(cond)
+            )
+            await db_session.execute(query)
+
+    await execute_with_retry(_update)
+    if do_log:
+        log.debug(
+            "Successfully updated status of VFolder(s) {} to {}",
+            [str(x) for x in vfolder_ids],
+            update_status.name,
+        )
+
+
 async def ensure_host_permission_allowed(
     db_conn,
     folder_host: str,
@@ -890,7 +955,7 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
-async def initiate_vfolder_removal(
+async def initiate_vfolder_purge(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
@@ -898,21 +963,21 @@ async def initiate_vfolder_removal(
 ) -> int:
     vfolder_info_len = len(requested_vfolders)
     vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
-    cond = vfolders.c.id.in_(vfolder_ids)
+    vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return 0
     elif vfolder_info_len == 1:
-        cond = vfolders.c.id == vfolder_ids[0]
+        vfolders.c.id == vfolder_ids[0]
+    await update_vfolder_status(
+        db_engine, vfolder_ids, VFolderOperationStatus.PURGE_ONGOING, do_log=False
+    )
 
-    async def _update_vfolder_status() -> None:
-        async with db_engine.begin_session() as db_session:
-            query = sa.update(vfolders).values(status=VFolderOperationStatus.DELETING).where(cond)
-            await db_session.execute(query)
-
-    await execute_with_retry(_update_vfolder_status)
+    row_deletion_infos: list[VFolderDeletionInfo] = []
+    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
 
     async def _delete():
-        for folder_id, host_name in requested_vfolders:
+        for vfolder_info in requested_vfolders:
+            folder_id, host_name = vfolder_info
             proxy_name, volume_name = storage_manager.split_host(host_name)
             try:
                 async with storage_manager.request(
@@ -923,20 +988,34 @@ async def initiate_vfolder_removal(
                         "volume": volume_name,
                         "vfid": str(folder_id),
                     },
-                ):
+                ) as (_, resp):
                     pass
-            except aiohttp.ClientResponseError:
-                raise VFolderOperationFailed(extra_msg=str(folder_id))
+            except (VFolderOperationFailed, InvalidAPIParameters) as e:
+                if e.status == 404:
+                    row_deletion_infos.append(vfolder_info)
+                else:
+                    failed_deletion.append((vfolder_info, repr(e)))
+            except Exception as e:
+                failed_deletion.append((vfolder_info, repr(e)))
+            else:
+                row_deletion_infos.append(vfolder_info)
+        if row_deletion_infos:
+            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
 
-        async def _delete_row() -> None:
-            async with db_engine.begin_session() as db_session:
-                await db_session.execute(sa.delete(vfolders).where(cond))
+            async def _delete_row() -> None:
+                async with db_engine.begin_session() as db_session:
+                    await db_session.execute(
+                        sa.delete(vfolders).where(vfolders.c.id.in_(vfolder_ids))
+                    )
 
-        await execute_with_retry(_delete_row)
-        log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+            await execute_with_retry(_delete_row)
+            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
+        if failed_deletion:
+            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
+            raise VFolderOperationFailed(extra_data=extra_data)
 
-    storage_ptask_group.create_task(_delete())
-    log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
+    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
+    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
 
     return vfolder_info_len
 
@@ -1177,6 +1256,45 @@ class VirtualFolder(graphene.ObjectType):
                 async for r in (await conn.stream(query))
                 if (obj := cls.from_row(graph_ctx, r)) is not None
             ]
+
+    @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        ids: list[str],
+        *,
+        domain_name: str | None = None,
+        group_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        filter: str | None = None,
+    ) -> Sequence[Sequence[VirtualFolder]]:
+        from .user import UserRow
+
+        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        query = (
+            sa.select(VFolderRow)
+            .select_from(j)
+            .where(VFolderRow.id.in_(ids))
+            .order_by(sa.desc(VFolderRow.created_at))
+        )
+        if user_id is not None:
+            query = query.where(VFolderRow.user == user_id)
+            if domain_name is not None:
+                query = query.where(UserRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(VFolderRow.group == group_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                ids,
+                lambda row: row["user"],
+            )
 
     @classmethod
     async def batch_load_by_user(

@@ -31,6 +31,8 @@ sandbox-type = "docker"
 scratch-type = "hostdir"
 scratch-root = "./scratches"
 scratch-size = "1G"
+scratch-nfs-address = ""
+scratch-nfs-options = ""
 
 
 [watcher]
