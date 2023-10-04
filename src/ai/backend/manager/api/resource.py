@@ -320,9 +320,9 @@ async def get_project_stats_for_period(
     root_ctx: RootContext,
     start_date: datetime,
     end_date: datetime,
-    group_ids: Optional[Sequence[UUID]] = None,
+    project_ids: Optional[Sequence[UUID]] = None,
 ) -> dict[UUID, ProjectResourceUsage]:
-    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, group_ids)
+    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, project_ids)
     local_tz = root_ctx.shared_config["system"]["timezone"]
     usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
     total_groups, _ = parse_total_resource_group(usage_groups)
