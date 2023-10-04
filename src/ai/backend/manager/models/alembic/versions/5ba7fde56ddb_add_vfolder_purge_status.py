@@ -1,7 +1,7 @@
 """add_vfolder_purge_status
 
 Revision ID: 5ba7fde56ddb
-Revises: a083c6c962e5
+Revises: 85615e005fa3
 Create Date: 2023-09-19 16:29:20.893345
 
 """
@@ -15,7 +15,7 @@ from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
 revision = "5ba7fde56ddb"
-down_revision = "a083c6c962e5"
+down_revision = "85615e005fa3"
 branch_labels = None
 depends_on = None
 
