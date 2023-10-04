@@ -2,7 +2,6 @@ import asyncio
 import logging
 import lzma
 import os
-import re
 import shutil
 import textwrap
 from pathlib import Path
@@ -359,31 +358,27 @@ class KubernetesCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str, root_path: str) -> Tuple[str, Optional[str]]:
-    if distro.startswith("static-"):
-        distro_name = distro.replace("-", "_")  # pkg/mod name use underscores
-    else:
-        if (m := re.search(r"^([a-z]+)\d+\.\d+$", distro)) is None:
-            raise ValueError('Unrecognized "distro[version]" format string.')
-        distro_name = m.group(1)
+async def prepare_krunner_env_impl(
+    distro: str, entrypoint_name: str, root_path: str
+) -> Tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(
         Path(
             pkg_resources.resource_filename(
-                f"ai.backend.krunner.{distro_name}", f"./krunner-version.{distro}.txt"
+                f"ai.backend.krunner.{entrypoint_name}", f"./krunner-version.{distro}.txt"
             )
         )
         .read_text()
         .strip()
     )
-    krunner_folder_name = f"backendai-krunner.v{current_version}.{distro}"
+    krunner_folder_name = f"backendai-krunner.v{current_version}.{arch}.{distro}"
     target_path = Path(root_path) / krunner_folder_name
     extractor_image = "backendai-krunner-extractor:latest"
 
     try:
         for item in await docker.images.list():
-            if item["RepoTags"] is None:
+            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
                 continue
             if item["RepoTags"][0] == extractor_image:
                 break
@@ -404,7 +399,7 @@ async def prepare_krunner_env_impl(distro: str, root_path: str) -> Tuple[str, Op
             target_path.mkdir(exist_ok=False)
             archive_path = Path(
                 pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{distro_name}", f"krunner-env.{distro}.{arch}.tar.xz"
+                    f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
                 )
             ).resolve()
             extractor_path = Path(
@@ -478,6 +473,9 @@ async def copy_runner_files(scratch_path: Path) -> None:
         "*.so",
         "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
         "extract_dotfiles.py",
+        "fantompass.py",
+        "hash_phrase.py",
+        "words.json",
     ]
 
     for target_glob in target_files:
@@ -500,7 +498,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
     tar archives.
     """
 
-    all_distros = []
+    all_distros: list[tuple[str, str]] = []
     entry_prefix = "backendai_krunner_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         log.debug("loading krunner pkg: {}", entrypoint.module)
@@ -516,15 +514,17 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
             .read_text()
             .splitlines()
         )
-        all_distros.extend(provided_versions)
+        all_distros.extend((distro, entrypoint.name) for distro in provided_versions)
 
     scratch_mount = local_config["container"]["scratch-root"]
     await copy_runner_files(Path(scratch_mount))
 
     tasks = []
     async with TaskGroup() as tg:
-        for distro in all_distros:
-            tasks.append(tg.create_task(prepare_krunner_env_impl(distro, scratch_mount)))
+        for distro, entrypoint_name in all_distros:
+            tasks.append(
+                tg.create_task(prepare_krunner_env_impl(distro, entrypoint_name, scratch_mount))
+            )
     distro_volumes = [t.result() for t in tasks if not t.cancelled()]
     result = {}
     for distro_name_and_version, volume_name in distro_volumes:

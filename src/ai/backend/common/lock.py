@@ -11,7 +11,7 @@ from typing import Any, Optional
 from etcetra.client import EtcdCommunicator, EtcdConnectionManager
 from redis.asyncio import Redis
 from redis.asyncio.lock import Lock as AsyncRedisLock
-from redis.asyncio.sentinel import SentinelConnectionPool
+from redis.exceptions import LockError, LockNotOwnedError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -23,7 +23,6 @@ from tenacity import (
 )
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.redis_helper import _default_conn_opts
 from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
@@ -198,6 +197,7 @@ class RedisLock(AbstractDistributedLock):
     _lock: Optional[AsyncRedisLock]
 
     default_timeout = 9600
+    default_lock_acquire_pause = 1.0
 
     def __init__(
         self,
@@ -206,27 +206,15 @@ class RedisLock(AbstractDistributedLock):
         *,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
-        socket_connect_timeout: float = 0.3,
         debug: bool = False,
+        lock_acquire_pause: Optional[float] = None,
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
-        if isinstance(redis.client, Redis):
-            self._redis = redis.client
-        else:
-            assert redis.service_name is not None
-            _conn_opts = {
-                **_default_conn_opts,
-                "socket_connect_timeout": socket_connect_timeout,
-            }
-            self._redis = redis.client.master_for(
-                redis.service_name,
-                redis_class=Redis,
-                connection_pool_class=SentinelConnectionPool,
-                **_conn_opts,
-            )
+        self._redis = redis.client
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._lock_acquire_pause = lock_acquire_pause or self.default_lock_acquire_pause
 
     async def __aenter__(self) -> None:
         self._lock = AsyncRedisLock(
@@ -235,15 +223,26 @@ class RedisLock(AbstractDistributedLock):
             blocking_timeout=self._timeout,
             timeout=self._lifetime,
             thread_local=False,
+            sleep=self._lock_acquire_pause,
         )
-        await self._lock.acquire()
+        try:
+            await self._lock.__aenter__()
+        except LockError as e:
+            raise asyncio.TimeoutError(str(e))
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._lock is not None
-        await self._lock.release()
+        try:
+            val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
+        except LockNotOwnedError:
+            log.exception("Lock no longer owned. Skip.")
+            return True
+        except LockError:
+            log.exception("Already unlocked. Skip.")
+            return True
         if self._debug:
             log.debug("RedisLock.__aexit__(): lock released")
 
-        return None
+        return val

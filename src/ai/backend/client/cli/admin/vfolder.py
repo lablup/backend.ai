@@ -51,7 +51,7 @@ def _list_cmd(docs: str = None):
         \b
         COLUMNS
             host, name, created_at, creator,
-            ownership_type (UESR, GROUP),
+            ownership_type (USER, GROUP),
             status (READY, PERFORMING, CLONING, DELETING, MOUNTED),
             permission (READ_ONLY, READ_WRITE, RW_DELETE, OWNER_PERM)
 

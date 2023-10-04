@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Mapping,
+    Sequence,
+    Set,
+    cast,
+    overload,
+)
 
 import attr
 import graphene
@@ -16,7 +26,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import JSONSerializableMixin, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixin, SessionTypes
 
 from .base import (
     Base,
@@ -37,6 +47,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     # table defs
     "scaling_groups",
+    "ScalingGroupOpts",
     "ScalingGroupRow",
     "sgroups_for_domains",
     "sgroups_for_groups",
@@ -67,12 +78,16 @@ class ScalingGroupOpts(JSONSerializableMixin):
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
+    agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
+    roundrobin: bool = False
 
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
+            "agent_selection_strategy": self.agent_selection_strategy,
+            "roundrobin": self.roundrobin,
         }
 
     @classmethod
@@ -89,6 +104,10 @@ class ScalingGroupOpts(JSONSerializableMixin):
                 t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
                 # Each scheduler impl refers an additional "config" key.
                 t.Key("config", default={}): t.Mapping(t.String, t.Any),
+                t.Key(
+                    "agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED
+                ): tx.Enum(AgentSelectionStrategy),
+                t.Key("roundrobin", default=False): t.Bool(),
             }
         ).allow_extra("*")
 
@@ -209,8 +228,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -219,8 +237,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[uuid.UUID],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -229,8 +246,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: str,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -239,8 +255,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[str],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 async def query_allowed_sgroups(
@@ -294,6 +309,7 @@ class ScalingGroup(graphene.ObjectType):
     is_public = graphene.Boolean()
     created_at = GQLDateTime()
     wsproxy_addr = graphene.String()
+    wsproxy_api_token = graphene.String()
     driver = graphene.String()
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
@@ -315,6 +331,7 @@ class ScalingGroup(graphene.ObjectType):
             is_public=row["is_public"],
             created_at=row["created_at"],
             wsproxy_addr=row["wsproxy_addr"],
+            wsproxy_api_token=row["wsproxy_api_token"],
             driver=row["driver"],
             driver_opts=row["driver_opts"],
             scheduler=row["scheduler"],
@@ -469,6 +486,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False, default=True)
     is_public = graphene.Boolean(required=False, default=True)
     wsproxy_addr = graphene.String(required=False)
+    wsproxy_api_token = graphene.String(required=False)
     driver = graphene.String(required=True)
     driver_opts = graphene.JSONString(required=False, default={})
     scheduler = graphene.String(required=True)
@@ -481,6 +499,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False)
     is_public = graphene.Boolean(required=False)
     wsproxy_addr = graphene.String(required=False)
+    wsproxy_api_token = graphene.String(required=False)
     driver = graphene.String(required=False)
     driver_opts = graphene.JSONString(required=False)
     scheduler = graphene.String(required=False)
@@ -513,6 +532,7 @@ class CreateScalingGroup(graphene.Mutation):
             "is_active": bool(props.is_active),
             "is_public": bool(props.is_public),
             "wsproxy_addr": props.wsproxy_addr,
+            "wsproxy_api_token": props.wsproxy_api_token,
             "driver": props.driver,
             "driver_opts": props.driver_opts,
             "scheduler": props.scheduler,
@@ -552,6 +572,7 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(props, data, "is_public")
         set_if_set(props, data, "driver")
         set_if_set(props, data, "wsproxy_addr")
+        set_if_set(props, data, "wsproxy_api_token")
         set_if_set(props, data, "driver_opts")
         set_if_set(props, data, "scheduler")
         set_if_set(

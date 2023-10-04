@@ -10,7 +10,7 @@ import shutil
 import time
 from collections import deque
 from pathlib import Path, PurePosixPath
-from typing import AsyncIterator, FrozenSet, Optional, Sequence, Union, final
+from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final
 
 import aiofiles.os
 import janus
@@ -81,6 +81,7 @@ class BaseQuotaModel(AbstractQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -138,6 +139,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
         self,
         quota_scope_id: QuotaScopeID,
         options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         loop = asyncio.get_running_loop()
@@ -357,6 +359,8 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 
 class BaseVolume(AbstractVolume):
+    name = "vfs"
+
     async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)
 

@@ -39,6 +39,7 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -74,7 +75,7 @@ from .base import (
 from .group import groups
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
-from .minilang.queryfilter import FieldSpecType, QueryFilterParser
+from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -379,7 +380,7 @@ kernels = sa.Table(
     KernelIDColumn(),
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
-    # Otherwise, it refers the kernel ID of the main contaienr of the belonged multi-container session.
+    # Otherwise, it refers the kernel ID of the main container of the belonged multi-container session.
     sa.Column(
         "session_id",
         SessionIDColumnType,
@@ -429,7 +430,7 @@ kernels = sa.Table(
     # Resource occupation
     sa.Column("container_id", sa.String(length=64)),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("requested_slots", ResourceSlotColumn(), nullable=True),
+    sa.Column("requested_slots", ResourceSlotColumn(), nullable=False, default=ResourceSlot()),
     sa.Column("occupied_shares", pgsql.JSONB(), nullable=False, default={}),  # legacy
     sa.Column("environ", sa.ARRAY(sa.String), nullable=True),
     sa.Column("mounts", sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03
@@ -468,7 +469,6 @@ kernels = sa.Table(
         default=KernelRole.COMPUTE,
         server_default=KernelRole.COMPUTE.name,
         nullable=False,
-        index=True,
     ),
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
@@ -812,6 +812,7 @@ class ComputeContainer(graphene.ObjectType):
     occupied_slots = graphene.JSONString()
     live_stat = graphene.JSONString()
     last_stat = graphene.JSONString()
+    preopen_ports = graphene.List(lambda: graphene.Int, required=False)
 
     @classmethod
     def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
@@ -854,6 +855,7 @@ class ComputeContainer(graphene.ObjectType):
             "agent_addr": row["agent_addr"] if not hide_agents else None,
             "container_id": row["container_id"] if not hide_agents else None,
             "resource_opts": row["resource_opts"],
+            "preopen_ports": row["preopen_ports"],
             # statistics
             # last_stat is resolved by Graphene (resolve_last_stat method)
         }
@@ -895,7 +897,7 @@ class ComputeContainer(graphene.ObjectType):
         "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
-        "status": ("status", lambda s: KernelStatus[s]),
+        "status": ("status", enum_field_getter(KernelStatus)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),

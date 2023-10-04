@@ -17,6 +17,7 @@ connectionMode = "SESSION"
 {% toml_field "debug" config["service"]["webui_debug"] %}
 {% toml_field "maskUserInfo" config["service"]["mask_user_info"] %}
 {% toml_strlist_field "singleSignOnVendors" config["service"]["single_sign_on_vendors"] %}
+{% toml_field "ssoRealmName" config["service"]["sso_realm_name"] %}
 {% toml_field "enableContainerCommit" config["service"]["enable_container_commit"] %}
 {% toml_field "hideAgents" config["service"]["hide_agents"] %}
 {% toml_field "appDownloadUrl" config["service"]["app_download_url"] %}
@@ -24,6 +25,7 @@ connectionMode = "SESSION"
 {% toml_field "force2FA" config["service"]["force_2FA"] %}
 {% toml_field "systemSSHImage" config["service"]["system_SSH_image"] %}
 {% toml_field "directoryBasedUsage" config["service"]["directory_based_usage"] %}
+{% toml_field "maxCountForPreopenPorts" config["session"]["max_count_for_preopen_ports"] %}
 
 [resources]
 {% toml_field "openPortToPublic" config["resources"]["open_port_to_public"] %}
@@ -54,3 +56,5 @@ connectionMode = "SESSION"
 {% toml_field "validSince" config["license"]["valid_since"] %}
 {% toml_field "validUntil" config["license"]["valid_until"] %}
 
+[pipeline]
+{% toml_field "endpoint" config["pipeline"]["endpoint"]|string %}

@@ -34,6 +34,7 @@ from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -50,10 +51,15 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    RedisConnectionInfo,
+    SessionTypes,
+)
 from ai.backend.common.utils import nmget
 
-from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
+from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -215,6 +221,7 @@ class IdleCheckerHost:
             self._event_producer,
             lambda: DoIdleCheckEvent(),
             self.check_interval,
+            task_name="idle_checker",
         )
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,
