@@ -47,6 +47,7 @@ from trafaret.lib import _empty
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
+from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -647,8 +648,6 @@ if jwt_available:
 
 
 class URL(t.Trafaret):
-    rx_scheme = re.compile(r"^[-a-z0-9]+://")
-
     def __init__(
         self,
         *,
@@ -657,19 +656,16 @@ class URL(t.Trafaret):
         self.scheme_required = scheme_required
 
     def check_and_return(self, value: Any) -> yarl.URL:
-        if not isinstance(value, (str, bytes)):
-            self._failure("A URL must be a unicode string or a byte sequence", value=value)
         if isinstance(value, bytes):
             value = value.decode("utf-8")
-        if self.scheme_required:
-            if not self.rx_scheme.match(value):
-                self._failure(
-                    "The given value does not have the scheme (protocol) part", value=value
-                )
         try:
-            return yarl.URL(value)
-        except ValueError as e:
-            self._failure(f"cannot convert the given value to URL (error: {e!r})", value=value)
+            parsed_url = yarl.URL(value)
+            if self.scheme_required:
+                parsed_url.origin()
+        except (ValueError, TypeError) as e:
+            self._failure(repr(e), value=value)
+        else:
+            return parsed_url
 
 
 class ToSet(t.Trafaret):
@@ -696,3 +692,25 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
+
+
+class RoundRobinStatesJSONString(t.Trafaret):
+    def check_and_return(self, value: Any) -> RoundRobinStates:
+        try:
+            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
+        except (KeyError, ValueError, json.decoder.JSONDecodeError):
+            self._failure(
+                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
+                " be a valid JSON string",
+                value=value,
+            )
+
+        rr_states: RoundRobinStates = {}
+        for resource_group, arch_rr_states_dict in rr_states_dict.items():
+            rr_states[resource_group] = {}
+            for arch, rr_state_dict in arch_rr_states_dict.items():
+                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
+                    self._failure("Invalid roundrobin states")
+                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
+
+        return rr_states

@@ -15,9 +15,8 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, arch_name_aliases
+from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageRow, ImageType
@@ -65,7 +64,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         ssl_ctx = None  # default
-        if not self.registry_info["ssl-verify"]:
+        if not self.registry_info["ssl_verify"]:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
         async with aiohttp.ClientSession(connector=connector) as sess:

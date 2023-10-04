@@ -87,10 +87,11 @@ from ..utils import (
 )
 from .kernel import DockerKernel
 from .metadata.server import MetadataServer
-from .resources import detect_resources
+from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
+    from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -153,7 +154,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_id: AgentId,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
-        computers: MutableMapping[str, ComputerContext],
+        computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -758,6 +759,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
                     "IPC_LOCK",  # for hugepages and RDMA
+                    "SYS_NICE",  # for NFS based GPUDirect Storage
                 ],
                 "Ulimits": [
                     {"Name": "nofile", "Soft": 1048576, "Hard": 1048576},
@@ -859,7 +861,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 assert container is not None
                 cid = container._id
                 resource_spec.container_id = cid
-                # Write resource.txt again to update the contaienr id.
+                # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
                     await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
@@ -962,6 +964,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
+        agent_public_key: Optional[PublicKey],
     ) -> None:
         super().__init__(
             etcd,
@@ -969,6 +972,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             stats_monitor=stats_monitor,
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
+            agent_public_key=agent_public_key,
         )
 
     async def __ainit__(self) -> None:
@@ -1085,10 +1089,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"system.slice/docker-{container_id}.scope"
         return mount_point / cgroup
 
-    async def detect_resources(
-        self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
-        return await detect_resources(self.etcd, self.local_config)
+    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await load_resources(self.etcd, self.local_config)
+
+    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await scan_available_resources(
+            self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
+        )
 
     async def enumerate_containers(
         self,
@@ -1209,6 +1216,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             reply = [
                                 struct.pack("i", 0),
                                 struct.pack("i", host_pid),
+                            ]
+                        elif msg[0] == b"is-jail-enabled":
+                            reply = [
+                                struct.pack("i", 0),
+                                struct.pack(
+                                    "i",
+                                    (
+                                        1
+                                        if self.local_config["container"]["sandbox-type"] == "jail"
+                                        else 0
+                                    ),
+                                ),
                             ]
                         else:
                             reply = [struct.pack("i", -2), b"Invalid action"]
@@ -1338,13 +1357,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if e.status == 409 and "is not running" in e.message:
                 # already dead
                 log.warning("destroy_kernel(k:{0}) already dead", kernel_id)
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             elif e.status == 404:
                 # missing
                 log.warning(
                     "destroy_kernel(k:{0}) kernel missing, forgetting this kernel", kernel_id
                 )
-                await self.rescan_resource_usage()
+                await self.reconstruct_resource_usage()
             else:
                 log.exception("destroy_kernel(k:{0}) kill error", kernel_id)
                 await self.error_monitor.capture_exception()
@@ -1522,10 +1541,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             if evdata is None:
                                 # Break out to the outermost loop when the connection is closed
                                 log.info(
-                                    (
-                                        "monitor_docker_events(): "
-                                        "restarting aiodocker event subscriber"
-                                    ),
+                                    "monitor_docker_events(): "
+                                    "restarting aiodocker event subscriber",
                                 )
                                 break
                             if evdata["Type"] != "container":

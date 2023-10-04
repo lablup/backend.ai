@@ -335,28 +335,23 @@ async def watcher_server(loop, pidx, args):
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(exists=True, dir_okay=False),
     default=None,
     help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(cli_ctx, config_path, log_level, debug=False):
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
+def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> None:
     watcher_config_iv = (
         t.Dict(
             {
@@ -394,8 +389,11 @@ def main(cli_ctx, config_path, log_level, debug=False):
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
-    if log_level == LogSeverity.DEBUG:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
+    if debug:
+        log_level = "DEBUG"
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     try:
         cfg = config.check(raw_cfg, watcher_config_iv)
@@ -433,7 +431,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
             stop_signals={signal.SIGINT, signal.SIGTERM, signal.SIGALRM},
         )
         log.info("exit.")
-    return 0
 
 
 if __name__ == "__main__":

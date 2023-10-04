@@ -16,248 +16,217 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 23.03.4 (2023-05-29)
+## 23.09.0 (2023-09-28)
 
 ### Features
-* Enable hard-sync manager DB and agent's kernel_registry. ([#1292](https://github.com/lablup/backend.ai/issues/1292))
-* Add a new route to the `WebServer` to support websocket proxy for the pipeline service. ([#1294](https://github.com/lablup/backend.ai/issues/1294))
+* Add option for roundrobin agent selection strategy ([#1405](https://github.com/lablup/backend.ai/issues/1405))
+* Add health check and manual trigger API for the manager scheduler ([#1444](https://github.com/lablup/backend.ai/issues/1444))
+* Implement VAST storage backend. ([#1577](https://github.com/lablup/backend.ai/issues/1577))
 
 ### Fixes
-* Fix MemoryPlugin memory wrong calculation bug ([#1291](https://github.com/lablup/backend.ai/issues/1291))
-* Use `session_id` to update status of destroyed session rather `kernel.session_id`. ([#1304](https://github.com/lablup/backend.ai/issues/1304))
+* Apply the jinja `string` filter to a `yarl.URL()`-typed field in webserver.conf to make it serializable ([#1595](https://github.com/lablup/backend.ai/issues/1595))
 
 
-## 23.03.3 (2023-05-26)
+## 23.09.0b3 (2023-09-22)
 
 ### Features
-* Add support for DellEMC storage backend. ([#682](https://github.com/lablup/backend.ai/issues/682))
-* Set abusing report path in db for Scalability. ([#858](https://github.com/lablup/backend.ai/issues/858))
-* Enable vfolder upload function to allow you to upload folders by making parent directory of a target path. ([#1233](https://github.com/lablup/backend.ai/issues/1233))
-* Add recurvice option to vfolder upload function. ([#1235](https://github.com/lablup/backend.ai/issues/1235))
-* Include `scaling_group_name` when fail to assign session to agent. ([#1259](https://github.com/lablup/backend.ai/issues/1259))
-* Add `agent_id` label to containers as `ai.backend.owner`. ([#1266](https://github.com/lablup/backend.ai/issues/1266))
-* Add a manager-side status check API to the storage proxy for internal monitoring ([#1268](https://github.com/lablup/backend.ai/issues/1268))
-* Resolve `resource_opts` of session from sibling kernels. ([#1282](https://github.com/lablup/backend.ai/issues/1282))
-* Implement feature to force password updates periodically based on manager settings. ([#1284](https://github.com/lablup/backend.ai/issues/1284))
-* Add a detailed request handler statistics to the web server ([#1285](https://github.com/lablup/backend.ai/issues/1285))
-* Intoduce separate concurrency limit for SFTP upload sessions ([#1299](https://github.com/lablup/backend.ai/issues/1299))
+* Add a GraphQL query to get the information of a virtual folder by ID. ([#432](https://github.com/lablup/backend.ai/issues/432))
+* Implement limitation of the number of containers per agent. ([#1338](https://github.com/lablup/backend.ai/issues/1338))
+* Introduce the k8s agent backend mode to `install-dev.sh` with `--agent-backend` option ([#1526](https://github.com/lablup/backend.ai/issues/1526))
+* Improve the resource metadata API (`/config/resource-slots/details`) to include only explicitly reported resource slots and be able to filter by the agent availability in a resource group ([#1589](https://github.com/lablup/backend.ai/issues/1589))
 
 ### Fixes
-* Rewrite the alembic history to resolve errors in migrating from 22.09. ([#1175](https://github.com/lablup/backend.ai/issues/1175))
-* Restore session callback function and remove a plugin for it ([#1212](https://github.com/lablup/backend.ai/issues/1212))
-* Update the priority of session allocation for the pipeline service. ([#1275](https://github.com/lablup/backend.ai/issues/1275))
-* Fix a potential hang-up and leak issue due to missing async-context managers around Redis pipelines ([#1281](https://github.com/lablup/backend.ai/issues/1281))
-* Handle error of Session `status_changed` if any status is not registered in `status_history`. ([#1288](https://github.com/lablup/backend.ai/issues/1288))
-* Fix doubling of agent's occupied resources when the transaction in `recalculate_usage()` is retried due to database contention ([#1295](https://github.com/lablup/backend.ai/issues/1295))
-* Remove vscode app from intrinsic service which blocks using image's own vscode service definition. ([#1298](https://github.com/lablup/backend.ai/issues/1298))
+* Enable `ResourceSlotColumn` to return `None` since we need to distinguish between empty `ResourceSlot` value and `None`.
+  Alter `kernels.requested_slots` column into not nullable since the value of the column should not be null. ([#1469](https://github.com/lablup/backend.ai/issues/1469))
+* Update outdated nfs mount for kubernetes agent backend ([#1527](https://github.com/lablup/backend.ai/issues/1527))
+* Collect orphan routings (route which its belonging session is already terminated) ([#1590](https://github.com/lablup/backend.ai/issues/1590))
+* Handle external error of storage proxy to return error response with detail message rather than just leaving it. ([#1591](https://github.com/lablup/backend.ai/issues/1591))
+* Add `pipeline.endpoint` default value to `configs/webserver/halfstack.conf` to be able to run immediately after install ([#1592](https://github.com/lablup/backend.ai/issues/1592))
+* Make `RedisHelperConfig` optional and give default values when it is not specified. ([#1593](https://github.com/lablup/backend.ai/issues/1593))
 
 
-## 23.03.2 (2023-05-05)
+## 23.09.0b2 (2023-09-20)
 
 ### Fixes
-* Downgrade yarl to 1.8.2 to fix image scanning feature not working ([#1261](https://github.com/lablup/backend.ai/issues/1261))
+* Fix webserver not working ([#1588](https://github.com/lablup/backend.ai/issues/1588))
 
 
-## 23.03.1 (2023-05-04)
+## 23.09.0b1 (2023-09-20)
 
 ### Features
-* Add --recursive option to cancel all the dependent sessions to session terminate API ([#893](https://github.com/lablup/backend.ai/issues/893))
-* The new `mock-accelerator` plugin supsedes the `cuda-mock` plugin.  It may be set to have arbitrary accelerator resource slots.  Existing developers who use the cuda-mock plugin should update their mockup device list configuration (`cuda-mock.toml`) to follow the new format (`mock-accelerator.toml`). ([#1158](https://github.com/lablup/backend.ai/issues/1158))
-* Utilization checker returns `thresholds_check_operator`. ([#1202](https://github.com/lablup/backend.ai/issues/1202))
-* Fix SCP/SFTP not working ([#1225](https://github.com/lablup/backend.ai/issues/1225))
-* Add support for idle checking ATOM accelerators ([#1234](https://github.com/lablup/backend.ai/issues/1234))
-* Add `is_public` field to scaling_group table. ([#1236](https://github.com/lablup/backend.ai/issues/1236))
-* Add agent `public-host` config option and impl manager API to fetch direct access info of `SYSTEM` kernel. ([#1238](https://github.com/lablup/backend.ai/issues/1238))
-* Make image scanner handle OCI image metadata formats ([#1241](https://github.com/lablup/backend.ai/issues/1241))
-* Do not count stakes of `SYSTEM` role kernels when calculating resource occupancy ([#1243](https://github.com/lablup/backend.ai/issues/1243))
-* Update `/folder/_/list-hosts` API to expose client scaling groups designated only for SSH connection apps ([#1246](https://github.com/lablup/backend.ai/issues/1246))
-* Add `system_SSH_image` config to webserver so that system-role ssh image used to support fast scp and sftp in file browser dialog can be specified. ([#1250](https://github.com/lablup/backend.ai/issues/1250))
-* Fix destroying session on behalf of other user by providing owner_access_key not working ([#1255](https://github.com/lablup/backend.ai/issues/1255))
-
-### Improvements
-* Improve `status_data` generation when the debug mode is enabled ([#1203](https://github.com/lablup/backend.ai/issues/1203))
+* Implement optional encryption of manager-to-agent RPC channels via CURVE asymmetric keypairs using updated Callosum ([#887](https://github.com/lablup/backend.ai/issues/887))
+* Feature to enable/disable passwordless sudo for a user (work account) inside a compute session ([#1530](https://github.com/lablup/backend.ai/issues/1530))
+* Use `session.max_age` from webserver.conf to set the expiration for the pipeline authentication token ([#1556](https://github.com/lablup/backend.ai/issues/1556))
+* Add new config directive `agent.advertised-rpc-addr` under agent.toml so that agent can be operated under NAT situation ([#1575](https://github.com/lablup/backend.ai/issues/1575))
+* Add pipeline option to the `config.toml.j2` so that webui can access it. ([#1576](https://github.com/lablup/backend.ai/issues/1576))
 
 ### Fixes
-* Calculate idle checker's remaining time to expire correctly. ([#1205](https://github.com/lablup/backend.ai/issues/1205))
-* Fix relative path computation in the NetApp storage backend and disable cross-volume vfolder cloning until we have explicit export/import abstractions for the storage backends ([#1208](https://github.com/lablup/backend.ai/issues/1208))
-* Optimize monthly stat API by reducing the number of iteration and fetch to Redis. ([#1214](https://github.com/lablup/backend.ai/issues/1214))
-* Remove `DoSyncKernelStatsEvent` events since it is deprecated and adjust the interval of agent heart-beat event through configuration. ([#1223](https://github.com/lablup/backend.ai/issues/1223))
-* Consume kernel lifecycle events and remove `manager.registry.kernel_creation_tracker`. ([#1224](https://github.com/lablup/backend.ai/issues/1224))
-* Disable collecting per-container statistics on macOS backend until #1230 is resolved ([#1231](https://github.com/lablup/backend.ai/issues/1231))
-* fix minor typo error in mock-accelerator config ([#1240](https://github.com/lablup/backend.ai/issues/1240))
-* Fix logical errors in the fallback process for cpuset detection in agents when the docker API is not available ([#1248](https://github.com/lablup/backend.ai/issues/1248))
-* Upgrade aiotools to 1.6.1 for potential memory leak fix when there are unhandled exceptions inside persistent task groups ([#1256](https://github.com/lablup/backend.ai/issues/1256))
-
-### Miscellaneous
-* Bump base Python version from 3.11.2 to 3.11.3 to resolve potential bugs. ([#1227](https://github.com/lablup/backend.ai/issues/1227))
-* Replace `./pants` with the scie-pants project so that developers could use a much faster version of `pants` binary bootstrapper that auto-installs the required Python interpreter using a static build ([#1237](https://github.com/lablup/backend.ai/issues/1237))
-
-
-## 23.03.0 (2023-03-30)
-
-### Features
-* Dispatch session related events to an external service when manager plugin with `PUBLISH_EVENT` implement exists ([#1094](https://github.com/lablup/backend.ai/issues/1094))
-* Report idle checker their idle remaining time and utilization to `Redis` and let Gql fetch the report. ([#1160](https://github.com/lablup/backend.ai/issues/1160))
-* Provide status information about usage, capacity of storage volume to `list-hosts` API ([#1170](https://github.com/lablup/backend.ai/issues/1170))
-* Query agent list with multiple statuses. For example, CLI query like this is now possible: `backend.ai admin agent list -s "TERMINATED,LOST"`. ([#1174](https://github.com/lablup/backend.ai/issues/1174))
-* Return `status_info` in session usage statistics API. ([#1176](https://github.com/lablup/backend.ai/issues/1176))
-* Add a `allow_preferred_port` config on webserver to hide/show Try preferred port. ([#1178](https://github.com/lablup/backend.ai/issues/1178))
-* Gather per-container network statistics. ([#1179](https://github.com/lablup/backend.ai/issues/1179))
-* Support to change the owner of (user) vfolder to only among users with an access to the vfolder's storage host ([#1182](https://github.com/lablup/backend.ai/issues/1182))
-* Add possible expire time of utilization checker to idle check result. ([#1185](https://github.com/lablup/backend.ai/issues/1185))
-* Add `[storage-proxy].ipc-base-path` configuration option to the storage proxy like other service daemons ([#1189](https://github.com/lablup/backend.ai/issues/1189))
-* Automatically mount `.linuxbrew` dot-folder, if exists, at `/home/linuxbrew/.linuxbrew` inside a container to support OS package installation with Homebrew. ([#1195](https://github.com/lablup/backend.ai/issues/1195))
-* Add a step to idle checkers to determine the initial grace period, which is calculated by the user's creation time. ([#1199](https://github.com/lablup/backend.ai/issues/1199))
-* Update libbaihook to latest version which includes fix to resolve fastertransformer crashing ([#1200](https://github.com/lablup/backend.ai/issues/1200))
-
-### Improvements
-* Automatically set the proper webui build artifact path in `webserver.conf` when installed with `--editable-webui` and document it in the sample configuration ([#1190](https://github.com/lablup/backend.ai/issues/1190))
-
-### Fixes
-* Fix session ls not working bug ([#1100](https://github.com/lablup/backend.ai/issues/1100))
-* Add delete transactions vfolder_invitations and vfolder_permissions table when new owner and invitee of vfolder are same ([#1186](https://github.com/lablup/backend.ai/issues/1186))
-* Make pipeline related configuration fields to be optional ([#1187](https://github.com/lablup/backend.ai/issues/1187))
-* Change input field of change vfolder ownership from `user_id` to `user_email` ([#1188](https://github.com/lablup/backend.ai/issues/1188))
-
-
-## 23.03.0a4 (2023-03-16)
-
-### Features
-* Replace `username` in the `compute_session` (and `compute_session_list`) GQL query with `full_name` and expose `full_name` to `get_container_stats_for_period` so that administrators can easily recognize users. ([#1167](https://github.com/lablup/backend.ai/issues/1167))
-* Add new inference_metrics column to compute_session GQL query ([#1168](https://github.com/lablup/backend.ai/issues/1168))
-
-
-## 23.03.0a3 (2023-03-15)
-No significant changes.
-
-
-## 23.03.0a3 (2023-03-15)
-
-### Fixes
-* Use SI bytesize unit where it is not mem size. ([#1098](https://github.com/lablup/backend.ai/issues/1098))
-
-
-## 23.03.0a2 (2023-03-15)
-
-### Features
-* Report commit status through redis rather direct RPC call. ([#1015](https://github.com/lablup/backend.ai/issues/1015))
-* Add an `enable_2FA` option to enable/disable 2-Factor-Authenticaiton feature. ([#1126](https://github.com/lablup/backend.ai/issues/1126))
-* Apply the `totp_activated` field in creating/updating user for admins to set the 2FA activation status. ([#1142](https://github.com/lablup/backend.ai/issues/1142))
-* Add support for OTP based 2FA login on Backend.AI CLI ([#1147](https://github.com/lablup/backend.ai/issues/1147))
-* Expose `user_name` field to `compute_session` (and also `compute_session_list`) GQL query. ([#1149](https://github.com/lablup/backend.ai/issues/1149))
-* Expand accelerator plugin interface to show richer information about itself and add new `/config/resource-slots/details` API to show information collected by new interface ([#1153](https://github.com/lablup/backend.ai/issues/1153))
-* Increased the manager API version to `v6.20230315` ([#1154](https://github.com/lablup/backend.ai/issues/1154))
-* Allow setting the maximum concurrency of container creation tasks in the agent per RPC call ([#1159](https://github.com/lablup/backend.ai/issues/1159))
-* Add a `force_2FA` option to force the use of 2-Factor-Authenticaiton. ([#1161](https://github.com/lablup/backend.ai/issues/1161))
-
-### Fixes
-* ssh-add not working bug due to permission issue ([#1141](https://github.com/lablup/backend.ai/issues/1141))
-* Update vfolder clone status by vfolder id rather vfolder name. ([#1145](https://github.com/lablup/backend.ai/issues/1145))
+* Fix sentinel connection pool usage and improve Redis sentinel support ([#1513](https://github.com/lablup/backend.ai/issues/1513))
+* Fix a mismatch of the list of session status in the CLI and the manager (e.g., missing `PULLING` in the CLI) ([#1557](https://github.com/lablup/backend.ai/issues/1557))
+* Let `RedisLock` retry until it acquires lock. ([#1559](https://github.com/lablup/backend.ai/issues/1559))
+* Fix vFolder removal failing due to repeated type casting ([#1561](https://github.com/lablup/backend.ai/issues/1561))
+* Let agents skip mount/umount task and just produce task succeeded event rather than just return. ([#1570](https://github.com/lablup/backend.ai/issues/1570))
+* Resolve `last_used` field of `KeyPair` Gql object from Redis. ([#1571](https://github.com/lablup/backend.ai/issues/1571))
+* Fix vFolder bulk deletion to finish any successful deletion task in a bulk. ([#1579](https://github.com/lablup/backend.ai/issues/1579))
+* Fix duplicate logger initialization when using `mgr start-server` command and let the CLI commands to use local logger without relaying log records via ZMQ sockets ([#1581](https://github.com/lablup/backend.ai/issues/1581))
+* Remove rows corresponding to `vfolders` not found by storage proxy. ([#1582](https://github.com/lablup/backend.ai/issues/1582))
+* Handle redis `LockError` when release. ([#1583](https://github.com/lablup/backend.ai/issues/1583))
+* Add new alembic migration to remove mismatches between software defined schema and actual DB schema ([#1584](https://github.com/lablup/backend.ai/issues/1584))
 
 ### External Dependency Updates
-* Replace `netifaces` (now unmaintained) with `ifaddr` in favor of better maintained one with a pure Python implementation ([#1155](https://github.com/lablup/backend.ai/issues/1155))
+* Upgrade alembic (1.8.1 -> 1.12.0) to add `alembic check` command for ease of database branch/schema management ([#1585](https://github.com/lablup/backend.ai/issues/1585))
 
 
-## 23.03.0a1 (2023-03-02)
+## 23.09.0a4 (2023-09-09)
+
+### Features
+* Add support for handling OpenID Connect authentication responses ([#1545](https://github.com/lablup/backend.ai/issues/1545))
+* Update both agent socket listener and metadata server to let container check what kind of sandbox it is being executed ([#1549](https://github.com/lablup/backend.ai/issues/1549))
+* Periodically scan and update available slots of all compute plugins ([#1551](https://github.com/lablup/backend.ai/issues/1551))
+* Add `task_name` to all `GlobalTimer._tick_task` for better debugging. ([#1553](https://github.com/lablup/backend.ai/issues/1553))
+
+### Fixes
+* Fix storage proxy watcher process always being started event if it is not enabled ([#1547](https://github.com/lablup/backend.ai/issues/1547))
+* Fix install-dev.sh failing to run when both trying to run the script from main branch and Node.js is not installed on the system ([#1548](https://github.com/lablup/backend.ai/issues/1548))
+* Let `RedisLock` raise `LockError` when it fails to acquire a lock instead of skipping lock. ([#1554](https://github.com/lablup/backend.ai/issues/1554))
+* Fix metadata server not started with given port number ([#1555](https://github.com/lablup/backend.ai/issues/1555))
+
+
+## 23.09.0a3 (2023-09-07)
+### Fixes
+* Hotfix: DB migration failing ([#1544](https://github.com/lablup/backend.ai/issues/1544))
+
+## 23.09.0a2 (2023-09-06)
+
+### Features
+* Preserve the GlobalTimer tick termination logs in task monitoring. ([#1541](https://github.com/lablup/backend.ai/issues/1541))
+
+### Fixes
+* Fix service not created when trying to use name of already destroyed one ([#1539](https://github.com/lablup/backend.ai/issues/1539))
+* Fix token not stored on database when character count of the token is greater than 1024 ([#1540](https://github.com/lablup/backend.ai/issues/1540))
+
+
+## 23.09.0a1 (2023-09-06)
 
 ### Breaking Changes
-* Now the mono-repo is updated to use Pants 2.16.0.dev5. Check out the PR description for the migration guide. ([#998](https://github.com/lablup/backend.ai/issues/998))
-* Now the main branch (for 23.03) requires Python 3.11.2 to run ([#1012](https://github.com/lablup/backend.ai/issues/1012))
+* Bump the manager API version to v7.20230615, as it includes a breaking change for quota management APIs ([#1375](https://github.com/lablup/backend.ai/issues/1375))
 
 ### Features
-* Introduce plugin based metadata server architecture ([#448](https://github.com/lablup/backend.ai/issues/448))
-* Refactor session managing process by adding session db table and migrating to sqlalchemy ORM partially. ([#576](https://github.com/lablup/backend.ai/issues/576))
-* Added `BACKENDAI_SERVICE_PORTS` and `BACKENDAI_PREOPEN_PORTS` to the session env as there is no way for the user to check the port inside the container. ([#648](https://github.com/lablup/backend.ai/issues/648))
-* Support IBM Spectrum Scale storage ([#744](https://github.com/lablup/backend.ai/issues/744))
-* Support local vscode using remote ssh mode to session container ([#751](https://github.com/lablup/backend.ai/issues/751))
-* Add support for Ceph file system in Storage Proxy. ([#760](https://github.com/lablup/backend.ai/issues/760))
-* Add `architecture` argument and options to the client SDK's session creation functions and commands ([#881](https://github.com/lablup/backend.ai/issues/881))
-* Create human-friendly session name randomly when it's not given. ([#885](https://github.com/lablup/backend.ai/issues/885))
-* Gather process list in container and measure their resource usage. ([#916](https://github.com/lablup/backend.ai/issues/916))
-* Add DELETABLE status for VFolderAccessStatus to distinguish from UPDATABLE status. ([#919](https://github.com/lablup/backend.ai/issues/919))
-* When rescanning container image registries, skip misformatted image names and tag names instead of failing the entire process. ([#933](https://github.com/lablup/backend.ai/issues/933))
-* Add `custom-auth` endpoint in Webserver to support custom authentication logic with Manager plugin. ([#936](https://github.com/lablup/backend.ai/issues/936))
-* Support setting the `use_host_network` option of scaling group in the client-py. ([#941](https://github.com/lablup/backend.ai/issues/941))
-* Remove the `Server` HTTP response header from the web server since it could potentially expose more attack surfaces to crackers ([#947](https://github.com/lablup/backend.ai/issues/947))
-* Add the `session_id` and `cluster_mode` columns to `get_container_stats_for_period` API to provide container statistics in response to multi-node sessions. ([#949](https://github.com/lablup/backend.ai/issues/949))
-* Add support for Ubuntu 22.04-based kernels and enhance selecting kernel runner binary's target version. ([#956](https://github.com/lablup/backend.ai/issues/956))
-* Make jail as a usable container sandbox option ([#960](https://github.com/lablup/backend.ai/issues/960))
-* Define a new recursive type to represent a nested dictionary. ([#981](https://github.com/lablup/backend.ai/issues/981))
-* Add fish shell support to `install-dev.sh` script ([#987](https://github.com/lablup/backend.ai/issues/987))
-* Refactor the data structure of background task event client from a set of queues to defaultdict of a set of queues to prevent handling unnecessary event ([#991](https://github.com/lablup/backend.ai/issues/991))
-* Support cgroup v2 on get_available_cores ([#992](https://github.com/lablup/backend.ai/issues/992))
-* Support using systemd cgroup driver for Docker ([#1000](https://github.com/lablup/backend.ai/issues/1000))
-* Stop using pids cgroup controller ([#1005](https://github.com/lablup/backend.ai/issues/1005))
-* Supports cgroup v2 for measuring container stats (cpu, mem, io) ([#1006](https://github.com/lablup/backend.ai/issues/1006))
-* Apply a hook `VERIFY_PASSWORD_FORMAT` for signup API handler to enforce the password policy for new users. ([#1008](https://github.com/lablup/backend.ai/issues/1008))
-* Create new `/folders/_/used-bytes` API ([#1013](https://github.com/lablup/backend.ai/issues/1013))
-* Add vfolder status in api response and update vfolder cli `list`, `info` commands to show vfolder's status. ([#1017](https://github.com/lablup/backend.ai/issues/1017))
-* Return API response right after starting vFolder removal instead of waiting until deletion process completes ([#1018](https://github.com/lablup/backend.ai/issues/1018))
-* Upgrade the mypy version to 1.0.0 ([#1021](https://github.com/lablup/backend.ai/issues/1021))
-* Update backend.ai-hook build for supporting cgroup v2 ([#1023](https://github.com/lablup/backend.ai/issues/1023))
-* Make group_id optional in list_shared_vfolders and add a command to list shared vfolders from client-py. ([#1026](https://github.com/lablup/backend.ai/issues/1026))
-* add POST `/ssh/keypair` API to let user use their own SSH keypair instead of randomly generated one ([#1032](https://github.com/lablup/backend.ai/issues/1032))
-* Add spinner on client for long background task ([#1033](https://github.com/lablup/backend.ai/issues/1033))
-* Adds `~/.ssh/id_rsa` in addition to `id_container`, so ease users not to specify the SSH private key always, for example, in cloning a GitHub private repository from terminal. ([#1038](https://github.com/lablup/backend.ai/issues/1038))
-* Add ProgressViewer for the progress background tasks which support both spinner and tqdm progress bar. ([#1049](https://github.com/lablup/backend.ai/issues/1049))
-* Add the phase-1 implementation of model serving, introducing a new 'inference' session type, `backend.ai {model,service}` commands, and the endpoint and routing database tables ([#1057](https://github.com/lablup/backend.ai/issues/1057))
-* Make the dev-setup installer to preserve a full dump of the initial etcd configuration as `./dev.etcd.installed.json` for easier restoration of etcd if corrupted during development ([#1061](https://github.com/lablup/backend.ai/issues/1061))
-* Auto-start SSH agent upon session startup ([#1067](https://github.com/lablup/backend.ai/issues/1067))
-* Update `image_list` query resolver to resolve image list faster ([#1073](https://github.com/lablup/backend.ai/issues/1073))
-* Add more HTTP forwarding headers in the webserver for the manager and webapp plugins: `X-Forwarded-Host` and `X-Forwarded-Proto` ([#1075](https://github.com/lablup/backend.ai/issues/1075))
-* Add validation of inference session labels when rescanning images ([#1087](https://github.com/lablup/backend.ai/issues/1087))
-* Avoid inadvertent killing (e.g., by `killall python`) of the kernel runner daemon inside user containers by changing the process title not to include "python" ([#1090](https://github.com/lablup/backend.ai/issues/1090))
-* Add `--local` option to `mgr image rescan` command to directly scan the local Docker daemon's image list for all-in-one development setups ([#1097](https://github.com/lablup/backend.ai/issues/1097))
+* Automate force-termination of hanging sessions, which have been stuck in `PREPARING` or `TERMINATING` status for a long period ([#670](https://github.com/lablup/backend.ai/issues/670))
+* Implement `container_pid_to_host_pid()` function ([#955](https://github.com/lablup/backend.ai/issues/955))
+* Add `project` field to Keypair graphene object and cmd, update minilang to query multiple rows from joined tables in one aggregated value. ([#1022](https://github.com/lablup/backend.ai/issues/1022))
+* Use case-insensitive matching when applying the query filter for enum-based fields ([#1036](https://github.com/lablup/backend.ai/issues/1036))
+* Introduce the vfolder structure v3 to handle per-user/per-project quota in a more sensible and compatible way ([#1191](https://github.com/lablup/backend.ai/issues/1191))
+* Use `zsh` as the default shell with minimal configs, but including smart auto-completion, when the binary is available in a kernel image. ([#1267](https://github.com/lablup/backend.ai/issues/1267))
+* Add basic support for model service ([#1278](https://github.com/lablup/backend.ai/issues/1278))
+* Add failure reason to the CLI login process in case of login failure. ([#1305](https://github.com/lablup/backend.ai/issues/1305))
+* Implement Dummy agent for easy integration test. ([#1313](https://github.com/lablup/backend.ai/issues/1313))
+* upgrade miniling to filter and order by JSON column. ([#1334](https://github.com/lablup/backend.ai/issues/1334))
+* Enable to filter and order by agent id when listing sessions. ([#1337](https://github.com/lablup/backend.ai/issues/1337))
+* Print migration steps as shell script instead of executing migration directly from python script ([#1345](https://github.com/lablup/backend.ai/issues/1345))
+* Issue a signed token to X-BackendAI-SSO header to authorize an user from the pipeline service ([#1350](https://github.com/lablup/backend.ai/issues/1350))
+* Add new GraphQL queries and mutations which can manipulate vFolder quota scope ([#1354](https://github.com/lablup/backend.ai/issues/1354))
+* Add a `directory_based_usage` config on webserver to show/hide Capacity column in each directory in data & storage page in Client-side. ([#1364](https://github.com/lablup/backend.ai/issues/1364))
+* Add the OOM event and the details of potentially affected processes explicitly to the container logs for easier inspection for both users and admins ([#1373](https://github.com/lablup/backend.ai/issues/1373))
+* Improve backward compatibility for filtering and querying the agent IDs assigned for a comptue session in the GraphQL API ([#1382](https://github.com/lablup/backend.ai/issues/1382))
+* Add `OptionalType` class as a new parameter type wrapper, allowing the client CLI to manage arguments of the `undefined` type. ([#1393](https://github.com/lablup/backend.ai/issues/1393))
+* Add more agent selection scheduling strategies ([#1394](https://github.com/lablup/backend.ai/issues/1394))
+* Refactor `SessionRow` ORM queries by introducing `KernelLoadingStrategy` to generalize and reuse `SessionRow.get_session()` ([#1396](https://github.com/lablup/backend.ai/issues/1396))
+* Update the open-source version of CUDA plugin to use CUDA 12.0, 12.1, and 12.2 versions and add missing pretty string representation of CUDA device objects ([#1419](https://github.com/lablup/backend.ai/issues/1419))
+* Add a status-check handler to the storage-proxy's client-facing API ([#1430](https://github.com/lablup/backend.ai/issues/1430))
+* Add new GraphQL queries and CLI commands to support paginated vfolder listing ([#1437](https://github.com/lablup/backend.ai/issues/1437))
+* Support setting the `wsproxy_addr` and `wsproxy_api_token` option of scaling group in the client-py. ([#1460](https://github.com/lablup/backend.ai/issues/1460))
+* Add manager redis ping command: `./backend.ai mgr redis ping` ([#1462](https://github.com/lablup/backend.ai/issues/1462))
+* implement basic `ping_kernel()` API on agent side. ([#1467](https://github.com/lablup/backend.ai/issues/1467))
+* Improve logging when the agent fails to allocate resource slots ([#1472](https://github.com/lablup/backend.ai/issues/1472))
+* Add a `max_count_for_preopen_ports` config on webserver to limit the number of session `preopen_ports` settings. ([#1477](https://github.com/lablup/backend.ai/issues/1477))
+* Allow token login with body parameters, along with previous cookie-based way, by passing body to Manager's authorize handler. ([#1478](https://github.com/lablup/backend.ai/issues/1478))
+* Add support for displaying `preopen_ports` when executing `session info` CLI command. ([#1479](https://github.com/lablup/backend.ai/issues/1479))
+* Implement a storage backend that works with a specific proxy API server in Openstack Manila. ([#1480](https://github.com/lablup/backend.ai/issues/1480))
+* - Update storage proxy to be also eligible as an event producer / dispatcher
+  - Add event dispatcher at agent ([#1481](https://github.com/lablup/backend.ai/issues/1481))
+* Reduce the start-up delay for inference session containers by deferring the initial health check ([#1488](https://github.com/lablup/backend.ai/issues/1488))
+* Enable to mount volumes on agents and storage proxies through events.
+  Remove kmanila storage backend as it has been migrated to plugins.
+  Implement a storage proxy watcher that is delegated root privileges and executes privileged tasks. ([#1495](https://github.com/lablup/backend.ai/issues/1495))
+* Set the sleep argument of `AsyncRedisLock` to preevnt flooding the Redis server due to a high rate of polling requests ([#1501](https://github.com/lablup/backend.ai/issues/1501))
+* Add GraphQL queries to track down generated endpoint tokens ([#1509](https://github.com/lablup/backend.ai/issues/1509))
+* Add a simple storage backend plugin interface to retrieve volume classes from separately install packages ([#1516](https://github.com/lablup/backend.ai/issues/1516))
+* Update `ContainerRegistry`-related mutations to respond with affected node ([#1521](https://github.com/lablup/backend.ai/issues/1521))
+* Change to allow webserver to save logs to a file, similar to manager and agents. ([#1528](https://github.com/lablup/backend.ai/issues/1528))
+* Add session show-graph command to visualize session dependencies ([#1532](https://github.com/lablup/backend.ai/issues/1532))
+* Store timestamp of user's last API call date in Unix epoch format on redis ([#1533](https://github.com/lablup/backend.ai/issues/1533))
 
 ### Fixes
-* Add missing `await` for a jupyter-client API when shutting down the kernel runner, as a follow-up fix to #873 ([#915](https://github.com/lablup/backend.ai/issues/915))
-* Improve scriptability of the `session events` CLI command by ensuring stdout flush and providing well-formatted JSON outputs of event data ([#925](https://github.com/lablup/backend.ai/issues/925))
-* Continue the server operation with a warning even when the aiomonitor thread could not be started and adjust the default aiomonitor ports out of the ephemeral port range ([#928](https://github.com/lablup/backend.ai/issues/928))
-* Fill the request payload with the plain-text request body when the web login handler is called without encryption.  This was a regression after introducing the login payload encryption. ([#929](https://github.com/lablup/backend.ai/issues/929))
-* Apply vfolder_host_permission to vfolder api. ([#946](https://github.com/lablup/backend.ai/issues/946))
-* Change the setting position of the `resp` to avoid AttributeError that occurs during converting from str to hex. ([#954](https://github.com/lablup/backend.ai/issues/954))
-* Add comment out on gpfs sample volume when setting up the development environment with ./script/install-dev.sh ([#965](https://github.com/lablup/backend.ai/issues/965))
-* Add command line logging option to manager, agent and storage ([#971](https://github.com/lablup/backend.ai/issues/971))
-* Disable the socket-relay container on macOS to avoid UNIX socket bind-mount compatibility issue in for macOS + virtiofs setups ([#986](https://github.com/lablup/backend.ai/issues/986))
-* Disable the socket-relay container mount on macOS to avoid UNIX socket bind-mount compatibility issue in for macOS + virtiofs setups ([#993](https://github.com/lablup/backend.ai/issues/993))
-* Fix `mpirun` failing to run when trying to specify mutlple hosts on multi-container session ([#995](https://github.com/lablup/backend.ai/issues/995))
-* Handle vary docker container creation fail. ([#1002](https://github.com/lablup/backend.ai/issues/1002))
-* Fix `--limit` option being treated as `str` instead of `int` ([#1003](https://github.com/lablup/backend.ai/issues/1003))
-* Rollback predicate mutations early when there is no candidate agent for a given image architecture. ([#1004](https://github.com/lablup/backend.ai/issues/1004))
-* Remove unused loop in CLI generate_paginated_results function, remove some vars of the function and rename the function. ([#1007](https://github.com/lablup/backend.ai/issues/1007))
-* Update `concurrency_used` per access key by number of sessions rather kernels. ([#1029](https://github.com/lablup/backend.ai/issues/1029))
-* Unable to delete a data folder (vfolder) when its host directory or intermediate parent directories were not exist. ([#1040](https://github.com/lablup/backend.ai/issues/1040))
-* Replace accessing non-existent `ImageRow.installed` with direct Redis queries in the `mgr image list --installed` command ([#1063](https://github.com/lablup/backend.ai/issues/1063))
-* Fix the agent logs partially missing depending on how the `ai.backend.agent.server` module is executed ([#1064](https://github.com/lablup/backend.ai/issues/1064))
-* Update agent's resource usage strictly after kernel creation, cancel and termination. ([#1069](https://github.com/lablup/backend.ai/issues/1069))
-* Add a new line in SSH keypairs to prevent possible errors for some keys in registering them to `ssh-agent`. ([#1071](https://github.com/lablup/backend.ai/issues/1071))
-* Removed no more used parameter with download_file and download_single from AgentRegistry ([#1076](https://github.com/lablup/backend.ai/issues/1076))
-* Update session-related events, introducing the `SessionTerminating` event and using proper session IDs instead of kernel IDs ([#1083](https://github.com/lablup/backend.ai/issues/1083))
-* Preserve the `PYTHONPATH` environment variable if defined by user-provided container images ([#1096](https://github.com/lablup/backend.ai/issues/1096))
-* Fix typos and add proper whitespace in the comment and CLI help strings ([#1099](https://github.com/lablup/backend.ai/issues/1099))
-* Fix `backend.ai ssh` CLI command in development setups ([#1101](https://github.com/lablup/backend.ai/issues/1101))
-* Fix a regression bug in `session watch` command ([#1103](https://github.com/lablup/backend.ai/issues/1103))
-* Resolve an error from `backend.ai admin group info` by taking the first returned group item ([#1104](https://github.com/lablup/backend.ai/issues/1104))
-* Assign variables before the inner function which attempts to access them. ([#1112](https://github.com/lablup/backend.ai/issues/1112))
-* When the session is in the PENDING, PREPARING state, assign the initial value to 'requested_slots' to know 'occupied_slots'. ([#1115](https://github.com/lablup/backend.ai/issues/1115))
+* Add filters and touch up on vfolder sharing fail
+  * Add `is_active` filter on querying from keypair when sharing both user and group(project) vfolder
+  * Touch-up message about handling group folder sharing results to display the failed account list properly. ([#1204](https://github.com/lablup/backend.ai/issues/1204))
+* Handle buggy ORM field loading when destroy session. ([#1312](https://github.com/lablup/backend.ai/issues/1312))
+* Use a more sensible value for the warning threshold for the number of concurrent generic/read-only transactions within a manager process ([#1320](https://github.com/lablup/backend.ai/issues/1320))
+* Check `None` value of config argument's `resources` key when enqueue session. ([#1322](https://github.com/lablup/backend.ai/issues/1322))
+* Fix to check type of `agent_id` strictly when schedule multi-node session. ([#1325](https://github.com/lablup/backend.ai/issues/1325))
+* Set session status `PULLING` when any sibling kernel is pulling image. ([#1326](https://github.com/lablup/backend.ai/issues/1326))
+* Fix agent refusing to send heartbeat when `public-host` is set ([#1332](https://github.com/lablup/backend.ai/issues/1332))
+* Fix some of manager's vFolder API raising error ([#1333](https://github.com/lablup/backend.ai/issues/1333))
+* Update storage proxy's `list_files()` API to only scan files in current directory, instead of scanning recursively ([#1335](https://github.com/lablup/backend.ai/issues/1335))
+* Fix vFolder v3 migration script failing ([#1336](https://github.com/lablup/backend.ai/issues/1336))
+* Fix agent not reading available krunner volumes when host's docker has untagged image ([#1341](https://github.com/lablup/backend.ai/issues/1341))
+* * Resolve regression which `ComputeSessionList` GraphQL query raises HTTP 400 error due to missing conversion of VFolder IDs in the mount history after introduction of Quota Scope IDs, by trying to update kernels and sessions table with appropriate quota scope ID
+  * Update VFolderID validator to also allow null vFolder ID in case of older session data with unknown quota scope ID ([#1343](https://github.com/lablup/backend.ai/issues/1343))
+* Return None for `sessions.status_changed` when `sessions.status_history` is None ([#1344](https://github.com/lablup/backend.ai/issues/1344))
+* Prevent scanning every sub-directories for listing vfolder files for requests with non-`recursive` option. ([#1355](https://github.com/lablup/backend.ai/issues/1355))
+* Enhance vfolder v3 directory migration script. ([#1357](https://github.com/lablup/backend.ai/issues/1357))
+* Add `groups_name` aggregated field in querying keypairs by email or access key to prevent field reference error. ([#1358](https://github.com/lablup/backend.ai/issues/1358))
+* Removing trailling comma from container's `service-ports` label. ([#1359](https://github.com/lablup/backend.ai/issues/1359))
+* Fix `get_fs_usage()` API reporting capacity as usage and usage as capacity on GPFS and Weka backend ([#1376](https://github.com/lablup/backend.ai/issues/1376))
+* Enable to order or filter by `image` when list sessions. ([#1378](https://github.com/lablup/backend.ai/issues/1378))
+* Finalize per-kernel scheduling results using the correct kernel IDs. ([#1380](https://github.com/lablup/backend.ai/issues/1380))
+* Avoid returning `NaN` values with undefined capacity and percentage values to prevent calculation errors but just set them zeros. ([#1385](https://github.com/lablup/backend.ai/issues/1385))
+* Add `session_name` to aliased key of `session_name` ([#1395](https://github.com/lablup/backend.ai/issues/1395))
+* Allow projcet vfolder creation regardless of the user (keypair) vfolder count limit ([#1397](https://github.com/lablup/backend.ai/issues/1397))
+* Prevent creating/cloning vfolders with duplicate names on different hosts by deleting conditions checking host. ([#1398](https://github.com/lablup/backend.ai/issues/1398))
+* Fix redundant vfolder creation while cloning and avoid checking `max_vfolder_count` when the admin has requested cloning of project type vfolders ([#1400](https://github.com/lablup/backend.ai/issues/1400))
+* Fix getting psutil.Process synchronously for catching psutil.NoSuchProcess error leak ([#1408](https://github.com/lablup/backend.ai/issues/1408))
+* Enable transit session status from `PULLING` to `CANCELLED` or `TERMINATED`. ([#1412](https://github.com/lablup/backend.ai/issues/1412))
+* Make the parsing routine of PostgreSQL version strings more robust with additional build tags ([#1415](https://github.com/lablup/backend.ai/issues/1415))
+* Allow storing an empty string (list) in the `project` field of container registry configurations for better compatibility with the GUI behavior and share the same input validation logic in both manager configuration loader and `set_config` API ([#1422](https://github.com/lablup/backend.ai/issues/1422))
+* Allow termination of a compute session even when the configured wsproxy address is invalid or inaccessible ([#1423](https://github.com/lablup/backend.ai/issues/1423))
+* Update `concurrency_used` by scanning the Redis fully when there is no `Session` data. ([#1429](https://github.com/lablup/backend.ai/issues/1429))
+* Add shell script codes to setup `version.txt` including vfolder version in `install-dev.sh`. ([#1438](https://github.com/lablup/backend.ai/issues/1438))
+* Ensure the interpretation of the `project` field to be a list when adding/updating container registries, even with empty strings ([#1447](https://github.com/lablup/backend.ai/issues/1447))
+* Support CRUD API for container registry using graphQL to deprecate the raw etcd access API from backend.AI WebUI ([#1450](https://github.com/lablup/backend.ai/issues/1450))
+* Add None check to out of scoped variable for correct error response to user. ([#1464](https://github.com/lablup/backend.ai/issues/1464))
+* Add the mininum page size check when paginating in the client CLI ([#1465](https://github.com/lablup/backend.ai/issues/1465))
+* Fix a regression that client-set environment variables were not properly passed to the session containers ([#1470](https://github.com/lablup/backend.ai/issues/1470))
+* Update outdated distro selection algorithm of Kubernetes agent backend ([#1474](https://github.com/lablup/backend.ai/issues/1474))
+* Provides improved logging of delete operations. ([#1490](https://github.com/lablup/backend.ai/issues/1490))
+* Correct null check when migrate `role` column in `kernels` table. ([#1500](https://github.com/lablup/backend.ai/issues/1500))
+* Fix a regression of unpickling code runner objects when restoring the last-saved kernel registry while restarting the agents ([#1502](https://github.com/lablup/backend.ai/issues/1502))
+* Separate consumer groups of event dispatcher for each service to not intercept other service's event. ([#1503](https://github.com/lablup/backend.ai/issues/1503))
+* Fix drifting of the agent allocation maps due to missing rollback mechanism when there is an allocation failure (e.g., `InsufficientResource`) ([#1510](https://github.com/lablup/backend.ai/issues/1510))
+* Add missing update of the etcd port in `storage-proxy.toml` by the `install-dev.sh` script ([#1514](https://github.com/lablup/backend.ai/issues/1514))
+* Enforce the VFolder `delete_by_id()` handler to validate `id` parameter to be an UUID ([#1517](https://github.com/lablup/backend.ai/issues/1517))
+* - Remove rows of sessions table associated with user to purge along with records under tables (error_logs, endpoints) which has foreign key constraint to `sessions.id` 
+  - Fix buggy user vfolder fetching query when purging user ([#1531](https://github.com/lablup/backend.ai/issues/1531))
+* Fix invalid redis key being set when rescanning resource usage ([#1534](https://github.com/lablup/backend.ai/issues/1534))
+* Fix Internal server error (500) raised on situations when Method not allowed (405) should be returned ([#1535](https://github.com/lablup/backend.ai/issues/1535))
 
 ### Documentation Updates
-* Guide to install Backend.AI with package (wheel). ([#939](https://github.com/lablup/backend.ai/issues/939))
+* Improve formatting and trafaret compatibility error reporting of the OpenAPI-based Manager REST API reference ([#1452](https://github.com/lablup/backend.ai/issues/1452))
+* Add predicate-checking plugin hook to enable validate resource request by plugin. ([#1454](https://github.com/lablup/backend.ai/issues/1454))
+* Update the environment setting command in `development-setup` document for verifying the installation ([#1463](https://github.com/lablup/backend.ai/issues/1463))
 
 ### External Dependency Updates
-* Remove dependency to `python-snappy` ([#1010](https://github.com/lablup/backend.ai/issues/1010))
-* Upgrade the hiredis version to 2.2.2, which was hold back to 1.x due to unexpected segfaults in its early 2.x versions ([#1025](https://github.com/lablup/backend.ai/issues/1025))
+* Update etcetra version to 0.1.17 ([#1537](https://github.com/lablup/backend.ai/issues/1537))
 
 ### Miscellaneous
-* Upgrade the mypy version to 0.991 ([#972](https://github.com/lablup/backend.ai/issues/972))
-* More explicit log for webserver's `login_handler` to filter and save the authentication logs only. ([#984](https://github.com/lablup/backend.ai/issues/984))
-* Update the socket-relay container's base distro (Alpine) version to 3.17 to enable support for `AF_VSOCK` in the latest socat 1.7.4 package ([#988](https://github.com/lablup/backend.ai/issues/988))
-* Add function that automate making news fragement process ([#989](https://github.com/lablup/backend.ai/issues/989))
-* Bump base Python version from 3.10.8 to 3.10.9 to reduce potential bugs. ([#997](https://github.com/lablup/backend.ai/issues/997))
+* Due to reduced readability due to numerous decorators, duplicate decorators are integrated and managed, and related modules are separated into `session` subpackages. ([#537](https://github.com/lablup/backend.ai/issues/537))
+* Bump the base Python version from 3.11.3 to 3.11.4 to resolve potential upstream bugs ([#1431](https://github.com/lablup/backend.ai/issues/1431))
+* Auto-enable `--editable-webui` option when running `install-dev.sh` from the main branch to ensure the latest version of it ([#1441](https://github.com/lablup/backend.ai/issues/1441))
+* Add `--show-guide` option to `install-dev.sh` for redisplaying the after-setup instructions ([#1442](https://github.com/lablup/backend.ai/issues/1442))
+* Replaced Flake8 and isort with Ruff for faster linting and formatting ([#1475](https://github.com/lablup/backend.ai/issues/1475))
 
 
-## 22.09 and earlier
+## 23.03 and earlier
 
-Please refer the following per-package changelogs.
-
-* [Unified changelog for the core components](https://github.com/lablup/backend.ai/blob/22.09/CHANGELOG.md)
+* [Unified changelog for the core components](https://github.com/lablup/backend.ai/blob/23.03/CHANGELOG.md)

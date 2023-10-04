@@ -20,6 +20,7 @@ from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, Resou
 
 from .base import (
     Base,
+    CurvePublicKeyColumn,
     EnumType,
     Item,
     PaginatedList,
@@ -34,7 +35,7 @@ from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .keypair import keypairs
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .scaling_group import query_allowed_sgroups
 from .user import UserRole, users
 
@@ -84,6 +85,7 @@ agents = sa.Table(
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("addr", sa.String(length=128), nullable=False),
     sa.Column("public_host", sa.String(length=256), nullable=True),
+    sa.Column("public_key", CurvePublicKeyColumn(), nullable=True),
     sa.Column("first_contact", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("lost_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("version", sa.String(length=64), nullable=False),
@@ -130,7 +132,7 @@ class Agent(graphene.ObjectType):
     schedulable = graphene.Boolean()
     available_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()
-    addr = graphene.String()
+    addr = graphene.String()  # bind/advertised host:port
     architecture = graphene.String()
     first_contact = GQLDateTime()
     lost_at = GQLDateTime()
@@ -140,6 +142,7 @@ class Agent(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
+    container_count = graphene.Int()
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -239,9 +242,15 @@ class Agent(graphene.ObjectType):
             },
         }
 
+    async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
+        ctx: GraphQueryContext = info.context
+        rs = ctx.redis_stat
+        cnt = await redis_helper.execute(rs, lambda r: r.get(f"container_count.{self.id}"))
+        return int(cnt) if cnt is not None else 0
+
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", lambda s: AgentStatus[s]),
+        "status": ("status", enum_field_getter(AgentStatus)),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -467,7 +476,7 @@ class AgentSummary(graphene.ObjectType):
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
-        "status": ("status", lambda s: AgentStatus[s]),
+        "status": ("status", enum_field_getter(AgentStatus)),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulabe", None),
     }

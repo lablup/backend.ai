@@ -74,6 +74,12 @@ heartbeat-timeout = 40.0
 # This affects the per-node configuration scope.
 # id = ""
 
+# Set the manager's RPC client certificate (public key and secret key).
+# This is a mandatory option even when no agents require authentication.
+# It must be generated for any new setup for security using
+# the `backend.ai mgr generate-rpc-keypair` command.
+# rpc-auth-manager-keypair = "fixtures/manager/manager.key_secret"
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
@@ -96,6 +102,9 @@ disabled-plugins = []
 
 # Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
 hide-agents = false
+
+# The order of agent selection.
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 # One of: "asyncio", "uvloop"
 # This changes the event loop backend.
@@ -122,7 +131,8 @@ importer-image = "lablup/importer:manylinux2010"
 # The starting port number for aiomonitor.
 # Since the manager is composed of multiple processes, each process will be exposed
 # via the port number of this base port number + pidx.
-# aiomonitor-port = 48100
+# aiomonitor-termui-port = 48100
+# aiomonitor-webui-port = 49100
 
 
 [docker-registry]

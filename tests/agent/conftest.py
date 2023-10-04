@@ -8,6 +8,7 @@ from pathlib import Path
 import aiodocker
 import pytest
 
+from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import LocalLogger
@@ -49,6 +50,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
     var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
+    mount_path = Path.cwd() / "vfroot"
 
     registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
     try:
@@ -63,9 +65,11 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "scaling-group": f"sg-{test_id}",
             "ipc-base-path": ipc_base_path,
             "var-base-path": var_base_path,
+            "mount-path": mount_path,
             "backend": "docker",
             "rpc-listen-addr": HostPortPair("", 18100 + get_parallel_slot()),
             "agent-sock-port": 18200 + get_parallel_slot(),
+            "metadata-server-bind-host": "0.0.0.0",
             "metadata-server-port": 18300 + get_parallel_slot(),
             "allow-compute-plugins": set(),
             "block-compute-plugins": set(),
@@ -95,9 +99,11 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             sentinel=None,
             service_name=None,
             password=None,
+            redis_helper_config=config.redis_helper_default_config,
         ),
         "plugins": {},
     }
+    cfg = agent_local_config_iv.check(cfg)
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()

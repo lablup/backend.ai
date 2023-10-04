@@ -29,6 +29,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -391,12 +392,10 @@ class SchedulingPredicate(Protocol):
         db_conn: SAConnection,
         sched_ctx: SchedulingContext,
         sess_ctx: PendingSession,
-    ) -> PredicateResult:
-        ...
+    ) -> PredicateResult: ...
 
 
 class AbstractScheduler(metaclass=ABCMeta):
-
     """
     Interface for scheduling algorithms where the
     ``schedule()`` method is a pure function.
@@ -428,6 +427,8 @@ class AbstractScheduler(metaclass=ABCMeta):
         self,
         possible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
+        agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_resource_priority: list[str],
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -444,6 +445,8 @@ class AbstractScheduler(metaclass=ABCMeta):
         self,
         possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
+        agent_selection_strategy: AgentSelectionStrategy,
+        agent_selection_resource_priority: list[str],
     ) -> Optional[AgentId]:
         """
         Assign an agent for a kernel of the session.

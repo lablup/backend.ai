@@ -32,6 +32,7 @@ __all__ = ("VFolder",)
 _default_list_fields = (
     vfolder_fields["host"],
     vfolder_fields["name"],
+    vfolder_fields["status"],
     vfolder_fields["created_at"],
     vfolder_fields["creator"],
     vfolder_fields["group_id"],
@@ -126,6 +127,87 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
+    async def paginated_own_list(
+        cls,
+        *,
+        fields: Sequence[FieldSpec] = _default_list_fields,
+        page_offset: int = 0,
+        page_size: int = 20,
+        filter: str = None,
+        order: str = None,
+    ) -> PaginatedResult[dict]:
+        """
+        Fetches the list of own vfolders.
+
+        :param fields: Additional per-vfolder query fields to fetch.
+        """
+        return await fetch_paginated_result(
+            "vfolder_own_list",
+            {
+                "filter": (filter, "String"),
+                "order": (order, "String"),
+            },
+            fields,
+            page_offset=page_offset,
+            page_size=page_size,
+        )
+
+    @api_function
+    @classmethod
+    async def paginated_invited_list(
+        cls,
+        *,
+        fields: Sequence[FieldSpec] = _default_list_fields,
+        page_offset: int = 0,
+        page_size: int = 20,
+        filter: str = None,
+        order: str = None,
+    ) -> PaginatedResult[dict]:
+        """
+        Fetches the list of invited vfolders.
+
+        :param fields: Additional per-vfolder query fields to fetch.
+        """
+        return await fetch_paginated_result(
+            "vfolder_invited_list",
+            {
+                "filter": (filter, "String"),
+                "order": (order, "String"),
+            },
+            fields,
+            page_offset=page_offset,
+            page_size=page_size,
+        )
+
+    @api_function
+    @classmethod
+    async def paginated_project_list(
+        cls,
+        *,
+        fields: Sequence[FieldSpec] = _default_list_fields,
+        page_offset: int = 0,
+        page_size: int = 20,
+        filter: str = None,
+        order: str = None,
+    ) -> PaginatedResult[dict]:
+        """
+        Fetches the list of invited vfolders.
+
+        :param fields: Additional per-vfolder query fields to fetch.
+        """
+        return await fetch_paginated_result(
+            "vfolder_project_list",
+            {
+                "filter": (filter, "String"),
+                "order": (order, "String"),
+            },
+            fields,
+            page_offset=page_offset,
+            page_size=page_size,
+        )
+
+    @api_function
+    @classmethod
     async def list_hosts(cls):
         rqst = Request("GET", "/folders/_/hosts")
         async with rqst.fetch() as resp:
@@ -154,6 +236,18 @@ class VFolder(BaseFunction):
     @api_function
     async def delete(self):
         rqst = Request("DELETE", "/folders/{0}".format(self.name))
+        async with rqst.fetch():
+            return {}
+
+    @api_function
+    async def purge(self):
+        rqst = Request("POST", "/folders/{0}/purge".format(self.name))
+        async with rqst.fetch():
+            return {}
+
+    @api_function
+    async def recover(self):
+        rqst = Request("POST", "/folders/{0}/recover".format(self.name))
         async with rqst.fetch():
             return {}
 
@@ -231,7 +325,11 @@ class VFolder(BaseFunction):
                                     ) as pbar:
                                         loop = current_loop()
                                         writer_fut = loop.run_in_executor(
-                                            None, self._write_file, file_path, file_mode, q.sync_q
+                                            None,
+                                            self._write_file,
+                                            file_path,
+                                            file_mode,
+                                            q.sync_q,
                                         )
                                         await asyncio.sleep(0)
                                         max_attempts = 10
@@ -239,7 +337,9 @@ class VFolder(BaseFunction):
                                             try:
                                                 async for attempt in AsyncRetrying(
                                                     wait=wait_exponential(
-                                                        multiplier=0.02, min=0.02, max=5.0
+                                                        multiplier=0.02,
+                                                        min=0.02,
+                                                        max=5.0,
                                                     ),
                                                     stop=stop_after_attempt(max_attempts),
                                                     retry=retry_if_exception_type(TryAgain),
@@ -303,10 +403,8 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[download_info["url"]]
                     else:
                         raise BackendClientError(
-                            (
-                                "Overriding storage proxy addresses are given, "
-                                "but no url matches with any of them.\n"
-                            ),
+                            "Overriding storage proxy addresses are given, "
+                            "but no url matches with any of them.\n",
                         )
 
                 params = {"token": download_info["token"]}
@@ -347,10 +445,8 @@ class VFolder(BaseFunction):
                         overriden_url = address_map[upload_info["url"]]
                     else:
                         raise BackendClientError(
-                            (
-                                "Overriding storage proxy addresses are given, "
-                                "but no url matches with any of them.\n"
-                            ),
+                            "Overriding storage proxy addresses are given, "
+                            "but no url matches with any of them.\n",
                         )
                 params = {"token": upload_info["token"]}
                 if dst_dir is not None:
