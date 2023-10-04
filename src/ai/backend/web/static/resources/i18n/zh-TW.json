@@ -60,7 +60,8 @@
       "Serving": "服务",
       "PasswordChangePlace": "点击顶部栏上的个人图标，进入 \"我的账户 \"菜单。",
       "Notifications": "通知",
-      "Tasks": "任务"
+      "Tasks": "任务",
+      "FastTrack": "FastTrack"
     },
     "YouAreOffline": "您現在離線",
     "YouAreOnline": "您現在在線",
@@ -108,7 +109,8 @@
     "IPUEnabled": "启用 IPU NPU",
     "ATOMEnabled": "已启用 ATOM NPU",
     "WarboyEnabled": "启用 Warboy NPU",
-    "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序"
+    "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
+    "FastTrack": "FastTrack"
   },
   "session": {
     "launcher": {
@@ -341,7 +343,12 @@
     "DescCommitSession": "您即将提交与下面会话相对应的容器：",
     "NoSessionToDisplay": "没有会话显示",
     "StatusInfo": "状态信息",
-    "System": "上传会话"
+    "System": "上传会话",
+    "ExpiresAfter": "剩余时间",
+    "CPU": "中央处理器",
+    "MEM": "内存",
+    "GPU": "GPU",
+    "GPU(MEM)": "图形处理器（内存）"
   },
   "button": {
     "Cancel": "取消",
@@ -991,14 +998,27 @@
     "IOWriteDesc": "从计算会话写入的数据量。(不包括从外部安装的设备（如数据文件夹）写入的数据量）。"
   },
   "language": {
-    "English": "英語",
-    "Korean": "韓國人",
+    "English": "English",
+    "Korean": "한국어",
     "Language": "語",
     "OSDefault": "操作系統默認值",
-    "Russian": "俄罗斯",
-    "French": "法语",
-    "Mongolian": "蒙古语",
-    "Indonesian": "印尼语"
+    "Russian": "русский",
+    "French": "Français",
+    "Mongolian": "Монгол",
+    "Indonesian": "Bahasa Indonesia",
+    "Brazilian": "brasileiro",
+    "Chinese": "中文",
+    "Chinese (Simplified)": "简体中文",
+    "Finnish": "Suomalainen",
+    "German": "Deutsch",
+    "Greek": "Ελληνική",
+    "Italian": "Italiano",
+    "Japanese": "日本語",
+    "Polish": "Polski",
+    "Portuguese": "Português",
+    "Spanish": "Español",
+    "Turkish": "Türkçe",
+    "Vietnamese": "Tiếng Việt"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "從存儲庫註冊新圖像",
@@ -1257,7 +1277,28 @@
   "error": {
     "UpdateError": "更新錯誤",
     "APIEndpointIsEmpty": "API 端點為空。請指定 Backend.AI API 端點進行註冊。",
-    "LoginSucceededManagerNotResponding": "登錄成功，但經理沒有響應。"
+    "LoginSucceededManagerNotResponding": "登錄成功，但經理沒有響應。",
+    "NetworkConnectionFailed": "网络连接失败。检查网络状态。",
+    "LoginFailed": "登录失败。检查登录信息。",
+    "AuthenticationFailed": "验证失败。检查信息和管理器状态。",
+    "VirtualFolderAlreadyExist": "已存在同名的虚拟文件夹。删除自己的文件夹或拒绝邀请。",
+    "TooManyLoginFailures": "短时间内登录失败次数过多。登录被暂时阻止。",
+    "MaximumVfolderCreation": "由于资源政策原因，无法创建更多 v 文件夹",
+    "CannotChangeVirtualFolderOption": "您不能更改不属于自己的 v 文件夹的选项。",
+    "CannotSharePrivateAutomountFolder": "无法按照策略共享自动挂载 v 文件夹。",
+    "FolderSharingNotAvailableToUser": "请求的用户无法共享文件夹。",
+    "ReachedResourceLimit": "已达到资源限制。检查资源和会话。",
+    "UserHasNoGroup": "用户没有组。请联系管理员修复。",
+    "InvalidSignupToken": "无效注册令牌",
+    "LoginInformationMismatch": "登录信息不匹配。检查您的信息",
+    "ResourcePolicyAlreadyExist": "已存在同名的资源策略。",
+    "ScalingGroupAlreadyExist": "已存在同名资源组。",
+    "UserNameAlreadyExist": "用户名已存在。不能重复。",
+    "ResourceLimitExceed": "超出资源限制。检查您的免费资源。",
+    "ResourcePolicyStillReferenced": "存在引用该资源策略的密钥对。",
+    "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
+    "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
+    "WrongAPIServerAddress": "错误的 API 服务器地址。"
   },
   "maxLength": {
     "64chars": "（最多 64 個字符）",
