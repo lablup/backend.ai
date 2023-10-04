@@ -150,7 +150,7 @@ async def ensure_vfolder_status(
                 VFolderOperationStatus.MOUNTED,
             }
         case VFolderAccessStatus.UPDATABLE:
-            # if UPDATABLE access status is requested, only READY operation status is accepted.
+            # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
             available_vf_statuses = {
                 VFolderOperationStatus.READY,
                 VFolderOperationStatus.MOUNTED,

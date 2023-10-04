@@ -145,7 +145,6 @@ class VFolderOperationStatus(str, enum.Enum):
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted
     DELETE_COMPLETE = "deleted-complete"  # vfolder is deleted
     PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed permanently
-    # PURGE_COMPLETE = "purged-complete"  # vfolder is removed permanently
 
 
 class VFolderAccessStatus(str, enum.Enum):
