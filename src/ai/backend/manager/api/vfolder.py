@@ -34,7 +34,7 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
@@ -56,6 +56,8 @@ from ..models import (
     AgentStatus,
     GroupRow,
     KernelStatus,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
     UserRole,
     UserRow,
     UserStatus,
@@ -387,6 +389,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         match group_id_or_name:
             case str():
                 # Convert the group name to group uuid.
+                log.debug("group_id_or_name(str):{}", group_id_or_name)
                 query = (
                     sa.select(GroupRow)
                     .where(
@@ -396,15 +399,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
                 result = await sess.execute(query)
                 group_row = result.scalar()
-                _gid, max_vfolder_size = (
+                _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
-                    group_row.resource_policy_row.max_vfolder_size,
+                    group_row.resource_policy_row.max_vfolder_count,
+                    group_row.resource_policy_row.max_quota_scope_size,
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = _gid
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
+                log.debug("group_id_or_name(uuid):{}", group_id_or_name)
                 query = (
                     sa.select(GroupRow)
                     .where(
@@ -414,9 +419,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
                 result = await sess.execute(query)
                 group_row = result.scalar()
-                _gid, max_vfolder_size = (
+                _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
-                    group_row.resource_policy_row.max_vfolder_size,
+                    group_row.resource_policy_row.max_vfolder_count,
+                    group_row.resource_policy_row.max_quota_scope_size,
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
@@ -429,7 +435,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
                 result = await sess.execute(query)
                 user_row = result.scalar()
-                max_vfolder_size = user_row.resource_policy_row.max_vfolder_size
+                max_vfolder_count, max_quota_scope_size = (
+                    user_row.resource_policy_row.max_vfolder_count,
+                    user_row.resource_policy_row.max_quota_scope_size,
+                )
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
 
@@ -465,7 +474,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
 
         # Check resource policy's max_vfolder_count
-        if keypair_resource_policy["max_vfolder_count"] > 0:
+        if max_vfolder_count > 0:
             query = (
                 sa.select([sa.func.count()])
                 .select_from(vfolders)
@@ -474,7 +483,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
             )
             result = await conn.scalar(query)
-            if result >= keypair_resource_policy["max_vfolder_count"] and ownership_type == "user":
+            if result >= max_vfolder_count and ownership_type == "user":
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
@@ -517,8 +526,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 # ):
                 #     pass
                 options = {}
-                if max_vfolder_size and max_vfolder_size > 0:
-                    options["initial_max_size_for_quota_scope"] = max_vfolder_size
+                if max_quota_scope_size and max_quota_scope_size > 0:
+                    options["initial_max_size_for_quota_scope"] = max_quota_scope_size
                 async with root_ctx.storage_manager.request(
                     folder_host,
                     "POST",
@@ -2564,6 +2573,36 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if source_proxy_name != target_proxy_name:
         raise InvalidAPIParameters("proxy name of source and target vfolders must be equal.")
 
+    async with root_ctx.db.begin_session() as sess:
+        if row["group"]:
+            log.debug("Cloning VFolder group ID: {}", row["group"])
+            query = (
+                sa.select(GroupRow)
+                .where((GroupRow.domain_name == domain_name) & (GroupRow.id == row["group"]))
+                .options(
+                    selectinload(GroupRow.resource_policy_row).options(
+                        load_only(ProjectResourcePolicyRow.max_vfolder_count)
+                    )
+                )
+            )
+            result = await sess.execute(query)
+            group_row = result.scalar()
+            max_vfolder_count = group_row.resource_policy_row.max_vfolder_count
+
+        else:
+            query = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.resource_policy_row).options(
+                        load_only(UserResourcePolicyRow.max_vfolder_count)
+                    )
+                )
+            )
+            result = await sess.execute(query)
+            user_row = result.scalar()
+            max_vfolder_count = user_row.resource_policy_row.max_vfolder_count
+
     async with root_ctx.db.begin() as conn:
         allowed_hosts = await filter_host_allowed_permission(
             conn,
@@ -2585,12 +2624,12 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             raise InvalidAPIParameters("You are not allowed to use this vfolder host.")
 
         # Check resource policy's max_vfolder_count
-        if resource_policy["max_vfolder_count"] > 0:
+        if max_vfolder_count > 0:
             query = sa.select([sa.func.count()]).where(
                 (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
             )
             result = await conn.scalar(query)
-            if result >= resource_policy["max_vfolder_count"] and row["group"] is None:
+            if result >= max_vfolder_count:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # Prevent creation of vfolder with duplicated name on all hosts.
