@@ -267,7 +267,7 @@ async def test_agg_to_str(session_info):
     kernel_data = {
         "session_id": session_id,
         "domain_name": orig_kernel["domain_name"],
-        "group_id": orig_kernel["group_id"],
+        "project_id": orig_kernel["project_id"],
         "user_uuid": orig_kernel["user_uuid"],
         "cluster_role": "sub",
         "occupied_slots": {},
@@ -332,7 +332,7 @@ async def test_agg_to_array(session_info):
     kernel_data = {
         "session_id": session_id,
         "domain_name": orig_kernel["domain_name"],
-        "group_id": orig_kernel["group_id"],
+        "project_id": orig_kernel["project_id"],
         "user_uuid": orig_kernel["user_uuid"],
         "cluster_role": "sub",
         "occupied_slots": {},
