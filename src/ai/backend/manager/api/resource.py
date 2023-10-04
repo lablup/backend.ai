@@ -552,7 +552,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("group_id"): t.String | t.Null,
+            t.Key("group_id", default=None): t.String | t.Null,
             t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
             t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         }
