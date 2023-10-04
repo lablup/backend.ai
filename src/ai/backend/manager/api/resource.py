@@ -1,6 +1,7 @@
 """
 Resource preset APIs.
 """
+from __future__ import annotations
 
 import copy
 import functools
@@ -9,7 +10,8 @@ import logging
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
+from uuid import UUID
 
 import aiohttp
 import aiohttp_cors
@@ -46,6 +48,12 @@ from ..models import (
     query_allowed_sgroups,
     resource_presets,
     users,
+)
+from ..models.resource_usage import (
+    ProjectResourceUsage,
+    fetch_resource_usage,
+    parse_resource_usage_groups,
+    parse_total_resource_group,
 )
 from .auth import auth_required, superadmin_required
 from .exceptions import InvalidAPIParameters
@@ -308,8 +316,24 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     return web.json_response({}, status=200)
 
 
+async def get_project_stats_for_period(
+    root_ctx: RootContext,
+    start_date: datetime,
+    end_date: datetime,
+    group_ids: Optional[Sequence[UUID]] = None,
+) -> dict[UUID, ProjectResourceUsage]:
+    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, group_ids)
+    local_tz = root_ctx.shared_config["system"]["timezone"]
+    usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
+    total_groups, _ = parse_total_resource_group(usage_groups)
+    return total_groups
+
+
 async def get_container_stats_for_period(
-    request: web.Request, start_date, end_date, project_ids=None
+    request: web.Request,
+    start_date: datetime,
+    end_date: datetime,
+    project_ids: Optional[Sequence[UUID]] = None,
 ):
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
@@ -533,7 +557,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["project_id", "group_id"]): t.String | t.Null,
+            tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
             t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
             t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         }
@@ -565,9 +589,10 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
     log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
     project_ids = [project_id] if project_id is not None else None
-    resp = await get_container_stats_for_period(
-        request, start_date, end_date, project_ids=project_ids
+    usage_map = await get_project_stats_for_period(
+        root_ctx, start_date, end_date, project_ids=project_ids
     )
+    resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
     return web.json_response(resp, status=200)
 

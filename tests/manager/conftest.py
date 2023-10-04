@@ -847,11 +847,13 @@ async def session_info(database_engine):
         domain = DomainRow(name=domain_name, total_resource_slots={})
         db_sess.add(domain)
 
-        user_resource_policy = UserResourcePolicyRow(name=resource_policy_name, max_vfolder_size=-1)
+        user_resource_policy = UserResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+        )
         db_sess.add(user_resource_policy)
 
         project_resource_policy = ProjectResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_size=-1
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
         )
         db_sess.add(project_resource_policy)
 

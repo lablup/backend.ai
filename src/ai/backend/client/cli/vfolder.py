@@ -166,7 +166,9 @@ def create(name, host, project, host_path, usage_mode, permission, quota, clonea
 @vfolder.command()
 @click.argument("name", type=str)
 def delete(name):
-    """Delete the given virtual folder. This operation is irreversible!
+    """Delete the given virtual folder.
+    This operation can be retracted by
+    calling `recover()`.
 
     \b
     NAME: Name of a virtual folder.
@@ -175,6 +177,38 @@ def delete(name):
         try:
             session.VFolder(name).delete()
             print_done("Deleted.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
+def purge(name):
+    """Purge the given virtual folder. This operation is irreversible!
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).purge()
+            print_done("Purged.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("name", type=str)
+def recover(name):
+    """Recover the given virtual folder from deleted status.
+
+    NAME: Name of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(name).recover()
+            print_done("Recovered.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -220,6 +254,7 @@ def info(name):
             print("- Number of files: {0}".format(result["numFiles"]))
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
+            print("- Status:", result["status"])
             print("- Usage Mode: {0}".format(result.get("usage_mode", "")))
             print("- Project ID: {0}".format(result["project"]))
             print("- User ID: {0}".format(result["user"]))

@@ -142,8 +142,6 @@ keypair_resource_policy_fields = FieldSet(
         FieldSpec("created_at"),
         FieldSpec("total_resource_slots"),
         FieldSpec("max_concurrent_sessions"),  # formerly concurrency_limit
-        FieldSpec("max_vfolder_count"),
-        FieldSpec("max_vfolder_size", formatter=sizebytes_output_formatter),
         FieldSpec("idle_timeout"),
         FieldSpec("max_containers_per_session"),
         FieldSpec("allowed_vfolder_hosts"),
@@ -294,6 +292,7 @@ vfolder_fields = FieldSet(
         FieldSpec("status"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
+        FieldSpec("status"),
         FieldSpec("permission"),
         FieldSpec("ownership_type"),
         FieldSpec("max_files"),
