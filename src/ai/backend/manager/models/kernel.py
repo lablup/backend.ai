@@ -576,6 +576,7 @@ class KernelRow(Base):
             )
         return None
 
+    @property
     def is_private(self) -> bool:
         return self.role in PRIVATE_KERNEL_ROLES
 
