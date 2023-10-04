@@ -19,15 +19,13 @@ import aiotools
 import click
 import jinja2
 import tomli
-import yarl
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
-from ai.backend.common import config
+from ai.backend.common import config, redis_helper
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.web.session import extra_config_headers, get_session
@@ -622,9 +620,6 @@ async def server_main(
     j2env.filters["toml_scalar"] = toml_scalar
     app["j2env"] = j2env
 
-    redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
-        config["session"]["redis"]["port"]
-    ).with_password(config["session"]["redis"]["password"]) / str(config["session"]["redis"]["db"])
     keepalive_options = {}
     if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
         keepalive_options[_TCP_KEEPIDLE] = 20
@@ -632,15 +627,17 @@ async def server_main(
         keepalive_options[_TCP_KEEPINTVL] = 5
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
-    app["redis"] = await Redis.from_url(
-        str(redis_url),
+
+    app["redis"] = redis_helper.get_redis_object(
+        config["session"]["redis"],
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
-    )
+    ).client
 
     if pidx == 0 and config["session"]["flush_on_startup"]:
         await app["redis"].flushdb()
         log.info("flushed session storage.")
+
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
@@ -750,32 +747,37 @@ async def server_main(
     "-f",
     "--config",
     "config_path",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default="webserver.conf",
     help="The configuration file to use.",
 )
-@click.option("--debug", is_flag=True, default=False, help="Use more verbose logging.")
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Set the logging level to DEBUG",
+)
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+    ctx: click.Context,
+    config_path: Path,
+    log_level: str,
+    debug: bool,
 ) -> None:
     # Delete this part when you remove --debug option
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+    if debug:
+        log_level = "DEBUG"
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     cfg = config.check(raw_cfg, config_iv)
 

@@ -278,6 +278,7 @@ user_fields = FieldSet(
         FieldSpec("projects { id name }", formatter=ProjectListFormatter()),
         FieldSpec("allowed_client_ip"),
         FieldSpec("totp_activated"),
+        FieldSpec("sudo_session_enabled"),
     ]
 )
 

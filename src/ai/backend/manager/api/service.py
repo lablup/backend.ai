@@ -40,12 +40,7 @@ from ..models import (
 )
 from ..types import UserScope
 from .auth import auth_required
-from .exceptions import (
-    InvalidAPIParameters,
-    ObjectNotFound,
-    ServiceUnavailable,
-    VFolderNotFound,
-)
+from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -352,6 +347,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         )
 
     params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
     await root_ctx.registry.create_session(
@@ -375,6 +371,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         startup_command=params["startup_command"],
         tag=params["tag"],
         callback_url=params["callback_url"],
+        sudo_session_enabled=sudo_session_enabled,
     )
 
     async with root_ctx.db.begin_session() as db_sess:
