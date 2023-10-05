@@ -1,7 +1,7 @@
 """make routings contain error
 
 Revision ID: 8c74e7df26f8
-Revises: 85615e005fa3
+Revises: b86b341fd9c9
 Create Date: 2023-10-01 15:05:38.743702
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "8c74e7df26f8"
-down_revision = "85615e005fa3"
+down_revision = "b86b341fd9c9"
 branch_labels = None
 depends_on = None
 
