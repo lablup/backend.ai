@@ -69,6 +69,7 @@ from ai.backend.common.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+    RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -108,6 +109,7 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
+from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
     BackendError,
@@ -322,6 +324,7 @@ class AgentRegistry:
         evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
+        evd.consume(RouteCreatedEvent, self, handle_route_creation)
 
         # action-trigerring events
         evd.consume(DoSyncKernelLogsEvent, self, handle_kernel_log, name="api.session.syncklog")
@@ -405,8 +408,7 @@ class AgentRegistry:
         starts_at_timestamp: Optional[str] = None,
         tag: Optional[str] = None,
         callback_url: Optional[yarl.URL] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        traffic_ratio: Optional[float] = None,
+        route_id: Optional[uuid.UUID] = None,
         sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
@@ -564,8 +566,7 @@ class AgentRegistry:
                         dependency_sessions=[SessionId(d) for d in dependencies],
                         callback_url=callback_url,
                         public_sgroup_only=public_sgroup_only,
-                        endpoint_id=endpoint_id,
-                        traffic_ratio=traffic_ratio,
+                        route_id=route_id,
                         sudo_session_enabled=sudo_session_enabled,
                     )
                 ),
@@ -863,8 +864,7 @@ class AgentRegistry:
         agent_list: Optional[Sequence[str]] = None,
         dependency_sessions: Optional[Sequence[SessionId]] = None,
         callback_url: Optional[URL] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        traffic_ratio: Optional[float] = None,
+        route_id: Optional[uuid.UUID] = None,
         sudo_session_enabled: bool = False,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
@@ -1223,16 +1223,9 @@ class AgentRegistry:
 
             async def _post_enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
-                    if endpoint_id:
-                        routing_row = RoutingRow(
-                            endpoint_id,
-                            session_id,
-                            user_scope.user_uuid,
-                            user_scope.domain_name,
-                            user_scope.group_id,
-                            traffic_ratio=traffic_ratio or 1.0,
-                        )
-                        db_sess.add(routing_row)
+                    if route_id:
+                        routing_row = await RoutingRow.get(db_sess, route_id)
+                        routing_row.session = session_id
 
                     if dependency_sessions:
                         matched_dependency_session_ids = []
@@ -1256,6 +1249,7 @@ class AgentRegistry:
                             for depend_id in matched_dependency_session_ids
                         ]
                         db_sess.add_all(dependency_rows)
+                    await db_sess.commit()
 
             await execute_with_retry(_post_enqueue)
         except DBAPIError as e:
@@ -3491,9 +3485,20 @@ async def invoke_session_callback(
                 new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
                     if isinstance(event, SessionCancelledEvent):
+                        update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
+                        if "error" in session.status_data:
+                            if session.status_data["error"]["name"] == "MultiAgentError":
+                                errors = session.status_data["error"]["collection"]
+                            else:
+                                errors = [session.status_data["error"]]
+                            update_data["error_data"] = {
+                                "type": "session_cancelled",
+                                "errors": errors,
+                                "session_id": session.id,
+                            }
                         query = (
                             sa.update(RoutingRow)
-                            .values({"status": RouteStatus.FAILED_TO_START})
+                            .values(update_data)
                             .where(RoutingRow.id == route.id)
                         )
                         await db_sess.execute(query)
@@ -3653,6 +3658,108 @@ async def handle_agent_heartbeat(
     event: AgentHeartbeatEvent,
 ) -> None:
     await context.handle_heartbeat(source, event.agent_info)
+
+
+async def handle_route_creation(
+    context: AgentRegistry,
+    source: AgentId,
+    event: RouteCreatedEvent,
+) -> None:
+    endpoint: EndpointRow | None = None
+
+    try:
+        async with context.db.begin_readonly_session() as db_sess:
+            log.debug("Route ID: {}", event.route_id)
+            route = await RoutingRow.get(db_sess, event.route_id)
+            endpoint = await EndpointRow.get(db_sess, route.endpoint, load_image=True)
+
+            query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
+                UserRow.uuid == endpoint.created_user
+            )
+            created_user = (await db_sess.execute(query)).fetchone()
+            if endpoint.session_owner != endpoint.created_user:
+                query = sa.select(
+                    sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
+                ).where(UserRow.uuid == endpoint.session_owner)
+                session_owner = (await db_sess.execute(query)).fetchone()
+            else:
+                session_owner = created_user
+
+            _, group_id, resource_policy = await query_userinfo(
+                db_sess,
+                created_user.uuid,
+                created_user["access_key"],
+                created_user.role,
+                created_user.domain_name,
+                None,
+                endpoint.domain,
+                endpoint.project,
+                query_on_behalf_of=session_owner["access_key"],
+            )
+
+            await context.create_session(
+                f"{endpoint.name}-{uuid.uuid4()}",
+                endpoint.image_row.name,
+                endpoint.image_row.architecture,
+                UserScope(
+                    domain_name=endpoint.domain,
+                    group_id=group_id,
+                    user_uuid=created_user.uuid,
+                    user_role=created_user.role,
+                ),
+                session_owner["access_key"],
+                resource_policy,
+                SessionTypes.INFERENCE,
+                {
+                    "mounts": [endpoint.model],
+                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                    "environ": endpoint.environ,
+                    "scaling_group": endpoint.resource_group,
+                    "resources": endpoint.resource_slots,
+                    "resource_opts": endpoint.resource_opts,
+                    "preopen_ports": None,
+                    "agent_list": None,
+                },
+                ClusterMode[endpoint.cluster_mode],
+                endpoint.cluster_size,
+                bootstrap_script=endpoint.bootstrap_script,
+                startup_command=endpoint.startup_command,
+                tag=endpoint.tag,
+                callback_url=endpoint.callback_url,
+                enqueue_only=True,
+                route_id=route.id,
+                sudo_session_enabled=session_owner.sudo_session_enabled,
+            )
+    except Exception as e:
+        log.exception("error while creating session:")
+        error_data = {
+            "type": "creation_failed",
+            "errors": [
+                {
+                    "src": "",
+                    "name": e.__class__.__name__,
+                    "repr": e.__repr__(),
+                }
+            ],
+        }
+
+        async def _update():
+            async with context.db.begin_session() as db_sess:
+                query = (
+                    sa.update(RoutingRow)
+                    .values({"status": RouteStatus.FAILED_TO_START, "error_data": error_data})
+                    .where(RoutingRow.id == event.route_id)
+                )
+                await db_sess.execute(query)
+                if endpoint:
+                    query = (
+                        sa.update(EndpointRow)
+                        .values({"retries": endpoint.retries + 1})
+                        .where(EndpointRow.id == endpoint.id)
+                    )
+                    await db_sess.execute(query)
+
+        await execute_with_retry(_update)
 
 
 async def handle_check_agent_resource(

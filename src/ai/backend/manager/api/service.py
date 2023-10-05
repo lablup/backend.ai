@@ -32,7 +32,6 @@ from ..models import (
     ImageRow,
     RouteStatus,
     RoutingRow,
-    SessionRow,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
@@ -699,20 +698,16 @@ async def list_errors(request: web.Request) -> web.Response:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
-        query = sa.select(SessionRow).where(SessionRow.id.in_([r.session for r in error_routes]))
-        result = await db_sess.execute(query)
-        error_sessions = result.scalars().all()
+    error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
 
     return web.json_response(
         {
             "errors": [
                 {
-                    "session_id": str(sess.id),
-                    "error": sess.status_data["error"],
+                    "session_id": route.error_data.get("session_id"),
+                    "error": route.error_data["errors"],
                 }
-                for sess in error_sessions
+                for route in error_routes
             ],
             "retries": endpoint.retries,
         }
