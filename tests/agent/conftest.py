@@ -99,6 +99,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             sentinel=None,
             service_name=None,
             password=None,
+            redis_helper_config=config.redis_helper_default_config,
         ),
         "plugins": {},
     }

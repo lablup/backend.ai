@@ -43,8 +43,10 @@ from callosum.rpc import Peer, RPCMessage
 from etcetra.types import WatchEventType
 from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
+from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
+from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -63,6 +65,7 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     LogSeverity,
+    QueueSentinel,
     SessionId,
     aobject,
 )
@@ -180,6 +183,9 @@ class RPCFunctionRegistry:
 
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
+    rpc_auth_manager_public_key: Optional[PublicKey]
+    rpc_auth_agent_public_key: Optional[PublicKey]
+    rpc_auth_agent_secret_key: Optional[SecretKey]
 
     loop: asyncio.AbstractEventLoop
     agent: AbstractAgent
@@ -218,6 +224,35 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
+        if self.local_config["agent"]["rpc-auth-agent-keypair"] is not None:
+            manager_pkey, _ = load_certificate(
+                self.local_config["agent"]["rpc-auth-manager-public-key"]
+            )
+            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+            agent_pkey, agent_skey = load_certificate(
+                self.local_config["agent"]["rpc-auth-agent-keypair"]
+            )
+            assert agent_skey is not None
+            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+            log.info(
+                "RPC encryption and authentication is enabled. "
+                "(agent_public_key = '{}', manager_public_key='{}')",
+                self.rpc_auth_agent_public_key.decode("ascii"),
+                self.rpc_auth_manager_public_key.decode("ascii"),
+            )
+            auth_handler = AgentAuthHandler(
+                "local",
+                self.rpc_auth_manager_public_key,
+                self.rpc_auth_agent_public_key,
+                self.rpc_auth_agent_secret_key,
+            )
+        else:
+            self.rpc_auth_manager_public_key = None
+            self.rpc_auth_agent_public_key = None
+            self.rpc_auth_agent_secret_key = None
+            auth_handler = None
+
         backend = self.local_config["agent"]["backend"]
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         self.agent = await agent_mod.get_agent_cls().new(  # type: ignore
@@ -225,12 +260,14 @@ class AgentRPCServer(aobject):
             self.local_config,
             stats_monitor=self.stats_monitor,
             error_monitor=self.error_monitor,
+            agent_public_key=self.rpc_auth_agent_public_key,
         )
 
         rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
+            authenticator=auth_handler,
             scheduler=ExitOrderedAsyncScheduler(),
             serializer=msgpack.packb,
             deserializer=msgpack.unpackb,
@@ -254,8 +291,12 @@ class AgentRPCServer(aobject):
             log.warning("watching etcd to wait for the manager being available")
             async with aclosing(self.etcd.watch_prefix("nodes/manager")) as agen:
                 async for ev in agen:
-                    if ev.event == WatchEventType.PUT and ev.value == "up":
-                        break
+                    match ev:
+                        case QueueSentinel.CLOSED | QueueSentinel.TIMEOUT:
+                            break
+                        case _:
+                            if ev.event == WatchEventType.PUT and ev.value == "up":
+                                break
         log.info("detected at least one manager running")
 
     async def read_agent_config(self):
@@ -263,7 +304,7 @@ class AgentRPCServer(aobject):
         self.local_config["redis"] = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
         )
-        log.info("configured redis_addr: {0}", self.local_config["redis"]["addr"])
+        log.info("configured redis: {0}", self.local_config["redis"])
 
         # Fill up vfolder configs from etcd.
         self.local_config["vfolder"] = config.vfolder_config_iv.check(

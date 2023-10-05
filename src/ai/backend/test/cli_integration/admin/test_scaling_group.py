@@ -64,6 +64,7 @@ def test_add_scaling_group(run: ClientRunnerFunc):
         "pending_timeout": 0.0,
         "config": {},
         "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
+        "roundrobin": False,
     }, "Scaling group scheduler options mismatch"
 
 
@@ -113,6 +114,7 @@ def test_update_scaling_group(run: ClientRunnerFunc):
         "pending_timeout": 0.0,
         "config": {},
         "agent_selection_strategy": AgentSelectionStrategy.DISPERSED,
+        "roundrobin": False,
     }, "Scaling group scheduler options mismatch"
 
 
