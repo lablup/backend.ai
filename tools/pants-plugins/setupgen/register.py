@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.package_dists import SetupKwargs, SetupKwargsRequest
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
@@ -49,10 +49,8 @@ async def setup_kwargs_plugin(
     # Validate that required fields are set.
     if not kwargs["name"].startswith("backend.ai-"):
         raise ValueError(
-            (
-                f"Invalid `name` kwarg in the `provides` field for {request.target.address}. The"
-                f" name must start with 'backend.ai-', but was {kwargs['name']}."
-            ),
+            f"Invalid `name` kwarg in the `provides` field for {request.target.address}. The"
+            f" name must start with 'backend.ai-', but was {kwargs['name']}.",
         )
     if "description" not in kwargs:
         raise ValueError(
@@ -134,11 +132,9 @@ async def setup_kwargs_plugin(
     conflicting_hardcoded_kwargs = set(kwargs.keys()).intersection(hardcoded_kwargs.keys())
     if conflicting_hardcoded_kwargs:
         raise ValueError(
-            (
-                "These kwargs should not be set in the `provides` field for"
-                f" {request.target.address} because Pants's internal plugin will automatically set"
-                f" them: {sorted(conflicting_hardcoded_kwargs)}"
-            ),
+            "These kwargs should not be set in the `provides` field for"
+            f" {request.target.address} because Pants's internal plugin will automatically set"
+            f" them: {sorted(conflicting_hardcoded_kwargs)}",
         )
     kwargs.update(hardcoded_kwargs)
 
