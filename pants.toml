@@ -52,7 +52,7 @@ interpreter_constraints = ["CPython==3.11.4"]
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
-search_path = ["<PYENV>"]
+search_path = ["<PYENV>", "<ASDF>"]
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
