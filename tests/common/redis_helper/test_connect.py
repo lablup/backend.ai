@@ -7,9 +7,9 @@ import aiotools
 import pytest
 import redis
 from redis.asyncio import Redis
+from redis.asyncio.retry import Retry
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
-from redis.retry import Retry
 from tenacity import (
     AsyncRetrying,
     retry_if_exception_type,
@@ -38,8 +38,6 @@ async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPort
         retry_on_error=[
             redis.exceptions.ConnectionError,
             redis.exceptions.TimeoutError,
-            ConnectionRefusedError,
-            ConnectionResetError,
         ],
     )
     await r.ping()
@@ -59,8 +57,6 @@ async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortP
             (
                 redis.exceptions.ConnectionError,
                 redis.exceptions.TimeoutError,
-                ConnectionRefusedError,
-                ConnectionResetError,
             )
         ),
     ):
