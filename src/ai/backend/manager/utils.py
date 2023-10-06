@@ -99,7 +99,7 @@ async def query_userinfo(
     requester_access_key: AccessKey,
     requester_role: UserRole,
     requester_domain: str,
-    keypair_resource_policy: dict,
+    keypair_resource_policy: dict | None,
     requesting_domain: str,
     requesting_project: str | UUID,
     query_on_behalf_of: Optional[AccessKey] = None,
@@ -119,7 +119,7 @@ async def query_userinfo(
     project_id = None
     resource_policy = None
 
-    if requester_access_key != owner_access_key:
+    if keypair_resource_policy is None or requester_access_key != owner_access_key:
         # Admin or superadmin is creating sessions for another user.
         # The check for admin privileges is already done in get_access_key_scope().
         query = (

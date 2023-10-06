@@ -460,6 +460,22 @@ class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
     name = "session_failure"
 
 
+@attrs.define(slots=True, frozen=True)
+class RouteCreationEventArgs:
+    route_id: uuid.UUID = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (str(self.route_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(uuid.UUID(value[0]))
+
+
+class RouteCreatedEvent(RouteCreationEventArgs, AbstractEvent):
+    name = "route_created"
+
+
 @attrs.define(auto_attribs=True, slots=True)
 class DoSyncKernelLogsEvent(AbstractEvent):
     name = "do_sync_kernel_logs"
