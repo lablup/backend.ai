@@ -747,6 +747,34 @@ class SchedulerDispatcher(aobject):
             agent_id: AgentId | None = None
             if agent is not None:
                 agent_id = agent.id
+
+                async with self.db.begin_session() as db_sess:
+                    result = (
+                        await db_sess.execute(
+                            sa.select([AgentRow.available_slots, AgentRow.occupied_slots]).where(
+                                AgentRow.id == agent_id
+                            )
+                        )
+                    ).fetchall()[0]
+
+                if result is None:
+                    raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
+
+                available_slots, occupied_slots = result
+
+                for key in available_slots.keys():
+                    if available_slots[key] - occupied_slots[key] >= sess_ctx.requested_slots[key]:
+                        continue
+                    else:
+                        raise InstanceNotAvailable(
+                            extra_msg=(
+                                f"The designated agent ({agent_id}) does not have "
+                                f"the enough remaining capacity ({key}, "
+                                f"requested: {sess_ctx.requested_slots[key]}, "
+                                f"remaining: {available_slots[key] - occupied_slots[key]})."
+                            ),
+                        )
+
             else:
                 sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
 
@@ -817,23 +845,6 @@ class SchedulerDispatcher(aobject):
                         )
 
             async with self.db.begin_session() as agent_db_sess:
-                query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
-                available_agent_slots = (await agent_db_sess.execute(query)).scalar()
-                if available_agent_slots is None:
-                    raise GenericBadRequest(f"No such agent: {agent_id}")
-                assert isinstance(available_agent_slots, ResourceSlot)
-                for key in available_agent_slots:
-                    if available_agent_slots[key] >= sess_ctx.requested_slots[key]:
-                        continue
-                    else:
-                        raise InstanceNotAvailable(
-                            extra_msg=(
-                                f"The designated agent ({agent_id}) does not have "
-                                f"the enough remaining capacity ({key}, "
-                                f"requested: {sess_ctx.requested_slots[key]}, "
-                                f"available: {available_agent_slots[key]})."
-                            ),
-                        )
                 agent_alloc_ctx = await _reserve_agent(
                     sched_ctx,
                     agent_db_sess,
@@ -981,12 +992,23 @@ class SchedulerDispatcher(aobject):
                     agent: Optional[AgentRow] = kernel.agent_row
                     if agent is not None:
                         # Check the resource availability of the manually designated agent
-                        query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent.id)
-                        available_agent_slots = (await agent_db_sess.execute(query)).scalar()
-                        if available_agent_slots is None:
-                            raise GenericBadRequest(f"No such agent: {agent.id}")
-                        for key in available_agent_slots:
-                            if available_agent_slots[key] >= kernel.requested_slots[key]:
+                        result = (
+                            await agent_db_sess.execute(
+                                sa.select(
+                                    [AgentRow.available_slots, AgentRow.occupied_slots]
+                                ).where(AgentRow.id == agent.id)
+                            )
+                        ).fecthall()[0]
+
+                        if result is None:
+                            raise GenericBadRequest(f"No such agent exist in DB: {agent_id}")
+                        available_slots, occupied_slots = result
+
+                        for key in available_slots.keys():
+                            if (
+                                available_slots[key] - occupied_slots[key]
+                                >= kernel.requested_slots[key]
+                            ):
                                 continue
                             else:
                                 raise InstanceNotAvailable(
@@ -994,7 +1016,7 @@ class SchedulerDispatcher(aobject):
                                         f"The designated agent ({agent.id}) does not have "
                                         f"the enough remaining capacity ({key}, "
                                         f"requested: {sess_ctx.requested_slots[key]}, "
-                                        f"available: {available_agent_slots[key]})."
+                                        f"remaining: {available_slots[key] - occupied_slots[key]})."
                                     ),
                                 )
                         agent_id = agent.id
