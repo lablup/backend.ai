@@ -87,7 +87,6 @@ from ai.backend.common.events import (
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
     KernelHealthCheckFailedEvent,
-    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
@@ -187,6 +186,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
+    event_producer: EventProducer
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
     kernel_features: FrozenSet[str]
@@ -201,6 +201,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
@@ -212,6 +213,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
+        self.event_producer = event_producer
         self.kernel_config = kernel_config
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
@@ -1520,6 +1522,7 @@ class AbstractAgent(
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config
             if kernel_obj.runner is not None:
+                kernel_obj.runner.event_producer = self.event_producer
                 await kernel_obj.runner.__ainit__()
         async with self.registry_lock:
             for kernel_id, container in await self.enumerate_containers(
@@ -1985,7 +1988,7 @@ class AbstractAgent(
                     raise
                 async with self.registry_lock:
                     self.kernel_registry[ctx.kernel_id].data.update(container_data)
-                await kernel_obj.init()
+                await kernel_obj.init(self.event_producer)
 
                 current_task = asyncio.current_task()
                 assert current_task is not None
@@ -2049,7 +2052,7 @@ class AbstractAgent(
                 if model_definition:
                     for model in model_definition["models"]:
                         asyncio.create_task(
-                            self.start_and_monitor_model_service_initial_health(kernel_obj, model)
+                            self.start_and_monitor_model_service_health(kernel_obj, model)
                         )
 
                 # Finally we are done.
@@ -2084,7 +2087,7 @@ class AbstractAgent(
                 await self.reconstruct_resource_usage()
                 raise e
 
-    async def start_and_monitor_model_service_initial_health(
+    async def start_and_monitor_model_service_health(
         self,
         kernel_obj: KernelObjectType,
         model: Any,
@@ -2094,13 +2097,9 @@ class AbstractAgent(
         if result["status"] == "failed":
             await self.event_producer.produce_event(
                 KernelHealthCheckFailedEvent(
-                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
-                )
-            )
-        else:
-            await self.event_producer.produce_event(
-                KernelHealthyEvent(
-                    kernel_obj.kernel_id, kernel_obj.session_id, reason=model["name"]
+                    kernel_obj.kernel_id,
+                    kernel_obj.session_id,
+                    reason=model["name"],
                 )
             )
 

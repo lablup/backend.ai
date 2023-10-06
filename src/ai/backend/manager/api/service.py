@@ -338,7 +338,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params["image"], ["*"], params["architecture"]),
+                ImageRef(params["image"], ["*"], "arm64"),
                 params["image"],
             ],
         )
@@ -350,7 +350,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     await root_ctx.registry.create_session(
         "",
         params["image"],
-        params["architecture"],
+        "arm64",
         UserScope(
             domain_name=params["domain"],
             group_id=group_id,

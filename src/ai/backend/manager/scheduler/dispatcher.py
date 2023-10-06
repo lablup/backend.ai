@@ -1359,7 +1359,7 @@ class SchedulerDispatcher(aobject):
             desired_session_count = endpoint.desired_session_count
             if (
                 endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
-                and len(endpoint.routings) == 0
+                and len(non_error_routings) == 0
             ):
                 endpoints_to_mark_terminated.add(endpoint)
                 continue
@@ -1420,7 +1420,7 @@ class SchedulerDispatcher(aobject):
             try:
                 await self.registry.destroy_session(
                     session,
-                    forced=False,
+                    forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 )
             except SessionNotFound:
