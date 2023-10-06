@@ -298,7 +298,6 @@ CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
-
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
@@ -865,7 +864,8 @@ setup_environment() {
   if [ $ENABLE_SSL -eq 1 ]; then
     show_info "Generating self-signed certificate..."
     openssl req -x509 -newkey rsa:4096 -keyout "${HALFSTACK_VOLUME_PATH}/redis-data/key.pem" -out "${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem" -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=www.example.com"
-    sed_inplace "s/^# \(.*--tls-.*\)/\1/" docker-compose.halfstack.current.yml
+  else
+    sed_inplace "/^ *--tls-/s/^/# /" docker-compose.halfstack.current.yml
   fi
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
