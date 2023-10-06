@@ -514,13 +514,14 @@ def get_redis_object(
             password=password,
             db=str(db),
             ssl=use_ssl,
-            **ssl_configs,
             sentinel_kwargs={
                 "password": password,
                 "ssl": use_ssl,
                 **ssl_configs,
                 **kwargs,
             },
+            min_other_sentinels=0,
+            **ssl_configs,
         )
         return RedisConnectionInfo(
             client=sentinel.master_for(
