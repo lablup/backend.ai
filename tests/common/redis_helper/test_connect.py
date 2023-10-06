@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
-        url=f"redis://{addr.host}:{addr.port}",
+        f"redis://{addr.host}:{addr.port}",
         socket_timeout=10.0,
         retry=Retry(ExponentialBackoff(), 10),
         retry_on_error=[
@@ -49,7 +49,7 @@ async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPort
 async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
-        url=f"redis://{addr.host}:{addr.port}",
+        f"redis://{addr.host}:{addr.port}",
         socket_timeout=10.0,
     )
     async for attempt in AsyncRetrying(
