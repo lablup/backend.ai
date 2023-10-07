@@ -711,7 +711,6 @@ class BaseRunner(metaclass=ABCMeta):
         )
         retries = 0
         is_healthy = False
-        print(json.dumps(model_service_info))
         while True:
             new_is_healthy = False
             try:
