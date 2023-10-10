@@ -333,7 +333,7 @@ class ModelServiceStatusEventArgs:
             str(self.kernel_id),
             str(self.session_id),
             self.model_name,
-            str(self.new_status),
+            self.new_status.value,
         )
 
     @classmethod
