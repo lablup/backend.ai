@@ -16,7 +16,7 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 23.09.0 (2023-10-10)
+## 23.09.1 (2023-10-10)
 
 ### Features
 * Refactor initiating logic of model session DB models so that errors while creating the session can be also stored and expressed to user ([#1599](https://github.com/lablup/backend.ai/issues/1599))
