@@ -320,12 +320,33 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
-class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_healthy"
+@attrs.define(slots=True, frozen=True)
+class ModelServiceHealthStatusEventArgs:
+    kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
+    model_name: str = attrs.field()
+    is_healthy: bool = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.kernel_id),
+            str(self.session_id),
+            self.model_name,
+            self.is_healthy,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            session_id=SessionId(uuid.UUID(value[1])),
+            model_name=value[2],
+            is_healthy=value[3],
+        )
 
 
-class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_health_check_failed"
+class ModelServiceHealthStatusUpdatedEvent(ModelServiceHealthStatusEventArgs, AbstractEvent):
+    name = "model_service_health_status_updated"
 
 
 @attrs.define(slots=True, frozen=True)

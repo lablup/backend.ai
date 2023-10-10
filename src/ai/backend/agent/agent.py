@@ -86,12 +86,12 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
-    KernelHealthCheckFailedEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
+    ModelServiceHealthStatusUpdatedEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
     VolumeMountableNodeType,
@@ -2096,10 +2096,11 @@ class AbstractAgent(
         result = await kernel_obj.start_model_service(model)
         if result["status"] == "failed":
             await self.event_producer.produce_event(
-                KernelHealthCheckFailedEvent(
+                ModelServiceHealthStatusUpdatedEvent(
                     kernel_obj.kernel_id,
                     kernel_obj.session_id,
-                    reason=model["name"],
+                    model["name"],
+                    False,
                 )
             )
 

@@ -37,11 +37,9 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import (
-    AbstractEvent,
     EventProducer,
-    KernelHealthCheckFailedEvent,
-    KernelHealthyEvent,
     KernelLifecycleEventReason,
+    ModelServiceHealthStatusUpdatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
@@ -951,15 +949,12 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = json.loads(msg_data)
-                            event: AbstractEvent
-                            if response["is_healthy"]:
-                                event = KernelHealthyEvent(
-                                    self.kernel_id, self.session_id, reason=response["model_name"]
-                                )
-                            else:
-                                event = KernelHealthCheckFailedEvent(
-                                    self.kernel_id, self.session_id, reason=response["model_name"]
-                                )
+                            event = ModelServiceHealthStatusUpdatedEvent(
+                                self.kernel_id,
+                                self.session_id,
+                                response["model_name"],
+                                response["is_healthy"],
+                            )
                             await self.event_producer.produce_event(event)
                         case b"apps-result":
                             await self.service_apps_info_queue.put(msg_data)

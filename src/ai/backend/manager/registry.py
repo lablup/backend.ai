@@ -61,14 +61,13 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
-    KernelHealthCheckFailedEvent,
-    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+    ModelServiceHealthStatusUpdatedEvent,
     RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
@@ -295,14 +294,9 @@ class AgentRegistry:
             name="api.session.kterm",
         )
         evd.consume(
-            KernelHealthCheckFailedEvent,
+            ModelServiceHealthStatusUpdatedEvent,
             self,
-            handle_kernel_health_check_result,
-        )
-        evd.consume(
-            KernelHealthyEvent,
-            self,
-            handle_kernel_health_check_result,
+            handle_model_service_health_check_result,
         )
         evd.consume(
             SessionTerminatingEvent,
@@ -3393,12 +3387,12 @@ async def handle_destroy_session(
     )
 
 
-async def handle_kernel_health_check_result(
+async def handle_model_service_health_check_result(
     context: AgentRegistry,
     source: AgentId,
-    event: KernelHealthyEvent | KernelHealthCheckFailedEvent,
+    event: ModelServiceHealthStatusUpdatedEvent,
 ) -> None:
-    log.info("HANDLE_KERNEL_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
+    log.info("HANDLE_MODEL_SERVICE_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
     try:
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
@@ -3416,13 +3410,7 @@ async def handle_kernel_health_check_result(
             query = (
                 sa.update(RoutingRow)
                 .values(
-                    {
-                        "status": (
-                            RouteStatus.HEALTHY
-                            if isinstance(event, KernelHealthyEvent)
-                            else RouteStatus.UNHEALTHY
-                        )
-                    }
+                    {"status": RouteStatus.HEALTHY if event.is_healthy else RouteStatus.UNHEALTHY}
                 )
                 .where(RoutingRow.id == route.id)
             )
