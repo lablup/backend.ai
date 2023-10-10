@@ -119,6 +119,7 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
+    ModelServiceStatus,
     MountPermission,
     MountTypes,
     Sentinel,
@@ -2102,7 +2103,7 @@ class AbstractAgent(
                     kernel_obj.kernel_id,
                     kernel_obj.session_id,
                     model["name"],
-                    False,
+                    ModelServiceStatus.HEALTHY,
                 )
             )
 

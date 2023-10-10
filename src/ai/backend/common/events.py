@@ -42,6 +42,7 @@ from .types import (
     EtcdRedisConfig,
     KernelId,
     LogSeverity,
+    ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
@@ -325,14 +326,14 @@ class ModelServiceStatusEventArgs:
     kernel_id: KernelId = attrs.field()
     session_id: SessionId = attrs.field()
     model_name: str = attrs.field()
-    is_healthy: bool = attrs.field()
+    new_status: ModelServiceStatus = attrs.field()
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
             str(self.session_id),
             self.model_name,
-            self.is_healthy,
+            str(self.new_status),
         )
 
     @classmethod
@@ -341,7 +342,7 @@ class ModelServiceStatusEventArgs:
             kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
             model_name=value[2],
-            is_healthy=value[3],
+            new_status=ModelServiceStatus(value[3]),
         )
 
 

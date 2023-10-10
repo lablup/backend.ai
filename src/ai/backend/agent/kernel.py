@@ -42,7 +42,15 @@ from ai.backend.common.events import (
     ModelServiceStatusEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
+from ai.backend.common.types import (
+    AgentId,
+    CommitStatus,
+    KernelId,
+    ModelServiceStatus,
+    ServicePort,
+    SessionId,
+    aobject,
+)
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -953,7 +961,11 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                                 self.kernel_id,
                                 self.session_id,
                                 response["model_name"],
-                                response["is_healthy"],
+                                (
+                                    ModelServiceStatus.HEALTHY
+                                    if response["is_healthy"]
+                                    else ModelServiceStatus.UNHEALTHY
+                                ),
                             )
                             await self.event_producer.produce_event(event)
                         case b"apps-result":

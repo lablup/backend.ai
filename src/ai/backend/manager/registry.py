@@ -98,6 +98,7 @@ from ai.backend.common.types import (
     ImageAlias,
     KernelEnqueueingConfig,
     KernelId,
+    ModelServiceStatus,
     RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
@@ -296,7 +297,7 @@ class AgentRegistry:
         evd.consume(
             ModelServiceStatusEvent,
             self,
-            handle_model_service_health_check_result,
+            handle_model_service_status_update,
         )
         evd.consume(
             SessionTerminatingEvent,
@@ -3387,12 +3388,12 @@ async def handle_destroy_session(
     )
 
 
-async def handle_model_service_health_check_result(
+async def handle_model_service_status_update(
     context: AgentRegistry,
     source: AgentId,
     event: ModelServiceStatusEvent,
 ) -> None:
-    log.info("HANDLE_MODEL_SERVICE_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
+    log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
     try:
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
@@ -3407,13 +3408,13 @@ async def handle_model_service_health_check_result(
 
     async def _update():
         async with context.db.begin_session() as db_sess:
-            query = (
-                sa.update(RoutingRow)
-                .values(
-                    {"status": RouteStatus.HEALTHY if event.is_healthy else RouteStatus.UNHEALTHY}
-                )
-                .where(RoutingRow.id == route.id)
-            )
+            data: dict[str, Any] = {}
+            match event.new_status:
+                case ModelServiceStatus.HEALTHY:
+                    data["status"] = RouteStatus.HEALTHY
+                case ModelServiceStatus.UNHEALTHY:
+                    data["status"] = RouteStatus.UNHEALTHY
+            query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
             await db_sess.execute(query)
 
             query = sa.select(RoutingRow).where(
