@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.0 (2023-10-10)
+
+### Features
+* Refactor initiating logic of model session DB models so that errors while creating the session can be also stored and expressed to user ([#1599](https://github.com/lablup/backend.ai/issues/1599))
+* Check health status of model service actively ([#1606](https://github.com/lablup/backend.ai/issues/1606))
+
+### Miscellaneous
+* Bump base Python version from 3.11.4 to 3.11.6 to resolve potential bugs. ([#1603](https://github.com/lablup/backend.ai/issues/1603))
+
+
 ## 23.09.0 (2023-09-28)
 
 ### Features
