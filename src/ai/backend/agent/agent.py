@@ -91,7 +91,7 @@ from ai.backend.common.events import (
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
-    ModelServiceHealthStatusUpdatedEvent,
+    ModelServiceStatusEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
     VolumeMountableNodeType,
@@ -2095,8 +2095,10 @@ class AbstractAgent(
         log.debug("starting model service of model {}", model["name"])
         result = await kernel_obj.start_model_service(model)
         if result["status"] == "failed":
+            # handle cases where krunner fails to spawn model service process
+            # if everything went well then krunner itself will report the status via zmq
             await self.event_producer.produce_event(
-                ModelServiceHealthStatusUpdatedEvent(
+                ModelServiceStatusEvent(
                     kernel_obj.kernel_id,
                     kernel_obj.session_id,
                     model["name"],

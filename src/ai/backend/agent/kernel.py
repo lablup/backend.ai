@@ -39,7 +39,7 @@ from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.events import (
     EventProducer,
     KernelLifecycleEventReason,
-    ModelServiceHealthStatusUpdatedEvent,
+    ModelServiceStatusEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, ServicePort, SessionId, aobject
@@ -949,7 +949,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = json.loads(msg_data)
-                            event = ModelServiceHealthStatusUpdatedEvent(
+                            event = ModelServiceStatusEvent(
                                 self.kernel_id,
                                 self.session_id,
                                 response["model_name"],

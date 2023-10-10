@@ -67,7 +67,7 @@ from ai.backend.common.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
-    ModelServiceHealthStatusUpdatedEvent,
+    ModelServiceStatusEvent,
     RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
@@ -294,7 +294,7 @@ class AgentRegistry:
             name="api.session.kterm",
         )
         evd.consume(
-            ModelServiceHealthStatusUpdatedEvent,
+            ModelServiceStatusEvent,
             self,
             handle_model_service_health_check_result,
         )
@@ -3390,7 +3390,7 @@ async def handle_destroy_session(
 async def handle_model_service_health_check_result(
     context: AgentRegistry,
     source: AgentId,
-    event: ModelServiceHealthStatusUpdatedEvent,
+    event: ModelServiceStatusEvent,
 ) -> None:
     log.info("HANDLE_MODEL_SERVICE_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
     try:

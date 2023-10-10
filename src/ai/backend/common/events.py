@@ -321,7 +321,7 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 
 
 @attrs.define(slots=True, frozen=True)
-class ModelServiceHealthStatusEventArgs:
+class ModelServiceStatusEventArgs:
     kernel_id: KernelId = attrs.field()
     session_id: SessionId = attrs.field()
     model_name: str = attrs.field()
@@ -345,8 +345,8 @@ class ModelServiceHealthStatusEventArgs:
         )
 
 
-class ModelServiceHealthStatusUpdatedEvent(ModelServiceHealthStatusEventArgs, AbstractEvent):
-    name = "model_service_health_status_updated"
+class ModelServiceStatusEvent(ModelServiceStatusEventArgs, AbstractEvent):
+    name = "model_service_status_updated"
 
 
 @attrs.define(slots=True, frozen=True)
