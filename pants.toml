@@ -52,7 +52,7 @@ interpreter_constraints = ["CPython==3.11.6"]
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
-search_path = ["<PYENV>", "<ASDF>"]
+search_path = ["<PYENV_LOCAL>", "<ASDF_LOCAL>", "<PYENV>", "<ASDF>"]
 
 [python-infer]
 use_rust_parser = true
