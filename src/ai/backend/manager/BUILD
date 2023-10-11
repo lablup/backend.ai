@@ -9,6 +9,15 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/cli/**",
+    ],
+)
+
 pex_binary(
     name="server",
     dependencies=[
