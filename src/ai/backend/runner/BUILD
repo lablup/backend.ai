@@ -6,7 +6,6 @@ python_sources(
 )
 
 visibility_private_component(
-    name="krunner-binary-deps",
     allowed_dependents=[
         "//src/ai/backend/kernel/**",
         "//src/ai/backend/agent/**",

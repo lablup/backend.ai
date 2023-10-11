@@ -8,7 +8,6 @@ python_sources(
 )
 
 visibility_private_component(
-    name="krunner-deps",
     allowed_dependents=[],
     allowed_dependencies=[
         "//src/ai/backend/common/**",

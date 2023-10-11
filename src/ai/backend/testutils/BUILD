@@ -3,7 +3,6 @@ python_test_utils(
 )
 
 visibility_private_component(
-    name="dep-rule",
     allowed_dependents=[
         "//src/ai/backend/test/**",
     ],
