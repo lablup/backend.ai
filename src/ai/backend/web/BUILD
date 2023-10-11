@@ -6,6 +6,17 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    name="dep-rule",
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/client/**",
+        "//src/ai/backend/cli/**",
+    ],
+)
+
 pex_binary(
     name="server",
     dependencies=[

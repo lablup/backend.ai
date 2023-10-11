@@ -8,6 +8,16 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    name="krunner-deps",
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/runner/**",
+        "//src/ai/backend/helpers/**",
+        "//python-kernel.lock",
+    ],
+)
+
 pex_binary(
     name="__main__",
     entry_point="__main__.py",

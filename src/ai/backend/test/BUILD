@@ -7,6 +7,16 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    name="krunner-deps",
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/testutils/**",
+    ],
+)
+
 pex_binary(
     name="cli",
     dependencies=[
