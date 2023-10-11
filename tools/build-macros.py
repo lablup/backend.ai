@@ -3,7 +3,7 @@ def visibility_private_component(**kwargs):
     allowed_dependencies = kwargs.get("allowed_dependencies", [])
     allowed_dependents = kwargs.get("allowed_dependents", [])
 
-    __dependents_rules__(
+    __dependents_rules__(  # noqa: F821
         (
             {"type": "*"},  # applies to every target in the project
             "/**",  # code within this directory, recursively
@@ -13,7 +13,7 @@ def visibility_private_component(**kwargs):
             "!*",  # no one else may import the source files
         )
     )
-    __dependencies_rules__(
+    __dependencies_rules__(  # noqa: F821
         (
             "*",  # applies to everything in this BUILD file
             "/**",  # may depend on anything in this subtree
