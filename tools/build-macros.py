@@ -20,7 +20,6 @@ def visibility_private_component(**kwargs):
             allowed_dependencies,  # extra allowed dependencies
             "//reqs#*",  # may depend on 3rd-party packages
             "//stubs/**",  # may depend on custom type stubs
-            "_lockfiles",
             "!*",  # may not depend on anything else
         )
     )
