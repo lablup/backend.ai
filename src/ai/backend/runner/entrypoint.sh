@@ -4,6 +4,13 @@ USER_ID=${LOCAL_USER_ID:-9001}
 GROUP_ID=${LOCAL_GROUP_ID:-9001}
 
 echo "Kernel started at: $(date -Iseconds -u)"
+echo "LOCAL_USER_ID=$LOCAL_USER_ID"
+echo "LOCAL_GROUP_ID=$LOCAL_GROUP_ID"
+echo "USER_ID=$USER_ID"
+echo "GROUP_ID=$GROUP_ID"
+if [ -z "$LOCAL_USER_ID" ]; then
+  echo "WARNING: \$LOCAL_USER_ID is an empty value. This may be a misbehavior of plugins manipulating the evironment variables of new containers and cause unexpected errors."
+fi
 
 if [ $USER_ID -eq 0 ]; then
 

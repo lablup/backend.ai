@@ -832,8 +832,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
-        if self.local_config["debug"]["log-kernel-config"]:
-            log.debug("full container config: {!r}", pretty(container_config))
 
         # optional local override of docker config
         extra_container_opts_name = "agent-docker-container-opts.json"
@@ -848,6 +846,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     update_nested_dict(container_config, extra_container_opts)
                 except IOError:
                     pass
+
+        # The final container config is settled down here.
+        if self.local_config["debug"]["log-kernel-config"]:
+            log.debug("full container config: {!r}", pretty(container_config))
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
