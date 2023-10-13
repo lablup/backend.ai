@@ -86,6 +86,9 @@ else
     else
       # The image has an existing user name for the given uid.
       # Merge the image's existing home directory into the bind-mounted "/home/work" from the scratch space.
+      # NOTE: Since the image layer and the scratch directory may reside in different filesystems,
+      #       we cannot use hard-links to reduce the copy overhead.
+      #       It assumes that the number/size of files in the image's home directory is not very large.
       cp -Rp "/home/$USER_NAME/*" /home/work/
       cp -Rp "/home/$USER_NAME/.*" /home/work/
       # Rename the user to "work" and let it use "/home/work" as the new home directory.
