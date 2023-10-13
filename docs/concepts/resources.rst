@@ -28,9 +28,9 @@ Resource slots are distinguished by its name consisting of two parts: the device
    * - ``cuda.shares``
      - ``cuda``
      - ``shares``
-   * - ``cuda.mig-10g``
+   * - ``cuda.mig-2c10g``
      - ``cuda``
-     - ``mig-10g``
+     - ``mig-2c10g``
 
 Each resource slot has a slot type as follows:
 
