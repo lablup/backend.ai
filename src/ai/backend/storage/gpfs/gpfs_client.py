@@ -1,4 +1,3 @@
-import base64
 import contextlib
 import logging
 import urllib.parse
@@ -7,7 +6,7 @@ from ssl import SSLContext
 from typing import Any, AsyncIterator, Dict, List, Mapping, Optional
 
 import aiohttp
-from aiohttp import web
+from aiohttp import BasicAuth, web
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -64,9 +63,7 @@ class GPFSAPIClient:
 
     @property
     def _req_header(self) -> Mapping[str, str]:
-        credential = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
         return {
-            "Authorization": f"Basic {credential}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -119,7 +116,7 @@ class GPFSAPIClient:
     @contextlib.asynccontextmanager
     async def _build_session(self) -> AsyncIterator[aiohttp.ClientSession]:
         async with aiohttp.ClientSession(
-            base_url=self.api_endpoint,
+            base_url=self.api_endpoint, auth=BasicAuth(self.username, self.password)
         ) as sess:
             yield sess
 
@@ -250,7 +247,6 @@ class GPFSAPIClient:
     ) -> None:
         body: Dict[str, Any] = {
             "filesetName": fileset_name,
-            "createDirectory": create_directory,
         }
         if owner is not None:
             body["owner"] = owner
