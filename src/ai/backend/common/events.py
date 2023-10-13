@@ -42,6 +42,7 @@ from .types import (
     EtcdRedisConfig,
     KernelId,
     LogSeverity,
+    ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
@@ -320,12 +321,33 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
-class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_healthy"
+@attrs.define(slots=True, frozen=True)
+class ModelServiceStatusEventArgs:
+    kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
+    model_name: str = attrs.field()
+    new_status: ModelServiceStatus = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.kernel_id),
+            str(self.session_id),
+            self.model_name,
+            self.new_status.value,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            session_id=SessionId(uuid.UUID(value[1])),
+            model_name=value[2],
+            new_status=ModelServiceStatus(value[3]),
+        )
 
 
-class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_health_check_failed"
+class ModelServiceStatusEvent(ModelServiceStatusEventArgs, AbstractEvent):
+    name = "model_service_status_updated"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -458,6 +480,22 @@ class SessionSuccessEvent(SessionResultEventArgs, AbstractEvent):
 
 class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
     name = "session_failure"
+
+
+@attrs.define(slots=True, frozen=True)
+class RouteCreationEventArgs:
+    route_id: uuid.UUID = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (str(self.route_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(uuid.UUID(value[0]))
+
+
+class RouteCreatedEvent(RouteCreationEventArgs, AbstractEvent):
+    name = "route_created"
 
 
 @attrs.define(auto_attribs=True, slots=True)

@@ -61,8 +61,6 @@ _default_conn_opts: Mapping[str, Any] = {
     "retry_on_error": [
         redis.exceptions.ConnectionError,
         redis.exceptions.TimeoutError,
-        ConnectionRefusedError,
-        ConnectionResetError,
     ],
 }
 

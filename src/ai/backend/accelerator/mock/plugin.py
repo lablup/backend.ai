@@ -38,6 +38,7 @@ from ai.backend.agent.resources import (
     FractionAllocMap,
 )
 from ai.backend.agent.types import Container, MountInfo
+from ai.backend.agent.utils import update_nested_dict
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -613,11 +614,17 @@ class MockPlugin(AbstractComputePlugin):
         match self.key:
             case "cuda":
                 if self.nvdocker_version[0] == 2:
-                    docker_config["env"] = [
-                        f"TF_MIN_GPU_MULTIPROCESSOR_COUNT={MIN_SMP_COUNT}",
-                        "BACKENDAI_MOCK_CUDA_DEVICES=" + ",".join(map(str, assigned_device_ids)),
-                        f"BACKENDAI_MOCK_CUDA_DEVICE_COUNT={len(assigned_device_ids)}",
-                    ]
+                    update_nested_dict(
+                        docker_config,
+                        {
+                            "Env": [
+                                f"TF_MIN_GPU_MULTIPROCESSOR_COUNT={MIN_SMP_COUNT}",
+                                "BACKENDAI_MOCK_CUDA_DEVICES="
+                                + ",".join(map(str, assigned_device_ids)),
+                                f"BACKENDAI_MOCK_CUDA_DEVICE_COUNT={len(assigned_device_ids)}",
+                            ]
+                        },
+                    )
                 else:
                     raise RuntimeError(
                         f"Unsupported nvidia-docker version: {self.nvdocker_version}"

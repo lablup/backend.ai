@@ -1333,7 +1333,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_scaling_groups_for_group(
+    async def resolve_scaling_groups_for_user_group(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         user_group,
