@@ -72,7 +72,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def rescan_single_registry(
         self,
-        reporter: ProgressReporter = None,
+        reporter: ProgressReporter | None = None,
     ) -> None:
         self.all_updates.set({})
         self.sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
@@ -83,21 +83,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         password = self.registry_info["password"]
         if password is not None:
             self.credentials["password"] = password
-        non_kernel_words = (
-            "common-",
-            "commons-",
-            "base-",
-            "krunner",
-            "builder",
-            "backendai",
-            "geofront",
-        )
         async with actxmgr(self.prepare_client_session)() as (url, client_session):
             self.registry_url = url
             async with aiotools.TaskGroup() as tg:
                 async for image in self.fetch_repositories(client_session):
-                    if not any((w in image) for w in non_kernel_words):  # skip non-kernel images
-                        tg.create_task(self._scan_image(client_session, image))
+                    tg.create_task(self._scan_image(client_session, image))
 
         all_updates = self.all_updates.get()
         if not all_updates:
