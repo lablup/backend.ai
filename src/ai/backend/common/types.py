@@ -67,6 +67,7 @@ __all__ = (
     "ResourceSlot",
     "ReadableCIDR",
     "HardwareMetadata",
+    "ModelServiceStatus",
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
@@ -1183,3 +1184,8 @@ class RoundRobinState(JSONSerializableMixin):
 
 # States of the round-robin scheduler for each resource group and architecture.
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+
+class ModelServiceStatus(enum.Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
