@@ -53,6 +53,7 @@ async def test_stream_fanout(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
         redis_helper_config=config.redis_helper_default_config,
         sentinel=None,
+        name="test",
         service_name=None,
     )
     assert isinstance(r.client, Redis)

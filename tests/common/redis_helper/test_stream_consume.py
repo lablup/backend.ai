@@ -65,6 +65,7 @@ async def test_stream_loadbalance(
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
         redis_helper_config=config.redis_helper_default_config,
+        name="test",
         sentinel=None,
         service_name=None,
     )
