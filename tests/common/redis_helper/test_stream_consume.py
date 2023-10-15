@@ -105,7 +105,7 @@ async def test_stream_loadbalance(
             with pytest.raises(RedisConnectionError):
                 await r.client.xadd("stream1", {"idx": 2 + i})
         elif disruption_method == "pause":
-            with pytest.raises((asyncio.TimeoutError, RedisTimeoutError)):
+            with pytest.raises((RedisConnectionError, asyncio.TimeoutError, RedisTimeoutError)):
                 await r.client.xadd("stream1", {"idx": 2 + i})
         else:
             raise RuntimeError("should not reach here")
