@@ -471,6 +471,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stat,
         root_ctx.redis_live,
         root_ctx.redis_image,
+        root_ctx.redis_stream,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.storage_manager,
