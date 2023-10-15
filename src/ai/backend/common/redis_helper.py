@@ -454,9 +454,10 @@ def get_redis_object(
         RedisHelperConfig, redis_config.get("redis_helper_config")
     )
     conn_opts = {
-        "auto_close_connection_pool": True,
         **_default_conn_opts,
         **kwargs,
+        # "lib_name": None,  # disable "CLIENT SETINFO"
+        # "lib_version": None,  # disable "CLIENT SETINFO"
     }
     conn_pool_opts = {
         **_default_conn_pool_opts,
@@ -510,12 +511,12 @@ def get_redis_object(
         url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
-        blocking_conn_pool = BlockingConnectionPool(**conn_pool_opts)
         return RedisConnectionInfo(
-            client=Redis.from_url(
-                str(url),
-                connection_pool=blocking_conn_pool,
-                **conn_opts,
+            client=Redis(
+                connection_pool=BlockingConnectionPool.from_url(
+                    str(url),
+                    **conn_opts,
+                )
             ),
             sentinel=None,
             name=name,
