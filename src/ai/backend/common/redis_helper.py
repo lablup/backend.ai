@@ -22,7 +22,7 @@ from typing import (
 
 import redis.exceptions
 import yarl
-from redis.asyncio import Redis
+from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
@@ -65,8 +65,8 @@ _default_conn_opts: Mapping[str, Any] = {
     ],
 }
 _default_conn_pool_opts: Mapping[str, Any] = {
-    "max_connections": 32,
-    "connection_ready_timeout": 20.0,
+    "max_connections": 16,
+    # "timeout": 20.0,  # for redis-py 5.0+
 }
 
 _scripts: Dict[str, str] = {}
@@ -194,10 +194,10 @@ async def execute(
     retry_log_count = 0
     last_log_time = first_trial
 
-    def show_retry_warning(e: Exception) -> None:
+    def show_retry_warning(e: Exception, warn_on_first_attempt: bool = True) -> None:
         nonlocal retry_log_count, last_log_time
         now = time.perf_counter()
-        if retry_log_count == 0 or now - last_log_time >= 10.0:
+        if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
             log.warning(
                 "Retrying due to interruption of Redis connection "
                 "({}, conn-pool: {}, retrying-for: {:.3f}s)",
@@ -248,7 +248,13 @@ async def execute(
             redis.exceptions.ConnectionError,
             ConnectionResetError,
         ) as e:
-            show_retry_warning(e)
+            warn_on_first_attempt = True
+            if (
+                isinstance(e, redis.exceptions.ConnectionError)
+                and "Too many connections" in e.args[0]
+            ):  # connection pool is full
+                warn_on_first_attempt = False
+            show_retry_warning(e, warn_on_first_attempt)
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except (
@@ -457,11 +463,10 @@ def get_redis_object(
         RedisHelperConfig, redis_config.get("redis_helper_config")
     )
     conn_opts = {
-        "auto_close_connection_pool": True,
         **_default_conn_opts,
         **kwargs,
-        # "lib_name": None,  # disable implicit "CLIENT SETINFO" (redis-py 5.0+)
-        # "lib_version": None,  # disable implicit "CLIENT SETINFO" (redis-py 5.0+)
+        # "lib_name": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
+        # "lib_version": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
     }
     conn_pool_opts = {
         **_default_conn_pool_opts,
@@ -472,8 +477,9 @@ def get_redis_object(
         conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
     if max_connections := redis_helper_config.get("max_connections"):
         conn_pool_opts["max_connections"] = int(max_connections)
-    if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
-        conn_pool_opts["timeout"] = float(connection_ready_timeout)
+    # for redis-py 5.0+
+    # if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
+    #     conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_config.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
@@ -516,9 +522,14 @@ def get_redis_object(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
         return RedisConnectionInfo(
-            client=Redis.from_url(
-                str(url),
+            # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
+            client=Redis(
+                connection_pool=ConnectionPool.from_url(
+                    str(url),
+                    **conn_pool_opts,
+                ),
                 **conn_opts,
+                auto_close_connection_pool=True,
             ),
             sentinel=None,
             name=name,
