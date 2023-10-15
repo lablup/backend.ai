@@ -22,7 +22,7 @@ from typing import (
 
 import redis.exceptions
 import yarl
-from redis.asyncio import BlockingConnectionPool, Redis
+from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
@@ -76,11 +76,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 class ConnectionNotAvailable(Exception):
     pass
-
-
-def _parse_stream_msg_id(msg_id: bytes) -> Tuple[int, int]:
-    timestamp, _, sequence = msg_id.partition(b"-")
-    return int(timestamp), int(sequence)
 
 
 async def subscribe(channel: PubSub, *, reconnect_poll_interval: float = 0.3) -> AsyncIterator[Any]:
@@ -182,6 +177,7 @@ async def execute(
     *,
     service_name: Optional[str] = None,
     encoding: Optional[str] = None,
+    command_timeout: Optional[float] = None,
 ) -> Any:
     """
     Executes a function that issues Redis commands or returns a pipeline/transaction of commands,
@@ -192,9 +188,7 @@ async def execute(
     """
     redis_client = redis_obj.client
     service_name = service_name or redis_obj.service_name
-    reconnect_poll_interval = float(
-        cast(str, redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
-    )
+    reconnect_poll_interval = redis_obj.redis_helper_config.get("reconnect_poll_timeout", 0.0)
 
     first_trial = time.perf_counter()
     retry_log_count = 0
@@ -253,12 +247,18 @@ async def execute(
             redis.exceptions.ReadOnlyError,
             redis.exceptions.ConnectionError,
             ConnectionResetError,
+        ) as e:
+            show_retry_warning(e)
+            await asyncio.sleep(reconnect_poll_interval)
+            continue
+        except (
             redis.exceptions.TimeoutError,
             asyncio.TimeoutError,
         ) as e:
-            show_retry_warning(e)
-            if not isinstance(e, (redis.exceptions.TimeoutError, asyncio.TimeoutError)):
-                await asyncio.sleep(reconnect_poll_interval)
+            if command_timeout is not None:
+                now = time.perf_counter()
+                if now - first_trial >= command_timeout + 1.0:
+                    show_retry_warning(e)
             continue
         except redis.exceptions.ResponseError as e:
             if "NOREPLICAS" in e.args[0]:
@@ -340,6 +340,7 @@ async def read_stream(
                     {stream_key: last_id},
                     block=block_timeout,
                 ),
+                command_timeout=block_timeout / 1000,
             )
             if not reply:
                 continue
@@ -390,6 +391,7 @@ async def read_stream_by_group(
                         str(autoclaim_idle_timeout),
                         autoclaim_start_id,
                     ),
+                    command_timeout=autoclaim_idle_timeout / 1000,
                 )
                 for msg_id, msg_data in reply[1]:
                     messages.append((msg_id, msg_data))
@@ -404,6 +406,7 @@ async def read_stream_by_group(
                     {stream_key: b">"},  # fetch messages not seen by other consumers
                     block=block_timeout,
                 ),
+                command_timeout=block_timeout / 1000,
             )
             if len(reply) == 0:
                 continue
@@ -454,10 +457,11 @@ def get_redis_object(
         RedisHelperConfig, redis_config.get("redis_helper_config")
     )
     conn_opts = {
+        "auto_close_connection_pool": True,
         **_default_conn_opts,
         **kwargs,
-        # "lib_name": None,  # disable "CLIENT SETINFO"
-        # "lib_version": None,  # disable "CLIENT SETINFO"
+        # "lib_name": None,  # disable implicit "CLIENT SETINFO" (redis-py 5.0+)
+        # "lib_version": None,  # disable implicit "CLIENT SETINFO" (redis-py 5.0+)
     }
     conn_pool_opts = {
         **_default_conn_pool_opts,
@@ -512,11 +516,9 @@ def get_redis_object(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
         return RedisConnectionInfo(
-            client=Redis(
-                connection_pool=BlockingConnectionPool.from_url(
-                    str(url),
-                    **conn_opts,
-                )
+            client=Redis.from_url(
+                str(url),
+                **conn_opts,
             ),
             sentinel=None,
             name=name,
