@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import logging
 import socket
+import time
 from typing import (
     Any,
     AsyncIterator,
@@ -175,7 +176,7 @@ async def execute(
     redis_obj: RedisConnectionInfo,
     func: Callable[[Redis], Awaitable[Any]],
     *,
-    service_name: str = None,
+    service_name: Optional[str] = None,
     encoding: Optional[str] = None,
 ) -> Any:
     """
@@ -190,6 +191,25 @@ async def execute(
     reconnect_poll_interval = float(
         cast(str, redis_obj.redis_helper_config.get("reconnect_poll_timeout"))
     )
+
+    first_trial = time.perf_counter()
+    retry_log_count = 0
+    last_log_time = first_trial
+
+    def show_retry_warning(e: Exception) -> None:
+        nonlocal retry_log_count, last_log_time
+        now = time.perf_counter()
+        if retry_log_count == 0 or now - last_log_time >= 10.0:
+            log.warning(
+                "Retrying due to interruption of Redis connection "
+                "({0}, connect_pool:{1}, service_name:{2}, elapsed time: {3:.3f}s)",
+                repr(e),
+                redis_obj.name,
+                service_name,
+                now - first_trial,
+            )
+            retry_log_count += 1
+            last_log_time = now
 
     while True:
         try:
@@ -228,21 +248,21 @@ async def execute(
             MasterNotFoundError,
             SlaveNotFoundError,
             redis.exceptions.ReadOnlyError,
+            redis.exceptions.ConnectionError,
             ConnectionResetError,
-        ):
-            await asyncio.sleep(reconnect_poll_interval)
-            continue
-        except redis.exceptions.ConnectionError as e:
-            log.error(f"execute(): Connecting to redis failed: {e}")
-            await asyncio.sleep(reconnect_poll_interval)
+            redis.exceptions.TimeoutError,
+            asyncio.TimeoutError,
+        ) as e:
+            show_retry_warning(e)
+            if not isinstance(e, (redis.exceptions.TimeoutError, asyncio.TimeoutError)):
+                await asyncio.sleep(reconnect_poll_interval)
             continue
         except redis.exceptions.ResponseError as e:
             if "NOREPLICAS" in e.args[0]:
+                show_retry_warning(e)
                 await asyncio.sleep(reconnect_poll_interval)
                 continue
             raise
-        except (redis.exceptions.TimeoutError, asyncio.TimeoutError):
-            continue
         except asyncio.CancelledError:
             raise
         finally:
@@ -422,6 +442,7 @@ async def read_stream_by_group(
 
 def get_redis_object(
     redis_config: EtcdRedisConfig,
+    name: str,
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
@@ -466,6 +487,7 @@ def get_redis_object(
         return RedisConnectionInfo(
             client=sentinel.master_for(service_name=service_name, password=password, **conn_opts),
             sentinel=sentinel,
+            name=name,
             service_name=service_name,
             redis_helper_config=redis_helper_config,
         )
@@ -479,6 +501,7 @@ def get_redis_object(
         return RedisConnectionInfo(
             client=Redis.from_url(str(url), **kwargs),
             sentinel=None,
+            name=name,
             service_name=None,
             redis_helper_config=redis_helper_config,
         )

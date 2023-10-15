@@ -1117,6 +1117,7 @@ class RedisHelperConfig(TypedDict):
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
     client: Redis
+    name: str  # connection pool name
     service_name: Optional[str]
     sentinel: Optional[redis.asyncio.sentinel.Sentinel]
     redis_helper_config: RedisHelperConfig
