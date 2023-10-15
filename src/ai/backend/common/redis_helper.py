@@ -206,7 +206,7 @@ async def execute(
         if retry_log_count == 0 or now - last_log_time >= 10.0:
             log.warning(
                 "Retrying due to interruption of Redis connection "
-                "({0}, conn-pool: {1}, retrying-for: {3:.3f}s)",
+                "({}, conn-pool: {}, retrying-for: {:.3f}s)",
                 repr(e),
                 redis_obj.name,
                 now - first_trial,
