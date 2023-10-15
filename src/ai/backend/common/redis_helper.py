@@ -22,7 +22,7 @@ from typing import (
 
 import redis.exceptions
 import yarl
-from redis.asyncio import Redis
+from redis.asyncio import BlockingConnectionPool, Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
@@ -63,6 +63,10 @@ _default_conn_opts: Mapping[str, Any] = {
         redis.exceptions.ConnectionError,
         redis.exceptions.TimeoutError,
     ],
+}
+_default_conn_pool_opts: Mapping[str, Any] = {
+    "max_connections": 32,
+    "connection_ready_timeout": 20.0,
 }
 
 _scripts: Dict[str, str] = {}
@@ -131,7 +135,7 @@ async def blpop(
     redis_obj: RedisConnectionInfo,
     key: str,
     *,
-    service_name: str = None,
+    service_name: Optional[str] = None,
 ) -> AsyncIterator[Any]:
     """
     An async-generator wrapper for blpop (blocking left pop).
@@ -202,10 +206,9 @@ async def execute(
         if retry_log_count == 0 or now - last_log_time >= 10.0:
             log.warning(
                 "Retrying due to interruption of Redis connection "
-                "({0}, connect_pool:{1}, service_name:{2}, elapsed time: {3:.3f}s)",
+                "({0}, conn-pool: {1}, retrying-for: {3:.3f}s)",
                 repr(e),
                 redis_obj.name,
-                service_name,
                 now - first_trial,
             )
             retry_log_count += 1
@@ -442,6 +445,7 @@ async def read_stream_by_group(
 
 def get_redis_object(
     redis_config: EtcdRedisConfig,
+    *,
     name: str,
     db: int = 0,
     **kwargs,
@@ -449,7 +453,22 @@ def get_redis_object(
     redis_helper_config: RedisHelperConfig = cast(
         RedisHelperConfig, redis_config.get("redis_helper_config")
     )
-
+    conn_opts = {
+        "auto_close_connection_pool": True,
+        **_default_conn_opts,
+        **kwargs,
+    }
+    conn_pool_opts = {
+        **_default_conn_pool_opts,
+    }
+    if socket_timeout := redis_helper_config.get("socket_timeout"):
+        conn_opts["socket_timeout"] = float(socket_timeout)
+    if socket_connect_timeout := redis_helper_config.get("socket_connect_timeout"):
+        conn_opts["socket_connect_timeout"] = float(socket_connect_timeout)
+    if max_connections := redis_helper_config.get("max_connections"):
+        conn_pool_opts["max_connections"] = int(max_connections)
+    if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
+        conn_pool_opts["timeout"] = float(connection_ready_timeout)
     if _sentinel_addresses := redis_config.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
@@ -474,18 +493,12 @@ def get_redis_object(
                 **kwargs,
             },
         )
-
-        conn_opts = {
-            **_default_conn_opts,
-            **kwargs,
-            "socket_timeout": float(cast(str, redis_helper_config.get("socket_timeout"))),
-            "socket_connect_timeout": float(
-                cast(str, redis_helper_config.get("socket_connect_timeout"))
-            ),
-        }
-
         return RedisConnectionInfo(
-            client=sentinel.master_for(service_name=service_name, password=password, **conn_opts),
+            client=sentinel.master_for(
+                service_name=service_name,
+                password=password,
+                **conn_opts,
+            ),
             sentinel=sentinel,
             name=name,
             service_name=service_name,
@@ -497,9 +510,13 @@ def get_redis_object(
         url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
-
+        blocking_conn_pool = BlockingConnectionPool(**conn_pool_opts)
         return RedisConnectionInfo(
-            client=Redis.from_url(str(url), **kwargs),
+            client=Redis.from_url(
+                str(url),
+                connection_pool=blocking_conn_pool,
+                **conn_opts,
+            ),
             sentinel=None,
             name=name,
             service_name=None,
