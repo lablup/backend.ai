@@ -331,22 +331,27 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     root_ctx.redis_live = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="stat",  # temporary storage for stat snapshots
         db=REDIS_STAT_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
     for redis_info in (
@@ -466,6 +471,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stat,
         root_ctx.redis_live,
         root_ctx.redis_image,
+        root_ctx.redis_stream,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.storage_manager,

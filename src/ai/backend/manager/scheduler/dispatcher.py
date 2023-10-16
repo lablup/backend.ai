@@ -179,6 +179,7 @@ class SchedulerDispatcher(aobject):
         self.db = registry.db
         self.redis_live = redis_helper.get_redis_object(
             self.shared_config.data["redis"],
+            name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
 
