@@ -450,7 +450,7 @@ async def stream_proxy(
     assert myself is not None
     try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await asyncio.shield(
+            session: SessionRow = await asyncio.shield(
                 database_ptask_group.create_task(
                     SessionRow.get_session(
                         db_sess,
@@ -464,10 +464,11 @@ async def stream_proxy(
         raise
     kernel: KernelRow = session.main_kernel
     kernel_id = kernel.id
-    stream_key = kernel_id
+    session_id: SessionId = session.id
+    stream_key = session_id
     stream_id = uuid.uuid4().hex
-    app_ctx.stream_proxy_handlers[stream_key].add(myself)
-    defer(lambda: app_ctx.stream_proxy_handlers[stream_key].discard(myself))
+    app_ctx.stream_proxy_handlers[kernel_id].add(myself)
+    defer(lambda: app_ctx.stream_proxy_handlers[kernel_id].discard(myself))
     if kernel.kernel_host is None:
         kernel_host = urlparse(kernel.agent_addr).hostname
     else:
@@ -513,8 +514,8 @@ async def stream_proxy(
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
     redis_live = root_ctx.redis_live
-    conn_tracker_key = f"session.{kernel_id}.active_app_connections"
-    conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
+    conn_tracker_key = f"session.{session_id}.active_app_connections"
+    conn_tracker_val = f"{session_id}:{service}:{stream_id}"
 
     _conn_tracker_script = textwrap.dedent("""
         local now = redis.call('TIME')
@@ -547,7 +548,7 @@ async def stream_proxy(
 
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
-            app_ctx.active_session_ids[kernel_id] += 1
+            app_ctx.active_session_ids[session_id] += 1
             now = await redis_helper.execute(redis_live, lambda r: r.time())
             now = now[0] + (now[1] / (10**6))
             await redis_helper.execute(
@@ -556,15 +557,15 @@ async def stream_proxy(
                 lambda r: r.zadd(conn_tracker_key, {conn_tracker_val: now}),
             )
             await root_ctx.idle_checker_host.update_app_streaming_status(
-                kernel_id,
+                session_id,
                 AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
             )
 
     async def clear_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
-            app_ctx.active_session_ids[kernel_id] -= 1
-            if app_ctx.active_session_ids[kernel_id] <= 0:
-                del app_ctx.active_session_ids[kernel_id]
+            app_ctx.active_session_ids[session_id] -= 1
+            if app_ctx.active_session_ids[session_id] <= 0:
+                del app_ctx.active_session_ids[session_id]
             await redis_helper.execute(
                 redis_live, lambda r: r.zrem(conn_tracker_key, conn_tracker_val)
             )
@@ -578,7 +579,7 @@ async def stream_proxy(
             )
             if remaining_count == 0:
                 await root_ctx.idle_checker_host.update_app_streaming_status(
-                    kernel_id,
+                    session_id,
                     AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                 )
 
