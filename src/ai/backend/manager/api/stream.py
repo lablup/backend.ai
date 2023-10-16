@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import json
 import logging
 import secrets
@@ -40,7 +41,7 @@ import trafaret as t
 import zmq
 import zmq.asyncio
 from aiohttp import web
-from aiotools import adefer, apartial
+from aiotools import adefer
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -463,8 +464,8 @@ async def stream_proxy(
     except (SessionNotFound, TooManySessionsMatched):
         raise
     kernel: KernelRow = session.main_kernel
-    kernel_id = kernel.id
-    session_id: SessionId = session.id
+    kernel_id = KernelId(kernel.id)
+    session_id = SessionId(session.id)
     stream_key = session_id
     stream_id = uuid.uuid4().hex
     app_ctx.stream_proxy_handlers[kernel_id].add(myself)
@@ -523,12 +524,16 @@ async def stream_proxy(
         redis.call('ZADD', KEYS[1], now, ARGV[1])
     """)
 
-    async def refresh_cb(kernel_id: str, data: bytes) -> None:
+    async def refresh_cb(
+        session_id: SessionId,
+        kernel_id: KernelId,
+        data: bytes,
+    ) -> None:
         await asyncio.shield(
             rpc_ptask_group.create_task(
                 call_non_bursty(
                     conn_tracker_key,
-                    apartial(
+                    functools.partial(
                         redis_helper.execute_script,
                         redis_live,
                         "update_conn_tracker",
@@ -542,9 +547,9 @@ async def stream_proxy(
             )
         )
 
-    down_cb = apartial(refresh_cb, kernel_id)
-    up_cb = apartial(refresh_cb, kernel_id)
-    ping_cb = apartial(refresh_cb, kernel_id)
+    down_cb = functools.partial(refresh_cb, session_id, kernel_id)
+    up_cb = functools.partial(refresh_cb, session_id, kernel_id)
+    ping_cb = functools.partial(refresh_cb, session_id, kernel_id)
 
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
