@@ -57,7 +57,6 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -307,6 +306,7 @@ class AgentRegistry:
         redis_stat: RedisConnectionInfo,
         redis_live: RedisConnectionInfo,
         redis_image: RedisConnectionInfo,
+        redis_stream: RedisConnectionInfo,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
@@ -321,6 +321,7 @@ class AgentRegistry:
         self.redis_stat = redis_stat
         self.redis_live = redis_live
         self.redis_image = redis_image
+        self.redis_stream = redis_stream
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.storage_manager = storage_manager
@@ -3874,15 +3875,12 @@ async def handle_kernel_log(
     source: AgentId,
     event: DoSyncKernelLogsEvent,
 ) -> None:
-    redis_conn = redis_helper.get_redis_object(
-        context.shared_config.data["redis"], db=REDIS_STREAM_DB
-    )
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()
     log_key = f"containerlog.{event.container_id}"
     try:
         list_size = await redis_helper.execute(
-            redis_conn,
+            context.redis_stream,
             lambda r: r.llen(log_key),
         )
         if list_size is None:
@@ -3895,7 +3893,7 @@ async def handle_kernel_log(
             return
         for _ in range(list_size):
             # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
+            chunk = await redis_helper.execute(context.redis_stream, lambda r: r.lpop(log_key))
             if chunk is None:  # maybe missing
                 log_buffer.write(b"(container log unavailable)\n")
                 break
@@ -3916,12 +3914,11 @@ async def handle_kernel_log(
         finally:
             # Clear the log data from Redis when done.
             await redis_helper.execute(
-                redis_conn,
+                context.redis_stream,
                 lambda r: r.delete(log_key),
             )
     finally:
         log_buffer.close()
-        await redis_conn.close()
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:

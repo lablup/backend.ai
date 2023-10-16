@@ -73,7 +73,8 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": sentinels,
             "service_name": "mymaster",
             "password": "develove",
-        }
+        },
+        name="test",
     )
 
     assert isinstance(r1.client, Sentinel)
@@ -89,7 +90,8 @@ async def test_instantiate_redisconninfo() -> None:
             "sentinel": parsed_addresses,
             "service_name": "mymaster",
             "password": "develove",
-        }
+        },
+        name="test",
     )
 
     assert isinstance(r2.client, Sentinel)

@@ -20,7 +20,7 @@ from typing import (
 
 import redis.exceptions
 import yarl
-from redis.asyncio import Redis
+from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import (
     MasterNotFoundError,
@@ -59,8 +59,6 @@ if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
 
 
 _default_conn_opts: Mapping[str, Any] = {
-    "socket_timeout": 5.0,
-    "socket_connect_timeout": 2.0,
     "socket_keepalive": True,
     "socket_keepalive_options": _keepalive_options,
     "retry": Retry(ExponentialBackoff(), 10),
@@ -69,7 +67,10 @@ _default_conn_opts: Mapping[str, Any] = {
         redis.exceptions.TimeoutError,
     ],
 }
-
+_default_conn_pool_opts: Mapping[str, Any] = {
+    "max_connections": 16,
+    # "timeout": 20.0,  # for redis-py 5.0+
+}
 
 _scripts: Dict[str, str] = {}
 
@@ -471,10 +472,24 @@ async def read_stream_by_group(
 
 def get_redis_object(
     redis_config: EtcdRedisConfig,
+    name: str,  # placeholder for backported codes
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
+    conn_opts = {
+        **_default_conn_opts,
+        **kwargs,
+        # "lib_name": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
+        # "lib_version": None,  # disable implicit "CLIENT SETINFO" (for redis-py 5.0+)
+    }
+    conn_pool_opts = {
+        **_default_conn_pool_opts,
+    }
     if _sentinel_addresses := redis_config.get("sentinel"):
+        log.warning(
+            "Native sentinel client in 23.03 has imperfect implementation. "
+            "It is not recommended to use it."
+        )
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
             sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
@@ -503,7 +518,14 @@ def get_redis_object(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
         return RedisConnectionInfo(
-            client=Redis.from_url(str(url), **kwargs),
+            client=Redis(
+                connection_pool=ConnectionPool.from_url(
+                    str(url),
+                    **conn_pool_opts,
+                ),
+                **conn_opts,
+                auto_close_connection_pool=True,
+            ),
             service_name=None,
         )
 
