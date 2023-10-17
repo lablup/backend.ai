@@ -129,6 +129,11 @@ usage() {
   echo "  ${LWHITE}--configure-ha${NC}"
   echo "    Configure HA dev environment."
   echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-ssl${NC}"
+  echo "    Apply SSL to Redis connection."
+  echo "    This generate and use self-signed certificate."
+  echo "    (default: false)"
 }
 
 show_error() {
@@ -286,12 +291,14 @@ PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpre
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 SHOW_GUIDE=0
+ENABLE_SSL=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
+
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
@@ -311,13 +318,23 @@ CODESPACES_POST_CREATE=0
 CODESPACES=${CODESPACES:-"false"}
 _INSTALLED_PYENV=0
 
-# Only Used in HA mode
 REDIS_MASTER_PORT="9500"
 REDIS_SLAVE1_PORT="9501"
 REDIS_SLAVE2_PORT="9502"
+
+[[ "$@" =~ "enable-ssl" ]] && REDIS_MASTER_EXPOSED_PORT="9510" || REDIS_MASTER_EXPOSED_PORT="9500"
+[[ "$@" =~ "enable-ssl" ]] && REDIS_SLAVE1_EXPOSED_PORT="9511" || REDIS_SLAVE1_EXPOSED_PORT="9501"
+[[ "$@" =~ "enable-ssl" ]] && REDIS_SLAVE2_EXPOSED_PORT="9512" || REDIS_SLAVE2_EXPOSED_PORT="9502"
+
+# Only Used in HA mode
+
 REDIS_SENTINEL1_PORT="9503"
 REDIS_SENTINEL2_PORT="9504"
 REDIS_SENTINEL3_PORT="9505"
+
+[[ "$@" =~ "enable-ssl" ]] && REDIS_SENTINEL1_EXPOSED_PORT="9513" || REDIS_SENTINEL1_EXPOSED_PORT="9503"
+[[ "$@" =~ "enable-ssl" ]] && REDIS_SENTINEL2_EXPOSED_PORT="9514" || REDIS_SENTINEL2_EXPOSED_PORT="9504"
+[[ "$@" =~ "enable-ssl" ]] && REDIS_SENTINEL3_EXPOSED_PORT="9515" || REDIS_SENTINEL3_EXPOSED_PORT="9505"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -351,6 +368,7 @@ while [ $# -gt 0 ]; do
     --agent-backend)        AGENT_BACKEND=$2; shift ;;
     --agent-backend=*)      AGENT_BACKEND="${1#*=}" ;;
     --configure-ha)         CONFIGURE_HA=1 ;;
+    --enable-ssl)           ENABLE_SSL=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -765,20 +783,24 @@ setup_environment() {
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
   mkdir -p "$HALFSTACK_VOLUME_PATH"
+
   if [ $CONFIGURE_HA -eq 1 ]; then
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
+    show_info "Start to configure HA dev environment..."
 
-    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+    cp "docker-compose.halfstack-ha.yml" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
-    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_MASTER_PORT}/${REDIS_MASTER_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE1_PORT}/${REDIS_SLAVE1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE2_PORT}/${REDIS_SLAVE2_PORT}/g" "docker-compose.halfstack.current.yml"
+
+    sed_inplace "s/\${REDIS_MASTER_EXPOSED_PORT}/${REDIS_MASTER_EXPOSED_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE1_EXPOSED_PORT}/${REDIS_SLAVE1_EXPOSED_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE2_EXPOSED_PORT}/${REDIS_SLAVE2_EXPOSED_PORT}/g" "docker-compose.halfstack.current.yml"
+
+    sed_inplace "s/\${REDIS_SENTINEL1_EXPOSED_PORT}/${REDIS_SENTINEL1_EXPOSED_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL2_EXPOSED_PORT}/${REDIS_SENTINEL2_EXPOSED_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL3_EXPOSED_PORT}/${REDIS_SENTINEL3_EXPOSED_PORT}/g" "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
@@ -792,23 +814,33 @@ setup_environment() {
 
     sed_inplace "s/\${COMPOSE_PATH}/${ROOT_PATH//\//\\/}\/tmp\/backend\.ai-halfstack-ha\/configs\//g" "docker-compose.halfstack.current.yml"
 
-    # Appends the given text to sentinel01.conf
     echo "" >> $sentinel01_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel01/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/${REDIS_SENTINEL1_PORT}/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_EXPOSED_PORT/${REDIS_SENTINEL1_EXPOSED_PORT}/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_MASTER_EXPOSED_PORT/${REDIS_MASTER_EXPOSED_PORT}/g" "$sentinel01_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel01_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9503/g" "$sentinel01_cfg_path"
 
-    # Appends the given text to sentinel02.conf
     echo "" >> $sentinel02_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel02/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/${REDIS_SENTINEL2_PORT}/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_EXPOSED_PORT/${REDIS_SENTINEL2_EXPOSED_PORT}/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_MASTER_EXPOSED_PORT/${REDIS_MASTER_EXPOSED_PORT}/g" "$sentinel02_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel02_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9504/g" "$sentinel02_cfg_path"
 
-    # Appends the given text to sentinel03.conf
     echo "" >> $sentinel03_cfg_path
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/${REDIS_SENTINEL3_PORT}/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_EXPOSED_PORT/${REDIS_SENTINEL3_EXPOSED_PORT}/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_MASTER_EXPOSED_PORT/${REDIS_MASTER_EXPOSED_PORT}/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
-    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+
+    if [ $ENABLE_SSL -ne 1 ]; then
+      sed_inplace "/^tls-/s/^/# /" "$sentinel01_cfg_path"
+      sed_inplace "/^tls-/s/^/# /" "$sentinel02_cfg_path"
+      sed_inplace "/^tls-/s/^/# /" "$sentinel03_cfg_path"
+    fi
+
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
     if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
@@ -817,13 +849,24 @@ setup_environment() {
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
   fi
 
+  if [ $ENABLE_SSL -eq 1 ]; then
+    sed_inplace "s/8110:6379/${REDIS_PORT}:6380/" "docker-compose.halfstack.current.yml"
+  else
+    sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
+  fi
+
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
-  sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+
+  if [ $ENABLE_SSL -eq 1 ]; then
+    show_info "Generating self-signed certificate..."
+    openssl req -x509 -newkey rsa:4096 -keyout "${HALFSTACK_VOLUME_PATH}/redis-data/key.pem" -out "${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem" -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=www.example.com"
+    sed_inplace "s/^# \(.*--tls-.*\)/\1/" docker-compose.halfstack.current.yml
+  fi
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
@@ -857,7 +900,7 @@ configure_backendai() {
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 
   if [ $CONFIGURE_HA -eq 1 ]; then
-    ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
+    ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_EXPOSED_PORT},127.0.0.1:${REDIS_SENTINEL2_EXPOSED_PORT},127.0.0.1:${REDIS_SENTINEL3_EXPOSED_PORT}"
     ./backend.ai mgr etcd put config/redis/service_name "mymaster"
     ./backend.ai mgr etcd put config/redis/password "develove"
   else
@@ -865,6 +908,23 @@ configure_backendai() {
   fi
 
   ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
+
+  SSL_CA_CERTS_PATH="${ROOT_PATH}/${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem"
+  SSL_CERTFILE_PATH="${ROOT_PATH}/${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem"
+  SSL_KEYFILE_PATH="${ROOT_PATH}/${HALFSTACK_VOLUME_PATH}/redis-data/key.pem"
+
+  if [ $ENABLE_SSL -eq 1 ]; then
+    cp ./configs/manager/sample.etcd.redis-tls.json ./redis-tls.json
+
+    sed_inplace "s|\${SSL_CA_CERTS_PATH}|${SSL_CA_CERTS_PATH}|g" ./redis-tls.json
+    sed_inplace "s|\${SSL_CERTFILE_PATH}|${SSL_CERTFILE_PATH}|g" ./redis-tls.json
+    sed_inplace "s|\${SSL_KEYFILE_PATH}|${SSL_KEYFILE_PATH}|g" ./redis-tls.json
+
+    ./backend.ai mgr etcd put-json config/redis ./redis-tls.json
+    rm -rf ./redis-tls.json
+  else
+    ./backend.ai mgr etcd put config/redis/redis_helper_config/ssl False
+  fi
 
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
@@ -881,7 +941,7 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
 
   # configure backend mode
-  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then 
+  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then
     sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
     sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
   elif [ $AGENT_BACKEND = "docker" ]; then
@@ -925,11 +985,29 @@ configure_backendai() {
 
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
-    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
-    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
-    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+    sed_inplace "s/^# \(redis\.password =\) \"mysecret\"/\1 \"develove\"/" ./webserver.conf
+    sed_inplace "s/^# \(redis\.service_name =\) \"mymaster\"/\1 \"mymaster\"/" ./webserver.conf
+
+    if [ $ENABLE_SSL -eq 1 ]; then
+      sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9513,127.0.0.1:9514,127.0.0.1:9515\"/ " ./webserver.conf
+    else
+      sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+    fi
   else
     sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+  fi
+
+  if [ $ENABLE_SSL -eq 1 ]; then
+    sed_inplace "s/^# \(redis\.redis_helper_config\.ssl\)/\1/" ./webserver.conf
+    sed_inplace "s/^# \(redis\.redis_helper_config\.ssl_cert_reqs\)/\1/" ./webserver.conf
+
+    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_ca_certs =\) \${SSL_CA_CERTS_PATH}|\1 \${SSL_CA_CERTS_PATH}|g" ./webserver.conf
+    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_certfile =\) \${SSL_CERTFILE_PATH}|\1 \${SSL_CERTFILE_PATH}|g" ./webserver.conf
+    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_keyfile =\) \${SSL_KEYFILE_PATH}|\1 \${SSL_KEYFILE_PATH}|g" ./webserver.conf
+
+    sed_inplace "s|\${SSL_CA_CERTS_PATH}|\"$SSL_CA_CERTS_PATH\"|g" ./webserver.conf
+    sed_inplace "s|\${SSL_CERTFILE_PATH}|\"$SSL_CERTFILE_PATH\"|g" ./webserver.conf
+    sed_inplace "s|\${SSL_KEYFILE_PATH}|\"$SSL_KEYFILE_PATH\"|g" ./webserver.conf
   fi
 
   # install and configure webui

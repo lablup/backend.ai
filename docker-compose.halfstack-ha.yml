@@ -22,16 +22,25 @@ services:
     networks:
     - half
     ports:
-    - 0.0.0.0:${REDIS_MASTER_PORT}:${REDIS_MASTER_PORT}
+    - 0.0.0.0:${REDIS_MASTER_EXPOSED_PORT}:${REDIS_MASTER_EXPOSED_PORT}
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     command: >
       redis-server
       --port ${REDIS_MASTER_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
       --replica-announce-ip node01
-      --replica-announce-port ${REDIS_MASTER_PORT}
+      --replica-announce-port ${REDIS_MASTER_EXPOSED_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
+      --tls-port ${REDIS_MASTER_EXPOSED_PORT}
+      --tls-replication yes
+      --tls-auth-clients no
+      --tls-cert-file /data/cert.pem
+      --tls-ca-cert-file /data/cert.pem
+      --tls-key-file /data/key.pem
+
     # IMPORTANT: We have INTENTIONALLY OMITTED the healthchecks
     # because it interferes with pause/unpause of container to simulate
     # network partitioning.
@@ -42,35 +51,51 @@ services:
     networks:
     - half
     ports:
-    - 0.0.0.0:${REDIS_SLAVE1_PORT}:${REDIS_SLAVE1_PORT}
+    - 0.0.0.0:${REDIS_SLAVE1_EXPOSED_PORT}:${REDIS_SLAVE1_EXPOSED_PORT}
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     command: >
       redis-server
       --port ${REDIS_SLAVE1_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof node01 ${REDIS_MASTER_PORT}
+      --slaveof node01 ${REDIS_MASTER_EXPOSED_PORT}
       --replica-announce-ip node02
-      --replica-announce-port ${REDIS_SLAVE1_PORT}
+      --replica-announce-port ${REDIS_SLAVE1_EXPOSED_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
+      --tls-port ${REDIS_SLAVE1_EXPOSED_PORT}
+      --tls-replication yes
+      --tls-auth-clients no
+      --tls-cert-file /data/cert.pem
+      --tls-ca-cert-file /data/cert.pem
+      --tls-key-file /data/key.pem
 
   backendai-half-redis-node03:
     image: redis:7.0.5-alpine
     hostname: node03
     ports:
-    - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
+    - 0.0.0.0:${REDIS_SLAVE2_EXPOSED_PORT}:${REDIS_SLAVE2_EXPOSED_PORT}
     networks:
     - half
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     command: >
       redis-server
-      --port ${REDIS_SLAVE2_PORT}
+      --port 9502
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
-      --slaveof node01 ${REDIS_MASTER_PORT}
+      --slaveof node01 ${REDIS_MASTER_EXPOSED_PORT}
       --replica-announce-ip node03
-      --replica-announce-port ${REDIS_SLAVE2_PORT}
+      --replica-announce-port ${REDIS_SLAVE2_EXPOSED_PORT}
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
+      --tls-port ${REDIS_SLAVE2_EXPOSED_PORT}
+      --tls-replication yes
+      --tls-auth-clients no
+      --tls-cert-file /data/cert.pem
+      --tls-ca-cert-file /data/cert.pem
+      --tls-key-file /data/key.pem
 
   backendai-half-redis-sentinel01:
     image: redis:7.0.5-alpine
@@ -81,16 +106,15 @@ services:
     - type: bind
       source: ${COMPOSE_PATH}
       target: /config
+    - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     ports:
-    - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
+    - 0.0.0.0:${REDIS_SENTINEL1_EXPOSED_PORT}:${REDIS_SENTINEL1_EXPOSED_PORT}
     depends_on:
     - backendai-half-redis-node01
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
       redis-sentinel /config/sentinel01.conf
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
     image: redis:7.0.5-alpine
@@ -101,16 +125,15 @@ services:
     - type: bind
       source: ${COMPOSE_PATH}
       target: /config
+    - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     ports:
-    - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
+    - 0.0.0.0:${REDIS_SENTINEL2_EXPOSED_PORT}:${REDIS_SENTINEL2_EXPOSED_PORT}
     depends_on:
     - backendai-half-redis-node01
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
       redis-sentinel /config/sentinel02.conf
-    environment:
-    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
     image: redis:7.0.5-alpine
@@ -121,16 +144,15 @@ services:
     - type: bind
       source: ${COMPOSE_PATH}
       target: /config
+    - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     ports:
-    - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
+    - 0.0.0.0:${REDIS_SENTINEL3_EXPOSED_PORT}:${REDIS_SENTINEL3_EXPOSED_PORT}
     depends_on:
     - backendai-half-redis-node01
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
       redis-sentinel /config/sentinel03.conf
-    environment:
-    - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-etcd-proxy:
     image: quay.io/coreos/etcd:v3.5.4

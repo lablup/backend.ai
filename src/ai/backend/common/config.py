@@ -46,6 +46,11 @@ redis_helper_default_config: RedisHelperConfig = {
     "socket_timeout": 5.0,
     "socket_connect_timeout": 2.0,
     "reconnect_poll_timeout": 0.3,
+    "ssl": None,
+    "ssl_ca_certs": None,
+    "ssl_cert_reqs": None,
+    "ssl_certfile": None,
+    "ssl_keyfile": None,
 }
 
 redis_helper_config_iv = t.Dict(
@@ -53,6 +58,10 @@ redis_helper_config_iv = t.Dict(
         t.Key("socket_timeout", default=5.0): t.Float,
         t.Key("socket_connect_timeout", default=2.0): t.Float,
         t.Key("reconnect_poll_timeout", default=0.3): t.Float,
+        t.Key("ssl", default=False): t.ToBool,
+        t.Key("ssl_ca_certs", default=None): t.Null | t.String,
+        t.Key("ssl_cert_reqs", default=None): t.Null | t.Enum("required", "optional", "none"),
+        t.Key("ssl_certfile", default=None): t.Null | t.String,
     }
 ).allow_extra("*")
 
