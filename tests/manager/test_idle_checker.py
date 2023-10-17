@@ -8,6 +8,7 @@ import pytest
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import KernelId, SessionId, SessionTypes
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import (
     BaseIdleChecker,
     IdleCheckerHost,
@@ -17,6 +18,7 @@ from ai.backend.manager.idle import (
     calculate_remaining_time,
     init_idle_checkers,
 )
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.server import (
@@ -153,6 +155,7 @@ async def network_timeout_idle_checker(
     # test 1
     # remaining time is positive and no grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=5).timestamp()
@@ -166,7 +169,11 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    session = SessionRow(id=session_id, session_type=SessionTypes.INTERACTIVE)
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
     policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
@@ -183,7 +190,7 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
         should_alive = await network_idle_checker.check_idleness(
@@ -201,6 +208,7 @@ async def network_timeout_idle_checker(
     # test 2
     # remaining time is negative and no grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=30).timestamp()
@@ -214,7 +222,11 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    session = SessionRow(id=session_id, session_type=SessionTypes.INTERACTIVE)
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
     policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
@@ -231,7 +243,7 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
         should_alive = await network_idle_checker.check_idleness(
@@ -249,6 +261,7 @@ async def network_timeout_idle_checker(
     # test 3
     # remaining time is positive with new user grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=5).timestamp()
@@ -265,7 +278,11 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    session = SessionRow(id=session_id, session_type=SessionTypes.INTERACTIVE)
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
     policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
@@ -282,7 +299,7 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
         grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(
@@ -307,6 +324,7 @@ async def network_timeout_idle_checker(
     # test 4
     # remaining time is negative with new user grace period
     session_id = SessionId(uuid4())
+    kernel_id = KernelId(uuid4())
     threshold = 10
     last_access = datetime(2020, 3, 1, 12, 30, second=0).timestamp()
     now = datetime(2020, 3, 1, 12, 30, second=50).timestamp()
@@ -323,7 +341,11 @@ async def network_timeout_idle_checker(
         },
         "enabled": "network_timeout,",
     }
-    session = SessionRow(id=session_id, session_type=SessionTypes.INTERACTIVE)
+    session = SessionRow(
+        id=session_id,
+        session_type=SessionTypes.INTERACTIVE,
+        kernels=[KernelRow(id=kernel_id, cluster_role=DEFAULT_ROLE)],
+    )
     policy = KeyPairResourcePolicyRow(idle_timeout=threshold)
 
     await root_ctx.shared_config.etcd.put_prefix("config/idle", idle_value)  # type: ignore[arg-type]
@@ -340,7 +362,7 @@ async def network_timeout_idle_checker(
 
         await redis_helper.execute(
             checker_host._redis_live,
-            lambda r: r.set(f"session.{session_id}.last_access", last_access),
+            lambda r: r.set(f"kernel.{kernel_id}.last_access", last_access),
         )
 
         grace_period_end = await checker_host._grace_period_checker.get_grace_period_end(

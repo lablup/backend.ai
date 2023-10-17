@@ -520,32 +520,32 @@ class DoSyncKernelLogsEvent(AbstractEvent):
 
 
 @attrs.define(auto_attribs=True, slots=True)
-class GenericSessionEventArgs(AbstractEvent):
-    session_id: SessionId = attrs.field()
+class GenericKernelEventArgs(AbstractEvent):
+    kernel_id: KernelId = attrs.field()
 
     def serialize(self) -> tuple:
-        return (str(self.session_id),)
+        return (str(self.kernel_id),)
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            SessionId(uuid.UUID(value[0])),
+            KernelId(uuid.UUID(value[0])),
         )
 
 
-class ExecutionStartedEvent(GenericSessionEventArgs, AbstractEvent):
+class ExecutionStartedEvent(GenericKernelEventArgs, AbstractEvent):
     name = "execution_started"
 
 
-class ExecutionFinishedEvent(GenericSessionEventArgs, AbstractEvent):
+class ExecutionFinishedEvent(GenericKernelEventArgs, AbstractEvent):
     name = "execution_finished"
 
 
-class ExecutionTimeoutEvent(GenericSessionEventArgs, AbstractEvent):
+class ExecutionTimeoutEvent(GenericKernelEventArgs, AbstractEvent):
     name = "execution_timeout"
 
 
-class ExecutionCancelledEvent(GenericSessionEventArgs, AbstractEvent):
+class ExecutionCancelledEvent(GenericKernelEventArgs, AbstractEvent):
     name = "execution_cancelled"
 
 

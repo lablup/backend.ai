@@ -2280,7 +2280,7 @@ class AbstractAgent(
             await restart_tracker.done_event.wait()
 
         await self.produce_event(
-            ExecutionStartedEvent(session_id),
+            ExecutionStartedEvent(kernel_id),
         )
         try:
             kernel_obj = self.kernel_registry[kernel_id]
@@ -2289,7 +2289,7 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             await self.produce_event(
-                ExecutionCancelledEvent(session_id),
+                ExecutionCancelledEvent(kernel_id),
             )
             raise
         except KeyError:
@@ -2303,11 +2303,11 @@ class AbstractAgent(
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
             await self.produce_event(
-                ExecutionFinishedEvent(session_id),
+                ExecutionFinishedEvent(kernel_id),
             )
         elif result["status"] == "exec-timeout":
             await self.produce_event(
-                ExecutionTimeoutEvent(session_id),
+                ExecutionTimeoutEvent(kernel_id),
             )
             await self.inject_container_lifecycle_event(
                 kernel_id,
