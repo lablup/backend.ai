@@ -1230,6 +1230,7 @@ class AgentRegistry:
                                     db_sess,
                                     dependency_id,
                                     access_key,
+                                    allow_stale=True,
                                 )
                             except SessionNotFound:
                                 raise InvalidAPIParameters(
