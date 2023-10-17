@@ -30,14 +30,15 @@ services:
       - "8110:6379"
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
+      - "./fixtures/redis:/fixtures:rw"
     command: >
       redis-server
       --appendonly yes
       --tls-auth-clients no
       --tls-port 6380
-      --tls-cert-file /data/cert.pem
-      --tls-ca-cert-file /data/cert.pem
-      --tls-key-file /data/key.pem
+      --tls-cert-file /fixtures/cert.pem
+      --tls-ca-cert-file /fixtures/cert.pem
+      --tls-key-file /fixtures/key.pem
 
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]

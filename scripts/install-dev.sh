@@ -335,6 +335,13 @@ REDIS_SENTINEL3_PORT="9505"
 [[ "$@" =~ "enable-ssl" ]] && REDIS_SENTINEL2_EXPOSED_PORT="9514" || REDIS_SENTINEL2_EXPOSED_PORT="9504"
 [[ "$@" =~ "enable-ssl" ]] && REDIS_SENTINEL3_EXPOSED_PORT="9515" || REDIS_SENTINEL3_EXPOSED_PORT="9505"
 
+# Used in Redis SSL configuration
+
+REDIS_SSL_CA_CERTS_PATH="${ROOT_PATH}/fixtures/redis/cert.pem"
+REDIS_SSL_CERTFILE_PATH="${ROOT_PATH}/fixtures/redis/cert.pem"
+REDIS_SSL_KEYFILE_PATH="${ROOT_PATH}/fixtures/redis/key.pem"
+
+
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
@@ -863,7 +870,9 @@ setup_environment() {
 
   if [ $ENABLE_SSL -eq 1 ]; then
     show_info "Generating self-signed certificate..."
-    openssl req -x509 -newkey rsa:4096 -keyout "${HALFSTACK_VOLUME_PATH}/redis-data/key.pem" -out "${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem" -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=www.example.com"
+    mkdir -p "fixtures/redis"
+    openssl req -x509 -newkey rsa:4096 -keyout "${REDIS_SSL_KEYFILE_PATH}" -out "${REDIS_SSL_CA_CERTS_PATH}" -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=www.example.com"
+    chmod +rwx "${REDIS_SSL_KEYFILE_PATH}" "${REDIS_SSL_CA_CERTS_PATH}"
   else
     sed_inplace "/^ *--tls-/s/^/# /" docker-compose.halfstack.current.yml
   fi
@@ -909,16 +918,12 @@ configure_backendai() {
 
   ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
 
-  SSL_CA_CERTS_PATH="${ROOT_PATH}/${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem"
-  SSL_CERTFILE_PATH="${ROOT_PATH}/${HALFSTACK_VOLUME_PATH}/redis-data/cert.pem"
-  SSL_KEYFILE_PATH="${ROOT_PATH}/${HALFSTACK_VOLUME_PATH}/redis-data/key.pem"
-
   if [ $ENABLE_SSL -eq 1 ]; then
     cp ./configs/manager/sample.etcd.redis-tls.json ./redis-tls.json
 
-    sed_inplace "s|\${SSL_CA_CERTS_PATH}|${SSL_CA_CERTS_PATH}|g" ./redis-tls.json
-    sed_inplace "s|\${SSL_CERTFILE_PATH}|${SSL_CERTFILE_PATH}|g" ./redis-tls.json
-    sed_inplace "s|\${SSL_KEYFILE_PATH}|${SSL_KEYFILE_PATH}|g" ./redis-tls.json
+    sed_inplace "s|\${SSL_CA_CERTS_PATH}|${REDIS_SSL_CA_CERTS_PATH}|g" ./redis-tls.json
+    sed_inplace "s|\${SSL_CERTFILE_PATH}|${REDIS_SSL_CERTFILE_PATH}|g" ./redis-tls.json
+    sed_inplace "s|\${SSL_KEYFILE_PATH}|${REDIS_SSL_KEYFILE_PATH}|g" ./redis-tls.json
 
     ./backend.ai mgr etcd put-json config/redis ./redis-tls.json
     rm -rf ./redis-tls.json
@@ -1001,13 +1006,13 @@ configure_backendai() {
     sed_inplace "s/^# \(redis\.redis_helper_config\.ssl\)/\1/" ./webserver.conf
     sed_inplace "s/^# \(redis\.redis_helper_config\.ssl_cert_reqs\)/\1/" ./webserver.conf
 
-    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_ca_certs =\) \${SSL_CA_CERTS_PATH}|\1 \${SSL_CA_CERTS_PATH}|g" ./webserver.conf
-    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_certfile =\) \${SSL_CERTFILE_PATH}|\1 \${SSL_CERTFILE_PATH}|g" ./webserver.conf
-    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_keyfile =\) \${SSL_KEYFILE_PATH}|\1 \${SSL_KEYFILE_PATH}|g" ./webserver.conf
+    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_ca_certs =\) \${SSL_CA_CERTS_PATH}|\1 \${REDIS_SSL_CA_CERTS_PATH}|g" ./webserver.conf
+    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_certfile =\) \${SSL_CERTFILE_PATH}|\1 \${REDIS_SSL_CERTFILE_PATH}|g" ./webserver.conf
+    sed_inplace "s|^# \(redis\.redis_helper_config\.ssl_keyfile =\) \${SSL_KEYFILE_PATH}|\1 \${REDIS_SSL_KEYFILE_PATH}|g" ./webserver.conf
 
-    sed_inplace "s|\${SSL_CA_CERTS_PATH}|\"$SSL_CA_CERTS_PATH\"|g" ./webserver.conf
-    sed_inplace "s|\${SSL_CERTFILE_PATH}|\"$SSL_CERTFILE_PATH\"|g" ./webserver.conf
-    sed_inplace "s|\${SSL_KEYFILE_PATH}|\"$SSL_KEYFILE_PATH\"|g" ./webserver.conf
+    sed_inplace "s|\${SSL_CA_CERTS_PATH}|\"$REDIS_SSL_CA_CERTS_PATH\"|g" ./webserver.conf
+    sed_inplace "s|\${SSL_CERTFILE_PATH}|\"$REDIS_SSL_CERTFILE_PATH\"|g" ./webserver.conf
+    sed_inplace "s|\${SSL_KEYFILE_PATH}|\"$REDIS_SSL_KEYFILE_PATH\"|g" ./webserver.conf
   fi
 
   # install and configure webui
