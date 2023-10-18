@@ -68,6 +68,7 @@ class ContainerRegistry(graphene.ObjectType):
     @classmethod
     def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
         return cls(
+            id=hostname,
             hostname=hostname,
             config=ContainerRegistryConfig(
                 url=config.get(""),
