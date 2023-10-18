@@ -68,6 +68,7 @@ class ContainerRegistry(graphene.ObjectType):
 
     @classmethod
     def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
+        password = config.get("password", None)
         return cls(
             hostname=hostname,
             config=ContainerRegistryConfig(
@@ -75,7 +76,7 @@ class ContainerRegistry(graphene.ObjectType):
                 type=config.get("type"),
                 project=config.get("project", None),
                 username=config.get("username", None),
-                password=PASSWORD_PLACEHOLDER,
+                password=PASSWORD_PLACEHOLDER if password is not None else None,
                 ssl_verify=config.get("ssl_verify", None),
             ),
         )
