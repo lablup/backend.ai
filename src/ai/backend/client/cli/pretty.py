@@ -145,7 +145,10 @@ def format_error(exc: Exception):
             if exc.data["type"].endswith("/graphql-error"):
                 yield "\n\u279c Message:\n"
                 for err_item in exc.data.get("data", []):
-                    yield f"{err_item['message']} (path: {_format_gql_path(err_item['path'])})\n"
+                    yield f"{err_item['message']}"
+                    if err_path := err_item.get("path"):
+                        yield f" (path: {_format_gql_path(err_path)})"
+                    yield "\n"
             else:
                 other_details = exc.data.get("msg", None)
                 if other_details:
