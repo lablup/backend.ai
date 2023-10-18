@@ -1939,24 +1939,20 @@ class Queries(graphene.ObjectType):
             )
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registry(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         hostname: str,
-        domain_name: Optional[str] = None,
-        access_key: AccessKey = None,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_registry(ctx, hostname)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registries(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
-        domain_name: Optional[str] = None,
-        access_key: AccessKey = None,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
