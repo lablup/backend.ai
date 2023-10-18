@@ -7,6 +7,7 @@ import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..defs import PASSWORD_PLACEHOLDER
 from . import UserRole
 from .base import privileged_mutation, set_if_set
 
@@ -74,7 +75,7 @@ class ContainerRegistry(graphene.ObjectType):
                 type=config.get("type"),
                 project=config.get("project", None),
                 username=config.get("username", None),
-                password=config.get("password", None),
+                password=PASSWORD_PLACEHOLDER,
                 ssl_verify=config.get("ssl_verify", None),
             ),
         )
