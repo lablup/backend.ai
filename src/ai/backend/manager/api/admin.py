@@ -170,5 +170,5 @@ if __name__ == "__main__":
     # (graphene transforms our object model into a textual representation)
     # This is useful for writing documentation!
     schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
-    print("======== GraphQL API Schema ========")
+    print("======== GraphQL API Schema ========", file=sys.stderr)
     print(str(schema))
