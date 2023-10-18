@@ -9,6 +9,8 @@ import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
+from graphene.validation import DisableIntrospection
+from graphql import parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
@@ -48,7 +50,13 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     app_ctx: PrivateContext = request.app["admin.context"]
     manager_status = await root_ctx.shared_config.get_manager_status()
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
-
+    validate_errors = validate(
+        schema=app_ctx.gql_schema.graphql_schema,
+        document_ast=parse(params["query"]),
+        rules=(DisableIntrospection,),
+    )
+    if validate_errors:
+        return ExecutionResult(None, errors=validate_errors)
     gql_ctx = GraphQueryContext(
         schema=app_ctx.gql_schema,
         dataloader_manager=DataLoaderManager(),
