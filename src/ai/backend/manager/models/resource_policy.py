@@ -97,7 +97,7 @@ user_resource_policies = sa.Table(
     mapper_registry.metadata,
     sa.Column("name", sa.String(length=256), primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
+    sa.Column("max_vfolder_count", sa.Integer(), default=0, nullable=False),
     sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
 )
 
@@ -117,7 +117,7 @@ project_resource_policies = sa.Table(
     mapper_registry.metadata,
     sa.Column("name", sa.String(length=256), primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
+    sa.Column("max_vfolder_count", sa.Integer(), default=0, nullable=True),
     sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
 )
 
