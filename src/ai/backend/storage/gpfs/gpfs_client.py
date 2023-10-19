@@ -179,11 +179,10 @@ class GPFSAPIClient:
         self, fs_name: str, quota_type: GPFSQuotaType = GPFSQuotaType.FILESET
     ) -> List[GPFSQuota]:
         async with self._build_session() as sess:
-            query = urllib.parse.urlencode({"filter": f"entityType={quota_type}"})
             response = await self._build_request(
                 sess,
                 "GET",
-                f"/filesystems/{fs_name}/quotas?{query}",
+                f"/filesystems/{fs_name}/quotas",
             )
             data = await response.json()
         return [GPFSQuota.from_dict(quota_info) for quota_info in data["quotas"]]
@@ -196,11 +195,10 @@ class GPFSAPIClient:
         quota_type: GPFSQuotaType = GPFSQuotaType.FILESET,
     ) -> List[GPFSQuota]:
         async with self._build_session() as sess:
-            query = urllib.parse.urlencode({"filter": f"entityType={quota_type}"})
             response = await self._build_request(
                 sess,
                 "GET",
-                f"/filesystems/{fs_name}/filesets/{fileset_name}/quotas?{query}",
+                f"/filesystems/{fs_name}/filesets/{fileset_name}/quotas",
             )
             data = await response.json()
             log.debug("response: {}", data)

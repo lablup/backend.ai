@@ -114,7 +114,7 @@ class GPFSQuota(DataClassJsonMixin):
     filesLimit: Optional[int]
     filesInDoubt: Optional[int]
     filesGrace: Optional[str]
-    defaultQuota: Optional[bool]
+    isDefaultQuota: Optional[bool]
 
 
 @dataclass
