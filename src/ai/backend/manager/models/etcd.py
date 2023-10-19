@@ -28,7 +28,7 @@ __all__: Sequence[str] = (
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -37,7 +37,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -120,6 +120,7 @@ class CreateContainerRegistry(graphene.Mutation):
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
         input_config: Dict[str, Any] = {"": props.url, "type": props.type}
+        log.info("ETCD.CREATE_CONTAINER_REGISTRY (input_config:{})", input_config)
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
