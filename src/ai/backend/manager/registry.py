@@ -50,7 +50,6 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -61,14 +60,13 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
-    KernelHealthCheckFailedEvent,
-    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+    ModelServiceStatusEvent,
     RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
@@ -99,6 +97,7 @@ from ai.backend.common.types import (
     ImageAlias,
     KernelEnqueueingConfig,
     KernelId,
+    ModelServiceStatus,
     RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
@@ -217,6 +216,7 @@ class AgentRegistry:
         redis_stat: RedisConnectionInfo,
         redis_live: RedisConnectionInfo,
         redis_image: RedisConnectionInfo,
+        redis_stream: RedisConnectionInfo,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
@@ -234,6 +234,7 @@ class AgentRegistry:
         self.redis_stat = redis_stat
         self.redis_live = redis_live
         self.redis_image = redis_image
+        self.redis_stream = redis_stream
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.storage_manager = storage_manager
@@ -295,14 +296,9 @@ class AgentRegistry:
             name="api.session.kterm",
         )
         evd.consume(
-            KernelHealthCheckFailedEvent,
+            ModelServiceStatusEvent,
             self,
-            handle_kernel_health_check_result,
-        )
-        evd.consume(
-            KernelHealthyEvent,
-            self,
-            handle_kernel_health_check_result,
+            handle_model_service_status_update,
         )
         evd.consume(
             SessionTerminatingEvent,
@@ -1235,6 +1231,7 @@ class AgentRegistry:
                                     db_sess,
                                     dependency_id,
                                     access_key,
+                                    allow_stale=True,
                                 )
                             except SessionNotFound:
                                 raise InvalidAPIParameters(
@@ -3393,12 +3390,12 @@ async def handle_destroy_session(
     )
 
 
-async def handle_kernel_health_check_result(
+async def handle_model_service_status_update(
     context: AgentRegistry,
     source: AgentId,
-    event: KernelHealthyEvent | KernelHealthCheckFailedEvent,
+    event: ModelServiceStatusEvent,
 ) -> None:
-    log.info("HANDLE_KERNEL_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
+    log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
     try:
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
@@ -3413,19 +3410,13 @@ async def handle_kernel_health_check_result(
 
     async def _update():
         async with context.db.begin_session() as db_sess:
-            query = (
-                sa.update(RoutingRow)
-                .values(
-                    {
-                        "status": (
-                            RouteStatus.HEALTHY
-                            if isinstance(event, KernelHealthyEvent)
-                            else RouteStatus.UNHEALTHY
-                        )
-                    }
-                )
-                .where(RoutingRow.id == route.id)
-            )
+            data: dict[str, Any] = {}
+            match event.new_status:
+                case ModelServiceStatus.HEALTHY:
+                    data["status"] = RouteStatus.HEALTHY
+                case ModelServiceStatus.UNHEALTHY:
+                    data["status"] = RouteStatus.UNHEALTHY
+            query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
             await db_sess.execute(query)
 
             query = sa.select(RoutingRow).where(
@@ -3837,16 +3828,12 @@ async def handle_kernel_log(
     source: AgentId,
     event: DoSyncKernelLogsEvent,
 ) -> None:
-    redis_conn = redis_helper.get_redis_object(
-        context.shared_config.data["redis"],
-        db=REDIS_STREAM_DB,
-    )
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()
     log_key = f"containerlog.{event.container_id}"
     try:
         list_size = await redis_helper.execute(
-            redis_conn,
+            context.redis_stream,
             lambda r: r.llen(log_key),
         )
         if list_size is None:
@@ -3859,7 +3846,7 @@ async def handle_kernel_log(
             return
         for _ in range(list_size):
             # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
+            chunk = await redis_helper.execute(context.redis_stream, lambda r: r.lpop(log_key))
             if chunk is None:  # maybe missing
                 log_buffer.write(b"(container log unavailable)\n")
                 break
@@ -3880,12 +3867,11 @@ async def handle_kernel_log(
         finally:
             # Clear the log data from Redis when done.
             await redis_helper.execute(
-                redis_conn,
+                context.redis_stream,
                 lambda r: r.delete(log_key),
             )
     finally:
         log_buffer.close()
-        await redis_conn.close()
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:

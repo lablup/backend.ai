@@ -11,14 +11,13 @@ import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from dateutil.relativedelta import relativedelta
 
-from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.defs import REDIS_LIVE_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
+from ai.backend.common.types import AgentId, LogSeverity
 
 from ..defs import LockID
 from ..models import UserRole, error_logs, projects
@@ -219,6 +218,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
     raw_lifetime = await etcd.get("config/logs/error/retention")
     if raw_lifetime is None:
         raw_lifetime = "90d"
+    lifetime: dt.timedelta | relativedelta
     try:
         lifetime = tx.TimeDuration().check(raw_lifetime)
     except ValueError:
@@ -239,7 +239,6 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     log_cleanup_timer: GlobalTimer
-    log_cleanup_timer_redis: RedisConnectionInfo
     log_cleanup_timer_evh: EventHandler[web.Application, DoLogCleanupEvent]
 
 
@@ -250,10 +249,6 @@ async def init(app: web.Application) -> None:
         DoLogCleanupEvent,
         app,
         log_cleanup_task,
-    )
-    app_ctx.log_cleanup_timer_redis = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
-        db=REDIS_LIVE_DB,
     )
     app_ctx.log_cleanup_timer = GlobalTimer(
         root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
@@ -271,7 +266,6 @@ async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app["logs.context"]
     await app_ctx.log_cleanup_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)
-    await app_ctx.log_cleanup_timer_redis.close()
 
 
 def create_app(

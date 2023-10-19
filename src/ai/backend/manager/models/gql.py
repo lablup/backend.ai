@@ -471,7 +471,7 @@ class Queries(graphene.ObjectType):
 
     # super-admin only
     # legacy
-    scaling_groups_for_group = graphene.List(
+    scaling_groups_for_user_group = graphene.List(
         ScalingGroup,
         group=graphene.String(required=True),
         is_active=graphene.Boolean(),
@@ -1524,7 +1524,7 @@ class Queries(graphene.ObjectType):
     # legacy
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_scaling_groups_for_group(
+    async def resolve_scaling_groups_for_user_group(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         group,

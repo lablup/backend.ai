@@ -179,6 +179,7 @@ class SchedulerDispatcher(aobject):
         self.db = registry.db
         self.redis_live = redis_helper.get_redis_object(
             self.shared_config.data["redis"],
+            name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
 
@@ -1375,25 +1376,25 @@ class SchedulerDispatcher(aobject):
                 status_filter=[EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING],
             )
         for endpoint in endpoints:
-            non_error_routings = [
+            active_routings = [
                 r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
             ]
             desired_session_count = endpoint.desired_session_count
             if (
                 endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
-                and len(endpoint.routings) == 0
+                and len(active_routings) == 0
             ):
                 endpoints_to_mark_terminated.add(endpoint)
                 continue
 
-            if len(non_error_routings) > desired_session_count:
+            if len(active_routings) > desired_session_count:
                 # We need to scale down!
-                destroy_count = len(non_error_routings) - desired_session_count
+                destroy_count = len(active_routings) - desired_session_count
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
-                            for route in non_error_routings
+                            for route in active_routings
                             if (
                                 route.status != RouteStatus.PROVISIONING
                                 and route.status != RouteStatus.TERMINATING
@@ -1405,19 +1406,19 @@ class SchedulerDispatcher(aobject):
                 log.debug(
                     "Shrinking {} from {} to {}",
                     endpoint.name,
-                    len(non_error_routings),
+                    len(active_routings),
                     endpoint.desired_session_count,
                 )
-            elif len(non_error_routings) < desired_session_count:
+            elif len(active_routings) < desired_session_count:
                 if endpoint.retries > SERVICE_MAX_RETRIES:
                     continue
                 # We need to scale up!
-                create_count = desired_session_count - len(non_error_routings)
+                create_count = desired_session_count - len(active_routings)
                 endpoints_to_expand[endpoint] = create_count
                 log.debug(
                     "Expanding {} from {} to {}",
                     endpoint.name,
-                    len(non_error_routings),
+                    len(active_routings),
                     endpoint.desired_session_count,
                 )
 
@@ -1442,7 +1443,7 @@ class SchedulerDispatcher(aobject):
             try:
                 await self.registry.destroy_session(
                     session,
-                    forced=False,
+                    forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 )
             except SessionNotFound:
