@@ -120,7 +120,6 @@ class CreateContainerRegistry(graphene.Mutation):
     ) -> CreateContainerRegistry:
         ctx: GraphQueryContext = info.context
         input_config: Dict[str, Any] = {"": props.url, "type": props.type}
-        log.info("ETCD.CREATE_CONTAINER_REGISTRY (input_config:{})", input_config)
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
