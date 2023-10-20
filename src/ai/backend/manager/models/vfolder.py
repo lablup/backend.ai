@@ -1418,7 +1418,7 @@ class QuotaScope(graphene.ObjectType):
                         .options(selectinload(GroupRow.resource_policy_row))
                     )
                 result = await sess.scalar(query)
-                resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                resource_policy_constraint = result.resource_policy_row.max_vfolder_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 
