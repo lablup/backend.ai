@@ -100,9 +100,8 @@ class GPFSFilesystem(DataClassJsonMixin):
 class GPFSQuota(DataClassJsonMixin):
     quotaId: Optional[int]
     filesystemName: Optional[str]
-    filesetName: Optional[str]
     quotaType: Optional[str]
-    objectName: Optional[str]
+    objectName: Optional[str]  # This represents fileset name you query quota of filesets.
     objectId: Optional[int]
     blockUsage: Optional[int]
     blockQuota: Optional[int]

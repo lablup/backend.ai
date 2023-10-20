@@ -198,7 +198,7 @@ class GPFSAPIClient:
             response = await self._build_request(
                 sess,
                 "GET",
-                f"/filesystems/{fs_name}/filesets/{fileset_name}/quotas",
+                f"/filesystems/{fs_name}/quotas?filter=objectName={fileset_name}",
             )
             data = await response.json()
             log.debug("response: {}", data)
