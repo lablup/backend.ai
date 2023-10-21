@@ -19,6 +19,7 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
@@ -75,10 +76,12 @@ class DockerKernel(AbstractKernel):
         super().__setstate__(props)
 
     async def create_code_runner(
-        self, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
         return await DockerCodeRunner.new(
             self.kernel_id,
+            self.session_id,
+            event_producer,
             kernel_host=self.data["kernel_host"],
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
@@ -354,6 +357,8 @@ class DockerCodeRunner(AbstractCodeRunner):
     def __init__(
         self,
         kernel_id,
+        session_id,
+        event_producer,
         *,
         kernel_host,
         repl_in_port,
@@ -361,7 +366,13 @@ class DockerCodeRunner(AbstractCodeRunner):
         exec_timeout=0,
         client_features=None,
     ) -> None:
-        super().__init__(kernel_id, exec_timeout=exec_timeout, client_features=client_features)
+        super().__init__(
+            kernel_id,
+            session_id,
+            event_producer,
+            exec_timeout=exec_timeout,
+            client_features=client_features,
+        )
         self.kernel_host = kernel_host
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
