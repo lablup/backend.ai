@@ -74,7 +74,8 @@ async def test_instantiate_redisconninfo() -> None:
             "service_name": "mymaster",
             "password": "develove",
             "redis_helper_config": config.redis_helper_default_config,
-        }
+        },
+        name="test",
     )
 
     assert isinstance(r1.client, Redis)
@@ -93,6 +94,7 @@ async def test_instantiate_redisconninfo() -> None:
             "password": "develove",
             "redis_helper_config": config.redis_helper_default_config,
         },
+        name="test",
     )
 
     assert isinstance(r2.client, Redis)
