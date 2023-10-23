@@ -408,7 +408,7 @@ class UserResourcePolicy(graphene.ObjectType):
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
     max_vfolder_count = BigInt()
-    max_vfolder_size = BigInt()  # aliased field
+    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")  # aliased field
     max_quota_scope_size = BigInt()
 
     @classmethod
@@ -586,7 +586,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
     max_vfolder_count = BigInt()
-    max_vfolder_size = BigInt()  # aliased field
+    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")  # aliased field
     max_quota_scope_size = BigInt()
 
     @classmethod
