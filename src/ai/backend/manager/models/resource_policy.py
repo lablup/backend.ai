@@ -482,13 +482,13 @@ class UserResourcePolicy(graphene.ObjectType):
 
 
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = BigInt(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = BigInt()
+    max_quota_scope_size = BigInt()
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = BigInt(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = BigInt()
+    max_quota_scope_size = BigInt()
 
 
 class CreateUserResourcePolicy(graphene.Mutation):
@@ -660,13 +660,13 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
 
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = BigInt(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = BigInt()
+    max_quota_scope_size = BigInt()
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = BigInt(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = BigInt()
+    max_quota_scope_size = BigInt()
 
 
 class CreateProjectResourcePolicy(graphene.Mutation):
