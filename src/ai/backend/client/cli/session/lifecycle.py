@@ -544,7 +544,14 @@ session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 def _restart_cmd(docs: str = None):
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
-    def restart(session_refs):
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        metavar="ACCESS_KEY",
+        help="Specify the owner of the target session explicitly.",
+    )
+    def restart(session_refs, owner):
         """
         Restart the compute session.
 
@@ -559,7 +566,7 @@ def _restart_cmd(docs: str = None):
             has_failure = False
             for session_ref in session_refs:
                 try:
-                    compute_session = session.ComputeSession(session_ref)
+                    compute_session = session.ComputeSession(session_ref, owner)
                     compute_session.restart()
                 except BackendAPIError as e:
                     print_error(e)
