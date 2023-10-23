@@ -67,7 +67,7 @@ from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -631,8 +631,16 @@ class AbstractAgent(
             node_id=self.local_config["agent"]["id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
-        self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
-        self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
+        self.redis_stream_pool = redis_helper.get_redis_object(
+            self.local_config["redis"],
+            name="stream",
+            db=REDIS_STREAM_DB,
+        )
+        self.redis_stat_pool = redis_helper.get_redis_object(
+            self.local_config["redis"],
+            name="stat",
+            db=REDIS_STAT_DB,
+        )
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()

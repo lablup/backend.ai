@@ -9,10 +9,8 @@ import secrets
 import socket
 import uuid
 from collections import defaultdict
-from types import TracebackType
 from typing import (
     Any,
-    Awaitable,
     Callable,
     ClassVar,
     Coroutine,
@@ -32,8 +30,8 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
+from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
-from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
 from .logging import BraceStyleAdapter
@@ -59,10 +57,6 @@ __all__ = (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-PTGExceptionHandler: TypeAlias = Callable[
-    [Type[Exception], Exception, TracebackType], Awaitable[None]
-]
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
@@ -850,16 +844,18 @@ class EventDispatcher(aobject):
         log_events: bool = False,
         *,
         consumer_group: str,
-        service_name: str = None,
+        service_name: str | None = None,
         stream_key: str = "events",
-        node_id: str = None,
-        consumer_exception_handler: PTGExceptionHandler = None,
-        subscriber_exception_handler: PTGExceptionHandler = None,
+        node_id: str | None = None,
+        consumer_exception_handler: AsyncExceptionHandler | None = None,
+        subscriber_exception_handler: AsyncExceptionHandler | None = None,
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
             _redis_config["service_name"] = service_name
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(
+            _redis_config, name="event_dispatcher.stream", db=db
+        )
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -905,7 +901,7 @@ class EventDispatcher(aobject):
         callback: EventCallback[TContext, TEvent],
         coalescing_opts: CoalescingOptions = None,
         *,
-        name: str = None,
+        name: str | None = None,
     ) -> EventHandler[TContext, TEvent]:
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
@@ -928,9 +924,9 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: str = None,
+        name: str | None = None,
     ) -> EventHandler[TContext, TEvent]:
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
@@ -1054,7 +1050,7 @@ class EventProducer(aobject):
         redis_config: EtcdRedisConfig,
         db: int = 0,
         *,
-        service_name: str = None,
+        service_name: str | None = None,
         stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
@@ -1062,7 +1058,11 @@ class EventProducer(aobject):
         if service_name:
             _redis_config["service_name"] = service_name
         self._closed = False
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(
+            _redis_config,
+            name="event_producer.stream",
+            db=db,
+        )
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -1092,7 +1092,7 @@ class EventProducer(aobject):
         )
 
 
-def _generate_consumer_id(node_id: str = None) -> str:
+def _generate_consumer_id(node_id: str | None = None) -> str:
     h = hashlib.sha1()
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()
