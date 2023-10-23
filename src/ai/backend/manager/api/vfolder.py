@@ -1025,10 +1025,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=params["id"])
 
-    # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
-    max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
-    if max_vfolder_size > 0 and (quota <= 0 or quota > max_vfolder_size):
-        quota = max_vfolder_size
+    # Limit vfolder size quota if it is larger than max_quota_scope_size of the resource policy.
+    max_quota_scope_size = resource_policy.get("max_quota_scope_size", 0)
+    if max_quota_scope_size > 0 and (quota <= 0 or quota > max_quota_scope_size):
+        quota = max_quota_scope_size
 
     async with root_ctx.storage_manager.request(
         proxy_name,
