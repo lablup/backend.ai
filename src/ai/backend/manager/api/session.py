@@ -1350,10 +1350,17 @@ async def get_info(request: web.Request) -> web.Response:
 
 @server_status_required(READ_ALLOWED)
 @auth_required
-async def restart(request: web.Request) -> web.Response:
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("owner_access_key", default=None): t.Null | t.String,
+        }
+    )
+)
+async def restart(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info("RESTART (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     async with root_ctx.db.begin_session() as db_sess:
         session = await SessionRow.get_session(
