@@ -115,14 +115,6 @@ def calculate_remaining_time(
     return remaining.total_seconds()
 
 
-class KernelActivenessData(NamedTuple):
-    cluster_role: str
-    value: float | None
-
-
-KernelActiveness: TypeAlias = dict[KernelId, KernelActivenessData]
-
-
 class KernelRemainingTimeData(NamedTuple):
     cluster_role: str
     remaining: float | None
