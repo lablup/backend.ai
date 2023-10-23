@@ -1014,7 +1014,7 @@ class BaseRunner(metaclass=ABCMeta):
                     service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
                         "/opt/backend.ai/lib:", ""
                     )
-                return await self._run_cmd(cmdargs, cwd, service_env, service_info, do_not_wait)
+                return await self._run_cmd(cmdargs, _cwd, service_env, service_info, do_not_wait)
             except Exception as e:
                 log.exception("start_service: unexpected error")
                 return {
