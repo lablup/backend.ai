@@ -1,8 +1,8 @@
-"""add_app_vfolder_type
+"""add_app_vfolde_type
 
-Revision ID: e061f81932ff
-Revises: a083c6c962e5
-Create Date: 2023-09-22 13:33:23.765830
+Revision ID: d5abd04dc8fa
+Revises: 8c74e7df26f8
+Create Date: 2023-10-23 16:56:21.612202
 
 """
 import enum
@@ -16,8 +16,8 @@ from sqlalchemy.sql import text
 from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
-revision = "e061f81932ff"
-down_revision = "a083c6c962e5"
+revision = "d5abd04dc8fa"
+down_revision = "8c74e7df26f8"
 branch_labels = None
 depends_on = None
 
