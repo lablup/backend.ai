@@ -5,6 +5,14 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/kernel/**",
+        "//src/ai/backend/agent/**",
+    ],
+    allowed_dependencies=[],
+)
+
 pex_binary(
     name="extract-dotfiles",
     entry_point="extract_dotfiles.py",

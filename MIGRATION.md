@@ -9,6 +9,7 @@ Backend.AI Migration Guide
 # 23.03 to 23.09
 * webserver configuration scheme updated
   - `webserver`, `logging` and `debug` categories added, with all of those marked as required.
+  - `session.redis.host` and `session.redis.port` settings are now part of `session.redis.addr`
 
 # 22.09 to 23.03
 * All running containers **MUST** be shut down before starting 23.03 version of Backend.AI Agent.

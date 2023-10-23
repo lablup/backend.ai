@@ -324,7 +324,7 @@ async def call_non_bursty(
     Execute a coroutine once upon max_bursts bursty invocations or max_idle
     milliseconds after bursts smaller than max_bursts.
     """
-    global _burst_last_call, _burst_calls, _burst_counts
+    global _burst_last_call, _burst_times, _burst_counts
     if inspect.iscoroutine(coro):
         # Coroutine objects may not be called before garbage-collected
         # as this function throttles the frequency of invocation.

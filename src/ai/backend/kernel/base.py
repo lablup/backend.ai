@@ -148,6 +148,10 @@ class BaseRunner(metaclass=ABCMeta):
     # Set by subclasses.
     user_input_queue: Optional[asyncio.Queue[str]]
 
+    _main_task: asyncio.Task
+    _run_task: asyncio.Task
+    _health_check_task: Optional[asyncio.Task]
+
     def __init__(self, runtime_path: Path) -> None:
         self.subproc = None
         self.runtime_path = runtime_path
@@ -253,6 +257,9 @@ class BaseRunner(metaclass=ABCMeta):
             self._main_task.cancel()
             await self._run_task
             await self._main_task
+            if self._health_check_task:
+                self._health_check_task.cancel()
+                await self._health_check_task
             log.debug("terminating service processes...")
             running_procs = [*self.services_running.values()]
             async with self._service_lock:
@@ -850,7 +857,7 @@ class BaseRunner(metaclass=ABCMeta):
         assert self.service_parser is not None
         model_service_info = model_info.get("service")
         result = {}
-        is_healthy = False
+        started = False
         try:
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
@@ -864,39 +871,82 @@ class BaseRunner(metaclass=ABCMeta):
                 "protocol": "http",
                 "options": {},
             }
-            result = await self._start_service(service_info, do_not_wait=True)
-            if (result["status"] == "running" or result["status"] == "started") and (
-                (health_check_info := model_service_info.get("health_check")) is not None
-            ):
-                health_check_endpoint = (
-                    f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
-                )
-                for _ in range(health_check_info["max_retries"]):
-                    try:
-                        async with timeout(health_check_info["max_wait_time"]):
-                            try:
-                                resp = await asyncio.get_running_loop().run_in_executor(
-                                    None, urllib.request.urlopen, health_check_endpoint
-                                )
-                                if resp.status == health_check_info["expected_status_code"]:
-                                    is_healthy = True
-                                    break
-                            except urllib.error.URLError:
-                                pass
-                            # falling to here means that health check has failed, so just wait until
-                            # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
-                            await asyncio.sleep(health_check_info["max_wait_time"])
-                    except asyncio.TimeoutError:
-                        pass
+            result = await self._start_service(
+                service_info, cwd=model_info["model_path"], do_not_wait=True
+            )
+            started = result["status"] == "running" or result["status"] == "started"
         finally:
-            if not is_healthy:
-                result = {"status": "failed", "error": "service unhealthy"}
+            if not started:
+                result = {"status": "failed", "error": "service failed to start"}
             await self.outsock.send_multipart(
                 [
                     b"model-service-result",
                     json.dumps(result).encode("utf8"),
                 ]
             )
+            if started:
+                if model_service_info.get("health_check"):
+                    self._health_check_task = asyncio.create_task(
+                        self.check_model_health(model_info["name"], model_service_info)
+                    )
+                else:
+                    await self.outsock.send_multipart(
+                        [
+                            b"model-service-status",
+                            json.dumps(
+                                {"model_name": model_info["name"], "is_healthy": True}
+                            ).encode("utf8"),
+                        ]
+                    )
+
+    async def check_model_health(self, model_name, model_service_info):
+        health_check_info = model_service_info.get("health_check")
+        health_check_endpoint = (
+            f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
+        )
+        retries = 0
+        is_healthy = False
+        while True:
+            new_is_healthy = False
+            try:
+                async with timeout(health_check_info["max_wait_time"]):
+                    try:
+                        resp = await asyncio.get_running_loop().run_in_executor(
+                            None, urllib.request.urlopen, health_check_endpoint
+                        )
+                        if resp.status == health_check_info["expected_status_code"]:
+                            new_is_healthy = True
+                    except urllib.error.URLError:
+                        pass
+                    # falling to here means that health check has failed, so just wait until
+                    # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
+                    await asyncio.sleep(health_check_info["max_wait_time"])
+            except asyncio.TimeoutError:
+                pass
+            finally:
+                if new_is_healthy and not is_healthy:
+                    is_healthy = True
+                    retries = 0
+                    await self.outsock.send_multipart(
+                        [
+                            b"model-service-status",
+                            json.dumps({"model_name": model_name, "is_healthy": True}).encode(
+                                "utf8"
+                            ),
+                        ]
+                    )
+                elif not new_is_healthy:
+                    if retries > health_check_info["max_retries"] and is_healthy:
+                        is_healthy = False
+                        await self.outsock.send_multipart(
+                            [
+                                b"model-service-status",
+                                json.dumps({"model_name": model_name, "is_healthy": False}).encode(
+                                    "utf8"
+                                ),
+                            ]
+                        )
+                    retries += 1
 
     async def _start_service_and_feed_result(self, service_info):
         result = await self._start_service(service_info)
@@ -908,7 +958,11 @@ class BaseRunner(metaclass=ABCMeta):
         )
 
     async def _start_service(
-        self, service_info: Mapping[str, Any], do_not_wait: bool = False
+        self,
+        service_info: Mapping[str, Any],
+        *,
+        cwd: Optional[str] = None,
+        do_not_wait: bool = False,
     ) -> dict[str, str]:
         async with self._service_lock:
             try:
@@ -919,7 +973,9 @@ class BaseRunner(metaclass=ABCMeta):
                     return {"status": "running"}
                 if service_info["protocol"] == "pty":
                     return {"status": "failed", "error": "not implemented yet"}
-                cwd = Path.cwd()
+                _cwd = Path.cwd()
+                if cwd:
+                    _cwd = Path(cwd)
                 cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
                 env: Mapping[str, str]
                 cmdargs, env = None, {}
@@ -940,7 +996,7 @@ class BaseRunner(metaclass=ABCMeta):
                     if start_info is None:
                         cmdargs, env = None, {}
                     elif len(start_info) == 3:
-                        cmdargs, env, cwd = start_info
+                        cmdargs, env, _cwd = start_info
                     elif len(start_info) == 2:
                         cmdargs, env = start_info
                 if cmdargs is None:

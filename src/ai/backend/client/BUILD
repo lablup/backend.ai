@@ -6,6 +6,16 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/web/**",
+    ],
+    allowed_dependencies=[
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/common/**",
+    ],
+)
+
 pex_binary(
     name="cli",
     dependencies=[

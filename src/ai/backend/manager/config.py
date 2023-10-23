@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 """
 Configuration Schema on etcd
 ----------------------------
@@ -208,6 +210,7 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
+    RoundRobinState,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -289,11 +292,6 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
                 }
             ).allow_extra("*"),
-            t.Key("pipeline", default=None): t.Null | t.Dict(
-                {
-                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
-                },
-            ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
                     t.Key("ssl-verify", default=True): t.ToBool,
@@ -326,11 +324,7 @@ _config_defaults: Mapping[str, Any] = {
     "redis": {
         "addr": None,
         "password": None,
-        "redis_helper_config": {
-            "socket_timeout": 5.0,
-            "socket_connect_timeout": 2.0,
-            "reconnect_poll_timeout": 0.3,
-        },
+        "redis_helper_config": config.redis_helper_default_config,
     },
     "docker": {
         "registry": {},
@@ -499,6 +493,7 @@ shared_config_iv = t.Dict(
                 ): session_hang_tolerance_iv,
             },
         ).allow_extra("*"),
+        t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
     }
 ).allow_extra("*")
 
@@ -878,3 +873,38 @@ class SharedConfig(AbstractConfig):
             self.data["redis"]["addr"][1]
         ).with_password(self.data["redis"]["password"]) / str(db)
         return url
+
+    async def get_roundrobin_state(
+        self, resource_group_name: str, architecture: str
+    ) -> RoundRobinState | None:
+        """
+        Return the roundrobin state for the given resource group and architecture.
+        If given resource group's roundrobin states or roundrobin state of the given architecture is not found, return None.
+        """
+        if (rr_state_str := await self.get_raw("roundrobin_states")) is not None:
+            rr_states_dict: dict[str, dict[str, Any]] = json.loads(rr_state_str)
+            resource_group_rr_states_dict = rr_states_dict.get(resource_group_name, None)
+
+            if resource_group_rr_states_dict is not None:
+                rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
+
+                if rr_state_dict is not None:
+                    return RoundRobinState(
+                        schedulable_group_id=rr_state_dict["schedulable_group_id"],
+                        next_index=rr_state_dict["next_index"],
+                    )
+
+        return None
+
+    async def put_roundrobin_state(
+        self, resource_group_name: str, architecture: str, state: RoundRobinState
+    ) -> None:
+        """
+        Update the roundrobin states using the given resource group and architecture key.
+        """
+        rr_states_dict = json.loads(await self.get_raw("roundrobin_states") or "{}")
+        if resource_group_name not in rr_states_dict:
+            rr_states_dict[resource_group_name] = {}
+
+        rr_states_dict[resource_group_name][architecture] = state.to_json()
+        await self.etcd.put("roundrobin_states", json.dumps(rr_states_dict))

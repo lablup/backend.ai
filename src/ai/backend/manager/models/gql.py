@@ -459,6 +459,11 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
     )
 
+    vfolder = graphene.Field(
+        VirtualFolder,
+        id=graphene.String(),
+    )
+
     vfolder_list = graphene.Field(  # legacy non-paginated list
         VirtualFolderList,
         limit=graphene.Int(required=True),
@@ -1328,7 +1333,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_scaling_groups_for_group(
+    async def resolve_scaling_groups_for_user_group(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         user_group,
@@ -1386,6 +1391,29 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return StorageVolumeList(items, total_count)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_vfolder(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        id: str,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+    ) -> Optional[VirtualFolder]:
+        graph_ctx: GraphQueryContext = info.context
+        user_role = graph_ctx.user["role"]
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx,
+            "VirtualFolder.by_id",
+            user_uuid=user_id,
+            user_role=user_role,
+            domain_name=domain_name,
+            group_id=group_id,
+        )
+        return await loader.load(id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
