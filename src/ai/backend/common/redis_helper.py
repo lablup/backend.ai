@@ -39,6 +39,7 @@ __all__ = (
     "read_stream",
     "read_stream_by_group",
     "get_redis_object",
+    "get_redis_now",
 )
 
 _keepalive_options: MutableMapping[int, int] = {}
@@ -536,6 +537,11 @@ def get_redis_object(
             service_name=None,
             redis_helper_config=redis_helper_config,
         )
+
+
+async def get_redis_now(redis_obj: RedisConnectionInfo) -> float:
+    t = await execute(redis_obj, lambda r: r.time())
+    return t[0] + (t[1] / (10**6))
 
 
 async def ping_redis_connection(redis_client: Redis) -> bool:

@@ -43,7 +43,7 @@ import zmq
 import zmq.asyncio
 from aiohttp import web
 from aiotools import adefer
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -52,12 +52,12 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import (
     AppStreamingStatus,
-    get_redis_now,
-    update_and_check_kernel_activeness,
+    get_kernel_conn_tracker_key,
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models import KernelLoadingStrategy, KernelRow, SessionRow
+from ..models import KernelLoadingStrategy, SessionRow
+from ..models.kernel import KernelRow, update_and_check_disconnection
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -521,7 +521,7 @@ async def stream_proxy(
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
     redis_live = root_ctx.redis_live
-    conn_tracker_key = f"kernel.{kernel_id}.active_app_connections"
+    conn_tracker_key = get_kernel_conn_tracker_key(kernel_id)
     conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
     _conn_tracker_script = textwrap.dedent("""
@@ -559,7 +559,7 @@ async def stream_proxy(
 
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
-            app_ctx.active_session_ids[session_id] += 1
+            app_ctx.active_kernel_ids[kernel_id] += 1
             now = await redis_helper.execute(redis_live, lambda r: r.time())
             now = now[0] + (now[1] / (10**6))
             await redis_helper.execute(
@@ -574,9 +574,9 @@ async def stream_proxy(
 
     async def clear_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
-            app_ctx.active_session_ids[session_id] -= 1
-            if app_ctx.active_session_ids[session_id] <= 0:
-                del app_ctx.active_session_ids[session_id]
+            app_ctx.active_kernel_ids[kernel_id] -= 1
+            if app_ctx.active_kernel_ids[kernel_id] <= 0:
+                del app_ctx.active_kernel_ids[kernel_id]
             await redis_helper.execute(
                 redis_live, lambda r: r.zrem(conn_tracker_key, conn_tracker_val)
             )
@@ -728,35 +728,29 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                     )
                 else:
                     raise e
-            session_ids = list(app_ctx.active_session_ids.keys())
+            kernel_ids = list(app_ctx.active_kernel_ids.keys())
             async with app_ctx.conn_tracker_lock:
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id.in_(session_ids))
+                kernel_query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id.in_(kernel_ids))
                     .options(
                         noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            load_only(KernelRow.id, KernelRow.cluster_role),
-                        ),
+                        load_only(KernelRow.id, KernelRow.cluster_role),
                     )
                 )
                 async with root_ctx.db.begin_readonly_session() as db_session:
-                    session_rows = (await db_session.scalars(session_query)).all()
-                now = await get_redis_now(redis_live)
-                for session in session_rows:
-                    for kernel in session.kernels:
-                        is_active = await update_and_check_kernel_activeness(
-                            redis_live,
-                            kernel,
-                            now,
-                            no_packet_timeout,
+                    kernel_rows: list[KernelRow] = (await db_session.scalars(kernel_query)).all()
+                for kernel in kernel_rows:
+                    is_dead = await update_and_check_disconnection(
+                        redis_live,
+                        kernel,
+                        no_packet_timeout,
+                    )
+                    if is_dead:
+                        await root_ctx.idle_checker_host.update_app_streaming_status(
+                            kernel.id,
+                            AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                         )
-                        if not is_active:
-                            await root_ctx.idle_checker_host.update_app_streaming_status(
-                                kernel.id,
-                                AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-                            )
             await asyncio.sleep(10)
     except asyncio.CancelledError:
         pass
@@ -771,7 +765,7 @@ class PrivateContext:
     zctx: zmq.asyncio.Context
     conn_tracker_lock: asyncio.Lock
     conn_tracker_gc_task: asyncio.Task
-    active_session_ids: DefaultDict[SessionId, int]
+    active_kernel_ids: DefaultDict[KernelId, int]
 
 
 async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
@@ -784,7 +778,7 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx.stream_stdin_socks = defaultdict(weakref.WeakSet)
     app_ctx.zctx = zmq.asyncio.Context()
     app_ctx.conn_tracker_lock = asyncio.Lock()
-    app_ctx.active_session_ids = defaultdict(int)  # multiset[int]
+    app_ctx.active_kernel_ids = defaultdict(int)  # multiset[int]
     app_ctx.conn_tracker_gc_task = asyncio.create_task(stream_conn_tracker_gc(root_ctx, app_ctx))
 
     root_ctx.event_dispatcher.subscribe(KernelTerminatingEvent, app, handle_kernel_terminating)

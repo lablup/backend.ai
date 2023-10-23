@@ -5,6 +5,7 @@ import functools
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
 from urllib.parse import quote_plus as urlquote
 
@@ -358,3 +359,7 @@ def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
 
 def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
+
+
+async def get_db_now(db_session: SASession) -> datetime:
+    return await db_session.scalar(sa.select(sa.func.now()))

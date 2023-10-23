@@ -66,11 +66,12 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, LockID
-from .models.kernel import KernelRow
+from .models.kernel import KernelRow, get_kernel_conn_tracker_key
 from .models.keypair import KeyPairRow
 from .models.resource_policy import KeyPairResourcePolicyRow
 from .models.session import SessionRow, SessionStatus
 from .models.user import UserRow
+from .models.utils import get_db_now
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
@@ -112,52 +113,6 @@ def calculate_remaining_time(
         baseline = max(idle_baseline, grace_period_end)
     remaining = baseline - now + timeout_period
     return remaining.total_seconds()
-
-
-async def get_redis_now(redis_obj: RedisConnectionInfo) -> float:
-    t = await redis_helper.execute(redis_obj, lambda r: r.time())
-    return t[0] + (t[1] / (10**6))
-
-
-async def get_db_now(db_session: SASession) -> datetime:
-    return await db_session.scalar(sa.select(sa.func.now()))
-
-
-def get_kernel_conn_tracker_key(kernel_id: KernelId) -> str:
-    return f"kernel.{kernel_id}.active_app_connections"
-
-
-async def update_and_check_kernel_activeness(
-    redis_conn: RedisConnectionInfo,
-    kernel: KernelRow,
-    current_time: float,
-    timeout: timedelta,
-) -> bool:
-    """
-    Update kernel's activeness.
-    Return True if the kernel has any active connection.
-    """
-    conn_tracker_key = get_kernel_conn_tracker_key(kernel.id)
-    prev_remaining_count = await redis_helper.execute(
-        redis_conn,
-        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
-    )
-    removed_count = await redis_helper.execute(
-        redis_conn,
-        lambda r: r.zremrangebyscore(
-            conn_tracker_key,
-            float("-inf"),
-            current_time - timeout.total_seconds(),
-        ),
-    )
-    remaining_count = await redis_helper.execute(
-        redis_conn,
-        lambda r: r.zcount(conn_tracker_key, float("-inf"), float("+inf")),
-    )
-    log.debug(
-        f"conn_tracker: gc {kernel.id} removed/remaining = {removed_count}/{remaining_count}",
-    )
-    return not (prev_remaining_count > 0 and remaining_count == 0)
 
 
 async def get_session_activeness(
@@ -756,7 +711,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         active_streams = await get_session_activeness(self._redis_live, session)
         if active_streams is not None and active_streams > 0:
             return True
-        now: float = await get_redis_now(self._redis_live)
+        now: float = await redis_helper.get_redis_now(self._redis_live)
         kernel_remaining: dict[KernelId, KernelRemainingTimeData] = {}
 
         async def _check_kernel_idleness(kernel: KernelRow) -> None:
