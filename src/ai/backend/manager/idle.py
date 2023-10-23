@@ -66,7 +66,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, LockID
-from .models.kernel import KernelRow, get_kernel_conn_tracker_key
+from .models.kernel import KernelRow, get_remaining_connection
 from .models.keypair import KeyPairRow
 from .models.resource_policy import KeyPairResourcePolicyRow
 from .models.session import SessionRow, SessionStatus
@@ -113,36 +113,6 @@ def calculate_remaining_time(
         baseline = max(idle_baseline, grace_period_end)
     remaining = baseline - now + timeout_period
     return remaining.total_seconds()
-
-
-async def get_session_activeness(
-    redis_conn: RedisConnectionInfo, session: SessionRow
-) -> float | None:
-    activeness = {}
-    for kernel in session.kernels:
-        key = get_kernel_conn_tracker_key(kernel.id)
-        active_streams = await redis_helper.execute(
-            redis_conn,
-            lambda r: r.zcount(
-                key,
-                float("-inf"),
-                float("+inf"),
-            ),
-        )
-        activeness[kernel.id] = active_streams
-    return define_session_activeness(activeness)
-
-
-def define_session_activeness(activeness: KernelActiveness) -> float | None:
-    # TODO: Define fine-grained policy for multi-kernel session.
-    candidate = None
-    for kernel_data in activeness.values():
-        if kernel_data.cluster_role == DEFAULT_ROLE:
-            candidate = kernel_data.value
-            break
-        if candidate is None:
-            candidate = kernel_data.value
-    return candidate
 
 
 class KernelActivenessData(NamedTuple):
@@ -708,8 +678,13 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         if session.session_type == SessionTypes.BATCH:
             return True
 
-        active_streams = await get_session_activeness(self._redis_live, session)
-        if active_streams is not None and active_streams > 0:
+        active_stream_cnt: int | None = None
+        for kernel in session.kernels:
+            # TODO: Define fine-grained policy for multi-kernel session.
+            if kernel.cluster_role in (DEFAULT_ROLE, "main"):
+                active_stream_cnt = await get_remaining_connection(self._redis_live, kernel)
+                break
+        if active_stream_cnt is not None and active_stream_cnt > 0:
             return True
         now: float = await redis_helper.get_redis_now(self._redis_live)
         kernel_remaining: dict[KernelId, KernelRemainingTimeData] = {}

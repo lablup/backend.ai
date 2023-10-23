@@ -50,14 +50,11 @@ from ai.backend.common import validators as tx
 from ai.backend.common.events import KernelTerminatingEvent
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
-from ai.backend.manager.idle import (
-    AppStreamingStatus,
-    get_kernel_conn_tracker_key,
-)
+from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
 from ..models import KernelLoadingStrategy, SessionRow
-from ..models.kernel import KernelRow, update_and_check_disconnection
+from ..models.kernel import KernelRow, get_kernel_conn_tracker_key, update_and_check_disconnection
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
