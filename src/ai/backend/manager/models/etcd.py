@@ -28,7 +28,7 @@ __all__: Sequence[str] = (
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -37,7 +37,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
