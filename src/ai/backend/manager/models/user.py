@@ -596,16 +596,16 @@ class CreateUser(graphene.Mutation):
             created_user = result.first()
 
             # Create a default keypair for the user.
-            from .keypair import CreateKeyPair, KeyPairInput, keypairs
+            from .keypair import CreateKeyPair, keypairs
 
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
-                KeyPairInput(
-                    is_active=(_status == UserStatus.ACTIVE),
-                    is_admin=user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                    resource_policy="default",
-                    rate_limit=10000,
-                ),
+                {
+                    "is_active": _status == UserStatus.ACTIVE,
+                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                    "resource_policy": "default",
+                    "rate_limit": 10000,
+                },
             )
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,

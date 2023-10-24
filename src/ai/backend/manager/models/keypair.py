@@ -511,6 +511,13 @@ class KeyPairInput(graphene.InputObjectType):
     # When modifying, set the field to "None" to skip setting the value.
 
 
+class KeyPairInputTD(TypedDict):
+    is_active: bool
+    is_admin: bool
+    resource_policy: str
+    rate_limit: int
+
+
 class ModifyKeyPairInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False)
     is_admin = graphene.Boolean(required=False)
@@ -549,17 +556,17 @@ class CreateKeyPair(graphene.Mutation):
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
     @classmethod
-    def prepare_new_keypair(cls, user_email: str, props: KeyPairInput) -> Dict[str, Any]:
+    def prepare_new_keypair(cls, user_email: str, props: KeyPairInputTD) -> Dict[str, Any]:
         ak, sk = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()
         data = {
             "user_id": user_email,
             "access_key": ak,
             "secret_key": sk,
-            "is_active": props.is_active,
-            "is_admin": props.is_admin,
-            "resource_policy": props.resource_policy,
-            "rate_limit": props.rate_limit,
+            "is_active": props["is_active"],
+            "is_admin": props["is_admin"],
+            "resource_policy": props["resource_policy"],
+            "rate_limit": props["rate_limit"],
             "num_queries": 0,
             "ssh_public_key": pubkey,
             "ssh_private_key": privkey,
