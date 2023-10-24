@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import json
 import logging
 import logging.config
 import uuid
 from typing import Any, Callable, Optional
 
+import redis
+import redis.asyncio as aioredis
 from aiohttp import web
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -12,19 +16,13 @@ from . import AbstractStorage, Session, extra_config_headers
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
-try:
-    from redis import VERSION
-    from redis import asyncio as aioredis
-except ImportError:  # pragma: no cover
-    aioredis = None  # type: ignore[assignment]
-
 
 class RedisStorage(AbstractStorage):
     """Redis storage"""
 
     def __init__(
         self,
-        redis_pool: "aioredis.Redis[bytes]",
+        redis_pool: aioredis.Redis,
         *,
         cookie_name: str = "AIOHTTP_SESSION",
         domain: Optional[str] = None,
@@ -51,7 +49,7 @@ class RedisStorage(AbstractStorage):
         if aioredis is None:
             raise RuntimeError("Please install redis")
         # May have installed aioredis separately (without aiohttp-session[aioredis]).
-        lib_version = VERSION[:2]
+        lib_version = redis.VERSION[:2]
         if lib_version < (4, 3):
             raise RuntimeError("redis<4.3 is not supported")
         self._key_factory = key_factory
@@ -75,9 +73,8 @@ class RedisStorage(AbstractStorage):
         data_bytes = await self._redis.get(self.cookie_name + "_" + key)
         if data_bytes is None:
             return Session(None, data=None, new=True, max_age=self.max_age)
-        data_str = data_bytes.decode("utf-8")
         try:
-            data = self._decoder(data_str)
+            data = self._decoder(data_bytes)
         except ValueError:
             data = None
         return Session(key, data=data, new=False, max_age=self.max_age)

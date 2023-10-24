@@ -19,7 +19,7 @@ license_defs = {
 
 _config_defaults: Mapping[str, Any] = {
     "pipeline": {
-        "endpoint": "http://127.0.0.1:9500",
+        "endpoint": yarl.URL("http://127.0.0.1:9500"),
         "jwt": {
             "secret": "7<:~[X,^Z1XM!*,Pe:PHR!bv,H~Q#l177<7gf_XHD6.<*<.t<[o|V5W(=0x:jTh-",
         },
@@ -79,6 +79,7 @@ config_iv = t.Dict(
                 t.Key("max_cpu_cores_per_container", default=64): t.ToInt,
                 t.Key("max_memory_per_container", default=64): t.ToInt,
                 t.Key("max_cuda_devices_per_container", default=16): t.ToInt,
+                t.Key("max_ipu_devices_per_container", default=8): t.ToInt,
                 t.Key("max_cuda_shares_per_container", default=16): t.ToInt,
                 t.Key("max_shm_per_container", default=2): t.ToFloat,
                 t.Key("max_file_upload_size", default=4294967296): t.ToInt,
@@ -138,7 +139,9 @@ config_iv = t.Dict(
                         ),
                         t.Key("service_name", default=None): t.Null | t.String,
                         t.Key("password", default=None): t.Null | t.String,
-                        t.Key("redis_helper_config"): config.redis_helper_config_iv,
+                        t.Key(
+                            "redis_helper_config", default=config.redis_helper_default_config
+                        ): config.redis_helper_config_iv,
                     }
                 ),
                 t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)

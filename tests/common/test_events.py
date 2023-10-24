@@ -6,7 +6,7 @@ import aiotools
 import attrs
 import pytest
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.events import (
     AbstractEvent,
     CoalescingOptions,
@@ -14,13 +14,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import AgentId, EtcdRedisConfig, RedisHelperConfig
-
-redis_helper_config: RedisHelperConfig = {
-    "socket_timeout": 5.0,
-    "socket_connect_timeout": 2.0,
-    "reconnect_poll_timeout": 0.3,
-}
+from ai.backend.common.types import AgentId, EtcdRedisConfig
 
 
 @attrs.define(slots=True, frozen=True)
@@ -44,7 +38,9 @@ EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 async def test_dispatch(redis_container) -> None:
     app = object()
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1], redis_helper_config=redis_helper_config)
+    redis_config = EtcdRedisConfig(
+        addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
+    )
     dispatcher = await EventDispatcher.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
@@ -96,7 +92,9 @@ async def test_error_on_dispatch(redis_container) -> None:
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = EtcdRedisConfig(addr=redis_container[1], redis_helper_config=redis_helper_config)
+    redis_config = EtcdRedisConfig(
+        addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
+    )
     dispatcher = await EventDispatcher.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,

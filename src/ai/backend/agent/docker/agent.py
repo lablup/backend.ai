@@ -43,7 +43,7 @@ from async_timeout import timeout
 
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
-from ai.backend.common.events import KernelLifecycleEventReason
+from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -152,6 +152,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
@@ -166,6 +167,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             kernel_id,
             session_id,
             agent_id,
+            event_producer,
             kernel_config,
             local_config,
             computers,
@@ -759,6 +761,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
                     "IPC_LOCK",  # for hugepages and RDMA
+                    "SYS_NICE",  # for NFS based GPUDirect Storage
                 ],
                 "Ulimits": [
                     {"Name": "nofile", "Soft": 1048576, "Hard": 1048576},
@@ -833,8 +836,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
-        if self.local_config["debug"]["log-kernel-config"]:
-            log.debug("full container config: {!r}", pretty(container_config))
 
         # optional local override of docker config
         extra_container_opts_name = "agent-docker-container-opts.json"
@@ -849,6 +850,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     update_nested_dict(container_config, extra_container_opts)
                 except IOError:
                     pass
+
+        # The final container config is settled down here.
+        if self.local_config["debug"]["log-kernel-config"]:
+            log.debug("full container config: {!r}", pretty(container_config))
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
@@ -912,7 +917,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    host_port = int((await container.port(port))[0]["HostPort"])
+                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    if ports is None:
+                        raise ContainerCreationError(container_id=cid)
+                    host_port = int(ports[0]["HostPort"])
                     assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
@@ -1300,6 +1308,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             kernel_id,
             session_id,
             self.id,
+            self.event_producer,
             kernel_config,
             self.local_config,
             self.computers,
