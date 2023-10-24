@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Προανοικτές θύρες για ρύθμιση (προαιρετικά)",
       "PortsTitleWithRange": "Τιμή θύρας (μεταξύ 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Τυχόν μη αποθηκευμένες προ-ανοιχτές θύρες θα εξαφανιστούν.",
-      "StartModelServing": "Έναρξη μοντέλου σερβιρίσματος"
+      "StartModelServing": "Έναρξη μοντέλου σερβιρίσματος",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -288,7 +292,9 @@
       "EnterValidSessionName": "Εισάγετε έγκυρο όνομα συνεδρίας",
       "SessionNameRequired": "Το όνομα συνεδρίας είναι υποχρεωτικό",
       "SluggedStrings": "Στιγμιότυπα αλφαριθμητικά (>3 χαρακτήρες)",
-      "SessionNameAlreadyExist": "Το όνομα συνεδρίας υπάρχει ήδη"
+      "SessionNameAlreadyExist": "Το όνομα συνεδρίας υπάρχει ήδη",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "Διαδραστικό",
     "Batch": "Παρτίδα",
@@ -369,7 +375,6 @@
     "DeleteAll": "Διαγραφή όλων",
     "Update": "Εκσυγχρονίζω",
     "Delete": "Διαγράφω",
-    "Dismiss": "Απολύω",
     "DismissAndProceed": "Παράβλεψη και συνέχεια",
     "Close": "Κλείσε",
     "Confirm": "Επιβεβαιώνω",
@@ -664,7 +669,8 @@
     "Used": "Μεταχειρισμένο",
     "Pipeline": "Φάκελοι αγωγών",
     "DialogDataFolder": "Ειδικοί φάκελοι αγωγών που δημιουργούνται αυτόματα κατά τη δημιουργία αγωγών στο FastTrack.",
-    "DialogModelFolder": "Μπορείτε να εξυπηρετείτε και να διαχειρίζεστε μοντέλα."
+    "DialogModelFolder": "Μπορείτε να εξυπηρετείτε και να διαχειρίζεστε μοντέλα.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {

@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Wstępnie otwarte porty do ustawienia (opcjonalnie)",
       "PortsTitleWithRange": "Wartość portu (między 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Wszystkie niezapisane wcześniej otwarte porty zostaną usunięte.",
-      "StartModelServing": "Rozpoczęcie obsługi modelu"
+      "StartModelServing": "Rozpoczęcie obsługi modelu",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -288,7 +292,9 @@
       "EnterValidSessionName": "Wprowadź prawidłową nazwę sesji",
       "SessionNameRequired": "Nazwa sesji jest wymagana",
       "SluggedStrings": "Ucięte ciągi znaków (>3 znaki)",
-      "SessionNameAlreadyExist": "Nazwa sesji już istnieje"
+      "SessionNameAlreadyExist": "Nazwa sesji już istnieje",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "Interaktywny",
     "Batch": "Partia",
@@ -369,7 +375,6 @@
     "DeleteAll": "Usuń wszystko",
     "Update": "Aktualizacja",
     "Delete": "Kasować",
-    "Dismiss": "Oddalić",
     "DismissAndProceed": "Odrzuć i kontynuuj",
     "Close": "Blisko",
     "Confirm": "Potwierdzać",
@@ -664,7 +669,8 @@
     "Used": "Używany",
     "Pipeline": "Foldery rurociągów",
     "DialogDataFolder": "Dedykowane potokom foldery, które są automatycznie tworzone podczas tworzenia potoków w FastTrack.",
-    "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi."
+    "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
