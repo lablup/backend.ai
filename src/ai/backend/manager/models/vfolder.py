@@ -340,6 +340,9 @@ async def query_accessible_vfolders(
     if allowed_vfolder_types is None:
         allowed_vfolder_types = ["user"]  # legacy default
 
+    if user_role == UserRole.SUPERADMIN or user_role == "superadmin":
+        allow_privileged_access = True
+
     vfolders_selectors = [
         vfolders.c.name,
         vfolders.c.id,
