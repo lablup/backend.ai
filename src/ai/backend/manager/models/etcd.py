@@ -29,7 +29,7 @@ __all__: Sequence[str] = (
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -38,7 +38,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -70,6 +70,7 @@ class ContainerRegistry(graphene.ObjectType):
     def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
         password = config.get("password", None)
         return cls(
+            id=hostname,
             hostname=hostname,
             config=ContainerRegistryConfig(
                 url=config.get(""),
