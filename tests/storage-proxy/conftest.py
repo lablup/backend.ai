@@ -4,6 +4,7 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -66,7 +67,11 @@ def has_backend(backend_name: str) -> dict[str, Any] | None:
         "xfs",
     ]
 )
-async def volume(request, local_volume, mock_etcd) -> AsyncIterator[AbstractVolume]:
+async def volume(
+    request,
+    local_volume,
+    mock_etcd,
+) -> AsyncIterator[AbstractVolume]:
     volume_cls: type[AbstractVolume]
     backend_options = {}
     volume_path = local_volume
@@ -107,6 +112,8 @@ async def volume(request, local_volume, mock_etcd) -> AsyncIterator[AbstractVolu
             volume_cls = XfsVolume
         case _:
             raise RuntimeError(f"Unknown volume backend: {request.param}")
+    mock_event_dispatcher = MagicMock()
+    mock_event_producer = MagicMock()
     volume = volume_cls(
         {
             "storage-proxy": {
@@ -116,6 +123,8 @@ async def volume(request, local_volume, mock_etcd) -> AsyncIterator[AbstractVolu
         volume_path,
         etcd=mock_etcd,
         options=backend_options,
+        event_dispathcer=mock_event_dispatcher,
+        event_producer=mock_event_producer,
     )
     await volume.init()
     try:

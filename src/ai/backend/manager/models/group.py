@@ -191,8 +191,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]:
-    ...
+) -> Iterable[uuid.UUID]: ...
 
 
 @overload
@@ -200,8 +199,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]:
-    ...
+) -> Iterable[uuid.UUID]: ...
 
 
 async def resolve_groups(
@@ -614,7 +612,7 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolders
 
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
@@ -629,7 +627,7 @@ class PurgeGroup(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            deleted_count = await initiate_vfolder_removal(
+            await initiate_vfolder_purge(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
@@ -638,6 +636,7 @@ class PurgeGroup(graphene.Mutation):
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
             raise
+        deleted_count = len(target_vfs)
         if deleted_count > 0:
             log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
         return deleted_count

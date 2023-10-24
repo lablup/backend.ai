@@ -26,24 +26,21 @@ from ai.backend.manager.registry import check_scaling_group
 
 from ..defs import DEFAULT_CHUNK_SIZE, DEFAULT_IMAGE_ARCH
 from ..models import (
+    EndpointLifecycle,
+    EndpointRow,
+    EndpointTokenRow,
     ImageRow,
-    SessionRow,
+    RouteStatus,
+    RoutingRow,
     UserRow,
     query_accessible_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
     vfolders,
 )
-from ..models.endpoint import EndpointRow
-from ..models.routing import RouteStatus, RoutingRow
 from ..types import UserScope
 from .auth import auth_required
-from .exceptions import (
-    InvalidAPIParameters,
-    ObjectNotFound,
-    ServiceUnavailable,
-    VFolderNotFound,
-)
+from .exceptions import InvalidAPIParameters, ObjectNotFound, ServiceUnavailable, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -94,7 +91,9 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
-    query_conds = EndpointRow.session_owner == request["user"]["uuid"]
+    query_conds = (EndpointRow.session_owner == request["user"]["uuid"]) & (
+        EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
+    )
     if params["name"]:
         query_conds &= EndpointRow.name == params["name"]
 
@@ -345,6 +344,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         )
 
     params["config"]["mount_map"] = {model_id: params["config"]["model_mount_destination"]}
+    sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     # check if session is valid to be created
     await root_ctx.registry.create_session(
@@ -368,9 +368,19 @@ async def create(request: web.Request, params: Any) -> web.Response:
         startup_command=params["startup_command"],
         tag=params["tag"],
         callback_url=params["callback_url"],
+        sudo_session_enabled=sudo_session_enabled,
     )
 
     async with root_ctx.db.begin_session() as db_sess:
+        query = sa.select(EndpointRow).where(
+            (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
+            & (EndpointRow.name == params["service_name"])
+        )
+        result = await db_sess.execute(query)
+        service_with_duplicate_name = result.scalar()
+        if service_with_duplicate_name is not None:
+            raise InvalidAPIParameters("Cannot create multiple services with same name")
+
         project_id = await resolve_group_name_or_id(
             await db_sess.connection(), params["domain"], params["group"]
         )
@@ -424,12 +434,18 @@ async def delete(request: web.Request) -> web.Response:
 
     async with root_ctx.db.begin_session() as db_sess:
         if len(endpoint.routings) == 0:
-            query = sa.delete(EndpointRow).where(EndpointRow.id == service_id)
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == service_id)
+                .values({"lifecycle_stage": EndpointLifecycle.DESTROYED})
+            )
         else:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
-                .values({"desired_session_count": -1})
+                .values(
+                    {"desired_session_count": 0, "lifecycle_stage": EndpointLifecycle.DESTROYING}
+                )
             )
         await db_sess.execute(query)
     return web.json_response({"success": True}, status=200)
@@ -485,10 +501,6 @@ async def scale(request: web.Request, params: Any) -> web.Response:
 
     if params["to"] < 0:
         raise InvalidAPIParameters("Amount of desired session count cannot be a negative number")
-    if params["to"] == len(endpoint.routings):
-        return web.json_response(
-            {"current_route_count": len(endpoint.routings), "target_count": params["to"]}
-        )
 
     async with root_ctx.db.begin_session() as db_sess:
         query = (
@@ -596,7 +608,8 @@ async def delete_route(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("duration"): tx.TimeDuration,
+            t.Key("duration", default=None): t.Null | tx.TimeDuration,
+            t.Key("valid_until", default=None): t.Null | t.Int,
         }
     ),
 )
@@ -630,8 +643,15 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    exp = datetime.now() + params["duration"]
-    body = {"user_uuid": str(endpoint.session_owner), "exp": int(exp.timestamp())}
+    if params["valid_until"]:
+        exp = params["valid_until"]
+    elif params["duration"]:
+        exp = int((datetime.now() + params["duration"]).timestamp())
+    else:
+        raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
+    if datetime.now().timestamp() > exp:
+        raise InvalidAPIParameters("valid_until is older than now")
+    body = {"user_uuid": str(endpoint.session_owner), "exp": exp}
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
@@ -641,7 +661,20 @@ async def generate_token(request: web.Request, params: Any) -> web.Response:
             },
         ) as resp:
             token_json = await resp.json()
-            return web.json_response({"token": token_json["token"]})
+            token = token_json["token"]
+
+    async with root_ctx.db.begin_session() as db_sess:
+        token_row = EndpointTokenRow(
+            uuid.uuid4(),
+            token,
+            endpoint.id,
+            endpoint.domain,
+            endpoint.project,
+            endpoint.session_owner,
+        )
+        db_sess.add(token_row)
+        await db_sess.commit()
+        return web.json_response({"token": token})
 
 
 @auth_required
@@ -665,20 +698,16 @@ async def list_errors(request: web.Request) -> web.Response:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
-        query = sa.select(SessionRow).where(SessionRow.id.in_([r.session for r in error_routes]))
-        result = await db_sess.execute(query)
-        error_sessions = result.scalars().all()
+    error_routes = [r for r in endpoint.routings if r.status == RouteStatus.FAILED_TO_START]
 
     return web.json_response(
         {
             "errors": [
                 {
-                    "session_id": str(sess.id),
-                    "error": sess.status_data["error"],
+                    "session_id": route.error_data.get("session_id"),
+                    "error": route.error_data["errors"],
                 }
-                for sess in error_sessions
+                for route in error_routes
             ],
             "retries": endpoint.retries,
         }

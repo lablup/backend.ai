@@ -11,7 +11,7 @@ from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
@@ -64,6 +64,9 @@ async def test_stream_loadbalance(
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        redis_helper_config=config.redis_helper_default_config,
+        name="test",
+        sentinel=None,
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -102,7 +105,7 @@ async def test_stream_loadbalance(
             with pytest.raises(RedisConnectionError):
                 await r.client.xadd("stream1", {"idx": 2 + i})
         elif disruption_method == "pause":
-            with pytest.raises((asyncio.TimeoutError, RedisTimeoutError)):
+            with pytest.raises((RedisConnectionError, asyncio.TimeoutError, RedisTimeoutError)):
                 await r.client.xadd("stream1", {"idx": 2 + i})
         else:
             raise RuntimeError("should not reach here")

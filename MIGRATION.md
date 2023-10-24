@@ -6,6 +6,11 @@ Backend.AI Migration Guide
 * The migration should be done while the managers and agents are shut down.
 * This guide only describes additional steps to follow other than the code/package upgrades.
 
+# 23.03 to 23.09
+* webserver configuration scheme updated
+  - `webserver`, `logging` and `debug` categories added, with all of those marked as required.
+  - `session.redis.host` and `session.redis.port` settings are now part of `session.redis.addr`
+
 # 22.09 to 23.03
 * All running containers **MUST** be shut down before starting 23.03 version of Backend.AI Agent.
 * Python version upgraded from 3.10 to 3.11. Actual patch version may differ by every Backend.AI release, so please make sure to check `pants.toml` of each release.

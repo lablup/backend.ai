@@ -50,7 +50,7 @@ from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
-from .endpoint import Endpoint, EndpointList
+from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
 from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
 from .image import (
     AliasImage,
@@ -236,6 +236,8 @@ class Queries(graphene.ObjectType):
     """
     All available GraphQL queries.
     """
+
+    node = graphene.relay.Node.Field()
 
     # super-admin only
     agent = graphene.Field(
@@ -457,6 +459,11 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
     )
 
+    vfolder = graphene.Field(
+        VirtualFolder,
+        id=graphene.String(),
+    )
+
     vfolder_list = graphene.Field(  # legacy non-paginated list
         VirtualFolderList,
         limit=graphene.Int(required=True),
@@ -602,6 +609,21 @@ class Queries(graphene.ObjectType):
 
     routing_list = graphene.Field(
         RoutingList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
+        endpoint_id=graphene.UUID(),
+    )
+
+    endpoint_token = graphene.Field(
+        EndpointToken,
+        token=graphene.String(required=True),
+    )
+
+    endpoint_token_list = graphene.Field(
+        EndpointTokenList,
         limit=graphene.Int(required=True),
         offset=graphene.Int(required=True),
         filter=graphene.String(),
@@ -1311,7 +1333,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_scaling_groups_for_group(
+    async def resolve_scaling_groups_for_user_group(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         user_group,
@@ -1369,6 +1391,29 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return StorageVolumeList(items, total_count)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_vfolder(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        id: str,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+    ) -> Optional[VirtualFolder]:
+        graph_ctx: GraphQueryContext = info.context
+        user_role = graph_ctx.user["role"]
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx,
+            "VirtualFolder.by_id",
+            user_uuid=user_id,
+            user_role=user_role,
+            domain_name=domain_name,
+            group_id=group_id,
+        )
+        return await loader.load(id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
@@ -1813,6 +1858,60 @@ class Queries(graphene.ObjectType):
             user_uuid=user_uuid,
         )
         return RoutingList(routing_list, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
+    async def resolve_endpoint_token(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        token: str,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> EndpointToken:
+        graph_ctx: GraphQueryContext = info.context
+        return await EndpointToken.load_item(
+            graph_ctx,
+            token,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+
+    @staticmethod
+    @scoped_query(autofill_user=False, user_key="user_uuid")
+    async def resolve_endpoint_token_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
+        project: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+    ) -> EndpointTokenList:
+        total_count = await EndpointToken.load_count(
+            info.context,
+            endpoint_id=endpoint_id,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+        token_list = await EndpointToken.load_slice(
+            info.context,
+            limit,
+            offset,
+            endpoint_id=endpoint_id,
+            filter=filter,
+            order=order,
+            project=project,
+            domain_name=domain_name,
+            user_uuid=user_uuid,
+        )
+        return EndpointTokenList(token_list, total_count)
 
     @staticmethod
     async def resolve_quota_scope(

@@ -30,10 +30,10 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
-from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
@@ -51,6 +51,7 @@ from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
+from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
@@ -254,7 +255,9 @@ async def exception_middleware(
             raise URLNotFound(extra_data=request.path)
         if ex.status_code == 405:
             concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
-            raise MethodNotAllowed(concrete_ex.method, concrete_ex.allowed_methods)
+            raise MethodNotAllowed(
+                method=concrete_ex.method, allowed_methods=concrete_ex.allowed_methods
+            )
         log.warning("Bad request: {0!r}", ex)
         raise GenericBadRequest
     except asyncio.CancelledError as e:
@@ -324,24 +327,31 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.shared_config.data["redis"]
+
     root_ctx.redis_live = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="stat",  # temporary storage for stat snapshots
         db=REDIS_STAT_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
+        name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
     for redis_info in (
@@ -351,7 +361,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
-        assert isinstance(redis_info.client, Redis)
         await redis_helper.ping_redis_connection(redis_info.client)
     yield
     await root_ctx.redis_stream.close()
@@ -443,20 +452,33 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from zmq.auth.certs import load_certificate
+
     from .registry import AgentRegistry
 
+    manager_pkey, manager_skey = load_certificate(
+        root_ctx.local_config["manager"]["rpc-auth-manager-keypair"]
+    )
+    assert manager_skey is not None
+    manager_public_key = PublicKey(manager_pkey)
+    manager_secret_key = SecretKey(manager_skey)
+    root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
     root_ctx.registry = AgentRegistry(
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.db,
+        root_ctx.agent_cache,
         root_ctx.redis_stat,
         root_ctx.redis_live,
         root_ctx.redis_image,
+        root_ctx.redis_stream,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
+        manager_public_key=manager_public_key,
+        manager_secret_key=manager_secret_key,
     )
     await root_ctx.registry.init()
     yield
@@ -920,23 +942,16 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
-    default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    default="INFO",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(
-    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
-) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = False) -> None:
     """
     Start the manager service as a foreground process.
     """
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
-    cfg = load_config(config_path, log_level.value)
+    cfg = load_config(config_path, "DEBUG" if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

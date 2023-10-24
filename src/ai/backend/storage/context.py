@@ -39,7 +39,9 @@ from .plugin import (
 )
 from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
+from .vast import VASTVolume
 from .vfs import BaseVolume
+from .watcher import WatcherClient
 from .weka import WekaVolume
 from .xfs import XfsVolume
 
@@ -48,17 +50,18 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
 DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
-    "purestorage": FlashBladeVolume,
-    "vfs": BaseVolume,
-    "xfs": XfsVolume,
-    "netapp": NetAppVolume,
+    FlashBladeVolume.name: FlashBladeVolume,
+    BaseVolume.name: BaseVolume,
+    XfsVolume.name: XfsVolume,
+    NetAppVolume.name: NetAppVolume,
     # NOTE: Dell EMC has two different storage: PowerStore and PowerScale (OneFS).
     #       We support the latter only for now.
-    "dellemc-onefs": DellEMCOneFSVolume,
-    "weka": WekaVolume,
-    "gpfs": GPFSVolume,  # IBM SpectrumScale or GPFS
+    DellEMCOneFSVolume.name: DellEMCOneFSVolume,
+    WekaVolume.name: WekaVolume,
+    GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
     "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
-    "cephfs": CephFSVolume,
+    CephFSVolume.name: CephFSVolume,
+    VASTVolume.name: VASTVolume,
 }
 
 
@@ -95,23 +98,30 @@ class RootContext:
     dsn: str | None
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
+    watcher: WatcherClient | None
 
     def __init__(
         self,
         pid: int,
+        pidx: int,
+        node_id: str,
         local_config: Mapping[str, Any],
         etcd: AsyncEtcd,
         *,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
+        watcher: WatcherClient | None,
         dsn: Optional[str] = None,
     ) -> None:
         self.pid = pid
+        self.pidx = pidx
+        self.node_id = node_id
         self.etcd = etcd
         self.local_config = local_config
         self.dsn = dsn
         self.event_producer = event_producer
         self.event_dispatcher = event_dispatcher
+        self.watcher = watcher
         self.cors_options = {
             "*": aiohttp_cors.ResourceOptions(
                 allow_credentials=False, expose_headers="*", allow_headers="*"
@@ -175,6 +185,8 @@ class RootContext:
             mount_path=Path(volume_config["path"]),
             options=volume_config["options"] or {},
             etcd=self.etcd,
+            event_dispathcer=self.event_dispatcher,
+            event_producer=self.event_producer,
         )
         await volume_obj.init()
         try:

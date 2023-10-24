@@ -183,7 +183,7 @@ class APIConfig:
     """
 
     DEFAULTS: Mapping[str, Union[str, Mapping]] = {
-        "endpoint": "https://api.backend.ai",
+        "endpoint": "https://api.cloud.backend.ai",
         "endpoint_type": "api",
         "version": f"v{API_VERSION[0]}.{API_VERSION[1]}",
         "hash_type": "sha256",

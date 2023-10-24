@@ -10,7 +10,7 @@ from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
@@ -31,7 +31,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.blpop(r, key, reconnect_poll_interval=0.2),
+                redis_helper.blpop(r, key),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -44,6 +44,9 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        redis_helper_config=config.redis_helper_default_config,
+        sentinel=None,
+        name="test",
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -112,7 +115,7 @@ async def test_blist_with_retrying_rpush(
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.blpop(r, key, reconnect_poll_interval=0.2),
+                redis_helper.blpop(r, key),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -123,6 +126,9 @@ async def test_blist_with_retrying_rpush(
     addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.2),
+        redis_helper_config=config.redis_helper_default_config,
+        sentinel=None,
+        name="test",
         service_name=None,
     )
     assert isinstance(r.client, Redis)

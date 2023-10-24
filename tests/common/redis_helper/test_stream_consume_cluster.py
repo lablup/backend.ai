@@ -9,7 +9,7 @@ import pytest
 from aiotools.context import aclosing
 from redis.asyncio.sentinel import Sentinel
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.types import RedisConnectionInfo
 
 from .types import RedisClusterInfo
@@ -57,21 +57,26 @@ async def test_stream_loadbalance_cluster(
             traceback.print_exc()
             return
 
-    s = RedisConnectionInfo(
-        Sentinel(
-            redis_cluster.sentinel_addrs,
-            password="develove",
-            socket_timeout=0.2,
-        ),
+    s = Sentinel(
+        redis_cluster.sentinel_addrs,
+        password="develove",
+        socket_timeout=0.2,
+    )
+
+    r = RedisConnectionInfo(
+        s.master_for(service_name="mymaster"),
+        redis_helper_config=config.redis_helper_default_config,
+        sentinel=s,
+        name="test",
         service_name="mymaster",
     )
-    _execute = aiotools.apartial(redis_helper.execute, s)
+    _execute = aiotools.apartial(redis_helper.execute, r)
     await _execute(lambda r: r.delete("stream1"))
     await _execute(lambda r: r.xgroup_create("stream1", "group1", b"$", mkstream=True))
 
     consumer_tasks = [
-        asyncio.create_task(consume("group1", "c1", s, "stream1")),
-        asyncio.create_task(consume("group1", "c2", s, "stream1")),
+        asyncio.create_task(consume("group1", "c1", r, "stream1")),
+        asyncio.create_task(consume("group1", "c2", r, "stream1")),
     ]
     await asyncio.sleep(0.1)
     interrupt_task = asyncio.create_task(

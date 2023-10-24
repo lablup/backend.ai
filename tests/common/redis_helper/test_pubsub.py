@@ -10,7 +10,7 @@ from redis.asyncio.client import PubSub
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from ai.backend.common import redis_helper
+from ai.backend.common import config, redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
@@ -32,7 +32,7 @@ async def test_pubsub(redis_container: Tuple[str, HostPortPair], disruption_meth
     async def subscribe(pubsub: PubSub) -> None:
         try:
             async with aiotools.aclosing(
-                redis_helper.subscribe(pubsub, reconnect_poll_interval=0.3),
+                redis_helper.subscribe(pubsub),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -42,6 +42,9 @@ async def test_pubsub(redis_container: Tuple[str, HostPortPair], disruption_meth
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        redis_helper_config=config.redis_helper_default_config,
+        sentinel=None,
+        name="test",
         service_name=None,
     )
     assert isinstance(r.client, Redis)
@@ -129,6 +132,9 @@ async def test_pubsub_with_retrying_pub(
 
     r = RedisConnectionInfo(
         Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
+        redis_helper_config=config.redis_helper_default_config,
+        sentinel=None,
+        name="test",
         service_name=None,
     )
     assert isinstance(r.client, Redis)
