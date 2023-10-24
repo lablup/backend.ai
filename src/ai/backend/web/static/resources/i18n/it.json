@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Porte pre-aperte da impostare (opzionale)",
       "PortsTitleWithRange": "Valore della porta (tra 1024 e 65535)",
       "PrePortConfigWillDisappear": "Tutte le porte preaperture non salvate scompariranno.",
-      "StartModelServing": "Avvio del modello di servizio"
+      "StartModelServing": "Avvio del modello di servizio",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -288,7 +292,9 @@
       "EnterValidSessionName": "Inserire un nome di sessione valido",
       "SessionNameRequired": "Il nome della sessione è obbligatorio",
       "SluggedStrings": "Stringhe con slugged (>3 caratteri)",
-      "SessionNameAlreadyExist": "Il nome della sessione esiste già"
+      "SessionNameAlreadyExist": "Il nome della sessione esiste già",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "Interattivo",
     "Batch": "Lotto",
@@ -369,7 +375,6 @@
     "DeleteAll": "Cancella tutto",
     "Update": "Aggiornare",
     "Delete": "Elimina",
-    "Dismiss": "Respingere",
     "DismissAndProceed": "Ignora e procedi",
     "Close": "Vicino",
     "Confirm": "Confermare",
@@ -664,7 +669,8 @@
     "Used": "Usato",
     "Pipeline": "Cartelle della pipeline",
     "DialogDataFolder": "Cartelle dedicate alle pipeline che vengono create automaticamente quando si creano le pipeline in FastTrack.",
-    "DialogModelFolder": "È possibile servire e gestire i modelli."
+    "DialogModelFolder": "È possibile servire e gestire i modelli.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
