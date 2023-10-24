@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Port yang sudah dibuka sebelumnya untuk diatur (opsional)",
       "PreOpenPortRange": "Port yang sudah dibuka sebelumnya hanya tersedia dari 1024 hingga 65535.",
       "MinMemory": "Kapasitas memori minimum untuk lingkungan runtime yang saat ini dipilih adalah {{size}}iB.",
-      "ModelStorage": "Penyimpanan Model"
+      "ModelStorage": "Penyimpanan Model",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -298,7 +302,9 @@
       "SessionNameRequired": "Nama sesi harus diisi",
       "EnterValidSessionName": "Masukkan nama sesi yang valid",
       "SessionNameAlreadyExist": "Nama sesi sudah ada",
-      "SluggedStrings": "String yang disumbat (>3 karakter)"
+      "SluggedStrings": "String yang disumbat (>3 karakter)",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
     "NoSessionToDisplay": "Tidak ada sesi yang ditampilkan",
@@ -369,7 +375,6 @@
     "DeleteAll": "Hapus Semua",
     "Update": "Perbarui",
     "Delete": "Hapus",
-    "Dismiss": "Tutup",
     "DismissAndProceed": "Tutup dan Lanjutkan",
     "Close": "Tutup",
     "Confirm": "Konfirmasi",
@@ -664,7 +669,8 @@
     "HostDetails": "Menampilkan informasi kuota untuk host penyimpanan yang dipilih.",
     "Used": "Digunakan",
     "Pipeline": "Folder Pipa",
-    "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack."
+    "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {

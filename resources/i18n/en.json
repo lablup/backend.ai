@@ -243,7 +243,12 @@
       "PreOpenPortPanelTitle": "Preopen ports to set (optional)",
       "PreOpenPortRange": "Preopen ports are only available from 1024 to 65535.",
       "MinMemory": "The minimum memory capacity for the currently selected runtime environment is {{size}}iB.",
-      "ModelStorage": "Model Storage"
+      "ModelStorage": "Model Storage",
+      "Enable": "Enable",
+      "Network": "Network",
+      "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
+      "preopen": "preopen",
+      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -320,7 +325,9 @@
       "SessionNameRequired": "Session name is required",
       "SluggedStrings": "Slugged strings (>3 chars)",
       "EnterValidSessionName": "Enter valid session name",
-      "SessionNameAlreadyExist": "Session name already exists"
+      "SessionNameAlreadyExist": "Session name already exists",
+      "SessionNameTooLong64": "Please enter 64 characters or less.",
+      "PleaseFollowSessionNameRule": "Please enter a combination of at least 3 letters, numbers, '.', '_', and '-'."
     },
     "EnvironmentInfo": "Environment Info",
     "DownloadingSessionLogs": "Downloading session logs.",
@@ -428,7 +435,6 @@
     "DeleteAll": "Delete All",
     "Update": "Update",
     "Delete": "Delete",
-    "Dismiss": "Dismiss",
     "DismissAndProceed": "Dismiss and Proceed",
     "Close": "Close",
     "Confirm": "Confirm",
@@ -756,7 +762,8 @@
     "HostDetails": "Displays quota information for the selected storage host.",
     "ProjectFolder": "Project Folder",
     "Pipeline": "Pipeline Folders",
-    "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack."
+    "DialogDataFolder": "Pipeline dedicated folders that are automatically created when creating pipelines in FastTrack.",
+    "SearchByName": "Search by name"
   },
   "dialog": {
     "warning": {

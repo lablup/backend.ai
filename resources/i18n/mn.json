@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Тохируулахын тулд портуудыг урьдчилан нээх (заавал биш)",
       "PreOpenPortRange": "Урьдчилан нээх портуудыг зөвхөн 1024-ээс 65535 хүртэл ашиглах боломжтой.",
       "MinMemory": "Одоогоор сонгогдсон ажиллах орчны орчны хамгийн бага санах ойн багтаамж нь {{size}}iB байна.",
-      "ModelStorage": "Загвар хадгалах"
+      "ModelStorage": "Загвар хадгалах",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -298,7 +302,9 @@
       "SessionNameRequired": "Сеансын нэрийг оруулах шаардлагатай",
       "EnterValidSessionName": "Хүчинтэй сессийн нэрийг оруулна уу",
       "SessionNameAlreadyExist": "Сешн нэр аль хэдийн байна",
-      "SluggedStrings": "Залгисан мөрүүд (>3 тэмдэгт)"
+      "SluggedStrings": "Залгисан мөрүүд (>3 тэмдэгт)",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "AlreadyTerminatingSession": "Сессийг аль хэдийн дуусгаж байна.",
     "NoSessionToDisplay": "Харуулах сесс алга",
@@ -369,7 +375,6 @@
     "DeleteAll": "Бүгдийг нь устгах",
     "Update": "Шинэчлэх",
     "Delete": "Устгах",
-    "Dismiss": "Ажлаас халах",
     "DismissAndProceed": "Ажлаас халах, үргэлжлүүлэх",
     "Close": "Хаах",
     "Confirm": "Баталгаажуулах",
@@ -664,7 +669,8 @@
     "HostDetails": "Сонгосон хадгалах сангийн хостын квотын мэдээллийг харуулна.",
     "Used": "Ашигласан",
     "Pipeline": "Дамжуулах хоолойн хавтас",
-    "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд."
+    "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
