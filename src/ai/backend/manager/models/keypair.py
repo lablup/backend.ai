@@ -548,7 +548,15 @@ class CreateKeyPair(graphene.Mutation):
         from .user import users  # noqa
 
         graph_ctx: GraphQueryContext = info.context
-        data = cls.prepare_new_keypair(user_id, props)
+        data = cls.prepare_new_keypair(
+            user_id,
+            {
+                "is_active": props.is_active,
+                "is_admin": props.is_admin,
+                "resource_policy": props.resource_policy,
+                "rate_limit": props.rate_limit,
+            },
+        )
         insert_query = sa.insert(keypairs).values(
             **data,
             user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
