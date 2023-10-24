@@ -232,7 +232,11 @@
       "PortsTitleWithRange": "端口值（1024 ~ 65535 之间）",
       "PrePortConfigWillDisappear": "任何未保存的预打开端口都将消失。",
       "StartModelServing": "开始模型服务",
-      "ModelStorage": "模型存储"
+      "ModelStorage": "模型存储",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -288,7 +292,9 @@
       "EnterValidSessionName": "输入有效的会话名称",
       "SessionNameRequired": "会话名称为必填项",
       "SluggedStrings": "多字符串（>3 字符）",
-      "SessionNameAlreadyExist": "会话名称已存在"
+      "SessionNameAlreadyExist": "会话名称已存在",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "交互式",
     "Batch": "批次",
@@ -369,7 +375,6 @@
     "DeleteAll": "删除所有",
     "Update": "更新",
     "Delete": "删除",
-    "Dismiss": "解雇",
     "DismissAndProceed": "解雇并继续",
     "Close": "关闭",
     "Confirm": "确认",
@@ -664,7 +669,8 @@
     },
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
-    "DialogModelFolder": "您可以服务和管理模型。"
+    "DialogModelFolder": "您可以服务和管理模型。",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
