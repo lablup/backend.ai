@@ -2223,15 +2223,15 @@ async def _delete(
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         folder_host = entry["host"]
-    await ensure_host_permission_allowed(
-        conn,
-        folder_host,
-        allowed_vfolder_types=allowed_vfolder_types,
-        user_uuid=user_uuid,
-        resource_policy=resource_policy,
-        domain_name=domain_name,
-        permission=VFolderHostPermission.DELETE,
-    )
+        await ensure_host_permission_allowed(
+            conn,
+            folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
+            permission=VFolderHostPermission.DELETE,
+        )
 
     await update_vfolder_status(
         root_ctx.db,

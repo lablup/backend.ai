@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Предварительно открытые порты для настройки (опционально)",
       "PreOpenPortRange": "Предварительно открытые порты доступны только в диапазоне от 1024 до 65535.",
       "MinMemory": "Минимальный объем памяти для выбранной в данный момент среды выполнения составляет {{size}}iB.",
-      "ModelStorage": "Модельное хранилище"
+      "ModelStorage": "Модельное хранилище",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -298,7 +302,9 @@
       "SessionNameRequired": "Имя сессии является обязательным",
       "EnterValidSessionName": "Введите действительное имя сессии",
       "SessionNameAlreadyExist": "Имя сессии уже существует",
-      "SluggedStrings": "Строки с засечками (>3 символов)"
+      "SluggedStrings": "Строки с засечками (>3 символов)",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "AlreadyTerminatingSession": "Уже завершаю сессию.",
     "NoSessionToDisplay": "Нет сеансов для отображения",
@@ -369,7 +375,6 @@
     "DeleteAll": "Удалить все",
     "Update": "Обновлять",
     "Delete": "Удалить",
-    "Dismiss": "Увольнять",
     "DismissAndProceed": "Закрыть и продолжить",
     "Close": "Закрывать",
     "Confirm": "Подтверждать",
@@ -664,7 +669,8 @@
     "HostDetails": "Отображает информацию о квотах для выбранного узла хранения.",
     "Used": "Используется",
     "Pipeline": "Трубопроводные папки",
-    "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack."
+    "DialogDataFolder": "Специальные папки для трубопроводов, которые автоматически создаются при создании трубопроводов в FastTrack.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {

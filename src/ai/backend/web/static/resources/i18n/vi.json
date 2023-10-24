@@ -232,7 +232,11 @@
       "PreOpenPortPanelTitle": "Mở trước các cổng để đặt (tùy chọn)",
       "PortsTitleWithRange": "Giá trị cổng (trong khoảng 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mọi cổng mở trước chưa được lưu sẽ biến mất.",
-      "StartModelServing": "Bắt đầu phân phối mẫu"
+      "StartModelServing": "Bắt đầu phân phối mẫu",
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -288,7 +292,9 @@
       "EnterValidSessionName": "Nhập tên phiên hợp lệ",
       "SessionNameRequired": "Tên phiên là bắt buộc",
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
-      "SessionNameAlreadyExist": "Tên phiên đã tồn tại"
+      "SessionNameAlreadyExist": "Tên phiên đã tồn tại",
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
@@ -369,7 +375,6 @@
     "DeleteAll": "Xóa hết",
     "Update": "Cập nhật",
     "Delete": "Xóa bỏ",
-    "Dismiss": "Bỏ qua",
     "DismissAndProceed": "Loại bỏ và tiếp tục",
     "Close": "Đóng",
     "Confirm": "Xác nhận",
@@ -664,7 +669,8 @@
     },
     "Pipeline": "Thư mục đường ống",
     "DialogDataFolder": "Các thư mục dành riêng cho đường dẫn được tạo tự động khi tạo đường dẫn trong FastTrack.",
-    "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình."
+    "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình.",
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
