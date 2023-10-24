@@ -15,6 +15,7 @@ visibility_private_component(
         "//src/ai/backend/storage/**",
         "//src/ai/backend/web/**",
         "//src/ai/backend/accelerator/**",
+        "//src/ai/backend/watcher/**",
         "//src/ai/backend/test/**",
         "//src/ai/backend/testutils/**",
     ],
