@@ -146,6 +146,12 @@ async def init(app: web.Application) -> None:
         mutation=Mutations,
         auto_camelcase=False,
     )
+    root_ctx: RootContext = app["_root.context"]
+    if root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+        log.warning(
+            "GraphQL schema introspection is enabled. "
+            "It is strongly advised to disable this in production setups."
+        )
 
 
 async def shutdown(app: web.Application) -> None:
