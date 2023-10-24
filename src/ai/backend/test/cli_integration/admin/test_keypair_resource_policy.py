@@ -54,12 +54,6 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         test_krp.get("max_concurrent_sessions") == 20
     ), "Test keypair resource policy max concurrent session mismatch"
     assert (
-        test_krp.get("max_vfolder_count") == 15
-    ), "Test keypair resource policy max vfolder count mismatch"
-    assert (
-        test_krp.get("max_vfolder_size") == "0 Bytes"
-    ), "Test keypair resource policy max vfolder size mismatch"
-    assert (
         test_krp.get("idle_timeout") == 1200
     ), "Test keypair resource policy idle timeout mismatch"
     assert (
@@ -128,12 +122,6 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
     assert (
         test_krp.get("max_concurrent_sessions") == 30
     ), "Test keypair resource policy max concurrent session mismatch"
-    assert (
-        test_krp.get("max_vfolder_count") == 10
-    ), "Test keypair resource policy max vfolder count mismatch"
-    assert (
-        test_krp.get("max_vfolder_size") == "0 Bytes"
-    ), "Test keypair resource policy max vfolder size mismatch"
     assert (
         test_krp.get("idle_timeout") == 1800
     ), "Test keypair resource policy idle timeout mismatch"

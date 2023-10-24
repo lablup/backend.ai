@@ -84,12 +84,6 @@ def list(ctx):
     help="Number of maximum containers per session.",
 )
 @click.option(
-    "--max-vfolder-count", type=int, default=10, help="Number of maximum virtual folders allowed."
-)
-@click.option(
-    "--max-vfolder-size", type=int, default=0, help="Maximum virtual folder size (future plan)."
-)
-@click.option(
     "--idle-timeout",
     type=int,
     default=1800,
@@ -116,8 +110,6 @@ def add(
     max_session_lifetime,
     max_concurrent_sessions,
     max_containers_per_session,
-    max_vfolder_count,
-    max_vfolder_size,
     idle_timeout,
     allowed_vfolder_hosts,
 ):
@@ -135,8 +127,6 @@ def add(
                 max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
                 max_containers_per_session=max_containers_per_session,
-                max_vfolder_count=max_vfolder_count,
-                max_vfolder_size=max_vfolder_size,
                 idle_timeout=idle_timeout,
                 allowed_vfolder_hosts=allowed_vfolder_hosts,
             )
@@ -176,8 +166,6 @@ def add(
 @click.option(
     "--max-containers-per-session", type=int, help="Number of maximum containers per session."
 )
-@click.option("--max-vfolder-count", type=int, help="Number of maximum virtual folders allowed.")
-@click.option("--max-vfolder-size", type=int, help="Maximum virtual folder size (future plan).")
 @click.option(
     "--idle-timeout",
     type=int,
@@ -199,8 +187,6 @@ def update(
     max_session_lifetime,
     max_concurrent_sessions,
     max_containers_per_session,
-    max_vfolder_count,
-    max_vfolder_size,
     idle_timeout,
     allowed_vfolder_hosts,
 ):
@@ -218,8 +204,6 @@ def update(
                 max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
                 max_containers_per_session=max_containers_per_session,
-                max_vfolder_count=max_vfolder_count,
-                max_vfolder_size=max_vfolder_size,
                 idle_timeout=idle_timeout,
                 allowed_vfolder_hosts=allowed_vfolder_hosts,
             )

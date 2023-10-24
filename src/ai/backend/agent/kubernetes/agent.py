@@ -34,6 +34,7 @@ from kubernetes_asyncio import config as kube_config
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventProducer
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
@@ -101,6 +102,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
         local_config: Mapping[str, Any],
         agent_sockpath: Path,
@@ -113,6 +115,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             kernel_id,
             session_id,
             agent_id,
+            event_producer,
             kernel_config,
             local_config,
             computers,
@@ -1025,6 +1028,7 @@ class KubernetesAgent(
             kernel_id,
             session_id,
             self.id,
+            self.event_producer,
             kernel_config,
             self.local_config,
             self.agent_sockpath,
