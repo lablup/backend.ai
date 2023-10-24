@@ -321,11 +321,7 @@ _config_defaults: Mapping[str, Any] = {
     "api": {
         "allow-origins": "*",
     },
-    "redis": {
-        "addr": None,
-        "password": None,
-        "redis_helper_config": config.redis_helper_default_config,
-    },
+    "redis": config.redis_default_config,
     "docker": {
         "registry": {},
         "image": {
@@ -414,19 +410,7 @@ shared_config_iv = t.Dict(
                 t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
             }
         ).allow_extra("*"),
-        t.Key("redis", default=_config_defaults["redis"]): t.Dict(
-            {
-                t.Key("addr", default=_config_defaults["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
-                    tx.HostPortPair
-                ),
-                t.Key("service_name", default=None): t.Null | t.String,
-                t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
-                t.Key(
-                    "redis_helper_config", default=_config_defaults["redis"]["redis_helper_config"]
-                ): config.redis_helper_config_iv,
-            }
-        ).allow_extra("*"),
+        t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
         t.Key("docker", default=_config_defaults["docker"]): t.Dict(
             {
                 t.Key("registry"): t.Mapping(t.String, container_registry_iv),
