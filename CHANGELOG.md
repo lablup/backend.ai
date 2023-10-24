@@ -16,6 +16,31 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.2 (2023-10-24)
+
+### Features
+* expose `max_ipu_devices_per_container` key to `config.toml` ([#1629](https://github.com/lablup/backend.ai/issues/1629))
+* Allow privileged access for other's VFolder to superadmin ([#1652](https://github.com/lablup/backend.ai/issues/1652))
+
+### Fixes
+* Use "m" as the default suffix if not specified in the resource slots when creating sessions via the client CLI ([#1518](https://github.com/lablup/backend.ai/issues/1518))
+* Update the default API endpoint of the client SDK (`api.cloud.backend.ai`) ([#1610](https://github.com/lablup/backend.ai/issues/1610))
+* Fix the mock accelerator plugin to properly set the environment variables without removing existing ones such as `LOCAL_USER_ID`. Also add explicit logging and warning about such situations. ([#1612](https://github.com/lablup/backend.ai/issues/1612))
+* Clean up `entrypoint.sh` (our custom container entrypoint), including fixes to avoid non-mandatory recursive file operations on `/home/work` ([#1613](https://github.com/lablup/backend.ai/issues/1613))
+* Update GPFS storage client for compatibility. ([#1616](https://github.com/lablup/backend.ai/issues/1616))
+* Enable exhaustive search for recursive session termination irrelevant to each session's status ([#1617](https://github.com/lablup/backend.ai/issues/1617))
+* Remove legacy name-based container image exclusion filter to prevent unexpected exclusion of user-built images with names containing "base-" or "common" ([#1619](https://github.com/lablup/backend.ai/issues/1619))
+* Improve logging when retrying redis connections during failover and use explicit names for all redis connection pools ([#1620](https://github.com/lablup/backend.ai/issues/1620))
+* Allow sessions to have dependencies on stale sessions during the `_post_enqueue()` process. ([#1624](https://github.com/lablup/backend.ai/issues/1624))
+* Mask sensitive fields when reading the container registry information via the manager GraphQL API ([#1627](https://github.com/lablup/backend.ai/issues/1627))
+* Use `ContainerRegistry.hostname` as ID to provide an unique identifier for each GraphQL node. ([#1631](https://github.com/lablup/backend.ai/issues/1631))
+* Allow admins to restart other's session by setting an optional parameter `owner_access_key`. ([#1635](https://github.com/lablup/backend.ai/issues/1635))
+* Unify each `project` field in GraphQL types `ContainerRegistry` to be a list of string. ([#1636](https://github.com/lablup/backend.ai/issues/1636))
+* Update GPFS storage client's Quota API parameters and queries. ([#1637](https://github.com/lablup/backend.ai/issues/1637))
+* Set deprecation message to `max_vfolder_size` graphene field. Set `max_vfolder_count` and `max_quota_scope_size` graphene fields optional. Update VFolder update API to use renewed column name `max_quota_scope_size`. ([#1644](https://github.com/lablup/backend.ai/issues/1644))
+* Handle `None` value of newly created Docker container's port. ([#1645](https://github.com/lablup/backend.ai/issues/1645))
+
+
 ## 23.09.1 (2023-10-10)
 
 ### Features
