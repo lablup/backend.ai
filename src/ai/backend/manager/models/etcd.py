@@ -7,6 +7,7 @@ import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..defs import PASSWORD_PLACEHOLDER
 from . import UserRole
 from .base import privileged_mutation, set_if_set
 
@@ -28,7 +29,7 @@ __all__: Sequence[str] = (
 class CreateContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -37,7 +38,7 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 class ModifyContainerRegistryInput(graphene.InputObjectType):
     url = graphene.String(required=True)
     type = graphene.String(required=True)
-    project = graphene.String()
+    project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()
     ssl_verify = graphene.Boolean()
@@ -67,14 +68,16 @@ class ContainerRegistry(graphene.ObjectType):
 
     @classmethod
     def from_row(cls, hostname: str, config: Mapping[str, str | list | None]) -> ContainerRegistry:
+        password = config.get("password", None)
         return cls(
+            id=hostname,
             hostname=hostname,
             config=ContainerRegistryConfig(
                 url=config.get(""),
                 type=config.get("type"),
                 project=config.get("project", None),
                 username=config.get("username", None),
-                password=config.get("password", None),
+                password=PASSWORD_PLACEHOLDER if password is not None else None,
                 ssl_verify=config.get("ssl_verify", None),
             ),
         )

@@ -26,6 +26,8 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 # The default container role name for multi-container sessions
 DEFAULT_ROLE: Final = "main"
 
+PASSWORD_PLACEHOLDER: Final = "*****"
+
 _RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
 RESERVED_VFOLDERS = [
