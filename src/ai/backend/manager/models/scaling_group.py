@@ -100,7 +100,6 @@ class ScalingGroupOpts(JSONSerializableMixin):
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
-    roundrobin: bool = False
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -108,7 +107,6 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
             "agent_selection_strategy": self.agent_selection_strategy,
-            "roundrobin": self.roundrobin,
         }
 
     @classmethod
@@ -117,18 +115,19 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("allowed_session_types", default=["interactive", "batch"]): t.List(
-                tx.Enum(SessionTypes), min_length=1
-            ),
-            t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
-            # Each scheduler impl refers an additional "config" key.
-            t.Key("config", default={}): t.Mapping(t.String, t.Any),
-            t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): tx.Enum(
-                AgentSelectionStrategy
-            ),
-            t.Key("roundrobin", default=False): t.Bool(),
-        }).allow_extra("*")
+        return t.Dict(
+            {
+                t.Key("allowed_session_types", default=["interactive", "batch"]): t.List(
+                    tx.Enum(SessionTypes), min_length=1
+                ),
+                t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
+                # Each scheduler impl refers an additional "config" key.
+                t.Key("config", default={}): t.Mapping(t.String, t.Any),
+                t.Key(
+                    "agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED
+                ): tx.Enum(AgentSelectionStrategy),
+            }
+        ).allow_extra("*")
 
 
 # When scheduling, we take the union of allowed scaling groups for

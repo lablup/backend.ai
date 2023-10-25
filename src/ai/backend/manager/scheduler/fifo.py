@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import sys
 from decimal import Decimal
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence
 
 import trafaret as t
 
@@ -12,24 +11,13 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
 )
+from ai.backend.manager.scheduler.utils import select_agent
 
 from ..models import AgentRow, SessionRow
-from .types import AbstractScheduler, KernelInfo
+from .types import AbstractScheduler, KernelInfo, SchedulingContext
 
 
-def get_slot_index(slotname: str, agent_selection_resource_priority: list[str]) -> int:
-    try:
-        return agent_selection_resource_priority.index(slotname)
-    except ValueError:
-        return sys.maxsize
-
-
-def key_by_remaining_slots(
-    agent: AgentRow,
-    requested_slots: ResourceSlot,
-    agent_selection_strategy: AgentSelectionStrategy,
-    agent_selection_resource_priority: list[str],
-) -> Tuple[int, ...]:
+def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
     unused_slot_keys = set()
     for k, v in requested_slots.items():
         if v == Decimal(0):
@@ -39,39 +27,7 @@ def key_by_remaining_slots(
         if k in unused_slot_keys and v > Decimal(0):
             num_extras += 1
 
-    for requested_slot_key in sorted(requested_slots.data.keys(), reverse=True):
-        device_name = requested_slot_key.split(".")[0]
-        if (
-            requested_slot_key not in agent_selection_resource_priority
-            and device_name in agent_selection_resource_priority
-        ):
-            agent_selection_resource_priority.insert(
-                agent_selection_resource_priority.index(device_name) + 1, requested_slot_key
-            )
-
-    resource_priorities = sorted(
-        requested_slots.data.keys(),
-        key=lambda item: get_slot_index(item, agent_selection_resource_priority),
-    )
-
-    remaining_slots = agent.available_slots - agent.occupied_slots
-
-    # If the requested slot does not exist in the corresponding agent,
-    # the agent should not be selected, in this case it puts -math.inf for avoiding to being selected.
-    match agent_selection_strategy:
-        case AgentSelectionStrategy.LEGACY:
-            comparators = [
-                agent.available_slots.get(key, -sys.maxsize) for key in resource_priorities
-            ]
-        case AgentSelectionStrategy.CONCENTRATED:
-            comparators = [-remaining_slots.get(key, sys.maxsize) for key in resource_priorities]
-        case AgentSelectionStrategy.DISPERSED | _:
-            comparators = [remaining_slots.get(key, -sys.maxsize) for key in resource_priorities]
-
-    # Put back agents with more extra slot types
-    # (e.g., accelerators)
-    # Also put front agents with exactly required slot types
-    return (-num_extras, *comparators)
+    return num_extras
 
 
 class FIFOSlotScheduler(AbstractScheduler):
@@ -105,57 +61,44 @@ class FIFOSlotScheduler(AbstractScheduler):
             return skipped_sessions[0].id
         return None
 
-    def _assign_agent(
-        self,
-        agents: Sequence[AgentRow],
-        requested_slots: ResourceSlot,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-    ) -> Optional[AgentId]:
-        possible_agents = []
-        for agent in agents:
-            remaining_slots = agent.available_slots - agent.occupied_slots
-            if remaining_slots >= requested_slots:
-                possible_agents.append(agent)
-        if possible_agents:
-            chosen_agent = max(
-                possible_agents,
-                key=lambda agent: key_by_remaining_slots(
-                    agent,
-                    requested_slots,
-                    agent_selection_strategy,
-                    agent_selection_resource_priority,
-                ),
-            )
-            return chosen_agent.id
-        return None
-
-    def assign_agent_for_session(
+    async def assign_agent_for_session(
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
         agent_selection_resource_priority: list[str],
+        sgroup_name: Optional[str] = None,
+        sched_ctx: Optional[SchedulingContext] = None,
+        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
-        return self._assign_agent(
+        return await select_agent(
             agents,
-            pending_session.requested_slots,
+            pending_session,
             agent_selection_strategy,
             agent_selection_resource_priority,
+            sgroup_name,
+            sched_ctx,
+            requested_architecture,
         )
 
-    def assign_agent_for_kernel(
+    async def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
-        pending_kernel: KernelInfo,
+        kernel_info: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
         agent_selection_resource_priority: list[str],
+        sgroup_name: Optional[str] = None,
+        sched_ctx: Optional[SchedulingContext] = None,
+        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
-        return self._assign_agent(
+        return await select_agent(
             agents,
-            pending_kernel.requested_slots,
+            kernel_info,
             agent_selection_strategy,
             agent_selection_resource_priority,
+            sgroup_name,
+            sched_ctx,
+            requested_architecture,
         )
 
 
@@ -171,55 +114,42 @@ class LIFOSlotScheduler(AbstractScheduler):
         # Just pick the last pending session.
         return SessionId(pending_sessions[-1].id)
 
-    def _assign_agent(
-        self,
-        agents: Sequence[AgentRow],
-        requested_slots: ResourceSlot,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-    ) -> Optional[AgentId]:
-        possible_agents = []
-        for agent in agents:
-            remaining_slots = agent.available_slots - agent.occupied_slots
-            if remaining_slots >= requested_slots:
-                possible_agents.append(agent)
-        if possible_agents:
-            chosen_agent = max(
-                possible_agents,
-                key=lambda agent: key_by_remaining_slots(
-                    agent,
-                    requested_slots,
-                    agent_selection_strategy,
-                    agent_selection_resource_priority,
-                ),
-            )
-            return chosen_agent.id
-        return None
-
-    def assign_agent_for_session(
+    async def assign_agent_for_session(
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
         agent_selection_resource_priority: list[str],
+        sgroup_name: Optional[str] = None,
+        sched_ctx: Optional[SchedulingContext] = None,
+        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
-        return self._assign_agent(
+        return await select_agent(
             agents,
-            pending_session.requested_slots,
+            pending_session,
             agent_selection_strategy,
             agent_selection_resource_priority,
+            sgroup_name,
+            sched_ctx,
+            requested_architecture,
         )
 
-    def assign_agent_for_kernel(
+    async def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
         agent_selection_resource_priority: list[str],
+        sgroup_name: Optional[str] = None,
+        sched_ctx: Optional[SchedulingContext] = None,
+        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
-        return self._assign_agent(
+        return await select_agent(
             agents,
-            pending_kernel.requested_slots,
+            pending_kernel,
             agent_selection_strategy,
             agent_selection_resource_priority,
+            sgroup_name,
+            sched_ctx,
+            requested_architecture,
         )

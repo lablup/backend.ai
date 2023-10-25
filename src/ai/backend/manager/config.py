@@ -863,10 +863,7 @@ class SharedConfig(AbstractConfig):
                 rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
 
                 if rr_state_dict is not None:
-                    return RoundRobinState(
-                        schedulable_group_id=rr_state_dict["schedulable_group_id"],
-                        next_index=rr_state_dict["next_index"],
-                    )
+                    return RoundRobinState(rr_state_dict["next_index"])
 
         return None
 

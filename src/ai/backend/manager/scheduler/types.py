@@ -423,12 +423,15 @@ class AbstractScheduler(metaclass=ABCMeta):
         return None
 
     @abstractmethod
-    def assign_agent_for_session(
+    async def assign_agent_for_session(
         self,
         possible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
         agent_selection_strategy: AgentSelectionStrategy,
         agent_selection_resource_priority: list[str],
+        sgroup_name: Optional[str] = None,
+        sched_ctx: Optional[SchedulingContext] = None,
+        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -441,12 +444,15 @@ class AbstractScheduler(metaclass=ABCMeta):
         return None
 
     @abstractmethod
-    def assign_agent_for_kernel(
+    async def assign_agent_for_kernel(
         self,
         possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
         agent_selection_strategy: AgentSelectionStrategy,
         agent_selection_resource_priority: list[str],
+        sgroup_name: Optional[str] = None,
+        sched_ctx: Optional[SchedulingContext] = None,
+        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
         """
         Assign an agent for a kernel of the session.
