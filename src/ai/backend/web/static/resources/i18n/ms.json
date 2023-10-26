@@ -233,10 +233,11 @@
       "PortsTitleWithRange": "Nilai port (antara 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mana-mana port prabuka yang belum disimpan akan hilang.",
       "StartModelServing": "Mulakan Penyajian Model",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Masukkan berbilang nilai yang dipisahkan dengan sama ada koma (,) atau ruang.",
+      "preopen": "prabuka",
+      "Network": "Rangkaian",
+      "Enable": "Dayakan",
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -293,8 +294,8 @@
       "SessionNameRequired": "Nama sesi diperlukan",
       "SluggedStrings": "Rentetan slugged (>3 aksara)",
       "SessionNameAlreadyExist": "Nama sesi sudah wujud",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Sila masukkan 64 aksara atau kurang.",
+      "PleaseFollowSessionNameRule": "Sila masukkan gabungan sekurang-kurangnya 3 huruf, nombor, '.', '_' dan '-'."
     },
     "Interactive": "Interaktif",
     "Batch": "Kumpulan",
@@ -670,7 +671,7 @@
     "Pipeline": "Folder Saluran Paip",
     "DialogDataFolder": "Folder khusus saluran paip yang dibuat secara automatik apabila membuat saluran paip dalam FastTrack.",
     "DialogModelFolder": "Anda boleh berkhidmat dan mengurus model.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Cari mengikut nama"
   },
   "dialog": {
     "warning": {
