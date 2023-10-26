@@ -433,6 +433,7 @@ class UserResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_size=row.max_vfolder_size,
+            max_quota_scope_size=row.max_vfolder_size,
         )
 
     @classmethod
@@ -519,7 +520,7 @@ class CreateUserResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> UserResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = UserResourcePolicyRow(name, props.max_vfolder_size)
+                row = UserResourcePolicyRow(name, max_vfolder_size=props.max_quota_scope_size)
                 sess.add(row)
                 await sess.flush()
                 query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
@@ -551,7 +552,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
         data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_size")
+        set_if_set(props, data, "max_quota_scope_size", target_key="max_vfolder_size")
         update_query = (
             sa.update(UserResourcePolicyRow).values(data).where(UserResourcePolicyRow.name == name)
         )
@@ -603,6 +604,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_size=row.max_vfolder_size,
+            max_quota_scope_size=row.max_vfolder_size,
         )
 
     @classmethod
@@ -689,7 +691,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):
 
         async def _do_mutate() -> ProjectResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
-                row = ProjectResourcePolicyRow(name, props.max_vfolder_size)
+                row = ProjectResourcePolicyRow(name, max_vfolder_size=props.max_quota_scope_size)
                 sess.add(row)
                 await sess.flush()
                 query = sa.select(ProjectResourcePolicyRow).where(
@@ -723,7 +725,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
         data: Dict[str, Any] = {}
-        set_if_set(props, data, "max_vfolder_size")
+        set_if_set(props, data, "max_quota_scope_size", target_key="max_vfolder_size")
         update_query = (
             sa.update(ProjectResourcePolicyRow)
             .values(data)
