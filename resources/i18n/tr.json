@@ -233,10 +233,11 @@
       "PortsTitleWithRange": "Port değeri (1024 ~ 65535 arasında)",
       "PrePortConfigWillDisappear": "Kaydedilmemiş tüm önceden açık portlar kaybolacaktır.",
       "StartModelServing": "Model Servisini Başlat",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Virgülle (,) veya boşlukla ayırarak birden fazla değer girin.",
+      "preopen": "önceden açılmak",
+      "Network": "Ağ",
+      "Enable": "Olanak vermek",
+      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -293,8 +294,8 @@
       "SessionNameRequired": "Oturum adı gereklidir",
       "SluggedStrings": "Kesikli dizeler (>3 karakter)",
       "SessionNameAlreadyExist": "Oturum adı zaten mevcut",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Lütfen 64 veya daha az karakter girin.",
+      "PleaseFollowSessionNameRule": "Lütfen en az 3 harf, rakam, '.', '_' ve '-' kombinasyonunu girin."
     },
     "Interactive": "İnteraktif",
     "Batch": "Toplu İş",
@@ -670,7 +671,7 @@
     "Pipeline": "Boru Hattı Klasörleri",
     "DialogDataFolder": "FastTrack'te boru hatları oluşturulurken otomatik olarak oluşturulan boru hattına özel klasörler.",
     "DialogModelFolder": "Modellere hizmet verebilir ve yönetebilirsiniz.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Ada göre ara"
   },
   "dialog": {
     "warning": {
@@ -897,7 +898,8 @@
     "PleaseSelectOption": "Lütfen bir seçeneği seçin.",
     "RegistrySuccessfullyModified": "Kayıt defteri başarıyla değiştirildi.",
     "NoRegistryToDisplay": "Görüntülenecek Kayıt Yok",
-    "ModifyRegistry": "Kayıt Defterini Değiştir"
+    "ModifyRegistry": "Kayıt Defterini Değiştir",
+    "ConfirmNoUserName": "Kullanıcı ve şifre belirtilmemiş, kaydetmek ister misiniz?"
   },
   "resourceGroup": {
     "ResourceGroups": "Kaynak Grupları",

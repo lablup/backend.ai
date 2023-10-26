@@ -233,10 +233,11 @@
       "PortsTitleWithRange": "Τιμή θύρας (μεταξύ 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Τυχόν μη αποθηκευμένες προ-ανοιχτές θύρες θα εξαφανιστούν.",
       "StartModelServing": "Έναρξη μοντέλου σερβιρίσματος",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Εισαγάγετε πολλές τιμές διαχωρισμένες είτε με κόμμα (,) είτε με κενό.",
+      "preopen": "προανοίγει",
+      "Network": "Δίκτυο",
+      "Enable": "επιτρέπω",
+      "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/) και παύλα (-)."
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -293,8 +294,8 @@
       "SessionNameRequired": "Το όνομα συνεδρίας είναι υποχρεωτικό",
       "SluggedStrings": "Στιγμιότυπα αλφαριθμητικά (>3 χαρακτήρες)",
       "SessionNameAlreadyExist": "Το όνομα συνεδρίας υπάρχει ήδη",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Εισαγάγετε 64 χαρακτήρες ή λιγότερους.",
+      "PleaseFollowSessionNameRule": "Εισαγάγετε έναν συνδυασμό τουλάχιστον 3 γραμμάτων, αριθμών, '.', '_' και '-'."
     },
     "Interactive": "Διαδραστικό",
     "Batch": "Παρτίδα",
@@ -670,7 +671,7 @@
     "Pipeline": "Φάκελοι αγωγών",
     "DialogDataFolder": "Ειδικοί φάκελοι αγωγών που δημιουργούνται αυτόματα κατά τη δημιουργία αγωγών στο FastTrack.",
     "DialogModelFolder": "Μπορείτε να εξυπηρετείτε και να διαχειρίζεστε μοντέλα.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Αναζήτηση με όνομα"
   },
   "dialog": {
     "warning": {
@@ -897,7 +898,8 @@
     "PleaseSelectOption": "Επιλέξτε μία από τις επιλογές.",
     "RegistrySuccessfullyModified": "Το μητρώο τροποποιήθηκε επιτυχώς.",
     "NoRegistryToDisplay": "Δεν εμφανίζονται μητρώα",
-    "ModifyRegistry": "Τροποποίηση μητρώου"
+    "ModifyRegistry": "Τροποποίηση μητρώου",
+    "ConfirmNoUserName": "Ο χρήστης και ο κωδικός πρόσβασης δεν έχουν καθοριστεί, θέλετε να αποθηκεύσετε;"
   },
   "resourceGroup": {
     "ResourceGroups": "Ομάδες πόρων",
