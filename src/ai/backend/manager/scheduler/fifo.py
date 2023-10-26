@@ -12,8 +12,8 @@ from ai.backend.common.types import (
     SessionId,
 )
 
-from ..models import AgentRow, SessionRow
-from .types import AbstractScheduler, KernelInfo
+from ..models import AgentRow, KernelRow, SessionRow
+from .types import AbstractScheduler
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
@@ -76,7 +76,7 @@ class FIFOSlotScheduler(AbstractScheduler):
     async def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
-        pending_kernel: KernelInfo,
+        pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         return await self.select_agent(
             agents,
@@ -113,7 +113,7 @@ class LIFOSlotScheduler(AbstractScheduler):
     async def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
-        pending_kernel: KernelInfo,
+        pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         return await self.select_agent(
             agents,

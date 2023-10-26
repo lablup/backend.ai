@@ -460,7 +460,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     async def assign_agent_for_kernel(
         self,
         possible_agents: Sequence[AgentRow],
-        pending_kernel: KernelInfo,
+        pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         """
         Assign an agent for a kernel of the session.
@@ -471,7 +471,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     async def select_agent(
         self,
         possible_agents: Sequence[AgentRow],
-        pending_session_or_kernel: SessionRow | KernelInfo,
+        pending_session_or_kernel: SessionRow | KernelRow,
         use_num_extras: bool,
         roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
@@ -498,15 +498,15 @@ class AbstractScheduler(metaclass=ABCMeta):
         # Note that ROUNDROBIN is not working with the multi-node multi-container session.
         # It assumes the pending session type is single-node session.
         # Otherwise, it will use 'Dispersed' strategy as default strategy.
-        if (
-            agent_selection_strategy == AgentSelectionStrategy.ROUNDROBIN
-            and type(pending_session_or_kernel) is KernelInfo
+
+        if agent_selection_strategy == AgentSelectionStrategy.ROUNDROBIN and isinstance(
+            pending_session_or_kernel, KernelRow
         ):
             agent_selection_strategy = AgentSelectionStrategy.DISPERSED
 
         match agent_selection_strategy:
             case AgentSelectionStrategy.ROUNDROBIN:
-                assert type(pending_session_or_kernel) is SessionRow
+                assert isinstance(pending_session_or_kernel, SessionRow)
                 assert roundrobin_context is not None
                 sched_ctx = roundrobin_context.sched_ctx
                 sgroup_name = roundrobin_context.sgroup_name
