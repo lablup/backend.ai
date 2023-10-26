@@ -16,6 +16,7 @@ def test_add_keypair(
     print("[ Add keypair ]")
 
     # Add test user
+    test_user_uuids = []
     for i, user in enumerate(users):
         arguments = [
             "--output=json",
@@ -36,6 +37,26 @@ def test_add_keypair(
             p.expect(EOF)
             response = json.loads(p.before.decode())
             assert response.get("ok") is True, f"Account#{i+1} add error"
+            test_user_uuids.append(response["user"]["uuid"])
+
+    # Add test users to the default group
+    with closing(run(["--output=json", "admin", "group", "list"])) as p:
+        p.expect(EOF)
+        response = json.loads(p.before.decode())
+        group_id = response["items"][0]["id"]
+
+    group_add_users_arguments = [
+        "--output=json",
+        "admin",
+        "group",
+        "add-users",
+        group_id,
+        *test_user_uuids,
+    ]
+    with closing(run(group_add_users_arguments)) as p:
+        p.expect(EOF)
+        response = json.loads(p.before.decode())
+        assert response.get("ok") is True, "Group add-users error"
 
     # Create keypair
     for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
@@ -56,7 +77,7 @@ def test_add_keypair(
         with closing(run(keypair_add_arguments)) as p:
             p.expect(EOF)
             response = json.loads(p.before.decode())
-            assert response.get("ok") is True, f"Keypair#{i+1} add error"
+            assert response.get("ok") is True, f"Keypair#{i+1} add error"  # TODO:
 
     # Check if keypair is added
     with closing(run(["--output=json", "admin", "keypair", "list"])) as p:

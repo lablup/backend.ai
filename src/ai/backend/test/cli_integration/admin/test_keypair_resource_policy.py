@@ -21,12 +21,12 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         "20",
         "--max-containers-per-session",
         "2",
-        "--max-vfolder-count",
-        "15",
-        "--max-vfolder-size",
-        "0",
         "--allowed-vfolder-hosts",
-        "local:volume1",
+        (
+            '{"local:volume1": ["create-vfolder", "modify-vfolder", "delete-vfolder",'
+            ' "mount-in-session", "upload-file", "download-file", "invite-others",'
+            ' "set-user-specific-permission"]}'
+        ),
         "--idle-timeout",
         "1200",
         keypair_resource_policy,
@@ -59,18 +59,22 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
     assert (
         test_krp.get("max_containers_per_session") == 2
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == {
-        "local:volume1": [
-            "create-vfolder",
-            "modify-vfolder",
-            "delete-vfolder",
-            "mount-in-session",
-            "upload-file",
-            "download-file",
-            "invite-others",
-            "set-user-specific-permission",
-        ],
+    raw_allowed_vfolder_hosts = test_krp.get("allowed_vfolder_hosts")
+    assert isinstance(raw_allowed_vfolder_hosts, str)
+    allowed_vfolder_hosts = json.loads(raw_allowed_vfolder_hosts)
+    assert set(allowed_vfolder_hosts.keys()) == {
+        "local:volume1"
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
+    assert set(allowed_vfolder_hosts["local:volume1"]) == {
+        "create-vfolder",
+        "delete-vfolder",
+        "download-file",
+        "invite-others",
+        "modify-vfolder",
+        "mount-in-session",
+        "set-user-specific-permission",
+        "upload-file",
+    }, "Test keypair resource policy allowed vfolder hosts permission mismatch"
 
 
 def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
@@ -90,12 +94,12 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         "30",
         "--max-containers-per-session",
         "1",
-        "--max-vfolder-count",
-        "10",
-        "--max-vfolder-size",
-        "0",
         "--allowed-vfolder-hosts",
-        "local:volume2",
+        (
+            '{"local:volume2": ["create-vfolder", "modify-vfolder", "delete-vfolder",'
+            ' "mount-in-session", "upload-file", "download-file", "invite-others",'
+            ' "set-user-specific-permission"]}'
+        ),
         "--idle-timeout",
         "1800",
         keypair_resource_policy,
@@ -128,18 +132,22 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
     assert (
         test_krp.get("max_containers_per_session") == 1
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == {
-        "local:volume2": [
-            "create-vfolder",
-            "modify-vfolder",
-            "delete-vfolder",
-            "mount-in-session",
-            "upload-file",
-            "download-file",
-            "invite-others",
-            "set-user-specific-permission",
-        ],
+    raw_allowed_vfolder_hosts = test_krp.get("allowed_vfolder_hosts")
+    assert isinstance(raw_allowed_vfolder_hosts, str)
+    allowed_vfolder_hosts = json.loads(raw_allowed_vfolder_hosts)
+    assert set(allowed_vfolder_hosts.keys()) == {
+        "local:volume2"
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
+    assert set(allowed_vfolder_hosts["local:volume2"]) == {
+        "create-vfolder",
+        "delete-vfolder",
+        "download-file",
+        "invite-others",
+        "modify-vfolder",
+        "mount-in-session",
+        "set-user-specific-permission",
+        "upload-file",
+    }, "Test keypair resource policy allowed vfolder hosts permission mismatch"
 
 
 def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
