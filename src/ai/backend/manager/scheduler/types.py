@@ -472,6 +472,7 @@ class AbstractScheduler(metaclass=ABCMeta):
         self,
         possible_agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelInfo,
+        use_num_extras: bool,
         roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         """
@@ -536,7 +537,7 @@ class AbstractScheduler(metaclass=ABCMeta):
                 chosen_agent = max(
                     possible_agents,
                     key=lambda agent: [
-                        -get_num_extras(agent, requested_slots),
+                        -get_num_extras(agent, requested_slots) if use_num_extras else 0,
                         *[
                             agent.available_slots.get(key, -sys.maxsize)
                             for key in resource_priorities
@@ -547,7 +548,7 @@ class AbstractScheduler(metaclass=ABCMeta):
                 chosen_agent = min(
                     possible_agents,
                     key=lambda agent: [
-                        get_num_extras(agent, requested_slots),
+                        get_num_extras(agent, requested_slots) if use_num_extras else 0,
                         *[
                             (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
                             for key in resource_priorities
@@ -558,7 +559,7 @@ class AbstractScheduler(metaclass=ABCMeta):
                 chosen_agent = max(
                     possible_agents,
                     key=lambda agent: [
-                        -get_num_extras(agent, requested_slots),
+                        -get_num_extras(agent, requested_slots) if use_num_extras else 0,
                         *[
                             (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
                             for key in resource_priorities

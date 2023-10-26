@@ -114,6 +114,7 @@ class DRFScheduler(AbstractScheduler):
         return await self.select_agent(
             possible_agents,
             pending_session_or_kernel,
+            False,
             roundrobin_context,
         )
 

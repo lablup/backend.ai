@@ -69,6 +69,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         return await self.select_agent(
             agents,
             pending_session,
+            True,
             roundrobin_context,
         )
 
@@ -80,6 +81,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         return await self.select_agent(
             agents,
             pending_kernel,
+            True,
         )
 
 
@@ -104,6 +106,7 @@ class LIFOSlotScheduler(AbstractScheduler):
         return await self.select_agent(
             agents,
             pending_session,
+            True,
             roundrobin_context,
         )
 
@@ -115,4 +118,5 @@ class LIFOSlotScheduler(AbstractScheduler):
         return await self.select_agent(
             agents,
             pending_kernel,
+            True,
         )
