@@ -233,10 +233,11 @@
       "PortsTitleWithRange": "Giá trị cổng (trong khoảng 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Mọi cổng mở trước chưa được lưu sẽ biến mất.",
       "StartModelServing": "Bắt đầu phân phối mẫu",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Nhập nhiều giá trị được phân tách bằng dấu phẩy (,) hoặc dấu cách.",
+      "preopen": "mở trước",
+      "Network": "Mạng",
+      "Enable": "Cho phép",
+      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-)."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -293,8 +294,8 @@
       "SessionNameRequired": "Tên phiên là bắt buộc",
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
       "SessionNameAlreadyExist": "Tên phiên đã tồn tại",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Vui lòng nhập 64 ký tự trở xuống.",
+      "PleaseFollowSessionNameRule": "Vui lòng nhập kết hợp ít nhất 3 chữ cái, số, '.', '_' và '-'."
     },
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
@@ -670,7 +671,7 @@
     "Pipeline": "Thư mục đường ống",
     "DialogDataFolder": "Các thư mục dành riêng cho đường dẫn được tạo tự động khi tạo đường dẫn trong FastTrack.",
     "DialogModelFolder": "Bạn có thể phục vụ và quản lý các mô hình.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Tìm kiếm theo tên"
   },
   "dialog": {
     "warning": {
