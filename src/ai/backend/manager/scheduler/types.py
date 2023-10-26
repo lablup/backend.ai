@@ -42,16 +42,16 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.scheduler.utils import (
-    get_num_extras,
-    get_requested_architecture,
-    sort_requested_slots_by_priority,
-)
 
 from ..defs import DEFAULT_ROLE
 from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
+from .utils import (
+    get_num_extras,
+    get_requested_architecture,
+    sort_requested_slots_by_priority,
+)
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
