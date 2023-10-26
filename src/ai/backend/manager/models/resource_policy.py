@@ -433,6 +433,7 @@ class UserResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_size=row.max_vfolder_size,
+            max_quota_scope_size=row.max_vfolder_size,
         )
 
     @classmethod
@@ -603,6 +604,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_size=row.max_vfolder_size,
+            max_quota_scope_size=row.max_vfolder_size,
         )
 
     @classmethod
