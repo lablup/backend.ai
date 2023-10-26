@@ -7,14 +7,13 @@ import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
-    AgentSelectionStrategy,
     ResourceSlot,
+    RoundRobinContext,
     SessionId,
 )
-from ai.backend.manager.scheduler.utils import select_agent
 
 from ..models import AgentRow, SessionRow
-from .types import AbstractScheduler, KernelInfo, SchedulingContext
+from .types import AbstractScheduler, KernelInfo
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
@@ -65,40 +64,22 @@ class FIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
+        roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
-        return await select_agent(
+        return await self.select_agent(
             agents,
             pending_session,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
+            roundrobin_context,
         )
 
     async def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
-        kernel_info: KernelInfo,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
+        pending_kernel: KernelInfo,
     ) -> Optional[AgentId]:
-        return await select_agent(
+        return await self.select_agent(
             agents,
-            kernel_info,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
+            pending_kernel,
         )
 
 
@@ -118,38 +99,20 @@ class LIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
+        roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
-        return await select_agent(
+        return await self.select_agent(
             agents,
             pending_session,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
+            roundrobin_context,
         )
 
     async def assign_agent_for_kernel(
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
-        return await select_agent(
+        return await self.select_agent(
             agents,
             pending_kernel,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
         )

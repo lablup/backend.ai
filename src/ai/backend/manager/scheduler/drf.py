@@ -10,8 +10,8 @@ import trafaret as t
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    AgentSelectionStrategy,
     ResourceSlot,
+    RoundRobinContext,
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -19,7 +19,7 @@ from ai.backend.manager.scheduler.utils import select_agent
 
 from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-from .types import AbstractScheduler, KernelInfo, SchedulingContext
+from .types import AbstractScheduler, KernelInfo
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -29,8 +29,13 @@ class DRFScheduler(AbstractScheduler):
     per_user_dominant_share: Dict[AccessKey, Decimal]
     total_capacity: ResourceSlot
 
-    def __init__(self, sgroup_opts: ScalingGroupOpts, config: Mapping[str, Any]) -> None:
-        super().__init__(sgroup_opts, config)
+    def __init__(
+        self,
+        sgroup_opts: ScalingGroupOpts,
+        config: Mapping[str, Any],
+        agent_selection_resource_priority: list[str],
+    ) -> None:
+        super().__init__(sgroup_opts, config, agent_selection_resource_priority)
         self.per_user_dominant_share = defaultdict(lambda: Decimal(0))
 
     def pick_session(
@@ -80,11 +85,7 @@ class DRFScheduler(AbstractScheduler):
         self,
         possible_agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelInfo,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
+        roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         # If some predicate checks for a picked session fail,
         # this method is NOT called at all for the picked session.
@@ -110,52 +111,30 @@ class DRFScheduler(AbstractScheduler):
         if self.per_user_dominant_share[access_key] < dominant_share_from_request:
             self.per_user_dominant_share[access_key] = dominant_share_from_request
 
-        return await select_agent(
+        return await self.select_agent(
             possible_agents,
             pending_session_or_kernel,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
+            roundrobin_context,
         )
 
     async def assign_agent_for_session(
         self,
         possible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
+        roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         return await self._assign_agent(
             possible_agents,
             pending_session,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
+            roundrobin_context,
         )
 
     async def assign_agent_for_kernel(
         self,
         possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
-        sgroup_name: Optional[str] = None,
-        sched_ctx: Optional[SchedulingContext] = None,
-        requested_architecture: Optional[str] = None,
     ) -> Optional[AgentId]:
         return await self._assign_agent(
             possible_agents,
             pending_kernel,
-            agent_selection_strategy,
-            agent_selection_resource_priority,
-            sgroup_name,
-            sched_ctx,
-            requested_architecture,
         )

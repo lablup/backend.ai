@@ -57,6 +57,7 @@ from ai.backend.common.types import (
     ClusterMode,
     RedisConnectionInfo,
     ResourceSlot,
+    RoundRobinContext,
     SessionId,
     aobject,
 )
@@ -133,13 +134,14 @@ def load_scheduler(
     name: str,
     sgroup_opts: ScalingGroupOpts,
     scheduler_config: dict[str, Any],
+    agent_selection_resource_priority: list[str],
 ) -> AbstractScheduler:
     entry_prefix = "backendai_scheduler_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == name:
             log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module)
             scheduler_cls = entrypoint.load()
-            return scheduler_cls(sgroup_opts, scheduler_config)
+            return scheduler_cls(sgroup_opts, scheduler_config, agent_selection_resource_priority)
     raise ImportError("Cannot load the scheduler plugin", name)
 
 
@@ -360,8 +362,18 @@ class SchedulerDispatcher(aobject):
             global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
                 scheduler_name, {}
             )
+
+        agent_selection_resource_priority = self.local_config["manager"][
+            "agent-selection-resource-priority"
+        ]
+
         scheduler_specific_config = {**global_scheduler_opts, **sgroup_opts.config}
-        return load_scheduler(scheduler_name, sgroup_opts, scheduler_specific_config)
+        return load_scheduler(
+            scheduler_name,
+            sgroup_opts,
+            scheduler_specific_config,
+            agent_selection_resource_priority,
+        )
 
     async def _schedule_in_sgroup(
         self,
@@ -740,7 +752,6 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_resource_priority: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
@@ -825,11 +836,10 @@ class SchedulerDispatcher(aobject):
                 cand_agent_id = await scheduler.assign_agent_for_session(
                     compatible_candidate_agents,
                     sess_ctx,
-                    scheduler.sgroup_opts.agent_selection_strategy,
-                    agent_selection_resource_priority,
-                    sgroup_name,
-                    sched_ctx,
-                    requested_architecture,
+                    RoundRobinContext(
+                        sgroup_name=sgroup_name,
+                        sched_ctx=sched_ctx,
+                    ),
                 )
                 if cand_agent_id is None:
                     raise InstanceNotAvailable(
@@ -966,7 +976,6 @@ class SchedulerDispatcher(aobject):
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_resource_priority: list[str],
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
@@ -1050,10 +1059,6 @@ class SchedulerDispatcher(aobject):
                         agent_id = await scheduler.assign_agent_for_kernel(
                             available_candidate_agents,
                             kernel,
-                            scheduler.sgroup_opts.agent_selection_strategy,
-                            agent_selection_resource_priority,
-                            sgroup_name,
-                            sched_ctx,
                         )
                         if agent_id is None:
                             raise InstanceNotAvailable(
