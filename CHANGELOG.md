@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.3 (2023-10-27)
+
+### Fixes
+* Replace the manager's shared redis config with the common's redis config, as this update is missed in #1586 ([#1653](https://github.com/lablup/backend.ai/issues/1653))
+* Revert #1652 ([#1656](https://github.com/lablup/backend.ai/issues/1656))
+* Fix `backend.ai-agent` package not recognizing `backend.ai-kernel` as dependency when building python package ([#1660](https://github.com/lablup/backend.ai/issues/1660))
+
+
 ## 23.09.2 (2023-10-24)
 
 ### Features
