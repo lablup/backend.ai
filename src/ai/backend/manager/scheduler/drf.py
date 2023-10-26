@@ -83,7 +83,7 @@ class DRFScheduler(AbstractScheduler):
 
     async def _assign_agent(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
         roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
@@ -91,8 +91,16 @@ class DRFScheduler(AbstractScheduler):
         # this method is NOT called at all for the picked session.
         # In such case, we just skip updating self.per_user_dominant_share state
         # and the scheduler dispatcher continues to pick another session within the same scaling group.
+
         access_key = pending_session_or_kernel.access_key
         requested_slots = pending_session_or_kernel.requested_slots
+
+        if not [
+            agent
+            for agent in compatible_agents
+            if agent.available_slots - agent.occupied_slots >= requested_slots
+        ]:
+            return None
 
         # We have one or more agents that can host the picked session.
 
@@ -112,7 +120,7 @@ class DRFScheduler(AbstractScheduler):
             self.per_user_dominant_share[access_key] = dominant_share_from_request
 
         return await self.select_agent(
-            possible_agents,
+            compatible_agents,
             pending_session_or_kernel,
             False,
             roundrobin_context,
@@ -120,22 +128,22 @@ class DRFScheduler(AbstractScheduler):
 
     async def assign_agent_for_session(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
         roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         return await self._assign_agent(
-            possible_agents,
+            compatible_agents,
             pending_session,
             roundrobin_context,
         )
 
     async def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         return await self._assign_agent(
-            possible_agents,
+            compatible_agents,
             pending_kernel,
         )

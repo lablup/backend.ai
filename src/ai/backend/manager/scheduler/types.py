@@ -440,7 +440,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     async def assign_agent_for_session(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
         roundrobin_context: Optional[
             RoundRobinContext
@@ -459,7 +459,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     async def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         """
@@ -470,7 +470,7 @@ class AbstractScheduler(metaclass=ABCMeta):
 
     async def select_agent(
         self,
-        possible_agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
         use_num_extras: bool,
         roundrobin_context: Optional[RoundRobinContext] = None,
@@ -482,13 +482,13 @@ class AbstractScheduler(metaclass=ABCMeta):
         agent_selection_strategy = self.sgroup_opts.agent_selection_strategy
         requested_slots = pending_session_or_kernel.requested_slots
 
-        agent_candidates = [
+        possible_candidates = [
             agent
-            for agent in possible_agents
+            for agent in compatible_agents
             if agent.available_slots - agent.occupied_slots >= requested_slots
         ]
 
-        if not agent_candidates:
+        if not possible_candidates:
             return None
 
         resource_priorities = sort_requested_slots_by_priority(
@@ -521,21 +521,21 @@ class AbstractScheduler(metaclass=ABCMeta):
                 if rr_state is None:
                     agent_idx = 0
                 else:
-                    agent_idx = rr_state.next_index % len(possible_agents)
+                    agent_idx = rr_state.next_index % len(possible_candidates)
 
                 # This logic assumes that the list of possible agents is not changed.
                 # If the list of possible agents is changed, the next agent will be selected at random by agent_idx.
                 # In this case, we will just use the agent_idx for the simplicity.
-                chosen_agent = possible_agents[agent_idx]
+                chosen_agent = possible_candidates[agent_idx]
 
-                rr_state = RoundRobinState((agent_idx + 1) % len(possible_agents))
+                rr_state = RoundRobinState((agent_idx + 1) % len(possible_candidates))
 
                 await sched_ctx.registry.shared_config.put_roundrobin_state(
                     sgroup_name, requested_architecture, rr_state
                 )
             case AgentSelectionStrategy.LEGACY:
                 chosen_agent = max(
-                    possible_agents,
+                    possible_candidates,
                     key=lambda agent: [
                         -get_num_extras(agent, requested_slots) if use_num_extras else 0,
                         *[
@@ -546,7 +546,7 @@ class AbstractScheduler(metaclass=ABCMeta):
                 )
             case AgentSelectionStrategy.CONCENTRATED:
                 chosen_agent = min(
-                    possible_agents,
+                    possible_candidates,
                     key=lambda agent: [
                         get_num_extras(agent, requested_slots) if use_num_extras else 0,
                         *[
@@ -557,7 +557,7 @@ class AbstractScheduler(metaclass=ABCMeta):
                 )
             case AgentSelectionStrategy.DISPERSED | _:
                 chosen_agent = max(
-                    possible_agents,
+                    possible_candidates,
                     key=lambda agent: [
                         -get_num_extras(agent, requested_slots) if use_num_extras else 0,
                         *[

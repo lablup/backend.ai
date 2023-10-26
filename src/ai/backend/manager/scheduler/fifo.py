@@ -62,12 +62,12 @@ class FIFOSlotScheduler(AbstractScheduler):
 
     async def assign_agent_for_session(
         self,
-        agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
         roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         return await self.select_agent(
-            agents,
+            compatible_agents,
             pending_session,
             True,
             roundrobin_context,
@@ -75,11 +75,11 @@ class FIFOSlotScheduler(AbstractScheduler):
 
     async def assign_agent_for_kernel(
         self,
-        agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         return await self.select_agent(
-            agents,
+            compatible_agents,
             pending_kernel,
             True,
         )
@@ -99,12 +99,12 @@ class LIFOSlotScheduler(AbstractScheduler):
 
     async def assign_agent_for_session(
         self,
-        agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_session: SessionRow,
         roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         return await self.select_agent(
-            agents,
+            compatible_agents,
             pending_session,
             True,
             roundrobin_context,
@@ -112,11 +112,11 @@ class LIFOSlotScheduler(AbstractScheduler):
 
     async def assign_agent_for_kernel(
         self,
-        agents: Sequence[AgentRow],
+        compatible_agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         return await self.select_agent(
-            agents,
+            compatible_agents,
             pending_kernel,
             True,
         )
