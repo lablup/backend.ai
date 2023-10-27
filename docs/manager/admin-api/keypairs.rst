@@ -36,9 +36,10 @@ Mutation Schema
 
    input KeyPairInput {
      is_active: Boolean
-     resource_policy: String
+     is_admin: Boolean
+     resource_policy: String!
      concurrency_limit: Int
-     rate_limit: Int
+     rate_limit: Int!
    }
 
    input ModifyKeyPairInput {
