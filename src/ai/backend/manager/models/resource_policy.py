@@ -139,8 +139,8 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     max_concurrent_sessions = graphene.Int()
     max_containers_per_session = graphene.Int()
     idle_timeout = BigInt()
-    max_vfolder_count = graphene.Int()
-    max_vfolder_size = BigInt()
+    max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
     allowed_vfolder_hosts = graphene.JSONString()
 
     @classmethod
@@ -291,8 +291,8 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_concurrent_sessions = graphene.Int(required=True)
     max_containers_per_session = graphene.Int(required=True)
     idle_timeout = BigInt(required=True)
-    max_vfolder_count = graphene.Int(required=True)
-    max_vfolder_size = BigInt(required=True)
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     allowed_vfolder_hosts = graphene.JSONString(required=False)
 
 
@@ -303,8 +303,8 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_concurrent_sessions = graphene.Int(required=False)
     max_containers_per_session = graphene.Int(required=False)
     idle_timeout = BigInt(required=False)
-    max_vfolder_count = graphene.Int(required=False)
-    max_vfolder_size = BigInt(required=False)
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     allowed_vfolder_hosts = graphene.JSONString(required=False)
 
 
