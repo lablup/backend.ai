@@ -41,6 +41,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMount,
 )
+from ai.backend.common.utils import get_first_status_history
 
 from ..api.exceptions import (
     AgentError,
@@ -76,7 +77,12 @@ from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    agg_to_array,
+    execute_with_retry,
+    sql_list_append,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -696,7 +702,10 @@ class SessionRow(Base):
         if self.status_history is None:
             return None
         try:
-            return datetime.fromisoformat(self.status_history[self.status.name])
+            first = get_first_status_history(self.status_history, self.status.name)
+            assert first is not None
+
+            return datetime.fromisoformat(first[1])
         except KeyError:
             return None
 
@@ -764,12 +773,8 @@ class SessionRow(Base):
 
                 update_values = {
                     "status": determined_status,
-                    "status_history": sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            determined_status.name: now.isoformat(),
-                        },
+                    "status_history": sql_list_append(
+                        SessionRow.status_history, [determined_status.name, now.isoformat()]
                     ),
                 }
                 if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
@@ -800,12 +805,8 @@ class SessionRow(Base):
             now = status_changed_at
         data = {
             "status": status,
-            "status_history": sql_json_merge(
-                SessionRow.status_history,
-                (),
-                {
-                    status.name: datetime.now(tzutc()).isoformat(),
-                },
+            "status_history": sql_list_append(
+                SessionRow.status_history, [status.name, datetime.now(tzutc()).isoformat()]
             ),
         }
         if status_data is not None:
@@ -1213,8 +1214,10 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        status_history = row.status_history or {}
-        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        status_history = row.status_history or []
+        first = get_first_status_history(status_history, SessionStatus.SCHEDULED.name)
+        raw_scheduled_at = first[1] if first is not None else None
+
         return {
             # identity
             "id": row.id,
