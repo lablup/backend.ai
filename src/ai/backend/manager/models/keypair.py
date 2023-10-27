@@ -538,7 +538,8 @@ class CreateKeyPair(graphene.Mutation):
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from .user import users  # noqa
+        from .group import association_groups_users, groups
+        from .user import users
 
         graph_ctx: GraphQueryContext = info.context
         data = cls.prepare_new_keypair(user_id, props)
@@ -546,7 +547,30 @@ class CreateKeyPair(graphene.Mutation):
             **data,
             user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
         )
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
+
+        async def _post_func(conn, result):
+            j = (
+                sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+                .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+                .join(groups, association_groups_users.c.group_id == groups.c.id)
+            )
+            query = (
+                sa.select(
+                    [
+                        keypairs,
+                        users.c.email,
+                        agg_to_array(groups.c.name).label("groups_name"),
+                    ]
+                )
+                .select_from(j)
+                .group_by(keypairs, users.c.email)
+            )
+            result = await conn.execute(query)
+            return result.first()
+
+        return await simple_db_mutate_returning_item(
+            cls, graph_ctx, insert_query, item_cls=KeyPair, post_func=_post_func
+        )
 
     @classmethod
     def prepare_new_keypair(cls, user_email: str, props: KeyPairInput) -> Dict[str, Any]:
