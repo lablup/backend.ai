@@ -260,7 +260,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                                 try:
                                     symlink_dst = Path(entry).resolve()
                                     symlink_dst = symlink_dst.relative_to(target_path)
-                                except RuntimeError:
+                                except (ValueError, RuntimeError):
                                     # ValueError and ELOOP
                                     pass
                                 else:
