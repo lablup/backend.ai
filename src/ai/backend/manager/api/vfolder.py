@@ -1025,10 +1025,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=params["id"])
 
-    # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
-    max_vfolder_size = resource_policy.get("max_vfolder_size", 0)
-    if max_vfolder_size > 0 and (quota <= 0 or quota > max_vfolder_size):
-        quota = max_vfolder_size
+    # Limit vfolder size quota if it is larger than max_quota_scope_size of the resource policy.
+    max_quota_scope_size = resource_policy.get("max_quota_scope_size", 0)
+    if max_quota_scope_size > 0 and (quota <= 0 or quota > max_quota_scope_size):
+        quota = max_quota_scope_size
 
     async with root_ctx.storage_manager.request(
         proxy_name,
@@ -2223,15 +2223,15 @@ async def _delete(
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         folder_host = entry["host"]
-    await ensure_host_permission_allowed(
-        conn,
-        folder_host,
-        allowed_vfolder_types=allowed_vfolder_types,
-        user_uuid=user_uuid,
-        resource_policy=resource_policy,
-        domain_name=domain_name,
-        permission=VFolderHostPermission.DELETE,
-    )
+        await ensure_host_permission_allowed(
+            conn,
+            folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
+            permission=VFolderHostPermission.DELETE,
+        )
 
     await update_vfolder_status(
         root_ctx.db,

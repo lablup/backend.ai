@@ -20,6 +20,7 @@ visibility_private_component(
         "//src/ai/backend/plugin/**",
         "//src/ai/backend/cli/**",  # not auto-inferred
         "//src/ai/backend/runner/**",
+        "//src/ai/backend/kernel/**",
         "//src/ai/backend/helpers/**",
     ],
 )
@@ -46,6 +47,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "src/ai/backend/kernel:src",
         ":kernel-support",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
