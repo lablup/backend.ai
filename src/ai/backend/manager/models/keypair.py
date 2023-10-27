@@ -214,8 +214,7 @@ class KeyPair(graphene.ObjectType):
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
-            # projects=row["groups_name"],
-            projects="",
+            projects=row["groups_name"],
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:

@@ -36,8 +36,8 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 
 class ModifyContainerRegistryInput(graphene.InputObjectType):
-    url = graphene.String(required=True)  # TODO
-    type = graphene.String(required=True)  # TODO
+    url = graphene.String(required=True)
+    type = graphene.String(required=True)
     project = graphene.List(graphene.String)
     username = graphene.String()
     password = graphene.String()

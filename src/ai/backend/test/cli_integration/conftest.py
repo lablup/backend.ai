@@ -64,8 +64,13 @@ def run(client_bin: Path, client_environ: dict[str, str]) -> Iterator[ClientRunn
     yield run_impl
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def domain_name() -> str:
+    return f"testing-{secrets.token_hex(8)}"
+
+
+@pytest.fixture(scope="module")
+def new_domain_name() -> str:
     return f"testing-{secrets.token_hex(8)}"
 
 

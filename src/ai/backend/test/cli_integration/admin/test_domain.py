@@ -4,7 +4,7 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_domain(run: ClientRunnerFunc):
+def test_add_domain(run: ClientRunnerFunc, domain_name: str):
     print("[ Add domain ]")
 
     # Add domain
@@ -19,10 +19,14 @@ def test_add_domain(run: ClientRunnerFunc):
         "--total-resource-slots",
         "{}",
         "--allowed-vfolder-hosts",
-        "local:volume1",
+        (
+            '{"local:volume1": ["create-vfolder", "modify-vfolder", "delete-vfolder",'
+            ' "mount-in-session", "upload-file", "download-file", "invite-others",'
+            ' "set-user-specific-permission"]}'
+        ),
         "--allowed-docker-registries",
         "cr.backend.ai",
-        "test",
+        domain_name,
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
@@ -37,30 +41,34 @@ def test_add_domain(run: ClientRunnerFunc):
         domain_list = loaded.get("items")
         assert isinstance(domain_list, list), "Domain list not printed properly"
 
-    test_domain = get_domain_from_list(domain_list, "test")
+    test_domain = get_domain_from_list(domain_list, domain_name)
 
     assert bool(test_domain), "Test domain doesn't exist"
     assert test_domain.get("description") == "Test domain", "Domain description mismatch"
     assert test_domain.get("is_active") is False, "Domain active status mismatch"
     assert test_domain.get("total_resource_slots") == {}, "Domain total resource slots mismatch"
-    assert test_domain.get("allowed_vfolder_hosts") == {
-        "local:volume1": [
-            "create-vfolder",
-            "modify-vfolder",
-            "delete-vfolder",
-            "mount-in-session",
-            "upload-file",
-            "download-file",
-            "invite-others",
-            "set-user-specific-permission",
-        ],
+    raw_allowed_vfolder_hosts = test_domain.get("allowed_vfolder_hosts")
+    assert isinstance(raw_allowed_vfolder_hosts, str)
+    allowed_vfolder_hosts = json.loads(raw_allowed_vfolder_hosts)
+    assert set(allowed_vfolder_hosts.keys()) == {
+        "local:volume1"
     }, "Domain allowed vfolder hosts mismatch"
+    assert set(allowed_vfolder_hosts["local:volume1"]) == {
+        "create-vfolder",
+        "modify-vfolder",
+        "delete-vfolder",
+        "mount-in-session",
+        "upload-file",
+        "download-file",
+        "invite-others",
+        "set-user-specific-permission",
+    }, "Domain allowed vfolder hosts permission mismatch"
     assert test_domain.get("allowed_docker_registries") == [
         "cr.backend.ai"
     ], "Domain allowed docker registries mismatch"
 
 
-def test_update_domain(run: ClientRunnerFunc):
+def test_update_domain(run: ClientRunnerFunc, domain_name: str, new_domain_name: str):
     print("[ Update domain ]")
 
     # Update domain
@@ -70,7 +78,7 @@ def test_update_domain(run: ClientRunnerFunc):
         "domain",
         "update",
         "--new-name",
-        "test123",
+        new_domain_name,
         "--description",
         "Test domain updated",
         "--is-active",
@@ -78,10 +86,14 @@ def test_update_domain(run: ClientRunnerFunc):
         "--total-resource-slots",
         "{}",
         "--allowed-vfolder-hosts",
-        "local:volume2",
+        (
+            '{"local:volume2": ["create-vfolder", "modify-vfolder", "delete-vfolder",'
+            ' "mount-in-session", "upload-file", "download-file", "invite-others",'
+            ' "set-user-specific-permission"]}'
+        ),
         "--allowed-docker-registries",
         "cr1.backend.ai",
-        "test",
+        domain_name,
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
@@ -96,34 +108,38 @@ def test_update_domain(run: ClientRunnerFunc):
         domain_list = loaded.get("items")
         assert isinstance(domain_list, list), "Domain list not printed properly"
 
-    test_domain = get_domain_from_list(domain_list, "test123")
+    test_domain = get_domain_from_list(domain_list, new_domain_name)
 
     assert bool(test_domain), "Test domain doesn't exist"
     assert test_domain.get("description") == "Test domain updated", "Domain description mismatch"
     assert test_domain.get("is_active") is True, "Domain active status mismatch"
     assert test_domain.get("total_resource_slots") == {}, "Domain total resource slots mismatch"
-    assert test_domain.get("allowed_vfolder_hosts") == {
-        "local:volume2": [
-            "create-vfolder",
-            "modify-vfolder",
-            "delete-vfolder",
-            "mount-in-session",
-            "upload-file",
-            "download-file",
-            "invite-others",
-            "set-user-specific-permission",
-        ],
+    raw_allowed_vfolder_hosts = test_domain.get("allowed_vfolder_hosts")
+    assert isinstance(raw_allowed_vfolder_hosts, str)
+    allowed_vfolder_hosts = json.loads(raw_allowed_vfolder_hosts)
+    assert set(allowed_vfolder_hosts.keys()) == {
+        "local:volume2"
     }, "Domain allowed vfolder hosts mismatch"
+    assert set(allowed_vfolder_hosts["local:volume2"]) == {
+        "create-vfolder",
+        "modify-vfolder",
+        "delete-vfolder",
+        "mount-in-session",
+        "upload-file",
+        "download-file",
+        "invite-others",
+        "set-user-specific-permission",
+    }, "Domain allowed vfolder hosts permission mismatch"
     assert test_domain.get("allowed_docker_registries") == [
         "cr1.backend.ai"
     ], "Domain allowed docker registries mismatch"
 
 
-def test_delete_domain(run: ClientRunnerFunc):
+def test_delete_domain(run: ClientRunnerFunc, new_domain_name: str):
     print("[ Delete domain ]")
 
     # Delete domain
-    with closing(run(["--output=json", "admin", "domain", "purge", "test123"])) as p:
+    with closing(run(["--output=json", "admin", "domain", "purge", new_domain_name])) as p:
         p.sendline("y")
         p.expect(EOF)
         before = p.before.decode()
