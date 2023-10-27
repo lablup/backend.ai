@@ -46,6 +46,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.common.utils import get_first_status_history
 
 from ..api.exceptions import (
     BackendError,
@@ -79,7 +80,12 @@ from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, JSONCoalesceExpr, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    JSONCoalesceExpr,
+    execute_with_retry,
+    sql_list_append,
+)
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -723,12 +729,8 @@ class KernelRow(Base):
         data = {
             "status": status,
             "status_changed": now,
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                (),
-                {
-                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
-                },
+            "status_history": sql_list_append(
+                KernelRow.status_history, [status.name, now.isoformat()]
             ),
         }
         if status_data is not None:
@@ -774,12 +776,8 @@ class KernelRow(Base):
                 if update_data is None:
                     update_values = {
                         "status": new_status,
-                        "status_history": sql_json_merge(
-                            KernelRow.status_history,
-                            (),
-                            {
-                                new_status.name: now.isoformat(),
-                            },
+                        "status_history": sql_list_append(
+                            KernelRow.status_history, [new_status.name, now.isoformat()]
                         ),
                     }
                 else:
@@ -921,7 +919,10 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row.status_history or {}
+
+        status_history = row["status_history"] or []
+        scheduled_at = get_first_status_history(status_history, KernelStatus.SCHEDULED.name)
+
         return {
             # identity
             "id": row.id,
@@ -947,7 +948,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
+            "scheduled_at": scheduled_at[1] if scheduled_at else None,
             "occupied_slots": row.occupied_slots.to_json(),
             # resources
             "agent": row.agent if not hide_agents else None,

@@ -465,7 +465,7 @@ async def get_container_stats_for_period(
             "status": row["status"].name,
             "status_info": row["status_info"],
             "status_changed": str(row["status_changed"]),
-            "status_history": row["status_history"] or {},
+            "status_history": row["status_history"] or [],
             "cluster_mode": row["cluster_mode"],
         }
         if group_id not in objs_per_group:

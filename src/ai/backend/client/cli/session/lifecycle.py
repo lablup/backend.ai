@@ -27,6 +27,7 @@ from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
+from ai.backend.common.utils import get_first_status_history
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -792,14 +793,14 @@ def status_history(session_id):
         try:
             status_history = kernel.get_status_history().get("result")
             print_info(f"status_history: {status_history}")
-            if (preparing := status_history.get("preparing")) is None:
+            if (preparing := get_first_status_history(status_history, "PREPARING")) is None:
                 result = {
                     "result": {
                         "seconds": 0,
                         "microseconds": 0,
                     },
                 }
-            elif (terminated := status_history.get("terminated")) is None:
+            elif (terminated := get_first_status_history(status_history, "TERMINATED")) is None:
                 alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
                 result = {
                     "result": {
