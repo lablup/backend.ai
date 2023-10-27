@@ -75,8 +75,8 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-_rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
-
+# Allow any character(include unicode) except whitespace
+_rx_slug = re.compile(r"^\S*$") # former regex: re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 association_groups_users = sa.Table(
     "association_groups_users",
     mapper_registry.metadata,
