@@ -251,21 +251,27 @@ class BaseFSOpModel(AbstractFSOpModel):
                             break
                         symlink_target = ""
                         entry_type = DirEntryType.FILE
+
                         try:
-                            if entry.is_dir():
+                            if entry.is_dir(follow_symlinks=False):
                                 entry_type = DirEntryType.DIRECTORY
                             if entry.is_symlink():
                                 entry_type = DirEntryType.SYMLINK
-                                symlink_dst = Path(entry).resolve()
+
                                 try:
+                                    symlink_dst = Path(entry).resolve()
                                     symlink_dst = symlink_dst.relative_to(target_path)
-                                except ValueError:
+                                except RuntimeError:
+                                    # ValueError and ELOOP
                                     pass
-                                symlink_target = os.fsdecode(symlink_dst)
+                                else:
+                                    symlink_target = os.fsdecode(symlink_dst)
+
                             entry_stat = entry.stat(follow_symlinks=False)
                         except (FileNotFoundError, PermissionError):
                             # the filesystem may be changed during scan
                             continue
+
                         item = DirEntry(
                             name=entry.name,
                             path=Path(entry.path).relative_to(target_path),
