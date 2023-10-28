@@ -3432,7 +3432,9 @@ async def handle_model_service_status_update(
                 await context.update_appproxy_endpoint_routes(
                     db_sess, route.endpoint_row, latest_routes
                 )
-            except Exception:
+            except Exception as e:
+                if isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001":
+                    raise
                 log.exception("failed to communicate with AppProxy endpoint:")
 
     await execute_with_retry(_update)
@@ -3513,6 +3515,11 @@ async def invoke_session_callback(
                                     db_sess, endpoint, new_routes
                                 )
                             except Exception as e:
+                                if (
+                                    isinstance(e, DBAPIError)
+                                    and getattr(e.orig, "pgcode", None) == "40001"
+                                ):
+                                    raise
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
                     else:
@@ -3540,6 +3547,11 @@ async def invoke_session_callback(
                                     db_sess, endpoint, new_routes
                                 )
                             except Exception as e:
+                                if (
+                                    isinstance(e, DBAPIError)
+                                    and getattr(e.orig, "pgcode", None) == "40001"
+                                ):
+                                    raise
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
 
