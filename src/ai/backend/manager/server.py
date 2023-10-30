@@ -49,7 +49,7 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
-from ai.backend.common.utils import env_info
+from ai.backend.common.utils import env_info, get_first_occurrence_time
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -568,9 +568,10 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             .where(
                 (
                     datetime.now(tz=tzutc())
-                    - SessionRow.status_history[status.name].astext.cast(
-                        sa.types.DateTime(timezone=True)
-                    )
+                    - sa.func.to_timestamp(
+                        get_first_occurrence_time(SessionRow.status_history, status.name),
+                        "YYYY-MM-DD HH24:MI:SS.US",
+                    ).cast(sa.types.DateTime(timezone=True))
                 )
                 > threshold
             )
@@ -625,6 +626,9 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
     max_interval = timedelta(hours=1).total_seconds()
     threshold: relativedelta | timedelta
+
+    print("session_hang_tolerance!!", session_hang_tolerance)
+
     for status, threshold in session_hang_tolerance["threshold"].items():
         try:
             session_status = SessionStatus[status]
