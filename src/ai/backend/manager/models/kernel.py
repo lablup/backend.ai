@@ -544,9 +544,9 @@ class KernelRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
-    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
-    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
+    status_history = (sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[]),)
+    callback_url = (sa.Column("callback_url", URLColumn, nullable=True, default=sa.null()),)
+    startup_command = (sa.Column("startup_command", sa.Text, nullable=True),)
     result = sa.Column(
         "result",
         EnumType(SessionResult),
