@@ -41,7 +41,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMount,
 )
-from ai.backend.common.utils import get_first_status_history
+from ai.backend.common.utils import get_first_status_history_record
 
 from ..api.exceptions import (
     AgentError,
@@ -702,7 +702,7 @@ class SessionRow(Base):
         if self.status_history is None:
             return None
         try:
-            first = get_first_status_history(self.status_history, self.status.name)
+            first = get_first_status_history_record(self.status_history, self.status.name)
             assert first is not None
 
             return datetime.fromisoformat(first[1])
@@ -1215,7 +1215,7 @@ class ComputeSession(graphene.ObjectType):
         group_name = getattr(row, "group_name")
         row = row.SessionRow
         status_history = row.status_history or []
-        first = get_first_status_history(status_history, SessionStatus.SCHEDULED.name)
+        first = get_first_status_history_record(status_history, SessionStatus.SCHEDULED.name)
         raw_scheduled_at = first[1] if first is not None else None
 
         return {

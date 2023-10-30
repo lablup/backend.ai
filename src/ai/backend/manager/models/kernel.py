@@ -45,7 +45,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.common.utils import get_first_status_history
+from ai.backend.common.utils import get_first_status_history_record
 
 from ..api.exceptions import (
     BackendError,
@@ -835,7 +835,7 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = ctx.local_config["manager"]["hide-agents"]
 
         status_history = row["status_history"] or []
-        scheduled_at = get_first_status_history(status_history, KernelStatus.SCHEDULED.name)
+        scheduled_at = get_first_status_history_record(status_history, KernelStatus.SCHEDULED.name)
 
         return {
             # identity
