@@ -44,9 +44,6 @@ jobs:
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Install Backend.AI
-      run: |
-        ./scripts/install-backend-ai.sh
     - name: Create GraphQL schema dump
       run: |
         ./py -m ai.backend.manager.models.gql

@@ -1940,18 +1940,6 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
-    async def resolve_container_registry(
-        executor: AsyncioExecutor,
-        info: graphene.ResolveInfo,
-        hostname: str,
-        domain_name: Optional[str] = None,
-        access_key: AccessKey = None,
-    ) -> ContainerRegistry:
-        ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
-
-    @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_container_registries(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
