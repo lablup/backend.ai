@@ -256,7 +256,6 @@ class BaseFSOpModel(AbstractFSOpModel):
                                 entry_type = DirEntryType.DIRECTORY
                             if entry.is_symlink():
                                 entry_type = DirEntryType.SYMLINK
-
                                 try:
                                     symlink_dst = Path(entry).resolve()
                                     symlink_dst = symlink_dst.relative_to(target_path)
