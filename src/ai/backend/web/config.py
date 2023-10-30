@@ -66,6 +66,7 @@ config_iv = t.Dict(
                 t.Key("enable_container_commit", default=False): t.ToBool,
                 t.Key("hide_agents", default=True): t.ToBool,
                 t.Key("app_download_url", default=""): t.String(allow_blank=True),
+                t.Key("allow_app_download_panel", default=True): t.ToBool,
                 t.Key("enable_2FA", default=False): t.ToBool(),
                 t.Key("force_2FA", default=False): t.ToBool(),
                 t.Key("system_SSH_image", default=""): t.String(allow_blank=True),
