@@ -452,13 +452,15 @@ def sql_json_merge(
     return expr
 
 
-def sql_list_append(col, arr):
+def sql_list_append(col, *arrs):
     """
-    Generate an SQLAlchemy column update expression that appends an item to
-    the existing JSONB array.
+    Generate an SQLAlchemy column update expression that appends items to
+    the existing JSONB array from multiple arrays.
     """
-    new_item_str = str(arr).replace("'", '"')
-    expr = col.op("||")(sa.text(f"'[{new_item_str}]'::jsonb"))
+    expr = col
+    for arr in arrs:
+        new_item_str = str(arr).replace("'", '"')
+        expr = expr.op("||")(sa.text(f"'[{new_item_str}]'::jsonb"))
     return expr
 
 
