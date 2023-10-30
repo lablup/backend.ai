@@ -824,7 +824,10 @@ class ComputeContainer(graphene.ObjectType):
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
         status_history = row["status_history"]
-        scheduled_at = get_first_status_history_record(status_history, KernelStatus.SCHEDULED.name)
+        first_scheduled = get_first_status_history_record(
+            status_history, KernelStatus.SCHEDULED.name
+        )
+        scheduled_at = first_scheduled[1] if first_scheduled else None
 
         return {
             # identity
@@ -849,7 +852,7 @@ class ComputeContainer(graphene.ObjectType):
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "starts_at": row["starts_at"],
-            "scheduled_at": scheduled_at[1] if scheduled_at else None,
+            "scheduled_at": scheduled_at,
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
