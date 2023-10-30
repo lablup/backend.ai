@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
@@ -169,12 +168,3 @@ def create_app(
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))
     return app, []
-
-
-if __name__ == "__main__":
-    # If executed as a main program, print all GraphQL schemas.
-    # (graphene transforms our object model into a textual representation)
-    # This is useful for writing documentation!
-    schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
-    print("======== GraphQL API Schema ========", file=sys.stderr)
-    print(str(schema))
