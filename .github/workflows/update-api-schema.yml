@@ -1,4 +1,4 @@
-name: GraphQL Updated
+name: graphql
 
 on:
   pull_request:
@@ -48,7 +48,7 @@ jobs:
       run: pants export '::'
     - name: Create GraphQL schema dump
       run: |
-        ./py -m ai.backend.manager.models.gql
+        ./backend.ai mgr gql show >> schema.graphql
     - name: Extract the author information
       id: get_author_info
       run: |
