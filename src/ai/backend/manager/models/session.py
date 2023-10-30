@@ -699,13 +699,9 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
-        try:
-            first = get_first_status_history_record(self.status_history, self.status.name)
-            assert first is not None
-
-            return datetime.fromisoformat(first[1])
-        except KeyError:
-            return None
+        if first_record := get_first_status_history_record(self.status_history, self.status.name):
+            return datetime.fromisoformat(first_record[1])
+        return None
 
     @property
     def resource_opts(self) -> dict[str, Any]:
@@ -1212,9 +1208,9 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        status_history = row.status_history or []
+        status_history = row.status_history
         first = get_first_status_history_record(status_history, SessionStatus.SCHEDULED.name)
-        raw_scheduled_at = first[1] if first is not None else None
+        scheduled_at = datetime.fromisoformat(first[1]) if first is not None else None
 
         return {
             # identity
@@ -1251,9 +1247,7 @@ class ComputeSession(graphene.ObjectType):
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
-            "scheduled_at": (
-                datetime.fromisoformat(raw_scheduled_at) if raw_scheduled_at is not None else None
-            ),
+            "scheduled_at": scheduled_at,
             "startup_command": row.startup_command,
             "result": row.result.name,
             # resources
