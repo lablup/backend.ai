@@ -73,7 +73,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_append_lists_to_list
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -941,12 +941,12 @@ async def update_vfolder_status(
                 sa.update(vfolders)
                 .values(
                     status=update_status,
-                    status_history=sql_append_lists_to_list(
+                    status_history=sql_json_merge(
                         vfolders.c.status_history,
-                        [
-                            update_status.name,
-                            datetime.now(tzutc()).isoformat(),
-                        ],
+                        (),
+                        {
+                            update_status.name: datetime.now(tzutc()).isoformat(),
+                        },
                     ),
                 )
                 .where(cond)
