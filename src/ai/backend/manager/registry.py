@@ -1747,8 +1747,8 @@ class AgentRegistry:
                                     status_history=sql_append_lists_to_list(
                                         KernelRow.status_history,
                                         [
-                                            KernelStatus.ERROR.name,
-                                            now.isoformat(),  # ["PULLING", "PREPARING"]
+                                            KernelStatus.ERROR.name,  # ["PULLING", "PREPARING"]
+                                            now.isoformat(),
                                         ],
                                     ),
                                     status_data=convert_to_status_data(ex, self.debug),
