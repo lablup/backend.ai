@@ -50,7 +50,7 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
-from ai.backend.common.utils import env_info, get_first_occurrence_time
+from ai.backend.common.utils import env_info
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -555,7 +555,6 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     import sqlalchemy as sa
     from dateutil.relativedelta import relativedelta
-    from dateutil.tz import tzutc
     from sqlalchemy.orm import load_only, noload
 
     from .config import session_hang_tolerance_iv
@@ -572,21 +571,23 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         query = (
             sa.select(SessionRow)
             .where(SessionRow.status == status)
-            .where(
-                (
-                    datetime.now(tz=tzutc())
-                    - sa.func.to_timestamp(
-                        get_first_occurrence_time(SessionRow.status_history, status.name),
-                        "YYYY-MM-DD HH24:MI:SS.US",
-                    ).cast(sa.types.DateTime(timezone=True))
-                )
-                > threshold
-            )
+            .where(sa.text("""
+                    EXISTS (
+                        SELECT 1
+                        FROM jsonb_array_elements(status_history) AS session_history
+                        WHERE
+                            session_history->>0 = :status_name AND
+                            (
+                                now() - CAST(session_history->>1 AS TIMESTAMP WITH TIME ZONE)
+                            ) > :threshold
+                    )
+                    """).bindparams(status_name=status.name, threshold=threshold))
             .options(
                 noload("*"),
                 load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
             )
         )
+
         async with db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.fetchall()
@@ -633,8 +634,6 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
     max_interval = timedelta(hours=1).total_seconds()
     threshold: relativedelta | timedelta
-
-    print("session_hang_tolerance!!", session_hang_tolerance)
 
     for status, threshold in session_hang_tolerance["threshold"].items():
         try:
