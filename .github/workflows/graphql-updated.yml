@@ -44,6 +44,8 @@ jobs:
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
+    - name: Pants export
+      run: pants export '::'
     - name: Create GraphQL schema dump
       run: |
         ./py -m ai.backend.manager.models.gql
