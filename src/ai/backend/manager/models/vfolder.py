@@ -104,7 +104,7 @@ from .rbac import (
 from .rbac.exceptions import InvalidScope, NotEnoughPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
 from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_list_append
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_append_lists_to_list
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -1466,7 +1466,7 @@ async def update_vfolder_status(
                 sa.update(vfolders)
                 .values(
                     status=update_status,
-                    status_history=sql_list_append(
+                    status_history=sql_append_lists_to_list(
                         vfolders.c.status_history,
                         [
                             update_status.name,
