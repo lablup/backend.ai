@@ -168,8 +168,8 @@ from .models.utils import (
     is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
+    sql_append_lists_to_list,
     sql_json_merge,
-    sql_list_append,
 )
 from .types import UserScope
 
@@ -1542,7 +1542,7 @@ class AgentRegistry:
                 "stdin_port": created_info["stdin_port"],
                 "stdout_port": created_info["stdout_port"],
                 "service_ports": service_ports,
-                "status_history": sql_list_append(
+                "status_history": sql_append_lists_to_list(
                     KernelRow.status_history, [new_status.name, datetime.now(tzutc()).isoformat()]
                 ),
             }
@@ -1717,7 +1717,7 @@ class AgentRegistry:
                                     status_info=f"other-error ({ex!r})",
                                     status_changed=now,
                                     terminated_at=now,
-                                    status_history=sql_list_append(
+                                    status_history=sql_append_lists_to_list(
                                         KernelRow.status_history,
                                         [
                                             KernelStatus.ERROR.name,
@@ -2256,7 +2256,7 @@ class AgentRegistry:
                                         "status_info": reason,
                                         "status_changed": now,
                                         "terminated_at": now,
-                                        "status_history": sql_list_append(
+                                        "status_history": sql_append_lists_to_list(
                                             KernelRow.status_history,
                                             [KernelStatus.TERMINATED.name, now.isoformat()],
                                         ),
@@ -2300,7 +2300,7 @@ class AgentRegistry:
                                             "kernel": {"exit_code": None},
                                             "session": {"status": "terminating"},
                                         },
-                                        "status_history": sql_list_append(
+                                        "status_history": sql_append_lists_to_list(
                                             KernelRow.status_history,
                                             [KernelStatus.TERMINATING.name, now.isoformat()],
                                         ),
@@ -2467,7 +2467,7 @@ class AgentRegistry:
                     sa.update(SessionRow)
                     .values(
                         status=SessionStatus.RESTARTING,
-                        status_history=sql_list_append(
+                        status_history=sql_append_lists_to_list(
                             SessionRow.status_history,
                             [
                                 SessionStatus.RESTARTING.name,
@@ -2506,7 +2506,7 @@ class AgentRegistry:
                     "stdin_port": kernel_info["stdin_port"],
                     "stdout_port": kernel_info["stdout_port"],
                     "service_ports": kernel_info.get("service_ports", []),
-                    "status_history": sql_list_append(
+                    "status_history": sql_append_lists_to_list(
                         KernelRow.status_history, [KernelStatus.RUNNING.name, now.isoformat()]
                     ),
                 }
@@ -3038,7 +3038,7 @@ class AgentRegistry:
                         ("kernel",),
                         {"exit_code": exit_code},
                     ),
-                    "status_history": sql_list_append(
+                    "status_history": sql_append_lists_to_list(
                         KernelRow.status_history, [KernelStatus.TERMINATED.name, now.isoformat()]
                     ),
                     "terminated_at": now,

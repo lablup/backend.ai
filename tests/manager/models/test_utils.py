@@ -11,7 +11,7 @@ from ai.backend.manager.models import KernelRow, SessionRow, kernels
 from ai.backend.manager.models.utils import (
     agg_to_array,
     agg_to_str,
-    sql_list_append,
+    sql_append_lists_to_list,
 )
 
 
@@ -34,7 +34,7 @@ async def test_sql_json_merge__default(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_list_append(session_info):
+async def test_sql_append_lists_to_list(session_info):
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = [
@@ -48,7 +48,7 @@ async def test_sql_list_append(session_info):
         kernels.update()
         .values(
             {
-                "status_history": sql_list_append(
+                "status_history": sql_append_lists_to_list(
                     kernels.c.status_history,
                     ["PENDING", timestamp],
                     ["PREPARING", timestamp],
@@ -62,7 +62,7 @@ async def test_sql_list_append(session_info):
         kernels.update()
         .values(
             {
-                "status_history": sql_list_append(
+                "status_history": sql_append_lists_to_list(
                     kernels.c.status_history,
                     ["TERMINATING", timestamp],
                     ["TERMINATED", timestamp],

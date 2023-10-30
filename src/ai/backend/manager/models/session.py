@@ -81,7 +81,7 @@ from .utils import (
     ExtendedAsyncSAEngine,
     agg_to_array,
     execute_with_retry,
-    sql_list_append,
+    sql_append_lists_to_list,
 )
 
 if TYPE_CHECKING:
@@ -773,7 +773,7 @@ class SessionRow(Base):
 
                 update_values = {
                     "status": determined_status,
-                    "status_history": sql_list_append(
+                    "status_history": sql_append_lists_to_list(
                         SessionRow.status_history, [determined_status.name, now.isoformat()]
                     ),
                 }
@@ -805,7 +805,7 @@ class SessionRow(Base):
             now = status_changed_at
         data = {
             "status": status,
-            "status_history": sql_list_append(
+            "status_history": sql_append_lists_to_list(
                 SessionRow.status_history, [status.name, datetime.now(tzutc()).isoformat()]
             ),
         }
