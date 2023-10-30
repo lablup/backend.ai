@@ -1879,41 +1879,6 @@ class Queries(graphene.ObjectType):
         )
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="user_uuid")
-    async def resolve_endpoint_token_list(
-        executor: AsyncioExecutor,
-        info: graphene.ResolveInfo,
-        limit: int,
-        offset: int,
-        *,
-        filter: Optional[str] = None,
-        order: Optional[str] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
-        domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-    ) -> EndpointTokenList:
-        total_count = await EndpointToken.load_count(
-            info.context,
-            endpoint_id=endpoint_id,
-            project=project,
-            domain_name=domain_name,
-            user_uuid=user_uuid,
-        )
-        token_list = await EndpointToken.load_slice(
-            info.context,
-            limit,
-            offset,
-            endpoint_id=endpoint_id,
-            filter=filter,
-            order=order,
-            project=project,
-            domain_name=domain_name,
-            user_uuid=user_uuid,
-        )
-        return EndpointTokenList(token_list, total_count)
-
-    @staticmethod
     async def resolve_quota_scope(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
