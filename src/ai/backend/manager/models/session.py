@@ -680,7 +680,7 @@ class SessionRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
+    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=False, default=[])
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
 
     startup_command = sa.Column("startup_command", sa.Text, nullable=True)
@@ -727,8 +727,6 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
-        if self.status_history is None:
-            return None
         try:
             first = get_first_status_history_record(self.status_history, self.status.name)
             assert first is not None
