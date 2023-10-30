@@ -793,14 +793,16 @@ def status_history(session_id):
         try:
             status_history = kernel.get_status_history().get("result")
             print_info(f"status_history: {status_history}")
-            if (preparing := get_first_status_history(status_history, "PREPARING")) is None:
+            if (preparing := get_first_status_history_record(status_history, "PREPARING")) is None:
                 result = {
                     "result": {
                         "seconds": 0,
                         "microseconds": 0,
                     },
                 }
-            elif (terminated := get_first_status_history(status_history, "TERMINATED")) is None:
+            elif (
+                terminated := get_first_status_history_record(status_history, "TERMINATED")
+            ) is None:
                 alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
                 result = {
                     "result": {
