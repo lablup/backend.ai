@@ -233,10 +233,11 @@
       "PreOpenPortRange": "Port yang sudah dibuka sebelumnya hanya tersedia dari 1024 hingga 65535.",
       "MinMemory": "Kapasitas memori minimum untuk lingkungan runtime yang saat ini dipilih adalah {{size}}iB.",
       "ModelStorage": "Penyimpanan Model",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Masukkan beberapa nilai yang dipisahkan dengan koma (,) atau spasi.",
+      "preopen": "pra-buka",
+      "Network": "Jaringan",
+      "Enable": "Memungkinkan",
+      "FolderAliasInvalid": "Hanya karakter alfanumerik, garis bawah (_), garis miring (/), dan tanda hubung (-) yang diperbolehkan."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -303,8 +304,8 @@
       "EnterValidSessionName": "Masukkan nama sesi yang valid",
       "SessionNameAlreadyExist": "Nama sesi sudah ada",
       "SluggedStrings": "String yang disumbat (>3 karakter)",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Silakan masukkan 64 karakter atau kurang.",
+      "PleaseFollowSessionNameRule": "Silakan masukkan kombinasi minimal 3 huruf, angka, '.', '_', dan '-'."
     },
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
     "NoSessionToDisplay": "Tidak ada sesi yang ditampilkan",
@@ -670,7 +671,7 @@
     "Used": "Digunakan",
     "Pipeline": "Folder Pipa",
     "DialogDataFolder": "Folder khusus pipeline yang secara otomatis dibuat saat membuat pipeline di FastTrack.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Cari berdasarkan nama"
   },
   "dialog": {
     "warning": {
@@ -897,7 +898,8 @@
     "PleaseSelectOption": "Silakan pilih salah satu opsi.",
     "RegistrySuccessfullyModified": "Registry berhasil dimodifikasi.",
     "ModifyRegistry": "Memodifikasi Registri",
-    "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan"
+    "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan",
+    "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",

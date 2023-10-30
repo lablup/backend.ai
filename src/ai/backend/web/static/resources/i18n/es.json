@@ -369,7 +369,8 @@
       "Status": "Estado",
       "StatusOfSelectedHost": "Estado del host seleccionado",
       "used": "usado"
-    }
+    },
+    "SearchByName": "Buscar por nombre"
   },
   "dialog": {
     "ErrorOccurred": "Se ha producido un error",
@@ -782,7 +783,8 @@
     "TypeRegistryNameToDelete": "Escriba el nombre de host del registro que desea eliminar",
     "UpdatingRegistryInfo": "Actualización de la información del registro...",
     "Username": "Nombre de usuario",
-    "UsernameOptional": "Nombre de usuario (opcional)"
+    "UsernameOptional": "Nombre de usuario (opcional)",
+    "ConfirmNoUserName": "Usuario y contraseña no especificados, ¿desea guardar?"
   },
   "resourceGroup": {
     "Active": "Activo",
@@ -963,7 +965,9 @@
       "EnterValidSessionName": "Introduzca un nombre de sesión válido",
       "SessionNameAlreadyExist": "El nombre de la sesión ya existe",
       "SessionNameRequired": "El nombre de la sesión es obligatorio",
-      "SluggedStrings": "Cadenas babosas (>3 caracteres)"
+      "SluggedStrings": "Cadenas babosas (>3 caracteres)",
+      "SessionNameTooLong64": "Introduzca 64 caracteres o menos.",
+      "PleaseFollowSessionNameRule": "Ingrese una combinación de al menos 3 letras, números, '.', '_' y '-'."
     },
     "XRDPconnection": "Conexión RDP",
     "applauncher": {
@@ -1096,7 +1100,12 @@
       "TotalAllocation": "Asignación total",
       "UserResourceLimit": "Límite de recursos de usuario",
       "Version": "Versión",
-      "sessionStillPreparing": "La sesión aún está en preparación. Una vez iniciada la sesión, pulse el icono de la aplicación para iniciarla."
+      "sessionStillPreparing": "La sesión aún está en preparación. Una vez iniciada la sesión, pulse el icono de la aplicación para iniciarla.",
+      "PreOpenPortRangeGuide": "Introduzca varios valores separados por una coma (,) o un espacio.",
+      "preopen": "preabierto",
+      "FolderAliasInvalid": "Sólo se permiten caracteres alfanuméricos, guión bajo (_), barra (/) y guión (-).",
+      "Network": "Red",
+      "Enable": "Permitir"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
