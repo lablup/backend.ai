@@ -357,7 +357,7 @@ container_registry_iv = t.Dict(
         t.Key(""): tx.URL,
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
-        t.Key("password", default=None): t.Null | t.String,
+        t.Key("password", default=None): t.Null | t.String(allow_blank=True),
         t.Key("project", default=None): (
             t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
         ),
@@ -711,6 +711,13 @@ class SharedConfig(AbstractConfig):
         raw_hostname = urllib.parse.quote(hostname, safe="")
         await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
 
+        # Exclude `None` values.
+        unset_password = False
+        if "password" in config_updated and config_updated["password"] is None:
+            # _ = config_updated.pop("password")
+            unset_password = True
+            config_updated["password"] = ""
+
         # Re-add the "accidentally" deleted items
         updates: dict[str, str] = {}
         for key, raw_item in registries.items():
@@ -740,6 +747,9 @@ class SharedConfig(AbstractConfig):
             )
         )
         await self.etcd.put_dict(updates)
+
+        if unset_password:
+            await self.etcd.delete(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}/password")
 
     async def delete_container_registry(self, hostname: str) -> None:
         # Fetch the raw registries data and make it a mutable dict.
