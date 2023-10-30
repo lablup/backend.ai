@@ -587,7 +587,6 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
             )
         )
-
         async with db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.fetchall()
@@ -634,7 +633,6 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
     heuristic_interval_weight = 0.4  # NOTE: Shorter than a half(0.5)
     max_interval = timedelta(hours=1).total_seconds()
     threshold: relativedelta | timedelta
-
     for status, threshold in session_hang_tolerance["threshold"].items():
         try:
             session_status = SessionStatus[status]
