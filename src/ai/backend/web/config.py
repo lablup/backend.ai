@@ -70,6 +70,7 @@ config_iv = t.Dict(
                 t.Key("force_2FA", default=False): t.ToBool(),
                 t.Key("system_SSH_image", default=""): t.String(allow_blank=True),
                 t.Key("directory_based_usage", default=False): t.ToBool(),
+                t.Key("allow_custom_resource_allocation", default=True): t.ToBool(),
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(
