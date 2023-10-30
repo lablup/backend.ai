@@ -406,7 +406,7 @@ async def umount(
     return True
 
 
-def get_first_status_history(arr: list[list[str]], status: str) -> list[str] | None:
+def get_first_status_history_record(arr: list[list[str]], status: str) -> list[str] | None:
     for item in arr:
         if item[0] == status:
             return item
