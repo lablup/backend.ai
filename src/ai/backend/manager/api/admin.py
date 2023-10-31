@@ -8,8 +8,9 @@ import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
+from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphene.validation import DisableIntrospection
-from graphql import parse, validate
+from graphql import Undefined, parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
@@ -164,6 +165,7 @@ def create_app(
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     app["admin.context"] = PrivateContext()
+    set_input_object_type_default_value(Undefined)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql))
