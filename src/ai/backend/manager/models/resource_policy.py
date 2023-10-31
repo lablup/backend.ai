@@ -417,9 +417,9 @@ class UserResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
-    max_vfolder_count = graphene.Int()
+    max_vfolder_count = graphene.Int(description="Added since 24.03.1")
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
-    max_quota_scope_size = BigInt()
+    max_quota_scope_size = BigInt(description="Added since 24.03.1")
 
     @classmethod
     def from_row(
@@ -434,7 +434,6 @@ class UserResourcePolicy(graphene.ObjectType):
             name=row.name,
             created_at=row.created_at,
             max_vfolder_count=row.max_vfolder_count,
-            max_vfolder_size=row.max_quota_scope_size,  # aliased field
             max_quota_scope_size=row.max_quota_scope_size,
         )
 
@@ -492,13 +491,13 @@ class UserResourcePolicy(graphene.ObjectType):
 
 
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int()
-    max_quota_scope_size = BigInt()
+    max_vfolder_count = graphene.Int(description="Added since 24.03.1")
+    max_quota_scope_size = BigInt(description="Added since 24.03.1")
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int()
-    max_quota_scope_size = BigInt()
+    max_vfolder_count = graphene.Int(description="Added since 24.03.1")
+    max_quota_scope_size = BigInt(description="Added since 24.03.1")
 
 
 class CreateUserResourcePolicy(graphene.Mutation):
@@ -595,9 +594,9 @@ class ProjectResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
-    max_vfolder_count = graphene.Int()
+    max_vfolder_count = graphene.Int(description="Added since 24.03.1")
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
-    max_quota_scope_size = BigInt()
+    max_quota_scope_size = BigInt(description="Added since 24.03.1")
 
     @classmethod
     def from_row(
@@ -670,13 +669,13 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
 
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int()
-    max_quota_scope_size = BigInt()
+    max_vfolder_count = graphene.Int(description="Added since 24.03.1")
+    max_quota_scope_size = BigInt(description="Added since 24.03.1")
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int()
-    max_quota_scope_size = BigInt()
+    max_vfolder_count = graphene.Int(description="Added since 24.03.1")
+    max_quota_scope_size = BigInt(description="Added since 24.03.1")
 
 
 class CreateProjectResourcePolicy(graphene.Mutation):
