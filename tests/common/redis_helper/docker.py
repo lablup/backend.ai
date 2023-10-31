@@ -202,7 +202,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
         print(f"{Path.home()=}")
         print("env command:")
         p = await simple_run_cmd(
-            "env",
+            ["env"],
             stdout=asyncio.subprocess.PIPE,
         )
         assert p.stdout is not None
