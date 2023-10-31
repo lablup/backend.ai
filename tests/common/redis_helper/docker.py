@@ -199,6 +199,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
         compose_file = compose_cfg_dir / "redis-cluster.yml"
 
+        print(f"HOME = {os.environ.get('HOME', '???????')!r}")
         async with async_timeout.timeout(30.0):
             cmdargs = [
                 *compose_cmd,
@@ -233,6 +234,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "--format",
                     "json",
                 ],
+                env=os.environ,
                 cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -273,6 +275,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "inspect",
                     *cids,
                 ],
+                env=os.environ,
                 cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -365,6 +368,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "down",
                         "-v",
                     ],
+                    env=os.environ,
                     cwd=compose_cfg_dir,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
