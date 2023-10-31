@@ -233,10 +233,11 @@
       "PreOpenPortRange": "Les ports préouverts sont uniquement disponibles entre 1024 et 65535.",
       "MinMemory": "La capacité de mémoire minimale pour l'environnement d'exécution actuellement sélectionné est de {{taille}}iB.",
       "ModelStorage": "Stockage de modèles",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Entrez plusieurs valeurs séparées par une virgule (,) ou un espace.",
+      "preopen": "préouverture",
+      "Network": "Réseau",
+      "Enable": "Activer",
+      "FolderAliasInvalid": "Seuls les caractères alphanumériques, le trait de soulignement (_), la barre oblique (/) et le tiret (-) sont autorisés."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -303,8 +304,8 @@
       "EnterValidSessionName": "Saisir un nom de session valide",
       "SessionNameAlreadyExist": "Le nom de la session existe déjà",
       "SluggedStrings": "Chaînes de caractères tronquées (>3 chars)",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Veuillez saisir 64 caractères ou moins.",
+      "PleaseFollowSessionNameRule": "Veuillez saisir une combinaison d'au moins 3 lettres, chiffres, '.', '_' et '-'."
     },
     "AlreadyTerminatingSession": "La session est déjà terminée.",
     "NoSessionToDisplay": "Aucune session à afficher",
@@ -670,7 +671,7 @@
     "Used": "Utilisé",
     "Pipeline": "Dossiers du pipeline",
     "DialogDataFolder": "Dossiers dédiés aux pipelines qui sont automatiquement créés lors de la création de pipelines dans FastTrack.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Rechercher par nom"
   },
   "dialog": {
     "warning": {
@@ -897,7 +898,8 @@
     "PleaseSelectOption": "Veuillez sélectionner une option.",
     "RegistrySuccessfullyModified": "Registre modifié avec succès.",
     "ModifyRegistry": "Modifier le registre",
-    "NoRegistryToDisplay": "Aucun registre à afficher"
+    "NoRegistryToDisplay": "Aucun registre à afficher",
+    "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",

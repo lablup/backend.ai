@@ -233,10 +233,11 @@
       "PortsTitleWithRange": "Valore della porta (tra 1024 e 65535)",
       "PrePortConfigWillDisappear": "Tutte le porte preaperture non salvate scompariranno.",
       "StartModelServing": "Avvio del modello di servizio",
-      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
-      "preopen": "__NOT_TRANSLATED__",
-      "Network": "__NOT_TRANSLATED__",
-      "Enable": "__NOT_TRANSLATED__"
+      "PreOpenPortRangeGuide": "Inserisci più valori separati da una virgola (,) o da uno spazio.",
+      "preopen": "preaperto",
+      "Network": "Rete",
+      "Enable": "Abilitare",
+      "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/) e trattino (-)."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -293,8 +294,8 @@
       "SessionNameRequired": "Il nome della sessione è obbligatorio",
       "SluggedStrings": "Stringhe con slugged (>3 caratteri)",
       "SessionNameAlreadyExist": "Il nome della sessione esiste già",
-      "SessionNameTooLong64": "__NOT_TRANSLATED__",
-      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
+      "SessionNameTooLong64": "Inserisci 64 caratteri o meno.",
+      "PleaseFollowSessionNameRule": "Inserisci una combinazione di almeno 3 lettere, numeri, \".\", \"_\" e \"-\"."
     },
     "Interactive": "Interattivo",
     "Batch": "Lotto",
@@ -670,7 +671,7 @@
     "Pipeline": "Cartelle della pipeline",
     "DialogDataFolder": "Cartelle dedicate alle pipeline che vengono create automaticamente quando si creano le pipeline in FastTrack.",
     "DialogModelFolder": "È possibile servire e gestire i modelli.",
-    "SearchByName": "__NOT_TRANSLATED__"
+    "SearchByName": "Ricerca per nome"
   },
   "dialog": {
     "warning": {
@@ -897,7 +898,8 @@
     "PleaseSelectOption": "Seleziona un'opzione.",
     "RegistrySuccessfullyModified": "Registro modificato con successo.",
     "NoRegistryToDisplay": "Nessun registro da visualizzare",
-    "ModifyRegistry": "Modificare il registro"
+    "ModifyRegistry": "Modificare il registro",
+    "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",

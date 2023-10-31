@@ -281,7 +281,7 @@
     "AllowedClientIps": "Allowed client IPs",
     "CommaSeparated": "comma-separated",
     "TryPreferredPort": "Try preferred port",
-    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"SSH Key Download\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
+    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"DOWNLOAD SSH KEY\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
     "SFTPExtraNotification": "It is recommended to delete sessions after they have been used, as there is a limit on the number of sessions. Sessions that are not used for uploading files within a certain period of time may be automatically deleted.",
     "Readmore": "Read More...",
     "Readless": "Read less",
@@ -990,7 +990,8 @@
     "RescanFailed": "Rescan Failed.",
     "NoRegistryToDisplay": "No Registries to display",
     "RegistrySuccessfullyModified": "Registry successfully modified.",
-    "PleaseSelectOption": "Please Select Option"
+    "PleaseSelectOption": "Please Select Option",
+    "ConfirmNoUserName": "User and password not specified, would you like to save?"
   },
   "resourceGroup": {
     "ResourceGroups": "Resource Groups",
