@@ -199,21 +199,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
         compose_file = compose_cfg_dir / "redis-cluster.yml"
 
-        print(f"{Path.home()=}")
-        print("env command:")
-        p = await simple_run_cmd(
-            ["env"],
-            stdout=asyncio.subprocess.PIPE,
-        )
-        assert p.stdout is not None
-        while True:
-            line = await p.stdout.readline()
-            if not line:
-                break
-            print("  " + line.decode().strip())
-        await p.wait()
-
-        print(f"HOME = {os.environ.get('HOME', '???????')!r}")
         async with async_timeout.timeout(30.0):
             cmdargs = [
                 *compose_cmd,
@@ -228,6 +213,8 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cmdargs,
                 env=os.environ,
                 cwd=compose_cfg_dir,
+                # stdout=asyncio.subprocess.DEVNULL,
+                # stderr=asyncio.subprocess.DEVNULL,
             )
             await p.wait()
             assert p.returncode == 0, "Compose cluster creation has failed."
@@ -246,7 +233,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "--format",
                     "json",
                 ],
-                env=os.environ,
                 cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -287,7 +273,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     "inspect",
                     *cids,
                 ],
-                env=os.environ,
                 cwd=compose_cfg_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -380,7 +365,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "down",
                         "-v",
                     ],
-                    env=os.environ,
                     cwd=compose_cfg_dir,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,

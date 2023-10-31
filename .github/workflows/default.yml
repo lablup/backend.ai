@@ -207,7 +207,6 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        echo "HOME=${HOME}"
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
       uses: actions/upload-artifact@v3

@@ -73,8 +73,6 @@ _scripts: Dict[str, str] = {}
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-# DUMMY TEXT
-
 
 class ConnectionNotAvailable(Exception):
     pass
