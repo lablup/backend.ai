@@ -165,9 +165,6 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             max_containers_per_session=row["max_containers_per_session"],
             idle_timeout=row["idle_timeout"],
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
-            max_vfolder_count=0,
-            max_vfolder_size=0,
-            max_quota_scope_size=0,
         )
 
     @classmethod
@@ -297,6 +294,9 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_containers_per_session = graphene.Int(required=True)
     idle_timeout = BigInt(required=True)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -307,6 +307,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_containers_per_session = graphene.Int(required=False)
     idle_timeout = BigInt(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
+    max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
+    max_quota_scope_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
