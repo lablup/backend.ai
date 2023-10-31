@@ -199,6 +199,20 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
         compose_file = compose_cfg_dir / "redis-cluster.yml"
 
+        print(f"{Path.home()=}")
+        print("env command:")
+        p = await simple_run_cmd(
+            "env",
+            stdout=asyncio.subprocess.PIPE,
+        )
+        assert p.stdout is not None
+        while True:
+            line = await p.stdout.readline()
+            if not line:
+                break
+            print("  " + line.decode())
+        await p.wait()
+
         print(f"HOME = {os.environ.get('HOME', '???????')!r}")
         async with async_timeout.timeout(30.0):
             cmdargs = [
