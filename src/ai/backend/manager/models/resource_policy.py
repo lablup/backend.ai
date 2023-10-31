@@ -143,6 +143,10 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     idle_timeout = BigInt()
     allowed_vfolder_hosts = graphene.JSONString()
 
+    max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4")
+    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
+    max_quota_scope_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
+
     @classmethod
     def from_row(
         cls,
@@ -161,6 +165,9 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             max_containers_per_session=row["max_containers_per_session"],
             idle_timeout=row["idle_timeout"],
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
+            max_vfolder_count=0,
+            max_vfolder_size=0,
+            max_quota_scope_size=0,
         )
 
     @classmethod
