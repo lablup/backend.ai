@@ -46,6 +46,7 @@ Alias keys are also URL-quoted in the same way.
        - timezone: "UTC"  # pytz-compatible timezone names (e.g., "Asia/Seoul")
      + api
        - allow-origins: "*"
+       - allow-graphql-schema-introspection: "yes" | "no"  # (default: no)
        + resources
          - group_resource_visibility: "true"  # return group resource status in check-presets
                                               # (default: false)
@@ -320,6 +321,7 @@ _config_defaults: Mapping[str, Any] = {
     },
     "api": {
         "allow-origins": "*",
+        "allow-graphql-schema-introspection": False,
     },
     "redis": config.redis_default_config,
     "docker": {
@@ -408,6 +410,10 @@ shared_config_iv = t.Dict(
         t.Key("api", default=_config_defaults["api"]): t.Dict(
             {
                 t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
+                t.Key(
+                    "allow-graphql-schema-introspection",
+                    default=_config_defaults["api"]["allow-graphql-schema-introspection"],
+                ): t.ToBool,
             }
         ).allow_extra("*"),
         t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
