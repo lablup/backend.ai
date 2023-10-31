@@ -12,7 +12,6 @@ from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from typing import (
-    TYPE_CHECKING,
     Any,
     FrozenSet,
     List,
@@ -32,6 +31,7 @@ from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
 from ai.backend.common.asyncio import current_loop
+from ai.backend.common.auth import PublicKey
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
@@ -76,9 +76,6 @@ from .kube_object import (
     Service,
 )
 from .resources import load_resources, scan_available_resources
-
-if TYPE_CHECKING:
-    from ai.backend.common.auth import PublicKey
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
