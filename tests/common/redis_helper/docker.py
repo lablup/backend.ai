@@ -210,7 +210,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             line = await p.stdout.readline()
             if not line:
                 break
-            print("  " + line.decode())
+            print("  " + line.decode().strip())
         await p.wait()
 
         print(f"HOME = {os.environ.get('HOME', '???????')!r}")
@@ -228,8 +228,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 cmdargs,
                 env=os.environ,
                 cwd=compose_cfg_dir,
-                # stdout=asyncio.subprocess.DEVNULL,
-                # stderr=asyncio.subprocess.DEVNULL,
             )
             await p.wait()
             assert p.returncode == 0, "Compose cluster creation has failed."
