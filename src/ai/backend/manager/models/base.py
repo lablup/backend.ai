@@ -37,6 +37,7 @@ from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
+from graphql import Undefined
 from graphql.language import ast  # pants: no-infer-dep
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
@@ -1036,8 +1037,8 @@ def set_if_set(
     target_key: Optional[str] = None,
 ) -> None:
     v = getattr(src, name)
-    # NOTE: unset optional fields are passed as null.
-    if v is not None:
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
         if callable(clean_func):
             target[target_key or name] = clean_func(v)
         else:
