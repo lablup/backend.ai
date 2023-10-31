@@ -69,8 +69,6 @@ from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
-
     from .gql import GraphQueryContext
     from .user import UserRole
 
@@ -759,14 +757,17 @@ def privileged_query(required_role: UserRole):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
                 raise GenericForbidden("superadmin privilege required")
-            return await func(executor, info, *args, **kwargs)
+            return await func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -792,7 +793,10 @@ def scoped_query(
     def wrap(resolve_func):
         @functools.wraps(resolve_func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
@@ -841,7 +845,7 @@ def scoped_query(
             if kwargs.get("project", None) is not None:
                 kwargs["project"] = group_id
             kwargs[user_key] = user_id
-            return await resolve_func(executor, info, *args, **kwargs)
+            return await resolve_func(root, info, *args, **kwargs)
 
         return wrapped
 
