@@ -1982,7 +1982,7 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         LifecycleEvent.DESTROY,
-                        KernelLifecycleEventReason.FAILED_TO_INITIATE,
+                        KernelLifecycleEventReason.FAILED_TO_CREATE,
                         container_id=ContainerId(cid),
                     )
                     raise AgentError(
