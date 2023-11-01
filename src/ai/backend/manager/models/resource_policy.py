@@ -28,6 +28,7 @@ from .base import (
 )
 from .keypair import keypairs
 from .user import UserRole
+from .utils import deprecation_reason_msg, description_msg
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -55,6 +56,34 @@ __all__: Sequence[str] = (
     "ModifyProjectResourcePolicy",
     "DeleteProjectResourcePolicy",
 )
+
+
+def user_max_vfolder_count(required: bool = False):
+    return graphene.Int(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the number of user vfolders."),
+    )
+
+
+def user_max_quota_scope_size(required: bool = False):
+    return BigInt(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the quota size of user vfolders."),
+    )
+
+
+def project_max_vfolder_count(required: bool = False):
+    return graphene.Int(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the number of project vfolders."),
+    )
+
+
+def project_max_quota_scope_size(required: bool = False):
+    return BigInt(
+        required=required,
+        description=description_msg("24.03.1", "Limitation of the quota size of project vfolders."),
+    )
 
 
 keypair_resource_policies = sa.Table(
@@ -142,6 +171,10 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     max_vfolder_count = graphene.Int(deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.4")
     allowed_vfolder_hosts = graphene.JSONString()
+
+    max_vfolder_count = graphene.Int(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_quota_scope_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
 
     @classmethod
     def from_row(
@@ -294,6 +327,9 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     allowed_vfolder_hosts = graphene.JSONString(required=False)
+    max_vfolder_count = graphene.Int(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_quota_scope_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -306,6 +342,9 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(required=False, deprecation_reason="Deprecated since 23.09.4")
     max_vfolder_size = BigInt(required=False, deprecation_reason="Deprecated since 23.09.4")
     allowed_vfolder_hosts = graphene.JSONString(required=False)
+    max_vfolder_count = graphene.Int(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_quota_scope_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
@@ -417,9 +456,9 @@ class UserResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
-    max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
-    max_vfolder_count = graphene.Int()
-    max_quota_scope_size = BigInt()
+    max_vfolder_count = user_max_vfolder_count()
+    max_quota_scope_size = user_max_quota_scope_size()
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.1"))
 
     @classmethod
     def from_row(
@@ -433,8 +472,8 @@ class UserResourcePolicy(graphene.ObjectType):
             id=f"UserResourcePolicy:{row.name}",
             name=row.name,
             created_at=row.created_at,
-            max_vfolder_size=row.max_vfolder_size,
-            max_quota_scope_size=row.max_vfolder_size,
+            max_vfolder_count=row.max_vfolder_count,
+            max_quota_scope_size=row.max_quota_scope_size,
         )
 
     @classmethod
@@ -491,13 +530,13 @@ class UserResourcePolicy(graphene.ObjectType):
 
 
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = user_max_vfolder_count()
+    max_quota_scope_size = user_max_quota_scope_size()
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = user_max_vfolder_count()
+    max_quota_scope_size = user_max_quota_scope_size()
 
 
 class CreateUserResourcePolicy(graphene.Mutation):
@@ -591,9 +630,9 @@ class ProjectResourcePolicy(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
     created_at = GQLDateTime(required=True)
-    max_vfolder_count = graphene.Int()
-    max_vfolder_size = BigInt()  # aliased field
-    max_quota_scope_size = BigInt()
+    max_vfolder_count = project_max_vfolder_count()
+    max_quota_scope_size = project_max_quota_scope_size()
+    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.1"))
 
     @classmethod
     def from_row(
@@ -665,13 +704,13 @@ class ProjectResourcePolicy(graphene.ObjectType):
 
 
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = project_max_vfolder_count()
+    max_quota_scope_size = project_max_quota_scope_size()
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
-    max_vfolder_count = graphene.Int(required=True)
-    max_quota_scope_size = BigInt(required=True)
+    max_vfolder_count = project_max_vfolder_count()
+    max_quota_scope_size = project_max_quota_scope_size()
 
 
 class CreateProjectResourcePolicy(graphene.Mutation):
