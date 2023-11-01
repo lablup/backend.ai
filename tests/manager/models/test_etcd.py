@@ -79,6 +79,7 @@ async def test_create_container_registry(client: Client, context: GraphQueryCont
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+    print("response:", response)
 
     container_registry = response["data"]["create_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
