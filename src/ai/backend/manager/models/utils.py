@@ -358,3 +358,14 @@ def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
 
 def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
+
+
+def description_msg(version: str, detail: str | None = None):
+    val = f"Added since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val
+
+
+def deprecation_reason_msg(version: str):
+    return f"Deprecated since {version}."
