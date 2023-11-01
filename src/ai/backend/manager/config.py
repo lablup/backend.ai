@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from graphql import Undefined
+
 """
 Configuration Schema on etcd
 ----------------------------
@@ -717,12 +719,9 @@ class SharedConfig(AbstractConfig):
         raw_hostname = urllib.parse.quote(hostname, safe="")
         await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
 
-        # Exclude `None` values.
-        unset_password = False
-        if "password" in config_updated and config_updated["password"] is None:
-            # _ = config_updated.pop("password")
-            unset_password = True
-            config_updated["password"] = ""
+        # Convert `Undefined` values to `None`.
+        if config_updated.get("password") is Undefined:
+            config_updated["password"] = None
 
         # Re-add the "accidentally" deleted items
         updates: dict[str, str] = {}
@@ -753,9 +752,6 @@ class SharedConfig(AbstractConfig):
             )
         )
         await self.etcd.put_dict(updates)
-
-        if unset_password:
-            await self.etcd.delete(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}/password")
 
     async def delete_container_registry(self, hostname: str) -> None:
         # Fetch the raw registries data and make it a mutable dict.

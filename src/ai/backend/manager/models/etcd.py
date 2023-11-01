@@ -165,7 +165,7 @@ class ModifyContainerRegistry(graphene.Mutation):
         # 3. 해당 필드가 null이면 unset 할 것
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
-        # set_if_set(props, input_config, "password")  # None
+        set_if_set(props, input_config, "password")
         input_config["password"] = props.password
         set_if_set(props, input_config, "ssl_verify")
         log.info(
