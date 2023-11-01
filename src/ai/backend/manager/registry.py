@@ -165,6 +165,7 @@ from .models import (
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
+    is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
     sql_json_merge,
@@ -3433,7 +3434,7 @@ async def handle_model_service_status_update(
                     db_sess, route.endpoint_row, latest_routes
                 )
             except Exception as e:
-                if isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001":
+                if is_db_retry_error(e):
                     raise
                 log.exception("failed to communicate with AppProxy endpoint:")
 
@@ -3515,10 +3516,7 @@ async def invoke_session_callback(
                                     db_sess, endpoint, new_routes
                                 )
                             except Exception as e:
-                                if (
-                                    isinstance(e, DBAPIError)
-                                    and getattr(e.orig, "pgcode", None) == "40001"
-                                ):
+                                if is_db_retry_error(e):
                                     raise
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
@@ -3547,10 +3545,7 @@ async def invoke_session_callback(
                                     db_sess, endpoint, new_routes
                                 )
                             except Exception as e:
-                                if (
-                                    isinstance(e, DBAPIError)
-                                    and getattr(e.orig, "pgcode", None) == "40001"
-                                ):
+                                if is_db_retry_error(e):
                                     raise
                                 log.warn("failed to communicate with AppProxy endpoint: {}", str(e))
                         await db_sess.commit()
