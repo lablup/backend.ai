@@ -364,12 +364,15 @@ def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
 
 
-def description_msg(version: str, detail: str | None = None):
+def description_msg(version: str, detail: str | None = None) -> str:
     val = f"Added since {version}."
     if detail:
         val = f"{val} {detail}"
     return val
 
 
-def deprecation_reason_msg(version: str):
-    return f"Deprecated since {version}."
+def deprecation_reason_msg(version: str, detail: str | None = None) -> str:
+    val = f"Deprecated since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val
