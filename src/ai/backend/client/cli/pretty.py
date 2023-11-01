@@ -4,6 +4,7 @@ import functools
 import sys
 import textwrap
 import traceback
+from typing import Sequence
 
 from click import echo, style
 from tqdm import tqdm
@@ -105,6 +106,17 @@ print_fail = functools.partial(print_pretty, status=PrintStatus.FAILED)
 print_warn = functools.partial(print_pretty, status=PrintStatus.WARNING)
 
 
+def _format_gql_path(items: Sequence[str | int]) -> str:
+    pieces = []
+    for item in items:
+        match item:
+            case int():
+                pieces.append(f"[{item}]")
+            case _:
+                pieces.append(f".{str(item)}")
+    return "".join(pieces)[1:]  # strip first dot
+
+
 def format_error(exc: Exception):
     if isinstance(exc, BackendAPIError):
         yield "{0}: {1} {2}\n".format(exc.__class__.__name__, exc.status, exc.reason)
@@ -132,7 +144,11 @@ def format_error(exc: Exception):
         else:
             if exc.data["type"].endswith("/graphql-error"):
                 yield "\n\u279c Message:\n"
-                yield from (f"{err_item['message']}\n" for err_item in exc.data.get("data", []))
+                for err_item in exc.data.get("data", []):
+                    yield f"{err_item['message']}"
+                    if err_path := err_item.get("path"):
+                        yield f" (path: {_format_gql_path(err_path)})"
+                    yield "\n"
             else:
                 other_details = exc.data.get("msg", None)
                 if other_details:
