@@ -192,7 +192,7 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Run halfstack etcd container
       run: |
-        docker-compose -f docker-compose.halfstack-main.yml run -d backendai-half-etcd
+        docker-compose -f docker-compose.halfstack-main.yml run -d --service-ports backendai-half-etcd
         docker ps
     - name: Test
       timeout-minutes: 15
