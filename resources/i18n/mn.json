@@ -233,11 +233,10 @@
       "PreOpenPortRange": "Урьдчилан нээх портуудыг зөвхөн 1024-ээс 65535 хүртэл ашиглах боломжтой.",
       "MinMemory": "Одоогоор сонгогдсон ажиллах орчны орчны хамгийн бага санах ойн багтаамж нь {{size}}iB байна.",
       "ModelStorage": "Загвар хадгалах",
-      "PreOpenPortRangeGuide": "Таслал (,) эсвэл хоосон зайгаар тусгаарласан олон утгыг оруулна уу.",
-      "preopen": "урьдчилан нээх",
-      "Network": "Сүлжээ",
-      "Enable": "Идэвхжүүлэх",
-      "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), зураас (-) ашиглахыг зөвшөөрнө."
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -304,8 +303,8 @@
       "EnterValidSessionName": "Хүчинтэй сессийн нэрийг оруулна уу",
       "SessionNameAlreadyExist": "Сешн нэр аль хэдийн байна",
       "SluggedStrings": "Залгисан мөрүүд (>3 тэмдэгт)",
-      "SessionNameTooLong64": "64 ба түүнээс бага тэмдэгт оруулна уу.",
-      "PleaseFollowSessionNameRule": "Дор хаяж 3 үсэг, тоо, '.', '_', '-' гэсэн хослолыг оруулна уу."
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "AlreadyTerminatingSession": "Сессийг аль хэдийн дуусгаж байна.",
     "NoSessionToDisplay": "Харуулах сесс алга",
@@ -671,7 +670,7 @@
     "Used": "Ашигласан",
     "Pipeline": "Дамжуулах хоолойн хавтас",
     "DialogDataFolder": "FastTrack-д дамжуулах шугам үүсгэх үед автоматаар үүсгэгддэг дамжуулах хоолойд зориулагдсан фолдерууд.",
-    "SearchByName": "Нэрээр нь хайх"
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
