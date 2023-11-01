@@ -160,13 +160,9 @@ class ModifyContainerRegistry(graphene.Mutation):
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
         input_config: Dict[str, Any] = {}
-        # 1. 해당 필드 자체가 없으면 건드리지 말 것
-        # 2. 해당 필드가 ""면 에러 나지 않고 ""로 덮어쓸 것
-        # 3. 해당 필드가 null이면 unset 할 것
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
-        input_config["password"] = props.password
         set_if_set(props, input_config, "ssl_verify")
         log.info(
             "ETCD.MODIFY_CONTAINER_REGISTRY (ak:{}, hostname:{}, config:{})",
