@@ -2,8 +2,9 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.client.session import APIConfig, Session
-from ai.backend.manager.models.gql import Mutations, Queries
+from ai.backend.common.types import HostPortPair
+from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 
 CONTAINER_REGISTRY_FIELDS = """
     container_registry {
@@ -19,24 +20,44 @@ CONTAINER_REGISTRY_FIELDS = """
     }
 """
 
-SCHEMA = Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
+
+@pytest.fixture(scope="module")
+def client() -> Client:
+    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
 
 
-def _admin_session():
-    api_config = APIConfig(
-        endpoint="http://127.0.0.1:8091",
-        endpoint_type="api",
-        access_key="AKIAIOSFODNN7EXAMPLE",
-        secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-        skip_sslcert_validation=True,
+@pytest.fixture(scope="module")
+def context() -> GraphQueryContext:
+    shared_config = SharedConfig(
+        etcd_addr=HostPortPair("127.0.0.1", 8121),
+        etcd_user="",
+        etcd_password="",
+        namespace="local",
     )
-    return Session(config=api_config)
+    return GraphQueryContext(
+        schema=None,  # type: ignore
+        dataloader_manager=None,  # type: ignore
+        local_config=None,  # type: ignore
+        shared_config=shared_config,  # type: ignore
+        etcd=None,  # type: ignore
+        user={"domain": "default", "role": "superadmin"},
+        access_key="AKIAIOSFODNN7EXAMPLE",
+        db=None,  # type: ignore
+        redis_stat=None,  # type: ignore
+        redis_image=None,  # type: ignore
+        redis_live=None,  # type: ignore
+        manager_status=None,  # type: ignore
+        known_slot_types=None,  # type: ignore
+        background_task_manager=None,  # type: ignore
+        storage_manager=None,  # type: ignore
+        registry=None,  # type: ignore
+        idle_checker_host=None,  # type: ignore
+    )
 
 
 @pytest.mark.dependency()
 @pytest.mark.asyncio
-async def test_create_container_registry():
-    client = Client(SCHEMA)
+async def test_create_container_registry(client: Client, context: GraphQueryContext):
     query = """
         mutation CreateContainerRegistry($hostname: String!, $props: CreateContainerRegistryInput!) {
             create_container_registry(hostname: $hostname, props: $props) {
@@ -57,29 +78,23 @@ async def test_create_container_registry():
         },
     }
 
-    context = {}  # info.context
     response = await client.execute_async(query, variables=variables, context_value=context)
-    print(response)  # {'data': {'create_container_registry': {'container_registry': None}}}
-    assert response is None
 
-    return
-
-    with _admin_session() as sess:
-        response = sess.Admin.query(query=query, variables=variables)
-        container_registry = response["create_container_registry"]["container_registry"]
-        assert container_registry["hostname"] == "cr.example.com"
-        assert container_registry["config"] == {
-            "url": "http://cr.example.com",
-            "type": "harbor2",
-            "project": ["default"],
-            "username": "username",
-            "password": "*****",
-            "ssl_verify": False,
-        }
+    container_registry = response["data"]["create_container_registry"]["container_registry"]
+    assert container_registry["hostname"] == "cr.example.com"
+    assert container_registry["config"] == {
+        "url": "http://cr.example.com",
+        "type": "harbor2",
+        "project": ["default"],
+        "username": "username",
+        "password": "*****",
+        "ssl_verify": False,
+    }
 
 
 @pytest.mark.dependency(depends=["test_create_container_registry"])
-def test_modify_container_registry():
+@pytest.mark.asyncio
+async def test_modify_container_registry(client: Client, context: GraphQueryContext):
     query = """
         mutation ModifyContainerRegistry($hostname: String!, $props: ModifyContainerRegistryInput!) {
             modify_container_registry(hostname: $hostname, props: $props) {
@@ -95,23 +110,21 @@ def test_modify_container_registry():
         },
     }
 
-    # response = CLIENT.execute(query, variables=variables)
-    # print(response)  # {'data': {'modify_container_registry': {'container_registry': None}}}
+    response = await client.execute_async(query, variables=variables, context_value=context)
 
-    # assert response["config"]["url"] != "http://cr.example.com"
-
-    with _admin_session() as sess:
-        response = sess.Admin.query(query=query, variables=variables)
-        container_registry = response["modify_container_registry"]["container_registry"]
-        assert container_registry["config"]["url"] == "http://cr.example.com"
-        assert container_registry["config"]["type"] == "harbor2"
-        assert container_registry["config"]["project"] == ["default"]
-        assert container_registry["config"]["username"] == "username2"
-        assert container_registry["config"]["ssl_verify"] is False
+    container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["type"] == "harbor2"
+    assert container_registry["config"]["project"] == ["default"]  # assert None == ['default']
+    assert container_registry["config"]["username"] == "username2"
+    assert container_registry["config"]["ssl_verify"] is False
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry"])
-def test_modify_container_registry_allows_empty_string():
+@pytest.mark.asyncio
+async def test_modify_container_registry_allows_empty_string(
+    client: Client, context: GraphQueryContext
+):
     query = """
         mutation ModifyContainerRegistry($hostname: String!, $props: ModifyContainerRegistryInput!) {
             modify_container_registry(hostname: $hostname, props: $props) {
@@ -127,19 +140,22 @@ def test_modify_container_registry_allows_empty_string():
         },
     }
 
-    with _admin_session() as sess:
-        response = sess.Admin.query(query=query, variables=variables)
-        container_registry = response["modify_container_registry"]["container_registry"]
-        assert container_registry["config"]["url"] == "http://cr.example.com"
-        assert container_registry["config"]["type"] == "harbor2"
-        assert container_registry["config"]["project"] == ["default"]
-        # assert container_registry["config"]["username"] == "username2"
-        assert container_registry["config"]["password"] == "*****"
-        assert container_registry["config"]["ssl_verify"] is False
+    response = await client.execute_async(query, variables=variables, context_value=context)
+
+    container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["type"] == "harbor2"
+    assert container_registry["config"]["project"] == ["default"]
+    # assert container_registry["config"]["username"] == "username2"
+    assert container_registry["config"]["password"] == "*****"
+    assert container_registry["config"]["ssl_verify"] is False
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
-def test_modify_container_registry_allows_null_for_unset():
+@pytest.mark.asyncio
+async def test_modify_container_registry_allows_null_for_unset(
+    client: Client, context: GraphQueryContext
+):
     query = """
         mutation ModifyContainerRegistry($hostname: String!, $props: ModifyContainerRegistryInput!) {
             modify_container_registry(hostname: $hostname, props: $props) {
@@ -155,19 +171,20 @@ def test_modify_container_registry_allows_null_for_unset():
         },
     }
 
-    with _admin_session() as sess:
-        response = sess.Admin.query(query=query, variables=variables)
-        container_registry = response["modify_container_registry"]["container_registry"]
-        assert container_registry["config"]["url"] == "http://cr.example.com"
-        assert container_registry["config"]["type"] == "harbor2"
-        assert container_registry["config"]["project"] == ["default"]
-        # assert container_registry["config"]["username"] == "username2"
-        assert container_registry["config"]["password"] is None
-        assert container_registry["config"]["ssl_verify"] is False
+    response = await client.execute_async(query, variables=variables, context_value=context)
+
+    container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["type"] == "harbor2"
+    assert container_registry["config"]["project"] == ["default"]
+    # assert container_registry["config"]["username"] == "username2"
+    assert container_registry["config"]["password"] is None
+    assert container_registry["config"]["ssl_verify"] is False
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_null_for_unset"])
-def test_delete_container_registry():
+@pytest.mark.asyncio
+async def test_delete_container_registry(client: Client, context: GraphQueryContext):
     query = """
         mutation DeleteContainerRegistry($hostname: String!) {
             delete_container_registry(hostname: $hostname) {
@@ -176,7 +193,11 @@ def test_delete_container_registry():
         }
     """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    with _admin_session() as sess:
-        response = sess.Admin.query(query=query, variables={"hostname": "cr.example.com"})
-        container_registry = response["delete_container_registry"]["container_registry"]
-        assert container_registry["hostname"] == "cr.example.com"
+    variables = {
+        "hostname": "cr.example.com",
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+
+    container_registry = response["data"]["delete_container_registry"]["container_registry"]
+    assert container_registry["hostname"] == "cr.example.com"
