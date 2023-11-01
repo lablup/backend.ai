@@ -191,7 +191,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Run halfstack containers
-      run: docker-compose -f docker-compose.halfstack.current.yml up
+      run: docker-compose -f docker-compose.halfstack-main.yml up
     - name: Test
       timeout-minutes: 15
       run: |
