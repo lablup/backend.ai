@@ -717,18 +717,14 @@ class SharedConfig(AbstractConfig):
         raw_hostname = urllib.parse.quote(hostname, safe="")
         await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
 
-        log.warning("modify() original_item.project: {}", original_item.get("project"))  # type: ignore
-        log.warning("modify() config_updated.project: {}", config_updated.get("project"))
         # Convert `Undefined` values to `None`.
         # if config_updated.get("project") is Undefined:
         if config_updated.get("project") is None:
             # _ = config_updated.pop("project")
             config_updated["project"] = original_item["project"]  # type: ignore
         if config_updated.get("password") is Undefined:
-            # config_updated["password"] = None
-            config_updated["password"] = original_item["password"]  # type: ignore
-        log.warning("modify_container_registry(): {}", original_item)  # noqa
-        log.warning("modify_container_registry(): {}", config_updated)  # noqa
+            config_updated["password"] = None
+            # config_updated["password"] = original_item["password"]  # type: ignore
 
         # Re-add the "accidentally" deleted items
         updates: dict[str, str] = {}

@@ -29,7 +29,7 @@ def client() -> Client:
 @pytest.fixture(scope="module")
 def context() -> GraphQueryContext:
     shared_config = SharedConfig(
-        etcd_addr=HostPortPair("0.0.0.0", 8120),
+        etcd_addr=HostPortPair("0.0.0.0", 8121),
         etcd_user="",
         etcd_password="",
         namespace="local",
@@ -79,8 +79,6 @@ async def test_create_container_registry(client: Client, context: GraphQueryCont
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-    print("response:", response)
-
     container_registry = response["data"]["create_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"] == {
@@ -112,7 +110,6 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "harbor2"
@@ -142,7 +139,6 @@ async def test_modify_container_registry_allows_empty_string(
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "harbor2"
@@ -173,7 +169,6 @@ async def test_modify_container_registry_allows_null_for_unset(
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "harbor2"
@@ -199,6 +194,5 @@ async def test_delete_container_registry(client: Client, context: GraphQueryCont
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-
     container_registry = response["data"]["delete_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
