@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 23.09.4 (2023-11-01)
+
+### Features
+* Add a `allow_app_download_panel` config to webserver to show/hide the webui app download panel on the summary page. ([#1664](https://github.com/lablup/backend.ai/issues/1664))
+* Add a `allow_custom_resource_allocation` config to webserver to show/hide the custom allocation on the session launcher. ([#1666](https://github.com/lablup/backend.ai/issues/1666))
+
+### Improvements
+* Upgrade Graphene and GraphQL core (v2 -> v3) for better support of Relay, security rules, and other improvements ([#1632](https://github.com/lablup/backend.ai/issues/1632))
+* Use the explicit `graphql.Undefined` value to fill the unspecified fields of GraphQL mutation input objects ([#1674](https://github.com/lablup/backend.ai/issues/1674))
+
+### Fixes
+* Use "m" as the default suffix if not specified in the resource slots when creating sessions via the client CLI ([#1518](https://github.com/lablup/backend.ai/issues/1518))
+* Lower limit of maximum available characters to name of model service to fix model service session refuses to be created when service name is longer than 28 characters ([#1642](https://github.com/lablup/backend.ai/issues/1642))
+* Fix symbolic link loop error of vfolder ([#1665](https://github.com/lablup/backend.ai/issues/1665))
+* Fix `execute_with_retry()` not retrying when DB commit has failed due to incorrect exception handling ([#1667](https://github.com/lablup/backend.ai/issues/1667))
+* Update the parameter of session-template update API to follow-up change of session-template create API. ([#1668](https://github.com/lablup/backend.ai/issues/1668))
+
+
 ## 23.09.3 (2023-10-27)
 
 ### Fixes
