@@ -233,11 +233,10 @@
       "PrePortConfigWillDisappear": "任何未保存的预打开端口都将消失。",
       "StartModelServing": "开始模型服务",
       "ModelStorage": "模型存储",
-      "PreOpenPortRangeGuide": "您可以輸入多個值，以逗號（,）或空格分隔。",
-      "preopen": "預開放埠",
-      "Network": "網路",
-      "Enable": "啟用",
-      "FolderAliasInvalid": "只能輸入大小寫字母、數字、底線 (_)、斜線 (/) 和破折號 (-)。"
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -294,8 +293,8 @@
       "SessionNameRequired": "会话名称为必填项",
       "SluggedStrings": "多字符串（>3 字符）",
       "SessionNameAlreadyExist": "会话名称已存在",
-      "SessionNameTooLong64": "請輸入不超過 64 個字元。",
-      "PleaseFollowSessionNameRule": "請輸入至少 3 個字母、數字、「.」、「_」和「-」的組合字元。"
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "交互式",
     "Batch": "批次",
@@ -671,7 +670,7 @@
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
     "DialogModelFolder": "您可以服务和管理模型。",
-    "SearchByName": "按名稱搜尋"
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
@@ -898,8 +897,7 @@
     "PleaseSelectOption": "請選擇一個選項。",
     "RegistrySuccessfullyModified": "注册表已成功修改。",
     "NoRegistryToDisplay": "无注册表显示",
-    "ModifyRegistry": "修改注册表",
-    "ConfirmNoUserName": "未指定用户和密码，要保存吗？"
+    "ModifyRegistry": "修改注册表"
   },
   "resourceGroup": {
     "ResourceGroups": "資源組",

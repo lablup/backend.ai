@@ -233,11 +233,10 @@
       "PortsTitleWithRange": "Wartość portu (między 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Wszystkie niezapisane wcześniej otwarte porty zostaną usunięte.",
       "StartModelServing": "Rozpoczęcie obsługi modelu",
-      "PreOpenPortRangeGuide": "Wprowadź wiele wartości oddzielonych przecinkiem (,) lub spacją.",
-      "preopen": "wstępnie otwarte",
-      "Network": "Sieć",
-      "Enable": "Włączać",
-      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-)."
+      "PreOpenPortRangeGuide": "__NOT_TRANSLATED__",
+      "preopen": "__NOT_TRANSLATED__",
+      "Network": "__NOT_TRANSLATED__",
+      "Enable": "__NOT_TRANSLATED__"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -294,8 +293,8 @@
       "SessionNameRequired": "Nazwa sesji jest wymagana",
       "SluggedStrings": "Ucięte ciągi znaków (>3 znaki)",
       "SessionNameAlreadyExist": "Nazwa sesji już istnieje",
-      "SessionNameTooLong64": "Wprowadź maksymalnie 64 znaki.",
-      "PleaseFollowSessionNameRule": "Wprowadź kombinację co najmniej 3 liter, cyfr, „.”, „_” i „-”."
+      "SessionNameTooLong64": "__NOT_TRANSLATED__",
+      "PleaseFollowSessionNameRule": "__NOT_TRANSLATED__"
     },
     "Interactive": "Interaktywny",
     "Batch": "Partia",
@@ -671,7 +670,7 @@
     "Pipeline": "Foldery rurociągów",
     "DialogDataFolder": "Dedykowane potokom foldery, które są automatycznie tworzone podczas tworzenia potoków w FastTrack.",
     "DialogModelFolder": "Możesz obsługiwać modele i zarządzać nimi.",
-    "SearchByName": "Szukaj według nazwy"
+    "SearchByName": "__NOT_TRANSLATED__"
   },
   "dialog": {
     "warning": {
@@ -898,8 +897,7 @@
     "PleaseSelectOption": "Proszę wybrać jedną opcję.",
     "RegistrySuccessfullyModified": "Rejestr został pomyślnie zmodyfikowany.",
     "NoRegistryToDisplay": "Brak rejestrów do wyświetlenia",
-    "ModifyRegistry": "Modyfikacja rejestru",
-    "ConfirmNoUserName": "Użytkownik i hasło nie zostały określone, czy chcesz zapisać?"
+    "ModifyRegistry": "Modyfikacja rejestru"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupy zasobów",
