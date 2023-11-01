@@ -28,7 +28,12 @@ python_distribution(
         description="Backend.AI WebUI Host",
         license="LGPLv3",
     ),
-    entry_points={},
+    entry_points={
+        "backendai_cli_v10": {
+            "web": "ai.backend.web.cli:main",
+            "web.start-server": "ai.backend.web.server:main",
+        },
+    },
     generate_setup=True,
     tags=["wheel"],
 )

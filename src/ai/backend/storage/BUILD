@@ -25,7 +25,12 @@ python_distribution(
         description="Backend.AI Storage Proxy",
         license="LGPLv3",
     ),
-    entry_points={},
+    entry_points={
+        "backendai_cli_v10": {
+            "storage": "ai.backend.storage.cli:main",
+            "storage.start-server": "ai.backend.storage.server:main",
+        },
+    },
     generate_setup=True,
     tags=["wheel"],
 )

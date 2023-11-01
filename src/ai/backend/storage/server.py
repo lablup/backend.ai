@@ -243,6 +243,7 @@ def main(
     log_level: str,
     debug: bool = False,
 ) -> int:
+    """Start the storage-proxy service as a foreground process."""
     try:
         local_config = load_local_config(config_path, debug=debug)
     except ConfigurationError:

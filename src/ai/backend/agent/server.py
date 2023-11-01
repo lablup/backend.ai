@@ -877,6 +877,7 @@ def main(
     log_level: str,
     debug: bool = False,
 ) -> int:
+    """Start the agent service as a foreground process."""
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
