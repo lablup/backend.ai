@@ -1,5 +1,9 @@
 python_sources(
     name="src",
+    sources=[
+        "*.py",
+        "!watcher.py",
+    ],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/agent/docker:src",  # not auto-inferred
@@ -8,6 +12,19 @@ python_sources(
         "src/ai/backend/helpers:src",
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
+        "!./__init__.py:src-watcher",
+    ],
+)
+python_sources(
+    name="src-watcher",
+    sources=[
+        "__init__.py",
+        "watcher.py",
+    ],
+    dependencies=[
+        ":resources",
+        # Exclude transitive dependencies of the agent itself!
+        "!./__init__.py:src",
     ],
 )
 
@@ -26,17 +43,11 @@ visibility_private_component(
     ],
 )
 
-python_requirement(
-    name="kernel-support",
-    requirements=[],
-)
-
 python_distribution(
     name="dist",
     dependencies=[
         ":src",
         "src/ai/backend/kernel:src",
-        ":kernel-support",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -60,6 +71,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        # Bundle cuda-open and mock accelerator plugins
         "//src/ai/backend/accelerator/cuda_open:lib",
         "//src/ai/backend/accelerator/cuda_open:buildscript",
         "//src/ai/backend/accelerator/mock:lib",
@@ -71,7 +83,7 @@ pex_binary(
     name="pex-watcher",
     entry_point="watcher.py",
     dependencies=[
-        ":src",
+        ":src-watcher",
         "!!stubs/trafaret:stubs",
     ],
 )
