@@ -190,8 +190,10 @@ jobs:
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Run halfstack containers
-      run: docker-compose -f docker-compose.halfstack-main.yml run -d backendai-half-etcd
+    - name: Run halfstack containers and manager
+      run: |
+        docker-compose -f docker-compose.halfstack-main.yml up -d
+        ./backend.ai mgr start-server --debug &
     - name: Test
       timeout-minutes: 15
       run: |
