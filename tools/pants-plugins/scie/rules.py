@@ -71,7 +71,6 @@ class ScieFieldSet(PackageFieldSet, RunFieldSet):
     lift: ScieLiftSourceField
 
 
-@rule_helper
 async def _get_interpreter_config(targets: Targets) -> Interpreter:
     # Get the interpreter_constraints for the Pex to determine which version of the Python Standalone to use
     constraints = await Get(

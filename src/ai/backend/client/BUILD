@@ -38,12 +38,10 @@ python_distribution(
 
 pex_binary(
     name="pex",
-    entry_point="ai.backend.client.cli.main:main",
-    execution_mode="venv",
+    entry_point="ai.backend.cli.__main__",
     dependencies=[
         ":src",
-        "//src/ai/backend/cli:src",
-        "!!stubs/trafaret:stubs",
+        ":buildscript",
     ],
 )
 
@@ -53,7 +51,7 @@ scie_binary(
 )
 
 resource(name="version", source="VERSION")
-
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[
