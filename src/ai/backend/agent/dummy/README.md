@@ -11,39 +11,5 @@ dummy agents do not run `sync_container_lifecycles()`.
 Setup the config file of dummy agent and run. You can check agent's `sample.toml`.
 You **should** set `agent.mode` value to `"dummy"` first.
 
-### Example of dummy compute device settings.
-1. cuda.device
-```
-...
-
-[dummy.agent.device-plugins]
-devices = [
-    { device-id = "device-id", device-name = "cuda", allocation-mode = "discrete" }
-]
-
-[dummy.agent.device-plugins.metadata]
-display-unit = "cuda-device"
-display-icon = "cuda-device"
-human-readable-name = "Cuda device"
-number-format = {}
-
-...
-```
-
-2. cuda.shares
-```
-...
-
-[dummy.agent.device-plugins]
-devices = [
-    { device-id = "device-id", device-name = "cuda", allocation-mode = "fractional" }
-]
-
-[dummy.agent.device-plugins.metadata]
-display-unit = "cuda-shares"
-display-icon = "cuda-shares"
-human-readable-name = "Cuda shares"
-number-format = {}
-
-...
-```
+### How to set compute devices.
+Dummy agents can use mock accelerators to set up heterogeneous computing devices, similar to how they do with *regular* agents. For more information, see `src/ai/backend/accelerator/mock`.
