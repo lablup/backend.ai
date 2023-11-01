@@ -28,24 +28,6 @@ dummy_local_config = t.Dict(
     {
         t.Key("agent"): t.Dict(
             {
-                t.Key("device-plugins", default=None): t.Null | t.Dict(
-                    {
-                        t.Key("devices"): t.List(dummy_device_config),
-                        t.Key("metadata"): t.Dict(
-                            {
-                                t.Key("display-unit"): t.String(),
-                                t.Key("display-icon"): t.String(),
-                                t.Key("number-format"): t.Dict(
-                                    {
-                                        t.Key("binary", default=False): t.ToBool(),
-                                        t.Key("round-length", default=0): t.ToInt(),
-                                    }
-                                ),
-                                t.Key("human-readable-name", default=None): t.Null | t.String(),
-                            }
-                        ),
-                    }
-                ),
                 t.Key("intrinsic"): t.Dict(
                     {
                         t.Key("cpu"): t.Dict(

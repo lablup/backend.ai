@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from typing import Any, Mapping, MutableMapping, Optional
+from typing import Any, Mapping, MutableMapping
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
@@ -9,10 +9,9 @@ from ai.backend.common.types import DeviceName, SlotName
 from ..exception import InitializationError
 from ..resources import (
     AbstractComputePlugin,
-    BasePluginContext,
+    ComputePluginContext,
     known_slot_types,
 )
-from .compute_plugin import DummyComputePlugin
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -32,7 +31,7 @@ async def load_resources(
     # Initialize intrinsic plugins by ourselves.
     from .intrinsic import CPUPlugin, MemoryPlugin
 
-    compute_plugin_ctx = DummyComputePluginContext(
+    compute_plugin_ctx = ComputePluginContext(
         etcd,
         local_config,
     )
@@ -98,33 +97,3 @@ async def scan_available_resources(
     log.info("Slot types: {!r}", known_slot_types)
 
     return slots
-
-
-class DummyComputePluginContext(BasePluginContext[DummyComputePlugin]):
-    plugin_group = "backendai_dummy_accelerator_v21"
-
-    async def init(
-        self,
-        context: Any = None,
-        allowlist: Optional[set] = None,
-        blocklist: Optional[set] = None,
-    ) -> None:
-        device_plugins: dict[str, Any] | None = self.local_config["dummy"]["agent"].get(
-            "device-plugins"
-        )
-        if device_plugins is None:
-            return
-        devices: list[dict[str, Any]] = device_plugins["devices"]
-        for dev in devices:
-            dev_name = dev["device-name"]
-            plugin_instance = DummyComputePlugin(
-                plugin_config={},
-                local_config=self.local_config,
-                key=dev_name,
-                allocation_mode=dev["allocation-mode"],
-            )
-            await plugin_instance.init(context=context)
-            self.plugins[dev_name] = plugin_instance
-
-    def attach_intrinsic_device(self, plugin: DummyComputePlugin) -> None:
-        self.plugins[plugin.key] = plugin
