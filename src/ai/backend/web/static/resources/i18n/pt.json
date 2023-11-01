@@ -232,7 +232,12 @@
       "PortsTitleWithRange": "Valor da porta (entre 1024 ~ 65535)",
       "PrePortConfigWillDisappear": "Quaisquer portas pré-abertas não guardadas desaparecerão.",
       "StartModelServing": "Iniciar modelo de serviço",
-      "ModelStorage": "Modelo de armazenamento"
+      "ModelStorage": "Modelo de armazenamento",
+      "PreOpenPortRangeGuide": "Insira vários valores separados por vírgula (,) ou espaço.",
+      "preopen": "pré-abrir",
+      "Network": "Rede",
+      "Enable": "Habilitar",
+      "FolderAliasInvalid": "Somente caracteres alfanuméricos, sublinhado (_), barra (/) e traço (-) são permitidos."
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -288,7 +293,9 @@
       "EnterValidSessionName": "Introduzir um nome de sessão válido",
       "SessionNameRequired": "O nome da sessão é obrigatório",
       "SluggedStrings": "Cadeias de caracteres com slugged (>3 caracteres)",
-      "SessionNameAlreadyExist": "O nome da sessão já existe"
+      "SessionNameAlreadyExist": "O nome da sessão já existe",
+      "SessionNameTooLong64": "Insira 64 caracteres ou menos.",
+      "PleaseFollowSessionNameRule": "Insira uma combinação de pelo menos 3 letras, números, '.', '_' e '-'."
     },
     "Interactive": "Interativo",
     "Batch": "Lote",
@@ -369,7 +376,6 @@
     "DeleteAll": "Apagar tudo",
     "Update": "Atualizar",
     "Delete": "Excluir",
-    "Dismiss": "Liberar",
     "DismissAndProceed": "Dispensar e prosseguir",
     "Close": "Perto",
     "Confirm": "confirme",
@@ -664,7 +670,8 @@
     },
     "Pipeline": "Pastas de pipelines",
     "DialogDataFolder": "Pastas dedicadas ao pipeline que são criadas automaticamente ao criar pipelines no FastTrack.",
-    "DialogModelFolder": "Pode servir e gerir modelos."
+    "DialogModelFolder": "Pode servir e gerir modelos.",
+    "SearchByName": "Procura por nome"
   },
   "dialog": {
     "warning": {
@@ -891,7 +898,8 @@
     "PleaseSelectOption": "Por favor selecione uma opção.",
     "RegistrySuccessfullyModified": "Registo modificado com sucesso.",
     "NoRegistryToDisplay": "Não há registos a apresentar",
-    "ModifyRegistry": "Modificar o registo"
+    "ModifyRegistry": "Modificar o registo",
+    "ConfirmNoUserName": "Utilizador e palavra-passe não especificados, pretende guardar?"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupos de Recursos",

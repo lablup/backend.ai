@@ -600,14 +600,12 @@ class CreateUser(graphene.Mutation):
 
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
-                graph_ctx.schema.get_type("KeyPairInput").create_container(
-                    {
-                        "is_active": _status == UserStatus.ACTIVE,
-                        "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                        "resource_policy": "default",
-                        "rate_limit": 10000,
-                    }
-                ),
+                {
+                    "is_active": _status == UserStatus.ACTIVE,
+                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                    "resource_policy": "default",
+                    "rate_limit": 10000,
+                },
             )
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,
@@ -1029,7 +1027,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolder_permissions, vfolders
 
         async with engine.begin_session() as conn:
             await conn.execute(
@@ -1044,7 +1042,7 @@ class PurgeUser(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            deleted_count = await initiate_vfolder_removal(
+            await initiate_vfolder_purge(
                 engine,
                 [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
@@ -1053,6 +1051,7 @@ class PurgeUser(graphene.Mutation):
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
             raise
+        deleted_count = len(target_vfs)
         if deleted_count > 0:
             log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
         return deleted_count

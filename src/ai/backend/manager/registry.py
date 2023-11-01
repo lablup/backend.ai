@@ -50,7 +50,6 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -61,14 +60,14 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
-    KernelHealthCheckFailedEvent,
-    KernelHealthyEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
+    ModelServiceStatusEvent,
+    RouteCreatedEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
@@ -98,6 +97,7 @@ from ai.backend.common.types import (
     ImageAlias,
     KernelEnqueueingConfig,
     KernelId,
+    ModelServiceStatus,
     RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
@@ -108,6 +108,7 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
+from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (
     BackendError,
@@ -215,6 +216,7 @@ class AgentRegistry:
         redis_stat: RedisConnectionInfo,
         redis_live: RedisConnectionInfo,
         redis_image: RedisConnectionInfo,
+        redis_stream: RedisConnectionInfo,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         storage_manager: StorageSessionManager,
@@ -232,6 +234,7 @@ class AgentRegistry:
         self.redis_stat = redis_stat
         self.redis_live = redis_live
         self.redis_image = redis_image
+        self.redis_stream = redis_stream
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.storage_manager = storage_manager
@@ -293,14 +296,9 @@ class AgentRegistry:
             name="api.session.kterm",
         )
         evd.consume(
-            KernelHealthCheckFailedEvent,
+            ModelServiceStatusEvent,
             self,
-            handle_kernel_health_check_result,
-        )
-        evd.consume(
-            KernelHealthyEvent,
-            self,
-            handle_kernel_health_check_result,
+            handle_model_service_status_update,
         )
         evd.consume(
             SessionTerminatingEvent,
@@ -322,6 +320,7 @@ class AgentRegistry:
         evd.consume(AgentStartedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
+        evd.consume(RouteCreatedEvent, self, handle_route_creation)
 
         # action-trigerring events
         evd.consume(DoSyncKernelLogsEvent, self, handle_kernel_log, name="api.session.syncklog")
@@ -405,8 +404,7 @@ class AgentRegistry:
         starts_at_timestamp: Optional[str] = None,
         tag: Optional[str] = None,
         callback_url: Optional[yarl.URL] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        traffic_ratio: Optional[float] = None,
+        route_id: Optional[uuid.UUID] = None,
         sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
         log.debug("create_session():")
@@ -564,8 +562,7 @@ class AgentRegistry:
                         dependency_sessions=[SessionId(d) for d in dependencies],
                         callback_url=callback_url,
                         public_sgroup_only=public_sgroup_only,
-                        endpoint_id=endpoint_id,
-                        traffic_ratio=traffic_ratio,
+                        route_id=route_id,
                         sudo_session_enabled=sudo_session_enabled,
                     )
                 ),
@@ -863,8 +860,7 @@ class AgentRegistry:
         agent_list: Optional[Sequence[str]] = None,
         dependency_sessions: Optional[Sequence[SessionId]] = None,
         callback_url: Optional[URL] = None,
-        endpoint_id: Optional[uuid.UUID] = None,
-        traffic_ratio: Optional[float] = None,
+        route_id: Optional[uuid.UUID] = None,
         sudo_session_enabled: bool = False,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
@@ -1223,16 +1219,9 @@ class AgentRegistry:
 
             async def _post_enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
-                    if endpoint_id:
-                        routing_row = RoutingRow(
-                            endpoint_id,
-                            session_id,
-                            user_scope.user_uuid,
-                            user_scope.domain_name,
-                            user_scope.group_id,
-                            traffic_ratio=traffic_ratio or 1.0,
-                        )
-                        db_sess.add(routing_row)
+                    if route_id:
+                        routing_row = await RoutingRow.get(db_sess, route_id)
+                        routing_row.session = session_id
 
                     if dependency_sessions:
                         matched_dependency_session_ids = []
@@ -1242,6 +1231,7 @@ class AgentRegistry:
                                     db_sess,
                                     dependency_id,
                                     access_key,
+                                    allow_stale=True,
                                 )
                             except SessionNotFound:
                                 raise InvalidAPIParameters(
@@ -1256,6 +1246,7 @@ class AgentRegistry:
                             for depend_id in matched_dependency_session_ids
                         ]
                         db_sess.add_all(dependency_rows)
+                    await db_sess.commit()
 
             await execute_with_retry(_post_enqueue)
         except DBAPIError as e:
@@ -3399,12 +3390,12 @@ async def handle_destroy_session(
     )
 
 
-async def handle_kernel_health_check_result(
+async def handle_model_service_status_update(
     context: AgentRegistry,
     source: AgentId,
-    event: KernelHealthyEvent | KernelHealthCheckFailedEvent,
+    event: ModelServiceStatusEvent,
 ) -> None:
-    log.info("HANDLE_KERNEL_HEALTH_CHECK_RESULT (source:{}, event:{})", source, event)
+    log.info("HANDLE_MODEL_SERVICE_STATUS_UPDATE (source:{}, event:{})", source, event)
     try:
         async with context.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
@@ -3419,19 +3410,13 @@ async def handle_kernel_health_check_result(
 
     async def _update():
         async with context.db.begin_session() as db_sess:
-            query = (
-                sa.update(RoutingRow)
-                .values(
-                    {
-                        "status": (
-                            RouteStatus.HEALTHY
-                            if isinstance(event, KernelHealthyEvent)
-                            else RouteStatus.UNHEALTHY
-                        )
-                    }
-                )
-                .where(RoutingRow.id == route.id)
-            )
+            data: dict[str, Any] = {}
+            match event.new_status:
+                case ModelServiceStatus.HEALTHY:
+                    data["status"] = RouteStatus.HEALTHY
+                case ModelServiceStatus.UNHEALTHY:
+                    data["status"] = RouteStatus.UNHEALTHY
+            query = sa.update(RoutingRow).values(data).where(RoutingRow.id == route.id)
             await db_sess.execute(query)
 
             query = sa.select(RoutingRow).where(
@@ -3491,9 +3476,20 @@ async def invoke_session_callback(
                 new_routes: list[RoutingRow]
                 async with context.db.begin_session() as db_sess:
                     if isinstance(event, SessionCancelledEvent):
+                        update_data: dict[str, Any] = {"status": RouteStatus.FAILED_TO_START}
+                        if "error" in session.status_data:
+                            if session.status_data["error"]["name"] == "MultiAgentError":
+                                errors = session.status_data["error"]["collection"]
+                            else:
+                                errors = [session.status_data["error"]]
+                            update_data["error_data"] = {
+                                "type": "session_cancelled",
+                                "errors": errors,
+                                "session_id": session.id,
+                            }
                         query = (
                             sa.update(RoutingRow)
-                            .values({"status": RouteStatus.FAILED_TO_START})
+                            .values(update_data)
                             .where(RoutingRow.id == route.id)
                         )
                         await db_sess.execute(query)
@@ -3655,6 +3651,108 @@ async def handle_agent_heartbeat(
     await context.handle_heartbeat(source, event.agent_info)
 
 
+async def handle_route_creation(
+    context: AgentRegistry,
+    source: AgentId,
+    event: RouteCreatedEvent,
+) -> None:
+    endpoint: EndpointRow | None = None
+
+    try:
+        async with context.db.begin_readonly_session() as db_sess:
+            log.debug("Route ID: {}", event.route_id)
+            route = await RoutingRow.get(db_sess, event.route_id)
+            endpoint = await EndpointRow.get(db_sess, route.endpoint, load_image=True)
+
+            query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
+                UserRow.uuid == endpoint.created_user
+            )
+            created_user = (await db_sess.execute(query)).fetchone()
+            if endpoint.session_owner != endpoint.created_user:
+                query = sa.select(
+                    sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)
+                ).where(UserRow.uuid == endpoint.session_owner)
+                session_owner = (await db_sess.execute(query)).fetchone()
+            else:
+                session_owner = created_user
+
+            _, group_id, resource_policy = await query_userinfo(
+                db_sess,
+                created_user.uuid,
+                created_user["access_key"],
+                created_user.role,
+                created_user.domain_name,
+                None,
+                endpoint.domain,
+                endpoint.project,
+                query_on_behalf_of=session_owner["access_key"],
+            )
+
+            await context.create_session(
+                f"{endpoint.name}-{uuid.uuid4()}",
+                endpoint.image_row.name,
+                endpoint.image_row.architecture,
+                UserScope(
+                    domain_name=endpoint.domain,
+                    group_id=group_id,
+                    user_uuid=created_user.uuid,
+                    user_role=created_user.role,
+                ),
+                session_owner["access_key"],
+                resource_policy,
+                SessionTypes.INFERENCE,
+                {
+                    "mounts": [endpoint.model],
+                    "mount_map": {endpoint.model: endpoint.model_mount_destiation},
+                    "environ": endpoint.environ,
+                    "scaling_group": endpoint.resource_group,
+                    "resources": endpoint.resource_slots,
+                    "resource_opts": endpoint.resource_opts,
+                    "preopen_ports": None,
+                    "agent_list": None,
+                },
+                ClusterMode[endpoint.cluster_mode],
+                endpoint.cluster_size,
+                bootstrap_script=endpoint.bootstrap_script,
+                startup_command=endpoint.startup_command,
+                tag=endpoint.tag,
+                callback_url=endpoint.callback_url,
+                enqueue_only=True,
+                route_id=route.id,
+                sudo_session_enabled=session_owner.sudo_session_enabled,
+            )
+    except Exception as e:
+        log.exception("error while creating session:")
+        error_data = {
+            "type": "creation_failed",
+            "errors": [
+                {
+                    "src": "",
+                    "name": e.__class__.__name__,
+                    "repr": e.__repr__(),
+                }
+            ],
+        }
+
+        async def _update():
+            async with context.db.begin_session() as db_sess:
+                query = (
+                    sa.update(RoutingRow)
+                    .values({"status": RouteStatus.FAILED_TO_START, "error_data": error_data})
+                    .where(RoutingRow.id == event.route_id)
+                )
+                await db_sess.execute(query)
+                if endpoint:
+                    query = (
+                        sa.update(EndpointRow)
+                        .values({"retries": endpoint.retries + 1})
+                        .where(EndpointRow.id == endpoint.id)
+                    )
+                    await db_sess.execute(query)
+
+        await execute_with_retry(_update)
+
+
 async def handle_check_agent_resource(
     context: AgentRegistry, source: AgentId, event: DoAgentResourceCheckEvent
 ) -> None:
@@ -3730,16 +3828,12 @@ async def handle_kernel_log(
     source: AgentId,
     event: DoSyncKernelLogsEvent,
 ) -> None:
-    redis_conn = redis_helper.get_redis_object(
-        context.shared_config.data["redis"],
-        db=REDIS_STREAM_DB,
-    )
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()
     log_key = f"containerlog.{event.container_id}"
     try:
         list_size = await redis_helper.execute(
-            redis_conn,
+            context.redis_stream,
             lambda r: r.llen(log_key),
         )
         if list_size is None:
@@ -3752,7 +3846,7 @@ async def handle_kernel_log(
             return
         for _ in range(list_size):
             # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
+            chunk = await redis_helper.execute(context.redis_stream, lambda r: r.lpop(log_key))
             if chunk is None:  # maybe missing
                 log_buffer.write(b"(container log unavailable)\n")
                 break
@@ -3773,12 +3867,11 @@ async def handle_kernel_log(
         finally:
             # Clear the log data from Redis when done.
             await redis_helper.execute(
-                redis_conn,
+                context.redis_stream,
                 lambda r: r.delete(log_key),
             )
     finally:
         log_buffer.close()
-        await redis_conn.close()
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:

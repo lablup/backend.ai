@@ -6,9 +6,22 @@ python_sources(
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
-        "src/ai/backend/kernel:src",
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
+    ],
+)
+
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/accelerator/**",
+    ],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/cli/**",  # not auto-inferred
+        "//src/ai/backend/runner/**",
+        "//src/ai/backend/kernel/**",
+        "//src/ai/backend/helpers/**",
     ],
 )
 
@@ -34,6 +47,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        "src/ai/backend/kernel:src",
         ":kernel-support",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],

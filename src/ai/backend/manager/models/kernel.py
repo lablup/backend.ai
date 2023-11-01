@@ -21,7 +21,7 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
+from dateutil.tz import tzfile, tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -560,6 +560,21 @@ class KernelRow(Base):
         if self.cluster_role == DEFAULT_ROLE:
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
+
+    @property
+    def used_time(self) -> Optional[str]:
+        if self.terminated_at is not None:
+            return str(self.terminated_at - self.created_at)
+        return None
+
+    def get_used_days(self, local_tz: tzfile) -> Optional[int]:
+        if self.terminated_at is not None:
+            return (
+                self.terminated_at.astimezone(local_tz).toordinal()
+                - self.created_at.astimezone(local_tz).toordinal()
+                + 1
+            )
+        return None
 
     @property
     def is_private(self) -> bool:

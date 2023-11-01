@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
@@ -28,6 +29,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -99,6 +101,8 @@ __all__ = (
     "InferenceSessionList",
     "KernelLoadingStrategy",
 )
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
 class SessionStatus(enum.Enum):
@@ -1234,7 +1238,7 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "group_name": group_name,
+            "group_name": group_name[0],
             "group_id": row.group_id,
             "user_email": email,
             "full_name": full_name,

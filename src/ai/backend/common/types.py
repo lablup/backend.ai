@@ -67,6 +67,7 @@ __all__ = (
     "ResourceSlot",
     "ReadableCIDR",
     "HardwareMetadata",
+    "ModelServiceStatus",
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
@@ -1107,15 +1108,18 @@ class EtcdRedisConfig(TypedDict, total=False):
     redis_helper_config: RedisHelperConfig
 
 
-class RedisHelperConfig(TypedDict):
+class RedisHelperConfig(TypedDict, total=False):
     socket_timeout: float
     socket_connect_timeout: float
     reconnect_poll_timeout: float
+    max_connections: int
+    connection_ready_timeout: float
 
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
     client: Redis
+    name: str  # connection pool name
     service_name: Optional[str]
     sentinel: Optional[redis.asyncio.sentinel.Sentinel]
     redis_helper_config: RedisHelperConfig
@@ -1183,3 +1187,8 @@ class RoundRobinState(JSONSerializableMixin):
 
 # States of the round-robin scheduler for each resource group and architecture.
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+
+class ModelServiceStatus(enum.Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"

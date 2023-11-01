@@ -785,6 +785,7 @@ async def registry_ctx(mocker):
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
     mock_redis_image = MagicMock()
+    mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.produce_event = AsyncMock()
@@ -798,6 +799,7 @@ async def registry_ctx(mocker):
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,
         redis_image=mock_redis_image,
+        redis_stream=mock_redis_stream,
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
@@ -847,11 +849,13 @@ async def session_info(database_engine):
         domain = DomainRow(name=domain_name, total_resource_slots={})
         db_sess.add(domain)
 
-        user_resource_policy = UserResourcePolicyRow(name=resource_policy_name, max_vfolder_size=-1)
+        user_resource_policy = UserResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+        )
         db_sess.add(user_resource_policy)
 
         project_resource_policy = ProjectResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_size=-1
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
         )
         db_sess.add(project_resource_policy)
 

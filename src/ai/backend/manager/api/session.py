@@ -1150,27 +1150,34 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     if params["recursive"]:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             dependent_session_ids = await find_dependent_sessions(
-                session_name, db_sess, owner_access_key
+                session_name,
+                db_sess,
+                owner_access_key,
+                allow_stale=True,
             )
 
             target_session_references: List[str | uuid.UUID] = [
                 *dependent_session_ids,
                 session_name,
             ]
-            sessions = [
-                await SessionRow.get_session(
-                    db_sess,
-                    name_or_id,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                )
-                for name_or_id in target_session_references
-            ]
+            sessions: Iterable[SessionRow | Exception] = await asyncio.gather(
+                *[
+                    SessionRow.get_session(
+                        db_sess,
+                        name_or_id,
+                        owner_access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
+                    )
+                    for name_or_id in target_session_references
+                ],
+                return_exceptions=True,
+            )
 
         last_stats = await asyncio.gather(
             *[
                 root_ctx.registry.destroy_session(sess, forced=params["forced"])
                 for sess in sessions
+                if isinstance(sess, SessionRow)
             ],
             return_exceptions=True,
         )
@@ -1341,10 +1348,17 @@ async def get_info(request: web.Request) -> web.Response:
 
 @server_status_required(READ_ALLOWED)
 @auth_required
-async def restart(request: web.Request) -> web.Response:
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("owner_access_key", default=None): t.Null | t.String,
+        }
+    )
+)
+async def restart(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
-    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info("RESTART (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     async with root_ctx.db.begin_session() as db_sess:
         session = await SessionRow.get_session(
@@ -1568,6 +1582,8 @@ async def find_dependent_sessions(
     root_session_name_or_id: str | uuid.UUID,
     db_session: SASession,
     access_key: AccessKey,
+    *,
+    allow_stale: bool = False,
 ) -> Set[uuid.UUID]:
     async def _find_dependent_sessions(session_id: uuid.UUID) -> Set[uuid.UUID]:
         result = await db_session.execute(
@@ -1586,7 +1602,10 @@ async def find_dependent_sessions(
         return dependent_sessions
 
     root_session = await SessionRow.get_session(
-        db_session, root_session_name_or_id, access_key=access_key
+        db_session,
+        root_session_name_or_id,
+        access_key=access_key,
+        allow_stale=allow_stale,
     )
     return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
 
