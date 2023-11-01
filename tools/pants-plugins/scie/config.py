@@ -59,7 +59,7 @@ class Interpreter:
     id: str = "cpython"
     provider: str = "PythonBuildStandalone"
     release: str = "20231002"
-    lazy: bool = True
+    lazy: bool = False
 
 
 @dataclass(frozen=True)
