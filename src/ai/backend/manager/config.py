@@ -1,9 +1,3 @@
-from __future__ import annotations
-
-import json
-
-from graphql import Undefined
-
 """
 Configuration Schema on etcd
 ----------------------------
@@ -177,6 +171,9 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
+from __future__ import annotations
+
+import json
 import logging
 import os
 import secrets
@@ -204,6 +201,7 @@ import aiotools
 import click
 import trafaret as t
 import yarl
+from graphql import Undefined
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
