@@ -222,7 +222,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-13-xlarge]
+        # ubuntu-latest: intel
+        # (TODO: linux aarch64)
+        # macos-12: intel
+        # macos-13: apple silicon
+        os: [ubuntu-latest, macos-13-xlarge, macos-12-large]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
