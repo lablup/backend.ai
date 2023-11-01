@@ -31,7 +31,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     DescriptionField,
@@ -112,7 +112,6 @@ def _contains_pex(built_package: BuiltPackage) -> bool:
     )
 
 
-@rule_helper
 async def _parse_lift_source(source: ScieLiftSourceField) -> Config:
     hydrated_source = await Get(HydratedSources, HydrateSourcesRequest(source))
     digest_contents = await Get(DigestContents, Digest, hydrated_source.snapshot.digest)
