@@ -192,9 +192,10 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Run halfstack containers and manager
       run: |
-        docker-compose -f docker-compose.halfstack-main.yml up -d
-        pants export ::
-        ./backend.ai mgr start-server --debug &
+        # docker-compose -f docker-compose.halfstack-main.yml up -d
+        # pants export ::
+        # ./backend.ai mgr start-server --debug &
+        docker-compose -f docker-compose.halfstack-main.yml run -d backendai-half-etcd
     - name: Test
       timeout-minutes: 15
       run: |

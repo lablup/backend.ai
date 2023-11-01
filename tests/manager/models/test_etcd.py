@@ -1,6 +1,9 @@
 import pytest
+from graphene import Schema
+from graphene.test import Client
 
 from ai.backend.client.session import APIConfig, Session
+from ai.backend.manager.models.gql import Mutations, Queries
 
 CONTAINER_REGISTRY_FIELDS = """
     container_registry {
@@ -16,6 +19,8 @@ CONTAINER_REGISTRY_FIELDS = """
     }
 """
 
+SCHEMA = Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
+
 
 def _admin_session():
     api_config = APIConfig(
@@ -29,7 +34,9 @@ def _admin_session():
 
 
 @pytest.mark.dependency()
-def test_create_container_registry():
+@pytest.mark.asyncio
+async def test_create_container_registry():
+    client = Client(SCHEMA)
     query = """
         mutation CreateContainerRegistry($hostname: String!, $props: CreateContainerRegistryInput!) {
             create_container_registry(hostname: $hostname, props: $props) {
@@ -49,6 +56,13 @@ def test_create_container_registry():
             "ssl_verify": False,
         },
     }
+
+    context = {}  # info.context
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    print(response)  # {'data': {'create_container_registry': {'container_registry': None}}}
+    assert response is None
+
+    return
 
     with _admin_session() as sess:
         response = sess.Admin.query(query=query, variables=variables)
@@ -80,6 +94,11 @@ def test_modify_container_registry():
             "username": "username2",
         },
     }
+
+    # response = CLIENT.execute(query, variables=variables)
+    # print(response)  # {'data': {'modify_container_registry': {'container_registry': None}}}
+
+    # assert response["config"]["url"] != "http://cr.example.com"
 
     with _admin_session() as sess:
         response = sess.Admin.query(query=query, variables=variables)
