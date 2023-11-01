@@ -29,7 +29,7 @@ def client() -> Client:
 @pytest.fixture(scope="module")
 def context() -> GraphQueryContext:
     shared_config = SharedConfig(
-        etcd_addr=HostPortPair("127.0.0.1", 8121),
+        etcd_addr=HostPortPair("127.0.0.1", 8120),
         etcd_user="",
         etcd_password="",
         namespace="local",
