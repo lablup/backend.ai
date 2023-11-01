@@ -3689,7 +3689,7 @@ async def handle_route_creation(
             )
 
             await context.create_session(
-                f"{endpoint.name}-{uuid.uuid4()}",
+                f"{endpoint.name}-{str(event.route_id)}",
                 endpoint.image_row.name,
                 endpoint.image_row.architecture,
                 UserScope(
