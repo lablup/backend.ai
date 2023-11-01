@@ -42,6 +42,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "!!stubs/trafaret:stubs",
     ],
 )
 

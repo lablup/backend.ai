@@ -16,6 +16,7 @@ visibility_private_component(
         "//src/ai/backend/accelerator/**",
     ],
     allowed_dependencies=[
+        "//src/ai/backend/accelerator/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/plugin/**",
         "//src/ai/backend/cli/**",  # not auto-inferred
@@ -23,19 +24,6 @@ visibility_private_component(
         "//src/ai/backend/kernel/**",
         "//src/ai/backend/helpers/**",
     ],
-)
-
-pex_binary(
-    name="server",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="server.py",
-)
-
-pex_binary(
-    name="watcher",
-    entry_point="watcher.py",
 )
 
 python_requirement(
@@ -66,8 +54,40 @@ python_distribution(
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "//src/ai/backend/accelerator/cuda_open:lib",
+        "//src/ai/backend/accelerator/cuda_open:buildscript",
+        "//src/ai/backend/accelerator/mock:lib",
+        "//src/ai/backend/accelerator/mock:buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
+pex_binary(
+    name="pex-watcher",
+    entry_point="watcher.py",
+    dependencies=[
+        ":src",
+        "!!stubs/trafaret:stubs",
+    ],
+)
 
+scie_binary(
+    name="backendai-agent",
+    dependencies=[":pex"],
+)
+
+scie_binary(
+    name="backendai-agent-watcher",
+    dependencies=[":pex-watcher"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[
