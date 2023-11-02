@@ -254,7 +254,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
     - if: ${{ matrix.os == 'linux-aarch64' }}
-      uses: deadsnakes/action@v3
+      uses: deadsnakes/action@v3.0.1
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
