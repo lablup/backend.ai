@@ -81,7 +81,7 @@ from .user import users
 from .utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    sql_append_lists_to_list,
+    sql_append_dict_to_list,
 )
 
 if TYPE_CHECKING:
@@ -645,8 +645,9 @@ class KernelRow(Base):
         data = {
             "status": status,
             "status_changed": now,
-            "status_history": sql_append_lists_to_list(
-                KernelRow.status_history, [status.name, now.isoformat()]
+            "status_history": sql_append_dict_to_list(
+                KernelRow.status_history,
+                {"status": status.name, "timestamp": now.isoformat()},
             ),
         }
         if status_data is not None:
@@ -692,8 +693,9 @@ class KernelRow(Base):
                 if update_data is None:
                     update_values = {
                         "status": new_status,
-                        "status_history": sql_append_lists_to_list(
-                            KernelRow.status_history, [new_status.name, now.isoformat()]
+                        "status_history": sql_append_dict_to_list(
+                            KernelRow.status_history,
+                            {"status": new_status.name, "timestamp": now.isoformat()},
                         ),
                     }
                 else:

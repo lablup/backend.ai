@@ -406,8 +406,14 @@ async def umount(
     return True
 
 
-def get_first_occurrence_time(status_history: list[list[str]], status: str) -> str | None:
-    for item in status_history:
-        if item[0] == status:
-            return item[1]
+def get_first_occurrence_time(
+    status_history_records: list[dict[str, str]], status: str
+) -> str | None:
+    """
+    Get the first occurrence time of the given status from the status history records.
+    """
+
+    for status_history in status_history_records:
+        if status_history["status"] == status:
+            return status_history["timestamp"]
     return None
