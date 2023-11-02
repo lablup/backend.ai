@@ -237,7 +237,17 @@ async def server_main(
 
 
 @click.command()
-@click.argument("config_path", metavar="CONFIG", type=Path)
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "The config file path. "
+        "[default: searching watcher.toml in ./, ~/.config/backend.ai/, and /etc/backend.ai/]"
+    ),
+)
 @click.option(
     "--debug",
     is_flag=True,
@@ -259,7 +269,7 @@ def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debu
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "watcher")
     except config.ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            "ConfigurationError: Could not read or validate the watcher local config:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)

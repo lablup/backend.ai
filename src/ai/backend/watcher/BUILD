@@ -15,14 +15,6 @@ visibility_private_component(
     ],
 )
 
-pex_binary(
-    name="server",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="server.py",
-)
-
 python_distribution(
     name="dist",
     dependencies=[
@@ -49,6 +41,7 @@ pex_binary(
     entry_point="ai.backend.cli.__main__",
     dependencies=[
         ":src",
+        ":buildscript",
         "!!stubs/trafaret:stubs",
     ],
 )

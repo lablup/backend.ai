@@ -199,7 +199,7 @@ async def server_main(
     default=None,
     help=(
         "The config file path. "
-        "(default: ./storage-proxy.toml and /etc/backend.ai/storage-proxy.toml)"
+        "[default: searching storage-proxy.toml in ./, ~/.config/backend.ai/, and /etc/backend.ai/]"
     ),
 )
 @click.option(

@@ -554,43 +554,45 @@ class LocalConfig(AbstractConfig):
 
 def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalConfig:
     # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
-
-    # Override the read config with environment variables (for legacy).
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    config.override_with_env(raw_cfg, ("db", "addr"), "BACKEND_DB_ADDR")
-    config.override_with_env(raw_cfg, ("db", "name"), "BACKEND_DB_NAME")
-    config.override_with_env(raw_cfg, ("db", "user"), "BACKEND_DB_USER")
-    config.override_with_env(raw_cfg, ("db", "password"), "BACKEND_DB_PASSWORD")
-    config.override_with_env(raw_cfg, ("manager", "num-proc"), "BACKEND_MANAGER_NPROC")
-    config.override_with_env(raw_cfg, ("manager", "ssl-cert"), "BACKEND_SSL_CERT")
-    config.override_with_env(raw_cfg, ("manager", "ssl-privkey"), "BACKEND_SSL_KEY")
-    config.override_with_env(raw_cfg, ("manager", "pid-file"), "BACKEND_PID_FILE")
-    config.override_with_env(raw_cfg, ("manager", "api-listen-addr", "host"), "BACKEND_SERVICE_IP")
-    config.override_with_env(
-        raw_cfg, ("manager", "api-listen-addr", "port"), "BACKEND_SERVICE_PORT"
-    )
-    config.override_with_env(
-        raw_cfg, ("manager", "event-listen-addr", "host"), "BACKEND_ADVERTISED_MANAGER_HOST"
-    )
-    config.override_with_env(
-        raw_cfg, ("manager", "event-listen-addr", "port"), "BACKEND_EVENTS_PORT"
-    )
-    config.override_with_env(
-        raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
-    )
-
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
-
-    # Validate and fill configurations
-    # (allow_extra will make configs to be forward-copmatible)
     try:
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
+
+        # Override the read config with environment variables (for legacy).
+        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+        config.override_with_env(raw_cfg, ("db", "addr"), "BACKEND_DB_ADDR")
+        config.override_with_env(raw_cfg, ("db", "name"), "BACKEND_DB_NAME")
+        config.override_with_env(raw_cfg, ("db", "user"), "BACKEND_DB_USER")
+        config.override_with_env(raw_cfg, ("db", "password"), "BACKEND_DB_PASSWORD")
+        config.override_with_env(raw_cfg, ("manager", "num-proc"), "BACKEND_MANAGER_NPROC")
+        config.override_with_env(raw_cfg, ("manager", "ssl-cert"), "BACKEND_SSL_CERT")
+        config.override_with_env(raw_cfg, ("manager", "ssl-privkey"), "BACKEND_SSL_KEY")
+        config.override_with_env(raw_cfg, ("manager", "pid-file"), "BACKEND_PID_FILE")
+        config.override_with_env(
+            raw_cfg, ("manager", "api-listen-addr", "host"), "BACKEND_SERVICE_IP"
+        )
+        config.override_with_env(
+            raw_cfg, ("manager", "api-listen-addr", "port"), "BACKEND_SERVICE_PORT"
+        )
+        config.override_with_env(
+            raw_cfg, ("manager", "event-listen-addr", "host"), "BACKEND_ADVERTISED_MANAGER_HOST"
+        )
+        config.override_with_env(
+            raw_cfg, ("manager", "event-listen-addr", "port"), "BACKEND_EVENTS_PORT"
+        )
+        config.override_with_env(
+            raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
+        )
+
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+
+        # Validate and fill configurations
+        # (allow_extra will make configs to be forward-copmatible)
         cfg = config.check(raw_cfg, manager_local_config_iv)
         if cfg["debug"]["enabled"]:
             print("== Manager configuration ==", file=sys.stderr)

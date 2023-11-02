@@ -11,14 +11,13 @@ import time
 import traceback
 from functools import partial
 from pathlib import Path
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import Any, AsyncIterator, MutableMapping, Tuple
 
 import aiohttp_cors
 import aiotools
 import click
 import jinja2
-import tomli
 from aiohttp import web
 from setproctitle import setproctitle
 
@@ -746,11 +745,14 @@ async def server_main(
 @click.command()
 @click.option(
     "-f",
+    "--config-path",
     "--config",
-    "config_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default="webserver.conf",
-    help="The configuration file to use.",
+    default=None,
+    help=(
+        "The config file path. "
+        "[default: searching webserver.conf in ./, ~/.config/backend.ai/, and /etc/backend.ai/]"
+    ),
 )
 @click.option(
     "--debug",
@@ -767,21 +769,28 @@ async def server_main(
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Path,
+    config_path: Path | None,
     log_level: str,
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
     # Delete this part when you remove --debug option
-    raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
-
-    if debug:
-        log_level = "DEBUG"
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-
-    cfg = config.check(raw_cfg, config_iv)
+    try:
+        # NOTE: For legacy reasons, webserver uses ".conf" instead of ".toml".
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "webserver", ".conf")
+        if debug:
+            log_level = "DEBUG"
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        cfg = config.check(raw_cfg, config_iv)
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the webserver local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
 
     if ctx.invoked_subcommand is None:
         cfg["webserver"]["pid-file"].write_text(str(os.getpid()))

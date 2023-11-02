@@ -883,7 +883,7 @@ def main(
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
     except config.ConfigurationError as e:
         print(
-            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            "ConfigurationError: Could not read or validate the agent local config:",
             file=sys.stderr,
         )
         print(pformat(e.invalid_data), file=sys.stderr)

@@ -128,21 +128,22 @@ model_definition_iv = t.Dict(
 )
 
 
-def find_config_file(daemon_name: str) -> Path:
+def find_config_file(daemon_name: str, ext: str = ".toml") -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
+    filename = f"{daemon_name}{ext}"
     if not toml_path_from_env:
         toml_paths = [
-            Path.cwd() / f"{daemon_name}.toml",
+            Path.cwd() / filename,
         ]
         if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
             parent_path = Path.cwd().parent
             while parent_path.is_relative_to(Path.home()):
                 if (parent_path / "BUILD_ROOT").exists():
-                    toml_paths.append(parent_path / f"{daemon_name}.toml")
+                    toml_paths.append(parent_path / filename)
                 parent_path = parent_path.parent
             toml_paths += [
-                Path.home() / ".config" / "backend.ai" / f"{daemon_name}.toml",
-                Path(f"/etc/backend.ai/{daemon_name}.toml"),
+                Path.home() / ".config" / "backend.ai" / filename,
+                Path(f"/etc/backend.ai/{filename}"),
             ]
         else:
             raise ConfigurationError(
@@ -167,12 +168,14 @@ def find_config_file(daemon_name: str) -> Path:
 
 
 def read_from_file(
-    toml_path: Optional[Union[Path, str]], daemon_name: str
+    toml_path: Optional[Union[Path, str]],
+    daemon_name: str,
+    ext: str = ".toml",
 ) -> Tuple[Dict[str, Any], Path]:
     config: Dict[str, Any]
     discovered_path: Path
     if toml_path is None:
-        discovered_path = find_config_file(daemon_name)
+        discovered_path = find_config_file(daemon_name, ext)
     else:
         discovered_path = Path(toml_path)
     try:
