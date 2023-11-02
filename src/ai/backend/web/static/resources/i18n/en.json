@@ -281,7 +281,7 @@
     "AllowedClientIps": "Allowed client IPs",
     "CommaSeparated": "comma-separated",
     "TryPreferredPort": "Try preferred port",
-    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"SSH Key Download\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
+    "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"DOWNLOAD SSH KEY\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
     "SFTPExtraNotification": "It is recommended to delete sessions after they have been used, as there is a limit on the number of sessions. Sessions that are not used for uploading files within a certain period of time may be automatically deleted.",
     "Readmore": "Read More...",
     "Readless": "Read less",
@@ -410,7 +410,7 @@
     "ExpiredDate": "Expired Date",
     "TokenExpiredDateHelp": "The default token expiration time is 24 hours later.",
     "TokenExpiredDateError": "The token expiration time must be after the current time",
-    "ServiceNameRule": "Only allow 4 to 64 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
+    "ServiceNameRule": "Only allow 4 to 24 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
     "resources": "Resources",
     "Image": "Image"
@@ -597,7 +597,8 @@
     "KeypairDetail": "Keypair Detail",
     "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
     "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
-    "SignoutSeccessfullyFinished": "Signout is seccessfully finished"
+    "SignoutSeccessfullyFinished": "Signout is seccessfully finished",
+    "EnableSudoSession": "Enable sudo session"
   },
   "data": {
     "Folders": "Folders",
@@ -990,7 +991,8 @@
     "RescanFailed": "Rescan Failed.",
     "NoRegistryToDisplay": "No Registries to display",
     "RegistrySuccessfullyModified": "Registry successfully modified.",
-    "PleaseSelectOption": "Please Select Option"
+    "PleaseSelectOption": "Please Select Option",
+    "ConfirmNoUserName": "User and password not specified, would you like to save?"
   },
   "resourceGroup": {
     "ResourceGroups": "Resource Groups",
