@@ -342,7 +342,7 @@ def fixture():
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.api:cli")
 def api():
-    """Command set for GraphQL schema."""
+    """Command set for API schema inspection and manipulation."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
