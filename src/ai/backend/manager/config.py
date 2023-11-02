@@ -201,7 +201,6 @@ import aiotools
 import click
 import trafaret as t
 import yarl
-from graphql import Undefined
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
@@ -716,15 +715,6 @@ class SharedConfig(AbstractConfig):
         # This will "accidentally" delete any registry sharing the same prefix.
         raw_hostname = urllib.parse.quote(hostname, safe="")
         await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
-
-        # Convert `Undefined` values to `None`.
-        # if config_updated.get("project") is Undefined:
-        if config_updated.get("project") is None:
-            # _ = config_updated.pop("project")
-            config_updated["project"] = original_item["project"]  # type: ignore
-        if config_updated.get("password") is Undefined:
-            config_updated["password"] = None
-            # config_updated["password"] = original_item["password"]  # type: ignore
 
         # Re-add the "accidentally" deleted items
         updates: dict[str, str] = {}

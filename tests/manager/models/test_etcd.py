@@ -111,9 +111,26 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
 
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "harbor2"
-    assert container_registry["config"]["project"] == ["default"]  # assert None == ['default']
+    assert container_registry["config"]["project"] == ["default"]
+    assert container_registry["config"]["username"] == "username2"
+    assert container_registry["config"]["ssl_verify"] is False
+
+    variables = {
+        "hostname": "cr.example.com",
+        "props": {
+            "project": ["default", "example"],
+        },
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["hostname"] == "cr.example.com"
+    assert container_registry["config"]["url"] == "http://cr.example.com"
+    assert container_registry["config"]["type"] == "harbor2"
+    assert container_registry["config"]["project"] == ["default", "example"]
     assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["ssl_verify"] is False
 
@@ -131,6 +148,7 @@ async def test_modify_container_registry_allows_empty_string(
         }
     """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
+    # Given an empty string to password
     variables = {
         "hostname": "cr.example.com",
         "props": {
@@ -138,12 +156,14 @@ async def test_modify_container_registry_allows_empty_string(
         },
     }
 
+    # Then password is set to empty string
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "harbor2"
-    assert container_registry["config"]["project"] == ["default"]
-    # assert container_registry["config"]["username"] == "username2"
+    assert container_registry["config"]["project"] == ["default", "example"]
+    assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["password"] == "*****"
     assert container_registry["config"]["ssl_verify"] is False
 
@@ -161,6 +181,7 @@ async def test_modify_container_registry_allows_null_for_unset(
         }
     """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
+    # Given a null to password
     variables = {
         "hostname": "cr.example.com",
         "props": {
@@ -168,12 +189,14 @@ async def test_modify_container_registry_allows_null_for_unset(
         },
     }
 
+    # Then password is unset
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
+    assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
     assert container_registry["config"]["type"] == "harbor2"
-    assert container_registry["config"]["project"] == ["default"]
-    # assert container_registry["config"]["username"] == "username2"
+    assert container_registry["config"]["project"] == ["default", "example"]
+    assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["password"] is None
     assert container_registry["config"]["ssl_verify"] is False
 
@@ -196,3 +219,14 @@ async def test_delete_container_registry(client: Client, context: GraphQueryCont
     response = await client.execute_async(query, variables=variables, context_value=context)
     container_registry = response["data"]["delete_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
+
+    query = """
+        query ContainerRegistry($hostname: String!) {
+            container_registry(hostname: $hostname) {
+                $CONTAINER_REGISTRY_FIELDS
+            }
+        }
+    """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    assert response["data"] is None
