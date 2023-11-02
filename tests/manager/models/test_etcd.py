@@ -70,7 +70,7 @@ async def test_create_container_registry(client: Client, context: GraphQueryCont
         "hostname": "cr.example.com",
         "props": {
             "url": "http://cr.example.com",
-            "type": "harbor2",
+            "type": "dockerhub",
             "project": ["default"],
             "username": "username",
             "password": "password",
@@ -83,7 +83,7 @@ async def test_create_container_registry(client: Client, context: GraphQueryCont
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"] == {
         "url": "http://cr.example.com",
-        "type": "harbor2",
+        "type": "dockerhub",
         "project": ["default"],
         "username": "username",
         "password": "*****",
@@ -113,7 +113,7 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
     container_registry = response["data"]["modify_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
     assert container_registry["config"]["url"] == "http://cr.example.com"
-    assert container_registry["config"]["type"] == "harbor2"
+    assert container_registry["config"]["type"] == "dockerhub"
     assert container_registry["config"]["project"] == ["default"]
     assert container_registry["config"]["username"] == "username2"
     assert container_registry["config"]["ssl_verify"] is False
@@ -121,6 +121,7 @@ async def test_modify_container_registry(client: Client, context: GraphQueryCont
     variables = {
         "hostname": "cr.example.com",
         "props": {
+            "type": "harbor2",
             "project": ["default", "example"],
         },
     }

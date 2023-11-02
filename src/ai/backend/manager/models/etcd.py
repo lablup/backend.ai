@@ -160,6 +160,8 @@ class ModifyContainerRegistry(graphene.Mutation):
     ) -> ModifyContainerRegistry:
         ctx: GraphQueryContext = info.context
         input_config: Dict[str, Any] = {}
+        set_if_set(props, input_config, "url")
+        set_if_set(props, input_config, "type")
         set_if_set(props, input_config, "project")
         set_if_set(props, input_config, "username")
         set_if_set(props, input_config, "password")
