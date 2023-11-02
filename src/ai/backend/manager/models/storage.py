@@ -200,7 +200,7 @@ class StorageVolume(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
 
-    id = graphene.String()  # "{proxy}:{name}""
+    # id = graphene.String()  # "{proxy}:{name}""
     backend = graphene.String()
     fsprefix = graphene.String()
     path = graphene.String()
