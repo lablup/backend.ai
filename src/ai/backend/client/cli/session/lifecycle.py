@@ -24,7 +24,8 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
-from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.cli.types import CliContextInfo, ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
 from ai.backend.common.utils import get_first_occurrence_time
@@ -779,8 +780,9 @@ def logs(session_id, kernel: str | None):
 
 
 @session.command("status-history")
+@pass_ctx_obj
 @click.argument("session_id", metavar="SESSID")
-def status_history(session_id):
+def status_history(ctx: CliContextInfo, session_id):
     """
     Shows the status transition history of the compute session.
 

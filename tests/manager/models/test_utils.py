@@ -1,17 +1,14 @@
 import uuid
-from datetime import datetime
 from typing import Union
 
 import pytest
 import sqlalchemy
 import sqlalchemy as sa
-from dateutil.tz import tzutc
 
 from ai.backend.manager.models import KernelRow, SessionRow, kernels
 from ai.backend.manager.models.utils import (
     agg_to_array,
     agg_to_str,
-    sql_append_lists_to_list,
 )
 
 
@@ -22,59 +19,6 @@ async def _select_kernel_row(
     query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
     kernel, *_ = await conn.execute(query)
     return kernel
-
-
-@pytest.mark.asyncio
-async def test_sql_json_merge__default(session_info):
-    session_id, conn = session_info
-    expected: list[list[str, str]] = []
-    kernel = await _select_kernel_row(conn, session_id)
-    assert kernel is not None
-    assert kernel.status_history == expected
-
-
-@pytest.mark.asyncio
-async def test_sql_append_lists_to_list(session_info):
-    session_id, conn = session_info
-    timestamp = datetime.now(tzutc()).isoformat()
-    expected = [
-        ["PENDING", timestamp],
-        ["PREPARING", timestamp],
-        ["TERMINATING", timestamp],
-        ["TERMINATED", timestamp],
-    ]
-
-    query = (
-        kernels.update()
-        .values(
-            {
-                "status_history": sql_append_lists_to_list(
-                    kernels.c.status_history,
-                    ["PENDING", timestamp],
-                    ["PREPARING", timestamp],
-                ),
-            }
-        )
-        .where(kernels.c.session_id == session_id)
-    )
-    await conn.execute(query)
-    query = (
-        kernels.update()
-        .values(
-            {
-                "status_history": sql_append_lists_to_list(
-                    kernels.c.status_history,
-                    ["TERMINATING", timestamp],
-                    ["TERMINATED", timestamp],
-                ),
-            }
-        )
-        .where(kernels.c.session_id == session_id)
-    )
-    await conn.execute(query)
-    kernel = await _select_kernel_row(conn, session_id)
-    assert kernel is not None
-    assert kernel.status_history == expected
 
 
 @pytest.mark.asyncio

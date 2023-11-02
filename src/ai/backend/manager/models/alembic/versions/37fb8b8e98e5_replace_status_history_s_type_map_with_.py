@@ -5,6 +5,7 @@ Revises: 8c74e7df26f8
 Create Date: 2023-10-30 08:02:27.845105
 
 """
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -15,7 +16,8 @@ depends_on = None
 
 
 def upgrade():
-    op.execute("""
+    op.execute(
+        """
         WITH data AS (
             SELECT id,
                    (jsonb_each(status_history)).key,
@@ -30,9 +32,11 @@ def upgrade():
             FROM data
             WHERE data.id = kernels.id
         );
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         WITH data AS (
             SELECT id,
                    (jsonb_each(status_history)).key,
@@ -47,11 +51,13 @@ def upgrade():
             FROM data
             WHERE data.id = sessions.id
         );
-    """)
+    """
+    )
 
 
 def downgrade():
-    op.execute("""
+    op.execute(
+        """
         WITH data AS (
             SELECT id, jsonb_object_agg(
                 elem->>0, elem->>1
@@ -64,9 +70,11 @@ def downgrade():
         SET status_history = data.new_status_history
         FROM data
         WHERE data.id = kernels.id;
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         WITH data AS (
             SELECT id, jsonb_object_agg(
                 elem->>0, elem->>1
@@ -79,4 +87,5 @@ def downgrade():
         SET status_history = data.new_status_history
         FROM data
         WHERE data.id = sessions.id;
-    """)
+    """
+    )

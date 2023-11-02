@@ -80,7 +80,7 @@ from .utils import (
     JSONCoalesceExpr,
     agg_to_array,
     execute_with_retry,
-    sql_append_lists_to_list,
+    sql_append_dict_to_list,
 )
 
 if TYPE_CHECKING:
@@ -810,8 +810,9 @@ class SessionRow(Base):
 
                 update_values = {
                     "status": determined_status,
-                    "status_history": sql_append_lists_to_list(
-                        SessionRow.status_history, [determined_status.name, now.isoformat()]
+                    "status_history": sql_append_dict_to_list(
+                        SessionRow.status_history,
+                        {"status": determined_status.name, "timestamp": now.isoformat()},
                     ),
                 }
                 if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
@@ -912,8 +913,9 @@ class SessionRow(Base):
             now = status_changed_at
         data = {
             "status": status,
-            "status_history": sql_append_lists_to_list(
-                SessionRow.status_history, [status.name, datetime.now(tzutc()).isoformat()]
+            "status_history": sql_append_dict_to_list(
+                SessionRow.status_history,
+                {"status": status.name, "timestamp": datetime.now(tzutc()).isoformat()},
             ),
         }
         if status_data is not None:
@@ -1280,7 +1282,8 @@ class ComputeSession(graphene.ObjectType):
     status_changed = GQLDateTime()
     status_info = graphene.String()
     status_data = graphene.JSONString()
-    status_history = graphene.JSONString()
+    status_history = graphene.JSONString()  # legacy
+    status_history_log = graphene.JSONString()
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
@@ -1321,8 +1324,7 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        status_history = row.status_history
-        scheduled_at = get_first_occurrence_time(status_history, SessionStatus.SCHEDULED.name)
+        scheduled_at = get_first_occurrence_time(row.status_history, SessionStatus.SCHEDULED.name)
 
         return {
             # identity
@@ -1355,7 +1357,8 @@ class ComputeSession(graphene.ObjectType):
             "status_changed": row.status_changed,
             "status_info": row.status_info,
             "status_data": row.status_data,
-            "status_history": status_history,
+            # "status_history": ...,  # filled by the legacy resolver
+            "status_history_log": row.status_history,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
             "starts_at": row.starts_at,
@@ -1438,6 +1441,10 @@ class ComputeSession(graphene.ObjectType):
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.idle_checker_host.get_idle_check_report(self.session_id)
+
+    # legacy
+    async def resolve_status_history(self, _info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        return {item["status"]: item["timestamp"] for item in self.status_history_log}
 
     _queryfilter_fieldspec: FieldSpecType = {
         "id": ("sessions_id", None),

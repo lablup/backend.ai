@@ -2191,6 +2191,35 @@ async def get_container_logs(
 @check_api_params(
     t.Dict({
         tx.AliasedKey(["session_name", "sessionName", "task_id", "taskId"]) >> "kernel_id": tx.UUID,
+        t.Key("owner_access_key", default=None): t.Null | t.String,
+    })
+)
+async def get_status_history(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    log.info(
+        "GET_STATUS_HISTORY (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    resp: dict[str, Mapping] = {"result": {}}
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        compute_session = await SessionRow.get_session(
+            db_sess,
+            session_name,
+            owner_access_key,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
+        resp["result"] = compute_session.status_history
+
+    return web.json_response(resp, status=200)
+
+
+@server_status_required(READ_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict({
+        tx.AliasedKey(["session_name", "sessionName", "task_id", "taskId"]) >> "kernel_id": tx.UUID,
     })
 )
 async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse:
@@ -2321,6 +2350,7 @@ def create_app(
         app.router.add_route("GET", "/{session_name}/direct-access-info", get_direct_access_info)
     )
     cors.add(app.router.add_route("GET", "/{session_name}/logs", get_container_logs))
+    cors.add(app.router.add_route("GET", "/{session_name}/status-history", get_status_history))
     cors.add(app.router.add_route("POST", "/{session_name}/rename", rename_session))
     cors.add(app.router.add_route("POST", "/{session_name}/interrupt", interrupt))
     cors.add(app.router.add_route("POST", "/{session_name}/complete", complete))
