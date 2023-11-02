@@ -204,7 +204,8 @@
       "PleaseSelectOptions": "Valitse vähintään yksi tai useampi vaihtoehto.",
       "PolicyName": "Vakuutuksen nimi Pakollinen.",
       "ValidationFailed": "Validointi epäonnistui"
-    }
+    },
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Allowslettersnumbersand-_": "Sallii kirjaimet, numerot ja -_",
@@ -692,7 +693,7 @@
     "ServiceEndpoint": "Palvelun päätepiste",
     "ServiceInfo": "Palvelun tiedot",
     "ServiceName": "Palvelun nimi",
-    "ServiceNameRule": "Ainoastaan aakkosnumeerisia merkkejä, alaviivoja(_), väliviivoja(-) ja pisteitä(.) saa olla 4-64 merkkiä, ja sen on päätyttävä aakkosnumeeriseen merkkiin.",
+    "ServiceNameRule": "Ainoastaan aakkosnumeerisia merkkejä, alaviivoja(_), väliviivoja(-) ja pisteitä(.) saa olla 4-24 merkkiä, ja sen on päätyttävä aakkosnumeeriseen merkkiin.",
     "Services": "Palvelut",
     "ServingRouteErrorModalTitle": "Palvelevan reitin virhe",
     "SessionId": "Istunnon ID",

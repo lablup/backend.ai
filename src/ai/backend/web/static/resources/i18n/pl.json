@@ -505,7 +505,8 @@
     "KeypairDetail": "Szczegóły pary kluczy",
     "SignoutSeccessfullyFinished": "Wylogowanie zostało pomyślnie zakończone",
     "Status": "Status",
-    "NoUserToDisplay": "Brak użytkowników do wyświetlenia"
+    "NoUserToDisplay": "Brak użytkowników do wyświetlenia",
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Folders": "Lornetka składana",
@@ -1337,7 +1338,7 @@
     "FormValidationFailed": "Walidacja formularza nie powiodła się",
     "StartNewServing": "Rozpocznij nową porcję",
     "ServiceName": "Nazwa usługi",
-    "ServiceNameRule": "Dozwolone są tylko 4 do 64 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
+    "ServiceNameRule": "Dozwolone są tylko 4 do 24 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
     "OpenToPublic": "Otwarte dla publiczności",
     "DesiredRoutingCount": "Pożądana liczba tras",
     "ServingRouteErrorModalTitle": "Błąd trasy serwowania",
