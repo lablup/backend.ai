@@ -18,22 +18,6 @@ visibility_private_component(
     ],
 )
 
-pex_binary(
-    name="server",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="server.py",
-)
-
-pex_binary(
-    name="cli",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="cli/__main__.py",
-)
-
 python_distribution(
     name="dist",
     dependencies=[
@@ -64,8 +48,23 @@ python_distribution(
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
 
+scie_binary(
+    name="backendai-manager",
+    dependencies=[":pex"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[
