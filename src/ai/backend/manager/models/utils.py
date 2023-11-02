@@ -326,15 +326,13 @@ def sql_json_merge(
     return expr
 
 
-def sql_append_lists_to_list(col, *arrs):
+def sql_append_dict_to_list(col, arg: dict):
     """
-    Generate an SQLAlchemy column update expression that append arrays to
+    Generate an SQLAlchemy column update expression that appends a dictionary to
     the existing JSONB array.
     """
-    expr = col
-    for arr in arrs:
-        new_item_str = str(arr).replace("'", '"')
-        expr = expr.op("||")(sa.text(f"'[{new_item_str}]'::jsonb"))
+    new_item_str = json.dumps(arg).replace("'", '"')
+    expr = col.op("||")(sa.text(f"'[{new_item_str}]'::jsonb"))
     return expr
 
 

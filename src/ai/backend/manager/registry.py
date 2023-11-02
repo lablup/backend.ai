@@ -170,7 +170,7 @@ from .models.utils import (
     is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
-    sql_append_lists_to_list,
+    sql_append_dict_to_list,
     sql_json_merge,
 )
 from .types import UserScope
@@ -991,9 +991,10 @@ class AgentRegistry:
         session_data = {
             "id": session_id,
             "status": SessionStatus.PENDING,
-            "status_history": [
-                [SessionStatus.PENDING.name, datetime.now(tzutc()).isoformat()],
-            ],
+            "status_history": {
+                "status": SessionStatus.PENDING.name,
+                "timestamp": datetime.now(tzutc()).isoformat(),
+            },
             "creation_id": session_creation_id,
             "name": session_name,
             "session_type": session_type,
@@ -1014,9 +1015,10 @@ class AgentRegistry:
 
         kernel_shared_data = {
             "status": KernelStatus.PENDING,
-            "status_history": [
-                [KernelStatus.PENDING.name, datetime.now(tzutc()).isoformat()],
-            ],
+            "status_history": {
+                "status": KernelStatus.PENDING.name,
+                "timestamp": datetime.now(tzutc()).isoformat(),
+            },
             "session_creation_id": session_creation_id,
             "session_id": session_id,
             "session_name": session_name,
@@ -1569,8 +1571,9 @@ class AgentRegistry:
                 "stdin_port": created_info["stdin_port"],
                 "stdout_port": created_info["stdout_port"],
                 "service_ports": service_ports,
-                "status_history": sql_append_lists_to_list(
-                    KernelRow.status_history, [new_status.name, datetime.now(tzutc()).isoformat()]
+                "status_history": sql_append_dict_to_list(
+                    KernelRow.status_history,
+                    {"status": new_status.name, "timestamp": datetime.now(tzutc()).isoformat()},
                 ),
             }
 
@@ -1744,12 +1747,12 @@ class AgentRegistry:
                                     status_info=f"other-error ({ex!r})",
                                     status_changed=now,
                                     terminated_at=now,
-                                    status_history=sql_append_lists_to_list(
+                                    status_history=sql_append_dict_to_list(
                                         KernelRow.status_history,
-                                        [
-                                            KernelStatus.ERROR.name,  # ["PULLING", "PREPARING"]
-                                            now.isoformat(),
-                                        ],
+                                        {
+                                            "status": KernelStatus.ERROR.name,
+                                            "timestamp": now.isoformat(),
+                                        },
                                     ),
                                     status_data=convert_to_status_data(ex, self.debug),
                                 )
@@ -2283,9 +2286,12 @@ class AgentRegistry:
                                         "status_info": reason,
                                         "status_changed": now,
                                         "terminated_at": now,
-                                        "status_history": sql_append_lists_to_list(
+                                        "status_history": sql_append_dict_to_list(
                                             KernelRow.status_history,
-                                            [KernelStatus.TERMINATED.name, now.isoformat()],
+                                            {
+                                                "status": KernelStatus.TERMINATED.name,
+                                                "timestamp": now.isoformat(),
+                                            },
                                         ),
                                     }
                                     if kern_stat:
@@ -2327,9 +2333,12 @@ class AgentRegistry:
                                             "kernel": {"exit_code": None},
                                             "session": {"status": "terminating"},
                                         },
-                                        "status_history": sql_append_lists_to_list(
+                                        "status_history": sql_append_dict_to_list(
                                             KernelRow.status_history,
-                                            [KernelStatus.TERMINATING.name, now.isoformat()],
+                                            {
+                                                "status": KernelStatus.TERMINATING.name,
+                                                "timestamp": now.isoformat(),
+                                            },
                                         ),
                                     }
                                     await db_sess.execute(
@@ -2494,12 +2503,12 @@ class AgentRegistry:
                     sa.update(SessionRow)
                     .values(
                         status=SessionStatus.RESTARTING,
-                        status_history=sql_append_lists_to_list(
+                        status_history=sql_append_dict_to_list(
                             SessionRow.status_history,
-                            [
-                                SessionStatus.RESTARTING.name,
-                                datetime.now(tzutc()).isoformat(),
-                            ],
+                            {
+                                "status": KernelStatus.RESTARTING.name,
+                                "timestamp": datetime.now(tzutc()).isoformat(),
+                            },
                         ),
                     )
                     .where(SessionRow.id == session.id)
@@ -2533,8 +2542,9 @@ class AgentRegistry:
                     "stdin_port": kernel_info["stdin_port"],
                     "stdout_port": kernel_info["stdout_port"],
                     "service_ports": kernel_info.get("service_ports", []),
-                    "status_history": sql_append_lists_to_list(
-                        KernelRow.status_history, [KernelStatus.RUNNING.name, now.isoformat()]
+                    "status_history": sql_append_dict_to_list(
+                        KernelRow.status_history,
+                        {"status": KernelStatus.RUNNING.name, "timestamp": now.isoformat()},
                     ),
                 }
                 await KernelRow.update_kernel(
@@ -3065,8 +3075,9 @@ class AgentRegistry:
                         ("kernel",),
                         {"exit_code": exit_code},
                     ),
-                    "status_history": sql_append_lists_to_list(
-                        KernelRow.status_history, [KernelStatus.TERMINATED.name, now.isoformat()]
+                    "status_history": sql_append_dict_to_list(
+                        KernelRow.status_history,
+                        {"status": KernelStatus.TERMINATED.name, "timestamp": now.isoformat()},
                     ),
                     "terminated_at": now,
                 }

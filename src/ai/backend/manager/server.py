@@ -564,7 +564,9 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         query = (
             sa.select(SessionRow)
             .where(SessionRow.status == status)
-            .where(sa.text("""
+            .where(
+                sa.text(
+                    """
                     EXISTS (
                         SELECT 1
                         FROM jsonb_array_elements(status_history) AS session_history
@@ -574,7 +576,9 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                                 now() - CAST(session_history->>1 AS TIMESTAMP WITH TIME ZONE)
                             ) > :threshold
                     )
-                    """).bindparams(status_name=status.name, threshold=threshold))
+                    """
+                ).bindparams(status_name=status.name, threshold=threshold)
+            )
             .options(
                 noload("*"),
                 load_only(SessionRow.id, SessionRow.name, SessionRow.status, SessionRow.access_key),
