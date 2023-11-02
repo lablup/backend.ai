@@ -253,10 +253,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
-    - if: ${{ matrix.os == 'linux-aarch64' }}
-      uses: deadsnakes/action@v3.0.1
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+      # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
