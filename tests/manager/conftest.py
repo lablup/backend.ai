@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.config import etcd_config_iv, redis_config_iv
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
@@ -46,7 +46,6 @@ from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config import LocalConfig, SharedConfig
-from ai.backend.manager.config import load as load_config
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -207,19 +206,6 @@ def local_config(
         if (val := src.get(key, sentinel)) is not sentinel:
             dst[key] = val
 
-    try:
-        # Override external database config with the current environment's config.
-        fs_local_config = load_config()
-        cfg["etcd"]["addr"] = fs_local_config["etcd"]["addr"]
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "user")
-        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
-        cfg["redis"]["addr"] = fs_local_config["redis"]["addr"]
-        _override_if_exists(fs_local_config["redis"], cfg["redis"], "password")
-        cfg["db"]["addr"] = fs_local_config["db"]["addr"]
-        _override_if_exists(fs_local_config["db"], cfg["db"], "user")
-        _override_if_exists(fs_local_config["db"], cfg["db"], "password")
-    except ConfigurationError:
-        pass
     yield cfg
     try:
         shutil.rmtree(ipc_base_path)

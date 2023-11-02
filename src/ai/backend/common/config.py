@@ -135,6 +135,10 @@ def find_config_file(daemon_name: str, ext: str = ".toml") -> Path:
         toml_paths = [
             Path.cwd() / filename,
         ]
+        if known_build_root := os.environ.get("BACKEND_BUILD_ROOT", None):
+            # When running inside `pants test`, we should correct the cwd.
+            toml_paths.append(Path(known_build_root) / filename)
+            os.chdir(known_build_root)
         if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
             parent_path = Path.cwd().parent
             while parent_path.is_relative_to(Path.home()):
