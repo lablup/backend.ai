@@ -1238,7 +1238,7 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "group_name": group_name,
+            "group_name": group_name[0],
             "group_id": row.group_id,
             "user_email": email,
             "full_name": full_name,

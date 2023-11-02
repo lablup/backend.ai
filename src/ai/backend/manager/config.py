@@ -46,6 +46,7 @@ Alias keys are also URL-quoted in the same way.
        - timezone: "UTC"  # pytz-compatible timezone names (e.g., "Asia/Seoul")
      + api
        - allow-origins: "*"
+       - allow-graphql-schema-introspection: "yes" | "no"  # (default: no)
        + resources
          - group_resource_visibility: "true"  # return group resource status in check-presets
                                               # (default: false)
@@ -320,12 +321,9 @@ _config_defaults: Mapping[str, Any] = {
     },
     "api": {
         "allow-origins": "*",
+        "allow-graphql-schema-introspection": False,
     },
-    "redis": {
-        "addr": None,
-        "password": None,
-        "redis_helper_config": config.redis_helper_default_config,
-    },
+    "redis": config.redis_default_config,
     "docker": {
         "registry": {},
         "image": {
@@ -412,21 +410,13 @@ shared_config_iv = t.Dict(
         t.Key("api", default=_config_defaults["api"]): t.Dict(
             {
                 t.Key("allow-origins", default=_config_defaults["api"]["allow-origins"]): t.String,
-            }
-        ).allow_extra("*"),
-        t.Key("redis", default=_config_defaults["redis"]): t.Dict(
-            {
-                t.Key("addr", default=_config_defaults["redis"]["addr"]): t.Null | tx.HostPortPair,
-                t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(
-                    tx.HostPortPair
-                ),
-                t.Key("service_name", default=None): t.Null | t.String,
-                t.Key("password", default=_config_defaults["redis"]["password"]): t.Null | t.String,
                 t.Key(
-                    "redis_helper_config", default=_config_defaults["redis"]["redis_helper_config"]
-                ): config.redis_helper_config_iv,
+                    "allow-graphql-schema-introspection",
+                    default=_config_defaults["api"]["allow-graphql-schema-introspection"],
+                ): t.ToBool,
             }
         ).allow_extra("*"),
+        t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
         t.Key("docker", default=_config_defaults["docker"]): t.Dict(
             {
                 t.Key("registry"): t.Mapping(t.String, container_registry_iv),
@@ -609,7 +599,10 @@ def load(config_path: Optional[Path] = None, log_level: str = "INFO") -> LocalCo
         if cfg["manager"]["secret"] is None:
             cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of manager local config has failed:", file=sys.stderr)
+        print(
+            "ConfigurationError: Could not read or validate the manager local config:",
+            file=sys.stderr,
+        )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:

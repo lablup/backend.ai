@@ -8,17 +8,10 @@ python_sources(
 visibility_private_component(
     allowed_dependents=[],
     allowed_dependencies=[
+        "//src/ai/backend/cli/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/plugin/**",
     ],
-)
-
-pex_binary(
-    name="server",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="server.py",
 )
 
 python_distribution(
@@ -32,13 +25,33 @@ python_distribution(
         description="Backend.AI Storage Proxy",
         license="LGPLv3",
     ),
-    entry_points={},
+    entry_points={
+        "backendai_cli_v10": {
+            "storage": "ai.backend.storage.cli:main",
+            "storage.start-server": "ai.backend.storage.server:main",
+        },
+    },
     generate_setup=True,
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
 
+scie_binary(
+    name="backendai-storage-proxy",
+    dependencies=[":pex"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[
