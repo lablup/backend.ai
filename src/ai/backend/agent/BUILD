@@ -1,9 +1,5 @@
 python_sources(
     name="src",
-    sources=[
-        "*.py",
-        "!watcher.py",
-    ],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/agent/docker:src",  # not auto-inferred
@@ -12,19 +8,6 @@ python_sources(
         "src/ai/backend/helpers:src",
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
-        "!./__init__.py:src-watcher",
-    ],
-)
-python_sources(
-    name="src-watcher",
-    sources=[
-        "__init__.py",
-        "watcher.py",
-    ],
-    dependencies=[
-        ":resources",
-        # Exclude transitive dependencies of the agent itself!
-        "!./__init__.py:src",
     ],
 )
 
@@ -79,23 +62,10 @@ pex_binary(
         "!!stubs/trafaret:stubs",
     ],
 )
-pex_binary(
-    name="pex-watcher",
-    entry_point="watcher.py",
-    dependencies=[
-        ":src-watcher",
-        "!!stubs/trafaret:stubs",
-    ],
-)
 
 scie_binary(
     name="backendai-agent",
     dependencies=[":pex"],
-)
-
-scie_binary(
-    name="backendai-agent-watcher",
-    dependencies=[":pex-watcher"],
 )
 
 resource(name="version", source="VERSION")

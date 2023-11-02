@@ -254,14 +254,16 @@ async def server_main(
 )
 @click.pass_context
 def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False):
-    if debug:
-        log_level = LogSeverity.DEBUG
-
-    if log_level != LogSeverity.DEBUG:
-        if (uid := os.geteuid()) != 0:
-            raise RuntimeError(f"Watcher must be run as root, not {uid}. Abort.")
-
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "watcher")
+    """Start the watcher service as a foreground process."""
+    try:
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "watcher")
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
 
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
     config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
@@ -273,6 +275,11 @@ def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debu
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
+    if debug:
+        log_level = LogSeverity.DEBUG
+    if log_level != LogSeverity.DEBUG:
+        if (uid := os.geteuid()) != 0:
+            raise RuntimeError(f"Watcher must be run as root, not {uid}. Abort.")
     config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
     config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())

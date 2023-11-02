@@ -11,6 +11,7 @@ visibility_private_component(
         "//src/ai/backend/agent/**",
         "//src/ai/backend/client/**",
         "//src/ai/backend/storage/**",
+        "//src/ai/backend/watcher/**",
         "//src/ai/backend/web/**",
     ],
     allowed_dependencies=[
