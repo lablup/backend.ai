@@ -247,11 +247,16 @@ jobs:
         PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python as Runtime
+
+    - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
+    - if: ${{ matrix.os == 'linux-aarch64' }}
+      uses: deadsnakes/action@v3
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
