@@ -11,6 +11,7 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
+    "scie",
     "towncrier_tool",
 ]
 pants_ignore = [
