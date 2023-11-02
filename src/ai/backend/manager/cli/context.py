@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import contextlib
+import sys
 from pathlib import Path
+from pprint import pformat
 from typing import AsyncIterator, Self
 
 import attrs
@@ -10,6 +12,7 @@ import click
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.config import SharedConfig
@@ -30,8 +33,16 @@ class CLIContext:
     @property
     def local_config(self) -> LocalConfig:
         # Lazy-load the configuration only when requested.
-        if self._local_config is None:
-            self._local_config = load_config(self.config_path, self.log_level)
+        try:
+            if self._local_config is None:
+                self._local_config = load_config(self.config_path, self.log_level)
+        except ConfigurationError as e:
+            print(
+                "ConfigurationError: Could not read or validate the manager local config:",
+                file=sys.stderr,
+            )
+            print(pformat(e.invalid_data), file=sys.stderr)
+            raise click.Abort()
         return self._local_config
 
     def __enter__(self) -> Self:
@@ -44,7 +55,7 @@ class CLIContext:
             self._logger.__enter__()
         return self
 
-    def __exit__(self, *exc_info) -> bool | None:
+    def __exit__(self, *exc_info) -> None:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
             self._logger.__exit__()
