@@ -267,42 +267,35 @@ def main(cli_ctx: click.Context, config_path: Path, log_level: LogSeverity, debu
     """Start the watcher service as a foreground process."""
     try:
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "watcher")
-    except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Could not read or validate the watcher local config:",
-            file=sys.stderr,
+        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+        config.override_with_env(
+            raw_cfg, ("watcher", "service-addr", "host"), "BACKEND_WATCHER_SERVICE_IP"
         )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
-
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    config.override_with_env(
-        raw_cfg, ("watcher", "service-addr", "host"), "BACKEND_WATCHER_SERVICE_IP"
-    )
-    config.override_with_env(
-        raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
-    )
-    if debug:
-        log_level = LogSeverity.DEBUG
-    if log_level != LogSeverity.DEBUG:
-        if (uid := os.geteuid()) != 0:
-            raise RuntimeError(f"Watcher must be run as root, not {uid}. Abort.")
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
-
-    try:
+        config.override_with_env(
+            raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
+        )
+        if debug:
+            log_level = LogSeverity.DEBUG
+        if log_level != LogSeverity.DEBUG:
+            if (uid := os.geteuid()) != 0:
+                raise RuntimeError(f"Watcher must be run as root, not {uid}. Abort.")
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
         cfg = config.check(raw_cfg, watcher_config_iv)
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Watcher configuration ==")
             pprint(cfg)
         cfg["_src"] = cfg_src_path
     except config.ConfigurationError as e:
-        print("Validation of watcher configuration has failed:", file=sys.stderr)
+        print(
+            "ConfigurationError: Could not read or validate the watcher local config:",
+            file=sys.stderr,
+        )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 

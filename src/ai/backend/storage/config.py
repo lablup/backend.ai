@@ -1,14 +1,11 @@
 import os
-import sys
 from pathlib import Path
-from pprint import pformat
 from typing import Any
 
 import trafaret as t
 
 from ai.backend.common import validators as tx
 from ai.backend.common.config import (
-    ConfigurationError,
     check,
     etcd_config_iv,
     override_key,
@@ -110,26 +107,15 @@ local_config_iv = (
 def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str, Any]:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = read_from_file(config_path, "storage-proxy")
-    os.chdir(cfg_src_path.parent)
-
     override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
     override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
     override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
     override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
     if debug:
         override_key(raw_cfg, ("debug", "enabled"), True)
-
-    try:
-        local_config = check(raw_cfg, local_config_iv)
-        local_config["_src"] = cfg_src_path
-        return local_config
-    except ConfigurationError as e:
-        print(
-            "ConfigurationError: Validation of storage-proxy local config has failed:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise
+    local_config = check(raw_cfg, local_config_iv)
+    local_config["_src"] = cfg_src_path
+    return local_config
 
 
 def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:
