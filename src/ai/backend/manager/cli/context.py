@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, AsyncIterator, Self
+import sys
+from pathlib import Path
+from pprint import pformat
+from typing import AsyncIterator, Self
 
 import attrs
 import click
@@ -9,21 +12,38 @@ import click
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.manager.config import SharedConfig
 
-if TYPE_CHECKING:
-    from ..config import LocalConfig
+from ..config import LocalConfig
+from ..config import load as load_config
 
 
 class CLIContext:
-    local_config: LocalConfig
-
+    _local_config: LocalConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, local_config: LocalConfig) -> None:
-        self.local_config = local_config
+    def __init__(self, config_path: Path, log_level: str) -> None:
+        self.config_path = config_path
+        self.log_level = log_level
+        self._local_config = None
+
+    @property
+    def local_config(self) -> LocalConfig:
+        # Lazy-load the configuration only when requested.
+        try:
+            if self._local_config is None:
+                self._local_config = load_config(self.config_path, self.log_level)
+        except ConfigurationError as e:
+            print(
+                "ConfigurationError: Could not read or validate the manager local config:",
+                file=sys.stderr,
+            )
+            print(pformat(e.invalid_data), file=sys.stderr)
+            raise click.Abort()
+        return self._local_config
 
     def __enter__(self) -> Self:
         # The "start-server" command is injected by ai.backend.cli from the entrypoint
@@ -31,12 +51,7 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            if (
-                "drivers" in self.local_config["logging"]
-                and "file" in self.local_config["logging"]["drivers"]
-            ):
-                self.local_config["logging"]["drivers"].remove("file")
-            self._logger = LocalLogger(self.local_config["logging"])
+            self._logger = LocalLogger({})
             self._logger.__enter__()
         return self
 
