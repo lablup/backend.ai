@@ -166,8 +166,11 @@ async def test_modify_container_registry_allows_empty_string(
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == ["default", "example"]
     assert container_registry["config"]["username"] == "username2"
-    assert container_registry["config"]["password"] == PASSWORD_PLACEHOLDER
     assert container_registry["config"]["ssl_verify"] is False
+
+    # Direct access to the etcd to reveal that the password is actually set as an empty string
+    registry = await context.shared_config.get_container_registry("cr.example.com")
+    assert registry["password"] == ""
 
 
 @pytest.mark.dependency(depends=["test_modify_container_registry_allows_empty_string"])
