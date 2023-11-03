@@ -209,9 +209,9 @@ class StorageVolume(graphene.ObjectType):
     performance_metric = graphene.JSONString()
     usage = graphene.JSONString()
     proxy = graphene.String(
-        description=description_msg("24.03.1", "Name of the proxy which this volume belongs to.")
+        description=description_msg("24.03.0", "Name of the proxy which this volume belongs to.")
     )
-    name = graphene.String(description=description_msg("24.03.1", "Name of the storage."))
+    name = graphene.String(description=description_msg("24.03.0", "Name of the storage."))
 
     async def resolve_hardware_metadata(self, info: graphene.ResolveInfo) -> HardwareMetadata:
         ctx: GraphQueryContext = info.context
