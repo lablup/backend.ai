@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-import json
-
 """
 Configuration Schema on etcd
 ----------------------------
@@ -175,6 +171,9 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
+from __future__ import annotations
+
+import json
 import logging
 import os
 import secrets
@@ -359,7 +358,7 @@ container_registry_iv = t.Dict(
         t.Key(""): tx.URL,
         t.Key("type", default="docker"): t.String,
         t.Key("username", default=None): t.Null | t.String,
-        t.Key("password", default=None): t.Null | t.String,
+        t.Key("password", default=None): t.Null | t.String(allow_blank=True),
         t.Key("project", default=None): (
             t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
         ),
