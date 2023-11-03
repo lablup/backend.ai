@@ -1036,6 +1036,11 @@ def set_if_set(
     clean_func=None,
     target_key: Optional[str] = None,
 ) -> None:
+    """
+    Set the target dict with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
     v = getattr(src, name)
     # NOTE: unset optional fields are passed as graphql.Undefined.
     if v is not Undefined:

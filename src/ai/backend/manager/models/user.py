@@ -518,7 +518,7 @@ class UserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=True, default="default")
     role = graphene.String(required=False, default=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False, defualt=None)
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False, default="default")
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
@@ -585,8 +585,8 @@ class CreateUser(graphene.Mutation):
             "role": UserRole(props.role),
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
-            "resource_policy": props.resource_policy or "default",
-            "sudo_session_enabled": props.sudo_session_enabled or False,
+            "resource_policy": props.resource_policy,
+            "sudo_session_enabled": props.sudo_session_enabled,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -614,9 +614,9 @@ class CreateUser(graphene.Mutation):
             await conn.execute(kp_insert_query)
 
             # Add user to groups if group_ids parameter is provided.
-            from .group import association_groups_users, groups
-
             if props.group_ids:
+                from .group import association_groups_users, groups
+
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)
