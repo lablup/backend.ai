@@ -2,9 +2,9 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common.types import HostPortPair
 from ai.backend.manager.config import SharedConfig
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.testutils.bootstrap import etcd_container  # noqa: F401
 
 CONTAINER_REGISTRY_FIELDS = """
     container_registry {
@@ -27,9 +27,9 @@ def client() -> Client:
 
 
 @pytest.fixture(scope="module")
-def context() -> GraphQueryContext:
+def context(etcd_container) -> GraphQueryContext:  # noqa: F811
     shared_config = SharedConfig(
-        etcd_addr=HostPortPair("0.0.0.0", 8121),
+        etcd_addr=etcd_container[1],
         etcd_user="",
         etcd_password="",
         namespace="local",

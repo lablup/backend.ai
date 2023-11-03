@@ -190,10 +190,6 @@ jobs:
       with:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Run halfstack etcd container
-      run: |
-        sed -i'' "s/- \"8120:2379\"/- \"8121:2379\"/g" docker-compose.halfstack-main.yml
-        docker-compose -f docker-compose.halfstack-main.yml run -d --service-ports backendai-half-etcd
     - name: Test
       timeout-minutes: 15
       run: |
