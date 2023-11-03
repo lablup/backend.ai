@@ -1,11 +1,10 @@
 import textwrap
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
-from ai.backend.client.output.fields import domain_fields
-from ai.backend.client.output.types import FieldSpec
-
+from ..output.fields import domain_fields
+from ..output.types import FieldSpec
 from ..session import api_session
-from ..types import GraphQLInputVars, Undefined, set_if_set, undefined
+from ..types import Undefined, set_if_set, undefined
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Domain",)
@@ -114,17 +113,18 @@ class Domain(BaseFunction):
         """)
         resolved_fields = resolve_fields(fields, domain_fields, (domain_fields["name"],))
         query = query.replace("$fields", " ".join(resolved_fields))
-        variables: GraphQLInputVars = {
-            "name": name,
-            "input": {
-                "description": description,
-                "is_active": is_active,
-            },
+        inputs = {
+            "description": description,
+            "is_active": is_active,
         }
-        set_if_set(variables["input"], "total_resource_slots", total_resource_slots)
-        set_if_set(variables["input"], "allowed_vfolder_hosts", allowed_vfolder_hosts)
-        set_if_set(variables["input"], "allowed_docker_registries", allowed_docker_registries)
-        set_if_set(variables["input"], "integration_id", integration_id)
+        set_if_set(inputs, "total_resource_slots", total_resource_slots)
+        set_if_set(inputs, "allowed_vfolder_hosts", allowed_vfolder_hosts)
+        set_if_set(inputs, "allowed_docker_registries", allowed_docker_registries)
+        set_if_set(inputs, "integration_id", integration_id)
+        variables = {
+            "name": name,
+            "input": inputs,
+        }
         data = await api_session.get().Admin._query(query, variables)
         return data["create_domain"]
 
@@ -153,17 +153,18 @@ class Domain(BaseFunction):
                 }
             }
         """)
-        variables: GraphQLInputVars = {
+        inputs: dict[str, Any] = {}
+        set_if_set(inputs, "name", new_name)
+        set_if_set(inputs, "description", description)
+        set_if_set(inputs, "is_active", is_active)
+        set_if_set(inputs, "total_resource_slots", total_resource_slots)
+        set_if_set(inputs, "allowed_vfolder_hosts", allowed_vfolder_hosts)
+        set_if_set(inputs, "allowed_docker_registries", allowed_docker_registries)
+        set_if_set(inputs, "integration_id", integration_id)
+        variables = {
             "name": name,
-            "input": {},
+            "input": inputs,
         }
-        set_if_set(variables["input"], "name", new_name)
-        set_if_set(variables["input"], "description", description)
-        set_if_set(variables["input"], "is_active", is_active)
-        set_if_set(variables["input"], "total_resource_slots", total_resource_slots)
-        set_if_set(variables["input"], "allowed_vfolder_hosts", allowed_vfolder_hosts)
-        set_if_set(variables["input"], "allowed_docker_registries", allowed_docker_registries)
-        set_if_set(variables["input"], "integration_id", integration_id)
         data = await api_session.get().Admin._query(query, variables)
         return data["modify_domain"]
 
