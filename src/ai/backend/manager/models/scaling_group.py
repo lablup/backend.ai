@@ -528,17 +528,19 @@ class CreateScalingGroup(graphene.Mutation):
     ) -> CreateScalingGroup:
         data = {
             "name": name,
-            "description": props.description,
-            "is_active": bool(props.is_active),
-            "is_public": bool(props.is_public),
-            "wsproxy_addr": props.wsproxy_addr,
-            "wsproxy_api_token": props.wsproxy_api_token,
-            "driver": props.driver,
-            "driver_opts": props.driver_opts,
-            "scheduler": props.scheduler,
-            "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
-            "use_host_network": bool(props.use_host_network),
         }
+        set_if_set(props, data, "description")
+        set_if_set(props, data, "is_active")
+        set_if_set(props, data, "is_public")
+        set_if_set(props, data, "driver")
+        set_if_set(props, data, "wsproxy_addr")
+        set_if_set(props, data, "wsproxy_api_token")
+        set_if_set(props, data, "driver_opts")
+        set_if_set(props, data, "scheduler")
+        set_if_set(
+            props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
+        )
+        set_if_set(props, data, "use_host_network")
         insert_query = sa.insert(scaling_groups).values(data)
         return await simple_db_mutate_returning_item(
             cls,
