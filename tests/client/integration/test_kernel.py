@@ -49,7 +49,7 @@ def exec_loop(kernel, mode, code, opts=None, user_inputs=None):
     return aggregate_console(console), num_queries
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def py3_kernel():
     with Session() as sess:
         kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04")

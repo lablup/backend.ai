@@ -211,6 +211,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     ALREADY_TERMINATED = "already-terminated"
     ANOMALY_DETECTED = "anomaly-detected"
     EXEC_TIMEOUT = "exec-timeout"
+    FAILED_TO_CREATE = "failed-to-create"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
     HANG_TIMEOUT = "hang-timeout"
