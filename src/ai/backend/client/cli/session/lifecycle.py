@@ -24,8 +24,9 @@ from tabulate import tabulate
 
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
-from ai.backend.cli.types import CliContextInfo, ExitCode, Undefined, undefined
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
 from ai.backend.common.utils import get_first_occurrence_time
@@ -782,7 +783,7 @@ def logs(session_id, kernel: str | None):
 @session.command("status-history")
 @pass_ctx_obj
 @click.argument("session_id", metavar="SESSID")
-def status_history(ctx: CliContextInfo, session_id):
+def status_history(ctx: CLIContext, session_id):
     """
     Shows the status transition history of the compute session.
 
@@ -794,31 +795,31 @@ def status_history(ctx: CliContextInfo, session_id):
         kernel = session.ComputeSession(session_id)
         try:
             status_history = kernel.get_status_history().get("result")
-            print_info(f"status_history: {status_history}")
+
+            prev_time = None
+
+            for status_record in status_history:
+                timestamp = datetime.fromisoformat(status_record["timestamp"])
+
+                if prev_time:
+                    time_diff = timestamp - prev_time
+                    status_record["time_elapsed"] = str(time_diff)
+
+                prev_time = timestamp
+
+            ctx.output.print_list(
+                status_history,
+                [FieldSpec("status"), FieldSpec("timestamp"), FieldSpec("time_elapsed")],
+            )
+
             if (preparing := get_first_occurrence_time(status_history, "PREPARING")) is None:
-                result = {
-                    "result": {
-                        "seconds": 0,
-                        "microseconds": 0,
-                    },
-                }
+                elapsed = timedelta()
             elif (terminated := get_first_occurrence_time(status_history, "TERMINATED")) is None:
-                alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
-                result = {
-                    "result": {
-                        "seconds": alloc_time_until_now.seconds,
-                        "microseconds": alloc_time_until_now.microseconds,
-                    },
-                }
+                elapsed = datetime.now(tzutc()) - isoparse(preparing)
             else:
-                alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
-                result = {
-                    "result": {
-                        "seconds": alloc_time.seconds,
-                        "microseconds": alloc_time.microseconds,
-                    },
-                }
-            print_done(f"Actual Resource Allocation Time: {result}")
+                elapsed = isoparse(terminated) - isoparse(preparing)
+
+            print_done(f"Actual Resource Allocation Time: {elapsed.total_seconds()}")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
