@@ -881,7 +881,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await container.start()
             except asyncio.CancelledError:
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(
+                        container_id=cid, message="Container creation cancelled"
+                    )
                 raise
             except Exception:
                 # Oops, we have to restore the allocated resources!
@@ -898,7 +900,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(container_id=cid, message="unknown")
                 raise
 
             additional_network_names: Set[str] = set()
@@ -917,7 +919,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    host_port = int((await container.port(port))[0]["HostPort"])
+                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    if ports is None:
+                        raise ContainerCreationError(
+                            container_id=cid, message="Container port not found"
+                        )
+                    host_port = int(ports[0]["HostPort"])
                     assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port

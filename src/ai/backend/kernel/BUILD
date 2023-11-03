@@ -9,7 +9,9 @@ python_sources(
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/agent/**",
+    ],
     allowed_dependencies=[
         "//src/ai/backend/runner/**",
         "//src/ai/backend/helpers/**",

@@ -1970,10 +1970,10 @@ class AbstractAgent(
                         preopen_ports,
                     )
                 except ContainerCreationError as e:
-                    log.warning(
-                        "Kernel failed to create container (k:{}). Kernel is going to be"
-                        " destroyed.",
-                        ctx.kernel_id,
+                    msg = e.message or "unknown"
+                    log.error(
+                        "Kernel failed to create container. Kernel is going to be destroyed."
+                        f" (k:{ctx.kernel_id}, detail:{msg})",
                     )
                     cid = e.container_id
                     async with self.registry_lock:
@@ -1982,10 +1982,12 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         LifecycleEvent.DESTROY,
-                        KernelLifecycleEventReason.UNKNOWN,
+                        KernelLifecycleEventReason.FAILED_TO_CREATE,
                         container_id=ContainerId(cid),
                     )
-                    raise AgentError(f"Kernel failed to create container (k:{str(ctx.kernel_id)})")
+                    raise AgentError(
+                        f"Kernel failed to create container (k:{str(ctx.kernel_id)}, detail:{msg})"
+                    )
                 except Exception:
                     log.warning(
                         "Kernel failed to create container (k:{}). Kernel is going to be"

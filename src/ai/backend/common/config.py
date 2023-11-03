@@ -66,10 +66,22 @@ redis_helper_config_iv = t.Dict(
     }
 ).allow_extra("*")
 
+redis_default_config = {
+    "addr": None,
+    "sentinel": None,
+    "service_name": None,
+    "password": None,
+    "redis_helper_config": redis_helper_default_config,
+}
+
 redis_config_iv = t.Dict(
     {
-        t.Key("addr", default=None): t.Null | tx.HostPortPair,
-        t.Key("password", default=None): t.Null | t.String,
+        t.Key("addr", default=redis_default_config["addr"]): t.Null | tx.HostPortPair,
+        t.Key(  # if present, addr is ignored and service_name becomes mandatory.
+            "sentinel", default=redis_default_config["sentinel"]
+        ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
+        t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
+        t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
         t.Key(
             "redis_helper_config",
             default=redis_helper_default_config,
