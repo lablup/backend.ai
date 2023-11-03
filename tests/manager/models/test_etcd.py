@@ -3,6 +3,7 @@ from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.manager.config import SharedConfig
+from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.testutils.bootstrap import etcd_container  # noqa: F401
 
@@ -86,7 +87,7 @@ async def test_create_container_registry(client: Client, context: GraphQueryCont
         "type": "dockerhub",
         "project": ["default"],
         "username": "username",
-        "password": "*****",
+        "password": PASSWORD_PLACEHOLDER,
         "ssl_verify": False,
     }
 
@@ -165,7 +166,7 @@ async def test_modify_container_registry_allows_empty_string(
     assert container_registry["config"]["type"] == "harbor2"
     assert container_registry["config"]["project"] == ["default", "example"]
     assert container_registry["config"]["username"] == "username2"
-    assert container_registry["config"]["password"] == "*****"
+    assert container_registry["config"]["password"] == PASSWORD_PLACEHOLDER
     assert container_registry["config"]["ssl_verify"] is False
 
 
