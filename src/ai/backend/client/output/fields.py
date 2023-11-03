@@ -181,6 +181,8 @@ session_fields = FieldSet([
     FieldSpec("created_user_id"),
     FieldSpec("status"),
     FieldSpec("status_info"),
+    FieldSpec("status_history"),
+    FieldSpec("status_history_log"),
     FieldSpec("status_data", formatter=nested_dict_formatter),
     FieldSpec("status_changed", "Last Updated"),
     FieldSpec("created_at"),
