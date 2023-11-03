@@ -9,7 +9,7 @@ import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
@@ -243,9 +243,15 @@ def main(
     log_level: str,
     debug: bool = False,
 ) -> int:
+    """Start the storage-proxy service as a foreground process."""
     try:
         local_config = load_local_config(config_path, debug=debug)
-    except ConfigurationError:
+    except ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     if debug:
         log_level = "DEBUG"

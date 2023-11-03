@@ -204,7 +204,8 @@
       "PleaseSelectOptions": "Por favor, seleccione al menos una opción o más.",
       "PolicyName": "Nombre de la póliza Obligatorio.",
       "ValidationFailed": "Validación fallida"
-    }
+    },
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Allowslettersnumbersand-_": "Permite letras, números y -_",
@@ -369,7 +370,8 @@
       "Status": "Estado",
       "StatusOfSelectedHost": "Estado del host seleccionado",
       "used": "usado"
-    }
+    },
+    "SearchByName": "Buscar por nombre"
   },
   "dialog": {
     "ErrorOccurred": "Se ha producido un error",
@@ -691,7 +693,7 @@
     "ServiceEndpoint": "Punto final del servicio",
     "ServiceInfo": "Información de servicio",
     "ServiceName": "Nombre del servicio",
-    "ServiceNameRule": "Sólo se permiten de 4 a 64 caracteres alfanuméricos, guión bajo(_), guión(-) y punto(.) y debe terminar con un carácter alfanumérico.",
+    "ServiceNameRule": "Sólo se permiten de 4 a 24 caracteres alfanuméricos, guión bajo(_), guión(-) y punto(.) y debe terminar con un carácter alfanumérico.",
     "Services": "Servicios",
     "ServingRouteErrorModalTitle": "Error de ruta de servicio",
     "SessionId": "ID de sesión",
@@ -782,7 +784,8 @@
     "TypeRegistryNameToDelete": "Escriba el nombre de host del registro que desea eliminar",
     "UpdatingRegistryInfo": "Actualización de la información del registro...",
     "Username": "Nombre de usuario",
-    "UsernameOptional": "Nombre de usuario (opcional)"
+    "UsernameOptional": "Nombre de usuario (opcional)",
+    "ConfirmNoUserName": "Usuario y contraseña no especificados, ¿desea guardar?"
   },
   "resourceGroup": {
     "Active": "Activo",
@@ -963,7 +966,9 @@
       "EnterValidSessionName": "Introduzca un nombre de sesión válido",
       "SessionNameAlreadyExist": "El nombre de la sesión ya existe",
       "SessionNameRequired": "El nombre de la sesión es obligatorio",
-      "SluggedStrings": "Cadenas babosas (>3 caracteres)"
+      "SluggedStrings": "Cadenas babosas (>3 caracteres)",
+      "SessionNameTooLong64": "Introduzca 64 caracteres o menos.",
+      "PleaseFollowSessionNameRule": "Ingrese una combinación de al menos 3 letras, números, '.', '_' y '-'."
     },
     "XRDPconnection": "Conexión RDP",
     "applauncher": {
@@ -1096,7 +1101,12 @@
       "TotalAllocation": "Asignación total",
       "UserResourceLimit": "Límite de recursos de usuario",
       "Version": "Versión",
-      "sessionStillPreparing": "La sesión aún está en preparación. Una vez iniciada la sesión, pulse el icono de la aplicación para iniciarla."
+      "sessionStillPreparing": "La sesión aún está en preparación. Una vez iniciada la sesión, pulse el icono de la aplicación para iniciarla.",
+      "PreOpenPortRangeGuide": "Introduzca varios valores separados por una coma (,) o un espacio.",
+      "preopen": "preabierto",
+      "FolderAliasInvalid": "Sólo se permiten caracteres alfanuméricos, guión bajo (_), barra (/) y guión (-).",
+      "Network": "Red",
+      "Enable": "Permitir"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
