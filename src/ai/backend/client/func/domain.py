@@ -95,8 +95,8 @@ class Domain(BaseFunction):
         description: str = "",
         is_active: bool = True,
         total_resource_slots: str | Undefined = undefined,
-        allowed_vfolder_hosts: str | Undefined = undefined,
-        allowed_docker_registries: Iterable[str] | Undefined = undefined,
+        allowed_vfolder_hosts: Sequence[str] | Undefined = undefined,
+        allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
