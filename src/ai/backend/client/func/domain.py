@@ -96,7 +96,7 @@ class Domain(BaseFunction):
         description: str = "",
         is_active: bool = True,
         total_resource_slots: str | Undefined = undefined,
-        allowed_vfolder_hosts: str | Undefined = undefined,  # JSON string
+        vfolder_host_perms: str | Undefined = undefined,  # JSON string
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
@@ -119,7 +119,7 @@ class Domain(BaseFunction):
             "is_active": is_active,
         }
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
-        set_if_set(inputs, "allowed_vfolder_hosts", allowed_vfolder_hosts)
+        set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
         set_if_set(inputs, "allowed_docker_registries", allowed_docker_registries)
         set_if_set(inputs, "integration_id", integration_id)
         variables = {
@@ -139,7 +139,7 @@ class Domain(BaseFunction):
         description: str | Undefined = undefined,
         is_active: bool | Undefined = undefined,
         total_resource_slots: str | Undefined = undefined,
-        allowed_vfolder_hosts: str | Undefined = undefined,  # JSON string
+        vfolder_host_perms: str | Undefined = undefined,  # JSON string
         allowed_docker_registries: Sequence[str] | Undefined = undefined,
         integration_id: str | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
@@ -160,7 +160,7 @@ class Domain(BaseFunction):
         set_if_set(inputs, "description", description)
         set_if_set(inputs, "is_active", is_active)
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
-        set_if_set(inputs, "allowed_vfolder_hosts", allowed_vfolder_hosts)
+        set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
         set_if_set(inputs, "allowed_docker_registries", allowed_docker_registries)
         set_if_set(inputs, "integration_id", integration_id)
         variables = {

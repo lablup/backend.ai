@@ -70,19 +70,21 @@ def list(ctx: CLIContext) -> None:
     help="Set total resource slots as a JSON string.",
 )
 @click.option(
-    "--allowed-vfolder-hosts",
+    "--vfolder-host-perms",
     "--vfolder-host-permissions",
     "--vfhost-perms",
-    type=str,
-    default="{}",
+    "--allowed-vfolder-hosts",  # legacy name
+    type=OptionalType(str),
+    default=undefined,
     help=(
         "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
-        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
 @click.option(
     "--allowed-docker-registries",
-    type=CommaSeparatedListType(),
+    type=OptionalType(CommaSeparatedListType),
+    default=undefined,
     help="Allowed docker registries.",
 )
 def add(
@@ -91,9 +93,9 @@ def add(
     description: str,
     inactive: bool,
     total_resource_slots: str,
-    allowed_vfolder_hosts: str,
-    allowed_docker_registries: Sequence[str],
-):
+    vfolder_host_perms: str | Undefined,
+    allowed_docker_registries: Sequence[str] | Undefined,
+) -> None:
     """
     Add a new domain.
 
@@ -106,7 +108,7 @@ def add(
                 description=description,
                 is_active=not inactive,
                 total_resource_slots=total_resource_slots,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                vfolder_host_perms=vfolder_host_perms,
                 allowed_docker_registries=allowed_docker_registries,
             )
         except Exception as e:
@@ -157,12 +159,15 @@ def add(
     help="Update total resource slots.",
 )
 @click.option(
-    "--allowed-vfolder-hosts",
+    "--vfolder-host-perms",
+    "--vfolder-host-permissions",
+    "--vfhost-perms",
+    "--allowed-vfolder-hosts",  # legacy name
     type=OptionalType(str),
     default=undefined,
     help=(
-        "Allowed virtual folder hosts. It must be JSON string (e.g:"
-        ' --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
+        "Allowed virtual folder hosts and permissions for them. It must be JSON string (e.g:"
+        ' --vfolder-host-perms=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')'
     ),
 )
 @click.option(
@@ -178,9 +183,9 @@ def update(
     description: str | Undefined,
     is_active: bool | Undefined,
     total_resource_slots: str | Undefined,
-    allowed_vfolder_hosts: str | Undefined,
+    vfolder_host_perms: str | Undefined,
     allowed_docker_registries: Sequence[str] | Undefined,
-):
+) -> None:
     """
     Update an existing domain.
 
@@ -194,7 +199,7 @@ def update(
                 description=description,
                 is_active=is_active,
                 total_resource_slots=total_resource_slots,
-                allowed_vfolder_hosts=allowed_vfolder_hosts,
+                vfolder_host_perms=vfolder_host_perms,
                 allowed_docker_registries=allowed_docker_registries,
             )
         except Exception as e:
@@ -222,7 +227,7 @@ def update(
 @domain.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-def delete(ctx: CLIContext, name):
+def delete(ctx: CLIContext, name: str) -> None:
     """
     Inactive an existing domain.
 
@@ -256,7 +261,7 @@ def delete(ctx: CLIContext, name):
 @domain.command()
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
-def purge(ctx: CLIContext, name):
+def purge(ctx: CLIContext, name: str) -> None:
     """
     Delete an existing domain.
 
