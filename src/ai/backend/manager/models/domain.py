@@ -40,9 +40,9 @@ __all__: Sequence[str] = (
     "domains",
     "DomainRow",
     "Domain",
-    "DomainInput",
-    "ModifyDomainInput",
+    "CreateDomainInput",
     "CreateDomain",
+    "ModifyDomainInput",
     "ModifyDomain",
     "DeleteDomain",
     "DomainDotfile",
@@ -170,7 +170,7 @@ class Domain(graphene.ObjectType):
             )
 
 
-class DomainInput(graphene.InputObjectType):
+class CreateDomainInput(graphene.InputObjectType):
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False, default=True)
     total_resource_slots = graphene.JSONString(required=False)
@@ -194,7 +194,7 @@ class CreateDomain(graphene.Mutation):
 
     class Arguments:
         name = graphene.String(required=True)
-        props = DomainInput(required=True)
+        props = CreateDomainInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -206,7 +206,7 @@ class CreateDomain(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         name: str,
-        props: DomainInput,
+        props: CreateDomainInput,
     ) -> CreateDomain:
         if _rx_slug.search(name) is None:
             return cls(False, "invalid name format. slug format required.", None)
