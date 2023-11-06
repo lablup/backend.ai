@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
 from typing import cast
 from weakref import WeakSet
 
 import click
+from rich.console import Console
 from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
@@ -61,6 +64,8 @@ class DevSetup(Static):
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
             raise
+        except Exception as e:
+            _log.write(e)
         finally:
             current_log.reset(_log_token)
 
@@ -78,7 +83,8 @@ class PackageSetup(Static):
         top_tasks.add(asyncio.create_task(self.install()))
 
     async def install(self) -> None:
-        log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log_token = current_log.set(_log)
         ctx = PackageContext()
         try:
             # prerequisites
@@ -92,9 +98,13 @@ class PackageSetup(Static):
             # post-setup
             await ctx.dump_etcd_config()
         except asyncio.CancelledError:
-            log.write(Text.from_markup("[red]Interrupted!"))
+            _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
             raise
+        except Exception as e:
+            _log.write(e)
+        finally:
+            current_log.reset(_log_token)
 
 
 class ModeMenu(Static):
@@ -221,6 +231,15 @@ def main(
     mode: InstallModes | None,
 ) -> None:
     """The installer"""
+    # check sudo permission
+    console = Console(stderr=True)
+    if os.geteuid() == 0:
+        console.print(
+            "[bright_red] The script should not be run as root, while it requires"
+            " the passwordless sudo privilege."
+        )
+        sys.exit(1)
+    # start installer
     app = InstallerApp(mode)
     current_app.set(app)
     app.run()

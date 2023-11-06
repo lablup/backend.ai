@@ -1,35 +1,31 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.text import Text
 
-from .context import current_log
+if TYPE_CHECKING:
+    from .context import Context
 
 
-async def install_git_lfs() -> None:
-    log = current_log.get()
-    log.write(Text.from_markup("[dim green]Installing Git LFS"))
-    """
-    case $DISTRO in
-    Debian)
-      $sudo apt-get install -y git-lfs
-      ;;
-    RedHat)
-      curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash
-      $sudo yum install -y git-lfs
-      ;;
-    SUSE)
-      $sudo zypper install -y git-lfs
-      ;;
-    Darwin)
-      brew install git-lfs
-      ;;
-    esac
-    git lfs install
-    """
+async def install_git_lfs(ctx: Context) -> None:
+    ctx.log.write(Text.from_markup("[dim green]Installing Git LFS"))
+    if ctx.os_info.distro == "RedHat":
+        "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash"
+    await ctx.install_system_package(
+        {
+            "Debian": ["git-lfs"],
+            "RedHat": ["git-lfs"],
+            "SUSE": ["git-lfs"],
+            "Darwin": ["git-lfs"],
+        }
+    )
+    await ctx.run_shell("git lfs install")
 
 
-async def install_git_hooks() -> None:
-    log = current_log.get()
-    log.write(Text.from_markup("[dim green]Installing Git hooks"))
-    """
+async def install_git_hooks(ctx: Context) -> None:
+    ctx.log.write(Text.from_markup("[dim green]Installing Git hooks"))
+    await ctx.run_shell("""
     local magic_str="monorepo standard pre-commit hook"
     if [ -f .git/hooks/pre-commit ]; then
       grep -Fq "$magic_str" .git/hooks/pre-commit
@@ -56,14 +52,13 @@ async def install_git_hooks() -> None:
       cp scripts/pre-push .git/hooks/pre-push
       chmod +x .git/hooks/pre-push
     fi
-    """
+    """)
 
 
-async def bootstrap_pants(local_execution_root_dir: str) -> None:
-    log = current_log.get()
-    log.write(Text.from_markup("[dim green]Bootstrapping Pantsbuild"))
-    log.write(f"local_execution_root_dir = {local_execution_root_dir}")
-    """
+async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:
+    ctx.log.write(Text.from_markup("[dim green]Bootstrapping Pantsbuild"))
+    ctx.log.write(f"local_execution_root_dir = {local_execution_root_dir}")
+    await ctx.run_shell("""
     pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
     mkdir -p "$pants_local_exec_root"
     $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
@@ -92,9 +87,8 @@ async def bootstrap_pants(local_execution_root_dir: str) -> None:
       exit 1
     fi
     set -e
-    """
-
-    """
+    """)
+    await ctx.run_shell("""
     pants export \
       --resolve=python-default \
       --resolve=python-kernel \
@@ -103,12 +97,11 @@ async def bootstrap_pants(local_execution_root_dir: str) -> None:
       --resolve=ruff \
       --resolve=mypy \
       --resolve=black
-    """
+    """)
 
 
-async def install_editable_webui() -> None:
-    log = current_log.get()
-    log.write(Text.from_markup("[dim green]Installing the editable version of webui"))
+async def install_editable_webui(ctx: Context) -> None:
+    ctx.log.write(Text.from_markup("[dim green]Installing the editable version of webui"))
     """
     if ! command -v node &> /dev/null; then
       install_node

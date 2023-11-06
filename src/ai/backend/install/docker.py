@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import base64
 import hashlib
@@ -5,9 +7,12 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .context import current_log
 from .utils import request_unix
+
+if TYPE_CHECKING:
+    from .context import Context
 
 __all__ = ("check_docker",)
 
@@ -73,28 +78,25 @@ async def detect_system_docker():
         return response_data["Version"]
 
 
-def fail_with_snap_docker_refresh_request() -> None:
-    log = current_log.get()
+def fail_with_snap_docker_refresh_request(log) -> None:
     log.write("Please install Docker 20.10.15 or later from the Snap package index.")
     log.write("Instructions: `sudo snap refresh docker --edge`")
     sys.exit(1)
 
 
-def fail_with_system_docker_install_request() -> None:
-    log = current_log.get()
+def fail_with_system_docker_install_request(log) -> None:
     log.write("Please install Docker for your system.")
     log.write("Instructions: https://docs.docker.com/install/")
     sys.exit(1)
 
 
-def fail_with_compose_install_request() -> None:
-    log = current_log.get()
+def fail_with_compose_install_request(log) -> None:
     log.write("Please install docker-compose v2 or later.")
     log.write("Instructions: https://docs.docker.com/compose/install/")
     sys.exit(1)
 
 
-async def get_preferred_pants_local_exec_root() -> str:
+async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
     docker_version = await detect_snap_docker()
     build_root_path = get_build_root()
     build_root_name = build_root_path.name
@@ -107,19 +109,18 @@ async def get_preferred_pants_local_exec_root() -> str:
         return f"/tmp/{build_root_name}-{build_root_hash}-pants"
 
 
-async def check_docker() -> None:
-    log = current_log.get()
+async def check_docker(ctx: Context) -> None:
     docker_version = await detect_snap_docker()
     if docker_version is not None:
-        log.write(f"Detected Docker installation: Snap package ({docker_version})")
+        ctx.log.write(f"Detected Docker installation: Snap package ({docker_version})")
         if parse_version(docker_version) < (20, 10, 15):
-            fail_with_snap_docker_refresh_request()
+            fail_with_snap_docker_refresh_request(ctx.log)
     else:
         docker_version = await detect_system_docker()
         if docker_version is not None:
-            log.write(f"Detected Docker installation: System package ({docker_version})")
+            ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
         else:
-            fail_with_system_docker_install_request()
+            fail_with_system_docker_install_request(ctx.log)
 
     proc = await asyncio.create_subprocess_exec(
         "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
@@ -128,19 +129,19 @@ async def check_docker() -> None:
     stdout = await proc.stdout.read()
     exit_code = await proc.wait()
     if exit_code != 0:
-        fail_with_compose_install_request()
+        fail_with_compose_install_request(ctx.log)
     m = re.search(r"\d+\.\d+\.\d+", stdout.decode())
     if m is None:
-        log.write("Failed to retrieve the docker-compose version!")
+        ctx.log.write("Failed to retrieve the docker-compose version!")
         sys.exit(1)
     else:
         compose_version = m.group(0)
-        log.write(f"Detected docker-compose installation ({compose_version})")
+        ctx.log.write(f"Detected docker-compose installation ({compose_version})")
         if parse_version(compose_version) < (2, 0, 0):
-            fail_with_compose_install_request()
+            fail_with_compose_install_request(ctx.log)
 
 
-async def check_docker_desktop_mount() -> None:
+async def check_docker_desktop_mount(ctx: Context) -> None:
     """
     echo "validating Docker Desktop mount permissions..."
     docker pull alpine:3.8 > /dev/null
