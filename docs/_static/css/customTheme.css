@@ -5353,7 +5353,7 @@ hr {
   font-size: 5.129vw;
   position: relative;
   display: block;
-  padding: 1.6rem 4rem;
+  padding: 1rem 4rem;
   line-height: 140%;
   color: #000;
 }
@@ -5714,10 +5714,6 @@ footer p {
   margin-left: 24px
 }
 
-/* .wy-nav-top {
-    display: block
-} */
-
 .wy-nav-top > a {
   color: #FFF;
 }
@@ -5840,6 +5836,34 @@ footer p {
   .customized-search-bar-in-desktop {
     position: absolute;
     top: 2.5rem;
+    right: 37rem;
+    display: block;
+    width: 29rem;
+  }
+
+  .customized-search-bar-in-desktop #search-icon-wrapper-in-desktop {
+    position: absolute;
+    top: 1rem;
+    left: 25rem;
+    width: 2.4rem;
+  }
+
+  .customized-search-bar-in-desktop #rtd-search-form-desktop input:first-child {
+    font-size: 2rem;
+    padding-right: 5rem;
+    width: 29rem;
+    height: 4rem;
+  }
+}
+
+
+
+
+
+@media screen and (min-width: 1495px) {
+  .customized-search-bar-in-desktop {
+    position: absolute;
+    top: 2.5rem;
     left: 85rem;
     display: block;
     width: 29rem;
@@ -5859,6 +5883,10 @@ footer p {
     height: 4rem;
   }
 }
+
+
+
+
 
 .customized-search-bar input:first-child {
   padding-right: 10vw;
@@ -5911,7 +5939,7 @@ img.search-icon {
 @media screen and (min-width: 1200px) {
   .wy-nav-content-wrap {
     margin-left: 43rem;
-    width: 106.5rem;
+    padding-right: 2.1rem;
   }
 
   .wy-nav-content {
@@ -5941,6 +5969,21 @@ img.search-icon {
     right: 1rem;
   }
 }
+
+
+
+
+@media screen and (min-width: 1495px) {
+  .wy-nav-content-wrap {
+    margin-left: 43rem;
+    padding-right: 0;
+    width: 106.5rem;
+  }
+}
+
+
+
+
 
 @media print {
   .rst-versions,.wy-nav-side,footer {
@@ -6477,10 +6520,6 @@ div.rst-other-versions small a {
 .rst-content .wy-table td p,.rst-content .wy-table td ul,.rst-content .wy-table th p,.rst-content .wy-table th ul,.rst-content table.docutils td p,.rst-content table.docutils td ul,.rst-content table.docutils th p,.rst-content table.docutils th ul,.rst-content table.field-list td p,.rst-content table.field-list td ul,.rst-content table.field-list th p,.rst-content table.field-list th ul {
   /* font-size: inherit */
 }
-
-/* .rst-content .btn:focus {
-  outline: 2px solid
-} */
 
 .rst-content table>caption .headerlink:after {
   font-size: 12px
@@ -7336,7 +7375,9 @@ section {
 }
 
 @media screen and (min-width: 1200px) {
-
+  section {
+    margin-bottom: 18.462rem;
+  }
 }
 
 /* @font-face {
