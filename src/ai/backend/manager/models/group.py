@@ -377,13 +377,13 @@ class Group(graphene.ObjectType):
 
 
 class GroupInput(graphene.InputObjectType):
-    description = graphene.String(required=False)
-    is_active = graphene.Boolean(required=False, default=True)
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
     domain_name = graphene.String(required=True)
-    total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.JSONString(required=False)
-    integration_id = graphene.String(required=False)
-    resource_policy = graphene.String(required=False, default="default")
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
+    integration_id = graphene.String(required=False, default_value="")
+    resource_policy = graphene.String(required=False, default_value="default")
 
 
 class ModifyGroupInput(graphene.InputObjectType):
@@ -430,11 +430,17 @@ class CreateGroup(graphene.Mutation):
             "description": props.description,
             "is_active": props.is_active,
             "domain_name": props.domain_name,
-            "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
-            "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
             "integration_id": props.integration_id,
-            "resource_policy": props.resource_policy or "default",
+            "resource_policy": props.resource_policy,
         }
+        # set_if_set() applies to optional without defaults
+        set_if_set(
+            props,
+            data,
+            "total_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(props, data, "allowed_vfolder_hosts")
         insert_query = sa.insert(groups).values(data)
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
 
