@@ -235,3 +235,10 @@ autodoc_default_options = {
     "member-order": "bysource",
 }
 autodoc_member_order = "bysource"
+
+# Design template append for new revamped webpage 2023-10-31
+html_style = 'css/customTheme.css'
+
+html_js_files = [
+    'js/custom.js',
+]

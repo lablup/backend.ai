@@ -269,7 +269,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
             body = yaml.safe_load(params["payload"])
         except (yaml.YAMLError, yaml.MarkedYAMLError):
             raise InvalidAPIParameters("Malformed payload")
-        for st in body["session_templates"]:
+        for st in body:
             template_data = check_task_template(st["template"])
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
             if "group_id" in st:

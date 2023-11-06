@@ -109,7 +109,6 @@
     "Delete": "Poista",
     "DeleteAll": "Poista kaikki",
     "Discard": "Hävitä",
-    "Dismiss": "Vapauttakaa",
     "DismissAndProceed": "Hylkää ja jatka",
     "Edit": "Muokkaa",
     "EnterManually": "Syötä manuaalisesti",
@@ -205,7 +204,8 @@
       "PleaseSelectOptions": "Valitse vähintään yksi tai useampi vaihtoehto.",
       "PolicyName": "Vakuutuksen nimi Pakollinen.",
       "ValidationFailed": "Validointi epäonnistui"
-    }
+    },
+    "EnableSudoSession": "__NOT_TRANSLATED__"
   },
   "data": {
     "Allowslettersnumbersand-_": "Sallii kirjaimet, numerot ja -_",
@@ -370,7 +370,8 @@
       "Status": "Tila",
       "StatusOfSelectedHost": "Valitun isännän tila",
       "used": "käytetty"
-    }
+    },
+    "SearchByName": "Hae nimellä"
   },
   "dialog": {
     "ErrorOccurred": "Tapahtunut virhe",
@@ -692,7 +693,7 @@
     "ServiceEndpoint": "Palvelun päätepiste",
     "ServiceInfo": "Palvelun tiedot",
     "ServiceName": "Palvelun nimi",
-    "ServiceNameRule": "Ainoastaan aakkosnumeerisia merkkejä, alaviivoja(_), väliviivoja(-) ja pisteitä(.) saa olla 4-64 merkkiä, ja sen on päätyttävä aakkosnumeeriseen merkkiin.",
+    "ServiceNameRule": "Ainoastaan aakkosnumeerisia merkkejä, alaviivoja(_), väliviivoja(-) ja pisteitä(.) saa olla 4-24 merkkiä, ja sen on päätyttävä aakkosnumeeriseen merkkiin.",
     "Services": "Palvelut",
     "ServingRouteErrorModalTitle": "Palvelevan reitin virhe",
     "SessionId": "Istunnon ID",
@@ -783,7 +784,8 @@
     "TypeRegistryNameToDelete": "Kirjoita rekisterin isäntänimi, jonka haluat poistaa",
     "UpdatingRegistryInfo": "Rekisteritietojen päivittäminen...",
     "Username": "Käyttäjätunnus",
-    "UsernameOptional": "Käyttäjätunnus (valinnainen)"
+    "UsernameOptional": "Käyttäjätunnus (valinnainen)",
+    "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?"
   },
   "resourceGroup": {
     "Active": "Aktiivinen",
@@ -964,7 +966,9 @@
       "EnterValidSessionName": "Syötä kelvollinen istunnon nimi",
       "SessionNameAlreadyExist": "Istunnon nimi on jo olemassa",
       "SessionNameRequired": "Istunnon nimi vaaditaan",
-      "SluggedStrings": "Slugged-merkkijonot (>3 merkkiä)"
+      "SluggedStrings": "Slugged-merkkijonot (>3 merkkiä)",
+      "SessionNameTooLong64": "Anna enintään 64 merkkiä.",
+      "PleaseFollowSessionNameRule": "Anna vähintään kolmen kirjaimen, numeron, '.', '_' ja '-' yhdistelmä."
     },
     "XRDPconnection": "RDP-yhteys",
     "applauncher": {
@@ -1097,7 +1101,12 @@
       "TotalAllocation": "Kokonaismääräraha",
       "UserResourceLimit": "Käyttäjän resurssirajoitus",
       "Version": "Versio",
-      "sessionStillPreparing": "Istuntoa valmistellaan edelleen. Kun istunto on alkanut, käynnistä sovellus napauttamalla sovelluskuvaketta."
+      "sessionStillPreparing": "Istuntoa valmistellaan edelleen. Kun istunto on alkanut, käynnistä sovellus napauttamalla sovelluskuvaketta.",
+      "PreOpenPortRangeGuide": "Syötä useita arvoja joko pilkulla (,) tai välilyönnillä erotettuina.",
+      "preopen": "avataan etukäteen",
+      "FolderAliasInvalid": "Vain aakkosnumeeriset merkit, alaviiva (_), kauttaviiva (/) ja viiva (-) ovat sallittuja.",
+      "Network": "Verkko",
+      "Enable": "ota käyttöön"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",

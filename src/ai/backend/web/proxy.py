@@ -217,8 +217,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                         "iat": now,
                         # Private claims
                         "aiohttp_session": aiohttp_session,
-                        "access_key": api_session.config.access_key,
-                        # "secret_key": api_session.config.secret_key,
+                        "access_key": api_session.config.access_key,  # since 23.03.10
                     }
                     sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token

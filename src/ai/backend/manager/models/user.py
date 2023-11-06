@@ -600,14 +600,12 @@ class CreateUser(graphene.Mutation):
 
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
-                graph_ctx.schema.get_type("KeyPairInput").create_container(
-                    {
-                        "is_active": _status == UserStatus.ACTIVE,
-                        "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                        "resource_policy": "default",
-                        "rate_limit": 10000,
-                    }
-                ),
+                {
+                    "is_active": _status == UserStatus.ACTIVE,
+                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                    "resource_policy": "default",
+                    "rate_limit": 10000,
+                },
             )
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,
