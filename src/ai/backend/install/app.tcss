@@ -28,6 +28,14 @@ ModeMenu ListView > ListItem .mode-item-desc {
 ModeMenu ListView > ListItem.--highlight .mode-item-desc {
    background: $primary-lighten-2;
 }
+ModeMenu ListView > ListItem.disabled .mode-item-title {
+    background: $panel;
+    color: $panel-lighten-2;
+}
+ModeMenu ListView > ListItem.disabled .mode-item-desc {
+    background: $panel;
+    color: $error;
+}
 ModeMenu ListView {
     width: 1fr;
     height: auto;

@@ -22,36 +22,50 @@ class ModeMenu(Static):
         id: str | None = None,
     ) -> None:
         super().__init__(id=id)
+        self._build_root = None
         if mode is None:
             try:
-                find_build_root()
+                self._build_root = find_build_root()
+                self._dev_available = True
                 mode = InstallModes.DEV
             except ValueError:
+                self._dev_available = False
                 mode = InstallModes.PACKAGE
         assert mode is not None
         self._mode = mode
 
     def compose(self) -> ComposeResult:
         yield Label("The installation mode:\n(up/down to change, enter to select)")
-        mode_desc = {
-            InstallModes.DEV: "Install for development using the current source checkout",
-            InstallModes.PACKAGE: "Install using release packages",
+        mode_desc: dict[tuple[InstallModes, bool], str] = {
+            (
+                InstallModes.DEV,
+                False,
+            ): f"Install for development using the current source checkout ({self._build_root})",
+            (
+                InstallModes.DEV,
+                True,
+            ): "Could not find the source clone as no BUILD_ROOT file is detected.",
+            (InstallModes.PACKAGE, False): "Install using release packages",
         }
         with ListView(
             id="mode-list", initial_index=list(InstallModes).index(InstallModes(self._mode))
         ):
             for mode in InstallModes:
+                disabled = not self._dev_available if mode == InstallModes.DEV else False
                 yield ListItem(
                     Horizontal(
                         Label(mode, classes="mode-item-title"),
-                        Label(mode_desc[mode], classes="mode-item-desc"),
+                        Label(mode_desc[(mode, disabled)], classes="mode-item-desc"),
                     ),
+                    classes="disabled" if disabled else "",
                     id=f"mode-{mode.value.lower()}",
                 )
         yield Label(id="mode-desc")
 
     @on(ListView.Selected, "#mode-list", item="#mode-dev")
     def start_dev_mode(self) -> None:
+        if not self._dev_available:
+            return
         self.app.sub_title = "Development Setup"
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "dev-setup"
