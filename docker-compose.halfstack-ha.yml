@@ -3,7 +3,7 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:15.1-alpine
+    image: postgres:16.0-alpine
     command: postgres -c 'max_connections=256'
     networks:
       - half
@@ -17,7 +17,7 @@ services:
 
   # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.3-alpine
     hostname: node01
     networks:
     - half
@@ -37,7 +37,7 @@ services:
     # network partitioning.
 
   backendai-half-redis-node02:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.3-alpine
     hostname: node02
     networks:
     - half
@@ -55,7 +55,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.3-alpine
     hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
@@ -73,7 +73,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.3-alpine
     hostname: sentinel01
     networks:
     - half
@@ -93,7 +93,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.3-alpine
     hostname: sentinel02
     networks:
     - half
@@ -113,7 +113,7 @@ services:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.3-alpine
     hostname: sentinel03
     networks:
     - half
@@ -133,7 +133,7 @@ services:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-etcd-proxy:
-    image: quay.io/coreos/etcd:v3.5.4
+    image: quay.io/coreos/etcd:v3.5.10
     depends_on:
       - "backendai-half-etcd-node01"
       - "backendai-half-etcd-node02"
@@ -151,7 +151,7 @@ services:
       --listen-addr=0.0.0.0:2379"
 
   backendai-half-etcd-node01:
-    image: quay.io/coreos/etcd:v3.5.4
+    image: quay.io/coreos/etcd:v3.5.10
     volumes:
       - "./tmp/backend.ai-halfstack-ha/etcd01-data:/etcd-data:rw"
     networks:
@@ -175,7 +175,7 @@ services:
       --initial-cluster-state $${STATE}"
 
   backendai-half-etcd-node02:
-    image: quay.io/coreos/etcd:v3.5.4
+    image: quay.io/coreos/etcd:v3.5.10
     volumes:
       - "./tmp/backend.ai-halfstack-ha/etcd02-data:/etcd-data:rw"
     networks:
@@ -199,7 +199,7 @@ services:
       --initial-cluster-state $${STATE}"
 
   backendai-half-etcd-node03:
-    image: quay.io/coreos/etcd:v3.5.4
+    image: quay.io/coreos/etcd:v3.5.10
     volumes:
       - "./tmp/backend.ai-halfstack-ha/etcd03-data:/etcd-data:rw"
     networks:
