@@ -20,6 +20,8 @@ license_defs = {
 _config_defaults: Mapping[str, Any] = {
     "pipeline": {
         "endpoint": yarl.URL("http://127.0.0.1:9500"),
+        "frontend-endpoint": yarl.URL("http://127.0.0.1:3000"),
+        "hide-button": False,
         "jwt": {
             "secret": "7<:~[X,^Z1XM!*,Pe:PHR!bv,H~Q#l177<7gf_XHD6.<*<.t<[o|V5W(=0x:jTh-",
         },
@@ -102,6 +104,14 @@ config_iv = t.Dict(
         t.Key("pipeline", default=_config_defaults["pipeline"]): t.Dict(
             {
                 t.Key("endpoint", default=_config_defaults["pipeline"]["endpoint"]): tx.URL,
+                tx.AliasedKey(
+                    ["frontend_endpoint", "frontend-endpoint"],
+                    default=_config_defaults["pipeline"]["frontend-endpoint"],
+                ): tx.URL,
+                tx.AliasedKey(
+                    ["hide_button", "hide-button"],
+                    default=_config_defaults["pipeline"]["hide-button"],
+                ): t.ToBool,
                 t.Key("jwt", default=_config_defaults["pipeline"]["jwt"]): t.Dict(
                     {
                         t.Key(
