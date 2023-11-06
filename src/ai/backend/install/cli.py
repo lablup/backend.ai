@@ -193,6 +193,7 @@ class InstallerApp(App):
     default=None,
     help="Override the installation mode. [default: auto-detect]",
 )
+# TODO: --show-guide?
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
