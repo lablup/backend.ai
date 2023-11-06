@@ -1,8 +1,7 @@
-from .context import current_os
-from .types import OSInfo
+from .types import OSInfo, Platform
 
 
-async def detect_os():
+async def detect_os() -> OSInfo:
     """
     # Detect distribution
     KNOWN_DISTRO="(Debian|Ubuntu|RedHat|CentOS|openSUSE|Amazon|Arista|SUSE)"
@@ -29,35 +28,11 @@ async def detect_os():
       exit 1
     fi
     """
-    current_os.set(
-        OSInfo(
-            platform="",
-            distro="",
-        )
+    return OSInfo(
+        platform=Platform.LINUX_ARM64,
+        distro="",
     )
 
 
 async def detect_cuda() -> None:
     pass
-
-
-async def check_docker_desktop_mount() -> None:
-    if current_os.get().distro != "Darwin":
-        return
-    """
-    echo "validating Docker Desktop mount permissions..."
-    docker pull alpine:3.8 > /dev/null
-    docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
-    if [ $? -ne 0 ]; then
-      # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
-      # so ~/.pyenv must be mountable.
-      show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
-      exit 1
-    fi
-    docker run --rm -v "$ROOT_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
-    if [ $? -ne 0 ]; then
-      show_error "You must allow mount of '$ROOT_PATH' in the File Sharing preference of the Docker Desktop app."
-      exit 1
-    fi
-    echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
-    """

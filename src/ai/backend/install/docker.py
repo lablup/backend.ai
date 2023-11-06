@@ -138,3 +138,23 @@ async def check_docker() -> None:
         log.write(f"Detected docker-compose installation ({compose_version})")
         if parse_version(compose_version) < (2, 0, 0):
             fail_with_compose_install_request()
+
+
+async def check_docker_desktop_mount() -> None:
+    """
+    echo "validating Docker Desktop mount permissions..."
+    docker pull alpine:3.8 > /dev/null
+    docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
+      # so ~/.pyenv must be mountable.
+      show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
+      exit 1
+    fi
+    docker run --rm -v "$ROOT_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      show_error "You must allow mount of '$ROOT_PATH' in the File Sharing preference of the Docker Desktop app."
+      exit 1
+    fi
+    echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
+    """

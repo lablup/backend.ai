@@ -9,9 +9,16 @@ class InstallModes(enum.StrEnum):
     PACKAGE = "PACKAGE"
 
 
+class Platform(enum.StrEnum):
+    LINUX_ARM64 = "linux-aarch64"
+    LINUX_X86_64 = "linux-x86_64"
+    MACOS_ARM64 = "macos-arm64"
+    MACOS_X86_64 = "macos-x86_64"
+
+
 @dataclasses.dataclass()
 class OSInfo:
-    platform: str
+    platform: Platform
     distro: str
 
 

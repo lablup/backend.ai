@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 from textual.widgets import RichLog
 
-from .common import check_docker_desktop_mount, detect_os
+from .common import detect_os
 from .dev import bootstrap_pants, install_editable_webui, install_git_hooks, install_git_lfs
-from .docker import check_docker, get_preferred_pants_local_exec_root
+from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
 from .types import OSInfo
 
 if TYPE_CHECKING:
@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 current_log: ContextVar[RichLog] = ContextVar("current_log")
 current_app: ContextVar[InstallerApp] = ContextVar("current_app")
-current_os: ContextVar[OSInfo] = ContextVar("current_os")
 
 
 class PostGuide(enum.Enum):
@@ -24,6 +23,8 @@ class PostGuide(enum.Enum):
 
 
 class Context:
+    os_info: OSInfo
+
     _post_guides: list[PostGuide]
 
     def __init__(self) -> None:
@@ -65,11 +66,12 @@ class Context:
 
 class DevContext(Context):
     async def check_prerequisites(self) -> None:
-        await detect_os()
+        self.os_info = await detect_os()
         await install_git_lfs()
         await install_git_hooks()
         await check_docker()
-        await check_docker_desktop_mount()
+        if self.os_info.distro == "Darwin":
+            await check_docker_desktop_mount()
         local_execution_root_dir = await get_preferred_pants_local_exec_root()
         await bootstrap_pants(local_execution_root_dir)
 
@@ -94,9 +96,10 @@ class DevContext(Context):
 
 class PackageContext(Context):
     async def check_prerequisites(self) -> None:
-        await detect_os()
+        self.os_info = await detect_os()
         await check_docker()
-        await check_docker_desktop_mount()
+        if self.os_info.distro == "Darwin":
+            await check_docker_desktop_mount()
 
     async def install(self) -> None:
         pass
