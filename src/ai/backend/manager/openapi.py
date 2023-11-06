@@ -304,6 +304,7 @@ async def generate_openapi(output_path: Path) -> None:
     "--output",
     "-o",
     default="-",
+    type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
 def main(output: Path) -> None:

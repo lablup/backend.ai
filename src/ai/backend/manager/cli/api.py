@@ -38,6 +38,7 @@ async def generate_gql_schema(output_path: Path) -> None:
     "--output",
     "-o",
     default="-",
+    type=click.Path(dir_okay=False, writable=True),
     help="Output file path (default: stdout)",
 )
 def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
