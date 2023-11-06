@@ -1,7 +1,7 @@
-Backend.AI Plugin Subsystem
-===========================
+Backend.AI Installer
+====================
 
 Package Structure
 -----------------
 
-* `ai.backend.plugin`: Abstract types for plugins and a common base plugin set
+* `ai.backend.install`: The installer package

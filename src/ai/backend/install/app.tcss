@@ -1,0 +1,44 @@
+Screen {
+    align: center middle;
+}
+Header {
+    text-style: bold;
+}
+
+ContentSwitcher {
+    background: $panel;
+    width: 90%;
+    height: 1fr;
+}
+
+ModeMenu {
+    width: 1fr;
+    margin: 2 2;
+    align-horizontal: center;
+}
+
+ModeMenu ListView > ListItem .mode-item-title {
+    width: 1fr;
+    text-style: bold;
+}
+ModeMenu ListView > ListItem .mode-item-desc {
+    background: $panel-lighten-2;
+    width: 4fr;
+}
+ModeMenu ListView > ListItem.--highlight .mode-item-desc {
+   background: $primary-lighten-2;
+}
+ModeMenu ListView {
+    width: 1fr;
+    height: auto;
+}
+ModeMenu Label {
+    padding: 1 2;
+}
+
+.mode-title {
+    width: 1fr;
+    padding: 1 2;
+    background: $panel-darken-1;
+    text-style: bold;
+}

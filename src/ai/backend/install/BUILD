@@ -10,6 +10,7 @@ visibility_private_component(
     allowed_dependencies=[
         "//src/ai/backend/cli/**",
         "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
     ]
 )
 
@@ -57,5 +58,6 @@ resources(
     ],
     sources=[
         "**/py.typed",
+        "app.tcss",
     ],
 )
