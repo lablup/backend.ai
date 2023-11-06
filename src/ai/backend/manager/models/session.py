@@ -684,9 +684,9 @@ class SessionRow(Base):
     # status_history records all status changes
     # e.g)
     # [
-    #   ["PENDING", "2022-10-22T10:22:30"],
-    #   ["SCHEDULED", "2022-10-22T11:40:30"],
-    #   ["PREPARING", "2022-10-25T10:22:30"]
+    #   {"status: "PENDING", "timestamp": "2022-10-22T10:22:30"},
+    #   {"status: "SCHEDULED", "timestamp": "2022-10-22T11:40:30"},
+    #   {"status: "PREPARING", "timestamp": "2022-10-25T10:22:30"}
     # ]
     callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
 
@@ -1357,7 +1357,6 @@ class ComputeSession(graphene.ObjectType):
             "status_changed": row.status_changed,
             "status_info": row.status_info,
             "status_data": row.status_data,
-            # "status_history": ...,  # filled by the legacy resolver
             "status_history_log": row.status_history,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
