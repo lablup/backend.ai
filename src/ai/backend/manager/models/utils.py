@@ -253,7 +253,7 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                 try:
                     result = await txn_func()
                 except DBAPIError as e:
-                    if getattr(e.orig, "pgcode", None) == "40001":
+                    if is_db_retry_error(e):
                         raise TryAgain
                     raise
     except RetryError:
@@ -358,3 +358,21 @@ def agg_to_str(column: sa.Column) -> sa.sql.functions.Function:
 
 def agg_to_array(column: sa.Column) -> sa.sql.functions.Function:
     return sa.func.array_agg(psql.aggregate_order_by(column, column.asc()))
+
+
+def is_db_retry_error(e: Exception) -> bool:
+    return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
+
+
+def description_msg(version: str, detail: str | None = None) -> str:
+    val = f"Added since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val
+
+
+def deprecation_reason_msg(version: str, detail: str | None = None) -> str:
+    val = f"Deprecated since {version}."
+    if detail:
+        val = f"{val} {detail}"
+    return val

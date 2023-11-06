@@ -11,6 +11,7 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
+    "scie",
     "towncrier_tool",
 ]
 pants_ignore = [
@@ -39,7 +40,7 @@ root_patterns = [
 ]
 
 [test]
-extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s"]
+extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
 
 [python]
 enable_resolves = true

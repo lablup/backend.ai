@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 import uuid
@@ -5,6 +6,10 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import attrs
 import graphene
+from graphene.types.inputobjecttype import set_input_object_type_default_value
+from graphql import Undefined
+
+set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
