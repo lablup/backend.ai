@@ -501,8 +501,8 @@ class KeyPairList(graphene.ObjectType):
 
 
 class KeyPairInput(graphene.InputObjectType):
-    is_active = graphene.Boolean(required=False, default=True)
-    is_admin = graphene.Boolean(required=False, default=False)
+    is_active = graphene.Boolean(required=False, default_value=True)
+    is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=True)

@@ -377,13 +377,13 @@ class Group(graphene.ObjectType):
 
 
 class GroupInput(graphene.InputObjectType):
-    description = graphene.String(required=False, default="")
-    is_active = graphene.Boolean(required=False, default=True)
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
     domain_name = graphene.String(required=True)
-    total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.JSONString(required=False)
-    integration_id = graphene.String(required=False, default="")
-    resource_policy = graphene.String(required=False, default="default")
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
+    integration_id = graphene.String(required=False, default_value="")
+    resource_policy = graphene.String(required=False, default_value="default")
 
 
 class ModifyGroupInput(graphene.InputObjectType):
