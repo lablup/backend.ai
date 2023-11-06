@@ -91,6 +91,12 @@ def list(ctx: CLIContext) -> None:
     help="Number of maximum concurrent sessions.",
 )
 @click.option(
+    "--max-concurrent-sftp-sessions",
+    type=int,
+    default=30,
+    help="Number of maximum concurrent SFTP sessions.",
+)
+@click.option(
     "--max-containers-per-session",
     type=int,
     default=1,
@@ -125,6 +131,7 @@ def add(
     total_resource_slots: str,  # JSON string
     max_session_lifetime: int,
     max_concurrent_sessions: int,
+    max_concurrent_sftp_sessions: int,
     max_containers_per_session: int,
     idle_timeout: int,
     vfolder_host_perms: str,  # JSON string
@@ -142,6 +149,7 @@ def add(
                 total_resource_slots=total_resource_slots,
                 max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
+                max_concurrent_sftp_sessions=max_concurrent_sftp_sessions,
                 max_containers_per_session=max_containers_per_session,
                 idle_timeout=idle_timeout,
                 vfolder_host_perms=vfolder_host_perms,
@@ -194,6 +202,12 @@ def add(
     help="Number of maximum concurrent sessions.",
 )
 @click.option(
+    "--max-concurrent-sftp-sessions",
+    type=OptionalType(int),
+    default=undefined,
+    help="Number of maximum concurrent SFTP sessions.",
+)
+@click.option(
     "--max-containers-per-session",
     type=OptionalType(int),
     default=undefined,
@@ -224,6 +238,7 @@ def update(
     total_resource_slots: str | Undefined,  # JSON string
     max_session_lifetime: int | Undefined,
     max_concurrent_sessions: int | Undefined,
+    max_concurrent_sftp_sessions: int | Undefined,
     max_containers_per_session: int | Undefined,
     idle_timeout: int | Undefined,
     vfolder_host_perms: str | Undefined,  # JSON string
@@ -241,6 +256,7 @@ def update(
                 total_resource_slots=total_resource_slots,
                 max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
+                max_concurrent_sftp_sessions=max_concurrent_sftp_sessions,
                 max_containers_per_session=max_containers_per_session,
                 idle_timeout=idle_timeout,
                 vfolder_host_perms=vfolder_host_perms,

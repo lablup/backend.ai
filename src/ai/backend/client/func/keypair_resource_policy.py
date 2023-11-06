@@ -47,6 +47,7 @@ class KeypairResourcePolicy(BaseFunction):
         total_resource_slots: str,
         max_session_lifetime: int,
         max_concurrent_sessions: int,
+        max_concurrent_sftp_sessions: int,
         max_containers_per_session: int,
         idle_timeout: int,
         vfolder_host_perms: str | Undefined = undefined,
@@ -72,6 +73,7 @@ class KeypairResourcePolicy(BaseFunction):
             "total_resource_slots": total_resource_slots,
             "max_session_lifetime": max_session_lifetime,
             "max_concurrent_sessions": max_concurrent_sessions,
+            "max_concurrent_sftp_sessions": max_concurrent_sftp_sessions,
             "max_containers_per_session": max_containers_per_session,
             "idle_timeout": idle_timeout,
             "allowed_vfolder_hosts": vfolder_host_perms,
@@ -93,6 +95,7 @@ class KeypairResourcePolicy(BaseFunction):
         default_for_unspecified: int | Undefined = undefined,
         max_session_lifetime: int | Undefined = undefined,
         max_concurrent_sessions: int | Undefined = undefined,
+        max_concurrent_sftp_sessions: int | Undefined = undefined,
         max_containers_per_session: int | Undefined = undefined,
         idle_timeout: int | Undefined = undefined,
         total_resource_slots: str | Undefined = undefined,
@@ -111,6 +114,7 @@ class KeypairResourcePolicy(BaseFunction):
         set_if_set(inputs, "total_resource_slots", total_resource_slots)
         set_if_set(inputs, "max_session_lifetime", max_session_lifetime)
         set_if_set(inputs, "max_concurrent_sessions", max_concurrent_sessions)
+        set_if_set(inputs, "max_concurrent_sftp_sessions", max_concurrent_sftp_sessions)
         set_if_set(inputs, "max_containers_per_session", max_containers_per_session)
         set_if_set(inputs, "idle_timeout", idle_timeout)
         set_if_set(inputs, "allowed_vfolder_hosts", vfolder_host_perms)
