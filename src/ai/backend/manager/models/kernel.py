@@ -521,9 +521,9 @@ kernels = sa.Table(
     # status_history records all status changes
     # e.g)
     # [
-    #   ["PENDING", "2022-10-22T10:22:30"],
-    #   ["SCHEDULED", "2022-10-22T11:40:30"],
-    #   ["PREPARING", "2022-10-25T10:22:30"]
+    #   {"status: "PENDING", "timestamp": "2022-10-22T10:22:30"},
+    #   {"status: "SCHEDULED", "timestamp": "2022-10-22T11:40:30"},
+    #   {"status: "PREPARING", "timestamp": "2022-10-25T10:22:30"}
     # ]
     sa.Column("callback_url", URLColumn, nullable=True, default=sa.null()),
     sa.Column("startup_command", sa.Text, nullable=True),
