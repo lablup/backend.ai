@@ -501,8 +501,8 @@ class KeyPairList(graphene.ObjectType):
 
 
 class KeyPairInput(graphene.InputObjectType):
-    is_active = graphene.Boolean(required=False, default=True)
-    is_admin = graphene.Boolean(required=False, default=False)
+    is_active = graphene.Boolean(required=False, default_value=True)
+    is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=True)
@@ -555,6 +555,7 @@ class CreateKeyPair(graphene.Mutation):
                 "is_admin": props.is_admin,
                 "resource_policy": props.resource_policy,
                 "rate_limit": props.rate_limit,
+                # props.concurrency_limit is always ignored
             },
         )
         insert_query = sa.insert(keypairs).values(
@@ -606,6 +607,7 @@ class ModifyKeyPair(graphene.Mutation):
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "rate_limit")
+        # props.concurrency_limit is always ignored
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, update_query)
 
