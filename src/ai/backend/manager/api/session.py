@@ -2173,6 +2173,7 @@ async def get_status_history(request: web.Request, params: Any) -> web.Response:
             db_sess,
             session_name,
             owner_access_key,
+            allow_stale=True,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         resp["result"] = compute_session.status_history
