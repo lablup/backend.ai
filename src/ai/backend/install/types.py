@@ -10,6 +10,12 @@ class InstallModes(enum.StrEnum):
 
 
 @dataclasses.dataclass()
+class OSInfo:
+    platform: str
+    distro: str
+
+
+@dataclasses.dataclass()
 class HalfstackConfig:
     postgres_addr: HostPortPair
     redis_addr: list[HostPortPair]  # multiple if HA

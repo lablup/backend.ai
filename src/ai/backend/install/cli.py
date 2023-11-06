@@ -21,9 +21,13 @@ from textual.widgets import (
     Static,
 )
 
-from ai.backend.install import __version__
 from ai.backend.plugin.entrypoint import find_build_root
 
+from . import __version__
+from .common import detect_os
+from .context import Context, current_app, current_log
+from .dev import bootstrap_pants, install_editable_webui, install_git_hooks, install_git_lfs
+from .docker import check_docker, get_preferred_pants_local_exec_root
 from .types import InstallModes
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
@@ -42,15 +46,31 @@ class DevSetup(Static):
         top_tasks.add(asyncio.create_task(self.install()))
 
     async def install(self) -> None:
-        log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log_token = current_log.set(_log)
         try:
-            for tick in range(3):
-                await asyncio.sleep(1)
-                log.write(Text.from_markup(f"[gold1](dev)[/] something is going: {tick}"))
+            # prerequisites
+            await detect_os()
+            await install_git_lfs()
+            await install_git_hooks()
+            await check_docker()
+            local_execution_root_dir = await get_preferred_pants_local_exec_root()
+            await bootstrap_pants(local_execution_root_dir)
+            # install
+            await install_editable_webui()
+            # TODO: install agent-watcher
+            # TODO: install storage-agent
+            # TODO: install storage-watcher
+            ctx = Context()
+            await ctx.install_halfstack(ha_setup=False)
+            # configure
+            # TODO: ...
         except asyncio.CancelledError:
-            log.write(Text.from_markup("[red]Interrupted!"))
+            _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
             raise
+        finally:
+            current_log.reset(_log_token)
 
 
 class PackageSetup(Static):
@@ -68,9 +88,15 @@ class PackageSetup(Static):
     async def install(self) -> None:
         log: RichLog = cast(RichLog, self.query_one(".log"))
         try:
-            for tick in range(3):
-                await asyncio.sleep(1)
-                log.write(Text.from_markup(f"[gold1](pkg)[/] something is going: {tick}"))
+            # prerequisites
+            await detect_os()
+            await check_docker()
+            # install
+            # TODO: download packages
+            ctx = Context()
+            await ctx.install_halfstack(ha_setup=False)
+            # configure
+            # TODO: ...
         except asyncio.CancelledError:
             log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -148,8 +174,8 @@ class ModeMenu(Static):
 
 class InstallerApp(App):
     BINDINGS = [
-        Binding("q", "quit", "Quit the installer"),
-        Binding("ctrl+c", "quit", "Quit the installer", show=False, priority=True),
+        Binding("q", "shutdown", "Quit the installer"),
+        Binding("ctrl+c", "shutdown", "Quit the installer", show=False, priority=True),
     ]
     CSS_PATH = "app.tcss"
 
@@ -170,7 +196,7 @@ class InstallerApp(App):
         header.tall = True
         self.title = "Backend.AI Installer"
 
-    async def action_quit(self):
+    async def action_shutdown(self, message: str | None = None, exit_code: int = 0) -> None:
         for t in {*top_tasks}:
             if t.done():
                 continue
@@ -179,7 +205,7 @@ class InstallerApp(App):
                 await t
             except asyncio.CancelledError:
                 pass
-        self.exit()
+        self.exit(return_code=exit_code, message=message)
 
 
 @click.command(
@@ -202,4 +228,5 @@ def main(
 ) -> None:
     """The installer"""
     app = InstallerApp(mode)
+    current_app.set(app)
     app.run()
