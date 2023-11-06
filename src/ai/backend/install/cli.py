@@ -24,10 +24,7 @@ from textual.widgets import (
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
-from .common import detect_os
-from .context import Context, current_app, current_log
-from .dev import bootstrap_pants, install_editable_webui, install_git_hooks, install_git_lfs
-from .docker import check_docker, get_preferred_pants_local_exec_root
+from .context import DevContext, PackageContext, current_app, current_log
 from .types import InstallModes
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
@@ -48,23 +45,18 @@ class DevSetup(Static):
     async def install(self) -> None:
         _log: RichLog = cast(RichLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
+        ctx = DevContext()
         try:
             # prerequisites
-            await detect_os()
-            await install_git_lfs()
-            await install_git_hooks()
-            await check_docker()
-            local_execution_root_dir = await get_preferred_pants_local_exec_root()
-            await bootstrap_pants(local_execution_root_dir)
+            await ctx.check_prerequisites()
             # install
-            await install_editable_webui()
-            # TODO: install agent-watcher
-            # TODO: install storage-agent
-            # TODO: install storage-watcher
-            ctx = Context()
             await ctx.install_halfstack(ha_setup=False)
+            await ctx.install()
             # configure
-            # TODO: ...
+            await ctx.configure()
+            await ctx.load_fixtures()
+            # post-setup
+            await ctx.dump_etcd_config()
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -87,16 +79,18 @@ class PackageSetup(Static):
 
     async def install(self) -> None:
         log: RichLog = cast(RichLog, self.query_one(".log"))
+        ctx = PackageContext()
         try:
             # prerequisites
-            await detect_os()
-            await check_docker()
+            await ctx.check_prerequisites()
             # install
-            # TODO: download packages
-            ctx = Context()
             await ctx.install_halfstack(ha_setup=False)
+            await ctx.install()
             # configure
-            # TODO: ...
+            await ctx.configure()
+            await ctx.load_fixtures()
+            # post-setup
+            await ctx.dump_etcd_config()
         except asyncio.CancelledError:
             log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)

@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 
 from textual.widgets import RichLog
 
+from .common import check_docker_desktop_mount, detect_os
+from .dev import bootstrap_pants, install_editable_webui, install_git_hooks, install_git_lfs
+from .docker import check_docker, get_preferred_pants_local_exec_root
 from .types import OSInfo
 
 if TYPE_CHECKING:
@@ -38,9 +41,6 @@ class Context:
     async def load_fixtures(self) -> None:
         pass
 
-    async def configure_services(self) -> None:
-        pass
-
     async def configure_manager(self) -> None:
         pass
 
@@ -59,8 +59,61 @@ class Context:
     async def dump_etcd_config(self) -> None:
         pass
 
-    async def populate_bundled_images(self) -> None:
+    async def populate_images(self) -> None:
         pass
 
-    async def pull_image(self) -> None:
+
+class DevContext(Context):
+    async def check_prerequisites(self) -> None:
+        await detect_os()
+        await install_git_lfs()
+        await install_git_hooks()
+        await check_docker()
+        await check_docker_desktop_mount()
+        local_execution_root_dir = await get_preferred_pants_local_exec_root()
+        await bootstrap_pants(local_execution_root_dir)
+
+    async def install(self) -> None:
+        await install_editable_webui()
+        # TODO: install agent-watcher
+        # TODO: install storage-agent
+        # TODO: install storage-watcher
+        # TODO: install webserver
+
+    async def configure(self) -> None:
+        await self.configure_manager()
+        await self.configure_agent()
+        await self.configure_storage_proxy()
+        await self.configure_webserver()
+        await self.configure_webui()
+
+    async def populate_images(self) -> None:
+        # TODO: docker pull
+        pass
+
+
+class PackageContext(Context):
+    async def check_prerequisites(self) -> None:
+        await detect_os()
+        await check_docker()
+        await check_docker_desktop_mount()
+
+    async def install(self) -> None:
+        pass
+        # TODO: install agent-watcher
+        # TODO: install storage-agent
+        # TODO: install storage-watcher
+        # TODO: install webserver
+        # TODO: install static wsproxy
+
+    async def configure(self) -> None:
+        await self.configure_manager()
+        await self.configure_agent()
+        await self.configure_storage_proxy()
+        await self.configure_webserver()
+        await self.configure_webui()
+        # TODO: install as systemd services?
+
+    async def populate_images(self) -> None:
+        # TODO: docker load
         pass

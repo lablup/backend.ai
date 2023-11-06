@@ -27,3 +27,10 @@ async def request_unix(
     async with aiohttp.ClientSession(connector=connector) as s:
         async with s.request(method, url, **kwargs) as r:
             yield r
+
+
+async def wget(url: str) -> None:
+    chunk_size = 16384
+    async with request("GET", url) as r:
+        # TODO: implement
+        await r.content.read(chunk_size)

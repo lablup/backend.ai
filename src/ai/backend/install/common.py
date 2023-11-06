@@ -42,6 +42,8 @@ async def detect_cuda() -> None:
 
 
 async def check_docker_desktop_mount() -> None:
+    if current_os.get().distro != "Darwin":
+        return
     """
     echo "validating Docker Desktop mount permissions..."
     docker pull alpine:3.8 > /dev/null
