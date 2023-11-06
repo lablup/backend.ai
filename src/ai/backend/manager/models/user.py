@@ -518,7 +518,7 @@ class UserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=True, default_value="default")
     role = graphene.String(required=False, default_value=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.List(lambda: graphene.String, required=False, defualt=None)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False, default_value=None)
     totp_activated = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=False, default_value="default")
     sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
