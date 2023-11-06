@@ -959,16 +959,16 @@ async def simple_db_mutate(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
+        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
     except sa.exc.StatementError as e:
-        log.warning("simple_db_mutate_returning_item(): statement error ({})", raw_query)
+        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
-        log.exception("simple_db_mutate_returning_item(): other error")
+        log.exception("simple_db_mutate(): other error")
         return result_cls(False, f"unexpected error: {e}")
 
 
@@ -1030,7 +1030,9 @@ async def simple_db_mutate_returning_item(
         log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)
     except sa.exc.StatementError as e:
-        log.warning("simple_db_mutate_returning_item(): statement error ({})", raw_query)
+        log.warning(
+            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
+        )
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
