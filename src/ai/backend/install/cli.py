@@ -1,15 +1,80 @@
+from __future__ import annotations
+
+import asyncio
 from typing import cast
+from weakref import WeakSet
 
 import click
+from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.widgets import ContentSwitcher, Footer, Header, Label, ListItem, ListView, Static
+from textual.widgets import (
+    ContentSwitcher,
+    Footer,
+    Header,
+    Label,
+    ListItem,
+    ListView,
+    RichLog,
+    Static,
+)
 
 from ai.backend.install import __version__
 from ai.backend.plugin.entrypoint import find_build_root
 
 from .types import InstallModes
+
+top_tasks: WeakSet[asyncio.Task] = WeakSet()
+
+
+class DevSetup(Static):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._task = None
+
+    def compose(self) -> ComposeResult:
+        yield Label("Development Setup", classes="mode-title")
+        yield RichLog(classes="log")
+
+    async def begin_install(self) -> None:
+        top_tasks.add(asyncio.create_task(self.install()))
+
+    async def install(self) -> None:
+        log: RichLog = cast(RichLog, self.query_one(".log"))
+        try:
+            for tick in range(3):
+                await asyncio.sleep(1)
+                log.write(Text.from_markup(f"[gold1](dev)[/] something is going: {tick}"))
+        except asyncio.CancelledError:
+            log.write(Text.from_markup("[red]Interrupted!"))
+            await asyncio.sleep(1)
+            raise
+
+
+class PackageSetup(Static):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._task = None
+
+    def compose(self) -> ComposeResult:
+        yield Label("Package Setup", classes="mode-title")
+        yield RichLog(classes="log")
+
+    async def begin_install(self) -> None:
+        top_tasks.add(asyncio.create_task(self.install()))
+
+    async def install(self) -> None:
+        log: RichLog = cast(RichLog, self.query_one(".log"))
+        try:
+            for tick in range(3):
+                await asyncio.sleep(1)
+                log.write(Text.from_markup(f"[gold1](pkg)[/] something is going: {tick}"))
+        except asyncio.CancelledError:
+            log.write(Text.from_markup("[red]Interrupted!"))
+            await asyncio.sleep(1)
+            raise
 
 
 class ModeMenu(Static):
@@ -69,25 +134,22 @@ class ModeMenu(Static):
         self.app.sub_title = "Development Setup"
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "dev-setup"
+        dev_setup: DevSetup = cast(DevSetup, self.app.query_one("#dev-setup"))
+        switcher.call_after_refresh(dev_setup.begin_install)
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
         self.app.sub_title = "Package Setup"
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "pkg-setup"
-
-
-class DevSetup(Static):
-    pass
-
-
-class PackageSetup(Static):
-    pass
+        pkg_setup: PackageSetup = cast(PackageSetup, self.app.query_one("#pkg-setup"))
+        switcher.call_after_refresh(pkg_setup.begin_install)
 
 
 class InstallerApp(App):
     BINDINGS = [
-        ("q", "quit", "Quit the installer"),
+        Binding("q", "quit", "Quit the installer"),
+        Binding("ctrl+c", "quit", "Quit the installer", show=False, priority=True),
     ]
     CSS_PATH = "app.tcss"
 
@@ -99,10 +161,8 @@ class InstallerApp(App):
         yield Header(show_clock=True)
         with ContentSwitcher(id="top", initial="mode-menu"):
             yield ModeMenu(self._mode, id="mode-menu")
-            with DevSetup(id="dev-setup"):
-                yield Label("Development Setup", classes="mode-title")
-            with PackageSetup(id="pkg-setup"):
-                yield Label("Package Setup", classes="mode-title")
+            yield DevSetup(id="dev-setup")
+            yield PackageSetup(id="pkg-setup")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -110,7 +170,15 @@ class InstallerApp(App):
         header.tall = True
         self.title = "Backend.AI Installer"
 
-    def action_quit(self):
+    async def action_quit(self):
+        for t in {*top_tasks}:
+            if t.done():
+                continue
+            t.cancel()
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
         self.exit()
 
 
