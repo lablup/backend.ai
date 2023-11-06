@@ -106,7 +106,7 @@ class Domain(BaseFunction):
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent("""\
-            mutation($name: String!, $input: CreateDomainInput!) {
+            mutation($name: String!, $input: DomainInput!) {
                 create_domain(name: $name, props: $input) {
                     ok msg domain {$fields}
                 }

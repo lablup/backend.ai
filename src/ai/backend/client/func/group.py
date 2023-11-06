@@ -142,7 +142,7 @@ class Group(BaseFunction):
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent("""\
-            mutation($name: String!, $input: CreateGroupInput!) {
+            mutation($name: String!, $input: GroupInput!) {
                 create_group(name: $name, props: $input) {
                     ok msg group {$fields}
                 }

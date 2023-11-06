@@ -49,9 +49,8 @@ __all__: Sequence[str] = (
     "KeyPair",
     "KeyPairList",
     "UserInfo",
-    "CreateKeyPairInput",
+    "KeyPairInput",
     "CreateKeyPair",
-    "ModifyKeyPairInput",
     "ModifyKeyPair",
     "DeleteKeyPair",
     "Dotfile",
@@ -501,7 +500,7 @@ class KeyPairList(graphene.ObjectType):
     items = graphene.List(KeyPair, required=True)
 
 
-class CreateKeyPairInput(graphene.InputObjectType):
+class KeyPairInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False, default=True)
     is_admin = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=True)
@@ -532,7 +531,7 @@ class CreateKeyPair(graphene.Mutation):
 
     class Arguments:
         user_id = graphene.String(required=True)
-        props = CreateKeyPairInput(required=True)
+        props = KeyPairInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -544,7 +543,7 @@ class CreateKeyPair(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         user_id: str,
-        props: CreateKeyPairInput,
+        props: KeyPairInput,
     ) -> CreateKeyPair:
         from .user import users  # noqa
 

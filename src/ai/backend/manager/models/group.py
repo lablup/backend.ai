@@ -62,9 +62,9 @@ __all__: Sequence[str] = (
     "AssocGroupUserRow",
     "resolve_group_name_or_id",
     "Group",
-    "CreateGroupInput",
-    "CreateGroup",
+    "GroupInput",
     "ModifyGroupInput",
+    "CreateGroup",
     "ModifyGroup",
     "DeleteGroup",
     "GroupDotfile",
@@ -376,7 +376,7 @@ class Group(graphene.ObjectType):
             ]
 
 
-class CreateGroupInput(graphene.InputObjectType):
+class GroupInput(graphene.InputObjectType):
     description = graphene.String(required=False, default="")
     is_active = graphene.Boolean(required=False, default=True)
     domain_name = graphene.String(required=True)
@@ -404,7 +404,7 @@ class CreateGroup(graphene.Mutation):
 
     class Arguments:
         name = graphene.String(required=True)
-        props = CreateGroupInput(required=True)
+        props = GroupInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -420,7 +420,7 @@ class CreateGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         name: str,
-        props: CreateGroupInput,
+        props: GroupInput,
     ) -> CreateGroup:
         if _rx_slug.search(name) is None:
             raise ValueError("invalid name format. slug format required.")

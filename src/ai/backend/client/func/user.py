@@ -269,7 +269,7 @@ class User(BaseFunction):
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent("""\
-            mutation($email: String!, $input: CreateUserInput!) {
+            mutation($email: String!, $input: UserInput!) {
                 create_user(email: $email, props: $input) {
                     ok msg user {$fields}
                 }

@@ -57,9 +57,9 @@ __all__: Sequence[str] = (
     "UserList",
     "UserGroup",
     "UserRole",
-    "CreateUserInput",
-    "CreateUser",
+    "UserInput",
     "ModifyUserInput",
+    "CreateUser",
     "ModifyUser",
     "DeleteUser",
     "UserStatus",
@@ -507,7 +507,7 @@ class UserList(graphene.ObjectType):
     items = graphene.List(User, required=True)
 
 
-class CreateUserInput(graphene.InputObjectType):
+class UserInput(graphene.InputObjectType):
     username = graphene.String(required=True)
     password = graphene.String(required=True)
     need_password_change = graphene.Boolean(required=True)
@@ -552,7 +552,7 @@ class CreateUser(graphene.Mutation):
 
     class Arguments:
         email = graphene.String(required=True)
-        props = CreateUserInput(required=True)
+        props = UserInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -564,7 +564,7 @@ class CreateUser(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         email: str,
-        props: CreateUserInput,
+        props: UserInput,
     ) -> CreateUser:
         graph_ctx: GraphQueryContext = info.context
         username = props.username if props.username else email

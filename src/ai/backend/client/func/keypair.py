@@ -57,7 +57,7 @@ class KeyPair(BaseFunction):
         """
         uid_type = "Int!" if isinstance(user_id, int) else "String!"
         q = (
-            "mutation($user_id: {0}, $input: CreateKeyPairInput!) {{".format(uid_type)
+            "mutation($user_id: {0}, $input: KeyPairInput!) {{".format(uid_type)
             + "  create_keypair(user_id: $user_id, props: $input) {"
             "    ok msg keypair { $fields }"
             "  }"
