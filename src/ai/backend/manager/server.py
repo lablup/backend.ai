@@ -571,9 +571,9 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                         SELECT 1
                         FROM jsonb_array_elements(status_history) AS session_history
                         WHERE
-                            session_history->>0 = :status_name AND
+                            session_history->>'status' = :status_name AND
                             (
-                                now() - CAST(session_history->>1 AS TIMESTAMP WITH TIME ZONE)
+                                now() - CAST(session_history->>'timestamp' AS TIMESTAMP WITH TIME ZONE)
                             ) > :threshold
                     )
                     """
