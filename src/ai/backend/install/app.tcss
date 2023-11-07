@@ -4,10 +4,14 @@ Screen {
 Header {
     text-style: bold;
 }
+#logo {
+    width: 1fr;
+    text-align: center;
+}
 
 ContentSwitcher {
     background: $panel;
-    width: 90%;
+    width: 1fr;
     height: 1fr;
 }
 

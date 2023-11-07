@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import textwrap
 from typing import cast
 from weakref import WeakSet
 
@@ -189,6 +190,14 @@ class InstallerApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
+        logo_text = textwrap.dedent("""
+        ____             _                  _      _    ___
+        | __ )  __ _  ___| | _____ _ __   __| |    / \  |_ _|
+        |  _ \ / _` |/ __| |/ / _ \ '_ \ / _` |   / _ \  | |
+        | |_) | (_| | (__|   <  __/ | | | (_| |_ / ___ \ | |
+        |____/ \__,_|\___|_|\_\___|_| |_|\__,_(_)_/   \_\___|
+        """)
+        yield Static(logo_text, id="logo")
         with ContentSwitcher(id="top", initial="mode-menu"):
             yield ModeMenu(self._mode, id="mode-menu")
             yield DevSetup(id="dev-setup")
