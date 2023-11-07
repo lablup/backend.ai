@@ -260,11 +260,13 @@ jobs:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Build packages
+    - name: Build fat packages
       run: |
-        pants --tag="-wheel" package '::'
+        pants --tag="scie" package '::'
         # 'pants run' does not support parallelization
         pants filter --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
+    - name: Clean up intermediate pex files
+      run: |
         rm -rf dist/src.*/
     - name: Upload scies
       uses: actions/upload-artifact@v3

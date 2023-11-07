@@ -151,6 +151,7 @@ class PackageContext(Context):
         async with request("GET", csum_url) as r:
             csum = (await r.text()).strip()
         # TODO: verify checksum
+        print(csum)
 
     async def _verify_package(self, name: str) -> None:
         path = f"./{self._mangle_pkgname(name)}"
@@ -158,6 +159,7 @@ class PackageContext(Context):
         csum_path = path + ".sha256"
         csum = Path(csum_path).read_text().strip()
         # TODO: verify checksum
+        print(csum)
 
     async def install(self) -> None:
         try:

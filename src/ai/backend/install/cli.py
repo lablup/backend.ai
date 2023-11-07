@@ -13,7 +13,7 @@ from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.widgets import (
     ContentSwitcher,
     Footer,
@@ -202,7 +202,7 @@ class InstallerApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        logo_text = textwrap.dedent("""
+        logo_text = textwrap.dedent(r"""
         ____             _                  _      _    ___
         | __ )  __ _  ___| | _____ _ __   __| |    / \  |_ _|
         |  _ \ / _` |/ __| |/ / _ \ '_ \ / _` |   / _ \  | |

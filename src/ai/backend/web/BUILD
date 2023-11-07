@@ -50,14 +50,26 @@ pex_binary(
 
 scie_binary(
     name="backendai-webserver",
+    fat=False,
     dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-webserver-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
 )
 
 run_shell_command(
     name="checksum",
     command="find dist -name 'backendai-webserver-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
     workdir="/",
-    execution_dependencies=[":backendai-webserver"],
+    execution_dependencies=[
+        ":backendai-webserver",
+        ":backendai-webserver-fat",
+    ],
     tags=["checksum"],
 )
 

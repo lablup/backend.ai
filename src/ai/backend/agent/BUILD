@@ -90,19 +90,42 @@ pex_binary(
 
 scie_binary(
     name="backendai-agent",
+    fat=False,
     dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-agent-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
 )
 
 scie_binary(
     name="backendai-agent-watcher",
+    fat=False,
     dependencies=[":pex-watcher"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-agent-watcher-fat",
+    fat=True,
+    dependencies=[":pex-watcher"],
+    tags=["scie", "fat"],
 )
 
 run_shell_command(
     name="checksum",
     command="find dist -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
     workdir="/",
-    execution_dependencies=[":backendai-agent", ":backendai-agent-watcher"],
+    execution_dependencies=[
+        ":backendai-agent",
+        ":backendai-agent-watcher",
+        ":backendai-agent-fat",
+        ":backendai-agent-watcher-fat",
+    ],
     tags=["checksum"],
 )
 

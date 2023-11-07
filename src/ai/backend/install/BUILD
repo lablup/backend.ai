@@ -46,14 +46,26 @@ pex_binary(
 
 scie_binary(
     name="backendai-install",
+    fat=False,
     dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-install-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
 )
 
 run_shell_command(
     name="checksum",
     command="find dist -name 'backendai-install-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
     workdir="/",
-    execution_dependencies=[":backendai-install"],
+    execution_dependencies=[
+        ":backendai-install",
+        ":backendai-install-fat",
+    ],
     tags=["checksum"],
 )
 
