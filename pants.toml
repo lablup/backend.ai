@@ -5,6 +5,7 @@ backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
     "pants.backend.python.typecheck.mypy",
+    "pants.backend.shell",
     "pants.backend.experimental.python",
     "pants.backend.experimental.python.lint.ruff",
     "pants.backend.experimental.visibility",

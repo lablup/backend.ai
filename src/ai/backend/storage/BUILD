@@ -50,6 +50,13 @@ scie_binary(
     dependencies=[":pex"],
 )
 
+run_shell_command(
+    name="checksum",
+    command="find dist -name 'backendai-storage-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
+    workdir="/",
+    execution_dependencies=[":backendai-storage"],
+)
+
 resource(name="version", source="VERSION")
 resource(name="buildscript", source="BUILD")
 resources(

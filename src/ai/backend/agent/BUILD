@@ -98,6 +98,13 @@ scie_binary(
     dependencies=[":pex-watcher"],
 )
 
+run_shell_command(
+    name="checksum",
+    command="find dist -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
+    workdir="/",
+    execution_dependencies=[":backendai-agent", ":backendai-agent-watcher"],
+)
+
 resource(name="version", source="VERSION")
 resource(name="buildscript", source="BUILD")
 resources(
