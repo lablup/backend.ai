@@ -1530,7 +1530,6 @@ class SchedulerDispatcher(aobject):
         log_args = (session,)
         log.debug(log_fmt + "try-starting", *log_args)
         try:
-            assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
         except Exception as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])

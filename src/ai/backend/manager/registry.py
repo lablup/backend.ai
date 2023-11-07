@@ -1271,34 +1271,43 @@ class AgentRegistry:
     async def start_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduled_session: SessionRow,
+        orig_scheduled_session: SessionRow,
     ) -> None:
         from .scheduler.types import AgentAllocationContext, KernelAgentBinding
-
-        kernel_agent_bindings: Sequence[KernelAgentBinding] = [
-            KernelAgentBinding(
-                kernel=k,
-                agent_alloc_ctx=AgentAllocationContext(
-                    agent_id=k.agent,
-                    agent_addr=k.agent_addr,
-                    scaling_group=scheduled_session.scaling_group,
-                ),
-                allocated_host_ports=set(),
-            )
-            for k in scheduled_session.kernels
-        ]
 
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_START_SESSION",
             (
-                scheduled_session.id,
-                scheduled_session.name,
-                scheduled_session.access_key,
+                orig_scheduled_session.id,
+                orig_scheduled_session.name,
+                orig_scheduled_session.access_key,
             ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
+
+        async with self.db.begin_readonly_session() as db_sess:
+            session_query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == orig_scheduled_session.id)
+                .options(selectinload(SessionRow.kernels))
+            )
+            scheduled_session: SessionRow = (await db_sess.scalars(session_query)).first()
+
+            kernel_agent_bindings: Sequence[KernelAgentBinding] = [
+                KernelAgentBinding(
+                    kernel=k,
+                    agent_alloc_ctx=AgentAllocationContext(
+                        agent_id=k.agent,
+                        agent_addr=k.agent_addr,
+                        scaling_group=scheduled_session.scaling_group_name,
+                    ),
+                    allocated_host_ports=set(),
+                )
+                for k in scheduled_session.kernels
+            ]
+        assert len(scheduled_session.kernels) > 0
 
         # Get resource policy for the session
         # TODO: memoize with TTL
