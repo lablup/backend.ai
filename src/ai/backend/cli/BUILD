@@ -39,7 +39,7 @@ python_distribution(
 )
 
 pex_binary(
-    name="cli",
+    name="pex",
     dependencies=[
         ":src",
     ],

@@ -511,17 +511,17 @@ class UserInput(graphene.InputObjectType):
     username = graphene.String(required=True)
     password = graphene.String(required=True)
     need_password_change = graphene.Boolean(required=True)
-    full_name = graphene.String(required=False, default="")
-    description = graphene.String(required=False, default="")
-    is_active = graphene.Boolean(required=False, default=True)
-    status = graphene.String(required=False, default=UserStatus.ACTIVE)
-    domain_name = graphene.String(required=True, default="default")
-    role = graphene.String(required=False, default=UserRole.USER)
+    full_name = graphene.String(required=False, default_value="")
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
+    status = graphene.String(required=False, default_value=UserStatus.ACTIVE)
+    domain_name = graphene.String(required=True, default_value="default")
+    role = graphene.String(required=False, default_value=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
-    totp_activated = graphene.Boolean(required=False, default=False)
-    resource_policy = graphene.String(required=False, default="default")
-    sudo_session_enabled = graphene.Boolean(required=False, default=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False, default_value=None)
+    totp_activated = graphene.Boolean(required=False, default_value=False)
+    resource_policy = graphene.String(required=False, default_value="default")
+    sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -585,8 +585,8 @@ class CreateUser(graphene.Mutation):
             "role": UserRole(props.role),
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
-            "resource_policy": props.resource_policy or "default",
-            "sudo_session_enabled": props.sudo_session_enabled or False,
+            "resource_policy": props.resource_policy,
+            "sudo_session_enabled": props.sudo_session_enabled,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -600,14 +600,12 @@ class CreateUser(graphene.Mutation):
 
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
-                graph_ctx.schema.get_type("KeyPairInput").create_container(
-                    {
-                        "is_active": _status == UserStatus.ACTIVE,
-                        "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                        "resource_policy": "default",
-                        "rate_limit": 10000,
-                    }
-                ),
+                {
+                    "is_active": _status == UserStatus.ACTIVE,
+                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                    "resource_policy": "default",
+                    "rate_limit": 10000,
+                },
             )
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,
@@ -616,9 +614,9 @@ class CreateUser(graphene.Mutation):
             await conn.execute(kp_insert_query)
 
             # Add user to groups if group_ids parameter is provided.
-            from .group import association_groups_users, groups
-
             if props.group_ids:
+                from .group import association_groups_users, groups
+
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)

@@ -771,6 +771,7 @@ def main(
     log_level: str,
     debug: bool,
 ) -> None:
+    """Start the webui host service as a foreground process."""
     # Delete this part when you remove --debug option
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
