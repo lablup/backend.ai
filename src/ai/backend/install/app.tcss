@@ -20,16 +20,26 @@ ModeMenu {
     margin: 2 2;
     align-horizontal: center;
 }
+ModeMenu ListView {
+    layout: horizontal;
+    width: 105;
+    height: auto;
+}
+ModeMenu ListView > ListItem {
+    width: 50;
+    margin: 1 2;
+    height: 10;
+    border: wide $panel;
+}
 ModeMenu ListView > ListItem .mode-item-title {
     width: 1fr;
     text-style: bold;
 }
 ModeMenu ListView > ListItem .mode-item-desc {
-    background: $panel-lighten-2;
-    width: 4fr;
+    width: 1fr;
 }
-ModeMenu ListView > ListItem.--highlight .mode-item-desc {
-    background: $primary-lighten-2;
+ModeMenu ListView > ListItem.--highlight {
+    border: wide white;
 }
 ModeMenu ListView > ListItem.disabled .mode-item-title {
     background: $panel;
@@ -38,10 +48,6 @@ ModeMenu ListView > ListItem.disabled .mode-item-title {
 ModeMenu ListView > ListItem.disabled .mode-item-desc {
     background: $panel;
     color: $error;
-}
-ModeMenu ListView {
-    width: 1fr;
-    height: auto;
 }
 ModeMenu Label {
     padding: 1 2;

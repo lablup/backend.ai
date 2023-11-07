@@ -3,12 +3,22 @@ from __future__ import annotations
 import enum
 import os
 from contextvars import ContextVar
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual.widgets import RichLog
 
+from ai.backend.install.utils import request
+
+from . import __version__
 from .common import detect_os
-from .dev import bootstrap_pants, install_editable_webui, install_git_hooks, install_git_lfs
+from .dev import (
+    bootstrap_pants,
+    install_editable_webui,
+    install_git_hooks,
+    install_git_lfs,
+    pants_export,
+)
 from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
 from .python import check_python
 from .types import OSInfo
@@ -107,11 +117,8 @@ class DevContext(Context):
         await bootstrap_pants(self, local_execution_root_dir)
 
     async def install(self) -> None:
+        await pants_export(self)
         await install_editable_webui(self)
-        # TODO: install agent-watcher
-        # TODO: install storage-agent
-        # TODO: install storage-watcher
-        # TODO: install webserver
 
     async def configure(self) -> None:
         await self.configure_manager()
@@ -132,13 +139,46 @@ class PackageContext(Context):
         if self.os_info.distro == "Darwin":
             await check_docker_desktop_mount(self)
 
+    def _mangle_pkgname(self, name: str) -> str:
+        return f"backendai-{name}-{self.os_info.platform}"
+
+    async def _fetch_package(self, name: str) -> None:
+        url = f"https://github.com/lablup/backend.ai/releases/download/{self.pkg_version}/{self._mangle_pkgname(name)}"
+        csum_url = url + ".sha256"
+        self.log.write(f"Downloading {url}...")
+        # TODO: wget...
+        self.log.write(f"Verifying {url}...")
+        async with request("GET", csum_url) as r:
+            csum = (await r.text()).strip()
+        # TODO: verify checksum
+
+    async def _verify_package(self, name: str) -> None:
+        path = f"./{self._mangle_pkgname(name)}"
+        self.log.write(f"Verifying {path}...")
+        csum_path = path + ".sha256"
+        csum = Path(csum_path).read_text().strip()
+        # TODO: verify checksum
+
     async def install(self) -> None:
-        pass
-        # TODO: install agent-watcher
-        # TODO: install storage-agent
-        # TODO: install storage-watcher
-        # TODO: install webserver
-        # TODO: install static wsproxy
+        try:
+            self.pkg_version = Path("DIST-INFO").read_text()
+            # use the local files
+            await self._verify_package("manager")
+            await self._verify_package("agent")
+            await self._verify_package("agent-watcher")
+            # replace above with await self._verify_package("watcher")
+            await self._verify_package("client")
+            await self._verify_package("webserver")
+        except FileNotFoundError:
+            self.pkg_version = __version__
+            # download
+            await self._fetch_package("manager")
+            await self._fetch_package("agent")
+            await self._fetch_package("agent-watcher")
+            # replace above with await self._fetch_package("watcher")
+            await self._fetch_package("client")
+            await self._fetch_package("webserver")
+            # TODO: await self._fetch_package("static wsproxy")
 
     async def configure(self) -> None:
         await self.configure_manager()

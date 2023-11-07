@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 async def install_git_lfs(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[dim green]Installing Git LFS"))
+    ctx.log.write(Text.from_markup("[bright_green]Installing Git LFS"))
     if ctx.os_info.distro == "RedHat":
         "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash"
     await ctx.install_system_package(
@@ -24,7 +24,7 @@ async def install_git_lfs(ctx: Context) -> None:
 
 
 async def install_git_hooks(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[dim green]Installing Git hooks"))
+    ctx.log.write(Text.from_markup("[bright_green]Installing Git hooks"))
     await ctx.run_shell("""
     local magic_str="monorepo standard pre-commit hook"
     if [ -f .git/hooks/pre-commit ]; then
@@ -56,7 +56,7 @@ async def install_git_hooks(ctx: Context) -> None:
 
 
 async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:
-    ctx.log.write(Text.from_markup("[dim green]Bootstrapping Pantsbuild"))
+    ctx.log.write(Text.from_markup("[bright_green]Bootstrapping Pantsbuild"))
     ctx.log.write(f"local_execution_root_dir = {local_execution_root_dir}")
     await ctx.run_shell("""
     pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
@@ -88,11 +88,13 @@ async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:
     fi
     set -e
     """)
+
+
+async def pants_export(ctx: Context) -> None:
+    ctx.log.write(Text.from_markup("[bright_green]Creating virtualenvs from pants export..."))
     await ctx.run_shell("""
     pants export \
       --resolve=python-default \
-      --resolve=python-kernel \
-      --resolve=pants-plugins \
       --resolve=towncrier \
       --resolve=ruff \
       --resolve=mypy \
@@ -101,7 +103,7 @@ async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:
 
 
 async def install_editable_webui(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[dim green]Installing the editable version of webui"))
+    ctx.log.write(Text.from_markup("[bright_green]Installing the editable version of webui"))
     """
     if ! command -v node &> /dev/null; then
       install_node

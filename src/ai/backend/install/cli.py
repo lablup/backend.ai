@@ -13,7 +13,7 @@ from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.widgets import (
     ContentSwitcher,
     Footer,
@@ -111,6 +111,11 @@ class PackageSetup(Static):
 class ModeMenu(Static):
     """A ListView to choose InstallModes and a description pane underneath."""
 
+    BINDINGS = [
+        Binding("left", "cursor_up", show=False),
+        Binding("right", "cursor_down", show=False),
+    ]
+
     def __init__(
         self,
         mode: InstallModes | None = None,
@@ -131,7 +136,7 @@ class ModeMenu(Static):
         self._mode = mode
 
     def compose(self) -> ComposeResult:
-        yield Label("The installation mode:\n(up/down to change, enter to select)")
+        yield Label("The installation mode:\n(arrow keys to change, enter to select)")
         mode_desc: dict[tuple[InstallModes, bool], str] = {
             (
                 InstallModes.DEV,
@@ -145,11 +150,12 @@ class ModeMenu(Static):
         }
         with ListView(
             id="mode-list", initial_index=list(InstallModes).index(InstallModes(self._mode))
-        ):
+        ) as lv:
+            self.lv = lv
             for mode in InstallModes:
                 disabled = not self._dev_available if mode == InstallModes.DEV else False
                 yield ListItem(
-                    Horizontal(
+                    Vertical(
                         Label(mode, classes="mode-item-title"),
                         Label(mode_desc[(mode, disabled)], classes="mode-item-desc"),
                     ),
@@ -157,6 +163,12 @@ class ModeMenu(Static):
                     id=f"mode-{mode.value.lower()}",
                 )
         yield Label(id="mode-desc")
+
+    def action_cursor_up(self) -> None:
+        self.lv.action_cursor_up()
+
+    def action_cursor_down(self) -> None:
+        self.lv.action_cursor_down()
 
     @on(ListView.Selected, "#mode-list", item="#mode-dev")
     def start_dev_mode(self) -> None:
