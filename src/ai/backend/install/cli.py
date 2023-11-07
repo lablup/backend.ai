@@ -130,11 +130,9 @@ class ModeMenu(Static):
         if mode is None:
             try:
                 self._build_root = find_build_root()
-                self._dev_available = True
                 self._enabled_menus.add(InstallModes.DEVELOP)
                 mode = InstallModes.DEVELOP
             except ValueError:
-                self._dev_available = False
                 mode = InstallModes.PACKAGE
         if Path("INSTALL-INFO").exists():
             self._enabled_menus.add(InstallModes.MAINTAIN)
@@ -183,7 +181,7 @@ class ModeMenu(Static):
 
     @on(ListView.Selected, "#mode-list", item="#mode-develop")
     def start_develop_mode(self) -> None:
-        if not self._dev_available:
+        if InstallModes.DEVELOP not in self._enabled_menus:
             return
         self.app.sub_title = "Development Setup"
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
@@ -193,6 +191,8 @@ class ModeMenu(Static):
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
+        if InstallModes.PACKAGE not in self._enabled_menus:
+            return
         self.app.sub_title = "Package Setup"
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "pkg-setup"
@@ -201,6 +201,8 @@ class ModeMenu(Static):
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
+        if InstallModes.MAINTAIN not in self._enabled_menus:
+            return
         pass
 
 
