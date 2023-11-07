@@ -22,13 +22,13 @@ ModeMenu {
 }
 ModeMenu ListView {
     layout: horizontal;
-    width: 105;
+    width: auto;
     height: auto;
 }
 ModeMenu ListView > ListItem {
-    width: 50;
+    width: 35;
     margin: 1 2;
-    height: 10;
+    height: 14;
     border: wide $panel;
 }
 ModeMenu ListView > ListItem .mode-item-title {
@@ -42,12 +42,14 @@ ModeMenu ListView > ListItem.--highlight {
     border: wide white;
 }
 ModeMenu ListView > ListItem.disabled .mode-item-title {
-    background: $panel;
     color: $panel-lighten-2;
 }
 ModeMenu ListView > ListItem.disabled .mode-item-desc {
-    background: $panel;
     color: $error;
+}
+ModeMenu ListView > ListItem.--highlight.disabled {
+    background: $panel;
+    border: wide $panel-lighten-2;
 }
 ModeMenu Label {
     padding: 1 2;

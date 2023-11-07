@@ -5,8 +5,9 @@ from ai.backend.common.types import HostPortPair
 
 
 class InstallModes(enum.StrEnum):
-    DEV = "DEV"
+    DEVELOP = "DEVELOP"
     PACKAGE = "PACKAGE"
+    MAINTAIN = "MAINTAIN"
 
 
 class Platform(enum.StrEnum):

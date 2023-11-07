@@ -4,6 +4,7 @@ import asyncio
 import os
 import sys
 import textwrap
+from pathlib import Path
 from typing import cast
 from weakref import WeakSet
 
@@ -124,14 +125,19 @@ class ModeMenu(Static):
     ) -> None:
         super().__init__(id=id)
         self._build_root = None
+        self._enabled_menus = set()
+        self._enabled_menus.add(InstallModes.PACKAGE)
         if mode is None:
             try:
                 self._build_root = find_build_root()
                 self._dev_available = True
-                mode = InstallModes.DEV
+                self._enabled_menus.add(InstallModes.DEVELOP)
+                mode = InstallModes.DEVELOP
             except ValueError:
                 self._dev_available = False
                 mode = InstallModes.PACKAGE
+        if Path("INSTALL-INFO").exists():
+            self._enabled_menus.add(InstallModes.MAINTAIN)
         assert mode is not None
         self._mode = mode
 
@@ -139,21 +145,26 @@ class ModeMenu(Static):
         yield Label("The installation mode:\n(arrow keys to change, enter to select)")
         mode_desc: dict[tuple[InstallModes, bool], str] = {
             (
-                InstallModes.DEV,
+                InstallModes.DEVELOP,
                 False,
-            ): f"Install for development using the current source checkout ({self._build_root})",
+            ): f"Install from the current source checkout ({self._build_root})",
             (
-                InstallModes.DEV,
+                InstallModes.DEVELOP,
                 True,
-            ): "Could not find the source clone as no BUILD_ROOT file is detected.",
+            ): "Could not find the source as no BUILD_ROOT file is detected.",
             (InstallModes.PACKAGE, False): "Install using release packages",
+            (InstallModes.MAINTAIN, False): "Maintain an existing setup",
+            (
+                InstallModes.MAINTAIN,
+                True,
+            ): "Could not find an existing setup (missing INSTALL-INFO)",
         }
         with ListView(
             id="mode-list", initial_index=list(InstallModes).index(InstallModes(self._mode))
         ) as lv:
             self.lv = lv
             for mode in InstallModes:
-                disabled = not self._dev_available if mode == InstallModes.DEV else False
+                disabled = mode not in self._enabled_menus
                 yield ListItem(
                     Vertical(
                         Label(mode, classes="mode-item-title"),
@@ -170,8 +181,8 @@ class ModeMenu(Static):
     def action_cursor_down(self) -> None:
         self.lv.action_cursor_down()
 
-    @on(ListView.Selected, "#mode-list", item="#mode-dev")
-    def start_dev_mode(self) -> None:
+    @on(ListView.Selected, "#mode-list", item="#mode-develop")
+    def start_develop_mode(self) -> None:
         if not self._dev_available:
             return
         self.app.sub_title = "Development Setup"
@@ -187,6 +198,10 @@ class ModeMenu(Static):
         switcher.current = "pkg-setup"
         pkg_setup: PackageSetup = cast(PackageSetup, self.app.query_one("#pkg-setup"))
         switcher.call_after_refresh(pkg_setup.begin_install)
+
+    @on(ListView.Selected, "#mode-list", item="#mode-maintain")
+    def start_maintain_mode(self) -> None:
+        pass
 
 
 class InstallerApp(App):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import os
 from contextvars import ContextVar
 from pathlib import Path
@@ -139,7 +140,9 @@ class PackageContext(Context):
         if self.os_info.distro == "Darwin":
             await check_docker_desktop_mount(self)
 
-    def _mangle_pkgname(self, name: str) -> str:
+    def _mangle_pkgname(self, name: str, fat: bool = False) -> str:
+        if fat:
+            return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
     async def _fetch_package(self, name: str) -> None:
@@ -153,8 +156,8 @@ class PackageContext(Context):
         # TODO: verify checksum
         print(csum)
 
-    async def _verify_package(self, name: str) -> None:
-        path = f"./{self._mangle_pkgname(name)}"
+    async def _verify_package(self, name: str, *, fat: bool) -> None:
+        path = f"./{self._mangle_pkgname(name, fat=fat)}"
         self.log.write(f"Verifying {path}...")
         csum_path = path + ".sha256"
         csum = Path(csum_path).read_text().strip()
@@ -163,17 +166,12 @@ class PackageContext(Context):
 
     async def install(self) -> None:
         try:
-            self.pkg_version = Path("DIST-INFO").read_text()
-            # use the local files
-            await self._verify_package("manager")
-            await self._verify_package("agent")
-            await self._verify_package("agent-watcher")
-            # replace above with await self._verify_package("watcher")
-            await self._verify_package("client")
-            await self._verify_package("webserver")
+            dist_info = json.loads(Path("DIST-INFO").read_bytes())
+            self.pkg_version = dist_info["version"]
+            use_fat_binary = dist_info.get("fat", False)
         except FileNotFoundError:
             self.pkg_version = __version__
-            # download
+            # download (NOTE: we always use the lazy version here)
             await self._fetch_package("manager")
             await self._fetch_package("agent")
             await self._fetch_package("agent-watcher")
@@ -181,6 +179,14 @@ class PackageContext(Context):
             await self._fetch_package("client")
             await self._fetch_package("webserver")
             # TODO: await self._fetch_package("static wsproxy")
+        else:
+            # use the local files
+            await self._verify_package("manager", fat=use_fat_binary)
+            await self._verify_package("agent", fat=use_fat_binary)
+            await self._verify_package("agent-watcher", fat=use_fat_binary)
+            # replace above with await self._verify_package("watcher", fat=use_fat_binary)
+            await self._verify_package("client", fat=use_fat_binary)
+            await self._verify_package("webserver", fat=use_fat_binary)
 
     async def configure(self) -> None:
         await self.configure_manager()
