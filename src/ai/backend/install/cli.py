@@ -177,7 +177,8 @@ class ModeMenu(Static):
         if InstallModes.MAINTAIN in self._enabled_menus:
             maintain_desc = "Maintain an existing setup"
         else:
-            maintain_desc = "Could not find an existing setup (missing INSTALL-INFO)"
+            # maintain_desc = "Could not find an existing setup (missing INSTALL-INFO)"
+            maintain_desc = "Coming soon!"
         mode_desc: dict[InstallModes, str] = {
             InstallModes.DEVELOP: develop_desc,
             InstallModes.PACKAGE: package_desc,
