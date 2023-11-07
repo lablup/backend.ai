@@ -486,8 +486,6 @@ class ModifyGroup(graphene.Mutation):
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")
-        if props.user_update_mode not in (None, "add", "remove"):
-            raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
             props.user_update_mode = None
         if not data and props.user_update_mode is None:
