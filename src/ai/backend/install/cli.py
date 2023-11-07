@@ -32,7 +32,7 @@ from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
 from .context import DevContext, PackageContext, current_log
-from .types import DistInfo, InstallModes
+from .types import CliArgs, ConfigError, DistInfo, InstallModes
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -94,6 +94,11 @@ class PackageSetup(Static):
         ctx = PackageContext(dist_info, self.app)
         try:
             # prerequisites
+            if dist_info.target_path.exists():
+                raise ConfigError(
+                    "The target path {dist_info.target_path} already exists. "
+                    "Set '--target-path` option to change it."
+                )
             await ctx.check_prerequisites()
             # install
             await ctx.install_halfstack(ha_setup=False)
@@ -128,7 +133,7 @@ class ModeMenu(Static):
 
     def __init__(
         self,
-        mode: InstallModes | None = None,
+        args: CliArgs,
         *,
         id: str | None = None,
     ) -> None:
@@ -142,13 +147,14 @@ class ModeMenu(Static):
             self._dist_info = DistInfo()
         self._enabled_menus = set()
         self._enabled_menus.add(InstallModes.PACKAGE)
+        mode = args.mode
         try:
             self._build_root = find_build_root()
             self._enabled_menus.add(InstallModes.DEVELOP)
-            if mode is None:
+            if args.mode is None:
                 mode = InstallModes.DEVELOP
         except ValueError:
-            if mode is None:
+            if args.mode is None:
                 mode = InstallModes.PACKAGE
         if Path("INSTALL-INFO").exists():
             self._enabled_menus.add(InstallModes.MAINTAIN)
@@ -232,9 +238,9 @@ class InstallerApp(App):
     ]
     CSS_PATH = "app.tcss"
 
-    def __init__(self, mode: InstallModes | None = None) -> None:
+    def __init__(self, args: CliArgs) -> None:
         super().__init__()
-        self._mode = mode
+        self._args = args
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -247,7 +253,7 @@ class InstallerApp(App):
         """)
         yield Static(logo_text, id="logo")
         with ContentSwitcher(id="top", initial="mode-menu"):
-            yield ModeMenu(self._mode, id="mode-menu")
+            yield ModeMenu(self._args, id="mode-menu")
             yield DevSetup(id="dev-setup")
             yield PackageSetup(id="pkg-setup")
         yield Footer()
@@ -280,12 +286,19 @@ class InstallerApp(App):
     default=None,
     help="Override the installation mode. [default: auto-detect]",
 )
+@click.option(
+    "--target-path",
+    type=str,
+    default=str(Path.home() / "backendai"),
+    help="Explicitly set the target installation path. [default: ~/backendai]",
+)
 # TODO: --show-guide?
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
-    ctx: click.Context,
+    cli_ctx: click.Context,
     mode: InstallModes | None,
+    target_path: str,
 ) -> None:
     """The installer"""
     # check sudo permission
@@ -297,5 +310,6 @@ def main(
         )
         sys.exit(1)
     # start installer
-    app = InstallerApp(mode)
+    args = CliArgs(mode=mode, target_path=target_path)
+    app = InstallerApp(args)
     app.run()

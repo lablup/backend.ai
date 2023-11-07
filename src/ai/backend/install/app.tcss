@@ -69,7 +69,10 @@ ModeMenu Label {
     background: $panel-darken-3;
 }
 
-ProgressBar.download-progress {
-    dock: top;
+#download-status {
+    dock: bottom;
+    padding: 1 2;
+    background: $panel;
     width: 50;
+    height: auto;
 }

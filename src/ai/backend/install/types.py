@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
+from rich.console import ConsoleRenderable
+from rich.text import Text
 
 from ai.backend.common.types import HostPortPair
 
@@ -35,12 +37,23 @@ class Platform(enum.StrEnum):
     MACOS_X86_64 = "macos-x86_64"
 
 
+@dataclasses.dataclass()
+class CliArgs:
+    mode: InstallModes | None
+    target_path: str
+
+
+class ConfigError(Exception):
+    def __rich__(self) -> ConsoleRenderable:
+        return Text.from_markup(f"[bold red]ConfigError: [bold white]{self.args[0]}[/]")
+
+
 class DistInfo(BaseModel):
     version: str = __version__
     package_source: PackageSource = PackageSource.GITHUB_RELEASE
     package_dir: Path = Field(default_factory=Path.cwd)
     use_fat_binary: bool = False
-    target_path: Path | None = None
+    target_path: Path = Field(default_factory=lambda: Path.home() / "backendai")
 
 
 class InstallInfo(BaseModel):

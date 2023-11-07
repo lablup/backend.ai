@@ -1,5 +1,5 @@
-import asyncio
 from contextlib import asynccontextmanager as actxmgr
+from pathlib import Path
 from typing import AsyncIterator
 
 import aiohttp
@@ -31,14 +31,21 @@ async def request_unix(
             yield r
 
 
-async def wget(url: str, progress: ProgressBar) -> None:
+async def wget(
+    url: str,
+    target_path: Path,
+    progress: ProgressBar | None = None,
+) -> None:
     chunk_size = 16384
-    async with request("GET", url, raise_for_status=True) as r:
-        progress.total = r.content_length
-        print(f"wget {url=} {r.history=} {progress.total=}")
-        while True:
-            chunk = await r.content.read(chunk_size)
-            if not chunk:
-                break
-            await asyncio.sleep(0.3)
-            progress.advance(len(chunk))
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(target_path, "wb") as out:
+        async with request("GET", url, raise_for_status=True) as r:
+            if progress is not None:
+                progress.total = r.content_length
+            while True:
+                chunk = await r.content.read(chunk_size)
+                if not chunk:
+                    break
+                out.write(chunk)
+                if progress is not None:
+                    progress.advance(len(chunk))

@@ -7,7 +7,8 @@ from pathlib import Path
 
 from rich.text import Text
 from textual.app import App
-from textual.widgets import ProgressBar, RichLog
+from textual.containers import Vertical
+from textual.widgets import Label, ProgressBar, RichLog, Static
 
 from .common import detect_os
 from .dev import (
@@ -18,7 +19,7 @@ from .dev import (
     pants_export,
 )
 from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
-from .http import request, wget
+from .http import wget
 from .python import check_python
 from .types import DistInfo, OSInfo, PackageSource
 
@@ -40,6 +41,7 @@ class Context:
         self.log = current_log.get()
         self.cwd = Path.cwd()
         self.dist_info = dist_info
+        self.wget_sema = asyncio.Semaphore(3)
 
     def add_post_guide(self, guide: PostGuide) -> None:
         self._post_guides.append(guide)
@@ -181,22 +183,31 @@ class PackageContext(Context):
             return True
         return False
 
-    async def _fetch_package(self, name: str) -> None:
-        url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{self._mangle_pkgname(name)}"
-        csum_url = url + ".sha256"
-        self.log.write(f"Downloading {url}...")
+    async def _fetch_package(self, name: str, vpane: Vertical) -> None:
+        pkg_name = self._mangle_pkgname(name)
+        pkg_path = self.dist_info.target_path / pkg_name
+        csum_path = pkg_path.with_name(pkg_name + ".sha256")
+        pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
+        csum_url = pkg_url + ".sha256"
+        self.log.write(f"Downloading {pkg_url}...")
+        item = Static(classes="progress-item")
+        label = Label(pkg_name, classes="progress-name")
         progress = ProgressBar(classes="progress-download")
-        progress.styles.margin = (len(self.log.lines) - self.log.scroll_offset.y, 0)
-        await self.log.mount(progress)
-        try:
-            await wget(url, progress)
-        finally:
-            progress.remove()
-        self.log.write(f"Verifying {url}...")
-        async with request("GET", csum_url) as r:
-            csum = (await r.text()).strip()
-        # TODO: verify checksum
-        print(csum)
+        await item.mount(label)
+        await item.mount(progress)
+        await vpane.mount(item)
+        async with self.wget_sema:
+            try:
+                await wget(pkg_url, pkg_path, progress)
+            finally:
+                item.remove()
+        self.log.write(f"Verifying {pkg_url}...")
+        await wget(csum_url, csum_path)
+        if not await self._validate_checksum(csum_path):
+            raise RuntimeError(
+                "Failed to validate the checksum of {pkg_path}. "
+                "Please check the install media and retry after removing it."
+            )
 
     async def _verify_package(self, name: str, *, fat: bool) -> None:
         pkg_name = self._mangle_pkgname(name, fat=fat)
@@ -213,14 +224,23 @@ class PackageContext(Context):
         match self.dist_info.package_source:
             case PackageSource.GITHUB_RELEASE:
                 # download (NOTE: we always use the lazy version here)
-                await self._fetch_package("manager")
-                await self._fetch_package("agent")
-                await self._fetch_package("agent-watcher")
-                # replace above with await self._fetch_package("watcher")
-                await self._fetch_package("webserver")
-                await self._fetch_package("storage-proxy")
-                await self._fetch_package("client")
-                # TODO: await self._fetch_package("static wsproxy")
+                self.log_header(
+                    f"Downloading prebuilt packages into {self.dist_info.target_path}..."
+                )
+                vpane = Vertical(id="download-status")
+                self.log.mount(vpane)
+                try:
+                    async with asyncio.TaskGroup() as tg:
+                        tg.create_task(self._fetch_package("manager", vpane))
+                        tg.create_task(self._fetch_package("agent", vpane))
+                        tg.create_task(self._fetch_package("agent-watcher", vpane))
+                        # replace above with self._fetch_package("watcher", vpane)
+                        tg.create_task(self._fetch_package("webserver", vpane))
+                        tg.create_task(self._fetch_package("storage-proxy", vpane))
+                        tg.create_task(self._fetch_package("client", vpane))
+                        # TODO: tg.create_task(self._fetch_package("static wsproxy"))
+                finally:
+                    vpane.remove()
             case PackageSource.LOCAL_DIR:
                 # use the local files
                 await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
