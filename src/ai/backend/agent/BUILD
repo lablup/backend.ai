@@ -77,6 +77,7 @@ pex_binary(
         "//src/ai/backend/accelerator/mock:lib",
         "//src/ai/backend/accelerator/mock:buildscript",
         "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src-watcher",
     ],
 )
 pex_binary(
@@ -85,6 +86,7 @@ pex_binary(
     dependencies=[
         ":src-watcher",
         "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src",
     ],
 )
 
