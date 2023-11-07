@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 
 from aiohttp import web
 
-from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.plugin import AbstractPlugin, AbstractWebappPlugin, BasePluginContext
 from ai.backend.watcher.base import BaseWatcher, BaseWatcherConfig
 
 from .defs import CORSOptions, WebMiddleware
@@ -20,7 +20,9 @@ class WatcherPluginContext(BasePluginContext[AbstractWatcherPlugin]):
     plugin_group = "backendai_watcher_v10"
 
 
-class AbstractWatcherWebAppPlugin(AbstractPlugin, metaclass=ABCMeta):
+class AbstractWatcherWebAppPlugin(AbstractWebappPlugin, metaclass=ABCMeta):
+    app_name = "agent-watcher"
+
     @abstractmethod
     async def create_app(
         self,

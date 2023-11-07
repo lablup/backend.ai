@@ -50,6 +50,15 @@ async def ping(request: web.Request) -> web.Response:
     )
 
 
+async def get_plugins(request: web.Request) -> web.Response:
+    ctx: RootContext = request.app["ctx"]
+
+    return web.json_response(
+        [{"plugin": app, "publicity": app.is_public} for app in ctx.webapps],
+        status=200,
+    )
+
+
 def init_subapp(
     pkg_name: str,
     root_app: web.Application,
@@ -208,6 +217,7 @@ async def server_main(
     cors = aiohttp_cors.setup(app, defaults=cors_options)
     cors.add(app.router.add_route("GET", r"", ping))
     cors.add(app.router.add_route("GET", r"/", ping))
+    cors.add(app.router.add_route("GET", "/plugins", get_plugins))
 
     watcher_ctx = await _init_watcher(ctx, etcd, local_config)
     webapp_plugin_ctx = await _init_subapp(app, ctx, etcd, local_config, cors_options)
