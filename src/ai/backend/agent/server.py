@@ -881,38 +881,33 @@ def main(
     # Determine where to read configuration.
     try:
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
-    except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Could not read or validate the agent local config:",
-            file=sys.stderr,
+
+        # Override the read config with environment variables (for legacy).
+        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+        config.override_with_env(
+            raw_cfg, ("agent", "rpc-listen-addr", "host"), "BACKEND_AGENT_HOST_OVERRIDE"
         )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
+        config.override_with_env(
+            raw_cfg, ("agent", "rpc-listen-addr", "port"), "BACKEND_AGENT_PORT"
+        )
+        config.override_with_env(raw_cfg, ("agent", "pid-file"), "BACKEND_PID_FILE")
+        config.override_with_env(
+            raw_cfg, ("container", "port-range"), "BACKEND_CONTAINER_PORT_RANGE"
+        )
+        config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
+        config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
+        config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
+        if debug:
+            log_level = "DEBUG"
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
-    # Override the read config with environment variables (for legacy).
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    config.override_with_env(
-        raw_cfg, ("agent", "rpc-listen-addr", "host"), "BACKEND_AGENT_HOST_OVERRIDE"
-    )
-    config.override_with_env(raw_cfg, ("agent", "rpc-listen-addr", "port"), "BACKEND_AGENT_PORT")
-    config.override_with_env(raw_cfg, ("agent", "pid-file"), "BACKEND_PID_FILE")
-    config.override_with_env(raw_cfg, ("container", "port-range"), "BACKEND_CONTAINER_PORT_RANGE")
-    config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
-    config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
-    config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
-
-    if debug:
-        log_level = "DEBUG"
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-
-    # Validate and fill configurations
-    # (allow_extra will make configs to be forward-copmatible)
-    try:
+        # Validate and fill configurations
+        # (allow_extra will make configs to be forward-copmatible)
         cfg = config.check(raw_cfg, agent_local_config_iv)
         if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
             if cfg["container"]["scratch-type"] == "k8s-nfs" and (
@@ -929,7 +924,10 @@ def main(
             pprint(cfg)
         cfg["_src"] = cfg_src_path
     except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
+        print(
+            "ConfigurationError: Could not read or validate the agent local config:",
+            file=sys.stderr,
+        )
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 

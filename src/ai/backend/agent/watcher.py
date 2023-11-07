@@ -377,25 +377,23 @@ def main(ctx: click.Context, config_path: str, log_level: str, debug: bool) -> N
         .allow_extra("*")
     )
 
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
-
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    config.override_with_env(
-        raw_cfg, ("watcher", "service-addr", "host"), "BACKEND_WATCHER_SERVICE_IP"
-    )
-    config.override_with_env(
-        raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
-    )
-    if debug:
-        log_level = "DEBUG"
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-
     try:
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+        config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+        config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+        config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+        config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+        config.override_with_env(
+            raw_cfg, ("watcher", "service-addr", "host"), "BACKEND_WATCHER_SERVICE_IP"
+        )
+        config.override_with_env(
+            raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
+        )
+        if debug:
+            log_level = "DEBUG"
+        config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
+        config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
         cfg = config.check(raw_cfg, watcher_config_iv)
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Watcher configuration ==")
