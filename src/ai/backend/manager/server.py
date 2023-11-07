@@ -436,6 +436,7 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
     await ctx.init(
+        context=ctx,
         allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
         blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
     )
