@@ -314,7 +314,7 @@ class User(BaseFunction):
         full_name: str | Undefined = undefined,
         domain_name: str | Undefined = undefined,
         role: UserRole | str | Undefined = undefined,
-        status: UserStatus | str | None = undefined,
+        status: UserStatus | str | Undefined = undefined,
         need_password_change: bool | Undefined = undefined,
         description: str | Undefined = undefined,
         allowed_client_ip: Iterable[str] | Undefined = undefined,
