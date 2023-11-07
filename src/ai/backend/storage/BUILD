@@ -52,9 +52,9 @@ scie_binary(
 
 run_shell_command(
     name="checksum",
-    command="find dist -name 'backendai-storage-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
+    command="find dist -name 'backendai-storage-proxy-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
     workdir="/",
-    execution_dependencies=[":backendai-storage"],
+    execution_dependencies=[":backendai-storage-proxy"],
     tags=["checksum"],
 )
 
