@@ -118,7 +118,10 @@ scie_binary(
 
 run_shell_command(
     name="checksum",
-    command="find dist -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
+    command=(
+        "find dist -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        " {} > {}.sha256'"
+    ),
     workdir="/",
     execution_dependencies=[
         ":backendai-agent",
