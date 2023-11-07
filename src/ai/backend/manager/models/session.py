@@ -1166,8 +1166,12 @@ class ComputeSession(graphene.ObjectType):
     domain_name = graphene.String()
     project_name = graphene.String()
     project_id = graphene.UUID()
-    group_name = graphene.String()  # legacy
-    group_id = graphene.UUID()  # legacy
+    group_name = graphene.String(
+        deprecation_reason="Deprecated since 24.03.0. Recommend to use `project_name`"
+    )
+    group_id = graphene.UUID(
+        deprecation_reason="Deprecated since 24.03.0. Recommend to use `project_id`"
+    )
     user_email = graphene.String()
     full_name = graphene.String()
     user_id = graphene.UUID()
@@ -1240,9 +1244,9 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "project_name": project_name,
+            "project_name": project_name[0],
             "project_id": row.project_id,
-            "group_name": project_name,  # legacy
+            "group_name": project_name[0],  # legacy
             "group_id": row.project_id,  # legacy
             "user_email": email,
             "full_name": full_name,

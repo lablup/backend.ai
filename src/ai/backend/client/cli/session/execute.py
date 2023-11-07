@@ -224,15 +224,18 @@ def format_stats(stats):
     return tabulate(formatted)
 
 
-def prepare_resource_arg(resources):
+def prepare_resource_arg(resources: Sequence[str]) -> Mapping[str, str]:
     if resources:
-        resources = {k: v for k, v in map(lambda s: s.split("=", 1), resources)}
+        parsed = {k: v for k, v in map(lambda s: s.split("=", 1), resources)}
+        if parsed["mem"] and not parsed["mem"][-1].isalpha():
+            # The default suffix is "m" (mega) if not specified.
+            parsed["mem"] += "m"
     else:
-        resources = {}  # use the defaults configured in the server
-    return resources
+        parsed = {}  # use the defaults configured in the server
+    return parsed
 
 
-def prepare_env_arg(env):
+def prepare_env_arg(env: Sequence[str]) -> Mapping[str, str]:
     if env is not None:
         envs = {k: v for k, v in map(lambda s: s.split("=", 1), env)}
     else:

@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 import uuid
@@ -5,6 +6,10 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import attrs
 import graphene
+from graphene.types.inputobjecttype import set_input_object_type_default_value
+from graphql import Undefined
+
+set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
@@ -17,10 +22,6 @@ from .etcd import (
 )
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import (
-        AsyncioExecutor,
-    )
-
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.types import (
@@ -689,7 +690,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         agent_id: AgentId,
     ) -> Agent:
@@ -704,7 +705,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agents(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         scaling_group: str = None,
@@ -719,7 +720,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -749,7 +750,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
     async def resolve_agent_summary(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         agent_id: AgentId,
         *,
@@ -774,7 +775,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
     async def resolve_agent_summary_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -813,7 +814,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_domain(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         name: str = None,
@@ -830,7 +831,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_domains(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         is_active: bool = None,
@@ -839,7 +840,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_project(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         id: uuid.UUID,
         *,
@@ -888,7 +889,7 @@ class Queries(graphene.ObjectType):
     # legacy
     @staticmethod
     async def resolve_group(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         id: uuid.UUID,
         *,
@@ -936,7 +937,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_projects_by_name(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         *,
@@ -985,7 +986,7 @@ class Queries(graphene.ObjectType):
     # legacy
     @staticmethod
     async def resolve_groups_by_name(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
         *,
@@ -1033,7 +1034,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_projects(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1063,7 +1064,7 @@ class Queries(graphene.ObjectType):
     # legacy
     @staticmethod
     async def resolve_groups(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1092,7 +1093,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_image(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         reference: str,
         architecture: str,
@@ -1114,7 +1115,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_images(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         is_installed=None,
@@ -1141,7 +1142,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=True, user_key="email")
     async def resolve_user(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1158,7 +1159,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=True, user_key="user_id")
     async def resolve_user_from_uuid(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1176,7 +1177,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_users(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1213,7 +1214,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_user_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1267,7 +1268,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
     async def resolve_keypair(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1284,7 +1285,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="email")
     async def resolve_keypairs(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
@@ -1311,7 +1312,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="email")
     async def resolve_keypair_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1343,7 +1344,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_keypair_resource_policy(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str = None,
     ) -> KeyPairResourcePolicy:
@@ -1364,7 +1365,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_keypair_resource_policies(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
     ) -> Sequence[KeyPairResourcePolicy]:
         ctx: GraphQueryContext = info.context
@@ -1385,7 +1386,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_user_resource_policy(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str = None,
     ) -> UserResourcePolicy:
@@ -1406,7 +1407,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_user_resource_policies(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
     ) -> Sequence[UserResourcePolicy]:
         ctx: GraphQueryContext = info.context
@@ -1427,7 +1428,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_project_resource_policy(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
     ) -> ProjectResourcePolicy:
@@ -1440,7 +1441,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_project_resource_policies(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
     ) -> Sequence[ProjectResourcePolicy]:
         ctx: GraphQueryContext = info.context
@@ -1455,7 +1456,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_resource_preset(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
     ) -> ResourcePreset:
@@ -1465,7 +1466,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_resource_presets(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
     ) -> Sequence[ResourcePreset]:
         return await ResourcePreset.load_all(info.context)
@@ -1473,7 +1474,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_group(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         name: str,
     ) -> ScalingGroup:
@@ -1487,7 +1488,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
@@ -1496,7 +1497,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_domain(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         domain: str,
         is_active: bool = None,
@@ -1510,7 +1511,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_project(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         project,
         is_active: bool = None,
@@ -1525,7 +1526,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_user_group(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         group,
         is_active: bool = None,
@@ -1539,7 +1540,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_keypair(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
         is_active: bool = None,
@@ -1553,7 +1554,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_storage_volume(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
     ) -> StorageVolume:
@@ -1562,7 +1563,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_storage_volume_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1586,7 +1587,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_vfolder(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         id: str,
         *,
@@ -1609,7 +1610,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1645,7 +1646,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_vfolder_permission_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1672,7 +1673,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder_own_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1702,7 +1703,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder_invited_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1732,7 +1733,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder_project_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1762,7 +1763,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_compute_container_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1804,7 +1805,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_compute_container(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         container_id: str,
     ) -> ComputeContainer:
@@ -1819,7 +1820,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_compute_session_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1857,7 +1858,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_compute_session(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         id: SessionId,
         *,
@@ -1880,7 +1881,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_legacy_compute_session_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -1917,7 +1918,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_legacy_compute_session(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         sess_id: str,
         *,
@@ -1947,7 +1948,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_vfolder_host_permissions(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
     ) -> PredefinedAtomicPermission:
         graph_ctx: GraphQueryContext = info.context
@@ -1956,7 +1957,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_endpoint(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         endpoint_id: uuid.UUID,
         project: Optional[uuid.UUID] = None,
@@ -1975,7 +1976,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_endpoint_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -2007,7 +2008,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_routing(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         routing_id: uuid.UUID,
         project: Optional[uuid.UUID] = None,
@@ -2026,7 +2027,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_routing_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -2061,7 +2062,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_endpoint_token(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         token: str,
         project: Optional[uuid.UUID] = None,
@@ -2080,7 +2081,7 @@ class Queries(graphene.ObjectType):
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_uuid")
     async def resolve_endpoint_token_list(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         limit: int,
         offset: int,
@@ -2114,7 +2115,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     async def resolve_quota_scope(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         *,
         quota_scope_id: Optional[str] = None,
@@ -2138,24 +2139,20 @@ class Queries(graphene.ObjectType):
             )
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registry(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         hostname: str,
-        domain_name: Optional[str] = None,
-        access_key: AccessKey = None,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_registry(ctx, hostname)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registries(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
-        domain_name: Optional[str] = None,
-        access_key: AccessKey = None,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)

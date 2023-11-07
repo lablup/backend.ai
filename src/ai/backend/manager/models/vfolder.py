@@ -16,6 +16,7 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1692,7 +1693,7 @@ class QuotaScope(graphene.ObjectType):
                         .options(selectinload(ProjectRow.resource_policy_row))
                     )
                 result = await sess.scalar(query)
-                resource_policy_constraint = result.resource_policy_row.max_vfolder_size
+                resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 
@@ -1733,7 +1734,14 @@ class SetQuotaScope(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
-
+        if props.hard_limit_bytes is Undefined:
+            # Do nothing but just return the quota scope object.
+            return cls(
+                QuotaScope(
+                    quota_scope_id=quota_scope_id,
+                    storage_host_name=storage_host_name,
+                )
+            )
         max_vfolder_size = props.hard_limit_bytes
         proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
         request_body = {

@@ -26,6 +26,7 @@ from .base import (
     EnumValueType,
     ForeignKeyIDColumn,
     IDColumn,
+    InferenceSessionError,
     Item,
     PaginatedList,
     ResourceSlotColumn,
@@ -352,17 +353,6 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
-
-
-class InferenceSessionError(graphene.ObjectType):
-    class InferenceSessionErrorInfo(graphene.ObjectType):
-        src = graphene.String(required=True)
-        name = graphene.String(required=True)
-        repr = graphene.String(required=True)
-
-    session_id = graphene.UUID()
-
-    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
 
 
 class Endpoint(graphene.ObjectType):

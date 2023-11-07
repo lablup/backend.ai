@@ -175,8 +175,8 @@ def _create_cmd(docs: str = None):
                 sys.exit(ExitCode.FAILURE)
         ######
         envs = prepare_env_arg(env)
-        resources = prepare_resource_arg(resources)
-        resource_opts = prepare_resource_arg(resource_opts)
+        parsed_resources = prepare_resource_arg(resources)
+        parsed_resource_opts = prepare_resource_arg(resource_opts)
         mount, mount_map = prepare_mount_arg(mount)
 
         preopen_ports = preopen
@@ -199,8 +199,8 @@ def _create_cmd(docs: str = None):
                     mount_map=mount_map,
                     envs=envs,
                     startup_command=startup_command,
-                    resources=resources,
-                    resource_opts=resource_opts,
+                    resources=parsed_resources,
+                    resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
                     project_name=project,
@@ -400,10 +400,10 @@ def _create_from_template_cmd(docs: str = None):
             name = name
 
         envs = prepare_env_arg(env) if len(env) > 0 or no_env else undefined
-        resources = (
+        parsed_resources = (
             prepare_resource_arg(resources) if len(resources) > 0 or no_resource else undefined
         )
-        resource_opts = (
+        parsed_resource_opts = (
             prepare_resource_arg(resource_opts)
             if len(resource_opts) > 0 or no_resource
             else undefined
@@ -429,8 +429,8 @@ def _create_from_template_cmd(docs: str = None):
                     mount_map=prepared_mount_map,
                     envs=envs,
                     startup_command=startup_command,
-                    resources=resources,
-                    resource_opts=resource_opts,
+                    resources=parsed_resources,
+                    resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
                     project_name=project,
@@ -552,7 +552,14 @@ session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 def _restart_cmd(docs: str = None):
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
-    def restart(session_refs):
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        metavar="ACCESS_KEY",
+        help="Specify the owner of the target session explicitly.",
+    )
+    def restart(session_refs, owner):
         """
         Restart the compute session.
 
@@ -567,7 +574,7 @@ def _restart_cmd(docs: str = None):
             has_failure = False
             for session_ref in session_refs:
                 try:
-                    compute_session = session.ComputeSession(session_ref)
+                    compute_session = session.ComputeSession(session_ref, owner)
                     compute_session.restart()
                 except BackendAPIError as e:
                     print_error(e)

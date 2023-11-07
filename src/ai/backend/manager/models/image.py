@@ -21,7 +21,6 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -672,7 +671,7 @@ class PreloadImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
@@ -693,7 +692,7 @@ class UnloadImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
@@ -713,7 +712,7 @@ class RescanImages(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         registry: str = None,
     ) -> RescanImages:
@@ -742,7 +741,7 @@ class ForgetImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         reference: str,
         architecture: str,
@@ -774,7 +773,7 @@ class AliasImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         alias: str,
         target: str,
@@ -807,7 +806,7 @@ class DealiasImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         alias: str,
     ) -> DealiasImage:
@@ -837,7 +836,7 @@ class ClearImages(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         registry: str,
     ) -> ClearImages:
@@ -887,7 +886,7 @@ class ModifyImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         target: str,
         architecture: str,
