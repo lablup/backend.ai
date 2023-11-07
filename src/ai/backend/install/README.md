@@ -24,6 +24,8 @@ dist/export/python/virtualenvs/python-default/3.11.6/bin/textual console
 
 In the second one, run:
 ```shell
+# manually activate the venv; otherwise textual cannot find itself
+source dist/export/python/virtualenvs/python-default/3.11.6/bin/activate
 PYTHONPATH=src dist/export/python/virtualenvs/python-default/3.11.6/bin/textual run --dev ai.backend.install.cli:InstallerApp
 ```
 
