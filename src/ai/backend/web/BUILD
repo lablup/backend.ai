@@ -58,6 +58,7 @@ run_shell_command(
     command="find dist -name 'backendai-webserver-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum {} > {}.sha256'",
     workdir="/",
     execution_dependencies=[":backendai-webserver"],
+    tags=["checksum"],
 )
 
 resource(name="version", source="VERSION")

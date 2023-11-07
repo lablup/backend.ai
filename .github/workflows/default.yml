@@ -263,6 +263,8 @@ jobs:
     - name: Build packages
       run: |
         pants --tag="-wheel" package '::'
+        # 'pants run' does not support parallelization
+        pants filter --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
         rm -rf dist/src.*/
     - name: Upload scies
       uses: actions/upload-artifact@v3
