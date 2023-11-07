@@ -95,9 +95,10 @@ class PackageSetup(Static):
         try:
             # prerequisites
             if dist_info.target_path.exists():
+                # TODO: change to ask overwriting
                 raise ConfigError(
                     "The target path {dist_info.target_path} already exists. "
-                    "Set '--target-path` option to change it."
+                    "Set '--target-path` option to change it or remove existing directory first."
                 )
             await ctx.check_prerequisites()
             # install
