@@ -939,12 +939,15 @@ async def simple_db_mutate(
 
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 await post_func(conn, result)
@@ -956,13 +959,16 @@ async def simple_db_mutate(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
     except sa.exc.StatementError as e:
+        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate(): other error")
         return result_cls(False, f"unexpected error: {e}")
 
 
@@ -998,13 +1004,16 @@ async def simple_db_mutate_returning_item(
         from the given mutation result**, because the result object could be fetched only one
         time due to its cursor-like nature.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 row = await post_func(conn, result)
@@ -1018,13 +1027,18 @@ async def simple_db_mutate_returning_item(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)
     except sa.exc.StatementError as e:
+        log.warning(
+            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
+        )
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate_returning_item(): other error")
         return result_cls(False, f"unexpected error: {e}", None)
 
 
@@ -1036,6 +1050,11 @@ def set_if_set(
     clean_func=None,
     target_key: Optional[str] = None,
 ) -> None:
+    """
+    Set the target dict with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
     v = getattr(src, name)
     # NOTE: unset optional fields are passed as graphql.Undefined.
     if v is not Undefined:
