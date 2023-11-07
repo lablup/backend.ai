@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import textwrap
@@ -26,11 +27,12 @@ from textual.widgets import (
     Static,
 )
 
+from ai.backend.install.utils import shorten_path
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
-from .context import DevContext, PackageContext, current_app, current_log
-from .types import InstallModes
+from .context import DevContext, PackageContext, current_log
+from .types import DistInfo, InstallModes
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -44,13 +46,13 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         yield RichLog(classes="log")
 
-    async def begin_install(self) -> None:
-        top_tasks.add(asyncio.create_task(self.install()))
+    async def begin_install(self, dist_info: DistInfo) -> None:
+        top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
-    async def install(self) -> None:
+    async def install(self, dist_info: DistInfo) -> None:
         _log: RichLog = cast(RichLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
-        ctx = DevContext()
+        ctx = DevContext(dist_info, self.app)
         try:
             # prerequisites
             await ctx.check_prerequisites()
@@ -69,6 +71,8 @@ class DevSetup(Static):
         except Exception as e:
             _log.write(e)
         finally:
+            _log.write("")
+            _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
             current_log.reset(_log_token)
 
 
@@ -81,13 +85,13 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         yield RichLog(classes="log")
 
-    async def begin_install(self) -> None:
-        top_tasks.add(asyncio.create_task(self.install()))
+    async def begin_install(self, dist_info: DistInfo) -> None:
+        top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
-    async def install(self) -> None:
+    async def install(self, dist_info: DistInfo) -> None:
         _log: RichLog = cast(RichLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
-        ctx = PackageContext()
+        ctx = PackageContext(dist_info, self.app)
         try:
             # prerequisites
             await ctx.check_prerequisites()
@@ -106,6 +110,8 @@ class PackageSetup(Static):
         except Exception as e:
             _log.write(e)
         finally:
+            _log.write("")
+            _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
             current_log.reset(_log_token)
 
 
@@ -117,6 +123,9 @@ class ModeMenu(Static):
         Binding("right", "cursor_down", show=False),
     ]
 
+    _dist_info: DistInfo
+    _dist_info_path: Path | None
+
     def __init__(
         self,
         mode: InstallModes | None = None,
@@ -125,14 +134,21 @@ class ModeMenu(Static):
     ) -> None:
         super().__init__(id=id)
         self._build_root = None
+        try:
+            self._dist_info_path = Path.cwd() / "DIST-INFO"
+            self._dist_info = DistInfo(**json.loads(self._dist_info_path.read_bytes()))
+        except FileNotFoundError:
+            self._dist_info_path = None
+            self._dist_info = DistInfo()
         self._enabled_menus = set()
         self._enabled_menus.add(InstallModes.PACKAGE)
-        if mode is None:
-            try:
-                self._build_root = find_build_root()
-                self._enabled_menus.add(InstallModes.DEVELOP)
+        try:
+            self._build_root = find_build_root()
+            self._enabled_menus.add(InstallModes.DEVELOP)
+            if mode is None:
                 mode = InstallModes.DEVELOP
-            except ValueError:
+        except ValueError:
+            if mode is None:
                 mode = InstallModes.PACKAGE
         if Path("INSTALL-INFO").exists():
             self._enabled_menus.add(InstallModes.MAINTAIN)
@@ -141,21 +157,24 @@ class ModeMenu(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("The installation mode:\n(arrow keys to change, enter to select)")
-        mode_desc: dict[tuple[InstallModes, bool], str] = {
-            (
-                InstallModes.DEVELOP,
-                False,
-            ): f"Install from the current source checkout ({self._build_root})",
-            (
-                InstallModes.DEVELOP,
-                True,
-            ): "Could not find the source as no BUILD_ROOT file is detected.",
-            (InstallModes.PACKAGE, False): "Install using release packages",
-            (InstallModes.MAINTAIN, False): "Maintain an existing setup",
-            (
-                InstallModes.MAINTAIN,
-                True,
-            ): "Could not find an existing setup (missing INSTALL-INFO)",
+        if self._dist_info_path is None:
+            package_desc = "Install using release packages"
+        else:
+            package_desc = f"Install using release packages ({shorten_path(self._dist_info_path)})"
+        if self._build_root is None:
+            develop_desc = "Could not find the source (missing BUILD_ROOT)"
+        else:
+            develop_desc = (
+                f"Install from the current source checkout ({shorten_path(self._build_root)})"
+            )
+        if InstallModes.MAINTAIN in self._enabled_menus:
+            maintain_desc = "Maintain an existing setup"
+        else:
+            maintain_desc = "Could not find an existing setup (missing INSTALL-INFO)"
+        mode_desc: dict[InstallModes, str] = {
+            InstallModes.DEVELOP: develop_desc,
+            InstallModes.PACKAGE: package_desc,
+            InstallModes.MAINTAIN: maintain_desc,
         }
         with ListView(
             id="mode-list", initial_index=list(InstallModes).index(InstallModes(self._mode))
@@ -166,7 +185,7 @@ class ModeMenu(Static):
                 yield ListItem(
                     Vertical(
                         Label(mode, classes="mode-item-title"),
-                        Label(mode_desc[(mode, disabled)], classes="mode-item-desc"),
+                        Label(mode_desc[mode], classes="mode-item-desc"),
                     ),
                     classes="disabled" if disabled else "",
                     id=f"mode-{mode.value.lower()}",
@@ -187,7 +206,7 @@ class ModeMenu(Static):
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "dev-setup"
         dev_setup: DevSetup = cast(DevSetup, self.app.query_one("#dev-setup"))
-        switcher.call_after_refresh(dev_setup.begin_install)
+        switcher.call_after_refresh(dev_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
@@ -197,7 +216,7 @@ class ModeMenu(Static):
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "pkg-setup"
         pkg_setup: PackageSetup = cast(PackageSetup, self.app.query_one("#pkg-setup"))
-        switcher.call_after_refresh(pkg_setup.begin_install)
+        switcher.call_after_refresh(pkg_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
@@ -279,5 +298,4 @@ def main(
         sys.exit(1)
     # start installer
     app = InstallerApp(mode)
-    current_app.set(app)
     app.run()

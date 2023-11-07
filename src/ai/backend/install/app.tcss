@@ -63,8 +63,13 @@ ModeMenu Label {
 }
 
 .log {
-    height: 30;
+    height: 1fr;
     width: 1fr;
     padding: 1 2;
     background: $panel-darken-3;
+}
+
+ProgressBar.download-progress {
+    dock: top;
+    width: 50;
 }

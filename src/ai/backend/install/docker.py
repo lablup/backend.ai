@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .utils import request_unix
+from .http import request_unix
 
 if TYPE_CHECKING:
     from .context import Context
@@ -110,6 +110,7 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
 
 
 async def check_docker(ctx: Context) -> None:
+    ctx.log_header("Checking Docker and Docker Compose availability")
     docker_version = await detect_snap_docker()
     if docker_version is not None:
         ctx.log.write(f"Detected Docker installation: Snap package ({docker_version})")
@@ -142,6 +143,7 @@ async def check_docker(ctx: Context) -> None:
 
 
 async def check_docker_desktop_mount(ctx: Context) -> None:
+    ctx.log_header("Checking Docker Desktop mount permissions")
     """
     echo "validating Docker Desktop mount permissions..."
     docker pull alpine:3.8 > /dev/null

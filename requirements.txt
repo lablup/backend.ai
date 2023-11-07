@@ -53,6 +53,7 @@ python-json-logger>=2.0.1
 pyzmq~=24.0.1
 PyJWT~=2.0
 PyYAML~=6.0
+pydantic~=2.4.2
 packaging>=21.3
 hiredis>=2.2.3
 redis[hiredis]==4.5.5

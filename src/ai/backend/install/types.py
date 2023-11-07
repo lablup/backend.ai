@@ -1,7 +1,15 @@
+from __future__ import annotations
+
 import dataclasses
 import enum
+from datetime import datetime
+from pathlib import Path
+
+from pydantic import BaseModel, Field
 
 from ai.backend.common.types import HostPortPair
+
+from . import __version__
 
 
 class InstallModes(enum.StrEnum):
@@ -10,11 +18,38 @@ class InstallModes(enum.StrEnum):
     MAINTAIN = "MAINTAIN"
 
 
+class PackageSource(enum.StrEnum):
+    GITHUB_RELEASE = "github-release"
+    LOCAL_DIR = "local-dir"
+
+
+class InstallType(enum.StrEnum):
+    SOURCE = "source"
+    PACKAGE = "package"
+
+
 class Platform(enum.StrEnum):
     LINUX_ARM64 = "linux-aarch64"
     LINUX_X86_64 = "linux-x86_64"
     MACOS_ARM64 = "macos-arm64"
     MACOS_X86_64 = "macos-x86_64"
+
+
+class DistInfo(BaseModel):
+    version: str = __version__
+    package_source: PackageSource = PackageSource.GITHUB_RELEASE
+    package_dir: Path = Field(default_factory=Path.cwd)
+    use_fat_binary: bool = False
+    target_path: Path | None = None
+
+
+class InstallInfo(BaseModel):
+    version: str
+    type: InstallType
+    last_updated: datetime
+    base_path: Path
+    halfstack_config: HalfstackConfig
+    service_config: ServiceConfig
 
 
 @dataclasses.dataclass()
@@ -50,18 +85,3 @@ class ServiceConfig:
     storage_agent_ipc_base_path: str
     storage_agent_var_base_path: str
     storage_watcher_bind: HostPortPair
-
-
-@dataclasses.dataclass()
-class DevInstallConfig:
-    editable_webui: bool
-    ha_halfstack: bool
-    service_config: ServiceConfig
-    halfstack_config: HalfstackConfig
-
-
-@dataclasses.dataclass()
-class PackageInstallConfig:
-    download: bool
-    service_config: ServiceConfig
-    halfstack_config: HalfstackConfig

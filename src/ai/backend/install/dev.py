@@ -1,17 +1,24 @@
 from __future__ import annotations
 
+import asyncio
+import shutil
+import textwrap
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.text import Text
+from .tomltool import toml_set
 
 if TYPE_CHECKING:
     from .context import Context
 
 
 async def install_git_lfs(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[bright_green]Installing Git LFS"))
+    ctx.log_header("Installing Git LFS")
     if ctx.os_info.distro == "RedHat":
-        "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash"
+        await ctx.run_shell(
+            "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh"
+            "| sudo bash"
+        )
     await ctx.install_system_package(
         {
             "Debian": ["git-lfs"],
@@ -20,90 +27,55 @@ async def install_git_lfs(ctx: Context) -> None:
             "Darwin": ["git-lfs"],
         }
     )
-    await ctx.run_shell("git lfs install")
+    await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
 
 
 async def install_git_hooks(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[bright_green]Installing Git hooks"))
-    await ctx.run_shell("""
-    local magic_str="monorepo standard pre-commit hook"
-    if [ -f .git/hooks/pre-commit ]; then
-      grep -Fq "$magic_str" .git/hooks/pre-commit
-      if [ $? -eq 0 ]; then
-        :
-      else
-        echo "" >> .git/hooks/pre-commit
-        cat scripts/pre-commit >> .git/hooks/pre-commit
-      fi
-    else
-      cp scripts/pre-commit .git/hooks/pre-commit
-      chmod +x .git/hooks/pre-commit
-    fi
-    local magic_str="monorepo standard pre-push hook"
-    if [ -f .git/hooks/pre-push ]; then
-      grep -Fq "$magic_str" .git/hooks/pre-push
-      if [ $? -eq 0 ]; then
-        :
-      else
-        echo "" >> .git/hooks/pre-push
-        cat scripts/pre-push >> .git/hooks/pre-push
-      fi
-    else
-      cp scripts/pre-push .git/hooks/pre-push
-      chmod +x .git/hooks/pre-push
-    fi
-    """)
+    ctx.log_header("Installing Git hooks")
+
+    def upsert_hook(hook_name: str, magic: str) -> None:
+        content = ""
+        src_path = Path("scripts") / hook_name
+        hook_path = Path(".git") / "hooks" / hook_name
+        try:
+            content = hook_path.read_text()
+        except FileNotFoundError:
+            shutil.copy(src_path, hook_path)
+            hook_path.chmod(0o777)
+            ctx.log.write(f"✓ Installed a new {hook_name} hook.")
+            return
+        if magic not in content:
+            content += "\n\n" + src_path.read_text()
+            hook_path.write_text(content)
+            ctx.log.write(f"✓ Updated the {hook_name} hook.")
+            return
+        ctx.log.write(f"✓ The {hook_name} hook is already installed.")
+
+    upsert_hook("pre-commit", "monorepo standard pre-commit hook")
+    upsert_hook("pre-push", "monorepo standard pre-push hook")
 
 
 async def bootstrap_pants(ctx: Context, local_execution_root_dir: str) -> None:
-    ctx.log.write(Text.from_markup("[bright_green]Bootstrapping Pantsbuild"))
+    ctx.log_header("Bootstrapping Pantsbuild")
     ctx.log.write(f"local_execution_root_dir = {local_execution_root_dir}")
-    await ctx.run_shell("""
-    pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
-    mkdir -p "$pants_local_exec_root"
-    $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
-    set +e
-    if command -v pants &> /dev/null ; then
-      echo "Pants system command is already installed."
-    else
-      case $DISTRO in
-      Darwin)
-        brew install pantsbuild/tap/pants
-        ;;
-      *)
-        curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
-        bash /tmp/get-pants.sh
-        if ! command -v pants &> /dev/null ; then
-          $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
-          show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
-        fi
-        ;;
-      esac
-    fi
-    pants version
-    if [ $? -eq 1 ]; then
-      # If we can't find the prebuilt Pants package, then try the source installation.
-      show_error "Cannot proceed the installation because Pants is not available for your platform!"
-      exit 1
-    fi
-    set -e
-    """)
+    toml_set(".pants.rc", "GLOBAL.local_execution_root_dir", local_execution_root_dir)
+    await ctx.run_shell("pants version")
 
 
 async def pants_export(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[bright_green]Creating virtualenvs from pants export..."))
-    await ctx.run_shell("""
+    ctx.log_header("Creating virtualenvs from pants export")
+    await ctx.run_shell(textwrap.dedent("""
     pants export \
-      --resolve=python-default \
-      --resolve=towncrier \
-      --resolve=ruff \
-      --resolve=mypy \
-      --resolve=black
-    """)
+     --resolve=python-default \
+     --resolve=towncrier \
+     --resolve=ruff \
+     --resolve=mypy \
+     --resolve=black
+    """))
 
 
 async def install_editable_webui(ctx: Context) -> None:
-    ctx.log.write(Text.from_markup("[bright_green]Installing the editable version of webui"))
+    ctx.log_header("Installing the editable version of webui")
     """
     if ! command -v node &> /dev/null; then
       install_node
