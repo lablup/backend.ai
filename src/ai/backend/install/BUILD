@@ -78,6 +78,7 @@ resources(
     name="resources",
     dependencies=[
         ":version",
+        "./configs:templates",
     ],
     sources=[
         "**/py.typed",

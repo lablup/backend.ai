@@ -28,12 +28,12 @@ from textual.widgets import (
 )
 
 from ai.backend.install.utils import shorten_path
-from ai.backend.install.widgets import DirectoryPathValidator, InputDialog
+from ai.backend.install.widgets import InputDialog
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, ConfigError, DistInfo, InstallModes
+from .types import CliArgs, DistInfo, InstallModes
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
