@@ -263,7 +263,7 @@ jobs:
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        cache-lmdb-store: 'false'
     - name: Build fat packages
       run: |
         pants --tag="scie" package '::'
@@ -318,7 +318,7 @@ jobs:
       with:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        cache-lmdb-store: 'false'
     - name: Build wheel packages
       run: |
         # Normalize the package version
