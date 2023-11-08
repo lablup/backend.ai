@@ -52,7 +52,15 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
-from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
+from .group import (
+    AddUserToGroup,
+    CreateGroup,
+    DeleteGroup,
+    DeleteUserFromGroup,
+    Group,
+    ModifyGroup,
+    PurgeGroup,
+)
 from .image import (
     AliasImage,
     ClearImages,
@@ -170,6 +178,8 @@ class Mutations(graphene.ObjectType):
     modify_group = ModifyGroup.Field()
     delete_group = DeleteGroup.Field()
     purge_group = PurgeGroup.Field()
+    add_user_to_group = AddUserToGroup.Field()
+    delete_user_from_group = DeleteUserFromGroup.Field()
 
     # super-admin only
     create_user = CreateUser.Field()
