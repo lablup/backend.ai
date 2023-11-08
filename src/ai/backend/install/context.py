@@ -5,6 +5,7 @@ import enum
 from contextvars import ContextVar
 from pathlib import Path
 
+import aiofiles
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
@@ -194,10 +195,9 @@ class PackageContext(Context):
         csum_url = pkg_url + ".sha256"
         self.log.write(f"Downloading {pkg_url}...")
         item = Static(classes="progress-item")
-        label = Label(pkg_name, classes="progress-name")
+        label = Label(Text.from_markup(f"[blue](download)[/] {pkg_name}"), classes="progress-name")
         progress = ProgressBar(classes="progress-download")
-        await item.mount(label)
-        await item.mount(progress)
+        item.mount_all([label, progress])
         await vpane.mount(item)
         async with self.wget_sema:
             try:
@@ -213,8 +213,26 @@ class PackageContext(Context):
         csum_path = pkg_path.with_name(pkg_name + ".sha256")
         await self._validate_checksum(pkg_path, csum_path)
 
-    async def _install_package(self, name: str, *, fat: bool) -> None:
-        pass
+    async def _install_package(self, name: str, vpane: Vertical, *, fat: bool) -> None:
+        pkg_name = self._mangle_pkgname(name, fat=fat)
+        src_path = self.dist_info.package_dir / pkg_name
+        dst_path = self.dist_info.target_path / pkg_name
+        item = Static(classes="progress-item")
+        label = Label(Text.from_markup(f"[blue](install)[/] {pkg_name}"), classes="progress-name")
+        progress = ProgressBar(classes="progress-download")
+        item.mount_all([label, progress])
+        await vpane.mount(item)
+        async with (
+            aiofiles.open(src_path, "rb") as src,
+            aiofiles.open(dst_path, "wb") as dst,
+        ):
+            progress.update(total=src_path.stat().st_size)
+            while True:
+                chunk = await src.read(1048576)
+                if not chunk:
+                    break
+                await dst.write(chunk)
+                progress.advance(len(chunk))
 
     async def install(self) -> None:
         vpane = Vertical(id="download-status")
@@ -222,7 +240,8 @@ class PackageContext(Context):
         try:
             match self.dist_info.package_source:
                 case PackageSource.GITHUB_RELEASE:
-                    # download (NOTE: we always use the lazy version here)
+                    # Download (NOTE: we always use the lazy version here)
+                    # In this case, we download the packages directly into the target path.
                     self.log_header(
                         f"Downloading prebuilt packages into {self.dist_info.target_path}..."
                     )
@@ -231,29 +250,41 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
+                        tg.create_task(self._fetch_package("wsproxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
-                        # TODO: tg.create_task(self._fetch_package("static wsproxy"))
+                    # Verify the checksums of the downloaded packages.
                     await self._verify_package("manager", fat=False)
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
                     await self._verify_package("webserver", fat=False)
+                    await self._verify_package("wsproxy", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
-                    # use the local files
+                    # Use the local files.
+                    # Verify the checksums first.
                     await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
-            await self._install_package("manager", fat=False)
-            await self._install_package("agent", fat=False)
-            await self._install_package("agent-watcher", fat=False)
-            await self._install_package("webserver", fat=False)
-            await self._install_package("storage-proxy", fat=False)
-            await self._install_package("client", fat=False)
+                    # Copy the packages into the target path.
+                    await self._install_package("manager", vpane, fat=self.dist_info.use_fat_binary)
+                    await self._install_package("agent", vpane, fat=self.dist_info.use_fat_binary)
+                    await self._install_package(
+                        "agent-watcher", vpane, fat=self.dist_info.use_fat_binary
+                    )
+                    await self._install_package(
+                        "webserver", vpane, fat=self.dist_info.use_fat_binary
+                    )
+                    await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
+                    await self._install_package(
+                        "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
+                    )
+                    await self._install_package("client", vpane, fat=self.dist_info.use_fat_binary)
         finally:
             vpane.remove()
 
