@@ -172,7 +172,7 @@ class PackageContext(Context):
             return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
-    async def _validate_checksum(self, csum_path: Path) -> bool:
+    async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
             *["sha256sum", "-c", str(csum_path)],
             stdout=asyncio.subprocess.DEVNULL,
@@ -180,8 +180,11 @@ class PackageContext(Context):
         )
         exit_code = await proc.wait()
         if exit_code == 0:
-            return True
-        return False
+            return
+        raise RuntimeError(
+            f"Failed to validate the checksum of {pkg_path}. "
+            "Please check the install media and retry after removing it."
+        )
 
     async def _fetch_package(self, name: str, vpane: Vertical) -> None:
         pkg_name = self._mangle_pkgname(name)
@@ -199,57 +202,60 @@ class PackageContext(Context):
         async with self.wget_sema:
             try:
                 await wget(pkg_url, pkg_path, progress)
+                await wget(csum_url, csum_path)
             finally:
                 item.remove()
-        self.log.write(f"Verifying {pkg_url}...")
-        await wget(csum_url, csum_path)
-        if not await self._validate_checksum(csum_path):
-            raise RuntimeError(
-                "Failed to validate the checksum of {pkg_path}. "
-                "Please check the install media and retry after removing it."
-            )
 
     async def _verify_package(self, name: str, *, fat: bool) -> None:
         pkg_name = self._mangle_pkgname(name, fat=fat)
         pkg_path = self.dist_info.package_dir / pkg_name
         self.log.write(f"Verifying {pkg_path} ...")
         csum_path = pkg_path.with_name(pkg_name + ".sha256")
-        if not await self._validate_checksum(csum_path):
-            raise RuntimeError(
-                "Failed to validate the checksum of {pkg_path}. "
-                "Please check the install media and retry after removing it."
-            )
+        await self._validate_checksum(pkg_path, csum_path)
+
+    async def _install_package(self, name: str, *, fat: bool) -> None:
+        pass
 
     async def install(self) -> None:
-        match self.dist_info.package_source:
-            case PackageSource.GITHUB_RELEASE:
-                # download (NOTE: we always use the lazy version here)
-                self.log_header(
-                    f"Downloading prebuilt packages into {self.dist_info.target_path}..."
-                )
-                vpane = Vertical(id="download-status")
-                self.log.mount(vpane)
-                try:
+        vpane = Vertical(id="download-status")
+        await self.log.mount(vpane)
+        try:
+            match self.dist_info.package_source:
+                case PackageSource.GITHUB_RELEASE:
+                    # download (NOTE: we always use the lazy version here)
+                    self.log_header(
+                        f"Downloading prebuilt packages into {self.dist_info.target_path}..."
+                    )
                     async with asyncio.TaskGroup() as tg:
                         tg.create_task(self._fetch_package("manager", vpane))
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
-                        # replace above with self._fetch_package("watcher", vpane)
                         tg.create_task(self._fetch_package("webserver", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                         # TODO: tg.create_task(self._fetch_package("static wsproxy"))
-                finally:
-                    vpane.remove()
-            case PackageSource.LOCAL_DIR:
-                # use the local files
-                await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
-                await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
-                await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
-                # replace above with await self._verify_package("watcher", fat=self.dist_info.use_fat_binary)
-                await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
-                await self._verify_package("client", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("manager", fat=False)
+                    await self._verify_package("agent", fat=False)
+                    await self._verify_package("agent-watcher", fat=False)
+                    await self._verify_package("webserver", fat=False)
+                    await self._verify_package("storage-proxy", fat=False)
+                    await self._verify_package("client", fat=False)
+                case PackageSource.LOCAL_DIR:
+                    # use the local files
+                    await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("client", fat=self.dist_info.use_fat_binary)
+            await self._install_package("manager", fat=False)
+            await self._install_package("agent", fat=False)
+            await self._install_package("agent-watcher", fat=False)
+            await self._install_package("webserver", fat=False)
+            await self._install_package("storage-proxy", fat=False)
+            await self._install_package("client", fat=False)
+        finally:
+            vpane.remove()
 
     async def configure(self) -> None:
         await self.configure_manager()

@@ -37,6 +37,7 @@ ModeMenu ListView > ListItem .mode-item-title {
 }
 ModeMenu ListView > ListItem .mode-item-desc {
     width: 1fr;
+    color: $text-muted;
 }
 ModeMenu ListView > ListItem.--highlight {
     border: wide white;
@@ -67,12 +68,48 @@ ModeMenu Label {
     width: 1fr;
     padding: 1 2;
     background: $panel-darken-3;
+    align: center middle;
 }
 
 #download-status {
     dock: bottom;
     padding: 1 2;
     background: $panel;
-    width: 50;
+    width: 100;
     height: auto;
+}
+#download-status ProgressBar Bar {
+    width: 80;
+}
+
+Button {
+    width: auto;
+    min-width: 16;
+    height: 5;
+    margin: 0 1;
+    padding: 0 2;
+    background: $panel-lighten-2;
+    border: wide $panel-lighten-1;
+    color: $text;
+    text-style: bold;
+}
+Button.primary {
+    background: $accent;
+}
+Button.primary:hover {
+    background: $accent-lighten-1;
+}
+Button.primary.-active:hover {
+    border: wide white;
+}
+Button:hover,
+Button.-active:hover {
+    background: $panel-lighten-3;
+    border: wide white;
+}
+Button:focus,
+Button.-active:focus {
+    border: wide white;
+    color: white;
+    text-style: bold;
 }

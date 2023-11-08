@@ -28,6 +28,7 @@ from textual.widgets import (
 )
 
 from ai.backend.install.utils import shorten_path
+from ai.backend.install.widgets import DirectoryPathValidator, InputDialog
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
@@ -46,7 +47,7 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         yield RichLog(classes="log")
 
-    async def begin_install(self, dist_info: DistInfo) -> None:
+    def begin_install(self, dist_info: DistInfo) -> None:
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
@@ -85,7 +86,7 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         yield RichLog(classes="log")
 
-    async def begin_install(self, dist_info: DistInfo) -> None:
+    def begin_install(self, dist_info: DistInfo) -> None:
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
@@ -95,11 +96,16 @@ class PackageSetup(Static):
         try:
             # prerequisites
             if dist_info.target_path.exists():
-                # TODO: change to ask overwriting
-                raise ConfigError(
-                    "The target path {dist_info.target_path} already exists. "
-                    "Set '--target-path` option to change it or remove existing directory first."
+                input_box = InputDialog(
+                    f"The target path {dist_info.target_path} already exists. "
+                    "Overwrite it or set a different target path.",
+                    str(dist_info.target_path),
+                    allow_cancel=False,
                 )
+                _log.mount(input_box)
+                value = await input_box.wait()
+                assert value is not None
+                dist_info.target_path = Path(value)
             await ctx.check_prerequisites()
             # install
             await ctx.install_halfstack(ha_setup=False)
@@ -214,7 +220,7 @@ class ModeMenu(Static):
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "dev-setup"
         dev_setup: DevSetup = cast(DevSetup, self.app.query_one("#dev-setup"))
-        switcher.call_after_refresh(dev_setup.begin_install, self._dist_info)
+        switcher.call_later(dev_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-package")
     def start_package_mode(self) -> None:
@@ -224,7 +230,7 @@ class ModeMenu(Static):
         switcher: ContentSwitcher = cast(ContentSwitcher, self.app.query_one("#top"))
         switcher.current = "pkg-setup"
         pkg_setup: PackageSetup = cast(PackageSetup, self.app.query_one("#pkg-setup"))
-        switcher.call_after_refresh(pkg_setup.begin_install, self._dist_info)
+        switcher.call_later(pkg_setup.begin_install, self._dist_info)
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
@@ -240,8 +246,15 @@ class InstallerApp(App):
     ]
     CSS_PATH = "app.tcss"
 
-    def __init__(self, args: CliArgs) -> None:
+    _args: CliArgs
+
+    def __init__(self, args: CliArgs | None = None) -> None:
         super().__init__()
+        if args is None:  # when run as textual dev mode
+            args = CliArgs(
+                mode=None,
+                target_path=str(Path.home() / "backendai"),
+            )
         self._args = args
 
     def compose(self) -> ComposeResult:
@@ -297,6 +310,7 @@ class InstallerApp(App):
 # TODO: --show-guide?
 @click.version_option(version=__version__)
 @click.pass_context
+@click.command
 def main(
     cli_ctx: click.Context,
     mode: InstallModes | None,
