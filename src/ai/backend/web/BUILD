@@ -65,10 +65,10 @@ scie_binary(
 run_shell_command(
     name="checksum",
     command=(
-        "find dist -name 'backendai-webserver-*' -not -name '*.sha256' | xargs -I {} sh -c"
+        "find . -name 'backendai-webserver-*' -not -name '*.sha256' | xargs -I {} sh -c"
         " 'sha256sum {} > {}.sha256'"
     ),
-    workdir="/",
+    workdir="/dist",
     execution_dependencies=[
         ":backendai-webserver",
         ":backendai-webserver-fat",
