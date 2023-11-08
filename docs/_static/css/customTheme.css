@@ -4670,6 +4670,18 @@ body {
   font-size: 3.077vw;
 }
 
+@media (min-width: 600px) {
+  .wy-text-small,small {
+    font-size: 1.843rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .wy-text-small,small {
+    font-size: 1.2rem;
+  }
+}
+
 @media only screen and (min-width: 600px) {
   .rst-other-versions small {
     font-size: 1.843rem;
@@ -4791,7 +4803,7 @@ h1 {
 
 @media (min-width: 1200px) {
   .rst-content .toctree-wrapper>p.caption,h2 {
-    font-size: 2.8rem;
+    font-size: 3.2rem;
   }
 }
 
@@ -4809,6 +4821,12 @@ h3 {
   }
 }
 
+@media (min-width: 1200px) {
+  h3 {
+    font-size: 2.4rem;
+  }
+}
+
 h4 {
   font-size: 4.103vw;
 }
@@ -4819,12 +4837,42 @@ h4 {
   }
 }
 
+@media (min-width: 1200px) {
+  h4 {
+    font-size: 1.8rem;
+  }
+}
+
 h5 {
   font-size: 3.846vw;
 }
 
+@media (min-width: 600px) {
+  h5 {
+    font-size: 2.1rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  h5 {
+    font-size: 1.4rem;
+  }
+}
+
 h6 {
   font-size: 3.59vw;
+}
+
+@media (min-width: 600px) {
+  h6 {
+    font-size: 1.8rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  h6 {
+    font-size: 1.2rem;
+  }
 }
 
 hr {
@@ -5884,10 +5932,6 @@ footer p {
   }
 }
 
-
-
-
-
 .customized-search-bar input:first-child {
   padding-right: 10vw;
   border: 1px solid #000;
@@ -5970,9 +6014,7 @@ img.search-icon {
   }
 }
 
-
-
-
+/* custom 추가 */
 @media screen and (min-width: 1495px) {
   .wy-nav-content-wrap {
     margin-left: 43rem;
@@ -5980,10 +6022,6 @@ img.search-icon {
     width: 106.5rem;
   }
 }
-
-
-
-
 
 @media print {
   .rst-versions,.wy-nav-side,footer {
@@ -6004,6 +6042,14 @@ img.search-icon {
   background: #000;
   font-family: Pretendard, sans-serif;
   z-index: 400
+}
+
+@media screen and (min-width: 1200px) {
+  .rst-versions {
+    display: block;
+    bottom: 7rem;
+    width: 35rem;
+  }
 }
 
 .rst-versions a {
@@ -6146,14 +6192,37 @@ div.rst-other-versions small a {
   display: block;
 }
 
-@media screen and (max-width: 1200px) {
+/* @media screen and (max-width: 1200px) {
   .rst-versions {
-      width:85%;
+      width: 85%;
       display: none
   }
 
   .rst-versions.shift {
       display: block
+  }
+} */
+
+.rst-versions {
+  width: 90%;
+  display: block;
+}
+
+@media screen and (min-width: 600px) {
+  .rst-versions {
+      width: 90%;
+      display: none
+  }
+
+  .rst-versions.shift {
+      display: block
+  }
+}
+
+@media screen and (min-width: 1199px) {
+  .rst-versions {
+      width: 53.845rem;
+      display: none
   }
 }
 

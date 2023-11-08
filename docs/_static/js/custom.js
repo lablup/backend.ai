@@ -218,20 +218,6 @@ function moveFooterButtons() {
   return;
 }
 
-function defineFlyoutMenu() {
-  const readTheDocsDiv = document.createElement('div');
-
-  readTheDocsDiv.id = 'readthedocs-embed-flyout';
-
-  // const referenceNode = document.querySelector('.wy-grid-for-nav');
-
-  // referenceNode.insertAdjacentElement("afterend", readTheDocsDiv);
-
-  const referenceNode = document.querySelector('.wy-nav-side')
-
-  referenceNode.append(readTheDocsDiv);
-}
-
 window.onload = function() {
   addHeader();
   addSearchElementInDocument();
@@ -240,5 +226,4 @@ window.onload = function() {
   addSnsLinks();
   moveFooterButtons();
   getCurrentPageTitle();
-  defineFlyoutMenu();
 }
