@@ -518,18 +518,33 @@ class ModifyGroup(graphene.Mutation):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
             props.user_update_mode = None
-        if not data:
+        if not data and props.user_update_mode is None:
             return cls(ok=False, msg="nothing to update", group=None)
 
         async def _do_mutate() -> ModifyGroup:
             async with graph_ctx.db.begin() as conn:
-                result = await conn.execute(
-                    sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
-                )
-                if result.rowcount > 0:
-                    o = Group.from_row(graph_ctx, result.first())
-                    return cls(ok=True, msg="success", group=o)
-                return cls(ok=False, msg="no such group", group=None)
+                if props.user_update_mode == "add":
+                    values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
+                    await conn.execute(
+                        sa.insert(association_groups_users).values(values),
+                    )
+                elif props.user_update_mode == "remove":
+                    await conn.execute(
+                        sa.delete(association_groups_users).where(
+                            (association_groups_users.c.user_id.in_(props.user_uuids))
+                            & (association_groups_users.c.group_id == gid),
+                        ),
+                    )
+                if data:
+                    result = await conn.execute(
+                        sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
+                    )
+                    if result.rowcount > 0:
+                        o = Group.from_row(graph_ctx, result.first())
+                        return cls(ok=True, msg="success", group=o)
+                    return cls(ok=False, msg="no such group", group=None)
+                else:  # updated association_groups_users table
+                    return cls(ok=True, msg="success", group=None)
 
         try:
             return await execute_with_retry(_do_mutate)
