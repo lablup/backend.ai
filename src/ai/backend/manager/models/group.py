@@ -393,8 +393,19 @@ class ModifyGroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False)
     domain_name = graphene.String(required=False)
     total_resource_slots = graphene.JSONString(required=False)
-    user_update_mode = graphene.String(required=False)
-    user_uuids = graphene.List(lambda: graphene.String, required=False)
+    user_update_mode = graphene.String(
+        deprecation_reason=(
+            "Deprecated since 24.03.0. Recommend to use CreateUsersToGroup, RemoveUsersFromGroup"
+            " mutation"
+        )
+    )
+    user_uuids = graphene.List(
+        lambda: graphene.String,
+        deprecation_reason=(
+            "Deprecated since 24.03.0. Recommend to use CreateUsersToGroup, RemoveUsersFromGroup"
+            " mutation"
+        ),
+    )
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
