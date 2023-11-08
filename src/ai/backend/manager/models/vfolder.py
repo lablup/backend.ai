@@ -1084,13 +1084,21 @@ class VirtualFolder(graphene.ObjectType):
     host = graphene.String()
     quota_scope_id = graphene.String()
     name = graphene.String()
-    user = graphene.UUID()  # User.id (current owner, null in project vfolders)
-    user_email = graphene.String()  # User.email (current owner, null in project vfolders)
-    project_id = graphene.UUID()  # Project.id (current owner, null in user vfolders)
-    project_name = graphene.String()  # project.name (current owenr, null in user vfolders)
-    group = graphene.UUID()  # Legacy.
-    group_name = graphene.String()  # Legacy.
-    creator = graphene.String()  # User.email (always set)
+    user = graphene.UUID(description="id of owner user. Should be null for project vfolders")
+    user_email = graphene.String(
+        description="email of owner user. Should be null for project vfolders"
+    )
+    project_id = graphene.UUID(description="id of owner project. Should be null for user vfolders")
+    project_name = graphene.String(
+        description="name of owner project. Should be null for user vfolders"
+    )
+    group = graphene.UUID(
+        deprecation_reason="Deprecated since 24.03.0, recommend to use `project_id`"
+    )
+    group_name = graphene.String(
+        deprecation_reason="Deprecated since 24.03.0, recommend to use `project_name`"
+    )
+    creator = graphene.String(description="Creator's email. Not nullable")
     unmanaged_path = graphene.String()
     usage_mode = graphene.String()
     permission = graphene.String()

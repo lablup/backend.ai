@@ -1522,7 +1522,7 @@ class Queries(graphene.ObjectType):
             is_active=is_active,
         )
 
-    # legacy
+    # legacy. Use `resolve_scaling_groups_for_project` instead.
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_user_group(

@@ -219,7 +219,10 @@ class User(graphene.ObjectType):
     totp_activated_at = GQLDateTime()
     sudo_session_enabled = graphene.Boolean()
 
-    groups = graphene.List(lambda: UserProject)  # legacy
+    groups = graphene.List(
+        lambda: UserProject,
+        deprecation_reason="Deprecated since 24.03.0, recommend to use `projects`",
+    )  # legacy
     projects = graphene.List(lambda: UserProject)
 
     async def resolve_groups(
