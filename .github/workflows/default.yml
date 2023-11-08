@@ -412,7 +412,7 @@ jobs:
 
 
   build-conda-pack-for-windows:
-    needs: [build-wheels]
+    needs: [build-wheels, make-final-release]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     env:
