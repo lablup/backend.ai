@@ -290,18 +290,26 @@ async def generate_openapi(output_path: Path) -> None:
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
             openapi["paths"][path][method.lower()] = route_def
-
-    async with aiofiles.open(output_path, mode="w") as fw:
-        await fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+    if output_path == "-" or output_path is None:
+        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+    else:
+        async with aiofiles.open(output_path, mode="w") as fw:
+            await fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
 
 
 @click.command()
-@click.argument("OUTPUT_PATH")
-def main(output_path: Path) -> None:
+@click.option(
+    "--output",
+    "-o",
+    default="-",
+    type=click.Path(dir_okay=False, writable=True),
+    help="Output file path (default: stdout)",
+)
+def main(output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
-    asyncio.run(generate_openapi(output_path))
+    asyncio.run(generate_openapi(output))
 
 
 if __name__ == "__main__":
