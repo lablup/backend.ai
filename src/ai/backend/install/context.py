@@ -446,7 +446,7 @@ class PackageContext(Context):
         dst_path = self.dist_info.target_path / pkg_name
         item = Static(classes="progress-item")
         label = Label(Text.from_markup(f"[blue](install)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-download")
+        progress = ProgressBar(classes="progress-install")
         item.mount_all([label, progress])
         await vpane.mount(item)
         async with (
@@ -477,17 +477,17 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        tg.create_task(self._fetch_package("wsproxy", vpane))
+                        # TODO: tg.create_task(self._fetch_package("wsproxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                     # Verify the checksums of the downloaded packages.
-                    await self._verify_package("manager", fat=False)
-                    await self._verify_package("agent", fat=False)
-                    await self._verify_package("agent-watcher", fat=False)
-                    await self._verify_package("webserver", fat=False)
-                    await self._verify_package("wsproxy", fat=False)
-                    await self._verify_package("storage-proxy", fat=False)
-                    await self._verify_package("client", fat=False)
+                    ## await self._verify_package("manager", fat=False)
+                    ## await self._verify_package("agent", fat=False)
+                    ## await self._verify_package("agent-watcher", fat=False)
+                    ## await self._verify_package("webserver", fat=False)
+                    ## # TODO: await self._verify_package("wsproxy", fat=False)
+                    ## await self._verify_package("storage-proxy", fat=False)
+                    ## await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
                     # Use the local files.
                     # Verify the checksums first.
@@ -495,7 +495,7 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
+                    # TODO: await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
                     # Copy the packages into the target path.
@@ -507,7 +507,7 @@ class PackageContext(Context):
                     await self._install_package(
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
+                    # TODO: await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )

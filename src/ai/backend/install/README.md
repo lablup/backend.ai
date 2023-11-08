@@ -22,13 +22,11 @@ In the first one, run:
 dist/export/python/virtualenvs/python-default/3.11.6/bin/textual console
 ```
 
-In the second one, run:
-```shell
-# manually activate the venv; otherwise textual cannot find itself
-source dist/export/python/virtualenvs/python-default/3.11.6/bin/activate
-PYTHONPATH=src dist/export/python/virtualenvs/python-default/3.11.6/bin/textual run --dev ai.backend.install.cli:InstallerApp
-```
-
 > **Warning**
 > You should use the `textual` executable created *inside the venv's `bin` directory*.
 > `./py -m textual` only shows the demo instead of executing the devtool command.
+
+In the second one, run:
+```shell
+TEXTUAL=devtools,debug ./backend.ai install
+```
