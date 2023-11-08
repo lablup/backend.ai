@@ -351,6 +351,11 @@ jobs:
       with:
         name: wheels
         path: dist/*.whl
+    - name: Upload source tarballs
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels
+        path: dist/*.tar.gz
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
