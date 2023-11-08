@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import AsyncIterator
@@ -45,7 +44,6 @@ async def wget(
         async with request("GET", url, raise_for_status=True) as r:
             if progress is not None and r.content_length:
                 progress.update(total=r.content_length)
-                print(f"WGET {url=} {progress.total=} {r.content_length=}")
             while True:
                 chunk = await r.content.read(chunk_size)
                 if not chunk:
@@ -53,5 +51,3 @@ async def wget(
                 out.write(chunk)
                 if progress is not None:
                     progress.advance(len(chunk))
-                    print(f"WGET {url=} {progress.total=} {progress.progress=}")
-                await asyncio.sleep(0.5)

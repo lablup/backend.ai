@@ -310,7 +310,6 @@ class InstallerApp(App):
 # TODO: --show-guide?
 @click.version_option(version=__version__)
 @click.pass_context
-@click.command
 def main(
     cli_ctx: click.Context,
     mode: InstallModes | None,
