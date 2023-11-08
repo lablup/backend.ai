@@ -413,17 +413,17 @@ class ModifyGroupInput(graphene.InputObjectType):
 
 class AddUsersToGroupInput(graphene.InputObjectType):
     user_ids = graphene.List(
-        lambda: graphene.UUID,
+        lambda: graphene.String,
         required=True,
-        description="Added since 24.03.1. ID array of the users to be added to the group.",
+        description="Added since 24.03.0. ID array of the users to be added to the group.",
     )
 
 
 class DeleteUsersFromGroupInput(graphene.InputObjectType):
     user_ids = graphene.List(
-        lambda: graphene.UUID,
+        lambda: graphene.String,
         required=True,
-        description="Added since 24.03.1. ID array of the users to be deleted from the group.",
+        description="Added since 24.03.0. ID array of the users to be deleted from the group.",
     )
 
 
@@ -568,7 +568,7 @@ class AddUserToGroup(graphene.Mutation):
         insert_query = sa.insert(AssocGroupUserRow).values(
             [
                 {
-                    "user_id": uid,
+                    "user_id": uuid.UUID(uid),
                     "group_id": gid,
                 }
                 for uid in props.user_ids
@@ -602,7 +602,8 @@ class DeleteUserFromGroup(graphene.Mutation):
             return cls(ok=False, msg="empty user id array")
 
         delete_query = sa.insert(AssocGroupUserRow).where(
-            (AssocGroupUserRow.group_id == gid) & (AssocGroupUserRow.user_id.in_(props.user_ids))
+            (AssocGroupUserRow.group_id == gid)
+            & (AssocGroupUserRow.user_id.in_([uuid.UUID(uid) for uid in props.user_ids]))
         )
         return await simple_db_mutate_returning_item(cls, graph_ctx, delete_query, item_cls=Group)
 
