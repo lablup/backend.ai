@@ -313,6 +313,9 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
