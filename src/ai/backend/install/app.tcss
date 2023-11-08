@@ -75,11 +75,11 @@ ModeMenu Label {
     dock: bottom;
     padding: 1 2;
     background: $panel;
-    width: 100;
+    width: 75;
     height: auto;
 }
 #download-status ProgressBar Bar {
-    width: 80;
+    width: 1fr;
 }
 
 Button {
