@@ -105,29 +105,250 @@ class Context:
                 exit_code = await p.wait()
         return exit_code
 
-    async def install_halfstack(self, ha_setup: bool) -> None:
-        pass
+    async def install_halfstack(self, *, ha_setup: bool) -> None:
+        r"""
+        SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+        if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+          SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+        fi
+        cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+
+        sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+        sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
+        sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+
+        mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
+        mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
+        mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+
+        $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
+        $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+        $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+        """
 
     async def load_fixtures(self) -> None:
-        pass
+        r"""
+        ./backend.ai mgr schema oneshot
+        ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
+        ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+
+        ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
+        ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
+        if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+          ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
+        else
+          ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+        fi
+
+        ./backend.ai mgr image rescan cr.backend.ai
+        if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+          ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+        else
+          ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+        fi
+        """
 
     async def configure_manager(self) -> None:
-        pass
+        r"""
+        cp configs/manager/halfstack.toml ./manager.toml
+        sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
+        sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+        sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
+        sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
+        sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
+        cp configs/manager/halfstack.alembic.ini ./alembic.ini
+        sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
+
+        if [ $CONFIGURE_HA -eq 1 ]; then
+          ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
+          ./backend.ai mgr etcd put config/redis/service_name "mymaster"
+          ./backend.ai mgr etcd put config/redis/password "develove"
+        else
+          ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+        fi
+
+        ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
+
+        cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
+        MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+        sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
+        sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+        """
 
     async def configure_agent(self) -> None:
-        pass
+        r"""
+        cp configs/agent/halfstack.toml ./agent.toml
+        mkdir -p "$VAR_BASE_PATH"
+        sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
+        sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
+        sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+        sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
+        sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+
+        # configure backend mode
+        if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then
+          sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
+          sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
+        elif [ $AGENT_BACKEND = "docker" ]; then
+          sed '/scratch-nfs-/d' ./agent.toml > ./agent.toml.sed
+          mv ./agent.toml.sed ./agent.toml
+        fi
+        sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
+        if [ $ENABLE_CUDA -eq 1 ]; then
+          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+        elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+        else
+          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
+        fi
+        """
 
     async def configure_storage_proxy(self) -> None:
-        pass
+        r"""
+        cp configs/storage-proxy/sample.toml ./storage-proxy.toml
+        STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+        sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
+        sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
+        sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
+        sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./storage-proxy.toml
+        # comment out all sample volumes
+        sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
+        sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
+        sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
+        sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
+        sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
+        sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
+        sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
+        sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
+        # add LOCAL_STORAGE_VOLUME vfs volume
+        echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+        """
 
     async def configure_webserver(self) -> None:
-        pass
+        r"""
+        cp configs/webserver/halfstack.conf ./webserver.conf
+        sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
+        """
 
     async def configure_webui(self) -> None:
         pass
 
+    async def configure_client(self) -> None:
+        r"""
+        CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
+        CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
+        echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_ADMIN_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+        chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
+        echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+
+        case $(basename $SHELL) in
+          fish)
+              echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+              echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+          ;;
+          *)
+              echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+              echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+          ;;
+        esac
+
+        echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
+        CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
+        echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+        chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+        echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+
+        case $(basename $SHELL) in
+          fish)
+              echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+              echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+          ;;
+          *)
+              echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+              echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+          ;;
+        esac
+
+        echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
+        CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
+        echo "# Directly access to the manager using API keypair (user)" > "${CLIENT_USER_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
+        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
+        chmod +x "${CLIENT_USER_CONF_FOR_API}"
+        CLIENT_USER2_CONF_FOR_API="env-local-user2-api.sh"
+        CLIENT_USER2_CONF_FOR_SESSION="env-local-user2-session.sh"
+        echo "# Directly access to the manager using API keypair (user2)" > "${CLIENT_USER2_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER2_CONF_FOR_API}"
+        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .access_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .secret_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
+        chmod +x "${CLIENT_USER2_CONF_FOR_API}"
+        echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+
+        case $(basename $SHELL) in
+          fish)
+              echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+              echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+          ;;
+          *)
+              echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+              echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+          ;;
+        esac
+
+        echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
+
+        """
+
     async def dump_etcd_config(self) -> None:
-        pass
+        r"""
+        ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json
+        """
+
+    async def prepare_local_vfolder_host(self) -> None:
+        r"""
+        VFOLDER_VERSION="3"
+        VFOLDER_VERSION_TXT="version.txt"
+        show_info "Setting up virtual folder..."
+        mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
+        echo "${VFOLDER_VERSION}" > "${ROOT_PATH}/${VFOLDER_REL_PATH}/${VFOLDER_VERSION_TXT}"
+        ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
+        mkdir -p scratches
+        POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+        ALL_VFOLDER_HOST_PERM='["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]'
+        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
+
+        """
 
     async def populate_images(self) -> None:
         pass
@@ -148,6 +369,12 @@ class DevContext(Context):
     async def install(self) -> None:
         await pants_export(self)
         await install_editable_webui(self)
+        await self.install_halfstack(ha_setup=False)
+
+    async def _configure_mock_accelerator(self) -> None:
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
 
     async def configure(self) -> None:
         await self.configure_manager()
@@ -287,6 +514,7 @@ class PackageContext(Context):
                     await self._install_package("client", vpane, fat=self.dist_info.use_fat_binary)
         finally:
             vpane.remove()
+        await self.install_halfstack(ha_setup=False)
 
     async def configure(self) -> None:
         await self.configure_manager()
