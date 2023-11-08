@@ -56,10 +56,10 @@ from .group import (
     AddUserToGroup,
     CreateGroup,
     DeleteGroup,
-    DeleteUserFromGroup,
     Group,
     ModifyGroup,
     PurgeGroup,
+    RemoveUsersFromGroup,
 )
 from .image import (
     AliasImage,
@@ -179,7 +179,7 @@ class Mutations(graphene.ObjectType):
     delete_group = DeleteGroup.Field()
     purge_group = PurgeGroup.Field()
     add_user_to_group = AddUserToGroup.Field()
-    delete_user_from_group = DeleteUserFromGroup.Field()
+    delete_user_from_group = RemoveUsersFromGroup.Field()
 
     # super-admin only
     create_user = CreateUser.Field()

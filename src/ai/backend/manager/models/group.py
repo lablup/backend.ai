@@ -395,14 +395,14 @@ class ModifyGroupInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(
         deprecation_reason=(
-            "Deprecated since 24.03.0. Recommend to use AddUsersToGroup, DeleteUsersFromGroup"
+            "Deprecated since 24.03.0. Recommend to use AddUsersToGroup, RemoveUsersFromGroup"
             " mutation"
         )
     )
     user_uuids = graphene.List(
         lambda: graphene.String,
         deprecation_reason=(
-            "Deprecated since 24.03.0. Recommend to use AddUsersToGroup, DeleteUsersFromGroup"
+            "Deprecated since 24.03.0. Recommend to use AddUsersToGroup, RemoveUsersFromGroup"
             " mutation"
         ),
     )
@@ -419,7 +419,7 @@ class AddUsersToGroupInput(graphene.InputObjectType):
     )
 
 
-class DeleteUsersFromGroupInput(graphene.InputObjectType):
+class RemoveUsersFromGroupInput(graphene.InputObjectType):
     user_ids = graphene.List(
         lambda: graphene.String,
         required=True,
@@ -592,12 +592,12 @@ class AddUserToGroup(graphene.Mutation):
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
 
 
-class DeleteUserFromGroup(graphene.Mutation):
+class RemoveUsersFromGroup(graphene.Mutation):
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
-        props = DeleteUsersFromGroupInput(required=True)
+        props = RemoveUsersFromGroupInput(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -608,8 +608,8 @@ class DeleteUserFromGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
-        props: DeleteUsersFromGroupInput,
-    ) -> DeleteUserFromGroup:
+        props: RemoveUsersFromGroupInput,
+    ) -> RemoveUsersFromGroup:
         graph_ctx: GraphQueryContext = info.context
         data: dict[str, Any] = {}
         set_if_set(props, data, "user_ids")
