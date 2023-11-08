@@ -289,7 +289,6 @@ jobs:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    environment: deploy-to-pypi
     steps:
     - uses: actions/checkout@v4
     - name: Fetch remote tags
@@ -347,14 +346,6 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
-      run: |
-        twine upload dist/*.whl dist/*.tar.gz
     - name: Upload wheels
       uses: actions/upload-artifact@v3
       with:
@@ -368,7 +359,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  make-github-release:
+  make-final-release:
     needs: [build-scies, build-wheels]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -386,6 +377,9 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Install towncrier requirements
+      run: |
+        pip install -U -r tools/towncrier-requirements.txt
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -400,6 +394,14 @@ jobs:
       with:
         name: scies
         path: dist
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
+      run: |
+        twine upload dist/*.whl dist/*.tar.gz
     - name: Release to GitHub
       uses: softprops/action-gh-release@v1
       with:
