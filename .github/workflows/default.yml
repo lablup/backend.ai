@@ -268,7 +268,7 @@ jobs:
       run: |
         pants --tag="scie" package '::'
         # 'pants run' does not support parallelization
-        pants filter --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
+        pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
     - name: Clean up intermediate pex files
       run: |
         rm -rf dist/src.*/
