@@ -218,6 +218,29 @@ function moveFooterButtons() {
   return;
 }
 
+// RTD 위치 테스트 용 div
+function defineFlyoutMenu() {
+  const readTheDocsDiv = document.createElement('div');
+
+  readTheDocsDiv.className = 'rst-versions shift';
+
+  const flyoutMenuSpan = document.createElement('span');
+
+  flyoutMenuSpan.className = 'rst-current-version';
+
+  const flyoutMenuDiv = document.createElement('div');
+
+  flyoutMenuDiv.className = 'rst-other-versions';
+
+  readTheDocsDiv.append(flyoutMenuSpan);
+
+  readTheDocsDiv.append(flyoutMenuDiv);
+
+  const referenceNode = document.querySelector('.wy-grid-for-nav');
+
+  referenceNode.insertAdjacentElement("afterend", readTheDocsDiv);
+}
+
 window.onload = function() {
   addHeader();
   addSearchElementInDocument();
@@ -226,4 +249,5 @@ window.onload = function() {
   addSnsLinks();
   moveFooterButtons();
   getCurrentPageTitle();
+  // defineFlyoutMenu();
 }

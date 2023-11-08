@@ -4670,18 +4670,6 @@ body {
   font-size: 3.077vw;
 }
 
-@media (min-width: 600px) {
-  .wy-text-small,small {
-    font-size: 1.843rem;
-  }
-}
-
-@media (min-width: 1200px) {
-  .wy-text-small,small {
-    font-size: 1.2rem;
-  }
-}
-
 @media only screen and (min-width: 600px) {
   .rst-other-versions small {
     font-size: 1.843rem;
@@ -5904,10 +5892,6 @@ footer p {
   }
 }
 
-
-
-
-
 @media screen and (min-width: 1495px) {
   .customized-search-bar-in-desktop {
     position: absolute;
@@ -6014,7 +5998,6 @@ img.search-icon {
   }
 }
 
-/* custom 추가 */
 @media screen and (min-width: 1495px) {
   .wy-nav-content-wrap {
     margin-left: 43rem;
@@ -6046,7 +6029,6 @@ img.search-icon {
 
 @media screen and (min-width: 1200px) {
   .rst-versions {
-    display: block;
     bottom: 7rem;
     width: 35rem;
   }
@@ -6192,23 +6174,18 @@ div.rst-other-versions small a {
   display: block;
 }
 
-/* @media screen and (max-width: 1200px) {
+@media screen and (max-width: 1199px) {
   .rst-versions {
-      width: 85%;
+      width: 53.845rem;
       display: none
   }
 
   .rst-versions.shift {
       display: block
   }
-} */
-
-.rst-versions {
-  width: 90%;
-  display: block;
 }
 
-@media screen and (min-width: 600px) {
+@media screen and (max-width: 600px) {
   .rst-versions {
       width: 90%;
       display: none
@@ -6216,13 +6193,6 @@ div.rst-other-versions small a {
 
   .rst-versions.shift {
       display: block
-  }
-}
-
-@media screen and (min-width: 1199px) {
-  .rst-versions {
-      width: 53.845rem;
-      display: none
   }
 }
 
@@ -7388,7 +7358,6 @@ td code .pre {
   }
 }
 
-
 .fa-home:before,.icon-home:before {
   content: url('../icons/icon-folder.svg');
 }
@@ -7421,7 +7390,6 @@ li.toctree-l1.current ul li.toctree-l2.current a.reference.internal.current {
     font-weight: 500;
   }
 }
-
 
 /* --for overriding pygments.css-- */
 
