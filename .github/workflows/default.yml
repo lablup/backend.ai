@@ -319,10 +319,7 @@ jobs:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Install local dependencies for packaging
-      run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
-    - name: Build packages
+    - name: Build wheel packages
       run: |
         # Normalize the package version
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
@@ -380,6 +377,9 @@ jobs:
     - name: Install towncrier requirements
       run: |
         pip install -U -r tools/towncrier-requirements.txt
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
