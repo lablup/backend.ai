@@ -43,9 +43,17 @@ class CliArgs:
     target_path: str
 
 
-class ConfigError(Exception):
+class PrerequisiteError(Exception):
+    def __init__(self, msg: str, *, instruction: str | None = None) -> None:
+        super().__init__(msg, instruction)
+        self.msg = msg
+        self.instruction = instruction
+
     def __rich__(self) -> ConsoleRenderable:
-        return Text.from_markup(f"[bold red]ConfigError: [bold white]{self.args[0]}[/]")
+        text = f"[bold red]:warning: [bold white]{self.msg}[/]"
+        if self.instruction:
+            text += f"\n:hammer: [bright_cyan]{self.instruction}[/]"
+        return Text.from_markup(text)
 
 
 class DistInfo(BaseModel):

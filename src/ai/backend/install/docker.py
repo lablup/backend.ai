@@ -5,9 +5,10 @@ import base64
 import hashlib
 import os
 import re
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from ai.backend.install.types import PrerequisiteError
 
 from .http import request_unix
 
@@ -79,21 +80,24 @@ async def detect_system_docker():
 
 
 def fail_with_snap_docker_refresh_request(log) -> None:
-    log.write("Please install Docker 20.10.15 or later from the Snap package index.")
-    log.write("Instructions: `sudo snap refresh docker --edge`")
-    sys.exit(1)
+    raise PrerequisiteError(
+        "Please install Docker 20.10.15 or later from the Snap package index.",
+        instruction="Try running `sudo snap refresh docker --edge`",
+    )
 
 
 def fail_with_system_docker_install_request(log) -> None:
-    log.write("Please install Docker for your system.")
-    log.write("Instructions: https://docs.docker.com/install/")
-    sys.exit(1)
+    raise PrerequisiteError(
+        "Please install Docker for your system.",
+        instruction="Check out https://docs.docker.com/install/",
+    )
 
 
 def fail_with_compose_install_request(log) -> None:
-    log.write("Please install docker-compose v2 or later.")
-    log.write("Instructions: https://docs.docker.com/compose/install/")
-    sys.exit(1)
+    raise PrerequisiteError(
+        "Please install docker-compose v2 or later.",
+        instruction="Check out https://docs.docker.com/compose/install/",
+    )
 
 
 async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
@@ -133,8 +137,7 @@ async def check_docker(ctx: Context) -> None:
         fail_with_compose_install_request(ctx.log)
     m = re.search(r"\d+\.\d+\.\d+", stdout.decode())
     if m is None:
-        ctx.log.write("Failed to retrieve the docker-compose version!")
-        sys.exit(1)
+        raise PrerequisiteError("Failed to retrieve the docker-compose version!")
     else:
         compose_version = m.group(0)
         ctx.log.write(f"Detected docker-compose installation ({compose_version})")
