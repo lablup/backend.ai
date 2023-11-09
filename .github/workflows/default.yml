@@ -265,24 +265,26 @@ jobs:
         SYSTEM="$OS_TYPE $CPU_ARCH"
         case "$SYSTEM" in
           "Linux x86_64" )
-            PLATFORM="linux_x64"
+            SRC_PLATFORM="linux_x64"
+            DST_PLATFORM="linux-x86_64"
             ;;
           "Linux aarch64" )
-            PLATFORM="linux_arm64"
+            SRC_PLATFORM="linux_arm64"
+            DST_PLATFORM="linux-aarch64"
             ;;
           "Darwin x86_64" )
-            PLATFORM="mac_x64"
-            npm rebuild
+            SRC_PLATFORM="macos_x64"
+            DST_PLATFORM="macos-x86_64"
             ;;
           "Darwin arm64" )
-            PLATFORM="mac_arm64"
-            npm rebuild
+            SRC_PLATFORM="macos_arm64"
+            DST_PLATFORM="macos-aarch64"
             ;;
         esac
         mkdir dist-local-proxy
         # Normalize the package naming
-        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$PLATFORM.zip"
-        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$PLATFORM"
+        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$SRC_PLATFORM.zip"
+        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$DST_PLATFORM"
     - name: Upload local-proxy binaries
       uses: actions/upload-artifact@v3
       with:
@@ -432,22 +434,11 @@ jobs:
       with:
         name: scies
         path: dist
-<<<<<<< HEAD
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
-      run: |
-        twine upload dist/*.whl dist/*.tar.gz
-=======
     - name: Download local-proxy
       uses: actions/download-artifact@v3
       with:
         name: local-proxy
         path: dist
->>>>>>> main
     - name: Release to GitHub
       uses: softprops/action-gh-release@v1
       with:
