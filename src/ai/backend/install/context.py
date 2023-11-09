@@ -4,6 +4,7 @@ import asyncio
 import enum
 import shutil
 from contextvars import ContextVar
+from functools import partial
 from pathlib import Path
 
 import aiofiles
@@ -428,13 +429,10 @@ class PackageContext(Context):
         label = Label(Text.from_markup(f"[blue](download)[/] {pkg_name}"), classes="progress-name")
         progress = ProgressBar(classes="progress-download")
         item.mount_all([label, progress])
-        await vpane.mount(item)
+        vpane.mount(item)
         async with self.wget_sema:
-            try:
-                await wget(pkg_url, dst_path, progress)
-                await wget(csum_url, csum_path)
-            finally:
-                item.remove()
+            await wget(pkg_url, dst_path, progress)
+            await wget(csum_url, csum_path)
 
     async def _verify_package(self, name: str, *, fat: bool) -> None:
         pkg_name = self._mangle_pkgname(name, fat=fat)
@@ -451,7 +449,7 @@ class PackageContext(Context):
         label = Label(Text.from_markup(f"[blue](install)[/] {pkg_name}"), classes="progress-name")
         progress = ProgressBar(classes="progress-install")
         item.mount_all([label, progress])
-        await vpane.mount(item)
+        vpane.mount(item)
         async with (
             aiofiles.open(src_path, "rb") as src,
             aiofiles.open(dst_path, "wb") as dst,
@@ -466,7 +464,8 @@ class PackageContext(Context):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
-            shutil.copy(
+            partial(
+                shutil.copy,
                 src_path.with_name(pkg_name + ".sha256"),
                 dst_path.with_name(pkg_name + ".sha256"),
             ),
