@@ -254,6 +254,37 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
       # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
+
+    - name: Unpack local-proxy binaries
+      run: |
+        OS_TYPE=$(uname -s)
+        CPU_ARCH=$(uname -m)
+        SYSTEM="$OS_TYPE $CPU_ARCH"
+        case "$SYSTEM" in
+          "Linux x86_64" )
+            PLATFORM="linux_x64"
+            ;;
+          "Linux aarch64" )
+            PLATFORM="linux_arm64"
+            ;;
+          "Darwin x86_64" )
+            PLATFORM="mac_x64"
+            npm rebuild
+            ;;
+          "Darwin arm64" )
+            PLATFORM="mac_arm64"
+            npm rebuild
+            ;;
+        esac
+        mkdir dist-local-proxy
+        # Normalize the package naming
+        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$PLATFORM.zip"
+        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$PLATFORM"
+    - name: Upload local-proxy binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: local-proxy
+        path: dist-local-proxy/*
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
@@ -391,6 +422,11 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: scies
+        path: dist
+    - name: Download local-proxy
+      uses: actions/download-artifact@v3
+      with:
+        name: local-proxy
         path: dist
     - name: Release to GitHub
       uses: softprops/action-gh-release@v1
