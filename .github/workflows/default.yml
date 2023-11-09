@@ -267,24 +267,30 @@ jobs:
           "Linux x86_64" )
             SRC_PLATFORM="linux-x64"
             DST_PLATFORM="linux-x86_64"
+            CHECKSUM_CMD="sha256sum"
             ;;
           "Linux aarch64" )
             SRC_PLATFORM="linux-arm64"
             DST_PLATFORM="linux-aarch64"
+            CHECKSUM_CMD="sha256sum"
             ;;
           "Darwin x86_64" )
             SRC_PLATFORM="macos-x64"
             DST_PLATFORM="macos-x86_64"
+            CHECKSUM_CMD="shasum -a 256"
             ;;
           "Darwin arm64" )
             SRC_PLATFORM="macos-arm64"
             DST_PLATFORM="macos-aarch64"
+            CHECKSUM_CMD="shasum -a 256"
             ;;
         esac
         mkdir dist-local-proxy
         # Normalize the package naming
         unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$SRC_PLATFORM.zip"
         mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$DST_PLATFORM"
+        cd dist-local-proxy
+        ls | xargs -I{} sh -c "$CHECKSUM_CMD {} > {}.sha256"
     - name: Upload local-proxy binaries
       uses: actions/upload-artifact@v3
       with:
