@@ -18,7 +18,7 @@ from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
 
 from .group import GroupRow
-from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
@@ -103,7 +103,7 @@ class ResourceUsage:
         }
 
 
-def to_str(val: Optional[Any]) -> Optional[str]:
+def to_str(val: Any) -> Optional[str]:
     return str(val) if val is not None else None
 
 
@@ -121,10 +121,11 @@ class BaseResourceUsageGroup:
     scheduled_at: Optional[str] = attrs.field(default=None)
     used_time: Optional[str] = attrs.field(default=None)
     used_days: Optional[int] = attrs.field(default=None)
+    agents: Optional[set[str]] = attrs.field(default=None)
 
     user_id: Optional[UUID] = attrs.field(default=None)
     user_email: Optional[str] = attrs.field(default=None)
-    user_full_name: Optional[str] = attrs.field(default=None)
+    full_name: Optional[str] = attrs.field(default=None)  # User's full_name
     access_key: Optional[UUID] = attrs.field(default=None)
     project_id: Optional[UUID] = attrs.field(default=None)
     project_name: Optional[str] = attrs.field(default=None)
@@ -183,8 +184,9 @@ class BaseResourceUsageGroup:
             "domain_name": self.domain_name,
             "last_stat": self.last_stat,
             "extra_info": self.extra_info,
-            "full_name": self.user_full_name,
-            "image_name": self.images,
+            "full_name": self.full_name,
+            "images": self.images,
+            "agents": self.agents,
             "status": self.status,
             "status_info": self.status_info,
             "status_history": self.status_history,
@@ -210,8 +212,9 @@ class BaseResourceUsageGroup:
             "domain_name": self.domain_name,
             "last_stat": self.last_stat,
             "extra_info": self.extra_info,
-            "full_name": to_str(self.user_full_name),
-            "image_name": self.images or set(),
+            "full_name": to_str(self.full_name),
+            "images": list(self.images) if self.images is not None else [],
+            "agents": list(self.agents) if self.agents is not None else [],
             "status": to_str(self.status),
             "status_info": to_str(self.status_info),
             "status_history": to_str(self.status_history),
@@ -322,6 +325,10 @@ class SessionResourceUsage(BaseResourceUsageGroup):
                 self.images = {*(other.images or set())}
             else:
                 self.images |= other.images or set()
+            if self.agents is None:
+                self.agents = {*(other.agents or set())}
+            else:
+                self.agents |= other.agents or set()
         return is_registered
 
 
@@ -354,17 +361,20 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
             raise ValueError(
                 "Cannot parse `ProjectResourceUsage` from usage_group that have None value field"
             )
+        filtered_data = {
+            **usage_group.to_map(),
+            "images": None,
+            "full_name": None,
+            "status": None,
+            "status_info": None,
+            "status_history": None,
+            "cluster_mode": None,
+            "scheduled_at": None,
+            "terminated_at": None,
+        }
         return cls(
             project_row=usage_group.project_row,
-            **usage_group.to_map(),
-            images=None,
-            user_full_name=None,
-            status=None,
-            status_info=None,
-            status_history=None,
-            cluster_mode=None,
-            scheduled_at=None,
-            terminated_at=None,
+            **filtered_data,
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
@@ -381,6 +391,10 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
                 self.images = {*(other.images or set())}
             else:
                 self.images |= other.images or set()
+            if self.agents is None:
+                self.agents = {*(other.agents or set())}
+            else:
+                self.agents |= other.agents or set()
         return is_registered
 
 
@@ -484,7 +498,7 @@ async def parse_resource_usage_groups(
             session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
-            scheduled_at=kern.scheduled_at,
+            scheduled_at=kern.status_history.get(KernelStatus.SCHEDULED.name),
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
@@ -498,9 +512,10 @@ async def parse_resource_usage_groups(
             session_id=kern.session_id,
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
-            user_full_name=kern.session.user.full_name,
-            images=kern.image,
-            status=kern.status,
+            full_name=kern.session.user.full_name,
+            images={kern.image},
+            agents={kern.agent},
+            status=kern.status.name,
             status_history=kern.status_history,
             cluster_mode=kern.cluster_mode,
             status_info=kern.status_info,
@@ -538,6 +553,9 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.created_at,
     KernelRow.terminated_at,
     KernelRow.last_stat,
+    KernelRow.status_history,
+    KernelRow.status,
+    KernelRow.status_info,
     KernelRow.session_id,
     KernelRow.id,
     KernelRow.container_id,
@@ -547,6 +565,7 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.mounts,
     KernelRow.resource_opts,
     KernelRow.image,
+    KernelRow.cluster_mode,
 )
 
 

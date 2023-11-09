@@ -589,6 +589,11 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     )
     resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
+    from pprint import pprint
+
+    print("Response ===")
+    pprint(resp)
+    print("---")
     return web.json_response(resp, status=200)
 
 
