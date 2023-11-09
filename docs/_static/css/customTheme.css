@@ -4670,16 +4670,20 @@ body {
   font-size: 3.077vw;
 }
 
-@media only screen and (min-width: 600px) {
+@media (min-width: 600px) {
   .rst-other-versions small {
     font-size: 1.843rem;
   }
 }
 
-@media only screen and (min-width: 1200px) {
+@media (min-width: 1200px) {
   .rst-other-versions small {
     font-size: 1.2rem;
   }
+}
+
+.rst-other-versions dl {
+  margin: 0 0 1rem 0 !important;
 }
 
 .wy-text-strike {
@@ -6144,6 +6148,22 @@ div.rst-other-versions small a {
   }
 }
 
+.rst-other-versions .injected dl:last-child dd div {
+  width: 70vw;
+}
+
+@media screen and (min-width: 600px) {
+  .rst-other-versions .injected dl:last-child dd div {
+    width: 40.8rem;
+  }
+}
+
+@media screen and (min-width: 1200px) {
+  .rst-versions.rst-badge {
+    width: 27.5rem;
+  }
+}
+
 #flyout-search-form input {
   width: 100%;
 }
@@ -6953,7 +6973,7 @@ html.writer-html4 .rst-content dl:not(.docutils)>dt,html.writer-html5 .rst-conte
   color: #2980b9;
   border-top: 3px solid #6ab0de;
   padding: 6px;
-  position: relative
+  position: relative;
 }
 
 html.writer-html4 .rst-content dl:not(.docutils)>dt:before,html.writer-html5 .rst-content dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.citation):not(.glossary):not(.simple)>dt:before {
