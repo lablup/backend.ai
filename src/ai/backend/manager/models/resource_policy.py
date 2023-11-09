@@ -317,15 +317,25 @@ class KeyPairResourcePolicy(graphene.ObjectType):
 
 class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     default_for_unspecified = graphene.String(required=True)
-    total_resource_slots = graphene.JSONString(required=True)
-    max_session_lifetime = graphene.Int(required=True, default_value=0)
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    max_session_lifetime = graphene.Int(required=False, default_value=0)
     max_concurrent_sessions = graphene.Int(required=True)
+    max_concurrent_sftp_sessions = graphene.Int(required=False, default_value=1)
     max_containers_per_session = graphene.Int(required=True)
     idle_timeout = BigInt(required=True)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    max_vfolder_count = graphene.Int(deprecation_reason=deprecation_reason_msg("23.09.4"))
-    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
-    max_quota_scope_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_vfolder_count = graphene.Int(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_vfolder_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_quota_scope_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -333,12 +343,22 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     max_session_lifetime = graphene.Int(required=False)
     max_concurrent_sessions = graphene.Int(required=False)
+    max_concurrent_sftp_sessions = graphene.Int(required=False)
     max_containers_per_session = graphene.Int(required=False)
     idle_timeout = BigInt(required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
-    max_vfolder_count = graphene.Int(deprecation_reason=deprecation_reason_msg("23.09.4"))
-    max_vfolder_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
-    max_quota_scope_size = BigInt(deprecation_reason=deprecation_reason_msg("23.09.4"))
+    max_vfolder_count = graphene.Int(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_vfolder_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
+    max_quota_scope_size = BigInt(
+        required=False,
+        deprecation_reason=deprecation_reason_msg("23.09.4"),
+    )
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):
@@ -366,6 +386,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
             "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
             "max_session_lifetime": props.max_session_lifetime,
             "max_concurrent_sessions": props.max_concurrent_sessions,
+            "max_concurrent_sftp_sessions": props.max_concurrent_sessions,
             "max_containers_per_session": props.max_containers_per_session,
             "idle_timeout": props.idle_timeout,
             "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
@@ -399,7 +420,10 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
     ) -> ModifyKeyPairResourcePolicy:
         data: Dict[str, Any] = {}
         set_if_set(
-            props, data, "default_for_unspecified", clean_func=lambda v: DefaultForUnspecified[v]
+            props,
+            data,
+            "default_for_unspecified",
+            clean_func=lambda v: DefaultForUnspecified[v],
         )
         set_if_set(
             props,
@@ -409,6 +433,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         )
         set_if_set(props, data, "max_session_lifetime")
         set_if_set(props, data, "max_concurrent_sessions")
+        set_if_set(props, data, "max_concurrent_sftp_sessions")
         set_if_set(props, data, "max_containers_per_session")
         set_if_set(props, data, "idle_timeout")
         set_if_set(props, data, "allowed_vfolder_hosts")
