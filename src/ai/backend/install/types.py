@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from rich.console import ConsoleRenderable
+from rich.console import ConsoleRenderable, RichCast
 from rich.text import Text
 
 from ai.backend.common.types import HostPortPair
@@ -43,7 +43,7 @@ class CliArgs:
     target_path: str
 
 
-class PrerequisiteError(Exception):
+class PrerequisiteError(RichCast, Exception):
     def __init__(self, msg: str, *, instruction: str | None = None) -> None:
         super().__init__(msg, instruction)
         self.msg = msg
@@ -74,16 +74,25 @@ class InstallInfo(BaseModel):
 
 
 @dataclasses.dataclass()
-class OSInfo:
+class OSInfo(RichCast):
     platform: Platform
     distro: str
+
+    def __rich__(self) -> ConsoleRenderable:
+        return Text.from_markup(f"[bold cyan]{self.platform} [not bold](variant: {self.distro})[/]")
 
 
 @dataclasses.dataclass()
 class HalfstackConfig:
+    ha_setup: bool
     postgres_addr: HostPortPair
-    redis_addr: list[HostPortPair]  # multiple if HA
+    postgres_user: str
+    postgres_password: str
+    redis_addr: HostPortPair | None
+    redis_sentinel_addrs: list[HostPortPair] | None
+    redis_password: str | None
     etcd_addr: list[HostPortPair]  # multiple if HA
+    etcd_password: str | None
 
 
 @dataclasses.dataclass()
@@ -91,6 +100,7 @@ class ServiceConfig:
     manager_bind: HostPortPair
     manager_ipc_base_path: str
     manager_var_base_path: str
+    manager_auth_key: str
     web_bind: HostPortPair
     web_ipc_base_path: str
     web_var_base_path: str
@@ -106,3 +116,4 @@ class ServiceConfig:
     storage_agent_ipc_base_path: str
     storage_agent_var_base_path: str
     storage_watcher_bind: HostPortPair
+    vfolder_relpath: str

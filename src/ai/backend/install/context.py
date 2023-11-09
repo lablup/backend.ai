@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import json
+import re
 import shutil
+from abc import ABCMeta, abstractmethod
 from contextvars import ContextVar
 from functools import partial
 from pathlib import Path
+from typing import Any, Sequence
 
 import aiofiles
+import pkg_resources
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
@@ -24,7 +29,7 @@ from .dev import (
 from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
 from .http import wget
 from .python import check_python
-from .types import DistInfo, OSInfo, PackageSource
+from .types import DistInfo, InstallInfo, OSInfo, PackageSource
 
 current_log: ContextVar[RichLog] = ContextVar("current_log")
 
@@ -33,7 +38,7 @@ class PostGuide(enum.Enum):
     UPDATE_ETC_HOSTS = 10
 
 
-class Context:
+class Context(metaclass=ABCMeta):
     os_info: OSInfo
 
     _post_guides: list[PostGuide]
@@ -45,6 +50,11 @@ class Context:
         self.cwd = Path.cwd()
         self.dist_info = dist_info
         self.wget_sema = asyncio.Semaphore(3)
+        self.install_info = self.hydrate_install_info()
+
+    @abstractmethod
+    def hydrate_install_info(self) -> InstallInfo:
+        raise NotImplementedError
 
     def add_post_guide(self, guide: PostGuide) -> None:
         self._post_guides.append(guide)
@@ -53,7 +63,7 @@ class Context:
         pass
 
     def log_header(self, title: str) -> None:
-        self.log.write(Text.from_markup(f"[bright_green]{title}"))
+        self.log.write(Text.from_markup(f"[bright_green]:green_circle: {title}"))
 
     async def install_system_package(self, name: dict[str, list[str]]) -> None:
         distro_pkg_name = " ".join(name[self.os_info.distro])
@@ -107,26 +117,59 @@ class Context:
                 exit_code = await p.wait()
         return exit_code
 
-    async def install_halfstack(self, *, ha_setup: bool) -> None:
-        r"""
-        SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-        if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-          SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
-        fi
-        cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+    def copy_config(self, template_name: str) -> Path:
+        src_path = pkg_resources.resource_filename("ai.backend.install.configs", template_name)
+        dst_path = self.dist_info.target_path / template_name
+        shutil.copy(src_path, dst_path)
+        return dst_path
 
-        sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
-        sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
-        sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+    @staticmethod
+    def sed_in_place(path: Path, pattern: str | re.Pattern, replacement: str) -> None:
+        content = path.read_text()
+        match pattern:
+            case str():
+                content = content.replace(pattern, replacement)
+            case re.Pattern():
+                content = pattern.sub(replacement, content)
+        path.write_text(content)
 
-        mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
-        mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
-        mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+    @staticmethod
+    def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern, str]]) -> None:
+        content = path.read_text()
+        for pattern, replacement in subs:
+            match pattern:
+                case str():
+                    content = content.replace(pattern, replacement)
+                case re.Pattern():
+                    content = pattern.sub(replacement, content)
+        path.write_text(content)
 
-        $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
-        $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
-        $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
-        """
+    async def install_halfstack(self) -> None:
+        dst_compose_path = self.copy_config("docker-compose.yml")
+
+        volume_path = self.dist_info.target_path / "volumes"
+        (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
+        (volume_path / "etcd-data").mkdir(parents=True, exist_ok=True)
+        (volume_path / "redis-data").mkdir(parents=True, exist_ok=True)
+
+        # TODO: implement ha setup
+        assert self.install_info.halfstack_config.redis_addr
+        self.sed_in_place_multi(
+            dst_compose_path,
+            [
+                ("8100:5432", f"{self.install_info.halfstack_config.postgres_addr.port}:5432"),
+                ("8100:6379", f"{self.install_info.halfstack_config.redis_addr[0].port}:6379"),
+                ("8100:2379", f"{self.install_info.halfstack_config.etcd_addr[0].port}:2379"),
+            ],
+        )
+        await self.run_shell(
+            """
+        sudo docker compose pull && \\
+        sudo docker compose up -d && \\
+        sudo docker compose ps
+        """,
+            cwd=self.dist_info.target_path,
+        )
 
     async def load_fixtures(self) -> None:
         r"""
@@ -151,51 +194,113 @@ class Context:
         """
 
     async def configure_manager(self) -> None:
-        r"""
-        cp configs/manager/halfstack.toml ./manager.toml
-        sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
-        sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
-        sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
-        sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
-        sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
-        cp configs/manager/halfstack.alembic.ini ./alembic.ini
-        sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
+        toml_path = self.copy_config("manager.toml")
+        alembic_path = self.copy_config("alembic.ini")
 
-        if [ $CONFIGURE_HA -eq 1 ]; then
-          ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
-          ./backend.ai mgr etcd put config/redis/service_name "mymaster"
-          ./backend.ai mgr etcd put config/redis/password "develove"
-        else
-          ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-        fi
+        etcd_addr = self.install_info.halfstack_config.etcd_addr
+        postgres_addr = self.install_info.halfstack_config.postgres_addr
 
-        ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                (re.compile("^num-proc = .*"), "num-proc = 1"),
+                ("port = 8120", f"port = {etcd_addr[0].port}"),
+                ("port = 8100", f"port = {postgres_addr.port}"),
+                ("port = 8081", f"port = {self.install_info.service_config.manager_bind.port}"),
+                (
+                    re.compile("^(# )?ipc-base-path =.*"),
+                    f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
+                ),
+            ],
+        )
+        self.sed_in_place(
+            alembic_path, "localhost:8100", f"{postgres_addr.host}:{postgres_addr.port}"
+        )
 
-        cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
-        MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
-        sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
-        sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
-        """
+        # TODO: put manager_auth_key by using secrets.token_hex(32)
+        storage_client_bind = self.install_info.service_config.storage_client_facing_bind
+        storage_manager_bind = self.install_info.service_config.storage_manager_facing_bind
+        data: Any = {
+            "volumes": {
+                "_types": {"group": "", "user": ""},
+                "default_host": "local:volume1",
+                "proxies": {
+                    "local": {
+                        "client_api": (
+                            f"http://{storage_client_bind.host}:{storage_client_bind.port}"
+                        ),
+                        "manager_api": (
+                            f"https://{storage_manager_bind.host}:{storage_manager_bind.port}"
+                        ),
+                        "secret": self.install_info.service_config.manager_auth_key,
+                        "ssl_verify": "false",
+                    }
+                },
+                "exposed_volume_info": "percentage",
+            },
+        }
+        if self.install_info.halfstack_config.ha_setup:
+            assert self.install_info.halfstack_config.redis_sentinel_addrs
+            data["redis"] = {
+                "sentinel": ",".join(
+                    f"{binding.host}:{binding.port}"
+                    for binding in self.install_info.halfstack_config.redis_sentinel_addrs
+                ),
+                "service_name": "mymaster",
+                "password": self.install_info.halfstack_config.redis_password,
+                "helper": {
+                    "socket_timeout": 5.0,
+                    "socket_connect_timeout": 2.0,
+                    "reconnect_poll_timeout": 0.3,
+                },
+            }
+        else:
+            assert self.install_info.halfstack_config.redis_addr
+            data["redis"] = {
+                "addr": f"{self.install_info.halfstack_config.redis_addr.host}:{self.install_info.halfstack_config.redis_addr.port}",
+                "password": self.install_info.halfstack_config.redis_password,
+                "helper": {
+                    "socket_timeout": 5.0,
+                    "socket_connect_timeout": 2.0,
+                    "reconnect_poll_timeout": 0.3,
+                },
+            }
+        (self.dist_info.target_path / "etcd.config.json").write_text(json.dumps(data))
+        # TODO: mgr etcd put-json
 
     async def configure_agent(self) -> None:
-        r"""
-        cp configs/agent/halfstack.toml ./agent.toml
-        mkdir -p "$VAR_BASE_PATH"
-        sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
-        sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
-        sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
-        sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
-        sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+        toml_path = self.copy_config("agent.toml")
 
-        # configure backend mode
-        if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then
-          sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
-          sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
-        elif [ $AGENT_BACKEND = "docker" ]; then
-          sed '/scratch-nfs-/d' ./agent.toml > ./agent.toml.sed
-          mv ./agent.toml.sed ./agent.toml
-        fi
-        sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                ("port = 8120", f"port = {self.install_info.halfstack_config.etcd_addr[0].port}"),
+                ("port = 6001", f"port = {self.install_info.service_config.agent_rpc_bind.port}"),
+                (
+                    "port = 6009",
+                    f"port = {self.install_info.service_config.agent_watcher_bind.port}",
+                ),
+                (
+                    re.compile("^(# )?ipc-base-path = .*"),
+                    f'ipc-base-path = "{self.install_info.service_config.agent_ipc_base_path}"',
+                ),
+                (
+                    re.compile("^(# )?var-base-path = .*"),
+                    f'var-base-path = "{self.install_info.service_config.agent_var_base_path}"',
+                ),
+                (
+                    re.compile("(# )?mount_path = .*"),
+                    (  # TODO
+                        f'"{self.dist_info.target_path / self.install_info.service_config.vfolder_relpath}"'
+                    ),
+                ),
+            ],
+        )
+        Path(self.install_info.service_config.agent_var_base_path).mkdir(
+            parents=True, exist_ok=True
+        )
+        # TODO: enable CUDA plugin if nvidia stack is detected
+        r"""
         if [ $ENABLE_CUDA -eq 1 ]; then
           sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
         elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -206,8 +311,8 @@ class Context:
         """
 
     async def configure_storage_proxy(self) -> None:
+        # TODO: toml_path = self.copy_config("storage-proxy.toml")
         r"""
-        cp configs/storage-proxy/sample.toml ./storage-proxy.toml
         STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
         sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
         sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
@@ -227,10 +332,12 @@ class Context:
         """
 
     async def configure_webserver(self) -> None:
-        r"""
-        cp configs/webserver/halfstack.conf ./webserver.conf
-        sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-        """
+        conf_path = self.copy_config("webserver.conf")
+        self.sed_in_place(
+            conf_path,
+            "https://api.backend.ai",
+            f"http://127.0.0.1:{self.install_info.service_config.manager_bind.port}",
+        )
 
     async def configure_webui(self) -> None:
         pass
@@ -357,6 +464,9 @@ class Context:
 
 
 class DevContext(Context):
+    def hydrate_install_info(self) -> InstallInfo:
+        raise NotImplementedError  # TODO: implement
+
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os(self)
         await install_git_lfs(self)
@@ -371,7 +481,7 @@ class DevContext(Context):
     async def install(self) -> None:
         await pants_export(self)
         await install_editable_webui(self)
-        await self.install_halfstack(ha_setup=False)
+        await self.install_halfstack()
 
     async def _configure_mock_accelerator(self) -> None:
         """
@@ -391,6 +501,9 @@ class DevContext(Context):
 
 
 class PackageContext(Context):
+    def hydrate_install_info(self) -> InstallInfo:
+        raise NotImplementedError  # TODO: implement
+
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os(self)
         await check_docker(self)
@@ -501,6 +614,7 @@ class PackageContext(Context):
                 case PackageSource.LOCAL_DIR:
                     # Use the local files.
                     # Copy the packages into the target path.
+                    self.log_header(f"Installing packages into {self.dist_info.target_path}...")
                     await self._install_package("manager", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package("agent", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package(
@@ -526,16 +640,22 @@ class PackageContext(Context):
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
             vpane.remove()
-        await self.install_halfstack(ha_setup=False)
+        self.log_header("Installing databases (halfstack)...")
+        await self.install_halfstack()
 
     async def configure(self) -> None:
+        self.log_header("Configuring manager...")
         await self.configure_manager()
+        self.log_header("Configuring agent...")
         await self.configure_agent()
+        self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
+        self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
         # TODO: install as systemd services?
 
     async def populate_images(self) -> None:
         # TODO: docker load
+        self.log_header("Loading docker images...")
         pass

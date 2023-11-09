@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rich.text import Text
+
 from .types import OSInfo, Platform
 
 if TYPE_CHECKING:
@@ -73,7 +75,8 @@ async def detect_os(ctx: Context) -> OSInfo:
         platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
         distro=distro,
     )
-    ctx.log.write(f"Detected OS info: {os_info}")
+    ctx.log.write(Text.from_markup("Detected OS info: ", end=""))
+    ctx.log.write(os_info)
     return os_info
 
 

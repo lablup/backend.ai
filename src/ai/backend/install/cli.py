@@ -58,7 +58,7 @@ class DevSetup(Static):
             # prerequisites
             await ctx.check_prerequisites()
             # install
-            await ctx.install_halfstack(ha_setup=False)
+            await ctx.install_halfstack()
             await ctx.install()
             # configure
             await ctx.configure()
@@ -109,7 +109,7 @@ class PackageSetup(Static):
                 dist_info.target_path = Path(value)
             await ctx.check_prerequisites()
             # install
-            await ctx.install_halfstack(ha_setup=False)
+            await ctx.install_halfstack()
             await ctx.install()
             # configure
             await ctx.configure()
@@ -243,8 +243,14 @@ class ModeMenu(Static):
 
 class InstallerApp(App):
     BINDINGS = [
-        Binding("q", "shutdown", "Quit the installer"),
-        Binding("ctrl+c", "shutdown", "Quit the installer", show=False, priority=True),
+        Binding("q", "shutdown", "Interrupt ongoing tasks / Quit the installer"),
+        Binding(
+            "ctrl+c",
+            "shutdown",
+            "Interrupt ongoing tasks / Quit the installer",
+            show=False,
+            priority=True,
+        ),
     ]
     CSS_PATH = "app.tcss"
 
@@ -281,15 +287,20 @@ class InstallerApp(App):
         self.title = "Backend.AI Installer"
 
     async def action_shutdown(self, message: str | None = None, exit_code: int = 0) -> None:
+        had_cancelled_tasks = False
         for t in {*top_tasks}:
             if t.done():
                 continue
+            had_cancelled_tasks = True
             t.cancel()
             try:
                 await t
             except asyncio.CancelledError:
                 pass
-        self.exit(return_code=exit_code, message=message)
+        if not had_cancelled_tasks:
+            # Let the user shutdown twice if there were cancelled tasks,
+            # so that the user could inspect what happened.
+            self.exit(return_code=exit_code, message=message)
 
 
 @click.command(
