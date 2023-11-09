@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import shutil
 from contextvars import ContextVar
 from pathlib import Path
 
@@ -396,15 +397,17 @@ class PackageContext(Context):
             await check_docker_desktop_mount(self)
 
     def _mangle_pkgname(self, name: str, fat: bool = False) -> str:
+        # local-proxy does not have fat variant. (It is always fat.)
         if fat and name != "backendai-local-proxy":
             return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
-            *["sha256sum", "-c", str(csum_path)],
+            *["sha256sum", "-c", csum_path.name],
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
+            cwd=csum_path.parent,
         )
         exit_code = await proc.wait()
         if exit_code == 0:
@@ -416,8 +419,8 @@ class PackageContext(Context):
 
     async def _fetch_package(self, name: str, vpane: Vertical) -> None:
         pkg_name = self._mangle_pkgname(name)
-        pkg_path = self.dist_info.target_path / pkg_name
-        csum_path = pkg_path.with_name(pkg_name + ".sha256")
+        dst_path = self.dist_info.target_path / pkg_name
+        csum_path = dst_path.with_name(pkg_name + ".sha256")
         pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
         csum_url = pkg_url + ".sha256"
         self.log.write(f"Downloading {pkg_url}...")
@@ -428,17 +431,17 @@ class PackageContext(Context):
         await vpane.mount(item)
         async with self.wget_sema:
             try:
-                await wget(pkg_url, pkg_path, progress)
+                await wget(pkg_url, dst_path, progress)
                 await wget(csum_url, csum_path)
             finally:
                 item.remove()
 
     async def _verify_package(self, name: str, *, fat: bool) -> None:
         pkg_name = self._mangle_pkgname(name, fat=fat)
-        pkg_path = self.dist_info.package_dir / pkg_name
-        self.log.write(f"Verifying {pkg_path} ...")
-        csum_path = pkg_path.with_name(pkg_name + ".sha256")
-        await self._validate_checksum(pkg_path, csum_path)
+        dst_path = self.dist_info.target_path / pkg_name
+        self.log.write(f"Verifying {dst_path} ...")
+        csum_path = dst_path.with_name(pkg_name + ".sha256")
+        await self._validate_checksum(dst_path, csum_path)
 
     async def _install_package(self, name: str, vpane: Vertical, *, fat: bool) -> None:
         pkg_name = self._mangle_pkgname(name, fat=fat)
@@ -460,6 +463,14 @@ class PackageContext(Context):
                     break
                 await dst.write(chunk)
                 progress.advance(len(chunk))
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            shutil.copy(
+                src_path.with_name(pkg_name + ".sha256"),
+                dst_path.with_name(pkg_name + ".sha256"),
+            ),
+        )
 
     async def install(self) -> None:
         vpane = Vertical(id="download-status")
@@ -481,23 +492,15 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                     # Verify the checksums of the downloaded packages.
-                    ## await self._verify_package("manager", fat=False)
-                    ## await self._verify_package("agent", fat=False)
-                    ## await self._verify_package("agent-watcher", fat=False)
-                    ## await self._verify_package("webserver", fat=False)
-                    ## await self._verify_package("local-proxy", fat=False)
-                    ## await self._verify_package("storage-proxy", fat=False)
-                    ## await self._verify_package("client", fat=False)
+                    await self._verify_package("manager", fat=False)
+                    await self._verify_package("agent", fat=False)
+                    await self._verify_package("agent-watcher", fat=False)
+                    await self._verify_package("webserver", fat=False)
+                    await self._verify_package("local-proxy", fat=False)
+                    await self._verify_package("storage-proxy", fat=False)
+                    await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
                     # Use the local files.
-                    # Verify the checksums first.
-                    await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("local-proxy", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("client", fat=self.dist_info.use_fat_binary)
                     # Copy the packages into the target path.
                     await self._install_package("manager", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package("agent", vpane, fat=self.dist_info.use_fat_binary)
@@ -514,6 +517,14 @@ class PackageContext(Context):
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )
                     await self._install_package("client", vpane, fat=self.dist_info.use_fat_binary)
+                    # Verify the checksums.
+                    await self._verify_package("manager", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("local-proxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
             vpane.remove()
         await self.install_halfstack(ha_setup=False)
