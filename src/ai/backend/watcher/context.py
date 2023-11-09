@@ -18,7 +18,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from .defs import WatcherName
 from .exception import InvalidWatcher
-from .plugin import AbstractWatcherWebAppPlugin
+from .plugin import WatcherWebAppPluginContext
 
 if TYPE_CHECKING:
     from .base import BaseWatcher
@@ -38,7 +38,7 @@ class RootContext:
     event_producer: EventProducer | None
     event_dispatcher: EventDispatcher | None
     _watchers: dict[WatcherName, BaseWatcher]
-    webapps: list[AbstractWatcherWebAppPlugin]
+    webapp_ctx: WatcherWebAppPluginContext | None
 
     def __init__(
         self,
@@ -59,7 +59,7 @@ class RootContext:
         self.event_producer = event_producer
         self.event_dispatcher = event_dispatcher
         self._watchers = {}
-        self.webapps = []
+        self.webapp_ctx = None
 
     async def __aenter__(self) -> None:
         pass

@@ -83,7 +83,7 @@ class AbstractPlugin(metaclass=ABCMeta):
 
 class AbstractWebappPlugin(AbstractPlugin):
     is_public: ClassVar[bool] = False
-    app_name: ClassVar[str] = "abc"
+    app_path: ClassVar[str] = "ai.backend"
 
 
 P = TypeVar("P", bound=AbstractPlugin)

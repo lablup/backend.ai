@@ -28,7 +28,7 @@ from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
-from .api import auth_middleware
+from .api import AUTH_PASS, auth_middleware
 from .config import watcher_config_iv
 from .context import RootContext
 from .defs import CORSOptions, WebMiddleware
@@ -53,8 +53,30 @@ async def ping(request: web.Request) -> web.Response:
 async def get_plugins(request: web.Request) -> web.Response:
     ctx: RootContext = request.app["ctx"]
 
+    if ctx.webapp_ctx is None:
+        return web.Response(status=503, text="Plugins are not initialized")
+
+    if request.get(AUTH_PASS, False):
+        app_list = [
+            {
+                "plugin": plugin_name,
+                "plugin_group": ctx.webapp_ctx.plugin_group,
+                "plugin_path": plugin.app_path,
+            }
+            for plugin_name, plugin in ctx.webapp_ctx.plugins.items()
+        ]
+    else:
+        app_list = [
+            {
+                "plugin": plugin_name,
+                "plugin_group": ctx.webapp_ctx.plugin_group,
+                "plugin_path": plugin.app_path,
+            }
+            for plugin_name, plugin in ctx.webapp_ctx.plugins.items()
+            if plugin.is_public
+        ]
     return web.json_response(
-        [{"plugin": app, "publicity": app.is_public} for app in ctx.webapps],
+        app_list,
         status=200,
     )
 
@@ -221,6 +243,7 @@ async def server_main(
 
     watcher_ctx = await _init_watcher(ctx, etcd, local_config)
     webapp_plugin_ctx = await _init_subapp(app, ctx, etcd, local_config, cors_options)
+    ctx.webapp_ctx = webapp_plugin_ctx
 
     runner = web.AppRunner(app)
     await runner.setup()

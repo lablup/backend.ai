@@ -21,7 +21,7 @@ class WatcherPluginContext(BasePluginContext[AbstractWatcherPlugin]):
 
 
 class AbstractWatcherWebAppPlugin(AbstractWebappPlugin, metaclass=ABCMeta):
-    app_name = "agent-watcher"
+    app_path = "ai.backend.watcher_modules"
 
     @abstractmethod
     async def create_app(
