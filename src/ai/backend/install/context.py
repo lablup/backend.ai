@@ -158,7 +158,7 @@ class Context(metaclass=ABCMeta):
             dst_compose_path,
             [
                 ("8100:5432", f"{self.install_info.halfstack_config.postgres_addr.port}:5432"),
-                ("8100:6379", f"{self.install_info.halfstack_config.redis_addr[0].port}:6379"),
+                ("8100:6379", f"{self.install_info.halfstack_config.redis_addr.port}:6379"),
                 ("8100:2379", f"{self.install_info.halfstack_config.etcd_addr[0].port}:2379"),
             ],
         )

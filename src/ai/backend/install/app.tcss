@@ -40,7 +40,7 @@ ModeMenu ListView > ListItem .mode-item-desc {
     color: $text-muted;
 }
 ModeMenu ListView > ListItem.--highlight {
-    border: wide white;
+    border: wide $foreground;
 }
 ModeMenu ListView > ListItem.disabled .mode-item-title {
     color: $panel-lighten-2;
@@ -100,16 +100,16 @@ Button.primary:hover {
     background: $accent-lighten-1;
 }
 Button.primary.-active:hover {
-    border: wide white;
+    border: wide $foreground;
 }
 Button:hover,
 Button.-active:hover {
     background: $panel-lighten-3;
-    border: wide white;
+    border: wide $foreground;
 }
 Button:focus,
 Button.-active:focus {
-    border: wide white;
-    color: white;
+    border: wide $foreground;
+    color: $text;
     text-style: bold;
 }

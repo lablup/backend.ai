@@ -48,7 +48,7 @@ class InputDialog(Static):
         border: wide $panel-lighten-1;
     }
     InputDialog Input:focus {
-        border: wide white;
+        border: wide $foreground;
     }
     InputDialog Horizontal {
         width: 1fr;
