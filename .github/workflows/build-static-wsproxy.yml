@@ -33,6 +33,7 @@ jobs:
       # For linux-aarch64 runner, we assume that we have the correct NodeJS version already (using asdf).
     - name: Build wsproxy
       run: |
+        npm i
         OS_TYPE=$(uname -s)
         CPU_ARCH=$(uname -m)
         SYSTEM="$OS_TYPE $CPU_ARCH"
@@ -45,12 +46,13 @@ jobs:
             ;;
           "Darwin x86_64" )
             PLATFORM="mac_x64"
+            npm rebuild
             ;;
           "Darwin arm64" )
             PLATFORM="mac_arm64"
+            npm rebuild
             ;;
         esac
-        npm i
         make -j1 "$PLATFORM"
     - name: Show the build result
       run: |
