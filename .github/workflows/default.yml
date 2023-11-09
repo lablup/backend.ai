@@ -265,19 +265,19 @@ jobs:
         SYSTEM="$OS_TYPE $CPU_ARCH"
         case "$SYSTEM" in
           "Linux x86_64" )
-            SRC_PLATFORM="linux_x64"
+            SRC_PLATFORM="linux-x64"
             DST_PLATFORM="linux-x86_64"
             ;;
           "Linux aarch64" )
-            SRC_PLATFORM="linux_arm64"
+            SRC_PLATFORM="linux-arm64"
             DST_PLATFORM="linux-aarch64"
             ;;
           "Darwin x86_64" )
-            SRC_PLATFORM="macos_x64"
+            SRC_PLATFORM="macos-x64"
             DST_PLATFORM="macos-x86_64"
             ;;
           "Darwin arm64" )
-            SRC_PLATFORM="macos_arm64"
+            SRC_PLATFORM="macos-arm64"
             DST_PLATFORM="macos-aarch64"
             ;;
         esac
