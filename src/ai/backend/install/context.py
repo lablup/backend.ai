@@ -396,7 +396,7 @@ class PackageContext(Context):
             await check_docker_desktop_mount(self)
 
     def _mangle_pkgname(self, name: str, fat: bool = False) -> str:
-        if fat:
+        if fat and name != "backendai-local-proxy":
             return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
@@ -477,7 +477,7 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        # TODO: tg.create_task(self._fetch_package("wsproxy", vpane))
+                        tg.create_task(self._fetch_package("local-proxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                     # Verify the checksums of the downloaded packages.
@@ -485,7 +485,7 @@ class PackageContext(Context):
                     ## await self._verify_package("agent", fat=False)
                     ## await self._verify_package("agent-watcher", fat=False)
                     ## await self._verify_package("webserver", fat=False)
-                    ## # TODO: await self._verify_package("wsproxy", fat=False)
+                    ## await self._verify_package("local-proxy", fat=False)
                     ## await self._verify_package("storage-proxy", fat=False)
                     ## await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
@@ -495,7 +495,7 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    # TODO: await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("local-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
                     # Copy the packages into the target path.
@@ -507,7 +507,9 @@ class PackageContext(Context):
                     await self._install_package(
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    # TODO: await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
+                    await self._install_package(
+                        "local-proxy", vpane, fat=self.dist_info.use_fat_binary
+                    )
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )
