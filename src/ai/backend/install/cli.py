@@ -70,6 +70,7 @@ class DevSetup(Static):
             await asyncio.sleep(1)
             raise
         except Exception as e:
+            _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
         finally:
             _log.write("")
@@ -120,6 +121,7 @@ class PackageSetup(Static):
             await asyncio.sleep(1)
             raise
         except Exception as e:
+            _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
         finally:
             _log.write("")
