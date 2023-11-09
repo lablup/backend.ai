@@ -61,6 +61,7 @@ async def get_plugins(request: web.Request) -> web.Response:
             {
                 "plugin": plugin_name,
                 "plugin_group": ctx.webapp_ctx.plugin_group,
+                "route_prefix": plugin.route_prefix,
                 "plugin_path": plugin.app_path,
             }
             for plugin_name, plugin in ctx.webapp_ctx.plugins.items()
@@ -70,6 +71,7 @@ async def get_plugins(request: web.Request) -> web.Response:
             {
                 "plugin": plugin_name,
                 "plugin_group": ctx.webapp_ctx.plugin_group,
+                "route_prefix": plugin.route_prefix,
                 "plugin_path": plugin.app_path,
             }
             for plugin_name, plugin in ctx.webapp_ctx.plugins.items()

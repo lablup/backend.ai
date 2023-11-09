@@ -22,6 +22,7 @@ class WatcherPluginContext(BasePluginContext[AbstractWatcherPlugin]):
 
 class AbstractWatcherWebAppPlugin(AbstractWebappPlugin, metaclass=ABCMeta):
     app_path = "ai.backend.watcher_modules"
+    route_prefix = "watcher"
 
     @abstractmethod
     async def create_app(
