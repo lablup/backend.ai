@@ -282,33 +282,34 @@ class Context(metaclass=ABCMeta):
         }
         await self.put_etcd_json("", data)
         data = {}
-        if self.install_info.halfstack_config.ha_setup:
-            assert self.install_info.halfstack_config.redis_sentinel_addrs
+        if halfstack.ha_setup:
+            assert halfstack.redis_sentinel_addrs
             data["redis"] = {
                 "sentinel": ",".join(
-                    f"{binding.host}:{binding.port}"
-                    for binding in self.install_info.halfstack_config.redis_sentinel_addrs
+                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
                 ),
                 "service_name": "mymaster",
-                "password": self.install_info.halfstack_config.redis_password,
                 "helper": {
                     "socket_timeout": 5.0,
                     "socket_connect_timeout": 2.0,
                     "reconnect_poll_timeout": 0.3,
                 },
             }
+            if halfstack.redis_password:
+                data["redis"]["password"] = halfstack.redis_password
         else:
-            assert self.install_info.halfstack_config.redis_addr
+            assert halfstack.redis_addr
             data["redis"] = {
-                "addr": f"{self.install_info.halfstack_config.redis_addr.face.host}:{self.install_info.halfstack_config.redis_addr.face.port}",
-                "password": self.install_info.halfstack_config.redis_password,
+                "addr": f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}",
                 "helper": {
                     "socket_timeout": 5.0,
                     "socket_connect_timeout": 2.0,
                     "reconnect_poll_timeout": 0.3,
                 },
             }
-        (self.install_info.base_path / "etcd.config.json").write_text(json.dumps(data))
+            if halfstack.redis_password:
+                data["redis"]["password"] = halfstack.redis_password
+        (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.put_etcd_json("config", data)
 
     async def configure_agent(self) -> None:
