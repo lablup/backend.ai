@@ -59,11 +59,9 @@ class DevSetup(Static):
             # prerequisites
             await ctx.check_prerequisites()
             # install
-            await ctx.install_halfstack()
             await ctx.install()
             # configure
             await ctx.configure()
-            await ctx.load_fixtures()
             # post-setup
             await ctx.dump_etcd_config()
         except asyncio.CancelledError:
@@ -114,11 +112,9 @@ class PackageSetup(Static):
                 dist_info.target_path = Path(value)
             await ctx.check_prerequisites()
             # install
-            await ctx.install_halfstack()
             await ctx.install()
             # configure
             await ctx.configure()
-            await ctx.load_fixtures()
             # post-setup
             await ctx.dump_etcd_config()
         except asyncio.CancelledError:

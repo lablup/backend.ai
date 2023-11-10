@@ -763,6 +763,7 @@ class PackageContext(Context):
         csum_path = dst_path.with_name(pkg_name + ".sha256")
         await self._validate_checksum(dst_path, csum_path)
         csum_path.unlink()
+        dst_path.chmod(0o755)
         dst_path.rename(dst_path.with_name(f"backendai-{name}"))
 
     async def _install_package(self, name: str, vpane: Vertical, *, fat: bool) -> None:
