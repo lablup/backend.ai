@@ -5,6 +5,7 @@ python_sources(
         "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
         "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
         "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
+        "src/ai/backend/manager/scheduler:src",
         "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         ":resources",
     ],
