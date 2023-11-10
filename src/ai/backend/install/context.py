@@ -210,8 +210,8 @@ class Context(metaclass=ABCMeta):
             dst_compose_path,
             [
                 ("8100:5432", f"{self.install_info.halfstack_config.postgres_addr.bind.port}:5432"),
-                ("8100:6379", f"{self.install_info.halfstack_config.redis_addr.bind.port}:6379"),
-                ("8100:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
+                ("8110:6379", f"{self.install_info.halfstack_config.redis_addr.bind.port}:6379"),
+                ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
         await self.run_shell(
@@ -582,13 +582,13 @@ class DevContext(Context):
         # TODO: multi-node setup
         halfstack_config = HalfstackConfig(
             ha_setup=False,
-            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8101)),
+            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
             postgres_user="postgres",
             postgres_password="develove",
-            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8111)),
+            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
             redis_sentinel_addrs=[],
             redis_password="develove",
-            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8121))],
+            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
             etcd_user=None,
             etcd_password=None,
         )
@@ -671,13 +671,13 @@ class PackageContext(Context):
         # TODO: multi-node setup
         halfstack_config = HalfstackConfig(
             ha_setup=False,
-            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8101)),
+            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
             postgres_user="postgres",
             postgres_password="develove",
-            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8111)),
+            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
             redis_sentinel_addrs=[],
             redis_password="develove",
-            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8121))],
+            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
             etcd_user=None,
             etcd_password=None,
         )
