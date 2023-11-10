@@ -33,7 +33,7 @@ from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, DistInfo, InstallModes
+from .types import CliArgs, DistInfo, InstallModes, PrerequisiteError
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -69,6 +69,9 @@ class DevSetup(Static):
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
             raise
+        except PrerequisiteError as e:
+            _log.write(Text.from_markup("[red]:warning: A prerequisite check has failed."))
+            _log.write(e)
         except Exception as e:
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
@@ -120,6 +123,9 @@ class PackageSetup(Static):
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
             raise
+        except PrerequisiteError as e:
+            _log.write(Text.from_markup("[red]:warning: A prerequisite check has failed."))
+            _log.write(e)
         except Exception as e:
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
