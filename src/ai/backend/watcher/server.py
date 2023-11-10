@@ -56,27 +56,18 @@ async def get_plugins(request: web.Request) -> web.Response:
     if ctx.webapp_ctx is None:
         return web.Response(status=503, text="Plugins are not initialized")
 
-    if request.get(AUTH_PASS, False):
-        app_list = [
-            {
-                "plugin": plugin_name,
-                "plugin_group": ctx.webapp_ctx.plugin_group,
-                "route_prefix": plugin.route_prefix,
-                "plugin_path": plugin.app_path,
-            }
-            for plugin_name, plugin in ctx.webapp_ctx.plugins.items()
-        ]
-    else:
-        app_list = [
-            {
-                "plugin": plugin_name,
-                "plugin_group": ctx.webapp_ctx.plugin_group,
-                "route_prefix": plugin.route_prefix,
-                "plugin_path": plugin.app_path,
-            }
-            for plugin_name, plugin in ctx.webapp_ctx.plugins.items()
-            if plugin.is_public
-        ]
+    app_list = [
+        {
+            "plugin": plugin_name,
+            "plugin_group": ctx.webapp_ctx.plugin_group,
+            "route_prefix": plugin.route_prefix,
+            "plugin_path": plugin.app_path,
+            "publicity": plugin.is_public,
+        }
+        for plugin_name, plugin in ctx.webapp_ctx.plugins.items()
+    ]
+    if not request.get(AUTH_PASS, False):
+        app_list = [info for info in app_list if info["publicity"]]
     return web.json_response(
         app_list,
         status=200,
