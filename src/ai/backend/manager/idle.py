@@ -34,6 +34,7 @@ from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -50,10 +51,15 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    RedisConnectionInfo,
+    SessionTypes,
+)
 from ai.backend.common.utils import nmget
 
-from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
+from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
@@ -99,6 +105,15 @@ def calculate_remaining_time(
         baseline = max(idle_baseline, grace_period_end)
     remaining = baseline - now + timeout_period
     return remaining.total_seconds()
+
+
+async def get_redis_now(redis_obj: RedisConnectionInfo) -> float:
+    t = await redis_helper.execute(redis_obj, lambda r: r.time())
+    return t[0] + (t[1] / (10**6))
+
+
+async def get_db_now(dbconn: SAConnection) -> datetime:
+    return await dbconn.scalar(sa.select(sa.func.now()))
 
 
 class UtilizationExtraInfo(NamedTuple):
@@ -173,10 +188,12 @@ class IdleCheckerHost:
         self._lock_factory = lock_factory
         self._redis_live = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
+            name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
+            name="idle.stat",
             db=REDIS_STAT_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
@@ -206,6 +223,7 @@ class IdleCheckerHost:
             self._event_producer,
             lambda: DoIdleCheckEvent(),
             self.check_interval,
+            task_name="idle_checker",
         )
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,
@@ -255,7 +273,9 @@ class IdleCheckerHost:
                 )
                 .select_from(j)
                 .where(
-                    (kernels.c.status.in_(LIVE_STATUS)) & (kernels.c.cluster_role == DEFAULT_ROLE),
+                    (kernels.c.status.in_(LIVE_STATUS))
+                    & (kernels.c.cluster_role == DEFAULT_ROLE)
+                    & (kernels.c.session_type != SessionTypes.INFERENCE),
                 )
             )
             result = await conn.execute(query)
@@ -519,8 +539,8 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
+        d.subscribe(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
         self._evhandlers = [
-            d.consume(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
             d.consume(ExecutionTimeoutEvent, None, self._execution_exited_cb),  # type: ignore
@@ -579,6 +599,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         source: AgentId,
         event: SessionStartedEvent,
     ) -> None:
+        log.debug("Got SessionStartedEvent")
         await self._update_timeout(event.session_id)
 
     async def _execution_started_cb(
@@ -628,8 +649,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         )
         if active_streams is not None and active_streams > 0:
             return True
-        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-        now: float = t[0] + (t[1] / (10**6))
+        now: float = await get_redis_now(self._redis_live)
         raw_last_access = await redis_helper.execute(
             self._redis_live,
             lambda r: r.get(f"session.{session_id}.last_access"),
@@ -700,7 +720,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
             # TODO: once per-status time tracking is implemented, let's change created_at
             #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
-            now: datetime = await dbconn.scalar(sa.select(sa.func.now()))
+            now: datetime = await get_db_now(dbconn)
             kernel_created_at: datetime = kernel["created_at"]
             remaining = calculate_remaining_time(
                 now, kernel_created_at, idle_timeout, grace_period_end
@@ -745,6 +765,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("cuda_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("cuda_mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
+                    t.Key("atom_mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                 },
             ),
         },
@@ -759,6 +780,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         "cpu": {"cpu_util"},
         "mem": {"mem"},
         "cuda": {"cuda_util", "cuda_mem"},
+        "atom": {"atom_mem"},
     }
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
@@ -850,7 +872,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Report time remaining until the first time window is full as expire time
-        db_now: datetime = await dbconn.scalar(sa.select(sa.func.now()))
+        db_now: datetime = await get_db_now(dbconn)
         kernel_created_at: datetime = kernel["created_at"]
         if grace_period_end is not None:
             start_from = max(grace_period_end, kernel_created_at)

@@ -69,6 +69,9 @@ usage() {
   echo "  ${LWHITE}-h, --help${NC}"
   echo "    Show this help message and exit"
   echo ""
+  echo "  ${LWHITE}--show-guide${NC}"
+  echo "    Show the guide generated after the installation"
+  echo ""
   echo "  ${LWHITE}--enable-cuda${NC}"
   echo "    Install CUDA accelerator plugin and pull a"
   echo "    TensorFlow CUDA kernel for testing/demo."
@@ -81,34 +84,39 @@ usage() {
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
+  echo "    If you are on the main branch, this will be automatically enabled."
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
-  echo "    (default: 8100)"
+  echo "    (default: 8101)"
   echo ""
   echo "  ${LWHITE}--redis-port PORT${NC}"
   echo "    The port to bind the Redis container service."
-  echo "    (default: 8110)"
+  echo "    (default: 8111)"
   echo ""
   echo "  ${LWHITE}--etcd-port PORT${NC}"
   echo "    The port to bind the etcd container service."
-  echo "    (default: 8120)"
+  echo "    (default: 8121)"
   echo ""
   echo "  ${LWHITE}--webserver-port PORT${NC}"
   echo "    The port to expose the web server."
-  echo "    (default: 8080)"
+  echo "    (default: 8090)"
   echo ""
   echo "  ${LWHITE}--manager-port PORT${NC}"
   echo "    The port to expose the manager API service."
-  echo "    (default: 8081)"
+  echo "    (default: 8091)"
   echo ""
   echo "  ${LWHITE}--agent-rpc-port PORT${NC}"
   echo "    The port for the manager-to-agent RPC calls."
-  echo "    (default: 6001)"
+  echo "    (default: 6011)"
   echo ""
   echo "  ${LWHITE}--agent-watcher-port PORT${NC}"
   echo "    The port for the agent's watcher service."
-  echo "    (default: 6009)"
+  echo "    (default: 6019)"
+  echo ""
+  echo "  ${LWHITE}--agent-backend mode${NC}"
+  echo "    Mode for backend agent(docker, kubernetes)."
+  echo "    (default: docker)"
   echo ""
   echo "  ${LWHITE}--ipc-base-path PATH${NC}"
   echo "    The base path for IPC sockets and shared temporary files."
@@ -117,6 +125,10 @@ usage() {
   echo "  ${LWHITE}--var-base-path PATH${NC}"
   echo "    The base path for shared data files."
   echo "    (default: ./var/lib/backend.ai)"
+  echo ""
+  echo "  ${LWHITE}--configure-ha${NC}"
+  echo "    Configure HA dev environment."
+  echo "    (default: false)"
 }
 
 show_error() {
@@ -126,7 +138,7 @@ show_error() {
 
 show_warning() {
   echo " "
-  echo "${YELLOW}[ERROR]${NC} ${LYELLOW}$1${NC}"
+  echo "${LRED}[WARN]${NC} ${LYELLOW}$1${NC}"
 }
 
 show_info() {
@@ -141,15 +153,78 @@ show_note() {
 
 show_important_note() {
   echo " "
-  echo "${LRED}[NOTE]${NC} $1"
+  echo "${LRED}[NOTE]${NC} ${LYELLOW}$1${NC}"
 }
 
-has_python() {
-  "$1" -c '' >/dev/null 2>&1
-  if [ "$?" -eq 127 ]; then
-    echo 0
+show_guide() {
+  show_note "Check out the default API keypairs and account credentials for local development and testing:"
+  echo "  > ${WHITE}cat env-local-admin-api.sh${NC}"
+  echo "  > ${WHITE}cat env-local-admin-session.sh${NC}"
+  echo "  > ${WHITE}cat env-local-domainadmin-api.sh${NC}"
+  echo "  > ${WHITE}cat env-local-domainadmin-session.sh${NC}"
+  echo "  > ${WHITE}cat env-local-user-api.sh${NC}"
+  echo "  > ${WHITE}cat env-local-user-session.sh${NC}"
+  show_note "To apply the client config, source one of the configs like:"
+  echo "  > ${WHITE}source env-local-user-session.sh${NC}"
+  show_important_note "You should change your default admin API keypairs in any public/production setups!"
+  show_note "How to run Backend.AI manager:"
+  echo "  > ${WHITE}./backend.ai mgr start-server --debug${NC}"
+  show_note "How to run Backend.AI agent:"
+  echo "  > ${WHITE}./backend.ai ag start-server --debug${NC}"
+  show_note "How to run Backend.AI storage-proxy:"
+  echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
+  show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
+  echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
+  echo "  to prevent misbehavior of the client used inside the web server.${NC}"
+  show_info "How to run your first code:"
+  echo "  > ${WHITE}./backend.ai --help${NC}"
+  echo "  > ${WHITE}source env-local-admin-api.sh${NC}"
+  echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
+  show_info "How to run docker-compose:"
+  if [ ! -z "$docker_sudo" ]; then
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
   else
-    echo 1
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  fi
+  if [ $EDITABLE_WEBUI -eq 1 ]; then
+    show_info "How to run the editable checkout of webui:"
+    echo "(Terminal 1)"
+    echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
+    echo "(Terminal 2)"
+    echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
+    echo "(Terminal 3)"
+    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
+    echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
+  fi
+  show_info "Manual configuration for the client accessible hostname in various proxies"
+  echo " "
+  echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
+  echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
+  echo "that can be accessible from both the client SDK and the web browser."
+  echo " "
+  echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC}"
+  echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}webServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
+  echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
+  echo " "
+  echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
+  echo "of the storage-proxy's client API endpoint."
+  echo " "
+  echo "An example command to change the value of that key:"
+  echo "  > ${WHITE}./backend.ai mgr etcd put volumes/proxies/local/client_api http://my-dev-machine:6021${NC}"
+  echo "where /etc/hosts in the VM contains:"
+  echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
+  echo "and where /etc/hosts in the web browser host contains:"
+  echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
+  show_info "How to reset this setup:"
+  echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
+  echo "  ${LRED}This will delete all your database!${NC}"
+  echo " "
+  if [ $_INSTALLED_PYENV -eq 1 ]; then
+    show_info "About pyenv installation:"
+    echo "Since we have installed ${BOLD}pyenv${NC} during setup, you should reload the shell to make it working as expected."
+    echo "Run the following command or re-login:"
+    echo "  ${WHITE}exec \$SHELL -l${NC}"
   fi
 }
 
@@ -174,31 +249,28 @@ DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN
 
 if [ $DISTRO = "Darwin" ]; then
   DISTRO="Darwin"
+  STANDALONE_PYTHON_PLATFORM="apple-darwin"
 elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
   DISTRO="Debian"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
   DISTRO="SUSE"
+  STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python3") -eq 1 ]; then
-  bpython=$(which "python3")
-elif [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python2") -eq 1 ]; then
-  bpython=$(which "python2")
-else
-  # Ensure "readlinkf" is working...
-  show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+/3+ is already available on your system."
-  exit 1
-fi
+
+show_info "Checking the bootstrapper Python version..."
+source scripts/bootstrap-static-python.sh
+$bpython -c 'import sys;print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -209,29 +281,25 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
-PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-DOWNLOAD_BIG_IMAGES=0
+
+SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
+CONFIGURE_HA=0
 EDITABLE_WEBUI=0
-# POSTGRES_PORT="8100"
-# REDIS_PORT="8110"
-# ETCD_PORT="8120"
-# MANAGER_PORT="8081"
-# WEBSERVER_PORT="8080"
-# AGENT_RPC_PORT="6001"
-# AGENT_WATCHER_PORT="6009"
-
 POSTGRES_PORT="8101"
-REDIS_PORT="8111"
-ETCD_PORT="8121"
+[[ "$@" =~ "configure-ha" ]] && REDIS_PORT="8210" || REDIS_PORT="8111"
+[[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
+
 MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
+AGENT_BACKEND="docker"
 IPC_BASE_PATH="/tmp/backend.ai/ipc"
 VAR_BASE_PATH=$(relpath "${ROOT_PATH}/var/lib/backend.ai")
 VFOLDER_REL_PATH="vfroot/local"
@@ -241,15 +309,24 @@ LOCAL_STORAGE_VOLUME="volume1"
 CODESPACES_ON_CREATE=0
 CODESPACES_POST_CREATE=0
 CODESPACES=${CODESPACES:-"false"}
+_INSTALLED_PYENV=0
+
+# Only Used in HA mode
+REDIS_MASTER_PORT="9500"
+REDIS_SLAVE1_PORT="9501"
+REDIS_SLAVE2_PORT="9502"
+REDIS_SENTINEL1_PORT="9503"
+REDIS_SENTINEL2_PORT="9504"
+REDIS_SENTINEL3_PORT="9505"
 
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
+    --show-guide)          SHOW_GUIDE=1 ;;
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
-    --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -271,6 +348,9 @@ while [ $# -gt 0 ]; do
     --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
     --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
     --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
+    --agent-backend)        AGENT_BACKEND=$2; shift ;;
+    --agent-backend=*)      AGENT_BACKEND="${1#*=}" ;;
+    --configure-ha)         CONFIGURE_HA=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -278,6 +358,9 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+if [ "$CURRENT_BRANCH" = "main" ]; then
+  EDITABLE_WEBUI=1  # auto-enable if we're on the main branch
+fi
 
 install_brew() {
   case $DISTRO in
@@ -374,6 +457,20 @@ install_system_pkg() {
   esac
 }
 
+install_node() {
+  if ! command -v nvm &> /dev/null; then
+    show_info "Installing latest version of NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+    export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+  fi
+
+  node_version=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
+  show_info "Installing Node.js v${node_version} via NVM..."
+  nvm install $node_version
+  nvm use node
+}
+
 set_brew_python_build_flags() {
   local _prefix_openssl="$(brew --prefix openssl)"
   local _prefix_sqlite3="$(brew --prefix sqlite3)"
@@ -389,16 +486,6 @@ set_brew_python_build_flags() {
 }
 
 install_python() {
-  if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-    local pants_python_version=$(pyenv latest -q '3.9')  # get the latest 3.9 from all installed versions
-    if [ -z "$pants_python_version" ]; then
-      pants_python_version=$(pyenv latest -q -k '3.9')  # get the latest 3.9 from all installable versions
-      show_info "Installing Python ${pants_python_version} for Pants to run ..."
-      pyenv install "${pants_python_version}"
-    else
-      echo "✓ Python ${pants_python_version} as the Pants runtime is already installed."
-    fi
-  fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
@@ -473,34 +560,41 @@ check_python() {
   pyenv shell --unset
 }
 
-search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv latest -q '3.9')
-  if [ -z "$_PYENV_PYVER" ]; then
-    >&2 echo "No Python 3.9 available via pyenv!"
-    >&2 echo "Please install Python 3.9 using pyenv and try again."
-    exit 1
-  else
-    >&2 echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
-  fi
-  echo "$_PYENV_PYVER"
-}
-
 bootstrap_pants() {
-  mkdir -p .tmp
+  pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  mkdir -p "$pants_local_exec_root"
+  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
-  local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-  echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  PANTS="./pants"
-  ./pants version
+  if command -v pants &> /dev/null ; then
+    echo "Pants system command is already installed."
+  else
+    case $DISTRO in
+    Darwin)
+      brew install pantsbuild/tap/pants
+      ;;
+    *)
+      curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh > /tmp/get-pants.sh
+      bash /tmp/get-pants.sh
+      if ! command -v pants &> /dev/null ; then
+        $sudo ln -s $HOME/bin/pants /usr/local/bin/pants
+        show_note "Symlinked $HOME/bin/pants from /usr/local/bin/pants as we could not find it from PATH..."
+      fi
+      ;;
+    esac
+  fi
+  pants version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
     show_error "Cannot proceed the installation because Pants is not available for your platform!"
     exit 1
   fi
-  set +e
+  set -e
 }
 
 install_editable_webui() {
+  if ! command -v node &> /dev/null; then
+    install_node
+  fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
@@ -527,6 +621,7 @@ install_editable_webui() {
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
   npm i
+  make compile
   make compile_wsproxy
   cd ../../../..
 }
@@ -536,12 +631,19 @@ install_editable_webui() {
 echo " "
 echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
+if [ $SHOW_GUIDE -eq 1 ]; then
+  show_guide
+  exit 0
+fi
+
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
+$bpython -m ensurepip --upgrade
+# FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  $bpython scripts/check-docker.py
+  $docker_sudo $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
@@ -592,7 +694,10 @@ EOS
 setup_environment() {
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
-    # TODO: ask if install pyenv
+    if [ -d "$HOME/.pyenv" ]; then
+      eval "$pyenv_init_script"
+      pyenv --version
+    fi
     show_info "Installing pyenv..."
     set -e
     curl https://pyenv.run | sh
@@ -605,7 +710,8 @@ setup_environment() {
     done
     set +e
     eval "$pyenv_init_script"
-    pyenv
+    pyenv --version
+    _INSTALLED_PYENV=1
   else
     eval "$pyenv_init_script"
   fi
@@ -645,13 +751,13 @@ setup_environment() {
   show_info "Using the current working-copy directory as the installation path..."
 
   show_info "Creating the unified virtualenv for IDEs..."
-  $PANTS export \
+  pants export \
     --resolve=python-default \
     --resolve=python-kernel \
     --resolve=pants-plugins \
-    --resolve=flake8 \
+    --resolve=towncrier \
+    --resolve=ruff \
     --resolve=mypy \
-    --resolve=isort \
     --resolve=black
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.
@@ -659,17 +765,66 @@ setup_environment() {
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
   mkdir -p "$HALFSTACK_VOLUME_PATH"
-  SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-  if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
+
+    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+
+    sed_inplace 's/\${REDIS_MASTER_PORT}/9500/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SLAVE1_PORT}/9501/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SLAVE2_PORT}/9502/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL1_PORT}/9503/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL2_PORT}/9504/g' "docker-compose.halfstack.current.yml"
+    sed_inplace 's/\${REDIS_SENTINEL3_PORT}/9505/g' "docker-compose.halfstack.current.yml"
+
+    mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
+
+    sentinel01_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel01.conf"
+    sentinel02_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel02.conf"
+    sentinel03_cfg_path="./tmp/backend.ai-halfstack-ha/configs/sentinel03.conf"
+
+    cp ./configs/redis/sentinel.conf $sentinel01_cfg_path
+    cp ./configs/redis/sentinel.conf $sentinel02_cfg_path
+    cp ./configs/redis/sentinel.conf $sentinel03_cfg_path
+
+    sed_inplace "s/\${COMPOSE_PATH}/${ROOT_PATH//\//\\/}\/tmp\/backend\.ai-halfstack-ha\/configs\//g" "docker-compose.halfstack.current.yml"
+
+    # Appends the given text to sentinel01.conf
+    echo "" >> $sentinel01_cfg_path
+    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel01/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel01_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9503/g" "$sentinel01_cfg_path"
+
+    # Appends the given text to sentinel02.conf
+    echo "" >> $sentinel02_cfg_path
+    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel02/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel02_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9504/g" "$sentinel02_cfg_path"
+
+    # Appends the given text to sentinel03.conf
+    echo "" >> $sentinel03_cfg_path
+    sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
+    sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+  else
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+    if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+      SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+    fi
+    cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
   fi
-  cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -678,10 +833,6 @@ setup_environment() {
     $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
   else
     $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
-    if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-      $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
-      $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.8-py38-cuda11.1"
-    fi
   fi
 }
 
@@ -691,7 +842,7 @@ configure_backendai() {
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    cp "configs/accelerator/cuda-mock.toml" cuda-mock.toml
+    cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
   fi
 
   # configure manager
@@ -704,7 +855,17 @@ configure_backendai() {
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
   cp configs/manager/halfstack.alembic.ini ./alembic.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
-  ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
+    ./backend.ai mgr etcd put config/redis/service_name "mymaster"
+    ./backend.ai mgr etcd put config/redis/password "develove"
+  else
+    ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+  fi
+
+  ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
+
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
@@ -718,17 +879,31 @@ configure_backendai() {
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./agent.toml
   sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./agent.toml
+
+  # configure backend mode
+  if [ $AGENT_BACKEND = "k8s" ] || [ $AGENT_BACKEND = "kubernetes" ]; then 
+    sed_inplace "s/mode = \"docker\"/mode = \"kubernetes\"/" ./agent.toml
+    sed_inplace "s/scratch-type = \"hostdir\"/scratch-type = \"k8s-nfs\"/" ./agent.toml
+  elif [ $AGENT_BACKEND = "docker" ]; then
+    sed '/scratch-nfs-/d' ./agent.toml > ./agent.toml.sed
+    mv ./agent.toml.sed ./agent.toml
+  fi
+  sed_inplace "s@\(# \)\{0,1\}mount-path = .*@mount-path = "'"'"${ROOT_PATH}/${VFOLDER_REL_PATH}"'"'"@" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
 
+  # configure agent
+  cp configs/agent/sample-dummy-config.toml ./agent.dummy.toml
+
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml
   STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+  sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
   sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./storage-proxy.toml
@@ -740,19 +915,30 @@ configure_backendai() {
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
   sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
   sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
+  sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
   # configure webserver
-  cp configs/webserver/sample.conf ./webserver.conf
-  sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+  cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-  sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
-  sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
+
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
+    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
+    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
+    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+  else
+    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+  fi
+
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
     sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
+  else
+    webui_version=$(jq -r '.package + " (built at " + .build + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
+    show_note "The currently embedded webui version: $webui_version"
   fi
 
   # configure tester
@@ -792,8 +978,11 @@ configure_backendai() {
   fi
 
   # Virtual folder setup
+  VFOLDER_VERSION="3"
+  VFOLDER_VERSION_TXT="version.txt"
   show_info "Setting up virtual folder..."
   mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
+  echo "${VFOLDER_VERSION}" > "${ROOT_PATH}/${VFOLDER_REL_PATH}/${VFOLDER_VERSION_TXT}"
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
@@ -812,7 +1001,7 @@ configure_backendai() {
   echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
-  echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
@@ -839,7 +1028,7 @@ configure_backendai() {
   echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-  echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
@@ -874,7 +1063,7 @@ configure_backendai() {
   echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .secret_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
-  echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 
   case $(basename $SHELL) in
@@ -904,71 +1093,15 @@ configure_backendai() {
   ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json
 
   show_info "Installation finished."
-  show_note "Check out the default API keypairs and account credentials for local development and testing:"
-  echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
-  echo "> ${WHITE}cat env-local-admin-session.sh${NC}"
-  echo "> ${WHITE}cat env-local-domainadmin-api.sh${NC}"
-  echo "> ${WHITE}cat env-local-domainadmin-session.sh${NC}"
-  echo "> ${WHITE}cat env-local-user-api.sh${NC}"
-  echo "> ${WHITE}cat env-local-user-session.sh${NC}"
-  show_note "To apply the client config, source one of the configs like:"
-  echo "> ${WHITE}source env-local-user-session.sh${NC}"
-  echo " "
-  show_note "Your pants invocation command:"
-  echo "> ${WHITE}${PANTS}${NC}"
-  echo " "
-  show_important_note "You should change your default admin API keypairs for production environment!"
-  show_note "How to run Backend.AI manager:"
-  echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
-  show_note "How to run Backend.AI agent:"
-  echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
-  show_note "How to run Backend.AI storage-proxy:"
-  echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
-  show_note "How to run Backend.AI web server (for ID/Password login):"
-  echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
-  show_note "How to run your first code:"
-  echo "> ${WHITE}./backend.ai --help${NC}"
-  echo "> ${WHITE}source env-local-admin-api.sh${NC}"
-  echo "> ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
-  echo " "
   echo "${GREEN}Development environment is now ready.${NC}"
-  show_note "How to run docker-compose:"
-  if [ ! -z "$docker_sudo" ]; then
-    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
-  else
-    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+
+  # TODO: Automate the following steps
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    echo "${RED}[NOTE] Please add the following lines to \"/etc/hosts\" file in your host OS.${NC}"
+    echo "${RED}127.0.0.1 node01${NC}"
+    echo "${RED}127.0.0.1 node02${NC}"
+    echo "${RED}127.0.0.1 node03${NC}"
   fi
-  if [ $EDITABLE_WEBUI -eq 1 ]; then
-    show_note "How to run the editable checkout of webui:"
-    echo "(Terminal 1)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
-    echo "(Terminal 2)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-    echo "(Terminal 3)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
-  fi
-  show_note "Manual configuration for the client accessible hostname in various proxies"
-  echo " "
-  echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
-  echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
-  echo "that can be accessible from both the client SDK and the web browser."
-  echo " "
-  echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC}"
-  echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}webServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
-  echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
-  echo " "
-  echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
-  echo "of the storage-proxy's client API endpoint."
-  echo " "
-  echo "An example command to change the value of that key:"
-  echo "  > ${WHITE}./backend.ai mgr etcd put volumes/proxies/local/client_api http://my-dev-machine:6021${NC}"
-  echo "where /etc/hosts in the VM contains:"
-  echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
-  echo "and where /etc/hosts in the web browser host contains:"
-  echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
-  show_note "How to reset this setup:"
-  echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
-  echo " "
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
@@ -976,6 +1109,6 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
 fi
 if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai
+  show_guide
 fi
-
 # vim: tw=0 sts=2 sw=2 et

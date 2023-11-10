@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 import aiohttp
 import sqlalchemy as sa
@@ -33,7 +33,7 @@ class LocalRegistry(BaseContainerRegistry):
                 labels = item["Labels"]
                 if not labels:
                     continue
-                if "ai.backend.kernelspec" in labels:
+                if "ai.backend.kernelspec" in labels and item["RepoTags"] is not None:
                     for image_ref_str in item["RepoTags"]:
                         if image_ref_str == "<none>:<none>":
                             # cache images
@@ -53,13 +53,14 @@ class LocalRegistry(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, str],
         image: str,
-        tag: str,
+        digest: str,
+        tag: Optional[str] = None,
     ) -> None:
         async def _read_image_info(
             _tag: str,
         ) -> tuple[dict[str, dict], str | None]:
             async with sess.get(
-                self.registry_url / "images" / f"{image}:{tag}" / "json"
+                self.registry_url / "images" / f"{image}:{digest}" / "json"
             ) as response:
                 data = await response.json()
                 architecture = data["Architecture"]
@@ -71,7 +72,7 @@ class LocalRegistry(BaseContainerRegistry):
                     "Architecture": data["Architecture"],
                 }
                 log.debug(
-                    "scanned image info: {}:{}\n{}", image, tag, json.dumps(summary, indent=2)
+                    "scanned image info: {}:{}\n{}", image, digest, json.dumps(summary, indent=2)
                 )
                 already_exists = 0
                 config_digest = data["Id"]
@@ -93,5 +94,5 @@ class LocalRegistry(BaseContainerRegistry):
                 }, None
 
         async with self.sema.get():
-            manifests, skip_reason = await _read_image_info(tag)
-            await self._read_manifest(image, tag, manifests, skip_reason)
+            manifests, skip_reason = await _read_image_info(digest)
+            await self._read_manifest(image, digest, manifests, skip_reason)

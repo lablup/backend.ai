@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import click  # noqa: E402
@@ -5,6 +6,8 @@ import click  # noqa: E402
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from .main import main  # noqa: E402
+
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 def load_entry_points(
@@ -19,10 +22,13 @@ def load_entry_points(
                 main.add_command(cmd, name=name)
         else:
             prefix, _, subprefix = entrypoint.name.partition(".")
-            if not subprefix:
-                subcmd = entrypoint.load()
-                main.add_command(subcmd, name=prefix)
-            else:
-                subcmd = entrypoint.load()
-                main.commands[prefix].add_command(subcmd, name=subprefix)  # type: ignore
+            try:
+                if not subprefix:
+                    subcmd = entrypoint.load()
+                    main.add_command(subcmd, name=prefix)
+                else:
+                    subcmd = entrypoint.load()
+                    main.commands[prefix].add_command(subcmd, name=subprefix)  # type: ignore
+            except ImportError:
+                log.warning("Failed to import %r (%s)", entrypoint, prefix)
     return main

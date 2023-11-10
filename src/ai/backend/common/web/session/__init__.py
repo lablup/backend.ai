@@ -46,7 +46,6 @@ class SessionData(TypedDict, total=False):
 
 
 class Session(MutableMapping[str, Any]):
-
     """Session dict-like object."""
 
     def __init__(
@@ -280,7 +279,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
         pass
 
     def load_cookie(self, request: web.Request) -> Optional[str]:
-        # TODO: Remove explicit type anotation when aiohttp 3.8 is out
+        # TODO: Remove explicit type annotation when aiohttp 3.8 is out
         cookie: Optional[str] = request.cookies.get(self._cookie_name)
         return cookie
 

@@ -25,6 +25,11 @@ agent_local_config_iv = (
                     t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
                         allow_blank_host=True
                     ),
+                    t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
+                    t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(
+                        type="file"
+                    ),
+                    t.Key("rpc-auth-agent-keypair", default=None): t.Null | tx.Path(type="file"),
                     t.Key("agent-sock-port", default=6007): t.ToInt[1024:65535],
                     t.Key("id", default=None): t.Null | t.String,
                     t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
@@ -33,6 +38,11 @@ agent_local_config_iv = (
                     t.Key("var-base-path", default="./var/lib/backend.ai"): tx.Path(
                         type="dir", auto_create=True
                     ),
+                    t.Key("mount-path", default=None): t.Null | tx.Path(
+                        type="dir", auto_create=True
+                    ),
+                    t.Key("cohabiting-storage-proxy", default=True): t.Bool(),
+                    t.Key("public-host", default=None): t.Null | t.String,
                     t.Key("region", default=None): t.Null | t.String,
                     t.Key("instance-type", default=None): t.Null | t.String,
                     t.Key("scaling-group", default="default"): t.String,
@@ -41,7 +51,11 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=48200): t.ToInt[1:65535],
+                    tx.AliasedKey(
+                        ["aiomonitor-termui-port", "aiomonitor-port"], default=48200
+                    ): t.ToInt[1:65535],
+                    t.Key("aiomonitor-webui-port", default=49200): t.ToInt[1:65535],
+                    t.Key("metadata-server-bind-host", default="0.0.0.0"): t.String,
                     t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
@@ -67,7 +81,7 @@ agent_local_config_iv = (
                     ),
                     t.Key("sandbox-type", default="docker"): t.Enum("docker", "jail"),
                     t.Key("jail-args", default=[]): t.List(t.String),
-                    t.Key("scratch-type"): t.Enum("hostdir", "memory", "k8s-nfs"),
+                    t.Key("scratch-type"): t.Enum("hostdir", "hostfile", "memory", "k8s-nfs"),
                     t.Key("scratch-root", default="./scratches"): tx.Path(
                         type="dir", auto_create=True
                     ),
@@ -104,6 +118,7 @@ agent_local_config_iv = (
                     t.Key("log-alloc-map", default=False): t.ToBool,
                     t.Key("log-events", default=False): t.ToBool,
                     t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("heartbeat-interval", default=20.0): t.Float,
                     t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {

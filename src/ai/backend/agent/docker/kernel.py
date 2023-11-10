@@ -19,14 +19,16 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import AgentEventData
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -38,6 +40,8 @@ class DockerKernel(AbstractKernel):
     def __init__(
         self,
         kernel_id: KernelId,
+        session_id: SessionId,
+        agent_id: AgentId,
         image: ImageRef,
         version: int,
         *,
@@ -49,6 +53,8 @@ class DockerKernel(AbstractKernel):
     ) -> None:
         super().__init__(
             kernel_id,
+            session_id,
+            agent_id,
             image,
             version,
             agent_config=agent_config,
@@ -69,10 +75,12 @@ class DockerKernel(AbstractKernel):
         super().__setstate__(props)
 
     async def create_code_runner(
-        self, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
         return await DockerCodeRunner.new(
             self.kernel_id,
+            self.session_id,
+            event_producer,
             kernel_host=self.data["kernel_host"],
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
@@ -123,6 +131,11 @@ class DockerKernel(AbstractKernel):
                 "options": opts,
             }
         )
+        return result
+
+    async def start_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        result = await self.runner.feed_start_model_service(model_service)
         return result
 
     async def shutdown_service(self, service: str):
@@ -330,6 +343,10 @@ class DockerKernel(AbstractKernel):
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
+    async def notify_event(self, evdata: AgentEventData):
+        assert self.runner is not None
+        await self.runner.feed_event(evdata)
+
 
 class DockerCodeRunner(AbstractCodeRunner):
     kernel_host: str
@@ -339,6 +356,8 @@ class DockerCodeRunner(AbstractCodeRunner):
     def __init__(
         self,
         kernel_id,
+        session_id,
+        event_producer,
         *,
         kernel_host,
         repl_in_port,
@@ -346,7 +365,13 @@ class DockerCodeRunner(AbstractCodeRunner):
         exec_timeout=0,
         client_features=None,
     ) -> None:
-        super().__init__(kernel_id, exec_timeout=exec_timeout, client_features=client_features)
+        super().__init__(
+            kernel_id,
+            session_id,
+            event_producer,
+            exec_timeout=exec_timeout,
+            client_features=client_features,
+        )
         self.kernel_host = kernel_host
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
@@ -375,7 +400,7 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
 
     try:
         for item in await docker.images.list():
-            if item["RepoTags"] is None:
+            if item["RepoTags"] is None or len(item["RepoTags"]) == 0:
                 continue
             if item["RepoTags"][0] == extractor_image:
                 break

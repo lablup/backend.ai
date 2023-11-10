@@ -37,6 +37,7 @@ from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
+from graphql import Undefined
 from graphql.language import ast  # pants: no-infer-dep
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
@@ -47,6 +48,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -55,6 +57,7 @@ from ai.backend.common.types import (
     EndpointId,
     JSONSerializableMixin,
     KernelId,
+    QuotaScopeID,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
@@ -67,8 +70,6 @@ from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
-
     from .gql import GraphQueryContext
     from .user import UserRole
 
@@ -171,6 +172,51 @@ class EnumValueType(TypeDecorator, SchemaType):
         return self._enum_class
 
 
+class CurvePublicKeyColumn(TypeDecorator):
+    """
+    A column type wrapper for string-based Z85-encoded CURVE public key.
+
+    In the database, it resides as a string but it's safe to just convert them to PublicKey (bytes)
+    because zmq uses Z85 encoding to use printable characters only in the key while the pyzmq API
+    treats them as bytes.
+
+    The pure binary representation of a public key is 32 bytes and its Z85-encoded form used in the
+    pyzmq APIs is 40 ASCII characters.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(40))
+
+    def process_bind_param(self, value: Optional[PublicKey], dialect) -> Optional[str]:
+        return value.decode("ascii") if value else None
+
+    def process_result_value(self, raw_value: str | None, dialect) -> Optional[PublicKey]:
+        if raw_value is None:
+            return None
+        return PublicKey(raw_value.encode("ascii"))
+
+
+class QuotaScopeIDType(TypeDecorator):
+    """
+    A column type wrapper for string-based quota scope ID.
+    """
+
+    impl = sa.String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(sa.String(64))
+
+    def process_bind_param(self, value: Optional[QuotaScopeID], dialect) -> Optional[str]:
+        return str(value) if value else None
+
+    def process_result_value(self, raw_value: str, dialect) -> QuotaScopeID:
+        return QuotaScopeID.parse(raw_value)
+
+
 class ResourceSlotColumn(TypeDecorator):
     """
     A column type wrapper for ResourceSlot from JSONB.
@@ -188,9 +234,11 @@ class ResourceSlotColumn(TypeDecorator):
             return value.to_json()
         return value
 
-    def process_result_value(self, raw_value: Dict[str, str], dialect) -> ResourceSlot:
+    def process_result_value(
+        self, raw_value: dict[str, str] | None, dialect
+    ) -> ResourceSlot | None:
         if raw_value is None:
-            return ResourceSlot()
+            return None
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get("mem")
@@ -344,16 +392,13 @@ class PermissionListColumn(TypeDecorator):
         self._perm_type = perm_type
 
     @overload
-    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]:
-        ...
+    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]: ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]:
-        ...
+    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]: ...
 
     @overload
-    def process_bind_param(self, value: None, dialect) -> List[str]:
-        ...
+    def process_bind_param(self, value: None, dialect) -> List[str]: ...
 
     def process_bind_param(
         self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
@@ -611,13 +656,12 @@ class _SQLBasedGQLObject(Protocol):
         cls: Type[_GenericSQLBasedGQLObject],
         ctx: GraphQueryContext,
         row: Row,
-    ) -> _GenericSQLBasedGQLObject:
-        ...
+    ) -> _GenericSQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -630,14 +674,18 @@ async def batch_result(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = None
-    async for row in await db_conn.stream(query):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
     return [*objs_per_key.values()]
 
 
 async def batch_multiresult(
     graph_ctx: GraphQueryContext,
-    db_conn: SAConnection,
+    db_conn: SAConnection | SASession,
     query: sa.sql.Select,
     obj_type: Type[_GenericSQLBasedGQLObject],
     key_list: Iterable[_Key],
@@ -650,7 +698,11 @@ async def batch_multiresult(
     objs_per_key = collections.OrderedDict()
     for key in key_list:
         objs_per_key[key] = list()
-    async for row in await db_conn.stream(query):
+    if isinstance(db_conn, SASession):
+        stream_func = db_conn.stream_scalars
+    else:
+        stream_func = db_conn.stream
+    async for row in await stream_func(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -705,14 +757,17 @@ def privileged_query(required_role: UserRole):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
             ctx: GraphQueryContext = info.context
             if ctx.user["role"] != UserRole.SUPERADMIN:
                 raise GenericForbidden("superadmin privilege required")
-            return await func(executor, info, *args, **kwargs)
+            return await func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -738,7 +793,10 @@ def scoped_query(
     def wrap(resolve_func):
         @functools.wraps(resolve_func)
         async def wrapped(
-            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+            root: Any,
+            info: graphene.ResolveInfo,
+            *args,
+            **kwargs,
         ) -> Any:
             from .user import UserRole
 
@@ -784,8 +842,10 @@ def scoped_query(
             kwargs["domain_name"] = domain_name
             if group_id is not None:
                 kwargs["group_id"] = group_id
+            if kwargs.get("project", None) is not None:
+                kwargs["project"] = group_id
             kwargs[user_key] = user_id
-            return await resolve_func(executor, info, *args, **kwargs)
+            return await resolve_func(root, info, *args, **kwargs)
 
         return wrapped
 
@@ -816,10 +876,8 @@ def privileged_mutation(required_role, target_func=None):
                     if target_domain is None and target_group is None:
                         return cls(
                             False,
-                            (
-                                "misconfigured privileged mutation: "
-                                "both target_domain and target_group missing"
-                            ),
+                            "misconfigured privileged mutation: "
+                            "both target_domain and target_group missing",
                             None,
                         )
                     permit_chains = []
@@ -880,12 +938,15 @@ async def simple_db_mutate(
 
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 await post_func(conn, result)
@@ -897,13 +958,16 @@ async def simple_db_mutate(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}")
     except sa.exc.StatementError as e:
+        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate(): other error")
         return result_cls(False, f"unexpected error: {e}")
 
 
@@ -939,13 +1003,16 @@ async def simple_db_mutate_returning_item(
         from the given mutation result**, because the result object could be fetched only one
         time due to its cursor-like nature.
     """
+    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
+        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
+            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 row = await post_func(conn, result)
@@ -959,13 +1026,18 @@ async def simple_db_mutate_returning_item(
     try:
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
+        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
         return result_cls(False, f"integrity error: {e}", None)
     except sa.exc.StatementError as e:
+        log.warning(
+            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
+        )
         orig_exc = e.orig
         return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
+        log.exception("simple_db_mutate_returning_item(): other error")
         return result_cls(False, f"unexpected error: {e}", None)
 
 
@@ -977,9 +1049,14 @@ def set_if_set(
     clean_func=None,
     target_key: Optional[str] = None,
 ) -> None:
+    """
+    Set the target dict with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
     v = getattr(src, name)
-    # NOTE: unset optional fields are passed as null.
-    if v is not None:
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
         if callable(clean_func):
             target[target_key or name] = clean_func(v)
         else:
@@ -1009,3 +1086,14 @@ async def populate_fixture(
                     for row in rows:
                         row[col.name] = col.type._schema.from_json(row[col.name])
             await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
+
+
+class InferenceSessionError(graphene.ObjectType):
+    class InferenceSessionErrorInfo(graphene.ObjectType):
+        src = graphene.String(required=True)
+        name = graphene.String(required=True)
+        repr = graphene.String(required=True)
+
+    session_id = graphene.UUID()
+
+    errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)

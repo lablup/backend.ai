@@ -179,8 +179,8 @@ class ComputeSession(BaseFunction):
         mount_map: Mapping[str, str] = None,
         envs: Mapping[str, str] = None,
         startup_command: str = None,
-        resources: Mapping[str, int] = None,
-        resource_opts: Mapping[str, int] = None,
+        resources: Mapping[str, str | int] = None,
+        resource_opts: Mapping[str, str | int] = None,
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
         domain_name: str = None,
@@ -358,14 +358,15 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
         dependencies: Sequence[str] = None,  # cannot be stored in templates
+        callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: Union[List[str], Undefined] = undefined,
         mount_map: Union[Mapping[str, str], Undefined] = undefined,
         envs: Union[Mapping[str, str], Undefined] = undefined,
         startup_command: str | Undefined = undefined,
-        resources: Union[Mapping[str, int], Undefined] = undefined,
-        resource_opts: Union[Mapping[str, int], Undefined] = undefined,
+        resources: Union[Mapping[str, str | int], Undefined] = undefined,
+        resource_opts: Union[Mapping[str, str | int], Undefined] = undefined,
         cluster_size: int | Undefined = undefined,
         cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
         domain_name: str | Undefined = undefined,
@@ -468,6 +469,8 @@ class ComputeSession(BaseFunction):
             "bootstrap_script": bootstrap_script,
             "enqueueOnly": enqueue_only,
             "maxWaitSeconds": max_wait,
+            "dependencies": dependencies,
+            "callbackURL": callback_url,
             "reuseIfExists": not no_reuse,
             "startupCommand": startup_command,
             "owner_access_key": owner_access_key,
@@ -527,7 +530,7 @@ class ComputeSession(BaseFunction):
         return identity_params
 
     @api_function
-    async def destroy(self, *, forced: bool = False):
+    async def destroy(self, *, forced: bool = False, recursive: bool = False):
         """
         Destroys the compute session.
         Since the server literally kills the container(s), all ongoing executions are
@@ -539,6 +542,9 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         if forced:
             params["forced"] = "true"
+        if recursive:
+            params["recursive"] = "true"
+
         rqst = Request(
             "DELETE",
             f"/{prefix}/{self.name}",
@@ -691,6 +697,27 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/logs",
             params=params,
         )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def get_dependency_graph(self):
+        """
+        Retrieves the root node of dependency graph of the compute session.
+        """
+        params = {}
+
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+
+        prefix = get_naming(api_session.get().api_version, "path")
+
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/dependency-graph",
+            params=params,
+        )
+
         async with rqst.fetch() as resp:
             return await resp.json()
 

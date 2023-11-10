@@ -21,7 +21,6 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +33,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
-from ai.backend.manager.container_registry import get_container_registry
+from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 from .base import (
@@ -114,7 +113,7 @@ async def rescan_images(
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
-            scanner_cls = get_container_registry(registry_info)
+            scanner_cls = get_container_registry_cls(registry_info)
             scanner = scanner_cls(db, registry_name, registry_info)
             tg.create_task(scanner.rescan_single_registry(reporter))
     # TODO: delete images removed from registry?
@@ -569,7 +568,7 @@ class Image(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars.all()]
+            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -672,7 +671,7 @@ class PreloadImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
@@ -693,7 +692,7 @@ class UnloadImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         references: Sequence[str],
         target_agents: Sequence[str],
@@ -713,7 +712,7 @@ class RescanImages(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         registry: str = None,
     ) -> RescanImages:
@@ -742,7 +741,7 @@ class ForgetImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         reference: str,
         architecture: str,
@@ -774,7 +773,7 @@ class AliasImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         alias: str,
         target: str,
@@ -807,7 +806,7 @@ class DealiasImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         alias: str,
     ) -> DealiasImage:
@@ -837,7 +836,7 @@ class ClearImages(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         registry: str,
     ) -> ClearImages:
@@ -887,7 +886,7 @@ class ModifyImage(graphene.Mutation):
 
     @staticmethod
     async def mutate(
-        executor: AsyncioExecutor,
+        root: Any,
         info: graphene.ResolveInfo,
         target: str,
         architecture: str,

@@ -33,13 +33,15 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common import config
+from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
-from ai.backend.manager.cli.context import CLIContext, init_logger
+from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
@@ -50,8 +52,10 @@ from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
     KernelRow,
+    ProjectResourcePolicyRow,
     ScalingGroupRow,
     SessionRow,
+    UserResourcePolicyRow,
     UserRow,
     agents,
     domains,
@@ -164,7 +168,11 @@ def local_config(
             ),
             "redis": redis_config_iv.check(
                 {
-                    "addr": {"host": redis_addr.host, "port": redis_addr.port},
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
                 }
             ),
             "db": {
@@ -226,9 +234,10 @@ def etcd_fixture(
     # Clear and reset etcd namespace using CLI functions.
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
-        logger=init_logger(local_config, nested=True),
-        local_config=local_config,
+        config_path=Path.cwd() / "dummy-manager.toml",
+        log_level="DEBUG",
     )
+    cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
             "volumes": {
@@ -378,9 +387,10 @@ def database(request, local_config, test_db):
 
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
-        logger=init_logger(local_config, nested=True),
-        local_config=local_config,
+        config_path=Path.cwd() / "dummy-manager.toml",
+        log_level="DEBUG",
     )
+    cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
@@ -745,12 +755,17 @@ class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
 
+    async def get(self, key: str) -> Any:
+        return None
+
 
 @pytest.fixture
 async def registry_ctx(mocker):
+    mock_local_config = MagicMock()
     mock_shared_config = MagicMock()
     mock_shared_config.update_resource_slots = AsyncMock()
-    mock_shared_config.etcd = None
+    mocked_etcd = DummyEtcd()
+    mock_shared_config.etcd = mocked_etcd
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
     mock_dbsess = MagicMock()
@@ -758,6 +773,7 @@ async def registry_ctx(mocker):
     mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
+    mock_agent_cache = MagicMock()
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
@@ -773,23 +789,28 @@ async def registry_ctx(mocker):
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
     mock_redis_image = MagicMock()
+    mock_redis_stream = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.produce_event = AsyncMock()
-    mocked_etcd = DummyEtcd()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
+        local_config=mock_local_config,
         shared_config=mock_shared_config,
         db=mock_db,
         redis_stat=mock_redis_stat,
         redis_live=mock_redis_live,
         redis_image=mock_redis_image,
+        redis_stream=mock_redis_stream,
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
+        agent_cache=mock_agent_cache,
+        manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
+        manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )
     await registry.init()
     try:
@@ -818,6 +839,8 @@ async def session_info(database_engine):
     session_id = str(uuid.uuid4()).replace("-", "")
     session_creation_id = str(uuid.uuid4()).replace("-", "")
 
+    resource_policy_name = str(uuid.uuid4()).replace("-", "")
+
     async with database_engine.begin_session() as db_sess:
         scaling_group = ScalingGroupRow(
             name=sgroup_name,
@@ -830,11 +853,22 @@ async def session_info(database_engine):
         domain = DomainRow(name=domain_name, total_resource_slots={})
         db_sess.add(domain)
 
+        user_resource_policy = UserResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+        )
+        db_sess.add(user_resource_policy)
+
+        project_resource_policy = ProjectResourcePolicyRow(
+            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+        )
+        db_sess.add(project_resource_policy)
+
         group = GroupRow(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
             total_resource_slots={},
+            resource_policy=resource_policy_name,
         )
         db_sess.add(group)
 
@@ -844,6 +878,7 @@ async def session_info(database_engine):
             username=f"TestCaseRunner-{postfix}",
             password=user_password,
             domain_name=domain_name,
+            resource_policy=resource_policy_name,
         )
         db_sess.add(user)
 
@@ -881,5 +916,15 @@ async def session_info(database_engine):
         await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
         await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
         await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+        await db_sess.execute(
+            sa.delete(ProjectResourcePolicyRow).where(
+                ProjectResourcePolicyRow.name == resource_policy_name
+            )
+        )
+        await db_sess.execute(
+            sa.delete(UserResourcePolicyRow).where(
+                UserResourcePolicyRow.name == resource_policy_name
+            )
+        )
         await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
         await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))

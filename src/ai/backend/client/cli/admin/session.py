@@ -14,7 +14,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_fail
-from ..session import session as user_session
+from ..session.lifecycle import session as user_session
 from ..types import CLIContext
 from . import admin
 
@@ -38,12 +38,11 @@ def _list_cmd(name: str = "list", docs: str = None):
             [
                 "PENDING",
                 "SCHEDULED",
+                "PULLING",
                 "PREPARING",
-                "BUILDING",
                 "RUNNING",
                 "RESTARTING",
-                "RESIZING",
-                "SUSPENDED",
+                "RUNNING_DEGRADED",
                 "TERMINATING",
                 "TERMINATED",
                 "ERROR",
@@ -159,8 +158,10 @@ def _list_cmd(name: str = "list", docs: str = None):
                 [
                     "PENDING",
                     "SCHEDULED",
+                    "PULLING",
                     "PREPARING",
                     "RUNNING",
+                    "RUNNING_DEGRADED",
                     "TERMINATING",
                     "ERROR",
                 ]
@@ -171,6 +172,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 [
                     "PREPARING",
                     "RUNNING",
+                    "RUNNING_DEGRADED",
                 ]
             )
             no_match_name = "running"
@@ -187,13 +189,15 @@ def _list_cmd(name: str = "list", docs: str = None):
                 [
                     "PENDING",
                     "SCHEDULED",
+                    "PULLING",
                     "PREPARING",
                     "RUNNING",
+                    "RESTARTING",
                     "RUNNING_DEGRADED",
                     "TERMINATING",
+                    "TERMINATED",
                     "ERROR",
                     "CANCELLED",
-                    "TERMINATED",
                 ]
             )
             no_match_name = "in any status"
@@ -215,6 +219,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     fetch_func,
                     initial_page_offset=offset,
                     page_size=limit,
+                    plain=plain,
                 )
         except Exception as e:
             ctx.output.print_error(e)

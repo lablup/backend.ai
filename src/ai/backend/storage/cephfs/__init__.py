@@ -1,99 +1,144 @@
 import asyncio
 import os
 import shutil
-from typing import Dict, FrozenSet, List
-from uuid import UUID
+from pathlib import Path
+from typing import Any, Dict, FrozenSet, List
 
-from ai.backend.common.types import BinarySize
-from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
+import aiofiles.os
 
-from ..exception import ExecutionError
-from ..types import FSUsage, Optional, VFolderCreationOptions
-from ..vfs import BaseVolume
+from ai.backend.common.types import BinarySize, QuotaScopeID
+from ai.backend.storage.exception import QuotaScopeNotFoundError
+
+from ..abc import CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel
+from ..subproc import run
+from ..types import CapacityUsage, Optional, QuotaConfig, QuotaUsage, TreeUsage
+from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
 
-async def run(cmd: str) -> str:
-    proc = await asyncio.create_subprocess_shell(
-        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
-    out, err = await proc.communicate()
-    if err:
-        raise ExecutionError(err.decode())
-    return out.decode()
+class CephDirQuotaModel(BaseQuotaModel):
+    async def create_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        options: Optional[QuotaConfig] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        await aiofiles.os.makedirs(qspath)
+        if options is not None:
+            await self.update_quota_scope(quota_scope_id, options)
+
+    async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            return None
+        loop = asyncio.get_running_loop()
+
+        def read_attrs() -> tuple[int, int]:
+            used_bytes = int(os.getxattr(qspath, "ceph.dir.rbytes").decode())  # type: ignore[attr-defined]
+            try:
+                limit_bytes = int(os.getxattr(qspath, "ceph.quota.max_bytes").decode())  # type: ignore[attr-defined]
+            except OSError as e:
+                match e.errno:
+                    case 61:
+                        limit_bytes = 0
+                    case _:
+                        limit_bytes = -1  # unset
+            return used_bytes, limit_bytes
+
+        # without type: ignore mypy will raise error when trying to run on macOS
+        # because os.getxattr() exists only for linux
+        used_bytes, limit_bytes = await loop.run_in_executor(
+            None,
+            read_attrs,
+        )
+        return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
+
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        config: QuotaConfig,
+    ) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            raise QuotaScopeNotFoundError
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            # without type: ignore mypy will raise error when trying to run on macOS
+            # because os.setxattr() exists only for linux
+            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", str(int(config.limit_bytes)).encode()),  # type: ignore[attr-defined]
+        )
+
+    async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
+        qspath = self.mangle_qspath(quota_scope_id)
+        if not qspath.exists():
+            raise QuotaScopeNotFoundError
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            # without type: ignore mypy will raise error when trying to run on macOS
+            # because os.setxattr() exists only for linux
+            lambda: os.setxattr(qspath, "ceph.quota.max_bytes", b"0"),  # type: ignore[attr-defined]
+        )
+
+
+class CephFSOpModel(BaseFSOpModel):
+    async def scan_tree_usage(self, target_path: Path) -> TreeUsage:
+        loop = asyncio.get_running_loop()
+        raw_reports = await loop.run_in_executor(
+            None,
+            lambda: (
+                os.getxattr(target_path, "ceph.dir.rentries"),  # type: ignore[attr-defined]
+                os.getxattr(target_path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+            ),
+        )
+        file_count = int(raw_reports[0].strip().decode())
+        used_bytes = int(raw_reports[1].strip().decode())
+        return TreeUsage(file_count=file_count, used_bytes=used_bytes)
+
+    async def scan_tree_size(self, target_path: Path) -> BinarySize:
+        loop = asyncio.get_running_loop()
+        raw_report = await loop.run_in_executor(
+            None,
+            lambda: os.getxattr(target_path, "ceph.dir.rbytes"),  # type: ignore[attr-defined]
+        )
+        return BinarySize(raw_report.strip().decode())
 
 
 class CephFSVolume(BaseVolume):
+    name = "cephfs"
     loop: asyncio.AbstractEventLoop
     registry: Dict[str, int]
     project_id_pool: List[int]
 
     async def init(self) -> None:
-        available = True
         try:
-            await asyncio.create_subprocess_exec(
-                b"ceph",
-                b"--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
+            await run([b"ceph", b"--version"])
         except FileNotFoundError:
-            available = False
-
-        if not available:
             raise RuntimeError("Ceph is not installed. ")
+        await super().init()
+
+    async def create_quota_model(self) -> AbstractQuotaModel:
+        return CephDirQuotaModel(self.mount_path)
+
+    async def create_fsop_model(self) -> AbstractFSOpModel:
+        return CephFSOpModel(
+            self.mount_path,
+            self.local_config["storage-proxy"]["scandir-limit"],
+        )
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SIZE])
 
-    # ----- volume operations -----
-    async def create_vfolder(
-        self,
-        vfid: UUID,
-        options: Optional[VFolderCreationOptions] = None,
-        *,
-        exist_ok: bool = False
-    ) -> None:
-        vfpath = self.mangle_vfpath(vfid)
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: vfpath.mkdir(0o755, parents=True, exist_ok=exist_ok),
-        )
-        if not (options is None or options.quota is None or options.quota == 0):
-            quota = options.quota
-            await self.set_quota(vfpath, quota)
-
-    async def get_fs_usage(self) -> FSUsage:
+    async def get_fs_usage(self) -> CapacityUsage:
         (total, used, _) = await asyncio.get_running_loop().run_in_executor(
             None,
             shutil.disk_usage,
             self.mount_path,
         )
-        return FSUsage(
-            capacity_bytes=BinarySize(total),
-            used_bytes=BinarySize(used),
-        )
-
-    async def get_quota(self, vfpath) -> BinarySize:
-        loop = asyncio.get_running_loop()
-        raw_report = await loop.run_in_executor(
-            None,
-            # without type: ignore mypy will raise error when trying to run on macOS
-            # because os.getxattr() is only for linux
-            lambda: os.getxattr(vfpath, "ceph.quota.max_bytes"),  # type: ignore[attr-defined]
-        )
-        report = str(raw_report)
-        if len(report.split()) != 6:
-            raise ExecutionError("ceph quota report output is in unexpected format")
-        _, quota = report.split("=")
-        quota = quota.replace('"', "")
-        return BinarySize(quota)
-
-    async def set_quota(self, vfpath, size_bytes: BinarySize) -> None:
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            # without type: ignore mypy will raise error when trying to run on macOS
-            # because os.setxattr() is only for linux
-            lambda: os.setxattr(vfpath, "ceph.quota.max_bytes", str(int(size_bytes)).encode()),  # type: ignore[attr-defined]
+        return CapacityUsage(
+            used_bytes=used,
+            capacity_bytes=total,
         )

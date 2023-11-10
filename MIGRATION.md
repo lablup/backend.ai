@@ -6,6 +6,18 @@ Backend.AI Migration Guide
 * The migration should be done while the managers and agents are shut down.
 * This guide only describes additional steps to follow other than the code/package upgrades.
 
+# 23.03 to 23.09
+* webserver configuration scheme updated
+  - `webserver`, `logging` and `debug` categories added, with all of those marked as required.
+  - `session.redis.host` and `session.redis.port` settings are now part of `session.redis.addr`
+
+# 22.09 to 23.03
+* All running containers **MUST** be shut down before starting 23.03 version of Backend.AI Agent.
+* Python version upgraded from 3.10 to 3.11. Actual patch version may differ by every Backend.AI release, so please make sure to check `pants.toml` of each release.
+* `scaling_groups.wsproxy_api_token` column added
+  - Required when calling Model Service API, so it is safe to leave column as blank when you're not starting Model Service from this scaling group
+* vFolder v3 folder structure migration
+  - since vFolder v3 feature is landed at the release stream, it is strongly recommended to migrate existing v2 (/vfroot/<first two characters of uuid>/<second two characters of uuid>/<all other characters>) structure to v3 (/vfroot/<quota scope id>/<first two characters of uuid>/<second two characters of uuid>/<all other characters>). There is a shell script generator (ai.backend.storage.migration) to create an automation script to transform the structure. Please check out `python -m ai.backend.storage.migration -h` for more information.
 ## 21.09 to 22.03
 
 * `alembic upgrade head` is required to migrate the PostgreSQL database schema.

@@ -13,39 +13,47 @@ concurrency:
 jobs:
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     steps:
-    - uses: actions/checkout@v3
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - uses: actions/checkout@v4
       with:
-        fetch-depth: 2
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: ./actions/init-pants
+      # See: github.com/pantsbuild/actions/tree/main/init-pants/
+      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-lint-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check '::'
+      run: pants tailor --check update-build-files --check '::'
     - name: Check forbidden cross imports
-      run: ./scripts/check-cross-imports.sh
+      run: pants dependencies '::'
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -53,13 +61,17 @@ jobs:
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
-        if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF}"
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          git remote set-branches origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
+        pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -70,33 +82,39 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest-8-cores
+    runs-on: arc-runner-set
     steps:
-    - uses: actions/checkout@v3
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - uses: actions/checkout@v4
       with:
-        fetch-depth: 2
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: ./actions/init-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-typecheck-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
@@ -106,13 +124,17 @@ jobs:
         else
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
-        if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF}"
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          git remote set-branches origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
+        pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -123,15 +145,22 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: [ubuntu-latest-8-cores]
     steps:
-    - uses: actions/checkout@v3
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - uses: actions/checkout@v4
       with:
-        fetch-depth: 2
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v3
+      uses: maxnowack/local-cache@v1
       id: lfs-cache
       with:
           path: .git/lfs
@@ -140,37 +169,45 @@ jobs:
       run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: ./actions/init-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-test-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
+      timeout-minutes: 15
       run: |
-        if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF}"
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        # configure redis sentinel cluster hostnames for testing
+        grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node02" /etc/hosts || echo "127.0.0.1 node02" | sudo tee -a /etc/hosts
+        grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          [ -n "$GITHUB_BASE_REF" ] && BASE_REF_SHORT="${GITHUB_BASE_REF}" || BASE_REF_SHORT="main"
+          BASE_REF="origin/${BASE_REF_SHORT}"
+          git remote set-branches origin "$BASE_REF_SHORT"
+          BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
+          BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+          git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF_SHORT}"
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
+        pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -m 'not integration' -v
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -179,12 +216,20 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  build-wheels:
+  build-scies:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest: intel
+        # linux-aarch64: aarch64 (self-hosted)
+        # macos-12: intel
+        # macos-13: apple silicon
+        os: [ubuntu-latest, linux-aarch64, macos-13-xlarge, macos-12-large]
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Create LFS file hash list
@@ -199,28 +244,103 @@ jobs:
       run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Prepare the pip cache directory
-      run: mkdir -p ~/.cache/pip
-    - name: Set up Python for Pants
+
+    - if: ${{ !endsWith(matrix.os, 'linux-aarch64') }}
       uses: actions/setup-python@v4
       with:
-        python-version: "3.9"
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: "pip"
+      # For linux-aarch64 runner, we assume that we have the correct prebuilt Python version already.
+
+    - name: Unpack local-proxy binaries
+      run: |
+        OS_TYPE=$(uname -s)
+        CPU_ARCH=$(uname -m)
+        SYSTEM="$OS_TYPE $CPU_ARCH"
+        case "$SYSTEM" in
+          "Linux x86_64" )
+            PLATFORM="linux_x64"
+            ;;
+          "Linux aarch64" )
+            PLATFORM="linux_arm64"
+            ;;
+          "Darwin x86_64" )
+            PLATFORM="mac_x64"
+            npm rebuild
+            ;;
+          "Darwin arm64" )
+            PLATFORM="mac_arm64"
+            npm rebuild
+            ;;
+        esac
+        mkdir dist-local-proxy
+        # Normalize the package naming
+        unzip "src/ai/backend/web/assets/backend.ai-local-proxy-$PLATFORM.zip"
+        mv "backend.ai-local-proxy" "dist-local-proxy/backendai-local-proxy-$PLATFORM"
+    - name: Upload local-proxy binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: local-proxy
+        path: dist-local-proxy/*
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      with:
+        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Build packages
+      run: |
+        pants --tag="-wheel" package '::'
+        rm -rf dist/src.*/
+    - name: Upload scies
+      uses: actions/upload-artifact@v3
+      with:
+        name: scies
+        path: dist/*
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  build-wheels:
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: deploy-to-pypi
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v3
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(awk -F'["]' '/CPython==/ {print $2; exit}' pants.toml | sed 's/CPython==//')
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
+        cache: "pip"
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      uses: pantsbuild/actions/init-pants@v5-scie-pants
       with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Install local dependencies for packaging
@@ -232,11 +352,11 @@ jobs:
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
         # Build non-platform-specific wheels
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
         # Build x86_64 wheels
         MANYLINUX_PTAG=manylinux2014_x86_64
         MACOS_PTAG=macosx_11_0_x86_64
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
@@ -244,7 +364,7 @@ jobs:
         # Build arm64 wheels
         MANYLINUX_PTAG=manylinux2014_aarch64
         MACOS_PTAG=macosx_11_0_arm64
-        ./pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
+        pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
@@ -254,7 +374,7 @@ jobs:
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `./pants publish ::` because we manually rename the
+      # We don't use `pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl dist/*.tar.gz
@@ -263,23 +383,58 @@ jobs:
       with:
         name: wheels
         path: dist/*.whl
-    - name: Extract the release changelog
-      run: |
-        python ./scripts/extract-release-changelog.py
-        python ./scripts/determine-release-type.py
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
-      with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*.whl
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
+
+
+  make-github-release:
+    needs: [build-scies, build-wheels]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: deploy-to-pypi
+    steps:
+    - uses: actions/checkout@v4
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Download wheels
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels
+        path: dist
+    - name: Download scies
+      uses: actions/download-artifact@v3
+      with:
+        name: scies
+        path: dist
+    - name: Download local-proxy
+      uses: actions/download-artifact@v3
+      with:
+        name: local-proxy
+        path: dist
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        files: |
+          dist/*
 
 
   build-conda-pack-for-windows:
@@ -289,7 +444,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -304,7 +459,7 @@ jobs:
       shell: bash
       run: |
         export LANG=C.UTF-8
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
@@ -312,7 +467,11 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
     - name: Normalize the package version
+      shell: bash
       run: |
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
@@ -336,43 +495,3 @@ jobs:
     - name: Upload conda-pack to GitHub release
       run: |
         gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
-
-
-  build-client-image:
-    needs: [build-wheels]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Extract Python version from pants.toml
-        shell: bash
-        run: |
-          export LANG=C.UTF-8
-          PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-          echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-          echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ./client.Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: lablup/backend.ai-client:${{ github.ref_name }}
-          build-args: |
-            PYTHON_VERSION=${{ env.PROJECT_PYTHON_VERSION }}
-            PKGVER=${{ github.ref_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Push latest
-        run: |
-          docker tag lablup/backend.ai-client:${{ github.ref_name }} lablup/backend.ai-client:latest
-          docker push lablup/backend.ai-client:latest

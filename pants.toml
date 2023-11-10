@@ -1,25 +1,31 @@
 [GLOBAL]
-pants_version = "2.16.0.dev7"
+pants_version = "2.17.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
-local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.black",
-    "pants.backend.python.lint.flake8",
-    "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
+    "pants.backend.experimental.python.lint.ruff",
+    "pants.backend.experimental.visibility",
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
+    "scie",
     "towncrier_tool",
 ]
 pants_ignore = [
-    "scripts",
-    "plugins",
-    "docs",  # TODO: docs build config
-    "*.log"
+    ".*/",
+    "/dist/",
+    "__pycache__",
+    "*~",  # vim swap/backup files
+    "/scripts/",
+    "/plugins/",
+    "/docs/",  # TODO: docs build config
+    "*.log",
+    "/tools/pants-plugins",
 ]
+build_file_prelude_globs = ["tools/build-macros.py"]
 
 [anonymous-telemetry]
 enabled = false
@@ -33,6 +39,9 @@ root_patterns = [
     "/tools/pants-plugins",
 ]
 
+[test]
+extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
+
 [python]
 enable_resolves = true
 # When changing this main Python version:
@@ -42,12 +51,14 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.11.2"]
+interpreter_constraints = ["CPython==3.11.6"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.11.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
-search_path = ["<PYENV>"]
+search_path = ["<PYENV_LOCAL>", "<ASDF_LOCAL>", "<PYENV>", "<ASDF>"]
+
+[python-infer]
+use_rust_parser = true
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
@@ -56,80 +67,45 @@ indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
+black = "tools/black.lock"
+ruff = "tools/ruff.lock"
+pytest = "tools/pytest.lock"
+coverage-py = "tools/coverage-py.lock"
+mypy = "tools/mypy.lock"
+towncrier = "tools/towncrier.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
-# [pex-cli]
-# version = "v2.1.99"
-# known_versions = [
-#     "v2.1.99|macos_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|macos_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|linux_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|linux_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-# ]
+[pex-cli]
+version = "v2.1.148"
+known_versions = [
+    "v2.1.148|macos_arm64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+    "v2.1.148|macos_x86_64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+    "v2.1.148|linux_arm64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+    "v2.1.148|linux_x86_64|5b1dee5a89fff25747753e917f96b8707ea62eed404d037d5f8cf8f2e80a13b7|4197604",
+]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [black]
-version = "black~=23.3"
-interpreter_constraints = ["CPython>=3.11,<4"]
-lockfile = "tools/black.lock"
+install_from_resolve = "black"
+interpreter_constraints = ["CPython==3.11.6"]  # don't know why this is required... (maybe a Pants bug?)
 
-[flake8]
-version = "flake8>=4.0.1"
-extra_requirements.add = [
-    "setuptools>=60.0",
-]
-lockfile = "tools/flake8.lock"
-
-[isort]
-lockfile = "tools/isort.lock"
-interpreter_constraints = ["CPython>=3.11,<4"]
+[ruff]
+install_from_resolve = "ruff"
 
 [pytest]
-version = "pytest>=7.1.2"
-extra_requirements.add = [
-    "pytest-asyncio>=0.19",
-    "pytest-aiohttp>=1.0.4",
-    "pytest-custom_exit_code>=0.3.0",
-    "pytest-dependency>=0.5.1",
-    "pytest-mock>=3.8.2",
-    "aioresponses>=0.7.3",
-]
+install_from_resolve = "pytest"
 args = ["-v", "--suppress-no-test-exit-code"]
-lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
 [coverage-py]
-version = "coverage[toml]>=6.4,<7.0"
-interpreter_constraints = ["CPython>=3.11,<4"]
+install_from_resolve = "coverage-py"
 report = ["xml", "console"]
-lockfile = "tools/coverage-py.lock"
 
 [mypy]
-version = "mypy==1.0.1"
-interpreter_constraints = ["CPython>=3.11,<4"]
-extra_requirements.add = [
-]
-lockfile = "tools/mypy.lock"
-extra_type_stubs = [
-    "types-six",
-    "types-setuptools",
-    "types-pkg_resources",
-    "types-python-dateutil",
-    "types-aiofiles",
-    "types-click",
-    "types-cachetools",
-    "types-Jinja2",
-    "types-PyYAML",
-    "types-redis",
-    "types-tabulate",
-]
-extra_type_stubs_lockfile = "tools/mypy-extra-type-stubs.lock"
+install_from_resolve = "mypy"
 
 [towncrier]
-version = "towncrier>=21.9"
-extra_requirements.add = [
-]
-lockfile = "tools/towncrier.lock"
+install_from_resolve = "towncrier"

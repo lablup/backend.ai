@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from typing import Sequence
 
 import click
 
@@ -9,13 +10,12 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
+from ...types import Undefined, undefined
 from ..extensions import pass_ctx_obj
-from ..params import CommaSeparatedListType
+from ..params import BoolExprType, CommaSeparatedListType, OptionalType
 from ..pretty import print_info
 from ..types import CLIContext
 from . import admin
-
-list_expr = CommaSeparatedListType()
 
 
 @admin.group()
@@ -46,6 +46,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
+        user_fields["sudo_session_enabled"],
     ]
     with Session() as session:
         try:
@@ -146,6 +147,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["domain_name"],
         user_fields["groups"],
         user_fields["allowed_client_ip"],
+        user_fields["sudo_session_enabled"],
     ]
     try:
         with Session() as session:
@@ -199,7 +201,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
 )
 @click.option(
     "--allowed-ip",
-    type=list_expr,
+    type=CommaSeparatedListType(),
     default=None,
     help=(
         "Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
@@ -207,18 +209,28 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     ),
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--sudo-session-enabled",
+    is_flag=True,
+    default=False,
+    help=(
+        "Enable passwordless sudo for a user inside a compute session. "
+        "Note that this feature does not automatically install sudo for the session."
+    ),
+)
 def add(
     ctx: CLIContext,
-    domain_name,
-    email,
-    password,
-    username,
-    full_name,
-    role,
-    status,
-    need_password_change,
-    allowed_ip,
-    description,
+    domain_name: str,
+    email: str,
+    password: str,
+    username: str,
+    full_name: str,
+    role: str,
+    status: str,
+    need_password_change: bool,
+    allowed_ip: str | None,
+    description: str,
+    sudo_session_enabled: bool,
 ):
     """
     Add new user. A user must belong to a domain, so DOMAIN_NAME should be provided.
@@ -241,6 +253,7 @@ def add(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
+                sudo_session_enabled=sudo_session_enabled,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -265,25 +278,52 @@ def add(
 @user.command()
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
-@click.option("-p", "--password", type=str, help="Password.")
-@click.option("-u", "--username", type=str, help="Username.")
-@click.option("-n", "--full-name", type=str, help="Full name.")
-@click.option("-d", "--domain-name", type=str, help="Domain name.")
+@click.option(
+    "-p",
+    "--password",
+    type=OptionalType(str),
+    default=undefined,
+    help="Password.",
+)
+@click.option(
+    "-u",
+    "--username",
+    type=OptionalType(str),
+    default=undefined,
+    help="Username.",
+)
+@click.option(
+    "-n",
+    "--full-name",
+    type=OptionalType(str),
+    default=undefined,
+    help="Full name.",
+)
+@click.option(
+    "-d",
+    "--domain-name",
+    type=OptionalType(str),
+    default=undefined,
+    help="Domain name.",
+)
 @click.option(
     "-r",
     "--role",
-    type=str,
+    type=OptionalType(str),
+    default=undefined,
     help="Role of the user. One of (admin, user, monitor).",
 )
 @click.option(
     "-s",
     "--status",
-    type=str,
+    type=OptionalType(str),
+    default=undefined,
     help="Account status. One of (active, inactive, deleted, before-verification).",
 )
 @click.option(
     "--need-password-change",
-    is_flag=True,
+    type=OptionalType(BoolExprType),
+    default=undefined,
     help=(
         "Flag indicate that user needs to change password. "
         "Useful when admin manually create password."
@@ -291,26 +331,36 @@ def add(
 )
 @click.option(
     "--allowed-ip",
-    type=list_expr,
-    default=None,
+    type=OptionalType(CommaSeparatedListType),
+    default=undefined,
     help=(
         "Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
         '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)'
     ),
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
+@click.option(
+    "--sudo-session-enabled",
+    type=OptionalType(BoolExprType),
+    default=undefined,
+    help=(
+        "Enable passwordless sudo for a user inside a compute session. "
+        "Note that this feature does not automatically install sudo for the session."
+    ),
+)
 def update(
     ctx: CLIContext,
-    email,
-    password,
-    username,
-    full_name,
-    domain_name,
-    role,
-    status,
-    need_password_change,
-    allowed_ip,
-    description,
+    email: str,
+    password: str | Undefined,
+    username: str | Undefined,
+    full_name: str | Undefined,
+    domain_name: str | Undefined,
+    role: str | Undefined,
+    status: str | Undefined,
+    need_password_change: bool | Undefined,
+    allowed_ip: Sequence[str] | Undefined,
+    description: str | Undefined,
+    sudo_session_enabled: bool | Undefined,
 ):
     """
     Update an existing user.
@@ -331,6 +381,7 @@ def update(
                 need_password_change=need_password_change,
                 allowed_client_ip=allowed_ip,
                 description=description,
+                sudo_session_enabled=sudo_session_enabled,
             )
         except Exception as e:
             ctx.output.print_mutation_error(

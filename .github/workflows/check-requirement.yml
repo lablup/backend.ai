@@ -1,0 +1,21 @@
+name: Check if a precompiled binary file exists in dependencies
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-requirement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if a precompiled binary file exists in dependencies
+        run: |
+            cat python.lock | grep -v '^//' | jq -r '.locked_resolves[].locked_requirements[]
+            | select(any(.artifacts[].url; endswith(".whl")) | not) | .project_name' >> packages-missing-precompiled-wheels.txt
+      - run: |
+            if [ -s packages-missing-precompiled-wheels.txt ]; then
+                echo "There are some dependencies that do not have precompiled binary files."
+                echo "Please check the following dependencies:"
+                cat packages-missing-precompiled-wheels.txt
+                exit 1
+            fi

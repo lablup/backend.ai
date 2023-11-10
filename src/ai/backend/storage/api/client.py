@@ -1,6 +1,7 @@
 """
 Client-facing API
 """
+from __future__ import annotations
 
 import asyncio
 import json
@@ -9,7 +10,17 @@ import os
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, Mapping, MutableMapping, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncContextManager,
+    Final,
+    Literal,
+    Mapping,
+    MutableMapping,
+    TypedDict,
+    cast,
+)
 
 import aiohttp_cors
 import janus
@@ -20,12 +31,16 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderID
 
-from ..abc import AbstractVolume
-from ..context import Context
+from .. import __version__
 from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
+
+if TYPE_CHECKING:
+    from ..abc import AbstractVolume
+    from ..context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -34,11 +49,20 @@ DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
+class DownloadTokenData(TypedDict):
+    op: Literal["download"]
+    volume: str
+    vfid: VFolderID
+    relpath: str
+    archive: bool
+    unmanaged_path: str | None
+
+
 download_token_data_iv = t.Dict(
     {
         t.Key("op"): t.Atom("download"),
         t.Key("volume"): t.String,
-        t.Key("vfid"): tx.UUID,
+        t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("archive", default=False): t.Bool,
         t.Key("unmanaged_path", default=None): t.Null | t.String,
@@ -47,11 +71,21 @@ download_token_data_iv = t.Dict(
     "*",
 )  # allow JWT-intrinsic keys
 
+
+class UploadTokenData(TypedDict):
+    op: Literal["upload"]
+    volume: str
+    vfid: VFolderID
+    relpath: str
+    session: str
+    size: int
+
+
 upload_token_data_iv = t.Dict(
     {
         t.Key("op"): t.Atom("upload"),
         t.Key("volume"): t.String,
-        t.Key("vfid"): tx.UUID,
+        t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
@@ -61,23 +95,55 @@ upload_token_data_iv = t.Dict(
 )  # allow JWT-intrinsic keys
 
 
-async def download(request: web.Request) -> web.StreamResponse:
-    ctx: Context = request.app["ctx"]
-    secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=download_token_data_iv,
-                ),
-                t.Key("dst_dir", default=None): t.Null | t.String,
-                t.Key("archive", default=False): t.ToBool,
-                t.Key("no_cache", default=False): t.ToBool,
-            },
+async def check_status(request: web.Request) -> web.StreamResponse:
+    class Params(TypedDict):
+        pass
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict({}),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
+    ) as _:
+        return web.json_response(
+            status=200,
+            data={
+                "status": "ok",
+                "type": "client-facing",
+                "storage-proxy": __version__,
+            },
+        )
+
+
+async def download(request: web.Request) -> web.StreamResponse:
+    ctx: RootContext = request.app["ctx"]
+    secret = ctx.local_config["storage-proxy"]["secret"]
+
+    class Params(TypedDict):
+        token: DownloadTokenData
+        dst_dir: str
+        archive: bool
+        no_cache: bool
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=download_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                    t.Key("archive", default=False): t.ToBool,
+                    t.Key("no_cache", default=False): t.ToBool,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
+        ),
     ) as params:
         async with ctx.get_volume(params["token"]["volume"]) as volume:
             token_data = params["token"]
@@ -216,20 +282,28 @@ async def tus_check_session(request: web.Request) -> web.Response:
     """
     Check the availability of an upload session.
     """
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=upload_token_data_iv,
-                ),
-                t.Key("dst_dir", default=None): t.Null | t.String,
-            },
+
+    class Params(TypedDict):
+        token: UploadTokenData
+        dst_dir: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
@@ -241,26 +315,34 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     """
     Perform the chunk upload.
     """
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config["storage-proxy"]["secret"]
-    async with check_params(
-        request,
-        t.Dict(
-            {
-                t.Key("token"): tx.JsonWebToken(
-                    secret=secret,
-                    inner_iv=upload_token_data_iv,
-                ),
-                t.Key("dst_dir", default=None): t.Null | t.String,
-            },
+
+    class Params(TypedDict):
+        token: UploadTokenData
+        dst_dir: str
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=upload_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
         ),
-        read_from=CheckParamSource.QUERY,
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
-            upload_temp_path = vfpath / ".upload" / token_data["session"]
+            upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
 
             async with AsyncFileWriter(
                 target_filename=upload_temp_path,
@@ -276,9 +358,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 parent_dir = vfpath
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
-                if not parent_dir.exists():
-                    parent_dir.mkdir(parents=True, exist_ok=True)
-                target_path = parent_dir / token_data["relpath"]
+                target_path: Path = parent_dir / token_data["relpath"]
+                if not target_path.parent.exists():
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()
@@ -296,7 +378,7 @@ async def tus_options(request: web.Request) -> web.Response:
     """
     Let clients discover the supported features of our tus.io server-side implementation.
     """
-    ctx: Context = request.app["ctx"]
+    ctx: RootContext = request.app["ctx"]
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
     headers["Access-Control-Allow-Headers"] = (
@@ -348,7 +430,7 @@ async def prepare_tus_session_headers(
     return headers
 
 
-async def init_client_app(ctx: Context) -> web.Application:
+async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application()
     app["ctx"] = ctx
     cors_options = {
@@ -360,10 +442,13 @@ async def init_client_app(ctx: Context) -> web.Application:
         ),
     }
     cors = aiohttp_cors.setup(app, defaults=cors_options)
+    r = cors.add(app.router.add_resource("/"))
+    r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
     r = app.router.add_resource("/upload")  # tus handlers handle CORS by themselves
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)
+
     return app

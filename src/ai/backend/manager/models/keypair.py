@@ -3,7 +3,8 @@ from __future__ import annotations
 import base64
 import secrets
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, TypedDict
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import graphene
 import sqlalchemy as sa
@@ -37,9 +38,10 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import ModifyUserInput, UserRole
+from .utils import agg_to_array
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -164,6 +166,7 @@ class KeyPair(graphene.ObjectType):
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
     user = graphene.UUID()
+    projects = graphene.List(lambda: graphene.String)
 
     ssh_public_key = graphene.String()
 
@@ -207,11 +210,11 @@ class KeyPair(graphene.ObjectType):
             is_admin=row["is_admin"],
             resource_policy=row["resource_policy"],
             created_at=row["created_at"],
-            last_used=row["last_used"],
             rate_limit=row["rate_limit"],
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
+            projects=row["groups_name"] if "groups_name" in row.keys() else [],
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
@@ -248,6 +251,14 @@ class KeyPair(graphene.ObjectType):
             return int(concurrency_used)
         return 0
 
+    async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
+        ctx: GraphQueryContext = info.context
+        last_call_time_key = f"kp:{self.access_key}:last_call_time"
+        row_ts = await redis_helper.execute(ctx.redis_stat, lambda r: r.get(last_call_time_key))
+        if row_ts is None:
+            return None
+        return datetime.fromtimestamp(float(row_ts))
+
     @classmethod
     async def load_all(
         cls,
@@ -278,7 +289,7 @@ class KeyPair(graphene.ObjectType):
                 if (obj := cls.from_row(graph_ctx, row)) is not None
             ]
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "access_key": ("keypairs_access_key", None),
         "user_id": ("users_uuid", None),
         "email": ("users_email", None),
@@ -291,19 +302,21 @@ class KeyPair(graphene.ObjectType):
         "rate_limit": ("keypairs_rate_limit", None),
         "num_queries": ("keypairs_num_queries", None),
         "ssh_public_key": ("keypairs_ssh_public_key", None),
+        "projects": ("groups_name", None),
     }
 
-    _queryorder_colmap = {
-        "access_key": "keypairs_access_key",
-        "email": "users_email",
-        "full_name": "users_full_name",
-        "is_active": "keypairs_is_active",
-        "is_admin": "keypairs_is_admin",
-        "resource_policy": "keypairs_resource_policy",
-        "created_at": "keypairs_created_at",
-        "last_used": "keypairs_last_used",
-        "rate_limit": "keypairs_rate_limit",
-        "num_queries": "keypairs_num_queries",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "access_key": ("keypairs_access_key", None),
+        "email": ("users_email", None),
+        "full_name": ("users_full_name", None),
+        "is_active": ("keypairs_is_active", None),
+        "is_admin": ("keypairs_is_admin", None),
+        "resource_policy": ("keypairs_resource_policy", None),
+        "created_at": ("keypairs_created_at", None),
+        "last_used": ("keypairs_last_used", None),
+        "rate_limit": ("keypairs_rate_limit", None),
+        "num_queries": ("keypairs_num_queries", None),
+        "projects": ("groups_name", agg_to_array),
     }
 
     @classmethod
@@ -316,9 +329,14 @@ class KeyPair(graphene.ObjectType):
         is_active: bool = None,
         filter: str = None,
     ) -> int:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
+        )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -346,12 +364,25 @@ class KeyPair(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[KeyPair]:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
+        )
         query = (
-            sa.select([keypairs, users.c.email, users.c.full_name])
+            sa.select(
+                [
+                    keypairs,
+                    users.c.email,
+                    users.c.full_name,
+                    agg_to_array(groups.c.name).label("groups_name"),
+                ]
+            )
             .select_from(j)
+            .group_by(keypairs, users.c.email, users.c.full_name)
             .limit(limit)
             .offset(offset)
         )
@@ -385,14 +416,27 @@ class KeyPair(graphene.ObjectType):
         domain_name: str = None,
         is_active: bool = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(
-            keypairs,
-            users,
-            keypairs.c.user == users.c.uuid,
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([keypairs]).select_from(j).where(keypairs.c.user_id.in_(user_ids))
+        query = (
+            sa.select(
+                [
+                    keypairs,
+                    users.c.email,
+                    users.c.full_name,
+                    agg_to_array(groups.c.name).label("groups_name"),
+                ]
+            )
+            .select_from(j)
+            .where(keypairs.c.user_id.in_(user_ids))
+            .group_by(keypairs, users.c.email, users.c.full_name)
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
@@ -415,14 +459,27 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: str = None,
     ) -> Sequence[Optional[KeyPair]]:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(
-            keypairs,
-            users,
-            keypairs.c.user == users.c.uuid,
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
         )
-        query = sa.select([keypairs]).select_from(j).where(keypairs.c.access_key.in_(access_keys))
+        query = (
+            sa.select(
+                [
+                    keypairs,
+                    users.c.email,
+                    users.c.full_name,
+                    agg_to_array(groups.c.name).label("groups_name"),
+                ]
+            )
+            .select_from(j)
+            .where(keypairs.c.access_key.in_(access_keys))
+            .group_by(keypairs, users.c.email, users.c.full_name)
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         async with graph_ctx.db.begin_readonly() as conn:
@@ -444,14 +501,21 @@ class KeyPairList(graphene.ObjectType):
 
 
 class KeyPairInput(graphene.InputObjectType):
-    is_active = graphene.Boolean(required=False, default=True)
-    is_admin = graphene.Boolean(required=False, default=False)
+    is_active = graphene.Boolean(required=False, default_value=True)
+    is_admin = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=True)
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=True)
 
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
+
+
+class KeyPairInputTD(TypedDict):
+    is_active: bool
+    is_admin: bool
+    resource_policy: str
+    rate_limit: int
 
 
 class ModifyKeyPairInput(graphene.InputObjectType):
@@ -484,7 +548,16 @@ class CreateKeyPair(graphene.Mutation):
         from .user import users  # noqa
 
         graph_ctx: GraphQueryContext = info.context
-        data = cls.prepare_new_keypair(user_id, props)
+        data = cls.prepare_new_keypair(
+            user_id,
+            {
+                "is_active": props.is_active,
+                "is_admin": props.is_admin,
+                "resource_policy": props.resource_policy,
+                "rate_limit": props.rate_limit,
+                # props.concurrency_limit is always ignored
+            },
+        )
         insert_query = sa.insert(keypairs).values(
             **data,
             user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
@@ -492,17 +565,17 @@ class CreateKeyPair(graphene.Mutation):
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
     @classmethod
-    def prepare_new_keypair(cls, user_email: str, props: KeyPairInput) -> Dict[str, Any]:
+    def prepare_new_keypair(cls, user_email: str, props: KeyPairInputTD) -> Dict[str, Any]:
         ak, sk = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()
         data = {
             "user_id": user_email,
             "access_key": ak,
             "secret_key": sk,
-            "is_active": props.is_active,
-            "is_admin": props.is_admin,
-            "resource_policy": props.resource_policy,
-            "rate_limit": props.rate_limit,
+            "is_active": props["is_active"],
+            "is_admin": props["is_admin"],
+            "resource_policy": props["resource_policy"],
+            "rate_limit": props["rate_limit"],
             "num_queries": 0,
             "ssh_public_key": pubkey,
             "ssh_private_key": privkey,
@@ -534,6 +607,7 @@ class ModifyKeyPair(graphene.Mutation):
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "rate_limit")
+        # props.concurrency_limit is always ignored
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, update_query)
 

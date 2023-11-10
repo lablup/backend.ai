@@ -49,6 +49,7 @@ would be:
    mask_user_info = false
    enable_container_commit = false
    hide_agents = true
+   directory_based_usage = false
 
    [resources]
    open_port_to_public = false
@@ -84,6 +85,7 @@ would be:
    flush_on_startup = false
    login_block_time = 1200  # 20 min (in sec)
    login_allowed_fail_count = 10
+   max_count_for_preopen_ports = 10
 
    [license]
 

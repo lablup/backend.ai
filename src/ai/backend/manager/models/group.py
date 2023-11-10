@@ -20,13 +20,14 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderID
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
@@ -138,6 +139,12 @@ groups = sa.Table(
     sa.Column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     ),
+    sa.Column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("project_resource_policies.name"),
+        nullable=False,
+    ),
 )
 
 
@@ -149,6 +156,7 @@ class GroupRow(Base):
         "ScalingGroupRow", secondary="sgroups_for_groups", back_populates="groups"
     )
     users = relationship("AssocGroupUserRow", back_populates="group")
+    resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -183,8 +191,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]:
-    ...
+) -> Iterable[uuid.UUID]: ...
 
 
 @overload
@@ -192,8 +199,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]:
-    ...
+) -> Iterable[uuid.UUID]: ...
 
 
 async def resolve_groups(
@@ -229,6 +235,7 @@ class Group(graphene.ObjectType):
     total_resource_slots = graphene.JSONString()
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
+    resource_policy = graphene.String()
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -247,6 +254,7 @@ class Group(graphene.ObjectType):
             total_resource_slots=row["total_resource_slots"].to_json(),
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
+            resource_policy=row["resource_policy"],
         )
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
@@ -369,12 +377,13 @@ class Group(graphene.ObjectType):
 
 
 class GroupInput(graphene.InputObjectType):
-    description = graphene.String(required=False)
-    is_active = graphene.Boolean(required=False, default=True)
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
     domain_name = graphene.String(required=True)
-    total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.JSONString(required=False)
-    integration_id = graphene.String(required=False)
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
+    integration_id = graphene.String(required=False, default_value="")
+    resource_policy = graphene.String(required=False, default_value="default")
 
 
 class ModifyGroupInput(graphene.InputObjectType):
@@ -387,6 +396,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     user_uuids = graphene.List(lambda: graphene.String, required=False)
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
+    resource_policy = graphene.String(required=False)
 
 
 class CreateGroup(graphene.Mutation):
@@ -420,10 +430,17 @@ class CreateGroup(graphene.Mutation):
             "description": props.description,
             "is_active": props.is_active,
             "domain_name": props.domain_name,
-            "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
-            "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
             "integration_id": props.integration_id,
+            "resource_policy": props.resource_policy,
         }
+        # set_if_set() applies to optional without defaults
+        set_if_set(
+            props,
+            data,
+            "total_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(props, data, "allowed_vfolder_hosts")
         insert_query = sa.insert(groups).values(data)
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
 
@@ -465,10 +482,11 @@ class ModifyGroup(graphene.Mutation):
         )
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "integration_id")
+        set_if_set(props, data, "resource_policy")
 
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")
-        if props.user_update_mode not in (None, "add", "remove"):
+        if props.user_update_mode not in (None, Undefined, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
             props.user_update_mode = None
@@ -571,11 +589,9 @@ class PurgeGroup(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             if await cls.group_vfolder_mounted_to_active_kernels(conn, gid):
                 raise RuntimeError(
-                    (
-                        "Some of virtual folders that belong to this group "
-                        "are currently mounted to active sessions. "
-                        "Terminate them first to proceed removal."
-                    ),
+                    "Some of virtual folders that belong to this group "
+                    "are currently mounted to active sessions. "
+                    "Terminate them first to proceed removal.",
                 )
             if await cls.group_has_active_kernels(conn, gid):
                 raise RuntimeError(
@@ -602,7 +618,7 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolders
 
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
@@ -617,15 +633,16 @@ class PurgeGroup(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            deleted_count = await initiate_vfolder_removal(
+            await initiate_vfolder_purge(
                 engine,
-                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
                 storage_ptask_group,
             )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
             raise
+        deleted_count = len(target_vfs)
         if deleted_count > 0:
             log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
         return deleted_count

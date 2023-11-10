@@ -1,12 +1,12 @@
 import json
 import textwrap
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from ai.backend.client.output.fields import scaling_group_fields
-from ai.backend.client.output.types import FieldSpec
-
+from ..output.fields import scaling_group_fields
+from ..output.types import FieldSpec
 from ..request import Request
 from ..session import api_session
+from ..types import Undefined, set_if_set, undefined
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("ScalingGroup",)
@@ -15,22 +15,28 @@ _default_list_fields = (
     scaling_group_fields["name"],
     scaling_group_fields["description"],
     scaling_group_fields["is_active"],
+    scaling_group_fields["is_public"],
     scaling_group_fields["created_at"],
     scaling_group_fields["driver"],
     scaling_group_fields["scheduler"],
     scaling_group_fields["use_host_network"],
+    scaling_group_fields["wsproxy_addr"],
+    scaling_group_fields["wsproxy_api_token"],
 )
 
 _default_detail_fields = (
     scaling_group_fields["name"],
     scaling_group_fields["description"],
     scaling_group_fields["is_active"],
+    scaling_group_fields["is_public"],
     scaling_group_fields["created_at"],
     scaling_group_fields["driver"],
     scaling_group_fields["driver_opts"],
     scaling_group_fields["scheduler"],
     scaling_group_fields["scheduler_opts"],
     scaling_group_fields["use_host_network"],
+    scaling_group_fields["wsproxy_addr"],
+    scaling_group_fields["wsproxy_api_token"],
 )
 
 
@@ -113,14 +119,18 @@ class ScalingGroup(BaseFunction):
     async def create(
         cls,
         name: str,
+        *,
         description: str = "",
         is_active: bool = True,
-        driver: str = None,
-        driver_opts: Mapping[str, str] = None,
-        scheduler: str = None,
-        scheduler_opts: Mapping[str, str] = None,
+        is_public: bool = True,
+        driver: str,
+        driver_opts: Mapping[str, str] | Undefined = undefined,
+        scheduler: str,
+        scheduler_opts: Mapping[str, str] | Undefined = undefined,
         use_host_network: bool = False,
-        fields: Iterable[FieldSpec | str] = None,
+        wsproxy_addr: str | None = None,
+        wsproxy_api_token: str | None = None,
+        fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Creates a new scaling group with the given options.
@@ -136,17 +146,21 @@ class ScalingGroup(BaseFunction):
             fields, scaling_group_fields, (scaling_group_fields["name"],)
         )
         query = query.replace("$fields", " ".join(resolved_fields))
+        inputs = {
+            "description": description,
+            "is_active": is_active,
+            "is_public": is_public,
+            "driver": driver,
+            "scheduler": scheduler,
+            "use_host_network": use_host_network,
+            "wsproxy_addr": wsproxy_addr,
+            "wsproxy_api_token": wsproxy_api_token,
+        }
+        set_if_set(inputs, "driver_opts", driver_opts, clean_func=json.dumps)
+        set_if_set(inputs, "scheduler_opts", scheduler_opts, clean_func=json.dumps)
         variables = {
             "name": name,
-            "input": {
-                "description": description,
-                "is_active": is_active,
-                "driver": driver,
-                "driver_opts": json.dumps(driver_opts),
-                "scheduler": scheduler,
-                "scheduler_opts": json.dumps(scheduler_opts),
-                "use_host_network": use_host_network,
-            },
+            "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["create_scaling_group"]
@@ -156,14 +170,18 @@ class ScalingGroup(BaseFunction):
     async def update(
         cls,
         name: str,
-        description: str = "",
-        is_active: bool = True,
-        driver: str = None,
-        driver_opts: Mapping[str, str] = None,
-        scheduler: str = None,
-        scheduler_opts: Mapping[str, str] = None,
-        use_host_network: bool = False,
-        fields: Iterable[FieldSpec | str] = None,
+        *,
+        description: str | Undefined = undefined,
+        is_active: bool | Undefined = undefined,
+        is_public: bool | Undefined = undefined,
+        driver: str | Undefined = undefined,
+        driver_opts: Mapping[str, str] | Undefined = undefined,
+        scheduler: str | Undefined = undefined,
+        scheduler_opts: Mapping[str, str] | Undefined = undefined,
+        use_host_network: bool | Undefined = undefined,
+        wsproxy_addr: Optional[str] | Undefined = undefined,
+        wsproxy_api_token: Optional[str] | Undefined = undefined,
+        fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
         Update existing scaling group.
@@ -179,17 +197,20 @@ class ScalingGroup(BaseFunction):
             fields, scaling_group_fields, (scaling_group_fields["name"],)
         )
         query = query.replace("$fields", " ".join(resolved_fields))
+        inputs: dict[str, Any] = {}
+        set_if_set(inputs, "description", description)
+        set_if_set(inputs, "is_active", is_active)
+        set_if_set(inputs, "is_public", is_public)
+        set_if_set(inputs, "driver", driver)
+        set_if_set(inputs, "driver_opts", driver_opts, clean_func=json.dumps)
+        set_if_set(inputs, "scheduler", scheduler)
+        set_if_set(inputs, "scheduler_opts", scheduler_opts, clean_func=json.dumps)
+        set_if_set(inputs, "use_host_network", use_host_network)
+        set_if_set(inputs, "wsproxy_addr", wsproxy_addr)
+        set_if_set(inputs, "wsproxy_api_token", wsproxy_api_token)
         variables = {
             "name": name,
-            "input": {
-                "description": description,
-                "is_active": is_active,
-                "driver": driver,
-                "driver_opts": None if driver_opts is None else json.dumps(driver_opts),
-                "scheduler": scheduler,
-                "scheduler_opts": None if scheduler_opts is None else json.dumps(scheduler_opts),
-                "use_host_network": use_host_network,
-            },
+            "input": inputs,
         }
         data = await api_session.get().Admin._query(query, variables)
         return data["modify_scaling_group"]

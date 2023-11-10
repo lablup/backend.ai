@@ -1,0 +1,5 @@
+{
+  "socket_timeout": 5.0,
+  "socket_connect_timeout": 2.0,
+  "reconnect_poll_timeout": 0.3
+}

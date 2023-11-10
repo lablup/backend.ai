@@ -334,9 +334,10 @@
     },
     "ngc-triton": {
       "name": "Triton Server (NGC)",
-      "description": "PyTorch is an open source machine learning framework that accelerates the path from research prototyping to production deployment. This environment is integrated with Nvidia GPU Cloud.",
+      "description": "NVIDIA Triton Inference Server is an open-source, high-performance server that simplifies the deployment of AI models for inference in production environments..This environment is integrated with Nvidia GPU Cloud.",
       "group": "Machine Learning / Deep Learning",
       "tags": [],
+      "icon": "nvidia.png",
       "label": [
         {
           "category": "Env",
@@ -748,6 +749,20 @@
           "color": "blue"
         }
       ]
+    },
+    "atom-orbit": {
+      "name": "Orbit Inference",
+      "description": "Orbit Inference Service",
+      "group": "Inference",
+      "tags": [],
+      "icon": "orbit.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Orbit",
+          "color": "red"
+        }
+      ]
     }
   },
   "tagAlias": {
@@ -789,18 +804,27 @@
     "tf2.10": "TensorFlow 2.10",
     "tf2.11": "TensorFlow 2.11",
     "tf2.12": "TensorFlow 2.12",
-    "tf2.13": "TensorFlow 2.13",                  
+    "tf2.13": "TensorFlow 2.13",
     "py3": "Python 3",
     "py2": "Python 2",
     "py27": "Python 2.7",
+    "py2.7": "Python 2.7",
     "py35": "Python 3.5",
+    "py3.5": "Python 3.5",
     "py36": "Python 3.6",
+    "py3.6": "Python 3.6",
     "py37": "Python 3.7",
+    "py3.7": "Python 3.7",
     "py38": "Python 3.8",
+    "py3.8": "Python 3.8",
     "py39": "Python 3.9",
+    "py3.9": "Python 3.9",
     "py310": "Python 3.10",
+    "py3.10": "Python 3.10",
     "py311": "Python 3.11",
+    "py3.11": "Python 3.11",
     "py312": "Python 3.12",
+    "py3.12": "Python 3.12",
     "ji15": "Julia 1.5",
     "ji16": "Julia 1.6",
     "ji17": "Julia 1.7",
@@ -844,6 +868,7 @@
     "cuda11.5": "GPU:CUDA11.5",
     "cuda11.6": "GPU:CUDA11.6",
     "cuda11.7": "GPU:CUDA11.7",
+    "cuda11.8": "GPU:CUDA11.8",
     "cuda12": "GPU:CUDA12",
     "cuda12.0": "GPU:CUDA12",
     "cuda12.1": "GPU:CUDA12.1",
@@ -856,7 +881,8 @@
     "alpine3.8": "Alpine Linux 3.8",
     "alpine3.12": "Alpine Linux 3.12",
     "ngc": "Nvidia GPU Cloud",
-    "ff": "Research Env."
+    "ff": "Research Env.",
+    "atom-orbit": "Orbit"
   },
   "tagReplace": {
     "^(tf)([0-9.]*)$": "TensorFlow $2",

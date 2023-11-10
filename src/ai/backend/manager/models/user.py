@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiotools
@@ -22,7 +22,7 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.types import RedisConnectionInfo, VFolderID
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
@@ -39,8 +39,8 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
 from .utils import ExtendedAsyncSAEngine
 
@@ -113,6 +113,11 @@ users = sa.Table(
     sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
     sa.Column("password", PasswordColumn()),
     sa.Column("need_password_change", sa.Boolean),
+    sa.Column(
+        "password_changed_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+    ),
     sa.Column("full_name", sa.String(length=64)),
     sa.Column("description", sa.String(length=500)),
     sa.Column("status", EnumValueType(UserStatus), default=UserStatus.ACTIVE, nullable=False),
@@ -132,6 +137,18 @@ users = sa.Table(
     sa.Column("totp_key", sa.String(length=32)),
     sa.Column("totp_activated", sa.Boolean, server_default=sa.false(), default=False),
     sa.Column("totp_activated_at", sa.DateTime(timezone=True), nullable=True),
+    sa.Column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("user_resource_policies.name"),
+        nullable=False,
+    ),
+    sa.Column(
+        "sudo_session_enabled",
+        sa.Boolean,
+        default=False,
+        nullable=False,
+    ),
 )
 
 
@@ -140,6 +157,7 @@ class UserRow(Base):
     sessions = relationship("SessionRow", back_populates="user")
     domain = relationship("DomainRow", back_populates="users")
     groups = relationship("AssocGroupUserRow", back_populates="user")
+    resource_policy_row = relationship("UserResourcePolicyRow", back_populates="users")
 
 
 class UserGroup(graphene.ObjectType):
@@ -194,9 +212,11 @@ class User(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     role = graphene.String()
+    resource_policy = graphene.String()
     allowed_client_ip = graphene.List(lambda: graphene.String)
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
+    sudo_session_enabled = graphene.Boolean()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -230,9 +250,11 @@ class User(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             role=row["role"],
+            resource_policy=row["resource_policy"],
             allowed_client_ip=row["allowed_client_ip"],
             totp_activated=row["totp_activated"],
             totp_activated_at=row["totp_activated_at"],
+            sudo_session_enabled=row["sudo_session_enabled"],
         )
 
     @classmethod
@@ -270,7 +292,7 @@ class User(graphene.ObjectType):
         async with ctx.db.begin_readonly() as conn:
             return [cls.from_row(ctx, row) async for row in (await conn.stream(query))]
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "uuid": ("uuid", None),
         "username": ("username", None),
         "email": ("email", None),
@@ -278,32 +300,36 @@ class User(graphene.ObjectType):
         "full_name": ("full_name", None),
         "description": ("description", None),
         "is_active": ("is_active", None),
-        "status": ("status", lambda s: UserStatus[s]),
+        "status": ("status", enum_field_getter(UserStatus)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
-        "role": ("role", lambda s: UserRole[s]),
+        "role": ("role", enum_field_getter(UserRole)),
+        "resource_policy": ("domain_name", None),
         "allowed_client_ip": ("allowed_client_ip", None),
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
     }
 
-    _queryorder_colmap = {
-        "uuid": "uuid",
-        "username": "username",
-        "email": "email",
-        "need_password_change": "need_password_change",
-        "full_name": "full_name",
-        "is_active": "is_active",
-        "status": "status",
-        "status_info": "status_info",
-        "created_at": "created_at",
-        "modified_at": "modified_at",
-        "domain_name": "domain_name",
-        "role": "role",
-        "totp_activated": "totp_activated",
-        "totp_activated_at": "totp_activated_at",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "uuid": ("uuid", None),
+        "username": ("username", None),
+        "email": ("email", None),
+        "need_password_change": ("need_password_change", None),
+        "full_name": ("full_name", None),
+        "is_active": ("is_active", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "created_at": ("created_at", None),
+        "modified_at": ("modified_at", None),
+        "domain_name": ("domain_name", None),
+        "role": ("role", None),
+        "resource_policy": ("resource_policy", None),
+        "totp_activated": ("totp_activated", None),
+        "totp_activated_at": ("totp_activated_at", None),
+        "sudo_session_enabled": ("sudo_session_enabled", None),
     }
 
     @classmethod
@@ -334,7 +360,11 @@ class User(graphene.ObjectType):
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser(
-                    {k: ("users_" + v[0], v[1]) for k, v in cls._queryfilter_fieldspec.items()}
+                    {
+                        k: ("users_" + v[0], v[1])
+                        for k, v in cls._queryfilter_fieldspec.items()
+                        if isinstance(v[0], str)
+                    }
                 )
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -380,7 +410,11 @@ class User(graphene.ObjectType):
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser(
-                    {k: ("users_" + v[0], v[1]) for k, v in cls._queryfilter_fieldspec.items()}
+                    {
+                        k: ("users_" + v[0], v[1])
+                        for k, v in cls._queryfilter_fieldspec.items()
+                        if isinstance(v[0], str)
+                    }
                 )
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -388,7 +422,11 @@ class User(graphene.ObjectType):
         if order is not None:
             if group_id is not None:
                 qoparser = QueryOrderParser(
-                    {k: "users_" + v for k, v in cls._queryorder_colmap.items()}
+                    {
+                        k: ("users_" + v[0], v[1])
+                        for k, v in cls._queryorder_colmap.items()
+                        if isinstance(v[0], str)
+                    }
                 )
             else:
                 qoparser = QueryOrderParser(cls._queryorder_colmap)
@@ -472,16 +510,17 @@ class UserInput(graphene.InputObjectType):
     username = graphene.String(required=True)
     password = graphene.String(required=True)
     need_password_change = graphene.Boolean(required=True)
-    full_name = graphene.String(required=False, default="")
-    description = graphene.String(required=False, default="")
-    is_active = graphene.Boolean(required=False, default=True)
-    status = graphene.String(required=False, default=UserStatus.ACTIVE)
-    domain_name = graphene.String(required=True, default="default")
-    role = graphene.String(required=False, default=UserRole.USER)
+    full_name = graphene.String(required=False, default_value="")
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
+    status = graphene.String(required=False, default_value=UserStatus.ACTIVE)
+    domain_name = graphene.String(required=True, default_value="default")
+    role = graphene.String(required=False, default_value=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
-    totp_activated = graphene.Boolean(required=False, default=False)
-
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False, default_value=None)
+    totp_activated = graphene.Boolean(required=False, default_value=False)
+    resource_policy = graphene.String(required=False, default_value="default")
+    sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -499,6 +538,8 @@ class ModifyUserInput(graphene.InputObjectType):
     group_ids = graphene.List(lambda: graphene.String, required=False)
     allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
     totp_activated = graphene.Boolean(required=False, default=False)
+    resource_policy = graphene.String(required=False)
+    sudo_session_enabled = graphene.Boolean(required=False, default=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -543,6 +584,8 @@ class CreateUser(graphene.Mutation):
             "role": UserRole(props.role),
             "allowed_client_ip": props.allowed_client_ip,
             "totp_activated": props.totp_activated,
+            "resource_policy": props.resource_policy,
+            "sudo_session_enabled": props.sudo_session_enabled,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -556,14 +599,12 @@ class CreateUser(graphene.Mutation):
 
             kp_data = CreateKeyPair.prepare_new_keypair(
                 email,
-                graph_ctx.schema.get_type("KeyPairInput").create_container(
-                    {
-                        "is_active": _status == UserStatus.ACTIVE,
-                        "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
-                        "resource_policy": "default",
-                        "rate_limit": 10000,
-                    }
-                ),
+                {
+                    "is_active": _status == UserStatus.ACTIVE,
+                    "is_admin": user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN],
+                    "resource_policy": "default",
+                    "rate_limit": 10000,
+                },
             )
             kp_insert_query = sa.insert(keypairs).values(
                 **kp_data,
@@ -572,9 +613,9 @@ class CreateUser(graphene.Mutation):
             await conn.execute(kp_insert_query)
 
             # Add user to groups if group_ids parameter is provided.
-            from .group import association_groups_users, groups
-
             if props.group_ids:
+                from .group import association_groups_users, groups
+
                 query = (
                     sa.select([groups.c.id])
                     .select_from(groups)
@@ -631,12 +672,17 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "role", clean_func=UserRole)
         set_if_set(props, data, "allowed_client_ip")
         set_if_set(props, data, "totp_activated")
+        set_if_set(props, data, "resource_policy")
+        set_if_set(props, data, "sudo_session_enabled")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
             data["status"] = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
 
-        user_update_data: Dict[str, Any]
+        if data.get("password") is not None:
+            data["password_changed_at"] = sa.func.now()
+
+        user_update_data: Dict[str, Any] = {}
         prev_domain_name: str
         prev_role: UserRole
 
@@ -856,10 +902,8 @@ class PurgeUser(graphene.Mutation):
 
             if await cls.user_vfolder_mounted_to_active_kernels(conn, user_uuid):
                 raise RuntimeError(
-                    (
-                        "Some of user's virtual folders are mounted to active kernels. "
-                        "Terminate those kernels first."
-                    ),
+                    "Some of user's virtual folders are mounted to active kernels. "
+                    "Terminate those kernels first.",
                 )
             if await cls.user_has_active_kernels(conn, user_uuid):
                 raise RuntimeError("User has some active kernels. Terminate them first.")
@@ -871,8 +915,11 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_error_logs(conn, user_uuid)
+            await cls.delete_endpoint(conn, user_uuid)
             await cls.delete_kernels(conn, user_uuid)
+            await cls.delete_sessions(conn, user_uuid)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
@@ -979,14 +1026,14 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_purge, vfolder_permissions, vfolders
 
         async with engine.begin_session() as conn:
             await conn.execute(
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
             result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host])
+                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
                 .select_from(vfolders)
                 .where(vfolders.c.user == user_uuid),
             )
@@ -994,15 +1041,16 @@ class PurgeUser(graphene.Mutation):
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            deleted_count = await initiate_vfolder_removal(
+            await initiate_vfolder_purge(
                 engine,
-                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
                 storage_manager,
                 storage_ptask_group,
             )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
             raise
+        deleted_count = len(target_vfs)
         if deleted_count > 0:
             log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
         return deleted_count
@@ -1070,6 +1118,34 @@ class PurgeUser(graphene.Mutation):
         return active_kernel_count > 0
 
     @classmethod
+    async def delete_endpoint(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all endpoint.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete endpoint
+        :return: number of deleted rows
+        """
+        from .endpoint import EndpointRow, EndpointTokenRow
+
+        result = await conn.execute(
+            sa.delete(EndpointTokenRow).where(EndpointTokenRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint tokens ({1})", result.rowcount, user_uuid)
+
+        result = await conn.execute(
+            sa.delete(EndpointRow).where(EndpointRow.session_owner == user_uuid)
+        )
+        if result.rowcount > 0:
+            log.info("deleted {0} user's endpoint ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
     async def delete_kernels(
         cls,
         conn: SAConnection,
@@ -1089,6 +1165,46 @@ class PurgeUser(graphene.Mutation):
         )
         if result.rowcount > 0:
             log.info("deleted {0} user's kernels ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_error_logs(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all error logs.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete error logs
+        :return: number of deleted rows
+        """
+        from .error_logs import error_logs
+
+        result = await conn.execute(sa.delete(error_logs).where(error_logs.c.user == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's error logs ({1})", result.rowcount, user_uuid)
+        return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        conn: SAConnection,
+        user_uuid: UUID,
+    ) -> int:
+        """
+        Delete user's all sessions.
+
+        :param conn: DB connection
+        :param user_uuid: user's UUID to delete sessions
+        :return: number of deleted rows
+        """
+        from .session import SessionRow
+
+        result = await conn.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
+        if result.rowcount > 0:
+            log.info("deleted {0} user's sessions ({1})", result.rowcount, user_uuid)
         return result.rowcount
 
     @classmethod
@@ -1117,6 +1233,10 @@ class PurgeUser(graphene.Mutation):
                 redis_conn,
                 lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
             )
+            await redis_helper.execute(
+                redis_conn,
+                lambda r: r.delete(f"keypair.sftp_concurrency_used.{access_key}"),
+            )
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
         )
@@ -1131,6 +1251,13 @@ def _hash_password(password):
 
 def _verify_password(guess, hashed):
     return bcrypt.verify(guess, hashed)
+
+
+def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
+    """
+    Compare a raw string password value to hased password.
+    """
+    return _verify_password(raw_password, hashed_password)
 
 
 async def check_credential(

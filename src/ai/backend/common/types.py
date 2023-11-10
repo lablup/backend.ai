@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import enum
 import ipaddress
 import itertools
@@ -10,6 +11,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
+from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import PurePosixPath
@@ -22,10 +24,12 @@ from typing import (
     Literal,
     Mapping,
     NewType,
+    NotRequired,
     Optional,
     Sequence,
     Tuple,
     Type,
+    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
@@ -63,10 +67,15 @@ __all__ = (
     "ResourceSlot",
     "ReadableCIDR",
     "HardwareMetadata",
+    "ModelServiceStatus",
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
+    "VFolderID",
+    "QuotaScopeID",
+    "VFolderUsageMode",
     "VFolderMount",
+    "QuotaConfig",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -136,32 +145,28 @@ T4 = TypeVar("T4")
 def check_typed_tuple(
     value: Tuple[Any],
     types: Tuple[Type[T1]],
-) -> Tuple[T1]:
-    ...
+) -> Tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any],
     types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]:
-    ...
+) -> Tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]:
-    ...
+) -> Tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
     value: Tuple[Any, Any, Any, Any],
     types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]:
-    ...
+) -> Tuple[T1, T2, T3, T4]: ...
 
 
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
@@ -290,6 +295,16 @@ class ClusterMode(str, enum.Enum):
 class CommitStatus(str, enum.Enum):
     READY = "ready"
     ONGOING = "ongoing"
+
+
+class AbuseReportValue(str, enum.Enum):
+    DETECTED = "detected"
+    CLEANING = "cleaning"
+
+
+class AbuseReport(TypedDict):
+    kernel: str
+    abuse_report: Optional[str]
 
 
 class MovingStatValue(TypedDict):
@@ -589,6 +604,9 @@ class ResourceSlot(UserDict):
         self.sync_keys(other)
         return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
+    def __neg__(self):
+        return type(self)({k: -v for k, v in self.data.items()})
+
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
@@ -773,14 +791,93 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@attrs.define(slots=True, frozen=True)
+class QuotaScopeID:
+    scope_type: QuotaScopeType
+    scope_id: Any
+
+    @classmethod
+    def parse(cls, raw: str) -> QuotaScopeID:
+        scope_type, _, rest = raw.partition(":")
+        match scope_type:
+            case "project":
+                return cls(QuotaScopeType.PROJECT, uuid.UUID(rest))
+            case "user":
+                return cls(QuotaScopeType.USER, uuid.UUID(rest))
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {scope_type}")
+
+    def __str__(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return f"{self.scope_type.value}:{str(self.scope_id)}"
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @property
+    def pathname(self) -> str:
+        match self.scope_id:
+            case uuid.UUID():
+                return self.scope_id.hex
+            case _:
+                raise ValueError(f"Unsupported vFolder quota scope type {self.scope_type}")
+
+
+class VFolderID:
+    quota_scope_id: QuotaScopeID | None
+    folder_id: uuid.UUID
+
+    @classmethod
+    def from_row(cls, row: Any) -> VFolderID:
+        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+        self.folder_id = folder_id
+        match quota_scope_id:
+            case QuotaScopeID():
+                self.quota_scope_id = quota_scope_id
+            case str():
+                self.quota_scope_id = QuotaScopeID.parse(quota_scope_id)
+            case None:
+                self.quota_scope_id = None
+            case _:
+                self.quota_scope_id = QuotaScopeID.parse(str(quota_scope_id))
+
+    def __str__(self) -> str:
+        if self.quota_scope_id is None:
+            return self.folder_id.hex
+        return f"{self.quota_scope_id}/{self.folder_id.hex}"
+
+    def __eq__(self, other) -> bool:
+        return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
+
+class VFolderUsageMode(str, enum.Enum):
+    """
+    Usage mode of virtual folder.
+
+    GENERAL: normal virtual folder
+    MODEL: virtual folder which provides shared models
+    DATA: virtual folder which provides shared data
+    """
+
+    GENERAL = "general"
+    MODEL = "model"
+    DATA = "data"
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
-    vfid: uuid.UUID
+    vfid: VFolderID
     vfsubpath: PurePosixPath
     host_path: PurePosixPath
     kernel_path: PurePosixPath
     mount_perm: MountPermission
+    usage_mode: VFolderUsageMode
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -790,6 +887,7 @@ class VFolderMount(JSONSerializableMixin):
             "host_path": str(self.host_path),
             "kernel_path": str(self.kernel_path),
             "mount_perm": self.mount_perm.value,
+            "usage_mode": self.usage_mode.value,
         }
 
     @classmethod
@@ -803,11 +901,14 @@ class VFolderMount(JSONSerializableMixin):
         return t.Dict(
             {
                 t.Key("name"): t.String,
-                t.Key("vfid"): tx.UUID,
+                t.Key("vfid"): tx.VFolderID,
                 t.Key("vfsubpath", default="."): tx.PurePath,
                 t.Key("host_path"): tx.PurePath,
                 t.Key("kernel_path"): tx.PurePath,
                 t.Key("mount_perm"): tx.Enum(MountPermission),
+                t.Key("usage_mode", default=VFolderUsageMode.GENERAL): t.Null | tx.Enum(
+                    VFolderUsageMode
+                ),
             }
         )
 
@@ -839,6 +940,32 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class QuotaConfig:
+    limit_bytes: int
+
+    class Validator(t.Trafaret):
+        def check_and_return(self, value: Any) -> QuotaConfig:
+            validator = t.Dict(
+                {
+                    t.Key("limit_bytes"): t.ToInt(),  # TODO: refactor using DecimalSize
+                }
+            )
+            converted = validator.check(value)
+            return QuotaConfig(
+                limit_bytes=converted["limit_bytes"],
+            )
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return cls.Validator()
+
+
+class QuotaScopeType(str, enum.Enum):
+    USER = "user"
+    PROJECT = "project"
 
 
 class ImageRegistry(TypedDict):
@@ -941,7 +1068,7 @@ class KernelEnqueueingConfig(TypedDict):
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
-    startup_command: str
+    startup_command: Optional[str]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
@@ -978,16 +1105,27 @@ class EtcdRedisConfig(TypedDict, total=False):
     sentinel: Optional[Union[str, List[HostPortPair]]]
     service_name: Optional[str]
     password: Optional[str]
+    redis_helper_config: RedisHelperConfig
+
+
+class RedisHelperConfig(TypedDict, total=False):
+    socket_timeout: float
+    socket_connect_timeout: float
+    reconnect_poll_timeout: float
+    max_connections: int
+    connection_ready_timeout: float
 
 
 @attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | redis.asyncio.sentinel.Sentinel
+    client: Redis
+    name: str  # connection pool name
     service_name: Optional[str]
+    sentinel: Optional[redis.asyncio.sentinel.Sentinel]
+    redis_helper_config: RedisHelperConfig
 
-    async def close(self) -> None:
-        if isinstance(self.client, Redis):
-            await self.client.close()
+    async def close(self, close_connection_pool: Optional[bool] = None) -> None:
+        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):
@@ -1002,3 +1140,55 @@ class AcceleratorMetadata(TypedDict):
     display_unit: str
     number_format: AcceleratorNumberFormat
     display_icon: str
+
+
+class AgentSelectionStrategy(enum.StrEnum):
+    DISPERSED = "dispersed"
+    CONCENTRATED = "concentrated"
+    # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
+    LEGACY = "legacy"
+
+
+class SchedulerStatus(TypedDict):
+    trigger_event: str
+    execution_time: str
+    finish_time: NotRequired[str]
+    resource_group: NotRequired[str]
+    endpoint_name: NotRequired[str]
+    action: NotRequired[str]
+
+
+class VolumeMountableNodeType(enum.StrEnum):
+    AGENT = enum.auto()
+    STORAGE_PROXY = enum.auto()
+
+
+@dataclass
+class RoundRobinState(JSONSerializableMixin):
+    schedulable_group_id: str
+    next_index: int
+
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict(
+            {
+                t.Key("schedulable_group_id"): t.String,
+                t.Key("next_index"): t.Int,
+            }
+        )
+
+
+# States of the round-robin scheduler for each resource group and architecture.
+RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+
+class ModelServiceStatus(enum.Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"

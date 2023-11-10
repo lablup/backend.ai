@@ -1,7 +1,7 @@
 """change keypair's ssh key column type
 
 Revision ID: cace152eefac
-Revises: b6b884fbae1f
+Revises: 213a04e90ecf
 Create Date: 2023-02-10 15:43:51.482204
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "cace152eefac"
-down_revision = "b6b884fbae1f"
+down_revision = "213a04e90ecf"
 branch_labels = None
 depends_on = None
 

@@ -1,0 +1,103 @@
+{
+  "deviceInfo": {
+    "cpu": {
+      "slot_name": "cpu",
+      "description": "CPU",
+      "human_readable_name": "CPU",
+      "display_unit": "Core",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "cpu"
+    },
+    "mem": {
+      "slot_name": "ram",
+      "description": "Memory",
+      "human_readable_name": "RAM",
+      "display_unit": "GiB",
+      "number_format": {
+        "binary": true,
+        "round_length": 0
+      },
+      "display_icon": "ram"
+    },
+    "cuda.device": {
+      "slot_name": "cuda.device",
+      "human_readable_name": "GPU",
+      "description": "CUDA-capable GPU",
+      "display_unit": "GPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "nvidia"
+    },
+    "cuda.shares": {
+      "slot_name": "cuda.shares",
+      "human_readable_name": "fGPU",
+      "description": "CUDA-capable GPU (fractional)",
+      "display_unit": "fGPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 2
+      },
+      "display_icon": "nvidia"
+    },
+    "rocm.device": {
+      "slot_name": "rocm.device",
+      "human_readable_name": "GPU",
+      "description": "ROCm-capable GPU",
+      "display_unit": "GPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rocm"
+    },
+    "tpu.device": {
+      "slot_name": "tpu.device",
+      "human_readable_name": "TPU",
+      "description": "TPU device",
+      "display_unit": "GPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "tpu"
+    },
+    "ipu.device": {
+      "slot_name": "ipu.device",
+      "human_readable_name": "IPU",
+      "description": "IPU device",
+      "display_unit": "IPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "ipu"
+    },
+    "atom": {
+      "slot_name": "atom.device",
+      "description": "ATOM",
+      "human_readable_name": "ATOM Device",
+      "display_unit": "ATOM",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
+    "warboy": {
+      "slot_name": "warboy.device",
+      "description": "Furiosa Warboy",
+      "human_readable_name": "Warboy Device",
+      "display_unit": "Warboy",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "furiosa"
+    }
+  }
+}

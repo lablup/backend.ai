@@ -50,6 +50,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
     root_ctx: RootContext = request.app["_root.context"]
+    resp = []
     async with root_ctx.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         log.debug("Params: {0}", params)
@@ -57,10 +58,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             body = json.loads(params["payload"])
         except json.JSONDecodeError:
             try:
-                body = yaml.safe_load(params["payload"])
+                body = yaml.safe_load_all(params["payload"])
             except (yaml.YAMLError, yaml.MarkedYAMLError):
                 raise InvalidAPIParameters("Malformed payload")
-        for st in body["session_templates"]:
+        for st in body:
             template_data = check_task_template(st["template"])
             template_id = uuid.uuid4().hex
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
@@ -81,10 +82,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 }
             )
             result = await conn.execute(query)
-            resp = {
-                "id": template_id,
-                "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
-            }
+            resp.append(
+                {
+                    "id": template_id,
+                    "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
+                }
+            )
             assert result.rowcount == 1
     return web.json_response(resp)
 
@@ -266,7 +269,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
             body = yaml.safe_load(params["payload"])
         except (yaml.YAMLError, yaml.MarkedYAMLError):
             raise InvalidAPIParameters("Malformed payload")
-        for st in body["session_templates"]:
+        for st in body:
             template_data = check_task_template(st["template"])
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
             if "group_id" in st:

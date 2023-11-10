@@ -18,6 +18,8 @@ var-base-path = "./var/lib/backend.ai"
 # allow-compute-plugins = []
 # block-compute-plugins = []
 image-commit-path = "./tmp/backend.ai/commit/"
+mount-path = "./vfroot/local"
+cohabiting-storage-proxy = true
 
 
 [container]
@@ -29,6 +31,8 @@ sandbox-type = "docker"
 scratch-type = "hostdir"
 scratch-root = "./scratches"
 scratch-size = "1G"
+scratch-nfs-address = ""
+scratch-nfs-options = ""
 
 
 [watcher]

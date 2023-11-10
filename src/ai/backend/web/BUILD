@@ -6,12 +6,15 @@ python_sources(
     ],
 )
 
-pex_binary(
-    name="server",
-    dependencies=[
-        ":src",
+visibility_private_component(
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/client/**",
+        "//src/ai/backend/cli/**",
     ],
-    entry_point="server.py",
 )
 
 python_distribution(
@@ -25,13 +28,33 @@ python_distribution(
         description="Backend.AI WebUI Host",
         license="LGPLv3",
     ),
-    entry_points={},
+    entry_points={
+        "backendai_cli_v10": {
+            "web": "ai.backend.web.cli:main",
+            "web.start-server": "ai.backend.web.server:main",
+        },
+    },
     generate_setup=True,
     tags=["wheel"],
 )
 
-resource(name="version", source="VERSION")
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
 
+scie_binary(
+    name="backendai-webserver",
+    dependencies=[":pex"],
+)
+
+resource(name="version", source="VERSION")
+resource(name="buildscript", source="BUILD")
 resources(
     name="resources",
     dependencies=[

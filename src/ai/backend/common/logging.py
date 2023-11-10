@@ -57,7 +57,13 @@ logging_config_iv = t.Dict(
         t.Key("drivers", default=["console"]): t.List(
             t.Enum("console", "logstash", "file", "graylog")
         ),
-        t.Key("console", default=None): t.Null | t.Dict(
+        t.Key(
+            "console",
+            default={
+                "colored": None,
+                "format": "verbose",
+            },
+        ): t.Dict(
             {
                 t.Key("colored", default=None): t.Null | t.Bool,
                 t.Key("format", default="verbose"): logformat_iv,
