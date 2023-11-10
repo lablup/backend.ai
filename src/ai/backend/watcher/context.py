@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager as actxmgr
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Final,
 )
 
@@ -72,15 +70,10 @@ class RootContext:
             raise TypeError(f"Duplicate watcher name. `{watcher_name}` already registered.")
         self._watchers[watcher_name] = watcher
 
-    @actxmgr
-    async def get_watcher(self, name: WatcherName) -> AsyncIterator[BaseWatcher]:
+    def get_watcher(self, name: WatcherName) -> BaseWatcher:
         try:
             watcher = self._watchers[name]
         except KeyError:
             raise InvalidWatcher(f"Watcher with name {name} not found")
 
-        await watcher.init()
-        try:
-            yield watcher
-        finally:
-            await watcher.shutdown()
+        return watcher
