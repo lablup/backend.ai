@@ -4,6 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -83,37 +84,54 @@ class OSInfo(RichCast):
 
 
 @dataclasses.dataclass()
+class ServerAddr:
+    bind: HostPortPair  # the server-bind address (e.g., 0.0.0.0:8080)
+    face: HostPortPair = cast(HostPortPair, None)  # the client-facing address (e.g., 10.1.2.3:9090)
+
+    def __post_init__(self) -> None:
+        # Ensure that face is always initialized, while its unspecified value is None.
+        if self.face is None:
+            if self.bind.host == "0.0.0.0" or self.bind.host == "::":
+                raise ValueError(
+                    f"Cannot use the server-bind address {self.bind.host!r} as the client-facing "
+                    "address. In such cases, you must specify a concrete client-facing address."
+                )
+            self.face = self.bind
+
+
+@dataclasses.dataclass()
 class HalfstackConfig:
     ha_setup: bool
-    postgres_addr: HostPortPair
+    postgres_addr: ServerAddr
     postgres_user: str
     postgres_password: str
-    redis_addr: HostPortPair | None
+    redis_addr: ServerAddr | None
     redis_sentinel_addrs: list[HostPortPair] | None
     redis_password: str | None
-    etcd_addr: list[HostPortPair]  # multiple if HA
+    etcd_addr: list[ServerAddr]  # multiple if HA
     etcd_password: str | None
 
 
 @dataclasses.dataclass()
 class ServiceConfig:
-    manager_bind: HostPortPair
+    manager_addr: ServerAddr
     manager_ipc_base_path: str
     manager_var_base_path: str
     manager_auth_key: str
-    web_bind: HostPortPair
-    web_ipc_base_path: str
-    web_var_base_path: str
-    agent_rpc_bind: HostPortPair
-    agent_watcher_bind: HostPortPair
+    webserver_addr: ServerAddr
+    webserver_ipc_base_path: str
+    webserver_var_base_path: str
+    agent_rpc_addr: ServerAddr
+    agent_watcher_addr: ServerAddr
     agent_ipc_base_path: str
     agent_var_base_path: str
-    storage_manager_facing_bind: HostPortPair
-    storage_client_facing_bind: HostPortPair
-    storage_ipc_base_path: str
-    storage_var_base_path: str
-    storage_agent_rpc_bind: HostPortPair
+    storage_proxy_manager_facing_addr: ServerAddr
+    storage_proxy_client_facing_addr: ServerAddr
+    storage_proxy_ipc_base_path: str
+    storage_proxy_var_base_path: str
+    storage_proxy_auth_key: str
+    storage_agent_rpc_addr: ServerAddr
     storage_agent_ipc_base_path: str
     storage_agent_var_base_path: str
-    storage_watcher_bind: HostPortPair
+    storage_watcher_addr: ServerAddr
     vfolder_relpath: str

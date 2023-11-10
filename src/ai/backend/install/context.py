@@ -4,15 +4,18 @@ import asyncio
 import enum
 import json
 import re
+import secrets
 import shutil
 from abc import ABCMeta, abstractmethod
 from contextvars import ContextVar
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Sequence
 
 import aiofiles
 import pkg_resources
+from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
@@ -29,7 +32,17 @@ from .dev import (
 from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
 from .http import wget
 from .python import check_python
-from .types import DistInfo, InstallInfo, OSInfo, PackageSource
+from .types import (
+    DistInfo,
+    HalfstackConfig,
+    HostPortPair,
+    InstallInfo,
+    InstallType,
+    OSInfo,
+    PackageSource,
+    ServerAddr,
+    ServiceConfig,
+)
 
 current_log: ContextVar[RichLog] = ContextVar("current_log")
 
@@ -217,7 +230,6 @@ class Context(metaclass=ABCMeta):
             alembic_path, "localhost:8100", f"{postgres_addr.host}:{postgres_addr.port}"
         )
 
-        # TODO: put manager_auth_key by using secrets.token_hex(32)
         storage_client_bind = self.install_info.service_config.storage_client_facing_bind
         storage_manager_bind = self.install_info.service_config.storage_manager_facing_bind
         data: Any = {
@@ -465,7 +477,50 @@ class Context(metaclass=ABCMeta):
 
 class DevContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
-        raise NotImplementedError  # TODO: implement
+        # TODO: customize addr/user/password options
+        # TODO: multi-node setup
+        halfstack_config = HalfstackConfig(
+            ha_setup=False,
+            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8101)),
+            postgres_user="postgres",
+            postgres_password="develove",
+            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8111)),
+            redis_sentinel_addrs=[],
+            redis_password="develove",
+            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8121))],
+            etcd_password=None,
+        )
+        service_config = ServiceConfig(
+            webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
+            webserver_ipc_base_path="ipc/webserver",
+            webserver_var_base_path="var/webserver",
+            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
+            manager_auth_key=secrets.token_urlsafe(32),
+            manager_ipc_base_path="ipc/manager",
+            manager_var_base_path="var/manager",
+            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
+            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_ipc_base_path="ipc/agent",
+            agent_var_base_path="var/agent",
+            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
+            storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_ipc_base_path="ipc/storage-proxy",
+            storage_proxy_var_base_path="var/storage-proxy",
+            storage_proxy_auth_key=secrets.token_urlsafe(32),
+            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
+            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
+            storage_agent_ipc_base_path="ipc/storage-agent",
+            storage_agent_var_base_path="var/storage-agent",
+            vfolder_relpath="vfolder/local/volume1",
+        )
+        return InstallInfo(
+            version=self.dist_info.version,
+            base_path=self.dist_info.target_path,
+            type=InstallType.SOURCE,
+            last_updated=datetime.now(tzutc()),
+            halfstack_config=halfstack_config,
+            service_config=service_config,
+        )
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os(self)
@@ -502,7 +557,50 @@ class DevContext(Context):
 
 class PackageContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
-        raise NotImplementedError  # TODO: implement
+        # TODO: customize addr/user/password options
+        # TODO: multi-node setup
+        halfstack_config = HalfstackConfig(
+            ha_setup=False,
+            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8101)),
+            postgres_user="postgres",
+            postgres_password="develove",
+            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8111)),
+            redis_sentinel_addrs=[],
+            redis_password="develove",
+            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8121))],
+            etcd_password=None,
+        )
+        service_config = ServiceConfig(
+            webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
+            webserver_ipc_base_path="ipc/webserver",
+            webserver_var_base_path="var/webserver",
+            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
+            manager_auth_key=secrets.token_urlsafe(32),
+            manager_ipc_base_path="ipc/manager",
+            manager_var_base_path="var/manager",
+            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
+            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_ipc_base_path="ipc/agent",
+            agent_var_base_path="var/agent",
+            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
+            storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_ipc_base_path="ipc/storage-proxy",
+            storage_proxy_var_base_path="var/storage-proxy",
+            storage_proxy_auth_key=secrets.token_urlsafe(32),
+            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
+            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
+            storage_agent_ipc_base_path="ipc/storage-agent",
+            storage_agent_var_base_path="var/storage-agent",
+            vfolder_relpath="vfolder/local/volume1",
+        )
+        return InstallInfo(
+            version=self.dist_info.version,
+            base_path=self.dist_info.target_path,
+            type=InstallType.PACKAGE,
+            last_updated=datetime.now(tzutc()),
+            halfstack_config=halfstack_config,
+            service_config=service_config,
+        )
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os(self)
