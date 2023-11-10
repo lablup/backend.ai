@@ -89,7 +89,7 @@ def fail_with_snap_docker_refresh_request(log) -> None:
 def fail_with_system_docker_install_request(log) -> None:
     raise PrerequisiteError(
         "Please install Docker for your system.",
-        instruction="Check out https://docs.docker.com/install/",
+        instruction="Check out https://docs.docker.com/engine/install/",
     )
 
 
