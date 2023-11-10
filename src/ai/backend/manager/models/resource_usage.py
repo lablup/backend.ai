@@ -130,7 +130,7 @@ class BaseResourceUsageGroup:
     project_id: Optional[UUID] = attrs.field(default=None)
     project_name: Optional[str] = attrs.field(default=None)
     kernel_id: Optional[UUID] = attrs.field(default=None)
-    container_id: Optional[UUID] = attrs.field(default=None)
+    container_ids: Optional[set[str]] = attrs.field(default=None)
     session_id: Optional[UUID] = attrs.field(default=None)
     session_name: Optional[str] = attrs.field(default=None)
     domain_name: Optional[str] = attrs.field(default=None)
@@ -178,7 +178,7 @@ class BaseResourceUsageGroup:
             "project_id": self.project_id,
             "project_name": self.project_name,
             "kernel_id": self.kernel_id,
-            "container_id": self.container_id,
+            "container_ids": self.container_ids,
             "session_id": self.session_id,
             "session_name": self.session_name,
             "domain_name": self.domain_name,
@@ -206,7 +206,7 @@ class BaseResourceUsageGroup:
             "project_id": to_str(self.project_id),
             "project_name": self.project_name,
             "kernel_id": to_str(self.kernel_id),
-            "container_id": to_str(self.container_id),
+            "container_ids": list(self.container_ids) if self.container_ids is not None else [],
             "session_id": to_str(self.session_id),
             "session_name": self.session_name,
             "domain_name": self.domain_name,
@@ -329,6 +329,10 @@ class SessionResourceUsage(BaseResourceUsageGroup):
                 self.agents = {*(other.agents or set())}
             else:
                 self.agents |= other.agents or set()
+            if self.container_ids is None:
+                self.container_ids = {*(other.container_ids or set())}
+            else:
+                self.container_ids |= other.container_ids or set()
         return is_registered
 
 
@@ -395,6 +399,10 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
                 self.agents = {*(other.agents or set())}
             else:
                 self.agents |= other.agents or set()
+            if self.container_ids is None:
+                self.container_ids = {*(other.container_ids or set())}
+            else:
+                self.container_ids |= other.container_ids or set()
         return is_registered
 
 
@@ -508,7 +516,7 @@ async def parse_resource_usage_groups(
             project_id=kern.session.group.id,
             project_name=kern.session.group.name,
             kernel_id=kern.id,
-            container_id=kern.container_id,
+            container_ids={kern.container_id},
             session_id=kern.session_id,
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
