@@ -109,6 +109,7 @@ class HalfstackConfig:
     redis_sentinel_addrs: list[HostPortPair] | None
     redis_password: str | None
     etcd_addr: list[ServerAddr]  # multiple if HA
+    etcd_user: str | None
     etcd_password: str | None
 
 

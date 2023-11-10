@@ -7,6 +7,7 @@ import re
 import secrets
 import shutil
 from abc import ABCMeta, abstractmethod
+from contextlib import aclosing
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
@@ -14,12 +15,15 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import aiofiles
+import asyncpg
 import pkg_resources
 from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import Label, ProgressBar, RichLog, Static
+
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 from .common import detect_os
 from .dev import (
@@ -40,6 +44,7 @@ from .types import (
     InstallType,
     OSInfo,
     PackageSource,
+    Platform,
     ServerAddr,
     ServiceConfig,
 )
@@ -90,9 +95,9 @@ class Context(metaclass=ABCMeta):
             case "Darwin":
                 await self.run_shell(f"brew install -y {distro_pkg_name}")
 
-    async def run_shell(self, script: str, **kwargs) -> int:
-        p = await asyncio.create_subprocess_shell(
-            script,
+    async def run_exec(self, cmdargs: Sequence[str], **kwargs) -> int:
+        p = await asyncio.create_subprocess_exec(
+            *cmdargs,
             stdout=kwargs.pop("stdout", asyncio.subprocess.PIPE),
             stderr=kwargs.pop("stderr", asyncio.subprocess.PIPE),
             **kwargs,
@@ -130,6 +135,9 @@ class Context(metaclass=ABCMeta):
                 exit_code = await p.wait()
         return exit_code
 
+    async def run_shell(self, script: str, **kwargs) -> int:
+        return await self.run_exec(["sh", "-c", script], **kwargs)
+
     def copy_config(self, template_name: str) -> Path:
         src_path = pkg_resources.resource_filename("ai.backend.install.configs", template_name)
         dst_path = self.dist_info.target_path / template_name
@@ -157,10 +165,40 @@ class Context(metaclass=ABCMeta):
                     content = pattern.sub(replacement, content)
         path.write_text(content)
 
+    async def run_manager_cli(self, cmdargs: Sequence[str]) -> None:
+        executable = Path(self.install_info.base_path) / "backendai-manager"
+        await self.run_exec(
+            [str(executable), *cmdargs],
+            cwd=self.install_info.base_path,
+        )
+
+    async def put_etcd_json(self, key: str, value: Any) -> None:
+        scope_prefix_map = {
+            ConfigScopes.GLOBAL: "",
+        }
+        halfstack = self.install_info.halfstack_config
+        creds: dict[str, str] | None = None
+        if halfstack.etcd_user is not None:
+            assert halfstack.etcd_password is not None
+            creds = {
+                "user": halfstack.etcd_user,
+                "password": halfstack.etcd_password,
+            }
+        etcd = AsyncEtcd(
+            self.install_info.halfstack_config.etcd_addr[0].face,
+            "local",
+            scope_prefix_map,
+            credentials=creds,
+        )
+        try:
+            await etcd.put_prefix(key, value, scope=ConfigScopes.GLOBAL)
+        finally:
+            await etcd.close()
+
     async def install_halfstack(self) -> None:
         dst_compose_path = self.copy_config("docker-compose.yml")
 
-        volume_path = self.dist_info.target_path / "volumes"
+        volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "etcd-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "redis-data").mkdir(parents=True, exist_ok=True)
@@ -170,9 +208,9 @@ class Context(metaclass=ABCMeta):
         self.sed_in_place_multi(
             dst_compose_path,
             [
-                ("8100:5432", f"{self.install_info.halfstack_config.postgres_addr.port}:5432"),
-                ("8100:6379", f"{self.install_info.halfstack_config.redis_addr.port}:6379"),
-                ("8100:2379", f"{self.install_info.halfstack_config.etcd_addr[0].port}:2379"),
+                ("8100:5432", f"{self.install_info.halfstack_config.postgres_addr.bind.port}:5432"),
+                ("8100:6379", f"{self.install_info.halfstack_config.redis_addr.bind.port}:6379"),
+                ("8100:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
         await self.run_shell(
@@ -181,45 +219,34 @@ class Context(metaclass=ABCMeta):
         sudo docker compose up -d && \\
         sudo docker compose ps
         """,
-            cwd=self.dist_info.target_path,
+            cwd=self.install_info.base_path,
         )
 
     async def load_fixtures(self) -> None:
-        r"""
-        ./backend.ai mgr schema oneshot
-        ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
-        ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
-
-        ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-        ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-        if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-          ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
-        else
-          ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-        fi
-
-        ./backend.ai mgr image rescan cr.backend.ai
-        if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-          ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
-        else
-          ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
-        fi
-        """
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+        await self.run_manager_cli(
+            ["mgr", "fixture", "populate", "fixtures/manager/example-keypairs.json"]
+        )
+        await self.run_manager_cli(
+            ["mgr", "fixture", "populate", "fixtures/manager/example-resource-presets.json"]
+        )
+        await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
 
     async def configure_manager(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
         toml_path = self.copy_config("manager.toml")
         alembic_path = self.copy_config("alembic.ini")
-
-        etcd_addr = self.install_info.halfstack_config.etcd_addr
-        postgres_addr = self.install_info.halfstack_config.postgres_addr
-
         self.sed_in_place_multi(
             toml_path,
             [
                 (re.compile("^num-proc = .*"), "num-proc = 1"),
-                ("port = 8120", f"port = {etcd_addr[0].port}"),
-                ("port = 8100", f"port = {postgres_addr.port}"),
-                ("port = 8081", f"port = {self.install_info.service_config.manager_bind.port}"),
+                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
+                ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
+                (
+                    "port = 8081",
+                    f"port = {self.install_info.service_config.manager_addr.bind.port}",
+                ),
                 (
                     re.compile("^(# )?ipc-base-path =.*"),
                     f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
@@ -227,23 +254,21 @@ class Context(metaclass=ABCMeta):
             ],
         )
         self.sed_in_place(
-            alembic_path, "localhost:8100", f"{postgres_addr.host}:{postgres_addr.port}"
+            alembic_path,
+            "localhost:8100",
+            f"{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}",
         )
-
-        storage_client_bind = self.install_info.service_config.storage_client_facing_bind
-        storage_manager_bind = self.install_info.service_config.storage_manager_facing_bind
+        await asyncio.sleep(0)
+        storage_client_facing_addr = service.storage_proxy_client_facing_addr
+        storage_manager_facing_addr = service.storage_proxy_manager_facing_addr
         data: Any = {
             "volumes": {
                 "_types": {"group": "", "user": ""},
                 "default_host": "local:volume1",
                 "proxies": {
                     "local": {
-                        "client_api": (
-                            f"http://{storage_client_bind.host}:{storage_client_bind.port}"
-                        ),
-                        "manager_api": (
-                            f"https://{storage_manager_bind.host}:{storage_manager_bind.port}"
-                        ),
+                        "client_api": f"http://{storage_client_facing_addr.face.host}:{storage_client_facing_addr.face.port}",
+                        "manager_api": f"https://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
                         "secret": self.install_info.service_config.manager_auth_key,
                         "ssl_verify": "false",
                     }
@@ -251,6 +276,8 @@ class Context(metaclass=ABCMeta):
                 "exposed_volume_info": "percentage",
             },
         }
+        await self.put_etcd_json("", data)
+        data = {}
         if self.install_info.halfstack_config.ha_setup:
             assert self.install_info.halfstack_config.redis_sentinel_addrs
             data["redis"] = {
@@ -269,7 +296,7 @@ class Context(metaclass=ABCMeta):
         else:
             assert self.install_info.halfstack_config.redis_addr
             data["redis"] = {
-                "addr": f"{self.install_info.halfstack_config.redis_addr.host}:{self.install_info.halfstack_config.redis_addr.port}",
+                "addr": f"{self.install_info.halfstack_config.redis_addr.face.host}:{self.install_info.halfstack_config.redis_addr.face.port}",
                 "password": self.install_info.halfstack_config.redis_password,
                 "helper": {
                     "socket_timeout": 5.0,
@@ -277,34 +304,30 @@ class Context(metaclass=ABCMeta):
                     "reconnect_poll_timeout": 0.3,
                 },
             }
-        (self.dist_info.target_path / "etcd.config.json").write_text(json.dumps(data))
-        # TODO: mgr etcd put-json
+        (self.install_info.base_path / "etcd.config.json").write_text(json.dumps(data))
+        await self.put_etcd_json("config", data)
 
     async def configure_agent(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
         toml_path = self.copy_config("agent.toml")
-
         self.sed_in_place_multi(
             toml_path,
             [
-                ("port = 8120", f"port = {self.install_info.halfstack_config.etcd_addr[0].port}"),
-                ("port = 6001", f"port = {self.install_info.service_config.agent_rpc_bind.port}"),
-                (
-                    "port = 6009",
-                    f"port = {self.install_info.service_config.agent_watcher_bind.port}",
-                ),
+                ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
+                ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
+                ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
                 (
                     re.compile("^(# )?ipc-base-path = .*"),
-                    f'ipc-base-path = "{self.install_info.service_config.agent_ipc_base_path}"',
+                    f'ipc-base-path = "{service.agent_ipc_base_path}"',
                 ),
                 (
                     re.compile("^(# )?var-base-path = .*"),
-                    f'var-base-path = "{self.install_info.service_config.agent_var_base_path}"',
+                    f'var-base-path = "{service.agent_var_base_path}"',
                 ),
                 (
                     re.compile("(# )?mount_path = .*"),
-                    (  # TODO
-                        f'"{self.dist_info.target_path / self.install_info.service_config.vfolder_relpath}"'
-                    ),
+                    f'"{self.install_info.base_path / service.vfolder_relpath}"',
                 ),
             ],
         )
@@ -323,32 +346,44 @@ class Context(metaclass=ABCMeta):
         """
 
     async def configure_storage_proxy(self) -> None:
-        # TODO: toml_path = self.copy_config("storage-proxy.toml")
-        r"""
-        STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
-        sed_inplace "s/port = 2379/port = ${ETCD_PORT}/" ./storage-proxy.toml
-        sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
-        sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
-        sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./storage-proxy.toml
-        # comment out all sample volumes
-        sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
-        sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
-        sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
-        sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-        sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
-        sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
-        sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
-        sed_inplace "s/^vast_/# vast_/" ./storage-proxy.toml
-        # add LOCAL_STORAGE_VOLUME vfs volume
-        echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
-        """
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        toml_path = self.copy_config("storage-proxy.toml")
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                ("port = 2379", f"port = {halfstack.etcd_addr[0].face.port}"),
+                (
+                    'secret = "some-secret-private-for-storage-proxy"',
+                    f'secret = "{service.storage_proxy_auth_key}"',
+                ),
+                (
+                    'secret = "some-secret-shared-with-manager"',
+                    f'secret = "{service.manager_auth_key}"',
+                ),
+                (
+                    re.compile("^(# )?ipc-base-path = .*"),
+                    f'ipc-base-path = "{service.storage_proxy_ipc_base_path}"',
+                ),
+                (
+                    re.compile("^(# )?var-base-path = .*"),  # unused yet
+                    f'var-base-path = "{service.storage_proxy_var_base_path}"',
+                ),
+                # the halfstack toml already has [volume.volume1] section
+                (
+                    'path = "vfolder/local/volume1"',
+                    f'path = "{service.vfolder_relpath}"',
+                ),
+            ],
+        )
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
+        service = self.install_info.service_config
         self.sed_in_place(
             conf_path,
             "https://api.backend.ai",
-            f"http://127.0.0.1:{self.install_info.service_config.manager_bind.port}",
+            f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}",
         )
 
     async def configure_webui(self) -> None:
@@ -454,25 +489,90 @@ class Context(metaclass=ABCMeta):
         """
 
     async def prepare_local_vfolder_host(self) -> None:
-        r"""
-        VFOLDER_VERSION="3"
-        VFOLDER_VERSION_TXT="version.txt"
-        show_info "Setting up virtual folder..."
-        mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
-        echo "${VFOLDER_VERSION}" > "${ROOT_PATH}/${VFOLDER_REL_PATH}/${VFOLDER_VERSION_TXT}"
-        ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
-        mkdir -p scratches
-        POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
-        ALL_VFOLDER_HOST_PERM='["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]'
-        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
-        $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
-
-        """
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
+        volume_root.mkdir(parents=True, exist_ok=True)
+        await asyncio.sleep(0)
+        Path(volume_root / "version.txt").write_text("3")
+        scratch_root = Path(self.install_info.base_path / "scratches")
+        scratch_root.mkdir(parents=True, exist_ok=True)
+        await asyncio.sleep(0)
+        async with aclosing(
+            await asyncpg.connect(
+                host=halfstack.postgres_addr.face.host,
+                port=halfstack.postgres_addr.face.port,
+                user=halfstack.postgres_user,
+                password=halfstack.postgres_password,
+                database="backend",
+            )
+        ) as conn:
+            default_vfolder_host_perms = [
+                "create-vfolder",
+                "modify-vfolder",
+                "delete-vfolder",
+                "mount-in-session",
+                "upload-file",
+                "download-file",
+                "invite-others",
+                "set-user-specific-permission",
+            ]
+            await conn.execute(
+                "UPDATE domains SET allowed_vfolder_hosts = $1",
+                {"local:volume1": default_vfolder_host_perms},
+            )
+            await conn.execute(
+                "UPDATE groups SET allowed_vfolder_hosts = $1",
+                {"local:volume1": default_vfolder_host_perms},
+            )
+            await conn.execute(
+                "UPDATE keypair_resource_policies SET allowed_vfolder_hosts = $1",
+                {"local:volume1": default_vfolder_host_perms},
+            )
+            await conn.execute(
+                "UPDATE vfolders SET host = $1",
+                "local:volume1",
+            )
 
     async def populate_images(self) -> None:
-        pass
+        if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+            project = "stable,community,multiarch"
+        else:
+            project = "stable,community"
+        data: Any = {
+            "docker": {
+                "registry": {
+                    "cr.backend.ai": {
+                        "": "https://cr.backend.ai",
+                        "type": "harbor2",
+                        "project": project,
+                    },
+                },
+            },
+        }
+        await self.put_etcd_json("config", data)
+        if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+            await self.run_manager_cli(
+                [
+                    "mgr",
+                    "image",
+                    "alias",
+                    "python",
+                    "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                    "aarch64",
+                ]
+            )
+        else:
+            await self.run_manager_cli(
+                [
+                    "mgr",
+                    "image",
+                    "alias",
+                    "python",
+                    "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                    "x86_64",
+                ]
+            )
 
 
 class DevContext(Context):
@@ -488,6 +588,7 @@ class DevContext(Context):
             redis_sentinel_addrs=[],
             redis_password="develove",
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8121))],
+            etcd_user=None,
             etcd_password=None,
         )
         service_config = ServiceConfig(
@@ -495,7 +596,7 @@ class DevContext(Context):
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            manager_auth_key=secrets.token_urlsafe(32),
+            manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
@@ -506,7 +607,7 @@ class DevContext(Context):
             storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_auth_key=secrets.token_urlsafe(32),
+            storage_proxy_auth_key=secrets.token_hex(32),
             storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
             storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
             storage_agent_ipc_base_path="ipc/storage-agent",
@@ -544,11 +645,19 @@ class DevContext(Context):
         """
 
     async def configure(self) -> None:
+        self.log_header("Configuring manager...")
         await self.configure_manager()
+        self.log_header("Configuring agent...")
         await self.configure_agent()
+        self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
+        self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Loading fixtures...")
+        await self.load_fixtures()
+        self.log_header("Preparing vfolder volumes...")
+        await self.prepare_local_vfolder_host()
 
     async def populate_images(self) -> None:
         # TODO: docker pull
@@ -568,6 +677,7 @@ class PackageContext(Context):
             redis_sentinel_addrs=[],
             redis_password="develove",
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8121))],
+            etcd_user=None,
             etcd_password=None,
         )
         service_config = ServiceConfig(
@@ -651,6 +761,8 @@ class PackageContext(Context):
         self.log.write(f"Verifying {dst_path} ...")
         csum_path = dst_path.with_name(pkg_name + ".sha256")
         await self._validate_checksum(dst_path, csum_path)
+        csum_path.unlink()
+        dst_path.rename(dst_path.with_name(f"backendai-{name}"))
 
     async def _install_package(self, name: str, vpane: Vertical, *, fat: bool) -> None:
         pkg_name = self._mangle_pkgname(name, fat=fat)
@@ -751,6 +863,10 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Loading fixtures...")
+        await self.load_fixtures()
+        self.log_header("Preparing vfolder volumes...")
+        await self.prepare_local_vfolder_host()
         # TODO: install as systemd services?
 
     async def populate_images(self) -> None:
