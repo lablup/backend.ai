@@ -176,7 +176,7 @@ scratch-root = "./scratches"    # env: BACKEND_SCRATCH_ROOT
 
 # Limit the maximum size of the scratch space.
 # If set zero, it is unlimited.
-scratch-size = "1G"
+scratch-size = "10G"
 
 # Enable legacy swarm mode.
 # This should be true to let this agent handles multi-container session.
