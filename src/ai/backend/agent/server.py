@@ -955,6 +955,13 @@ def main(
         )
         raise click.Abort()
 
+    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+        print(
+            "Cannot use hostfile scratch type unless the agent runs as root.",
+            file=sys.stderr,
+        )
+        raise click.Abort()
+
     if cli_ctx.invoked_subcommand is None:
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
