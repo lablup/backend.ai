@@ -2,6 +2,7 @@ python_sources(
     name="src",
     dependencies=[
         ":resources",
+        "./configs:src",
     ],
 )
 

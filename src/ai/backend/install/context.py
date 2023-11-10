@@ -141,6 +141,7 @@ class Context(metaclass=ABCMeta):
     def copy_config(self, template_name: str) -> Path:
         src_path = pkg_resources.resource_filename("ai.backend.install.configs", template_name)
         dst_path = self.dist_info.target_path / template_name
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(src_path, dst_path)
         return dst_path
 

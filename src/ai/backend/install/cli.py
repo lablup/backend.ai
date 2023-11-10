@@ -12,6 +12,7 @@ from weakref import WeakSet
 import click
 from rich.console import Console
 from rich.text import Text
+from rich.traceback import Traceback
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -75,6 +76,7 @@ class DevSetup(Static):
         except Exception as e:
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
+            _log.write(Traceback())
         finally:
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
@@ -129,6 +131,7 @@ class PackageSetup(Static):
         except Exception as e:
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
+            _log.write(Traceback())
         finally:
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))

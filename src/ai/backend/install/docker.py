@@ -72,6 +72,15 @@ async def detect_system_docker():
             break
     else:
         return None
+    proc = await asyncio.create_subprocess_exec(
+        *["sudo", "chmod", "666", str(sock_path)],
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    assert proc.stdout is not None
+    stdout = await proc.stdout.read()
+    if (await proc.wait()) != 0:
+        raise RuntimeError("Failed to set the docker socket permission", stdout.decode())
     async with request_unix("GET", str(sock_path), "http://localhost/version") as r:
         if r.status != 200:
             raise RuntimeError("Failed to query the Docker daemon API")
@@ -79,21 +88,21 @@ async def detect_system_docker():
         return response_data["Version"]
 
 
-def fail_with_snap_docker_refresh_request(log) -> None:
+def fail_with_snap_docker_refresh_request() -> None:
     raise PrerequisiteError(
         "Please install Docker 20.10.15 or later from the Snap package index.",
         instruction="Try running `sudo snap refresh docker --edge`",
     )
 
 
-def fail_with_system_docker_install_request(log) -> None:
+def fail_with_system_docker_install_request() -> None:
     raise PrerequisiteError(
         "Please install Docker for your system.",
         instruction="Check out https://docs.docker.com/engine/install/",
     )
 
 
-def fail_with_compose_install_request(log) -> None:
+def fail_with_compose_install_request() -> None:
     raise PrerequisiteError(
         "Please install docker-compose v2 or later.",
         instruction="Check out https://docs.docker.com/compose/install/",
@@ -119,13 +128,13 @@ async def check_docker(ctx: Context) -> None:
     if docker_version is not None:
         ctx.log.write(f"Detected Docker installation: Snap package ({docker_version})")
         if parse_version(docker_version) < (20, 10, 15):
-            fail_with_snap_docker_refresh_request(ctx.log)
+            fail_with_snap_docker_refresh_request()
     else:
         docker_version = await detect_system_docker()
         if docker_version is not None:
             ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
         else:
-            fail_with_system_docker_install_request(ctx.log)
+            fail_with_system_docker_install_request()
 
     proc = await asyncio.create_subprocess_exec(
         "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
@@ -134,7 +143,7 @@ async def check_docker(ctx: Context) -> None:
     stdout = await proc.stdout.read()
     exit_code = await proc.wait()
     if exit_code != 0:
-        fail_with_compose_install_request(ctx.log)
+        fail_with_compose_install_request()
     m = re.search(r"\d+\.\d+\.\d+", stdout.decode())
     if m is None:
         raise PrerequisiteError("Failed to retrieve the docker-compose version!")
@@ -142,7 +151,7 @@ async def check_docker(ctx: Context) -> None:
         compose_version = m.group(0)
         ctx.log.write(f"Detected docker-compose installation ({compose_version})")
         if parse_version(compose_version) < (2, 0, 0):
-            fail_with_compose_install_request(ctx.log)
+            fail_with_compose_install_request()
 
 
 async def check_docker_desktop_mount(ctx: Context) -> None:
