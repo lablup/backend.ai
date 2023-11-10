@@ -7,7 +7,6 @@ import re
 import secrets
 import shutil
 from abc import ABCMeta, abstractmethod
-from contextlib import aclosing
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
@@ -15,6 +14,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import aiofiles
+import aiotools
 import asyncpg
 import pkg_resources
 from dateutil.tz import tzutc
@@ -224,20 +224,23 @@ class Context(metaclass=ABCMeta):
         )
 
     async def load_fixtures(self) -> None:
+        fixture_path = Path(pkg_resources.resource_filename("ai.backend.install.fixtures", ""))
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
         await self.run_manager_cli(
-            ["mgr", "fixture", "populate", "fixtures/manager/example-keypairs.json"]
+            ["mgr", "fixture", "populate", str(fixture_path / "example-keypairs.json")]
         )
         await self.run_manager_cli(
-            ["mgr", "fixture", "populate", "fixtures/manager/example-resource-presets.json"]
+            ["mgr", "fixture", "populate", str(fixture_path / "example-resource-presets.json")]
         )
-        await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
 
     async def configure_manager(self) -> None:
+        base_path = self.install_info.base_path
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         toml_path = self.copy_config("manager.toml")
         alembic_path = self.copy_config("alembic.ini")
+        (base_path / "fixtures" / "manager").mkdir(parents=True, exist_ok=True)
+        await self.run_manager_cli(["mgr", "generate-rpc-keypair", "fixtures/manager", "manager"])
         self.sed_in_place_multi(
             toml_path,
             [
@@ -499,7 +502,7 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
-        async with aclosing(
+        async with aiotools.closing_async(
             await asyncpg.connect(
                 host=halfstack.postgres_addr.face.host,
                 port=halfstack.postgres_addr.face.port,
@@ -518,20 +521,21 @@ class Context(metaclass=ABCMeta):
                 "invite-others",
                 "set-user-specific-permission",
             ]
+            update_arg = json.dumps({"local:volume1": default_vfolder_host_perms})
             await conn.execute(
-                "UPDATE domains SET allowed_vfolder_hosts = $1",
-                {"local:volume1": default_vfolder_host_perms},
+                "UPDATE domains SET allowed_vfolder_hosts = $1::jsonb;",
+                update_arg,
             )
             await conn.execute(
-                "UPDATE groups SET allowed_vfolder_hosts = $1",
-                {"local:volume1": default_vfolder_host_perms},
+                "UPDATE groups SET allowed_vfolder_hosts = $1::jsonb;",
+                update_arg,
             )
             await conn.execute(
-                "UPDATE keypair_resource_policies SET allowed_vfolder_hosts = $1",
-                {"local:volume1": default_vfolder_host_perms},
+                "UPDATE keypair_resource_policies SET allowed_vfolder_hosts = $1::jsonb;",
+                update_arg,
             )
             await conn.execute(
-                "UPDATE vfolders SET host = $1",
+                "UPDATE vfolders SET host = $1;",
                 "local:volume1",
             )
 
@@ -552,6 +556,7 @@ class Context(metaclass=ABCMeta):
             },
         }
         await self.put_etcd_json("config", data)
+        await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
         if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
             await self.run_manager_cli(
                 [
@@ -587,7 +592,7 @@ class DevContext(Context):
             postgres_password="develove",
             redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
             redis_sentinel_addrs=[],
-            redis_password="develove",
+            redis_password=None,
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
             etcd_user=None,
             etcd_password=None,
@@ -676,7 +681,7 @@ class PackageContext(Context):
             postgres_password="develove",
             redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
             redis_sentinel_addrs=[],
-            redis_password="develove",
+            redis_password=None,
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
             etcd_user=None,
             etcd_password=None,

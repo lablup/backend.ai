@@ -3,6 +3,7 @@ python_sources(
     dependencies=[
         ":resources",
         "./configs:src",
+        "./fixtures:src",
     ],
 )
 
@@ -80,6 +81,7 @@ resources(
     dependencies=[
         ":version",
         "./configs:templates",
+        "./fixtures:resources",
     ],
     sources=[
         "**/py.typed",
