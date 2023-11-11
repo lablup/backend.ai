@@ -396,18 +396,12 @@ class Context(metaclass=ABCMeta):
         conf_path = self.copy_config("webserver.conf")
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        self.sed_in_place_multi(
-            conf_path,
-            [
-                (
-                    "https://api.backend.ai",
-                    f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}",
-                ),
-            ],
-        )
         assert halfstack.redis_addr is not None
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
+            data["api"][  # type: ignore
+                "endpoint"
+            ] = f"http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}"
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -436,7 +430,15 @@ class Context(metaclass=ABCMeta):
             tomlkit.dump(data, fp)
 
     async def configure_webui(self) -> None:
-        pass
+        dotenv_path = self.install_info.base_path / ".env"
+        service = self.install_info.service_config
+        envs = [
+            f"PROXYLISTENIP={service.local_proxy_addr.bind.host}",
+            f"PROXYBASEHOST={service.local_proxy_addr.face.host}",
+            f"PROXYBASEPORT={service.local_proxy_addr.face.port}",
+            "",
+        ]
+        dotenv_path.write_text("\n".join(envs))
 
     async def configure_client(self) -> None:
         r"""
@@ -534,7 +536,7 @@ class Context(metaclass=ABCMeta):
 
     async def dump_install_info(self) -> None:
         base_path = self.install_info.base_path
-        etcd_dump = await self.etcd_get_json("")
+        etcd_dump = dict(await self.etcd_get_json(""))  # conv chainmap to normal dict
         (base_path / "etcd.installed.json").write_text(json.dumps(etcd_dump))
         (Path.cwd() / "INSTALL-INFO").write_text(self.install_info.model_dump_json())
 
@@ -654,6 +656,7 @@ class DevContext(Context):
             manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
+            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
@@ -739,6 +742,7 @@ class PackageContext(Context):
             manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
+            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
