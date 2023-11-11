@@ -581,6 +581,9 @@ class Context(metaclass=ABCMeta):
             project = "stable,community"
         data: Any = {
             "docker": {
+                "image": {
+                    "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
+                },
                 "registry": {
                     "cr.backend.ai": {
                         "": "https://cr.backend.ai",
@@ -833,7 +836,6 @@ class PackageContext(Context):
         )
 
     async def install(self) -> None:
-        return
         vpane = Vertical(id="download-status")
         await self.log.mount(vpane)
         try:
