@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import importlib.resources
 import json
 import os
 import re
@@ -9,16 +10,16 @@ import secrets
 import shutil
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
+from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Iterator, Sequence
 
 import aiofiles
 import aiotools
 import asyncpg
-import pkg_resources
 import tomlkit
 from dateutil.tz import tzutc
 from rich.text import Text
@@ -93,6 +94,17 @@ class Context(metaclass=ABCMeta):
             return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
+    @staticmethod
+    @contextmanager
+    def resource_path(pkg: str, filename: str) -> Iterator[Path]:
+        # pkg_resources is deprecated since .
+        # importlib handles zipped resources as well.
+        path_provider = importlib.resources.as_file(
+            importlib.resources.files(pkg).joinpath(filename)
+        )
+        with path_provider as resource_path:
+            yield resource_path
+
     async def install_system_package(self, name: dict[str, list[str]]) -> None:
         distro_pkg_name = " ".join(name[self.os_info.distro])
         match self.os_info.distro:
@@ -149,10 +161,10 @@ class Context(metaclass=ABCMeta):
         return await self.run_exec(["sh", "-c", script], **kwargs)
 
     def copy_config(self, template_name: str) -> Path:
-        src_path = pkg_resources.resource_filename("ai.backend.install.configs", template_name)
-        dst_path = self.dist_info.target_path / template_name
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(src_path, dst_path)
+        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
+            dst_path = self.dist_info.target_path / template_name
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(src_path, dst_path)
         return dst_path
 
     @staticmethod
@@ -242,14 +254,13 @@ class Context(metaclass=ABCMeta):
         )
 
     async def load_fixtures(self) -> None:
-        fixture_path = Path(pkg_resources.resource_filename("ai.backend.install.fixtures", ""))
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
-        await self.run_manager_cli(
-            ["mgr", "fixture", "populate", str(fixture_path / "example-keypairs.json")]
-        )
-        await self.run_manager_cli(
-            ["mgr", "fixture", "populate", str(fixture_path / "example-resource-presets.json")]
-        )
+        with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-resource-presets.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
     async def configure_manager(self) -> None:
         base_path = self.install_info.base_path
@@ -452,11 +463,11 @@ class Context(metaclass=ABCMeta):
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
         service = self.install_info.service_config
-        keypair_path = pkg_resources.resource_filename(
+        with self.resource_path(
             "ai.backend.install.fixtures", "example-keypairs.json"
-        )
-        current_shell = os.environ.get("SHELL", "sh")
-        keypair_data = json.loads(Path(keypair_path).read_bytes())
+        ) as keypair_path:
+            current_shell = os.environ.get("SHELL", "sh")
+            keypair_data = json.loads(Path(keypair_path).read_bytes())
         for keypair in keypair_data["keypairs"]:
             email = keypair["user_id"]
             if match := re.search(r"^(\w+)@", email):
