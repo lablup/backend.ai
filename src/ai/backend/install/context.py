@@ -7,11 +7,12 @@ import re
 import secrets
 import shutil
 from abc import ABCMeta, abstractmethod
+from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 import aiofiles
 import aiotools
@@ -174,11 +175,12 @@ class Context(metaclass=ABCMeta):
             cwd=self.install_info.base_path,
         )
 
-    async def put_etcd_json(self, key: str, value: Any) -> None:
+    @actxmgr
+    async def etcd_ctx(self) -> AsyncIterator[AsyncEtcd]:
+        halfstack = self.install_info.halfstack_config
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
         }
-        halfstack = self.install_info.halfstack_config
         creds: dict[str, str] | None = None
         if halfstack.etcd_user is not None:
             assert halfstack.etcd_password is not None
@@ -193,9 +195,17 @@ class Context(metaclass=ABCMeta):
             credentials=creds,
         )
         try:
-            await etcd.put_prefix(key, value, scope=ConfigScopes.GLOBAL)
+            yield etcd
         finally:
             await etcd.close()
+
+    async def etcd_put_json(self, key: str, value: Any) -> None:
+        async with self.etcd_ctx() as etcd:
+            await etcd.put_prefix(key, value, scope=ConfigScopes.GLOBAL)
+
+    async def etcd_get_json(self, key: str) -> Any:
+        async with self.etcd_ctx() as etcd:
+            return await etcd.get_prefix(key, scope=ConfigScopes.GLOBAL)
 
     async def install_halfstack(self) -> None:
         dst_compose_path = self.copy_config("docker-compose.yml")
@@ -280,7 +290,7 @@ class Context(metaclass=ABCMeta):
                 "exposed_volume_info": "percentage",
             },
         }
-        await self.put_etcd_json("", data)
+        await self.etcd_put_json("", data)
         data = {}
         if halfstack.ha_setup:
             assert halfstack.redis_sentinel_addrs
@@ -310,7 +320,7 @@ class Context(metaclass=ABCMeta):
             if halfstack.redis_password:
                 data["redis"]["password"] = halfstack.redis_password
         (base_path / "etcd.config.json").write_text(json.dumps(data))
-        await self.put_etcd_json("config", data)
+        await self.etcd_put_json("config", data)
 
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -522,10 +532,11 @@ class Context(metaclass=ABCMeta):
 
         """
 
-    async def dump_etcd_config(self) -> None:
-        r"""
-        ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json
-        """
+    async def dump_install_info(self) -> None:
+        base_path = self.install_info.base_path
+        etcd_dump = await self.etcd_get_json("")
+        (base_path / "etcd.installed.json").write_text(json.dumps(etcd_dump))
+        (Path.cwd() / "INSTALL-INFO").write_text(self.install_info.model_dump_json())
 
     async def prepare_local_vfolder_host(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -593,7 +604,7 @@ class Context(metaclass=ABCMeta):
                 },
             },
         }
-        await self.put_etcd_json("config", data)
+        await self.etcd_put_json("config", data)
         await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
         if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
             await self.run_manager_cli(

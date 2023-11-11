@@ -64,7 +64,7 @@ class DevSetup(Static):
             await ctx.configure()
             # post-setup
             await ctx.populate_images()
-            await ctx.dump_etcd_config()
+            await ctx.dump_install_info()
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -118,7 +118,7 @@ class PackageSetup(Static):
             await ctx.configure()
             # post-setup
             await ctx.populate_images()
-            await ctx.dump_etcd_config()
+            await ctx.dump_install_info()
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
