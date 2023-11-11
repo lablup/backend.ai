@@ -26,6 +26,13 @@ class PackageSource(enum.StrEnum):
     LOCAL_DIR = "local-dir"
 
 
+class ImageSource(enum.StrEnum):
+    BACKENDAI_REGISTRY = "cr.backend.ai"
+    DOCKER_HUB = "index.docker.io"
+    LOCAL_REGISTRY = "local-registry"  # not implemented yet
+    LOCAL_DIR = "local-dir"
+
+
 class InstallType(enum.StrEnum):
     SOURCE = "source"
     PACKAGE = "package"
@@ -57,12 +64,19 @@ class PrerequisiteError(RichCast, Exception):
         return Text.from_markup(text)
 
 
+class LocalImageSource(BaseModel):
+    ref: str
+    file: Path
+
+
 class DistInfo(BaseModel):
     version: str = __version__
     package_source: PackageSource = PackageSource.GITHUB_RELEASE
     package_dir: Path = Field(default_factory=Path.cwd)
     use_fat_binary: bool = False
     target_path: Path = Field(default_factory=lambda: Path.home() / "backendai")
+    image_source: ImageSource = ImageSource.BACKENDAI_REGISTRY
+    image_sources: list[LocalImageSource] = Field(default_factory=list)
 
 
 class InstallInfo(BaseModel):
