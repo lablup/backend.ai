@@ -700,10 +700,6 @@ class DevContext(Context):
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
 
-    async def populate_images(self) -> None:
-        # TODO: docker pull
-        pass
-
 
 class PackageContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
@@ -911,8 +907,3 @@ class PackageContext(Context):
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
         # TODO: install as systemd services?
-
-    async def populate_images(self) -> None:
-        # TODO: docker load
-        self.log_header("Loading docker images...")
-        pass
