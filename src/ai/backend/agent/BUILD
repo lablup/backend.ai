@@ -47,7 +47,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "src/ai/backend/kernel:src",
+        "src/ai/backend/kernel:src",  # included only in binary dists
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -71,6 +71,7 @@ pex_binary(
     dependencies=[
         ":src",
         ":buildscript",
+        "//src/ai/backend/kernel:src",  # included only in binary dists
         # Bundle cuda-open and mock accelerator plugins
         "//src/ai/backend/accelerator/cuda_open:lib",
         "//src/ai/backend/accelerator/cuda_open:buildscript",
