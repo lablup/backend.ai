@@ -17,6 +17,7 @@ import aiofiles
 import aiotools
 import asyncpg
 import pkg_resources
+import tomlkit
 from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
@@ -216,7 +217,6 @@ class Context(metaclass=ABCMeta):
         )
         await self.run_shell(
             """
-        sudo docker compose pull && \\
         sudo docker compose up -d && \\
         sudo docker compose ps
         """,
@@ -384,12 +384,46 @@ class Context(metaclass=ABCMeta):
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
+        halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        self.sed_in_place(
+        self.sed_in_place_multi(
             conf_path,
-            "https://api.backend.ai",
-            f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}",
+            [
+                (
+                    "https://api.backend.ai",
+                    f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}",
+                ),
+            ],
         )
+        assert halfstack.redis_addr is not None
+        with conf_path.open("r") as fp:
+            data = tomlkit.load(fp)
+            helper_table = tomlkit.table()
+            helper_table["socket_timeout"] = 5.0
+            helper_table["socket_connect_timeout"] = 2.0
+            helper_table["reconnect_poll_timeout"] = 0.3
+            if halfstack.ha_setup:
+                assert halfstack.redis_sentinel_addrs
+                redis_table = tomlkit.table()
+                redis_table["sentinel"] = ",".join(
+                    f"{binding.host}:{binding.port}" for binding in halfstack.redis_sentinel_addrs
+                )
+                redis_table["service_name"] = "mymaster"
+                redis_table["redis_helper_config"] = helper_table
+                if halfstack.redis_password:
+                    redis_table["password"] = halfstack.redis_password
+            else:
+                assert halfstack.redis_addr
+                redis_table = tomlkit.table()
+                redis_table["addr"] = (
+                    f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"
+                )
+                redis_table["redis_helper_config"] = helper_table
+                if halfstack.redis_password:
+                    redis_table["password"] = halfstack.redis_password
+            data["session"]["redis"] = redis_table  # type: ignore
+        with conf_path.open("w") as fp:
+            tomlkit.dump(data, fp)
 
     async def configure_webui(self) -> None:
         pass
@@ -803,6 +837,7 @@ class PackageContext(Context):
         )
 
     async def install(self) -> None:
+        return
         vpane = Vertical(id="download-status")
         await self.log.mount(vpane)
         try:
