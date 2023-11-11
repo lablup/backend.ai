@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import json
+import os
 import re
 import secrets
 import shutil
@@ -84,6 +85,12 @@ class Context(metaclass=ABCMeta):
 
     def log_header(self, title: str) -> None:
         self.log.write(Text.from_markup(f"[bright_green]:green_circle: {title}"))
+
+    def mangle_pkgname(self, name: str, fat: bool = False) -> str:
+        # local-proxy does not have fat variant. (It is always fat.)
+        if fat and name != "backendai-local-proxy":
+            return f"backendai-{name}-fat-{self.os_info.platform}"
+        return f"backendai-{name}-{self.os_info.platform}"
 
     async def install_system_package(self, name: dict[str, list[str]]) -> None:
         distro_pkg_name = " ".join(name[self.os_info.distro])
@@ -441,98 +448,57 @@ class Context(metaclass=ABCMeta):
         dotenv_path.write_text("\n".join(envs))
 
     async def configure_client(self) -> None:
-        r"""
-        CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
-        CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
-        echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_ADMIN_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-        chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
-        echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-
-        case $(basename $SHELL) in
-          fish)
-              echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-              echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-          ;;
-          *)
-              echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-              echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-          ;;
-        esac
-
-        echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-        echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-        echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-        echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-        chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-        CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
-        CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
-        echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-        chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-        echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-
-        case $(basename $SHELL) in
-          fish)
-              echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-              echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-          ;;
-          *)
-              echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-              echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-          ;;
-        esac
-
-        echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-        echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-        echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-        echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-        chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-        CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
-        CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
-        echo "# Directly access to the manager using API keypair (user)" > "${CLIENT_USER_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
-        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
-        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
-        chmod +x "${CLIENT_USER_CONF_FOR_API}"
-        CLIENT_USER2_CONF_FOR_API="env-local-user2-api.sh"
-        CLIENT_USER2_CONF_FOR_SESSION="env-local-user2-session.sh"
-        echo "# Directly access to the manager using API keypair (user2)" > "${CLIENT_USER2_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER2_CONF_FOR_API}"
-        echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .access_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
-        echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .secret_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
-        echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
-        chmod +x "${CLIENT_USER2_CONF_FOR_API}"
-        echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
-        echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-
-        case $(basename $SHELL) in
-          fish)
-              echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-              echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-          ;;
-          *)
-              echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-              echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-          ;;
-        esac
-
-        echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-        echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-        echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-        echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-        chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
-
-        """
+        # TODO: add an option to generate keypairs
+        base_path = self.install_info.base_path
+        service = self.install_info.service_config
+        keypair_path = pkg_resources.resource_filename(
+            "ai.backend.install.fixtures", "example-keypairs.json"
+        )
+        current_shell = os.environ.get("SHELL", "sh")
+        keypair_data = json.loads(Path(keypair_path).read_bytes())
+        for keypair in keypair_data["keypairs"]:
+            email = keypair["user_id"]
+            if match := re.search(r"^(\w+)@", email):
+                username = match.group(1)
+            else:
+                continue
+            with open(base_path / f"env-local-{username}-api.sh", "w") as fp:
+                print("# Directly access to the manager using API keypair (admin)", file=fp)
+                print(
+                    "export"
+                    f" BACKEND_ENDPOINT=http://{service.manager_addr.face.host}:{service.manager_addr.face.port}/",
+                    file=fp,
+                )
+                print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
+                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
+                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+        for user in keypair_data["users"]:
+            username = user["username"]
+            with open(base_path / f"env-local-{username}-session.sh", "w") as fp:
+                print(
+                    "# Indirectly access to the manager via the web server using a cookie-based"
+                    " login session",
+                    file=fp,
+                )
+                print(
+                    "export"
+                    f" BACKEND_ENDPOINT=http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}/",
+                    file=fp,
+                )
+                print("export BACKEND_ENDPOINT_TYPE=session", file=fp)
+                if current_shell == "fish":
+                    print("set -e BACKEND_ACCESS_KEY", file=fp)
+                    print("set -e BACKEND_SECRET_KEY", file=fp)
+                else:
+                    print("unset BACKEND_ACCESS_KEY", file=fp)
+                    print("unset BACKEND_SECRET_KEY", file=fp)
+                client_executable = self.mangle_pkgname("client")
+                print(
+                    f"""echo 'Run `./{client_executable} login` to activate a login session.'""",
+                    file=fp,
+                )
+                print(f"""echo 'Your email: {user['email']}'""", file=fp)
+                print(f"""echo 'Your password: {user['password']}'""", file=fp)
 
     async def dump_install_info(self) -> None:
         base_path = self.install_info.base_path
@@ -712,6 +678,8 @@ class DevContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Generating client environ configs...")
+        await self.configure_client()
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
         self.log_header("Preparing vfolder volumes...")
@@ -773,12 +741,6 @@ class PackageContext(Context):
         if self.os_info.distro == "Darwin":
             await check_docker_desktop_mount(self)
 
-    def _mangle_pkgname(self, name: str, fat: bool = False) -> str:
-        # local-proxy does not have fat variant. (It is always fat.)
-        if fat and name != "backendai-local-proxy":
-            return f"backendai-{name}-fat-{self.os_info.platform}"
-        return f"backendai-{name}-{self.os_info.platform}"
-
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
             *["sha256sum", "-c", csum_path.name],
@@ -795,7 +757,7 @@ class PackageContext(Context):
         )
 
     async def _fetch_package(self, name: str, vpane: Vertical) -> None:
-        pkg_name = self._mangle_pkgname(name)
+        pkg_name = self.mangle_pkgname(name)
         dst_path = self.dist_info.target_path / pkg_name
         csum_path = dst_path.with_name(pkg_name + ".sha256")
         pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
@@ -811,7 +773,7 @@ class PackageContext(Context):
             await wget(csum_url, csum_path)
 
     async def _verify_package(self, name: str, *, fat: bool) -> None:
-        pkg_name = self._mangle_pkgname(name, fat=fat)
+        pkg_name = self.mangle_pkgname(name, fat=fat)
         dst_path = self.dist_info.target_path / pkg_name
         self.log.write(f"Verifying {dst_path} ...")
         csum_path = dst_path.with_name(pkg_name + ".sha256")
@@ -821,7 +783,7 @@ class PackageContext(Context):
         dst_path.rename(dst_path.with_name(f"backendai-{name}"))
 
     async def _install_package(self, name: str, vpane: Vertical, *, fat: bool) -> None:
-        pkg_name = self._mangle_pkgname(name, fat=fat)
+        pkg_name = self.mangle_pkgname(name, fat=fat)
         src_path = self.dist_info.package_dir / pkg_name
         dst_path = self.dist_info.target_path / pkg_name
         item = Static(classes="progress-item")
@@ -919,6 +881,8 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Generating client environ configs...")
+        await self.configure_client()
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
         self.log_header("Preparing vfolder volumes...")
