@@ -312,10 +312,7 @@ class DockerKernel(AbstractKernel):
 
         files = []
         for f in os.scandir(sys.argv[1]):
-            if f.is_symlink():
-                fstat = os.lstat(f)
-            else:
-                fstat = f.stat()
+            fstat = f.stat(follow_symlinks=False)
 
             ctime = fstat.st_ctime  # TODO: way to get concrete create time?
             mtime = fstat.st_mtime
