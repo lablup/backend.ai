@@ -19,10 +19,16 @@ from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.manager.models.image import ImageRow, ImageType
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+from ..models.image import ImageRow, ImageType
+from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
+progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
+    "progress_reporter", default=None
+)
+all_updates: ContextVar[Dict[ImageRef, Dict[str, Any]]] = ContextVar("all_updates")
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -34,10 +40,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     base_hdrs: Dict[str, str]
     credentials: Dict[str, str]
     ssl_verify: bool
-
-    sema: ContextVar[asyncio.Semaphore]
-    reporter: ContextVar[Optional[ProgressReporter]]
-    all_updates: ContextVar[Dict[ImageRef, Dict[str, Any]]]
 
     def __init__(
         self,
@@ -58,10 +60,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         }
         self.credentials = {}
         self.ssl_verify = ssl_verify
-        self.sema = ContextVar("sema")
-        self.reporter = ContextVar("reporter", default=None)
-        self.all_updates = ContextVar("all_updates")
 
+    @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         ssl_ctx = None  # default
         if not self.registry_info["ssl_verify"]:
@@ -74,26 +74,26 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         reporter: ProgressReporter | None = None,
     ) -> None:
-        self.all_updates.set({})
-        self.sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
-        self.reporter.set(reporter)
+        all_updates.set({})
+        concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
+        progress_reporter.set(reporter)
         username = self.registry_info["username"]
         if username is not None:
             self.credentials["username"] = username
         password = self.registry_info["password"]
         if password is not None:
             self.credentials["password"] = password
-        async with actxmgr(self.prepare_client_session)() as (url, client_session):
+        async with self.prepare_client_session() as (url, client_session):
             self.registry_url = url
             async with aiotools.TaskGroup() as tg:
                 async for image in self.fetch_repositories(client_session):
                     tg.create_task(self._scan_image(client_session, image))
 
-        all_updates = self.all_updates.get()
-        if not all_updates:
+        _all_updates = all_updates.get()
+        if not _all_updates:
             log.info("No images found in registry {0}", self.registry_url)
         else:
-            image_identifiers = [(k.canonical, k.architecture) for k in all_updates.keys()]
+            image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
             async with self.db.begin_session() as session:
                 existing_images = await session.scalars(
                     sa.select(ImageRow).where(
@@ -104,10 +104,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
                 for image_row in existing_images:
                     key = image_row.image_ref
-                    values = all_updates.get(key)
+                    values = _all_updates.get(key)
                     if values is None:
                         continue
-                    all_updates.pop(key)
+                    _all_updates.pop(key)
                     image_row.config_digest = values["config_digest"]
                     image_row.size_bytes = values["size_bytes"]
                     image_row.accelerators = values.get("accels")
@@ -131,7 +131,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels=v["labels"],
                             resources=v["resources"],
                         )
-                        for k, v in all_updates.items()
+                        for k, v in _all_updates.items()
                     ]
                 )
                 await session.flush()
@@ -166,23 +166,35 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     tag_list_url = self.registry_url.with_path(next_page_url.path).with_query(
                         next_page_url.query
                     )
-        if (reporter := self.reporter.get()) is not None:
+        if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(tags)
         async with aiotools.TaskGroup() as tg:
             for tag in tags:
                 tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
+
+    async def scan_single_ref(self, image_ref: str) -> None:
+        async with self.prepare_client_session() as (url, sess):
+            image, tag = ImageRef._parse_image_tag(image_ref)
+            rqst_args = await registry_login(
+                sess,
+                self.registry_url,
+                self.credentials,
+                f"repository:{image}:pull",
+            )
+            rqst_args["headers"].update(**self.base_hdrs)
+            await self._scan_tag(sess, rqst_args, image, tag)
 
     async def _scan_tag(
         self,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
-        digest: str,
+        digest_or_tag: str,
         tag: Optional[str] = None,
     ) -> None:
-        async with self.sema.get():
+        async with concurrency_sema.get():
             async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{digest}", **rqst_args
+                self.registry_url / f"v2/{image}/manifests/{digest_or_tag}", **rqst_args
             ) as resp:
                 if resp.status == 404:
                     # ignore missing tags
@@ -206,7 +218,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels.update(raw_labels)
                         else:
                             log.warn(
-                                "label not found on image {}:{}/{}", image, digest, architecture
+                                "label not found on image {}:{}/{}",
+                                image,
+                                digest_or_tag,
+                                architecture,
                             )
                     else:
                         raw_labels = data["config"].get("Labels")
@@ -214,7 +229,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             labels.update(raw_labels)
                         else:
                             log.warn(
-                                "label not found on image {}:{}/{}", image, digest, architecture
+                                "label not found on image {}:{}/{}",
+                                image,
+                                digest_or_tag,
+                                architecture,
                             )
                     manifest = {
                         architecture: {
@@ -223,7 +241,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             "digest": config_digest,
                         },
                     }
-        await self._read_manifest(image, tag or digest, manifest)
+        await self._read_manifest(image, tag or digest_or_tag, manifest)
 
     async def _read_manifest(
         self,
@@ -237,7 +255,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 skip_reason = "missing/deleted"
             log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
             progress_msg = f"Skipped {image}:{tag} ({skip_reason})"
-            if (reporter := self.reporter.get()) is not None:
+            if (reporter := progress_reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
             return
 
@@ -292,7 +310,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     res_key = k[len(res_prefix) :]
                     resources[res_key] = {"min": v}
                 updates["resources"] = ImageRow.resources.type._schema.check(resources)
-                self.all_updates.get().update(
+                all_updates.get().update(
                     {
                         update_key: updates,
                     }
@@ -308,7 +326,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 else:
                     log.info("Updated image - {0}:{1}/{2}", image, tag, architecture)
                     progress_msg = f"Updated {image}:{tag}/{architecture}"
-                if (reporter := self.reporter.get()) is not None:
+                if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)
 
     @abstractmethod
