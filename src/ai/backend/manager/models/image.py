@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import enum
 import functools
 import logging
@@ -87,7 +86,6 @@ async def rescan_images(
 ) -> None:
     # cannot import ai.backend.manager.config at start due to circular import
     from ..config import container_registry_iv
-    from ..container_registry.base import all_updates, concurrency_sema
 
     if local:
         registries = {
@@ -123,13 +121,7 @@ async def rescan_images(
                     )
                     scanner_cls = get_container_registry_cls(registry_info)
                     scanner = scanner_cls(db, registry_name, registry_info)
-                    all_updates_token = all_updates.set({})
-                    sema_token = concurrency_sema.set(asyncio.Semaphore(1))
-                    try:
-                        await scanner.scan_single_ref(repo_with_tag)
-                    finally:
-                        concurrency_sema.reset(sema_token)
-                        all_updates.reset(all_updates_token)
+                    await scanner.scan_single_ref(repo_with_tag)
                     return
             else:
                 # treat it as a normal registry name
