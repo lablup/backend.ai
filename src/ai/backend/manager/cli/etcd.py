@@ -1,23 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
 import sys
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING
 
 import click
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.cli import EnumChoice, MinMaxRange
-from ai.backend.common.config import redis_config_iv
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..config import SharedConfig
+from .context import etcd_ctx
 from .image_impl import alias as alias_impl
 from .image_impl import dealias as dealias_impl
 from .image_impl import forget_image as forget_image_impl
@@ -35,50 +33,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 @click.group()
 def cli() -> None:
     pass
-
-
-@contextlib.asynccontextmanager
-async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    local_config = cli_ctx.local_config
-    creds = None
-    if local_config["etcd"]["user"]:
-        creds = {
-            "user": local_config["etcd"]["user"],
-            "password": local_config["etcd"]["password"],
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-    etcd = AsyncEtcd(
-        local_config["etcd"]["addr"],
-        local_config["etcd"]["namespace"],
-        scope_prefix_map,
-        credentials=creds,
-    )
-    try:
-        yield etcd
-    finally:
-        await etcd.close()
-
-
-@contextlib.asynccontextmanager
-async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedConfig]:
-    local_config = cli_ctx.local_config
-    # scope_prefix_map is created inside ConfigServer
-    shared_config = SharedConfig(
-        local_config["etcd"]["addr"],
-        local_config["etcd"]["user"],
-        local_config["etcd"]["password"],
-        local_config["etcd"]["namespace"],
-    )
-    await shared_config.reload()
-    raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
-    local_config["redis"] = redis_config_iv.check(raw_redis_config)
-    try:
-        yield shared_config
-    finally:
-        await shared_config.close()
 
 
 @cli.command()
