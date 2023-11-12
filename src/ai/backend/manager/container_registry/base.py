@@ -193,6 +193,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         tag: Optional[str] = None,
     ) -> None:
         async with concurrency_sema.get():
+            rqst_args["headers"][
+                "Accept"
+            ] = "application/vnd.docker.distribution.manifest.list.v2+json"
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{digest_or_tag}", **rqst_args
             ) as resp:
@@ -201,47 +204,59 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     # (may occur after deleting an image from the docker hub)
                     return
                 resp.raise_for_status()
-                data = await resp.json()
-
-                config_digest = data["config"]["digest"]
-                size_bytes = sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+                manifest_list = (await resp.json())["manifests"]
+            rqst_args["headers"]["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
+            manifests = {}
+            for manifest in manifest_list:
+                platform_arg = (
+                    f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
+                )
+                if variant := manifest["platform"].get("variant", None):
+                    platform_arg += f"/{variant}"
+                architecture = manifest["platform"]["architecture"]
+                architecture = arch_name_aliases.get(architecture, architecture)
                 async with sess.get(
-                    self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+                    self.registry_url / f"v2/{image}/manifests/{manifest['digest']}", **rqst_args
                 ) as resp:
-                    resp.raise_for_status()
-                    data = json.loads(await resp.read())
-                    architecture = arch_name_aliases.get(data["architecture"], data["architecture"])
-                    labels = {}
-                    if "container_config" in data:
-                        raw_labels = data["container_config"].get("Labels")
-                        if raw_labels:
-                            labels.update(raw_labels)
+                    data = await resp.json()
+                    config_digest = data["config"]["digest"]
+                    size_bytes = (
+                        sum(layer["size"] for layer in data["layers"]) + data["config"]["size"]
+                    )
+                    async with sess.get(
+                        self.registry_url / f"v2/{image}/blobs/{config_digest}", **rqst_args
+                    ) as resp:
+                        resp.raise_for_status()
+                        data = json.loads(await resp.read())
+                        labels = {}
+                        if "container_config" in data:
+                            raw_labels = data["container_config"].get("Labels")
+                            if raw_labels:
+                                labels.update(raw_labels)
+                            else:
+                                log.warn(
+                                    "label not found on image {}:{}/{}",
+                                    image,
+                                    digest_or_tag,
+                                    architecture,
+                                )
                         else:
-                            log.warn(
-                                "label not found on image {}:{}/{}",
-                                image,
-                                digest_or_tag,
-                                architecture,
-                            )
-                    else:
-                        raw_labels = data["config"].get("Labels")
-                        if raw_labels:
-                            labels.update(raw_labels)
-                        else:
-                            log.warn(
-                                "label not found on image {}:{}/{}",
-                                image,
-                                digest_or_tag,
-                                architecture,
-                            )
-                    manifest = {
-                        architecture: {
+                            raw_labels = data["config"].get("Labels")
+                            if raw_labels:
+                                labels.update(raw_labels)
+                            else:
+                                log.warn(
+                                    "label not found on image {}:{}/{}",
+                                    image,
+                                    digest_or_tag,
+                                    architecture,
+                                )
+                        manifests[architecture] = {
                             "size": size_bytes,
                             "labels": labels,
                             "digest": config_digest,
-                        },
-                    }
-        await self._read_manifest(image, tag or digest_or_tag, manifest)
+                        }
+            await self._read_manifest(image, tag or digest_or_tag, manifests)
 
     async def _read_manifest(
         self,
