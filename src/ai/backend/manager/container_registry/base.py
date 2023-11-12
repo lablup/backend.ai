@@ -173,16 +173,22 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
 
     async def scan_single_ref(self, image_ref: str) -> None:
-        async with self.prepare_client_session() as (url, sess):
-            image, tag = ImageRef._parse_image_tag(image_ref)
-            rqst_args = await registry_login(
-                sess,
-                self.registry_url,
-                self.credentials,
-                f"repository:{image}:pull",
-            )
-            rqst_args["headers"].update(**self.base_hdrs)
-            await self._scan_tag(sess, rqst_args, image, tag)
+        all_updates_token = all_updates.set({})
+        sema_token = concurrency_sema.set(asyncio.Semaphore(1))
+        try:
+            async with self.prepare_client_session() as (url, sess):
+                image, tag = ImageRef._parse_image_tag(image_ref)
+                rqst_args = await registry_login(
+                    sess,
+                    self.registry_url,
+                    self.credentials,
+                    f"repository:{image}:pull",
+                )
+                rqst_args["headers"].update(**self.base_hdrs)
+                await self._scan_tag(sess, rqst_args, image, tag)
+        finally:
+            concurrency_sema.reset(sema_token)
+            all_updates.reset(all_updates_token)
 
     async def _scan_tag(
         self,
