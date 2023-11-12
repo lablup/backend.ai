@@ -254,7 +254,7 @@ def set_image_resource_limit(
 @cli.command()
 @click.argument("registry")
 @click.pass_obj
-def rescan_images(cli_ctx: CLIContext, registry) -> None:
+def rescan_images(cli_ctx: CLIContext, registry: str) -> None:
     """
     Update the kernel image metadata from all configured docker registries.
 
@@ -269,7 +269,7 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
 @click.argument("target")
 @click.argument("architecture")
 @click.pass_obj
-def alias(cli_ctx, alias, target, architecture) -> None:
+def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
     """Add an image alias from the given alias to the target image reference."""
     log.warn("etcd alias command is deprecated, use image alias instead")
     asyncio.run(alias_impl(cli_ctx, alias, target, architecture))
@@ -278,7 +278,7 @@ def alias(cli_ctx, alias, target, architecture) -> None:
 @cli.command()
 @click.argument("alias")
 @click.pass_obj
-def dealias(cli_ctx, alias) -> None:
+def dealias(cli_ctx: CLIContext, alias: str) -> None:
     """Remove an alias."""
     log.warn("etcd dealias command is deprecated, use image dealias instead")
     asyncio.run(dealias_impl(cli_ctx, alias))
@@ -287,7 +287,7 @@ def dealias(cli_ctx, alias) -> None:
 @cli.command()
 @click.argument("value")
 @click.pass_obj
-def quote(cli_ctx: CLIContext, value) -> None:
+def quote(cli_ctx: CLIContext, value: str) -> None:
     """
     Quote the given string for use as a URL piece in etcd keys.
     Use this to generate argument inputs for aliases and raw image keys.
@@ -298,7 +298,7 @@ def quote(cli_ctx: CLIContext, value) -> None:
 @cli.command()
 @click.argument("value")
 @click.pass_obj
-def unquote(cli_ctx: CLIContext, value) -> None:
+def unquote(cli_ctx: CLIContext, value: str) -> None:
     """
     Unquote the given string used as a URL piece in etcd keys.
     """
@@ -316,7 +316,12 @@ def unquote(cli_ctx: CLIContext, value) -> None:
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, scope) -> None:
+def set_storage_sftp_scaling_group(
+    cli_ctx: CLIContext,
+    proxy: str,
+    scaling_groups: str,
+    scope: ConfigScopes,
+) -> None:
     """
     Updates storage proxy node config's SFTP desginated scaling groups.
     To enter multiple scaling groups concatenate names with comma(,).
@@ -346,7 +351,11 @@ def set_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scaling_groups, s
     help="The configuration scope to put the value.",
 )
 @click.pass_obj
-def remove_storage_sftp_scaling_group(cli_ctx: CLIContext, proxy, scope) -> None:
+def remove_storage_sftp_scaling_group(
+    cli_ctx: CLIContext,
+    proxy: str,
+    scope: ConfigScopes,
+) -> None:
     """
     Removes storage proxy node config's SFTP desginated scaling groups.
     """
