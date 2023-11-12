@@ -77,6 +77,7 @@ class DistInfo(BaseModel):
     target_path: Path = Field(default_factory=lambda: Path.home() / "backendai")
     image_source: ImageSource = ImageSource.BACKENDAI_REGISTRY
     image_sources: list[LocalImageSource] = Field(default_factory=list)
+    image_refs: list[str] = Field(default_factory=list)
 
 
 class InstallInfo(BaseModel):

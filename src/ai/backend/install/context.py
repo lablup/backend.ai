@@ -629,17 +629,18 @@ class Context(metaclass=ABCMeta):
                     },
                 }
                 await self.etcd_put_json("config", data)
-                await self.run_manager_cli(["mgr", "image", "rescan", "index.docker.io"])
+                # TODO: implement lablup/backend.ai#1621
+                # await self.run_manager_cli(["mgr", "image", "rescan", "index.docker.io"])
                 if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                     await self.alias_image(
                         "python",
-                        "index.docker.io/lablup/python:3.9-ubuntu20.04",
+                        "index.docker.io/lablup/python:3.11-ubuntu22.04",
                         "aarch64",
                     )
                 else:
                     await self.alias_image(
                         "python",
-                        "index.docker.io/lablup/python:3.9-ubuntu20.04",
+                        "index.docker.io/lablup/python:3.11-ubuntu22.04",
                         "x86_64",
                     )
             case ImageSource.LOCAL_DIR:
