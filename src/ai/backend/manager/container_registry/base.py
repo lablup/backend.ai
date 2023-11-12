@@ -345,8 +345,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     )
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:
-                    log.info("Updated image - {0}:{1}/{2}", image, tag, architecture)
-                    progress_msg = f"Updated {image}:{tag}/{architecture}"
+                    log.info(
+                        "Updated image - {0}:{1}/{2} ({3})",
+                        image,
+                        tag,
+                        architecture,
+                        manifest["digest"],
+                    )
+                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest['digest']})"
                 if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)
 
