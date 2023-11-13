@@ -46,7 +46,7 @@ class DevSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Development Setup", classes="mode-title")
-        yield RichLog(classes="log")
+        yield RichLog(wrap=True, classes="log")
 
     def begin_install(self, dist_info: DistInfo) -> None:
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
@@ -89,7 +89,7 @@ class PackageSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Package Setup", classes="mode-title")
-        yield RichLog(classes="log")
+        yield RichLog(wrap=True, classes="log")
 
     def begin_install(self, dist_info: DistInfo) -> None:
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
