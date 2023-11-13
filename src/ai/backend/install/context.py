@@ -301,8 +301,8 @@ class Context(metaclass=ABCMeta):
                 "proxies": {
                     "local": {
                         "client_api": f"http://{storage_client_facing_addr.face.host}:{storage_client_facing_addr.face.port}",
-                        "manager_api": f"https://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
-                        "secret": self.install_info.service_config.manager_auth_key,
+                        "manager_api": f"http://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
+                        "secret": self.install_info.service_config.storage_proxy_manager_auth_key,
                         "ssl_verify": "false",
                     }
                 },
@@ -383,33 +383,37 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         toml_path = self.copy_config("storage-proxy.toml")
-        self.sed_in_place_multi(
-            toml_path,
-            [
-                ("port = 2379", f"port = {halfstack.etcd_addr[0].face.port}"),
-                (
-                    'secret = "some-secret-private-for-storage-proxy"',
-                    f'secret = "{service.storage_proxy_auth_key}"',
-                ),
-                (
-                    'secret = "some-secret-shared-with-manager"',
-                    f'secret = "{service.manager_auth_key}"',
-                ),
-                (
-                    re.compile("^(# )?ipc-base-path = .*"),
-                    f'ipc-base-path = "{service.storage_proxy_ipc_base_path}"',
-                ),
-                (
-                    re.compile("^(# )?var-base-path = .*"),  # unused yet
-                    f'var-base-path = "{service.storage_proxy_var_base_path}"',
-                ),
-                # the halfstack toml already has [volume.volume1] section
-                (
-                    'path = "vfolder/local/volume1"',
-                    f'path = "{service.vfolder_relpath}"',
-                ),
-            ],
-        )
+        with toml_path.open("r") as fp:
+            data = tomlkit.load(fp)
+            etcd_table = tomlkit.table()
+            etcd_addr_table = tomlkit.inline_table()
+            etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+            etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+            etcd_table["addr"] = etcd_addr_table
+            etcd_table["namespace"] = "local"
+            if halfstack.etcd_user:
+                etcd_table["user"] = halfstack.etcd_user
+            else:
+                etcd_table.pop("user", None)
+            if halfstack.etcd_password:
+                etcd_table["password"] = halfstack.etcd_password
+            else:
+                etcd_table.pop("password", None)
+            data["etcd"] = etcd_table
+            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
+            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
+            client_facing_addr_table = tomlkit.inline_table()
+            client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
+            client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
+            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
+            manager_facing_addr_table = tomlkit.inline_table()
+            manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
+            manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
+            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
+            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
+            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+        with toml_path.open("w") as fp:
+            tomlkit.dump(data, fp)
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
@@ -420,7 +424,7 @@ class Context(metaclass=ABCMeta):
             data = tomlkit.load(fp)
             data["api"][  # type: ignore
                 "endpoint"
-            ] = f"http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}"
+            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -671,7 +675,7 @@ class DevContext(Context):
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            manager_auth_key=secrets.token_hex(32),
+            storage_proxy_manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
             local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
@@ -683,7 +687,7 @@ class DevContext(Context):
             storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_auth_key=secrets.token_hex(32),
+            storage_proxy_random=secrets.token_hex(32),
             storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
             storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
             storage_agent_ipc_base_path="ipc/storage-agent",
@@ -759,7 +763,7 @@ class PackageContext(Context):
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            manager_auth_key=secrets.token_urlsafe(32),
+            storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
             local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
@@ -771,7 +775,7 @@ class PackageContext(Context):
             storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_auth_key=secrets.token_urlsafe(32),
+            storage_proxy_random=secrets.token_urlsafe(32),
             storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
             storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
             storage_agent_ipc_base_path="ipc/storage-agent",
@@ -835,6 +839,7 @@ class PackageContext(Context):
         dst_path.rename(dst_path.with_name(f"backendai-{name}"))
 
     async def _install_package(self, name: str, vpane: Vertical, *, fat: bool) -> None:
+        self.dist_info.target_path.mkdir(parents=True, exist_ok=True)
         pkg_name = self.mangle_pkgname(name, fat=fat)
         src_path = self.dist_info.package_dir / pkg_name
         dst_path = self.dist_info.target_path / pkg_name
@@ -843,11 +848,11 @@ class PackageContext(Context):
         progress = ProgressBar(classes="progress-install")
         item.mount_all([label, progress])
         vpane.mount(item)
+        progress.update(total=src_path.stat().st_size)
         async with (
             aiofiles.open(src_path, "rb") as src,
             aiofiles.open(dst_path, "wb") as dst,
         ):
-            progress.update(total=src_path.stat().st_size)
             while True:
                 chunk = await src.read(1048576)
                 if not chunk:

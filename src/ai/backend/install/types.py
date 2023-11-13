@@ -133,7 +133,6 @@ class ServiceConfig:
     manager_addr: ServerAddr
     manager_ipc_base_path: str
     manager_var_base_path: str
-    manager_auth_key: str
     webserver_addr: ServerAddr
     webserver_ipc_base_path: str
     webserver_var_base_path: str
@@ -146,7 +145,8 @@ class ServiceConfig:
     storage_proxy_client_facing_addr: ServerAddr
     storage_proxy_ipc_base_path: str
     storage_proxy_var_base_path: str
-    storage_proxy_auth_key: str
+    storage_proxy_manager_auth_key: str
+    storage_proxy_random: str
     storage_agent_rpc_addr: ServerAddr
     storage_agent_ipc_base_path: str
     storage_agent_var_base_path: str
