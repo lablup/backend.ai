@@ -54,9 +54,9 @@ class LocalRegistry(BaseContainerRegistry):
         image: str,
     ) -> None:
         repo, _, tag = image.rpartition(":")
-        await self._scan_tag(sess, {}, repo, tag)
+        await self._scan_tag_local(sess, {}, repo, tag)
 
-    async def _scan_tag(
+    async def _scan_tag_local(
         self,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, str],
@@ -71,35 +71,33 @@ class LocalRegistry(BaseContainerRegistry):
                 self.registry_url / "images" / f"{image}:{digest}" / "json"
             ) as response:
                 data = await response.json()
-                architecture = data["Architecture"]
-                summary = {
-                    "Id": data["Id"],
-                    "RepoDigests": data.get("RepoDigests", []),
-                    "Config.Image": data["Config"]["Image"],
-                    "ContainerConfig.Image": data["ContainerConfig"]["Image"],
-                    "Architecture": data["Architecture"],
-                }
-                log.debug(
-                    "scanned image info: {}:{}\n{}", image, digest, json.dumps(summary, indent=2)
-                )
-                already_exists = 0
-                config_digest = data["Id"]
-                async with self.db.begin_readonly_session() as db_session:
-                    already_exists = await db_session.scalar(
-                        sa.select([sa.func.count(ImageRow.id)]).where(
-                            ImageRow.config_digest == config_digest,
-                            ImageRow.is_local == sa.false(),
-                        )
+            architecture = data["Architecture"]
+            summary = {
+                "Id": data["Id"],
+                "RepoDigests": data.get("RepoDigests", []),
+                "Config.Image": data["Config"]["Image"],
+                "ContainerConfig.Image": data["ContainerConfig"]["Image"],
+                "Architecture": data["Architecture"],
+            }
+            log.debug("scanned image info: {}:{}\n{}", image, digest, json.dumps(summary, indent=2))
+            already_exists = 0
+            config_digest = data["Id"]
+            async with self.db.begin_readonly_session() as db_session:
+                already_exists = await db_session.scalar(
+                    sa.select([sa.func.count(ImageRow.id)]).where(
+                        ImageRow.config_digest == config_digest,
+                        ImageRow.is_local == sa.false(),
                     )
-                if already_exists > 0:
-                    return {}, "already synchronized from a remote registry"
-                return {
-                    architecture: {
-                        "size": data["Size"],
-                        "labels": data["Config"]["Labels"],
-                        "digest": config_digest,
-                    },
-                }, None
+                )
+            if already_exists > 0:
+                return {}, "already synchronized from a remote registry"
+            return {
+                architecture: {
+                    "size": data["Size"],
+                    "labels": data["Config"]["Labels"],
+                    "digest": config_digest,
+                },
+            }, None
 
         async with concurrency_sema.get():
             manifests, skip_reason = await _read_image_info(digest)
