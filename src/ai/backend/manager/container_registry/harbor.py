@@ -152,15 +152,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
                                 return
                             tag = image_info["tags"][0]["name"]
                             match image_info["manifest_media_type"]:
-                                case self.content_type_oci_manifest:
+                                case self.MEDIA_TYPE_OCI_INDEX:
                                     await self._process_oci_index(
                                         tg, sess, rqst_args, image, image_info
                                     )
-                                case self.content_type_docker_manifest_list:
+                                case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                                     await self._process_docker_v2_multiplatform_image(
                                         tg, sess, rqst_args, image, image_info
                                     )
-                                case self.content_type_docker_manifest:
+                                case self.MEDIA_TYPE_DOCKER_MANIFEST:
                                     await self._process_docker_v2_image(
                                         tg, sess, rqst_args, image, image_info
                                     )
@@ -359,7 +359,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         """
         manifests = {}
         async with concurrency_sema.get():
-            rqst_args["headers"]["Accept"] = self.content_type_docker_manifest
+            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
             # Harbor does not provide architecture information for a single-arch tag reference.
             # We heuristically detect the architecture using the tag name pattern.
             if tag.endswith("-arm64") or tag.endswith("-aarch64"):
