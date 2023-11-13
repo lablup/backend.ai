@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
+
 /* --Reset CSS Start-- */
 html, body, div, span,
 h1, h2, h3, h4, h5, h6,
@@ -25,44 +27,6 @@ ol, ul {
   font-weight: 400;
   unicode-range: U+0041-005A, U+0061-007A, U+AC00-D7A3, U+0030-0039, U+0020-002F, U+003A-0040, U+005B-0060, U+007B-007E
 }
-
-/* 보조 폰트 */
-@font-face {
-  font-family: ABCWhyteInktrap;
-  src: url('./fonts/ABCWhyteInktrap-Regular.woff') format('woff');
-  font-weight: 400;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: ABCWhyteInktrap;
-  src: url('./fonts/ABCWhyteInktrap-RegularItalic.woff2') format('woff2');
-  font-weight: 400;
-  font-style: italic;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-/* 폰트 변경을 대비한 Poppins */
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/Poppins-Regular.ttf') format('truetype');
-  font-weight: 400;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/fonts/Poppins-Medium.ttf') format('truetype');
-  font-weight: 500;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/Poppins-SemiBold.ttf') format('truetype');
-  font-weight: 600;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
 /* --Font End-- */
 
 /* --Custom Global Theme Start-- */
@@ -80,7 +44,7 @@ html {
 }
 
 body {
-  font-family: Pretendard, WhyteABCInktrap, Poppins, sans-serif;
+  font-family: Pretendard, Poppins, sans-serif;
   font-size: 4.103vw;
   word-break: keep-all;
 }
@@ -446,7 +410,7 @@ input {
 }
 
 input::placeholder {
-  font-family: Pretendard, Poppins, sans-serif;
+  font-family: Pretendard, sans-serif;
   font-size: 3.59vw;
   line-height: 160%;
 }
@@ -4639,7 +4603,7 @@ body,html {
 }
 
 body {
-  font-family: Pretendard, Poppins, ABCWhyteInktrap, sans-serif;
+  font-family: Pretendard, Poppins, sans-serif;
   font-weight: 400;
   color: #000;
   min-height: 100%;
@@ -5622,7 +5586,7 @@ hr {
 }
 
 .wy-nav-top a {
-  font-family: ABCWhyteInktrap, Pretendard, sans-serif;
+  font-family: Pretendard, sans-serif;
   font-style: italic;
   display: -webkit-box;
     -webkit-line-clamp: 1;
