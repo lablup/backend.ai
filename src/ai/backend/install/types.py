@@ -49,6 +49,7 @@ class Platform(enum.StrEnum):
 class CliArgs:
     mode: InstallModes | None
     target_path: str
+    show_guide: bool
 
 
 class PrerequisiteError(RichCast, Exception):

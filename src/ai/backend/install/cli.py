@@ -24,8 +24,11 @@ from textual.widgets import (
     Label,
     ListItem,
     ListView,
+    Markdown,
     RichLog,
     Static,
+    TabbedContent,
+    TabPane,
 )
 
 from ai.backend.install.utils import shorten_path
@@ -34,7 +37,7 @@ from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, DistInfo, InstallModes, PrerequisiteError
+from .types import CliArgs, DistInfo, InstallInfo, InstallModes, PrerequisiteError
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -89,7 +92,11 @@ class PackageSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Package Setup", classes="mode-title")
-        yield RichLog(wrap=True, classes="log")
+        with TabbedContent(id="tabs"):
+            with TabPane("Install Log", id="log"):
+                yield RichLog(wrap=True, classes="log")
+            with TabPane("Install Report", id="report"):
+                yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
@@ -119,6 +126,10 @@ class PackageSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
+            await asyncio.sleep(2.0)
+            install_report = InstallReport(ctx.install_info, id="install-report")
+            self.query_one("TabPane#report Label").remove()
+            self.query_one("TabPane#report").mount(install_report)
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -134,6 +145,112 @@ class PackageSetup(Static):
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
             current_log.reset(_log_token)
+
+
+class InstallReport(Static):
+    def __init__(self, install_info: InstallInfo, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.install_info = install_info
+
+    def compose(self) -> ComposeResult:
+        service = self.install_info.service_config
+        yield Markdown(textwrap.dedent(f"""
+        Follow each tab's instructions.  Once all 5 service daemons are ready, you may connect to
+        `http://{service.webserver_addr.face.host}:{service.webserver_addr.face.port}`.
+
+        Use the following credentials for the admin access:
+        - Username: `admin@lablup.com`
+        - Password: `wJalrXUt`
+
+        To see this guide again, run `./backendai-install-<platform> --show-guide`.
+        """))
+        with TabbedContent():
+            with TabPane("Web Server", id="webserver"):
+                yield Markdown(textwrap.dedent(f"""
+                Run the following commands in a separate shell:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-webserver web start-server
+                ```
+
+                It works if the console output ends with something like:
+                ```
+                ...
+                2023-11-14 08:04:30.300 INFO ai.backend.web.server [2215731] serving at 0.0.0.0:8090
+                2023-11-14 08:04:30.303 INFO ai.backend.web.server [2215731] Using uvloop as the event loop backend
+                ```
+
+                To terminate, send SIGINT or press Ctrl+C in the console.
+                """))
+            with TabPane("Manager", id="manager"):
+                yield Markdown(textwrap.dedent(f"""
+                Run the following commands in a separate shell:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-manager mgr start-server
+                ```
+
+                It works if the console output ends with something like:
+                ```
+                ...
+                2023-11-14 08:02:35.704 INFO ai.backend.manager.server [2213274] started handling API requests at 0.0.0.0:8091
+                2023-11-14 08:02:35.730 INFO ai.backend.manager.server [2213276] started handling API requests at 0.0.0.0:8091
+                2023-11-14 08:02:35.731 INFO ai.backend.manager.server [2213273] started handling API requests at 0.0.0.0:8091
+                2023-11-14 08:02:35.739 INFO ai.backend.manager.server [2213275] started handling API requests at 0.0.0.0:8091
+                ```
+
+                To terminate, send SIGINT or press Ctrl+C in the console.
+                """))
+            with TabPane("Agent", id="agent"):
+                yield Markdown(textwrap.dedent(f"""
+                Run the following commands in a separate shell:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-agent ag start-server
+                ```
+
+                It works if the console output ends with something like:
+                ```
+                ...
+                2023-11-14 08:03:38.048 INFO ai.backend.agent.server [2214424] started handling RPC requests at 127.0.0.1:6011
+                ```
+
+                To terminate, send SIGINT or press Ctrl+C in the console.
+                """))
+            with TabPane("Storage Proxy", id="storage-proxy"):
+                yield Markdown(textwrap.dedent(f"""
+                Run the following commands in a separate shell:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-storage-proxy storage start-server
+                ```
+
+                It works if the console output ends with something like:
+                ```
+                ...
+                2023-11-14 08:04:54.855 INFO ai.backend.storage.server [2216229] Node ID: i-storage-proxy-local
+                2023-11-14 08:04:54.858 INFO ai.backend.storage.server [2216229] Using uvloop as the event loop backend
+                ```
+
+                To terminate, send SIGINT or press Ctrl+C in the console.
+                """))
+            with TabPane("Local Proxy", id="local-proxy"):
+                yield Markdown(textwrap.dedent(f"""
+                Run the following commands in a separate shell:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-local-proxy
+                ```
+
+                It works if the console output ends with something like:
+                ```
+                ...
+                11-14 08:05:08 info [manager.js]: Listening on port 5050!
+                11-14 08:05:08 info [local_proxy.js]: Proxy is ready: http://127.0.0.1:5050/
+                ```
+
+                To terminate, send SIGINT or press Ctrl+C in the console.
+                """))
 
 
 class ModeMenu(Static):
@@ -270,6 +387,7 @@ class InstallerApp(App):
             args = CliArgs(
                 mode=None,
                 target_path=str(Path.home() / "backendai"),
+                show_guide=False,
             )
         self._args = args
 
@@ -283,10 +401,20 @@ class InstallerApp(App):
         |____/ \__,_|\___|_|\_\___|_| |_|\__,_(_)_/   \_\___|
         """)
         yield Static(logo_text, id="logo")
-        with ContentSwitcher(id="top", initial="mode-menu"):
-            yield ModeMenu(self._args, id="mode-menu")
-            yield DevSetup(id="dev-setup")
-            yield PackageSetup(id="pkg-setup")
+        if self._args.show_guide:
+            try:
+                install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
+                yield InstallReport(install_info)
+            except IOError as e:
+                log = RichLog()
+                log.write("Failed to read INSTALL-INFO!")
+                log.write(e)
+                yield log
+        else:
+            with ContentSwitcher(id="top", initial="mode-menu"):
+                yield ModeMenu(self._args, id="mode-menu")
+                yield DevSetup(id="dev-setup")
+                yield PackageSetup(id="pkg-setup")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -328,13 +456,19 @@ class InstallerApp(App):
     default=str(Path.home() / "backendai"),
     help="Explicitly set the target installation path. [default: ~/backendai]",
 )
-# TODO: --show-guide?
+@click.option(
+    "--show-guide",
+    is_flag=True,
+    default=False,
+    help="Show the post-install guide using INSTALL-INFO if present.",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     mode: InstallModes | None,
     target_path: str,
+    show_guide: bool,
 ) -> None:
     """The installer"""
     # check sudo permission
@@ -346,6 +480,10 @@ def main(
         )
         sys.exit(1)
     # start installer
-    args = CliArgs(mode=mode, target_path=target_path)
+    args = CliArgs(
+        mode=mode,
+        target_path=target_path,
+        show_guide=show_guide,
+    )
     app = InstallerApp(args)
     app.run()
