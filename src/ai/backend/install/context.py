@@ -513,10 +513,19 @@ class Context(metaclass=ABCMeta):
                 print(f"""echo 'Your password: {user['password']}'""", file=fp)
 
     async def dump_install_info(self) -> None:
+        self.log_header("Dumping the installation configs...")
         base_path = self.install_info.base_path
         etcd_dump = dict(await self.etcd_get_json(""))  # conv chainmap to normal dict
-        (base_path / "etcd.installed.json").write_text(json.dumps(etcd_dump))
-        (Path.cwd() / "INSTALL-INFO").write_text(self.install_info.model_dump_json())
+        etcd_dump_path = base_path / "etcd.installed.json"
+        etcd_dump_path.write_text(json.dumps(etcd_dump))
+        self.log.write(
+            Text.from_markup("stored the etcd configuration as [bold]{etcd_dump_path}[/]")
+        )
+        install_info_path = Path.cwd() / "INSTALL-INFO"
+        install_info_path.write_text(self.install_info.model_dump_json())
+        self.log.write(
+            Text.from_markup("stored the installation info as [bold]{install_info_path}[/]")
+        )
 
     async def prepare_local_vfolder_host(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -581,6 +590,7 @@ class Context(metaclass=ABCMeta):
         data: Any
         match self.dist_info.image_source:
             case ImageSource.BACKENDAI_REGISTRY:
+                self.log_header("Scanning and pulling configured Backend.AI container images...")
                 if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                     project = "stable,community,multiarch"
                 else:
@@ -614,6 +624,7 @@ class Context(metaclass=ABCMeta):
                         "x86_64",
                     )
             case ImageSource.DOCKER_HUB:
+                self.log_header("Scanning and pulling configured Docker Hub container images...")
                 data = {
                     "docker": {
                         "image": {
@@ -633,6 +644,7 @@ class Context(metaclass=ABCMeta):
                     await self.run_manager_cli(["mgr", "image", "rescan", ref])
                     await self.run_exec(["sudo", "docker", "pull", ref])
             case ImageSource.LOCAL_DIR:
+                self.log_header("Populating local container images...")
                 for src in self.dist_info.image_sources:
                     # TODO: Ensure src.ref
                     await self.run_exec(["sudo", "docker", "load", "-i", str(src.file)])
