@@ -519,12 +519,12 @@ class Context(metaclass=ABCMeta):
         etcd_dump_path = base_path / "etcd.installed.json"
         etcd_dump_path.write_text(json.dumps(etcd_dump))
         self.log.write(
-            Text.from_markup("stored the etcd configuration as [bold]{etcd_dump_path}[/]")
+            Text.from_markup(f"stored the etcd configuration as [bold]{etcd_dump_path}[/]")
         )
         install_info_path = Path.cwd() / "INSTALL-INFO"
         install_info_path.write_text(self.install_info.model_dump_json())
         self.log.write(
-            Text.from_markup("stored the installation info as [bold]{install_info_path}[/]")
+            Text.from_markup(f"stored the installation info as [bold]{install_info_path}[/]")
         )
 
     async def prepare_local_vfolder_host(self) -> None:
