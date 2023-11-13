@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import urllib.parse
-from pprint import pprint
 from typing import Any, AsyncIterator, Mapping, Optional, cast
 
 import aiohttp
@@ -200,9 +199,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 or reference["platform"]["architecture"] == "unknown"
             ):
                 continue
-            print("process_oci_index: ", end="")
-            pprint(image_info)
-            pprint(reference)
             digests.append((reference["child_digest"], reference["platform"]["architecture"]))
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += len(digests)
