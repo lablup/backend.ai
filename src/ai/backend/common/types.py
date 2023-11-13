@@ -1114,6 +1114,11 @@ class RedisHelperConfig(TypedDict, total=False):
     reconnect_poll_timeout: float
     max_connections: int
     connection_ready_timeout: float
+    ssl: Optional[bool]
+    ssl_ca_certs: Optional[str]
+    ssl_cert_reqs: Optional[str]
+    ssl_certfile: Optional[str]
+    ssl_keyfile: Optional[str]
 
 
 @attrs.define(auto_attribs=True)

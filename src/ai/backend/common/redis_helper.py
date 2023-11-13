@@ -462,6 +462,20 @@ def get_redis_object(
     redis_helper_config: RedisHelperConfig = cast(
         RedisHelperConfig, redis_config.get("redis_helper_config")
     )
+
+    use_ssl = redis_helper_config.get("ssl", False)
+
+    ssl_configs = (
+        {
+            "ssl_cert_reqs": redis_helper_config.get("ssl_cert_reqs", None),
+            "ssl_ca_certs": redis_helper_config.get("ssl_ca_certs", None),
+            "ssl_certfile": redis_helper_config.get("ssl_certfile", None),
+            "ssl_keyfile": redis_helper_config.get("ssl_keyfile", None),
+        }
+        if use_ssl
+        else {}
+    )
+
     conn_opts = {
         **_default_conn_opts,
         **kwargs,
@@ -480,6 +494,7 @@ def get_redis_object(
     # for redis-py 5.0+
     # if connection_ready_timeout := redis_helper_config.get("connection_ready_timeout"):
     #     conn_pool_opts["timeout"] = float(connection_ready_timeout)
+
     if _sentinel_addresses := redis_config.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
@@ -499,10 +514,15 @@ def get_redis_object(
             [(str(host), port) for host, port in sentinel_addresses],
             password=password,
             db=str(db),
+            ssl=use_ssl,
             sentinel_kwargs={
                 "password": password,
+                "ssl": use_ssl,
+                **ssl_configs,
                 **kwargs,
             },
+            min_other_sentinels=0,
+            **ssl_configs,
         )
         return RedisConnectionInfo(
             client=sentinel.master_for(
@@ -518,15 +538,19 @@ def get_redis_object(
     else:
         redis_url = redis_config.get("addr")
         assert redis_url is not None
-        url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
+        scheme = "rediss" if use_ssl else "redis"
+        url = yarl.URL(f"{scheme}://host").with_host(str(redis_url[0])).with_port(
             redis_url[1]
         ).with_password(redis_config.get("password")) / str(db)
+
         return RedisConnectionInfo(
             # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
             client=Redis(
                 connection_pool=ConnectionPool.from_url(
                     str(url),
                     **conn_pool_opts,
+                    **kwargs,
+                    **ssl_configs,
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,

@@ -1,0 +1,9 @@
+{
+  "redis_helper_config": {
+    "ssl": true,
+    "ssl_cert_reqs": "required",
+    "ssl_ca_certs": "${SSL_CA_CERTS_PATH}",
+    "ssl_certfile": "${SSL_CERTFILE_PATH}",
+    "ssl_keyfile": "${SSL_KEYFILE_PATH}"
+  }
+}

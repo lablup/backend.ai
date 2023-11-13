@@ -137,3 +137,5 @@ logs/
 
 # Generated files
 docs/manager/rest-reference/openapi.json
+
+fixtures/redis
