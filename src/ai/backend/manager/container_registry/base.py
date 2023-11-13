@@ -74,21 +74,26 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         reporter: ProgressReporter | None = None,
     ) -> None:
-        all_updates.set({})
+        all_updates_token = all_updates.set({})
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
-        username = self.registry_info["username"]
-        if username is not None:
-            self.credentials["username"] = username
-        password = self.registry_info["password"]
-        if password is not None:
-            self.credentials["password"] = password
-        async with self.prepare_client_session() as (url, client_session):
-            self.registry_url = url
-            async with aiotools.TaskGroup() as tg:
-                async for image in self.fetch_repositories(client_session):
-                    tg.create_task(self._scan_image(client_session, image))
+        try:
+            username = self.registry_info["username"]
+            if username is not None:
+                self.credentials["username"] = username
+            password = self.registry_info["password"]
+            if password is not None:
+                self.credentials["password"] = password
+            async with self.prepare_client_session() as (url, client_session):
+                self.registry_url = url
+                async with aiotools.TaskGroup() as tg:
+                    async for image in self.fetch_repositories(client_session):
+                        tg.create_task(self._scan_image(client_session, image))
+            await self.commit_rescan_result()
+        finally:
+            all_updates.reset(all_updates_token)
 
+    async def commit_rescan_result(self) -> None:
         _all_updates = all_updates.get()
         if not _all_updates:
             log.info("No images found in registry {0}", self.registry_url)
@@ -136,6 +141,25 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 )
                 await session.flush()
 
+    async def scan_single_ref(self, image_ref: str) -> None:
+        all_updates_token = all_updates.set({})
+        sema_token = concurrency_sema.set(asyncio.Semaphore(1))
+        try:
+            async with self.prepare_client_session() as (url, sess):
+                image, tag = ImageRef._parse_image_tag(image_ref)
+                rqst_args = await registry_login(
+                    sess,
+                    self.registry_url,
+                    self.credentials,
+                    f"repository:{image}:pull",
+                )
+                rqst_args["headers"].update(**self.base_hdrs)
+                await self._scan_tag(sess, rqst_args, image, tag)
+            await self.commit_rescan_result()
+        finally:
+            concurrency_sema.reset(sema_token)
+            all_updates.reset(all_updates_token)
+
     async def _scan_image(
         self,
         sess: aiohttp.ClientSession,
@@ -172,47 +196,35 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             for tag in tags:
                 tg.create_task(self._scan_tag(sess, rqst_args, image, tag))
 
-    async def scan_single_ref(self, image_ref: str) -> None:
-        all_updates_token = all_updates.set({})
-        sema_token = concurrency_sema.set(asyncio.Semaphore(1))
-        try:
-            async with self.prepare_client_session() as (url, sess):
-                image, tag = ImageRef._parse_image_tag(image_ref)
-                rqst_args = await registry_login(
-                    sess,
-                    self.registry_url,
-                    self.credentials,
-                    f"repository:{image}:pull",
-                )
-                rqst_args["headers"].update(**self.base_hdrs)
-                await self._scan_tag(sess, rqst_args, image, tag)
-        finally:
-            concurrency_sema.reset(sema_token)
-            all_updates.reset(all_updates_token)
-
     async def _scan_tag(
         self,
         sess: aiohttp.ClientSession,
         rqst_args: dict[str, Any],
         image: str,
-        digest_or_tag: str,
-        tag: Optional[str] = None,
+        tag: str,
     ) -> None:
+        content_type_manifest_list = "application/vnd.docker.distribution.manifest.list.v2+json"
+        content_type_manifest = "application/vnd.docker.distribution.manifest.v2+json"
+        manifests = {}
         async with concurrency_sema.get():
-            rqst_args["headers"][
-                "Accept"
-            ] = "application/vnd.docker.distribution.manifest.list.v2+json"
+            rqst_args["headers"]["Accept"] = content_type_manifest_list
             async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{digest_or_tag}", **rqst_args
+                self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
             ) as resp:
                 if resp.status == 404:
                     # ignore missing tags
                     # (may occur after deleting an image from the docker hub)
                     return
+                content_type = resp.headers["Content-Type"]
                 resp.raise_for_status()
-                manifest_list = (await resp.json())["manifests"]
-            rqst_args["headers"]["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
-            manifests = {}
+                if content_type != content_type_manifest_list:
+                    raise RuntimeError(
+                        "The registry does not support the standard way of "
+                        "listing multiarch images."
+                    )
+                resp_json = await resp.json()
+                manifest_list = resp_json["manifests"]
+            rqst_args["headers"]["Accept"] = content_type_manifest
             for manifest in manifest_list:
                 platform_arg = (
                     f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
@@ -243,7 +255,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 log.warn(
                                     "label not found on image {}:{}/{}",
                                     image,
-                                    digest_or_tag,
+                                    tag,
                                     architecture,
                                 )
                         else:
@@ -254,7 +266,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 log.warn(
                                     "label not found on image {}:{}/{}",
                                     image,
-                                    digest_or_tag,
+                                    tag,
                                     architecture,
                                 )
                         manifests[architecture] = {
@@ -262,7 +274,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             "labels": labels,
                             "digest": config_digest,
                         }
-            await self._read_manifest(image, tag or digest_or_tag, manifests)
+            await self._read_manifest(image, tag or tag, manifests)
 
     async def _read_manifest(
         self,

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import json
 import logging
+from contextlib import asynccontextmanager as actxmgr
 from typing import AsyncIterator, Optional
 
 import aiohttp
@@ -10,12 +13,17 @@ from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models.image import ImageRow
-from .base import BaseContainerRegistry
+from .base import (
+    BaseContainerRegistry,
+    concurrency_sema,
+    progress_reporter,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class LocalRegistry(BaseContainerRegistry):
+    @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         url, connector = get_docker_connector()
         async with aiohttp.ClientSession(connector=connector) as sess:
@@ -27,7 +35,7 @@ class LocalRegistry(BaseContainerRegistry):
     ) -> AsyncIterator[str]:
         async with sess.get(self.registry_url / "images" / "json") as response:
             items = await response.json()
-            if (reporter := self.reporter.get()) is not None:
+            if (reporter := progress_reporter.get()) is not None:
                 reporter.total_progress = len(items)
             for item in items:
                 labels = item["Labels"]
@@ -93,6 +101,6 @@ class LocalRegistry(BaseContainerRegistry):
                     },
                 }, None
 
-        async with self.sema.get():
+        async with concurrency_sema.get():
             manifests, skip_reason = await _read_image_info(digest)
             await self._read_manifest(image, digest, manifests, skip_reason)
