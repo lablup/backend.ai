@@ -172,8 +172,9 @@ class ModeMenu(Static):
         except ValueError:
             if args.mode is None:
                 mode = InstallModes.PACKAGE
-        if Path("INSTALL-INFO").exists():
-            self._enabled_menus.add(InstallModes.MAINTAIN)
+        # TODO: implement
+        # if Path("INSTALL-INFO").exists():
+        #     self._enabled_menus.add(InstallModes.MAINTAIN)
         assert mode is not None
         self._mode = mode
 
