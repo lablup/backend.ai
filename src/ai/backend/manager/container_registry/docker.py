@@ -19,6 +19,12 @@ class DockerHubRegistry(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         # We need some special treatment for the Docker Hub.
+        raise DeprecationWarning(
+            "Rescanning the whole Docker registry is disabled due to rate "
+            "limits of the Docker Hub API."
+        )
+        yield ""
+        """
         params = {"page_size": "30"}
         username = self.registry_info["username"]
         hub_url = yarl.URL("https://hub.docker.com")
@@ -47,6 +53,7 @@ class DockerHubRegistry(BaseContainerRegistry):
                 repo_list_url = hub_url.with_path(next_page_url.path).with_query(
                     next_page_url.query
                 )
+        """
 
 
 class DockerRegistry_v2(BaseContainerRegistry):
