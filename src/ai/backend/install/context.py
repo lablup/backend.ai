@@ -599,66 +599,75 @@ class Context(metaclass=ABCMeta):
 
     async def populate_images(self) -> None:
         data: Any
-        match self.dist_info.image_source:
-            case ImageSource.BACKENDAI_REGISTRY:
-                self.log_header("Scanning and pulling configured Backend.AI container images...")
-                if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                    project = "stable,community,multiarch"
-                else:
-                    project = "stable,community"
-                data = {
-                    "docker": {
-                        "image": {
-                            "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                        },
-                        "registry": {
-                            "cr.backend.ai": {
-                                "": "https://cr.backend.ai",
-                                "type": "harbor2",
-                                "project": project,
+        for image_source in self.dist_info.image_sources:
+            match image_source:
+                case ImageSource.BACKENDAI_REGISTRY:
+                    self.log_header(
+                        "Scanning and pulling configured Backend.AI container images..."
+                    )
+                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+                        project = "stable,community,multiarch"
+                    else:
+                        project = "stable,community"
+                    data = {
+                        "docker": {
+                            "image": {
+                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
+                            },
+                            "registry": {
+                                "cr.backend.ai": {
+                                    "": "https://cr.backend.ai",
+                                    "type": "harbor2",
+                                    "project": project,
+                                },
                             },
                         },
-                    },
-                }
-                await self.etcd_put_json("config", data)
-                await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
-                if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                    await self.alias_image(
-                        "python",
-                        "cr.backend.ai/stable/python:3.9-ubuntu20.04",
-                        "aarch64",
+                    }
+                    await self.etcd_put_json("config", data)
+                    await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
+                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+                        await self.alias_image(
+                            "python",
+                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "aarch64",
+                        )
+                    else:
+                        await self.alias_image(
+                            "python",
+                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "x86_64",
+                        )
+                case ImageSource.DOCKER_HUB:
+                    self.log_header(
+                        "Scanning and pulling configured Docker Hub container images..."
                     )
-                else:
-                    await self.alias_image(
-                        "python",
-                        "cr.backend.ai/stable/python:3.9-ubuntu20.04",
-                        "x86_64",
-                    )
-            case ImageSource.DOCKER_HUB:
-                self.log_header("Scanning and pulling configured Docker Hub container images...")
-                data = {
-                    "docker": {
-                        "image": {
-                            "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                        },
-                        "registry": {
-                            "index.docker.io": {
-                                "": "https://registry-1.docker.io",
-                                "type": "docker",
-                                "username": "lablup",
+                    data = {
+                        "docker": {
+                            "image": {
+                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
+                            },
+                            "registry": {
+                                "index.docker.io": {
+                                    "": "https://registry-1.docker.io",
+                                    "type": "docker",
+                                    "username": "lablup",
+                                },
                             },
                         },
-                    },
-                }
-                await self.etcd_put_json("config", data)
-                for ref in self.dist_info.image_refs:
-                    await self.run_manager_cli(["mgr", "image", "rescan", ref])
-                    await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
-            case ImageSource.LOCAL_DIR:
-                self.log_header("Populating local container images...")
-                for src in self.dist_info.image_sources:
-                    # TODO: Ensure src.ref
-                    await self.run_exec([*self.docker_sudo, "docker", "load", "-i", str(src.file)])
+                    }
+                    await self.etcd_put_json("config", data)
+                    for ref in self.dist_info.image_refs:
+                        await self.run_manager_cli(["mgr", "image", "rescan", ref])
+                        await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
+                case ImageSource.LOCAL_DIR:
+                    self.log_header("Populating local container images...")
+                    for src in self.dist_info.image_payloads:
+                        # TODO: Ensure src.ref
+                        await self.run_exec(
+                            [*self.docker_sudo, "docker", "load", "-i", str(src.file)]
+                        )
+                case ImageSource.LOCAL_REGISTRY:
+                    raise NotImplementedError()
 
 
 class DevContext(Context):

@@ -76,8 +76,8 @@ class DistInfo(BaseModel):
     package_dir: Path = Field(default_factory=Path.cwd)
     use_fat_binary: bool = False
     target_path: Path = Field(default_factory=lambda: Path.home() / "backendai")
-    image_source: ImageSource = ImageSource.BACKENDAI_REGISTRY
-    image_sources: list[LocalImageSource] = Field(default_factory=list)
+    image_sources: list[ImageSource] = [ImageSource.BACKENDAI_REGISTRY, ImageSource.DOCKER_HUB]
+    image_payloads: list[LocalImageSource] = Field(default_factory=list)
     image_refs: list[str] = Field(default_factory=list)
 
 
