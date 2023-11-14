@@ -170,7 +170,7 @@ class InstallReport(Static):
         - Username: `admin@lablup.com`
         - Password: `wJalrXUt`
 
-        To see this guide again, run `./backendai-install-<platform> --show-guide`.
+        To see this guide again, run './backendai-install-<platform> install --show-guide'.
         """))
         with TabbedContent():
             with TabPane("Web Server", id="webserver"):
