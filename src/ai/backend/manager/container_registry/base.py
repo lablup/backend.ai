@@ -41,13 +41,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     credentials: Dict[str, str]
     ssl_verify: bool
 
-    content_type_docker_manifest_list: Final[str] = (
+    MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
+    MEDIA_TYPE_OCI_MANIFEST: Final[str] = "application/vnd.oci.image.manifest.v1+json"
+    MEDIA_TYPE_DOCKER_MANIFEST_LIST: Final[str] = (
         "application/vnd.docker.distribution.manifest.list.v2+json"
     )
-    content_type_oci_manifest: Final[str] = "application/vnd.oci.image.index.v1+json"
-    content_type_docker_manifest: Final[str] = (
-        "application/vnd.docker.distribution.manifest.v2+json"
-    )
+    MEDIA_TYPE_DOCKER_MANIFEST: Final[str] = "application/vnd.docker.distribution.manifest.v2+json"
 
     def __init__(
         self,
@@ -213,7 +212,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     ) -> None:
         manifests = {}
         async with concurrency_sema.get():
-            rqst_args["headers"]["Accept"] = self.content_type_docker_manifest_list
+            rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST_LIST
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{tag}", **rqst_args
             ) as resp:
@@ -223,14 +222,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     return
                 content_type = resp.headers["Content-Type"]
                 resp.raise_for_status()
-                if content_type != self.content_type_docker_manifest_list:
-                    raise RuntimeError(
-                        "The registry does not support the standard way of "
-                        "listing multiarch images."
-                    )
                 resp_json = await resp.json()
-                manifest_list = resp_json["manifests"]
-            rqst_args["headers"]["Accept"] = self.content_type_docker_manifest
+                match content_type:
+                    case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                        manifest_list = resp_json["manifests"]
+                        request_type = self.MEDIA_TYPE_DOCKER_MANIFEST
+                    case self.MEDIA_TYPE_OCI_INDEX:
+                        manifest_list = [
+                            item
+                            for item in resp_json["manifests"]
+                            if "annotations" not in item  # skip attestation manifests
+                        ]
+                        request_type = self.MEDIA_TYPE_OCI_MANIFEST
+                    case _:
+                        raise RuntimeError(
+                            "The registry does not support the standard way of "
+                            "listing multiarch images."
+                        )
+            rqst_args["headers"]["Accept"] = request_type
             for manifest in manifest_list:
                 platform_arg = (
                     f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
