@@ -26,7 +26,7 @@ async def detect_os(ctx: Context) -> OSInfo:
             stderr=asyncio.subprocess.DEVNULL,
         )
         assert p.stdout is not None
-        uname_s_output = await p.stdout.read()
+        uname_s_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
@@ -38,12 +38,12 @@ async def detect_os(ctx: Context) -> OSInfo:
             stderr=asyncio.subprocess.DEVNULL,
         )
         assert p.stdout is not None
-        lsb_release_output = await p.stdout.read()
+        lsb_release_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
     try:
-        issue_output = Path("/etc/issue").read_bytes()
+        issue_output = Path("/etc/issue").read_bytes().strip()
     except IOError:
         issue_output = b""
     release_metadata = lsb_release_output + b"\n" + issue_output
