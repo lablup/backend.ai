@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
+
 /* --Reset CSS Start-- */
 html, body, div, span, 
 h1, h2, h3, h4, h5, h6, 
@@ -25,44 +27,6 @@ ol, ul {
   font-weight: 400;
   unicode-range: U+0041-005A, U+0061-007A, U+AC00-D7A3, U+0030-0039, U+0020-002F, U+003A-0040, U+005B-0060, U+007B-007E
 }
-
-/* 보조 폰트 */
-@font-face {
-  font-family: ABCWhyteInktrap;
-  src: url('./fonts/ABCWhyteInktrap-Regular.woff') format('woff');
-  font-weight: 400;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: ABCWhyteInktrap;
-  src: url('./fonts/ABCWhyteInktrap-RegularItalic.woff2') format('woff2');
-  font-weight: 400;
-  font-style: italic;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-/* 폰트 변경을 대비한 Poppins */
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/Poppins-Regular.ttf') format('truetype');
-  font-weight: 400;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/fonts/Poppins-Medium.ttf') format('truetype');
-  font-weight: 500;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
-
-@font-face {
-  font-family: Poppins;
-  src: url('./fonts/Poppins-SemiBold.ttf') format('truetype');
-  font-weight: 600;
-  unicode-range: U+0041-005A, U+0061-007A, U+0030-0039;
-}
 /* --Font End-- */
 
 /* --Custom Global Theme Start-- */
@@ -80,7 +44,7 @@ html {
 }
 
 body {
-  font-family: Pretendard, WhyteABCInktrap, Poppins, sans-serif;
+  font-family: Pretendard, Poppins, sans-serif;
   font-size: 4.103vw;
   word-break: keep-all;
 }
@@ -446,7 +410,7 @@ input {
 }
 
 input::placeholder {
-  font-family: Pretendard, Poppins, sans-serif;
+  font-family: Pretendard, sans-serif;
   font-size: 3.59vw;
   line-height: 160%;
 }
@@ -4639,7 +4603,7 @@ body,html {
 }
 
 body {
-  font-family: Pretendard, Poppins, ABCWhyteInktrap, sans-serif;
+  font-family: Pretendard, Poppins, sans-serif;
   font-weight: 400;
   color: #000;
   min-height: 100%;
@@ -4670,16 +4634,20 @@ body {
   font-size: 3.077vw;
 }
 
-@media only screen and (min-width: 600px) {
+@media (min-width: 600px) {
   .rst-other-versions small {
     font-size: 1.843rem;
   }
 }
 
-@media only screen and (min-width: 1200px) {
+@media (min-width: 1200px) {
   .rst-other-versions small {
     font-size: 1.2rem;
   }
+}
+
+.rst-other-versions dl {
+  margin: 0 0 1rem 0 !important;
 }
 
 .wy-text-strike {
@@ -4791,7 +4759,7 @@ h1 {
 
 @media (min-width: 1200px) {
   .rst-content .toctree-wrapper>p.caption,h2 {
-    font-size: 2.8rem;
+    font-size: 3.2rem;
   }
 }
 
@@ -4809,6 +4777,12 @@ h3 {
   }
 }
 
+@media (min-width: 1200px) {
+  h3 {
+    font-size: 2.4rem;
+  }
+}
+
 h4 {
   font-size: 4.103vw;
 }
@@ -4819,12 +4793,42 @@ h4 {
   }
 }
 
+@media (min-width: 1200px) {
+  h4 {
+    font-size: 1.8rem;
+  }
+}
+
 h5 {
   font-size: 3.846vw;
 }
 
+@media (min-width: 600px) {
+  h5 {
+    font-size: 2.1rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  h5 {
+    font-size: 1.4rem;
+  }
+}
+
 h6 {
   font-size: 3.59vw;
+}
+
+@media (min-width: 600px) {
+  h6 {
+    font-size: 1.8rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  h6 {
+    font-size: 1.2rem;
+  }
 }
 
 hr {
@@ -5582,7 +5586,7 @@ hr {
 }
 
 .wy-nav-top a {
-  font-family: ABCWhyteInktrap, Pretendard, sans-serif;
+  font-family: Pretendard, sans-serif;
   font-style: italic;
   display: -webkit-box;
     -webkit-line-clamp: 1;
@@ -5856,10 +5860,6 @@ footer p {
   }
 }
 
-
-
-
-
 @media screen and (min-width: 1495px) {
   .customized-search-bar-in-desktop {
     position: absolute;
@@ -5883,10 +5883,6 @@ footer p {
     height: 4rem;
   }
 }
-
-
-
-
 
 .customized-search-bar input:first-child {
   padding-right: 10vw;
@@ -5970,9 +5966,6 @@ img.search-icon {
   }
 }
 
-
-
-
 @media screen and (min-width: 1495px) {
   .wy-nav-content-wrap {
     margin-left: 43rem;
@@ -5980,10 +5973,6 @@ img.search-icon {
     width: 106.5rem;
   }
 }
-
-
-
-
 
 @media print {
   .rst-versions,.wy-nav-side,footer {
@@ -6004,6 +5993,13 @@ img.search-icon {
   background: #000;
   font-family: Pretendard, sans-serif;
   z-index: 400
+}
+
+@media screen and (min-width: 1200px) {
+  .rst-versions {
+    bottom: 7rem;
+    width: 35rem;
+  }
 }
 
 .rst-versions a {
@@ -6116,6 +6112,22 @@ div.rst-other-versions small a {
   }
 }
 
+.rst-other-versions .injected dl:last-child dd div {
+  width: 70vw;
+}
+
+@media screen and (min-width: 600px) {
+  .rst-other-versions .injected dl:last-child dd div {
+    width: 40.8rem;
+  }
+}
+
+@media screen and (min-width: 1200px) {
+  .rst-versions.rst-badge {
+    width: 27.5rem;
+  }
+}
+
 #flyout-search-form input {
   width: 100%;
 }
@@ -6146,9 +6158,20 @@ div.rst-other-versions small a {
   display: block;
 }
 
-@media screen and (max-width: 1200px) {
+@media screen and (max-width: 1199px) {
   .rst-versions {
-      width:85%;
+      width: 53.845rem;
+      display: none
+  }
+
+  .rst-versions.shift {
+      display: block
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .rst-versions {
+      width: 90%;
       display: none
   }
 
@@ -6914,7 +6937,7 @@ html.writer-html4 .rst-content dl:not(.docutils)>dt,html.writer-html5 .rst-conte
   color: #2980b9;
   border-top: 3px solid #6ab0de;
   padding: 6px;
-  position: relative
+  position: relative;
 }
 
 html.writer-html4 .rst-content dl:not(.docutils)>dt:before,html.writer-html5 .rst-content dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.citation):not(.glossary):not(.simple)>dt:before {
@@ -7319,7 +7342,6 @@ td code .pre {
   }
 }
 
-
 .fa-home:before,.icon-home:before {
   content: url('../icons/icon-folder.svg');
 }
@@ -7352,7 +7374,6 @@ li.toctree-l1.current ul li.toctree-l2.current a.reference.internal.current {
     font-weight: 500;
   }
 }
-
 
 /* --for overriding pygments.css-- */
 
