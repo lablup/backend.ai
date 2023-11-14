@@ -92,7 +92,7 @@ logging_config_iv = t.Dict(
                 t.Key("host"): t.String,
                 t.Key("port"): t.ToInt[1024:65535],
                 t.Key("level", default="INFO"): loglevel_iv,
-                t.Key("ssl-verify", default=False): t.Bool,
+                t.Key("validate", default=False): t.Bool,
                 t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
                 t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
                 t.Key("certfile", default=None): t.Null | t.String(allow_blank=True),
@@ -217,7 +217,7 @@ def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler
     graylog_handler = graypy.GELFTLSHandler(
         host=drv_config["host"],
         port=drv_config["port"],
-        validate=drv_config["ssl-verify"],
+        validate=drv_config["validate"],
         ca_certs=drv_config["ca-certs"],
         keyfile=drv_config["keyfile"],
         certfile=drv_config["certfile"],
