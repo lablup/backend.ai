@@ -705,6 +705,8 @@ class DevContext(Context):
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os(self)
+        self.log.write(Text.from_markup("Detected OS info: ", end=""))
+        self.log.write(self.os_info)
         await install_git_lfs(self)
         await install_git_hooks(self)
         await check_python(self)
@@ -793,6 +795,8 @@ class PackageContext(Context):
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os(self)
+        self.log.write(Text.from_markup("Detected OS info: ", end=""))
+        self.log.write(self.os_info)
         await check_docker(self)
         if self.os_info.distro == "Darwin":
             await check_docker_desktop_mount(self)

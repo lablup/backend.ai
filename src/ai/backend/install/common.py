@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.text import Text
-
 from .types import OSInfo, Platform
 
 if TYPE_CHECKING:
@@ -70,14 +68,14 @@ async def detect_os(ctx: Context) -> OSInfo:
         assert platform_kernel == "linux"
         distro = "SUSE"
     else:
-        raise RuntimeError("Unsupported host linux distribution")
-    os_info = OSInfo(
+        raise RuntimeError(
+            "Unsupported host linux distribution: "
+            f"{uname_s_output.decode()}, {release_metadata.decode()}"
+        )
+    return OSInfo(
         platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
         distro=distro,
     )
-    ctx.log.write(Text.from_markup("Detected OS info: ", end=""))
-    ctx.log.write(os_info)
-    return os_info
 
 
 async def detect_cuda(ctx: Context) -> None:
