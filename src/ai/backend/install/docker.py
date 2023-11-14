@@ -59,7 +59,7 @@ async def detect_snap_docker():
                 return pkg_data["version"]
 
 
-async def detect_system_docker():
+async def detect_system_docker(ctx: Context):
     # Well-known docker socket paths
     sock_paths = [
         Path("/run/docker.sock"),  # Linux default
@@ -68,7 +68,7 @@ async def detect_system_docker():
 
     # Read from context
     proc = await asyncio.create_subprocess_exec(
-        *("sudo", "docker", "context", "show"),
+        *(*ctx.docker_sudo, "docker", "context", "show"),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -76,7 +76,7 @@ async def detect_system_docker():
     context_name = (await proc.stdout.read()).decode().strip()
     await proc.wait()
     proc = await asyncio.create_subprocess_exec(
-        *("sudo", "docker", "context", "inspect", context_name),
+        *(*ctx.docker_sudo, "docker", "context", "inspect", context_name),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -102,15 +102,18 @@ async def detect_system_docker():
             + ", ".join(str(sock_path) for sock_path in sock_paths)
             + ")"
         )
-    proc = await asyncio.create_subprocess_exec(
-        *["sudo", "chmod", "666", str(sock_path)],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    assert proc.stdout is not None
-    stdout = await proc.stdout.read()
-    if (await proc.wait()) != 0:
-        raise RuntimeError("Failed to set the docker socket permission", stdout.decode())
+    if ctx.docker_sudo:
+        # change the docker socket permission (temporarily)
+        # so that we could access the docker daemon API directly.
+        proc = await asyncio.create_subprocess_exec(
+            *["sudo", "chmod", "666", str(sock_path)],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        assert proc.stdout is not None
+        stdout = await proc.stdout.read()
+        if (await proc.wait()) != 0:
+            raise RuntimeError("Failed to set the docker socket permission", stdout.decode())
     async with request_unix("GET", str(sock_path), "http://localhost/version") as r:
         if r.status != 200:
             raise RuntimeError("Failed to query the Docker daemon API")
@@ -152,6 +155,23 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
         return f"/tmp/{build_root_name}-{build_root_hash}-pants"
 
 
+async def determine_docker_sudo() -> bool:
+    proc = await asyncio.create_subprocess_exec(
+        *("docker", "version"),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    assert proc.stdout is not None
+    stdout = (await proc.stdout.read()).decode()
+    if (await proc.wait()) != 0:
+        if "permission denied" in stdout.lower():
+            # installed, requires sudo
+            return True
+        raise RuntimeError("Docker client command is not available in the host.")
+    # installed, does not require sudo
+    return False
+
+
 async def check_docker(ctx: Context) -> None:
     ctx.log_header("Checking Docker and Docker Compose availability")
     docker_version = await detect_snap_docker()
@@ -160,7 +180,7 @@ async def check_docker(ctx: Context) -> None:
         if parse_version(docker_version) < (20, 10, 15):
             fail_with_snap_docker_refresh_request()
     else:
-        docker_version = await detect_system_docker()
+        docker_version = await detect_system_docker(ctx)
         ctx.log.write(docker_version)
         if docker_version is not None:
             ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
@@ -168,7 +188,7 @@ async def check_docker(ctx: Context) -> None:
             fail_with_system_docker_install_request()
 
     proc = await asyncio.create_subprocess_exec(
-        "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
+        *ctx.docker_sudo, "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
     )
     assert proc.stdout is not None
     stdout = await proc.stdout.read()

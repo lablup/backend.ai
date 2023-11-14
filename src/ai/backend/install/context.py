@@ -37,7 +37,12 @@ from .dev import (
     install_git_lfs,
     pants_export,
 )
-from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
+from .docker import (
+    check_docker,
+    check_docker_desktop_mount,
+    determine_docker_sudo,
+    get_preferred_pants_local_exec_root,
+)
 from .http import wget
 from .python import check_python
 from .types import (
@@ -63,6 +68,7 @@ class PostGuide(enum.Enum):
 
 class Context(metaclass=ABCMeta):
     os_info: OSInfo
+    docker_sudo: list[str]
 
     _post_guides: list[PostGuide]
 
@@ -245,10 +251,11 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
+        sudo = " ".join(self.docker_sudo)
         await self.run_shell(
-            """
-        sudo docker compose up -d && \\
-        sudo docker compose ps
+            f"""
+        {sudo} docker compose up -d && \\
+        {sudo} docker compose ps
         """,
             cwd=self.install_info.base_path,
         )
@@ -646,12 +653,12 @@ class Context(metaclass=ABCMeta):
                 await self.etcd_put_json("config", data)
                 for ref in self.dist_info.image_refs:
                     await self.run_manager_cli(["mgr", "image", "rescan", ref])
-                    await self.run_exec(["sudo", "docker", "pull", ref])
+                    await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
             case ImageSource.LOCAL_DIR:
                 self.log_header("Populating local container images...")
                 for src in self.dist_info.image_sources:
                     # TODO: Ensure src.ref
-                    await self.run_exec(["sudo", "docker", "load", "-i", str(src.file)])
+                    await self.run_exec([*self.docker_sudo, "docker", "load", "-i", str(src.file)])
 
 
 class DevContext(Context):
@@ -707,6 +714,10 @@ class DevContext(Context):
         self.os_info = await detect_os(self)
         self.log.write(Text.from_markup("Detected OS info: ", end=""))
         self.log.write(self.os_info)
+        if determine_docker_sudo():
+            self.docker_sudo = ["sudo"]
+        else:
+            self.docker_sudo = []
         await install_git_lfs(self)
         await install_git_hooks(self)
         await check_python(self)
@@ -797,6 +808,10 @@ class PackageContext(Context):
         self.os_info = await detect_os(self)
         self.log.write(Text.from_markup("Detected OS info: ", end=""))
         self.log.write(self.os_info)
+        if determine_docker_sudo():
+            self.docker_sudo = ["sudo"]
+        else:
+            self.docker_sudo = []
         await check_docker(self)
         if self.os_info.distro == "Darwin":
             await check_docker_desktop_mount(self)
