@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import os
 import re
 from pathlib import Path
@@ -59,19 +60,48 @@ async def detect_snap_docker():
 
 
 async def detect_system_docker():
+    # Well-known docker socket paths
     sock_paths = [
         Path("/run/docker.sock"),  # Linux default
         Path("/var/run/docker.sock"),  # macOS default
     ]
+
+    # Read from context
+    proc = await asyncio.create_subprocess_exec(
+        *("sudo", "docker", "context", "show"),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    assert proc.stdout is not None
+    context_name = (await proc.stdout.read()).decode().strip()
+    await proc.wait()
+    proc = await asyncio.create_subprocess_exec(
+        *("sudo", "docker", "context", "inspect", context_name),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    assert proc.stdout is not None
+    stdout = await proc.stdout.read()
+    await proc.wait()
+    context_info = json.loads(stdout)
+    context_sock_path = context_info[0]["Endpoints"]["docker"]["Host"].removeprefix("unix://")
+    sock_paths.insert(0, Path(context_sock_path))
+
+    # Read from environment variable
     if env_sock_path := os.environ.get("DOCKER_HOST", None):
         # Some special setups like OrbStack may have a custom DOCKER_HOST.
         env_sock_path = env_sock_path.removeprefix("unix://")
         sock_paths.insert(0, Path(env_sock_path))
+
     for sock_path in sock_paths:
         if sock_path.is_socket():
             break
     else:
-        return None
+        raise RuntimeError(
+            "Failed to find Docker daemon socket ("
+            + ", ".join(str(sock_path) for sock_path in sock_paths)
+            + ")"
+        )
     proc = await asyncio.create_subprocess_exec(
         *["sudo", "chmod", "666", str(sock_path)],
         stdout=asyncio.subprocess.PIPE,
@@ -131,6 +161,7 @@ async def check_docker(ctx: Context) -> None:
             fail_with_snap_docker_refresh_request()
     else:
         docker_version = await detect_system_docker()
+        ctx.log.write(docker_version)
         if docker_version is not None:
             ctx.log.write(f"Detected Docker installation: System package ({docker_version})")
         else:

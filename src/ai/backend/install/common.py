@@ -45,8 +45,9 @@ async def detect_os(ctx: Context) -> OSInfo:
     except IOError:
         issue_output = b""
     release_metadata = lsb_release_output + b"\n" + issue_output
-    if uname_s_output == "Darwin":
+    if uname_s_output == b"Darwin":
         assert platform_kernel == "darwin"
+        platform_kernel = "macos"
         distro = "Darwin"
     elif (
         Path("/etc/debian_version").exists()
@@ -70,7 +71,7 @@ async def detect_os(ctx: Context) -> OSInfo:
     else:
         raise RuntimeError(
             "Unsupported host linux distribution: "
-            f"{uname_s_output.decode()}, {release_metadata.decode()}"
+            f"{uname_s_output.decode()!r}, {release_metadata.decode()!r}"
         )
     return OSInfo(
         platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
