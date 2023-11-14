@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rich.text import Text
+
 from ai.backend.install.types import PrerequisiteError
 
 from .http import request_unix
@@ -65,23 +67,38 @@ async def detect_system_docker(ctx: Context):
         Path("/run/docker.sock"),  # Linux default
         Path("/var/run/docker.sock"),  # macOS default
     ]
+    if ctx.docker_sudo:
+        ctx.log.write(
+            Text.from_markup("[yellow]Docker commands require sudo. We will use sudo.[/]")
+        )
 
     # Read from context
     proc = await asyncio.create_subprocess_exec(
         *(*ctx.docker_sudo, "docker", "context", "show"),
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.STDOUT,
     )
     assert proc.stdout is not None
-    context_name = (await proc.stdout.read()).decode().strip()
-    await proc.wait()
+    stdout = ""
+    try:
+        async with asyncio.timeout(0.5):
+            stdout = (await proc.stdout.read()).decode().strip()
+            await proc.wait()
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise PrerequisiteError(
+            "sudo requires prompt.",
+            instruction="Please make sudo available without password prompts.",
+        )
+    context_name = stdout
     proc = await asyncio.create_subprocess_exec(
         *(*ctx.docker_sudo, "docker", "context", "inspect", context_name),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
     assert proc.stdout is not None
-    stdout = await proc.stdout.read()
+    stdout = (await proc.stdout.read()).decode()
     await proc.wait()
     context_info = json.loads(stdout)
     context_sock_path = context_info[0]["Endpoints"]["docker"]["Host"].removeprefix("unix://")
@@ -102,6 +119,7 @@ async def detect_system_docker(ctx: Context):
             + ", ".join(str(sock_path) for sock_path in sock_paths)
             + ")"
         )
+    ctx.log.write(Text.from_markup(f"[yellow]{sock_path=}[/]"))
     if ctx.docker_sudo:
         # change the docker socket permission (temporarily)
         # so that we could access the docker daemon API directly.
@@ -111,9 +129,9 @@ async def detect_system_docker(ctx: Context):
             stderr=asyncio.subprocess.STDOUT,
         )
         assert proc.stdout is not None
-        stdout = await proc.stdout.read()
+        stdout = (await proc.stdout.read()).decode()
         if (await proc.wait()) != 0:
-            raise RuntimeError("Failed to set the docker socket permission", stdout.decode())
+            raise RuntimeError("Failed to set the docker socket permission", stdout)
     async with request_unix("GET", str(sock_path), "http://localhost/version") as r:
         if r.status != 200:
             raise RuntimeError("Failed to query the Docker daemon API")
