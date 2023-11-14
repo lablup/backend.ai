@@ -445,6 +445,13 @@ jobs:
       with:
         name: local-proxy
         path: dist
+    - name: SBOM report generation
+      uses: ./.github/workflows/sbom.yml
+    - name: Download SBOM report
+      uses: actions/download-artifact@v3
+      with:
+        name: SBOM report
+        path: dist
     - name: Release to GitHub
       uses: softprops/action-gh-release@v1
       with:
