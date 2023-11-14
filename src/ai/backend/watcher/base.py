@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 60
+DEFAULT_POLLING_INTERVAL: Final = 30
 
 
 async def _run_cmd(cmd: list[str]) -> ProcResult:
@@ -91,7 +92,10 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         fstab_path: str | None = None,
         mount_prefix: str | None = None,
     ) -> None:
-        _mount_path = Path(mount_path)
+        if mount_prefix is None:
+            _mount_path = Path(mount_path)
+        else:
+            _mount_path = Path(mount_prefix, mount_path)
 
         def already_done() -> bool:
             return _mount_path.is_mount()
@@ -122,7 +126,10 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         *,
         timeout_sec: float | None = DEFAULT_FILE_IO_TIMEOUT,
     ) -> bool:
-        _mount_path = Path(mount_path)
+        if mount_prefix is None:
+            _mount_path = Path(mount_path)
+        else:
+            _mount_path = Path(mount_prefix, mount_path)
 
         def already_done() -> bool:
             return not _mount_path.is_mount()
@@ -141,3 +148,26 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
                 rmdir_if_empty,
                 timeout_sec=timeout_sec,
             )
+
+    async def check_mount(
+        self,
+        mount_path: str,
+        mount_prefix: str | None = None,
+    ) -> bool:
+        if mount_prefix is None:
+            _mount_path = Path(mount_path)
+        else:
+            _mount_path = Path(mount_prefix, mount_path)
+        return _mount_path.is_mount()
+
+    async def poll_check_mount(
+        self,
+        mount_path: str,
+        mount_prefix: str | None = None,
+        *,
+        interval: float = DEFAULT_POLLING_INTERVAL,
+    ) -> bool:
+        while True:
+            if not (await self.check_mount(mount_path, mount_prefix)):
+                raise
+            await asyncio.sleep(interval)
