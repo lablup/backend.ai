@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.text import Text
+from ai.backend.common.arch import arch_name_aliases
 
 from .types import OSInfo, Platform
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 async def detect_os(ctx: Context) -> OSInfo:
     platform_kernel = sys.platform
-    platform_arch = platform.machine()
+    platform_arch = arch_name_aliases.get(platform.machine(), platform.machine())
     distro: str | None = None
     uname_s_output = b""
     try:
@@ -26,7 +26,7 @@ async def detect_os(ctx: Context) -> OSInfo:
             stderr=asyncio.subprocess.DEVNULL,
         )
         assert p.stdout is not None
-        uname_s_output = await p.stdout.read()
+        uname_s_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
@@ -38,17 +38,18 @@ async def detect_os(ctx: Context) -> OSInfo:
             stderr=asyncio.subprocess.DEVNULL,
         )
         assert p.stdout is not None
-        lsb_release_output = await p.stdout.read()
+        lsb_release_output = (await p.stdout.read()).strip()
         await p.wait()
     except OSError:
         pass
     try:
-        issue_output = Path("/etc/issue").read_bytes()
+        issue_output = Path("/etc/issue").read_bytes().strip()
     except IOError:
         issue_output = b""
     release_metadata = lsb_release_output + b"\n" + issue_output
-    if uname_s_output == "Darwin":
+    if uname_s_output == b"Darwin":
         assert platform_kernel == "darwin"
+        platform_kernel = "macos"
         distro = "Darwin"
     elif (
         Path("/etc/debian_version").exists()
@@ -70,14 +71,14 @@ async def detect_os(ctx: Context) -> OSInfo:
         assert platform_kernel == "linux"
         distro = "SUSE"
     else:
-        raise RuntimeError("Unsupported host linux distribution")
-    os_info = OSInfo(
+        raise RuntimeError(
+            "Unsupported host linux distribution: "
+            f"{uname_s_output.decode()!r}, {release_metadata.decode()!r}"
+        )
+    return OSInfo(
         platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
         distro=distro,
     )
-    ctx.log.write(Text.from_markup("Detected OS info: ", end=""))
-    ctx.log.write(os_info)
-    return os_info
 
 
 async def detect_cuda(ctx: Context) -> None:
