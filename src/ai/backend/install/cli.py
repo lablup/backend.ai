@@ -49,7 +49,11 @@ class DevSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Development Setup", classes="mode-title")
-        yield RichLog(wrap=True, classes="log")
+        with TabbedContent():
+            with TabPane("Install Log", id="tab-dev-log"):
+                yield RichLog(wrap=True, classes="log")
+            with TabPane("Install Report", id="tab-dev-report"):
+                yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
@@ -68,6 +72,10 @@ class DevSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
+            install_report = InstallReport(ctx.install_info, id="install-report")
+            self.query_one("TabPane#tab-dev-report Label").remove()
+            self.query_one("TabPane#tab-dev-report").mount(install_report)
+            cast(TabbedContent, self.query_one("TabbedContent")).active = "tab-dev-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -92,10 +100,10 @@ class PackageSetup(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Package Setup", classes="mode-title")
-        with TabbedContent(id="tabs"):
-            with TabPane("Install Log", id="log"):
+        with TabbedContent():
+            with TabPane("Install Log", id="tab-pkg-log"):
                 yield RichLog(wrap=True, classes="log")
-            with TabPane("Install Report", id="report"):
+            with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
@@ -126,10 +134,10 @@ class PackageSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
-            await asyncio.sleep(2.0)
             install_report = InstallReport(ctx.install_info, id="install-report")
-            self.query_one("TabPane#report Label").remove()
-            self.query_one("TabPane#report").mount(install_report)
+            self.query_one("TabPane#tab-pkg-report Label").remove()
+            self.query_one("TabPane#tab-pkg-report").mount(install_report)
+            cast(TabbedContent, self.query_one("TabbedContent")).active = "tab-pkg-report"
         except asyncio.CancelledError:
             _log.write(Text.from_markup("[red]Interrupted!"))
             await asyncio.sleep(1)
@@ -176,8 +184,8 @@ class InstallReport(Static):
                 It works if the console output ends with something like:
                 ```
                 ...
-                2023-11-14 08:04:30.300 INFO ai.backend.web.server [2215731] serving at 0.0.0.0:8090
-                2023-11-14 08:04:30.303 INFO ai.backend.web.server [2215731] Using uvloop as the event loop backend
+                INFO ai.backend.web.server [2215731] serving at {service.webserver_addr.bind.host}:{service.webserver_addr.bind.port}
+                INFO ai.backend.web.server [2215731] Using uvloop as the event loop backend
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
@@ -193,10 +201,9 @@ class InstallReport(Static):
                 It works if the console output ends with something like:
                 ```
                 ...
-                2023-11-14 08:02:35.704 INFO ai.backend.manager.server [2213274] started handling API requests at 0.0.0.0:8091
-                2023-11-14 08:02:35.730 INFO ai.backend.manager.server [2213276] started handling API requests at 0.0.0.0:8091
-                2023-11-14 08:02:35.731 INFO ai.backend.manager.server [2213273] started handling API requests at 0.0.0.0:8091
-                2023-11-14 08:02:35.739 INFO ai.backend.manager.server [2213275] started handling API requests at 0.0.0.0:8091
+                INFO ai.backend.manager.server [2213274] started handling API requests at {service.manager_addr.bind.host}:{service.manager_addr.bind.port}
+                INFO ai.backend.manager.server [2213275] started handling API requests at {service.manager_addr.bind.host}:{service.manager_addr.bind.port}
+                INFO ai.backend.manager.server [2213276] started handling API requests at {service.manager_addr.bind.host}:{service.manager_addr.bind.port}
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
@@ -212,7 +219,7 @@ class InstallReport(Static):
                 It works if the console output ends with something like:
                 ```
                 ...
-                2023-11-14 08:03:38.048 INFO ai.backend.agent.server [2214424] started handling RPC requests at 127.0.0.1:6011
+                INFO ai.backend.agent.server [2214424] started handling RPC requests at {service.agent_rpc_addr.bind.host}:{service.agent_rpc_addr.bind.port}
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
@@ -228,8 +235,8 @@ class InstallReport(Static):
                 It works if the console output ends with something like:
                 ```
                 ...
-                2023-11-14 08:04:54.855 INFO ai.backend.storage.server [2216229] Node ID: i-storage-proxy-local
-                2023-11-14 08:04:54.858 INFO ai.backend.storage.server [2216229] Using uvloop as the event loop backend
+                INFO ai.backend.storage.server [2216229] Node ID: i-storage-proxy-local
+                INFO ai.backend.storage.server [2216229] Using uvloop as the event loop backend
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
@@ -245,8 +252,8 @@ class InstallReport(Static):
                 It works if the console output ends with something like:
                 ```
                 ...
-                11-14 08:05:08 info [manager.js]: Listening on port 5050!
-                11-14 08:05:08 info [local_proxy.js]: Proxy is ready: http://127.0.0.1:5050/
+                info [manager.js]: Listening on port {service.local_proxy_addr.bind.port}!
+                info [local_proxy.js]: Proxy is ready: http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}/
                 ```
 
                 To terminate, send SIGINT or press Ctrl+C in the console.
