@@ -41,7 +41,7 @@ class InstallType(enum.StrEnum):
 class Platform(enum.StrEnum):
     LINUX_ARM64 = "linux-aarch64"
     LINUX_X86_64 = "linux-x86_64"
-    MACOS_ARM64 = "macos-arm64"
+    MACOS_ARM64 = "macos-aarch64"
     MACOS_X86_64 = "macos-x86_64"
 
 
@@ -76,8 +76,8 @@ class DistInfo(BaseModel):
     package_dir: Path = Field(default_factory=Path.cwd)
     use_fat_binary: bool = False
     target_path: Path = Field(default_factory=lambda: Path.home() / "backendai")
-    image_source: ImageSource = ImageSource.BACKENDAI_REGISTRY
-    image_sources: list[LocalImageSource] = Field(default_factory=list)
+    image_sources: list[ImageSource] = [ImageSource.BACKENDAI_REGISTRY, ImageSource.DOCKER_HUB]
+    image_payloads: list[LocalImageSource] = Field(default_factory=list)
     image_refs: list[str] = Field(default_factory=list)
 
 
