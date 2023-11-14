@@ -41,7 +41,7 @@ class InstallType(enum.StrEnum):
 class Platform(enum.StrEnum):
     LINUX_ARM64 = "linux-aarch64"
     LINUX_X86_64 = "linux-x86_64"
-    MACOS_ARM64 = "macos-arm64"
+    MACOS_ARM64 = "macos-aarch64"
     MACOS_X86_64 = "macos-x86_64"
 
 

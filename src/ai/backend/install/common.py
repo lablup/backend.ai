@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ai.backend.common.arch import arch_name_aliases
+
 from .types import OSInfo, Platform
 
 if TYPE_CHECKING:
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
 
 async def detect_os(ctx: Context) -> OSInfo:
     platform_kernel = sys.platform
-    platform_arch = platform.machine()
+    platform_arch = arch_name_aliases.get(platform.machine(), platform.machine())
     distro: str | None = None
     uname_s_output = b""
     try:
