@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Generic, Mapping, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Final, Generic, Mapping, TypeVar, cast
 
 from async_timeout import timeout
 
@@ -166,8 +166,12 @@ class BaseWatcher(Generic[WatcherConfigType], metaclass=ABCMeta):
         mount_prefix: str | None = None,
         *,
         interval: float = DEFAULT_POLLING_INTERVAL,
-    ) -> bool:
+        error_handler: Coroutine,
+        return_when_error: bool = False,
+    ) -> None:
         while True:
             if not (await self.check_mount(mount_path, mount_prefix)):
-                raise
+                await error_handler
+                if return_when_error:
+                    return
             await asyncio.sleep(interval)
