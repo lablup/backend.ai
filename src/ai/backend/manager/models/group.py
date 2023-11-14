@@ -46,7 +46,7 @@ from .base import (
     simple_db_mutate_returning_item,
 )
 from .storage import StorageSessionManager
-from .user import ModifyUserInput, UserRole
+from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
@@ -395,36 +395,28 @@ class ModifyGroupInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(
         deprecation_reason=(
-            "Deprecated since 24.03.0. Recommend to use AddUsersToGroup, RemoveUsersFromGroup"
-            " mutation"
+            "Deprecated since 24.03.0. Recommend to use `added_users` and `removed_users` fields"
         )
     )
     user_uuids = graphene.List(
         lambda: graphene.String,
         deprecation_reason=(
-            "Deprecated since 24.03.0. Recommend to use AddUsersToGroup, RemoveUsersFromGroup"
-            " mutation"
+            "Deprecated since 24.03.0. Recommend to use `added_users` and `removed_users` fields"
         ),
+    )
+    added_users = graphene.List(
+        lambda: graphene.String,
+        required=False,
+        description="Added since 24.03.0. ID array of the users to be added to the group.",
+    )
+    removed_users = graphene.List(
+        lambda: graphene.String,
+        required=False,
+        description="Added since 24.03.0. ID array of the users to be removed from the group.",
     )
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-
-
-class AddUsersToGroupInput(graphene.InputObjectType):
-    user_ids = graphene.List(
-        lambda: graphene.String,
-        required=True,
-        description="Added since 24.03.0. ID array of the users to be added to the group.",
-    )
-
-
-class RemoveUsersFromGroupInput(graphene.InputObjectType):
-    user_ids = graphene.List(
-        lambda: graphene.String,
-        required=True,
-        description="Added since 24.03.0. ID array of the users to be deleted from the group.",
-    )
 
 
 class CreateGroup(graphene.Mutation):
@@ -494,10 +486,11 @@ class ModifyGroup(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         gid: uuid.UUID,
-        props: ModifyUserInput,
+        props: ModifyGroupInput,
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}
+        user_data: dict[str, set] = {}
         set_if_set(props, data, "name")
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
@@ -512,31 +505,54 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "integration_id")
         set_if_set(props, data, "resource_policy")
 
+        set_if_set(props, user_data, "added_users", clean_func=set)
+        set_if_set(props, user_data, "removed_users", clean_func=set)
+
         if "name" in data and _rx_slug.search(data["name"]) is None:
             raise ValueError("invalid name format. slug format required.")
         if props.user_update_mode not in (None, Undefined, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
             props.user_update_mode = None
-        if not data and props.user_update_mode is None:
+        if not data and not user_data and props.user_update_mode in (None, Undefined):
             return cls(ok=False, msg="nothing to update", group=None)
 
         async def _do_mutate() -> ModifyGroup:
-            async with graph_ctx.db.begin() as conn:
+            async with graph_ctx.db.begin_session() as db_session:
+                # Using `user_update_mode` and `user_uuids` is deprecated
                 if props.user_update_mode == "add":
                     values = [{"user_id": uuid, "group_id": gid} for uuid in props.user_uuids]
-                    await conn.execute(
+                    await db_session.execute(
                         sa.insert(association_groups_users).values(values),
                     )
                 elif props.user_update_mode == "remove":
-                    await conn.execute(
+                    await db_session.execute(
                         sa.delete(association_groups_users).where(
                             (association_groups_users.c.user_id.in_(props.user_uuids))
                             & (association_groups_users.c.group_id == gid),
                         ),
                     )
+
+                added_users = user_data.get("added_users") or set()
+                removed_users = user_data.get("removed_users") or set()
+                if union := (added_users & removed_users):
+                    raise ValueError(
+                        "Should be no duplicate user id in `added_users` and `removed_users`."
+                        f" (ids: {list(union)})"
+                    )
+                if added_users:
+                    values = [{"user_id": uuid, "group_id": gid} for uuid in added_users]
+                    await db_session.execute(
+                        sa.insert(association_groups_users).values(values),
+                    )
+                if removed_users:
+                    values = [{"user_id": uuid, "group_id": gid} for uuid in removed_users]
+                    await db_session.execute(
+                        sa.insert(association_groups_users).values(values),
+                    )
+
                 if data:
-                    result = await conn.execute(
+                    result = await db_session.execute(
                         sa.update(groups).values(data).where(groups.c.id == gid).returning(groups),
                     )
                     if result.rowcount > 0:
@@ -554,73 +570,6 @@ class ModifyGroup(graphene.Mutation):
             raise
         except Exception as e:
             return cls(ok=False, msg=f"unexpected error: {e}", group=None)
-
-
-class AddUserToGroup(graphene.Mutation):
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
-
-    class Arguments:
-        gid = graphene.UUID(required=True)
-        props = AddUsersToGroupInput(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
-    @classmethod
-    async def mutate(
-        cls,
-        root,
-        info: graphene.ResolveInfo,
-        gid: uuid.UUID,
-        props: AddUsersToGroupInput,
-    ) -> AddUserToGroup:
-        graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "user_ids")
-        if not props.user_ids:
-            return cls(ok=False, msg="empty user id array")
-
-        insert_query = sa.insert(AssocGroupUserRow).values(
-            [
-                {
-                    "user_id": uuid.UUID(uid),
-                    "group_id": gid,
-                }
-                for uid in props.user_ids
-            ]
-        )
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
-
-
-class RemoveUsersFromGroup(graphene.Mutation):
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
-
-    class Arguments:
-        gid = graphene.UUID(required=True)
-        props = RemoveUsersFromGroupInput(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
-    @classmethod
-    async def mutate(
-        cls,
-        root,
-        info: graphene.ResolveInfo,
-        gid: uuid.UUID,
-        props: RemoveUsersFromGroupInput,
-    ) -> RemoveUsersFromGroup:
-        graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "user_ids")
-        if not props.user_ids:
-            return cls(ok=False, msg="empty user id array")
-
-        delete_query = sa.insert(AssocGroupUserRow).where(
-            (AssocGroupUserRow.group_id == gid)
-            & (AssocGroupUserRow.user_id.in_([uuid.UUID(uid) for uid in props.user_ids]))
-        )
-        return await simple_db_mutate_returning_item(cls, graph_ctx, delete_query, item_cls=Group)
 
 
 class DeleteGroup(graphene.Mutation):
