@@ -90,7 +90,7 @@ class Context(metaclass=ABCMeta):
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         # local-proxy does not have fat variant. (It is always fat.)
-        if fat and name != "backendai-local-proxy":
+        if fat and name != "local-proxy":
             return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
