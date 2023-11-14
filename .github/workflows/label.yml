@@ -26,3 +26,4 @@ jobs:
       uses: "lablup/size-label-action@master"
       env:
         GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        IGNORED: "**/*.lock"

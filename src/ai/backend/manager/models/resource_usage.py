@@ -18,7 +18,7 @@ from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
 
 from .group import GroupRow
-from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
@@ -103,7 +103,7 @@ class ResourceUsage:
         }
 
 
-def to_str(val: Optional[Any]) -> Optional[str]:
+def to_str(val: Any) -> Optional[str]:
     return str(val) if val is not None else None
 
 
@@ -118,22 +118,31 @@ class BaseResourceUsageGroup:
 
     created_at: Optional[datetime] = attrs.field(default=None)
     terminated_at: Optional[datetime] = attrs.field(default=None)
+    scheduled_at: Optional[str] = attrs.field(default=None)
     used_time: Optional[str] = attrs.field(default=None)
     used_days: Optional[int] = attrs.field(default=None)
+    agents: Optional[set[str]] = attrs.field(default=None)
 
     user_id: Optional[UUID] = attrs.field(default=None)
     user_email: Optional[str] = attrs.field(default=None)
+    full_name: Optional[str] = attrs.field(default=None)  # User's full_name
     access_key: Optional[UUID] = attrs.field(default=None)
     project_id: Optional[UUID] = attrs.field(default=None)
     project_name: Optional[str] = attrs.field(default=None)
     kernel_id: Optional[UUID] = attrs.field(default=None)
-    container_id: Optional[UUID] = attrs.field(default=None)
+    container_ids: Optional[set[str]] = attrs.field(default=None)
     session_id: Optional[UUID] = attrs.field(default=None)
     session_name: Optional[str] = attrs.field(default=None)
     domain_name: Optional[str] = attrs.field(default=None)
+    images: Optional[set[str]] = attrs.field(default=None)
 
     last_stat: Optional[Mapping[str, Any]] = attrs.field(default=None)
     extra_info: Mapping[str, Any] = attrs.field(factory=dict)
+
+    status: Optional[str] = attrs.field(default=None)
+    status_info: Optional[str] = attrs.field(default=None)
+    status_history: Optional[str] = attrs.field(default=None)
+    cluster_mode: Optional[str] = attrs.field(default=None)
 
     total_usage: ResourceUsage = attrs.field(factory=ResourceUsage)
 
@@ -169,19 +178,26 @@ class BaseResourceUsageGroup:
             "project_id": self.project_id,
             "project_name": self.project_name,
             "kernel_id": self.kernel_id,
-            "container_id": self.container_id,
+            "container_ids": self.container_ids,
             "session_id": self.session_id,
             "session_name": self.session_name,
             "domain_name": self.domain_name,
             "last_stat": self.last_stat,
             "extra_info": self.extra_info,
+            "full_name": self.full_name,
+            "images": self.images,
+            "agents": self.agents,
+            "status": self.status,
+            "status_info": self.status_info,
+            "status_history": self.status_history,
+            "cluster_mode": self.cluster_mode,
+            "scheduled_at": self.scheduled_at,
             "total_usage": self.total_usage,
         }
 
     def to_json_base(self) -> dict[str, Any]:
         return {
             "created_at": to_str(self.created_at),
-            "terminated_at": to_str(self.terminated_at),
             "used_time": self.used_time,
             "used_days": self.used_days,
             "user_id": to_str(self.user_id),
@@ -190,12 +206,21 @@ class BaseResourceUsageGroup:
             "project_id": to_str(self.project_id),
             "project_name": self.project_name,
             "kernel_id": to_str(self.kernel_id),
-            "container_id": to_str(self.container_id),
+            "container_ids": list(self.container_ids) if self.container_ids is not None else [],
             "session_id": to_str(self.session_id),
             "session_name": self.session_name,
             "domain_name": self.domain_name,
             "last_stat": self.last_stat,
             "extra_info": self.extra_info,
+            "full_name": to_str(self.full_name),
+            "images": list(self.images) if self.images is not None else [],
+            "agents": list(self.agents) if self.agents is not None else [],
+            "status": to_str(self.status),
+            "status_info": to_str(self.status_info),
+            "status_history": to_str(self.status_history),
+            "cluster_mode": to_str(self.cluster_mode),
+            "scheduled_at": to_str(self.scheduled_at),
+            "terminated_at": to_str(self.terminated_at),
             "total_usage": self.total_usage.to_json(),
         }
 
@@ -264,7 +289,7 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         if child:
             return_val = {
                 **return_val,
-                ResourceGroupUnit.KERNEL.value: {
+                "kernels": {
                     str(g.kernel_id): g.to_json(child) for g in self.child_usage_group.values()
                 },
             }
@@ -296,6 +321,18 @@ class SessionResourceUsage(BaseResourceUsageGroup):
         is_registered = self.child_usage_group[other.kernel_id].register_resource_group(other)
         if is_registered:
             self.total_usage += other.total_usage
+            if self.images is None:
+                self.images = {*(other.images or set())}
+            else:
+                self.images |= other.images or set()
+            if self.agents is None:
+                self.agents = {*(other.agents or set())}
+            else:
+                self.agents |= other.agents or set()
+            if self.container_ids is None:
+                self.container_ids = {*(other.container_ids or set())}
+            else:
+                self.container_ids |= other.container_ids or set()
         return is_registered
 
 
@@ -316,7 +353,7 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
         if child:
             return_val = {
                 **return_val,
-                ResourceGroupUnit.SESSION.value: {
+                "sessions": {
                     str(g.session_id): g.to_json(child) for g in self.child_usage_group.values()
                 },
             }
@@ -328,9 +365,20 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
             raise ValueError(
                 "Cannot parse `ProjectResourceUsage` from usage_group that have None value field"
             )
+        filtered_data = {
+            **usage_group.to_map(),
+            "images": None,
+            "full_name": None,
+            "status": None,
+            "status_info": None,
+            "status_history": None,
+            "cluster_mode": None,
+            "scheduled_at": None,
+            "terminated_at": None,
+        }
         return cls(
             project_row=usage_group.project_row,
-            **usage_group.to_map(),
+            **filtered_data,
         )
 
     def register_resource_group(self, other: BaseResourceUsageGroup) -> bool:
@@ -343,6 +391,18 @@ class ProjectResourceUsage(BaseResourceUsageGroup):
         is_registered = self.child_usage_group[other.session_id].register_resource_group(other)
         if is_registered:
             self.total_usage += other.total_usage
+            if self.images is None:
+                self.images = {*(other.images or set())}
+            else:
+                self.images |= other.images or set()
+            if self.agents is None:
+                self.agents = {*(other.agents or set())}
+            else:
+                self.agents |= other.agents or set()
+            if self.container_ids is None:
+                self.container_ids = {*(other.container_ids or set())}
+            else:
+                self.container_ids |= other.container_ids or set()
         return is_registered
 
 
@@ -446,6 +506,7 @@ async def parse_resource_usage_groups(
             session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
+            scheduled_at=kern.status_history.get(KernelStatus.SCHEDULED.name),
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
@@ -455,10 +516,17 @@ async def parse_resource_usage_groups(
             project_id=kern.session.group.id,
             project_name=kern.session.group.name,
             kernel_id=kern.id,
-            container_id=kern.container_id,
+            container_ids={kern.container_id},
             session_id=kern.session_id,
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
+            full_name=kern.session.user.full_name,
+            images={kern.image},
+            agents={kern.agent},
+            status=kern.status.name,
+            status_history=kern.status_history,
+            cluster_mode=kern.cluster_mode,
+            status_info=kern.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
             total_usage=parse_resource_usage(kern, stat_map[kern.id]),
         )
@@ -474,6 +542,11 @@ SESSION_RESOURCE_SELECT_COLS = (
     SessionRow.id,
     SessionRow.group_id,
     SessionRow.access_key,
+    SessionRow.images,
+    SessionRow.cluster_mode,
+    SessionRow.status_history,
+    SessionRow.status,
+    SessionRow.status_info,
 )
 
 PROJECT_RESOURCE_SELECT_COLS = (
@@ -488,6 +561,9 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.created_at,
     KernelRow.terminated_at,
     KernelRow.last_stat,
+    KernelRow.status_history,
+    KernelRow.status,
+    KernelRow.status_info,
     KernelRow.session_id,
     KernelRow.id,
     KernelRow.container_id,
@@ -496,6 +572,8 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.vfolder_mounts,
     KernelRow.mounts,
     KernelRow.resource_opts,
+    KernelRow.image,
+    KernelRow.cluster_mode,
 )
 
 
@@ -515,7 +593,9 @@ def _parse_query(
         load_only(*KERNEL_RESOURCE_SELECT_COLS),
         session_load.options(
             load_only(*SESSION_RESOURCE_SELECT_COLS),
-            joinedload(SessionRow.user).options(load_only(UserRow.email, UserRow.username)),
+            joinedload(SessionRow.user).options(
+                load_only(UserRow.email, UserRow.username, UserRow.full_name)
+            ),
             project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
         ),
     )
