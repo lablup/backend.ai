@@ -18,6 +18,7 @@ visibility_private_component(
         "//src/ai/backend/watcher/**",
         "//src/ai/backend/test/**",
         "//src/ai/backend/testutils/**",
+        "//src/ai/backend/install/**",
     ],
     allowed_dependencies=[
         "//src/ai/backend/plugin/**",

@@ -1,8 +1,8 @@
-Miscellaneous Utilities
+Type Definitions
 =======================
 
-.. module:: ai.backend.client.utils
-.. currentmodule:: ai.backend.client.utils
+.. module:: ai.backend.client.types
+.. currentmodule:: ai.backend.client.types
 
 .. autoclass:: Undefined
    :members:
