@@ -1,18 +1,18 @@
 python_sources(
     name="src",
     dependencies=[
-        "src/ai/backend/cli:src",
         ":resources",
+        "./configs:src",
+        "./fixtures:src",
     ],
 )
 
 visibility_private_component(
-    allowed_dependents=[
-        "//src/ai/backend/web/**",
-    ],
+    allowed_dependents=[],
     allowed_dependencies=[
         "//src/ai/backend/cli/**",
         "//src/ai/backend/common/**",
+        "//src/ai/backend/plugin/**",
     ],
 )
 
@@ -23,13 +23,13 @@ python_distribution(
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
-        name="backend.ai-client",
-        description="Backend.AI Client SDK",
+        name="backend.ai-install",
+        description="Backend.AI Installer",
         license="MIT",
     ),
     entry_points={
         "backendai_cli_v10": {
-            "_": "ai.backend.client.cli.main:main",
+            "install": "ai.backend.install.cli:main",
         },
     },
     generate_setup=True,
@@ -47,14 +47,14 @@ pex_binary(
 )
 
 scie_binary(
-    name="backendai-client",
+    name="backendai-install",
     fat=False,
     dependencies=[":pex"],
     tags=["scie", "lazy"],
 )
 
 scie_binary(
-    name="backendai-client-fat",
+    name="backendai-install-fat",
     fat=True,
     dependencies=[":pex"],
     tags=["scie", "fat"],
@@ -63,13 +63,13 @@ scie_binary(
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-client-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-install-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",
     execution_dependencies=[
-        ":backendai-client",
-        ":backendai-client-fat",
+        ":backendai-install",
+        ":backendai-install-fat",
     ],
     tags=["checksum"],
 )
@@ -80,8 +80,11 @@ resources(
     name="resources",
     dependencies=[
         ":version",
+        "./configs:templates",
+        "./fixtures:resources",
     ],
     sources=[
         "**/py.typed",
+        "app.tcss",
     ],
 )

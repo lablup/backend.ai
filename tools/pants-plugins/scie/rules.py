@@ -50,6 +50,7 @@ from .subsystems import Science
 from .target_types import (
     ScieBinaryNameField,
     ScieDependenciesField,
+    ScieFatFlagField,
     ScieLiftSourceField,
     SciePlatformField,
 )
@@ -57,6 +58,7 @@ from .target_types import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_LIFT_PATH: Final[str] = "lift.toml"
+DEFAULT_FAT_LIFT_PATH: Final[str] = "lift-fat.toml"
 
 
 @dataclass(frozen=True)
@@ -69,9 +71,10 @@ class ScieFieldSet(PackageFieldSet, RunFieldSet):
     dependencies: ScieDependenciesField
     platforms: SciePlatformField
     lift: ScieLiftSourceField
+    fat: ScieFatFlagField
 
 
-async def _get_interpreter_config(targets: Targets) -> Interpreter:
+async def _get_interpreter_config(targets: Targets, fat: bool) -> Interpreter:
     # Get the interpreter_constraints for the Pex to determine which version of the Python Standalone to use
     constraints = await Get(
         InterpreterConstraints,
@@ -81,7 +84,7 @@ async def _get_interpreter_config(targets: Targets) -> Interpreter:
     minimum_version = constraints.minimum_python_version(["3.8", "3.9", "3.10", "3.11"])
     assert minimum_version is not None, "No minimum python version found"
     # Create a toml configuration from the input targets and the minimum_version
-    return Interpreter(version=minimum_version)
+    return Interpreter(version=minimum_version, lazy=not fat)
 
 
 def _get_target_platforms(
@@ -165,7 +168,7 @@ async def scie_binary(
     target_platforms = _get_target_platforms(
         field_set.platforms.value, science.default_url_platform_mapping, platform
     )
-    interpreter_config = await _get_interpreter_config(direct_deps)
+    interpreter_config = await _get_interpreter_config(direct_deps, field_set.fat.value)
     # TODO: This might be better solved by using the `:target_name` syntax and letting downstream handle it
     files_config = _get_files_config(built_packages)
 
@@ -184,6 +187,8 @@ async def scie_binary(
     parsed_config: Config | None = None
     lift_digest = EMPTY_DIGEST
     lift_path = DEFAULT_LIFT_PATH
+    if field_set.fat:
+        lift_path = DEFAULT_FAT_LIFT_PATH
     if field_set.lift.value is not None:
         # If the user specified a lift.toml file, then use that instead of the generated one
         parsed_config = await _parse_lift_source(field_set.lift)
