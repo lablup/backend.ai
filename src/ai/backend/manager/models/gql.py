@@ -13,6 +13,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models.gql_relay import AsyncNode
 
 from .etcd import (
     ContainerRegistry,
@@ -52,7 +53,7 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
-from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
+from .group import CreateGroup, DeleteGroup, Group, GroupNode, ModifyGroup, PurgeGroup
 from .image import (
     AliasImage,
     ClearImages,
@@ -238,7 +239,7 @@ class Queries(graphene.ObjectType):
     All available GraphQL queries.
     """
 
-    node = graphene.relay.Node.Field()
+    node = AsyncNode.Field()
 
     # super-admin only
     agent = graphene.Field(
@@ -291,6 +292,9 @@ class Queries(graphene.ObjectType):
         Domain,
         is_active=graphene.Boolean(),
     )
+
+    group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
+    group_nodes = graphene.List(GroupNode)
 
     group = graphene.Field(
         Group,
@@ -793,6 +797,19 @@ class Queries(graphene.ObjectType):
         is_active: bool = None,
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
+
+    async def resolve_group_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id,
+    ):
+        return await GroupNode.get_node(info, id)
+
+    async def resolve_group_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ):
+        return await GroupNode.list_node(info)
 
     @staticmethod
     async def resolve_group(

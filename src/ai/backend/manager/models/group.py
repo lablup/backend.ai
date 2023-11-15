@@ -45,8 +45,9 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
+from .gql_relay import AsyncNode
 from .storage import StorageSessionManager
-from .user import ModifyUserInput, UserRole
+from .user import ModifyUserInput, UserConnection, UserNode, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
@@ -734,6 +735,41 @@ class PurgeGroup(graphene.Mutation):
         )
         active_kernel_count = await db_conn.scalar(query)
         return True if active_kernel_count > 0 else False
+
+
+class GroupNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    name = graphene.String()
+    users = graphene.relay.ConnectionField(UserConnection)
+
+    async def resolve_users(self, info: graphene.ResolveInfo, *args, **kwargs):
+        graph_ctx: GraphQueryContext = info.context
+
+        # TODO: DB query optimization
+        query = sa.select(AssocGroupUserRow).where(AssocGroupUserRow.group_id == self.id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            assoc_row = (await db_session.scalars(query)).all()
+            user_ids = [assoc.user_id for assoc in assoc_row]
+        return [(await UserNode.get_user(info, user_id)) for user_id in user_ids]
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
+        graph_ctx: GraphQueryContext = info.context
+        _, gid = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(GroupRow).where(GroupRow.id == gid)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            group_row = (await db_session.scalars(query)).first()
+            return cls(id=gid, name=group_row.name)
+
+    @classmethod
+    async def list_node(cls, info: graphene.ResolveInfo) -> list[GroupNode]:
+        graph_ctx: GraphQueryContext = info.context
+        query = sa.select(GroupRow)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            group_rows = (await db_session.scalars(query)).all()
+            return [cls(id=group_row.id, name=group_row.name) for group_row in group_rows]
 
 
 class GroupDotfile(TypedDict):

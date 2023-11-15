@@ -39,6 +39,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
+from .gql_relay import AsyncNode
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
@@ -1244,6 +1245,32 @@ class PurgeUser(graphene.Mutation):
         if result.rowcount > 0:
             log.info("deleted {0} user's keypairs ({1})", result.rowcount, user_uuid)
         return result.rowcount
+
+
+class UserNode(graphene.ObjectType):
+    class Meta:
+        interfaces = (AsyncNode,)
+
+    username = graphene.String()
+
+    @classmethod
+    async def get_user(cls, info: graphene.ResolveInfo, user_id) -> UserNode:
+        graph_ctx: GraphQueryContext = info.context
+
+        query = sa.select(UserRow).where(UserRow.uuid == user_id)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_row = (await db_session.scalars(query)).first()
+            return cls(id=user_id, username=user_row.username)
+
+    @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> UserNode:
+        _, uid = AsyncNode.resolve_global_id(info, id)
+        return await cls.get_user(info, uid)
+
+
+class UserConnection(graphene.relay.Connection):
+    class Meta:
+        node = UserNode
 
 
 def _hash_password(password):
