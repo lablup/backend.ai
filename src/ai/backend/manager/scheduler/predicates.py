@@ -18,6 +18,7 @@ from ..models import (
     SessionDependencyRow,
     SessionRow,
 )
+from ..models.session import SessionStatus
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
@@ -119,6 +120,7 @@ async def check_dependencies(
         sa.select(
             SessionRow.id,
             SessionRow.name,
+            SessionRow.status,
             SessionRow.result,
         )
         .select_from(j)
@@ -128,7 +130,7 @@ async def check_dependencies(
     rows = result.fetchall()
     pending_dependencies = []
     for row in rows:
-        if row.result != SessionResult.SUCCESS:
+        if row.result != SessionResult.SUCCESS or row.status != SessionStatus.TERMINATED:
             pending_dependencies.append(row)
     all_success = not pending_dependencies
     if all_success:
