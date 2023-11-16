@@ -13,7 +13,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.gql_relay import AsyncNode
+from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionField
 
 from .etcd import (
     ContainerRegistry,
@@ -53,7 +53,15 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
-from .group import CreateGroup, DeleteGroup, Group, GroupNode, ModifyGroup, PurgeGroup
+from .group import (
+    CreateGroup,
+    DeleteGroup,
+    Group,
+    GroupConnection,
+    GroupNode,
+    ModifyGroup,
+    PurgeGroup,
+)
 from .image import (
     AliasImage,
     ClearImages,
@@ -115,7 +123,9 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
+    UserConnection,
     UserList,
+    UserNode,
     UserRole,
     UserStatus,
 )
@@ -294,7 +304,7 @@ class Queries(graphene.ObjectType):
     )
 
     group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
-    group_nodes = graphene.List(GroupNode)
+    group_nodes = ConnectionField(GroupConnection)
 
     group = graphene.Field(
         Group,
@@ -361,6 +371,8 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
         status=graphene.String(),
     )
+
+    user_nodes = ConnectionField(UserConnection)
 
     keypair = graphene.Field(
         KeyPair,
@@ -808,6 +820,7 @@ class Queries(graphene.ObjectType):
     async def resolve_group_nodes(
         root: Any,
         info: graphene.ResolveInfo,
+        **args,
     ):
         return await GroupNode.list_node(info)
 
@@ -1105,6 +1118,13 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return UserList(user_list, total_count)
+
+    async def resolve_user_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        **args,
+    ):
+        return await UserNode.list_node(info)
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")
