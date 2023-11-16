@@ -39,7 +39,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode
+from .gql_relay import AsyncNode, Connection
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
@@ -1275,7 +1275,7 @@ class UserNode(graphene.ObjectType):
         return await cls.get_user(info, uid)
 
 
-class UserConnection(graphene.relay.Connection):
+class UserConnection(Connection):
     class Meta:
         node = UserNode
 

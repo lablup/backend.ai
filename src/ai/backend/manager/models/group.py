@@ -45,7 +45,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode
+from .gql_relay import AsyncNode, Connection, ConnectionField
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -742,7 +742,7 @@ class GroupNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
-    users = graphene.relay.ConnectionField(UserConnection)
+    users = ConnectionField(UserConnection)
 
     async def resolve_users(self, info: graphene.ResolveInfo, *args, **kwargs):
         graph_ctx: GraphQueryContext = info.context
@@ -772,6 +772,11 @@ class GroupNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
             return [cls(id=group_row.id, name=group_row.name) for group_row in group_rows]
+
+
+class GroupConnection(Connection):
+    class Meta:
+        node = GroupNode
 
 
 class GroupDotfile(TypedDict):
