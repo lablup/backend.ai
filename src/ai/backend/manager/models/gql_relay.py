@@ -1,5 +1,5 @@
-import asyncio
 import functools
+from typing import Any
 
 from graphene.relay.node import Node, NodeField
 from graphene.types.utils import get_type
@@ -34,8 +34,8 @@ class AsyncNode(Node):
         return type_, id_
 
     @classmethod
-    async def get_node_from_global_id(cls, info, global_id, only_type=None):
-        _type, _id = cls.resolve_global_id(info, global_id)
+    async def get_node_from_global_id(cls, info, global_id, only_type=None) -> Any:
+        _type, _ = cls.resolve_global_id(info, global_id)
 
         graphene_type = info.schema.get_type(_type)
         if graphene_type is None:
@@ -51,7 +51,5 @@ class AsyncNode(Node):
 
         get_node = getattr(graphene_type, "get_node", None)
         if get_node:
-            if asyncio.iscoroutinefunction(get_node):
-                return await get_node(info, _id)
-            else:
-                return get_node(info, _id)
+            return await get_node(info, global_id)
+        raise Exception(f'ObjectType "{_type}" does not implement `get_node` method.')
