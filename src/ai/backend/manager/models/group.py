@@ -23,7 +23,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import joinedload, relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
@@ -747,12 +747,14 @@ class GroupNode(graphene.ObjectType):
     async def resolve_users(self, info: graphene.ResolveInfo, *args, **kwargs):
         graph_ctx: GraphQueryContext = info.context
 
-        # TODO: DB query optimization
-        query = sa.select(AssocGroupUserRow).where(AssocGroupUserRow.group_id == self.id)
+        group_query = (
+            sa.select(AssocGroupUserRow)
+            .where(AssocGroupUserRow.group_id == self.id)
+            .options(joinedload(AssocGroupUserRow.user))
+        )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            assoc_row = (await db_session.scalars(query)).all()
-            user_ids = [assoc.user_id for assoc in assoc_row]
-        return [(await UserNode.get_user(info, user_id)) for user_id in user_ids]
+            assoc_rows = (await db_session.scalars(group_query)).all()
+            return [UserNode.from_row(assoc_row.user) for assoc_row in assoc_rows]
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
