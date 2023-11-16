@@ -433,7 +433,7 @@ class Context(metaclass=ABCMeta):
             wsproxy_itable["url"] = (
                 "http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
             )
-            data["service"]["wsproxy"] = wsproxy_itable
+            data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -793,7 +793,7 @@ class PackageContext(Context):
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
+            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 15050)),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
