@@ -1252,12 +1252,44 @@ class UserNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     username = graphene.String()
+    email = graphene.String()
+    need_password_change = graphene.Boolean()
+    full_name = graphene.String()
+    description = graphene.String()
+    is_active = graphene.Boolean()  # legacy
+    status = graphene.String()
+    status_info = graphene.String()
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    domain_name = graphene.String()
+    role = graphene.String()
+    resource_policy = graphene.String()
+    allowed_client_ip = graphene.List(lambda: graphene.String)
+    totp_activated = graphene.Boolean()
+    totp_activated_at = GQLDateTime()
+    sudo_session_enabled = graphene.Boolean()
 
     @classmethod
     def from_row(cls, row: UserRow) -> UserNode:
         return cls(
             id=row.uuid,
             username=row.username,
+            email=row.email,
+            need_password_change=row.need_password_change,
+            full_name=row.full_name,
+            description=row.description,
+            is_active=(row.status == UserStatus.ACTIVE),
+            status=row.status,
+            status_info=row.status_info,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
+            role=row.role,
+            resource_policy=row.resource_policy,
+            allowed_client_ip=row.allowed_client_ip,
+            totp_activated=row.totp_activated,
+            totp_activated_at=row.totp_activated_at,
+            sudo_session_enabled=row.sudo_session_enabled,
         )
 
     @classmethod

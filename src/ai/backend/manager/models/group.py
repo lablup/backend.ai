@@ -742,7 +742,43 @@ class GroupNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     name = graphene.String()
+    description = graphene.String()
+    is_active = graphene.Boolean()
+    created_at = GQLDateTime()
+    modified_at = GQLDateTime()
+    domain_name = graphene.String()
+    total_resource_slots = graphene.JSONString()
+    allowed_vfolder_hosts = graphene.JSONString()
+    integration_id = graphene.String()
+    resource_policy = graphene.String()
+    scaling_groups = graphene.List(lambda: graphene.String)
+
     users = ConnectionField(UserConnection)
+
+    @classmethod
+    def from_row(cls, row: GroupRow) -> GroupNode:
+        return cls(
+            id=row.id,
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
+            total_resource_slots=row.total_resource_slots,
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            integration_id=row.integration_id,
+            resource_policy=row.resource_policy,
+        )
+
+    async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx,
+            "ScalingGroup.by_group",
+        )
+        sgroups = await loader.load(self.id)
+        return [sg.name for sg in sgroups]
 
     async def resolve_users(self, info: graphene.ResolveInfo, *args, **kwargs):
         graph_ctx: GraphQueryContext = info.context
@@ -763,7 +799,7 @@ class GroupNode(graphene.ObjectType):
         query = sa.select(GroupRow).where(GroupRow.id == gid)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
-            return cls(id=gid, name=group_row.name)
+            return cls.from_row(group_row)
 
     @classmethod
     async def list_node(cls, info: graphene.ResolveInfo) -> list[GroupNode]:
@@ -771,7 +807,7 @@ class GroupNode(graphene.ObjectType):
         query = sa.select(GroupRow)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
-            return [cls(id=group_row.id, name=group_row.name) for group_row in group_rows]
+            return [cls.from_row(group_row) for group_row in group_rows]
 
 
 class GroupConnection(Connection):
