@@ -1256,7 +1256,9 @@ class UserNode(graphene.ObjectType):
     need_password_change = graphene.Boolean()
     full_name = graphene.String()
     description = graphene.String()
-    is_active = graphene.Boolean()  # legacy
+    is_active = graphene.Boolean(
+        deprecation_reason="Deprecated since 24.03.0. Recommend to use `status` field."
+    )
     status = graphene.String()
     status_info = graphene.String()
     created_at = GQLDateTime()
