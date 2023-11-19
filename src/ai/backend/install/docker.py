@@ -150,19 +150,13 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
 
 
 async def determine_docker_sudo(ctx: Context) -> bool:
-    proc = await asyncio.create_subprocess_exec(
-        *("docker", "version"),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    assert proc.stdout is not None
-    stdout = (await proc.stdout.read()).decode()
-    if (await proc.wait()) != 0:
-        if "permission denied" in stdout.lower():
-            # installed, requires sudo
-            return True
-        raise RuntimeError("Docker client command is not available in the host.")
-    # installed, does not require sudo
+    sock_path, docker_host, connector = get_docker_connector()
+    try:
+        async with aiohttp.ClientSession(connector=connector) as sess:
+            async with sess.get(docker_host / "version") as r:
+                await r.json()
+    except PermissionError:
+        return True
     return False
 
 
