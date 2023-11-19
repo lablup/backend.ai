@@ -98,46 +98,80 @@ inference_image_label_schema = t.Dict(
 ).ignore_extra("*")
 
 
-def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
+def get_docker_context_host() -> str | None:
+    try:
+        docker_config_path = Path.home() / ".docker" / "config.json"
+        docker_config = json.loads(docker_config_path.read_bytes())
+    except IOError:
+        return None
+    current_context_name = docker_config.get("currentContext", "default")
+    for meta_path in (Path.home() / ".docker" / "contexts" / "meta").glob("*/meta.json"):
+        context_data = json.loads(meta_path.read_bytes())
+        if context_data["Name"] == current_context_name:
+            return context_data["Endpoints"]["docker"]["Host"]
+    return None
+
+
+def parse_docker_host_url(
+    docker_host: yarl.URL,
+) -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
+    match docker_host.scheme:
+        case "http" | "https":
+            return None, docker_host, aiohttp.TCPConnector()
+        case "unix":
+            path = Path(docker_host.path)
+            if not path.exists() or not path.is_socket():
+                raise RuntimeError(f"DOCKER_HOST {path} is not a valid socket file.")
+            decoded_path = os.fsdecode(path)
+            connector_cls = aiohttp.UnixConnector
+        case "npipe":
+            path = Path(docker_host.path.replace("/", "\\"))
+            if not path.exists() or not path.is_fifo():
+                raise RuntimeError(f"DOCKER_HOST {path} is not a valid named pipe.")
+            decoded_path = os.fsdecode(path)
+            connector_cls = aiohttp.NamedPipeConnector
+        case _ as unknown_scheme:
+            raise RuntimeError("unsupported connection scheme", unknown_scheme)
+    return (
+        path,
+        yarl.URL("http://localhost"),
+        connector_cls(decoded_path),
+    )
+
+
+def get_docker_connector() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
     connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
     if raw_docker_host := os.environ.get("DOCKER_HOST", None):
-        docker_host = yarl.URL(raw_docker_host)
-        match docker_host.scheme:
-            case "http" | "https":
-                return docker_host, aiohttp.TCPConnector()
-            case "unix":
-                search_paths = [Path(docker_host.path)]
-                connector_cls = aiohttp.UnixConnector
-            case "npipe":
-                search_paths = [Path(docker_host.path.replace("/", "\\"))]
-                connector_cls = aiohttp.NamedPipeConnector
-            case _ as unknown_scheme:
-                raise RuntimeError("unsupported connection scheme", unknown_scheme)
-    else:
-        match sys.platform:
-            case "linux" | "darwin":
-                search_paths = [
-                    Path("/run/docker.sock"),
-                    Path("/var/run/docker.sock"),
-                    Path.home() / ".docker/run/docker.sock",
-                ]
-                connector_cls = aiohttp.UnixConnector
-            case "win32":
-                search_paths = [
-                    Path(r"\\.\pipe\docker_engine"),
-                ]
-                connector_cls = aiohttp.NamedPipeConnector
-            case _ as platform_name:
-                raise RuntimeError("unsupported platform", platform_name)
+        return parse_docker_host_url(yarl.URL(raw_docker_host))
+    if raw_docker_host := get_docker_context_host():
+        return parse_docker_host_url(yarl.URL(raw_docker_host))
+    match sys.platform:
+        case "linux" | "darwin":
+            search_paths = [
+                Path("/run/docker.sock"),
+                Path("/var/run/docker.sock"),
+                Path.home() / ".docker/run/docker.sock",
+            ]
+            connector_cls = aiohttp.UnixConnector
+        case "win32":
+            search_paths = [
+                Path(r"\\.\pipe\docker_engine"),
+            ]
+            connector_cls = aiohttp.NamedPipeConnector
+        case _ as platform_name:
+            raise RuntimeError(f"unsupported platform: {platform_name}")
     for p in search_paths:
         if p.exists() and (p.is_socket() or p.is_fifo()):
             decoded_path = os.fsdecode(p)
             return (
+                p,
                 yarl.URL("http://localhost"),
                 connector_cls(decoded_path),
             )
     else:
-        raise RuntimeError("could not find the docker socket")
+        searched_paths = ", ".join(map(os.fsdecode, search_paths))
+        raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
 
 
 async def login(
