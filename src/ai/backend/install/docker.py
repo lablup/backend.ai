@@ -71,7 +71,7 @@ async def detect_system_docker(ctx: Context):
         sock_path, docker_host, connector = get_docker_connector()
     except RuntimeError as e:
         raise PrerequisiteError(f"Could not find the docker socket ({e})") from e
-    ctx.log.write(Text.from_markup(f"[cyan]{docker_host=}[/]"))
+    ctx.log.write(Text.from_markup(f"[cyan]{docker_host=} {sock_path=}[/]"))
 
     # Test a docker command to ensure passwordless sudo.
     proc = await asyncio.create_subprocess_exec(
@@ -96,7 +96,7 @@ async def detect_system_docker(ctx: Context):
         # Change the docker socket permission (temporarily)
         # so that we could access the docker daemon API directly.
         # NOTE: For TCP URLs (e.g., remote Docker), we don't have the socket file.
-        if sock_path is not None:
+        if sock_path is not None and not sock_path.resolve().is_relative_to(Path.home()):
             proc = await asyncio.create_subprocess_exec(
                 *["sudo", "chmod", "666", str(sock_path)],
                 stdout=asyncio.subprocess.PIPE,
@@ -149,7 +149,7 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
         return f"/tmp/{build_root_name}-{build_root_hash}-pants"
 
 
-async def determine_docker_sudo() -> bool:
+async def determine_docker_sudo(ctx: Context) -> bool:
     proc = await asyncio.create_subprocess_exec(
         *("docker", "version"),
         stdout=asyncio.subprocess.PIPE,

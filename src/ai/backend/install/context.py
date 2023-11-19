@@ -723,7 +723,7 @@ class DevContext(Context):
         self.os_info = await detect_os(self)
         self.log.write(Text.from_markup("Detected OS info: ", end=""))
         self.log.write(self.os_info)
-        if determine_docker_sudo():
+        if await determine_docker_sudo(self):
             self.docker_sudo = ["sudo"]
         else:
             self.docker_sudo = []
@@ -817,7 +817,7 @@ class PackageContext(Context):
         self.os_info = await detect_os(self)
         self.log.write(Text.from_markup("Detected OS info: ", end=""))
         self.log.write(self.os_info)
-        if determine_docker_sudo():
+        if await determine_docker_sudo(self):
             self.docker_sudo = ["sudo"]
         else:
             self.docker_sudo = []
