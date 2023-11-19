@@ -75,7 +75,7 @@ async def detect_system_docker(ctx: Context):
 
     # Test a docker command to ensure passwordless sudo.
     proc = await asyncio.create_subprocess_exec(
-        *(*ctx.docker_sudo, "docker", "ps"),
+        *(*ctx.docker_sudo, "docker", "version"),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
