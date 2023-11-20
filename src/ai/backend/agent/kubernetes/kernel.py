@@ -298,7 +298,8 @@ class KubernetesKernel(AbstractKernel):
 
         files = []
         for f in os.scandir(sys.argv[1]):
-            fstat = f.stat()
+            fstat = f.stat(follow_symlinks=False)
+
             ctime = fstat.st_ctime  # TODO: way to get concrete create time?
             mtime = fstat.st_mtime
             atime = fstat.st_atime
