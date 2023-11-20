@@ -45,10 +45,15 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode, Connection, ConnectionField
+from .gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionField,
+    ConnectionResolverResult,
+)
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserConnection, UserNode, UserRole
-from .utils import ExtendedAsyncSAEngine, execute_with_retry
+from .utils import ExtendedAsyncSAEngine, build_sql_stmt_from_connection_arg, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -795,19 +800,40 @@ class GroupNode(graphene.ObjectType):
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
         graph_ctx: GraphQueryContext = info.context
-        _, gid = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(GroupRow).where(GroupRow.id == gid)
+        _, group_id = AsyncNode.resolve_global_id(info, id)
+        query = sa.select(GroupRow).where(GroupRow.id == group_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
             return cls.from_row(group_row)
 
     @classmethod
-    async def list_node(cls, info: graphene.ResolveInfo) -> list[GroupNode]:
+    async def list_node(
+        cls,
+        info: graphene.ResolveInfo,
+        order_expr: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query = sa.select(GroupRow)
+        query, order, limit = build_sql_stmt_from_connection_arg(
+            info,
+            GroupRow,
+            GroupRow.id,
+            order_expr,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
-            return [cls.from_row(group_row) for group_row in group_rows]
+            result = [cls.from_row(group_row) for group_row in group_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, order, limit, total_cnt)
 
 
 class GroupConnection(Connection):

@@ -813,7 +813,7 @@ class Queries(graphene.ObjectType):
     async def resolve_group_node(
         root: Any,
         info: graphene.ResolveInfo,
-        id,
+        id: str,
     ):
         return await GroupNode.get_node(info, id)
 
@@ -822,7 +822,15 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         **args,
     ):
-        return await GroupNode.list_node(info)
+        # `args` contains after, first, before, last
+        return await GroupNode.list_node(
+            info,
+            args.get("orders"),
+            args.get("after"),
+            args.get("first"),
+            args.get("before"),
+            args.get("last"),
+        )
 
     @staticmethod
     async def resolve_group(
@@ -1124,7 +1132,14 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         **args,
     ):
-        return await UserNode.list_node(info)
+        return await UserNode.list_node(
+            info,
+            args.get("orders"),
+            args.get("after"),
+            args.get("first"),
+            args.get("before"),
+            args.get("last"),
+        )
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="access_key")

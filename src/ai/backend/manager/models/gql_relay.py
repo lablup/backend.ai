@@ -1,6 +1,9 @@
+from __future__ import annotations
+
+import enum
 import functools
 import re
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable, NamedTuple, Protocol
 
 import graphene
 from graphene.relay.connection import (
@@ -12,6 +15,58 @@ from graphene.relay.connection import (
 from graphene.relay.node import Node, NodeField, is_node
 from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
+
+
+class PageInfoType(Protocol):
+    @property
+    def start_cursor(self) -> str | None: ...
+
+    @property
+    def end_cursor(self) -> str | None: ...
+
+    @property
+    def has_previous_page(self) -> bool: ...
+
+    @property
+    def has_next_page(self) -> bool: ...
+
+
+class EdgeType(Protocol):
+    @property
+    def node(self) -> Any: ...
+
+    @property
+    def cursor(self) -> str: ...
+
+
+class ConnectionType(Protocol):
+    @property
+    def edges(self) -> list[EdgeType]: ...
+
+    @property
+    def page_info(self) -> PageInfoType: ...
+
+
+class EdgeConstructor(Protocol):
+    def __call__(
+        self,
+        *,
+        node: Any,
+        cursor: str,
+    ) -> EdgeType: ...
+
+
+class ConnectionConstructor(Protocol):
+    @property
+    def Edge(self) -> EdgeConstructor: ...
+
+    def __call__(
+        self,
+        *,
+        edges: list[EdgeType],
+        page_info: PageInfoType,
+        count: int,
+    ) -> Connection: ...
 
 
 class AsyncNodeField(NodeField):
@@ -42,7 +97,7 @@ class AsyncNode(Node):
         return type_, id_
 
     @classmethod
-    async def get_node_from_global_id(cls, info, global_id, only_type=None) -> Any:
+    async def get_node_from_global_id(cls, info, global_id: str, only_type=None) -> Any:
         _type, _ = cls.resolve_global_id(info, global_id)
 
         graphene_type = info.schema.get_type(_type)
@@ -125,7 +180,19 @@ class Connection(graphene.ObjectType):
         return super().__init_subclass_with_meta__(_meta=_meta, **options)
 
 
-class AsyncIterableConnectionField(IterableConnectionField):
+class PaginationOrder(enum.Enum):
+    FORWARD = "forward"
+    BACKWARD = "backward"
+
+
+class ConnectionResolverResult(NamedTuple):
+    node_list: list[Any]
+    order: PaginationOrder
+    page_size: int
+    total_count: int
+
+
+class AsyncListConnectionField(IterableConnectionField):
     def __init__(self, type, *args, **kwargs):
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
@@ -148,22 +215,65 @@ class AsyncIterableConnectionField(IterableConnectionField):
         return type_
 
     @classmethod
+    def resolve_connection(
+        cls,
+        connection_type: ConnectionConstructor,
+        args: dict[str, Any] | None,
+        resolved: list[Any] | Connection,
+        *,
+        page_size: int,
+        order: PaginationOrder = PaginationOrder.FORWARD,
+        count: int = -1,
+    ) -> Connection:
+        if not isinstance(resolved, list):
+            return resolved
+
+        assert isinstance(resolved, list), (
+            "Resolved value from the connection field has to be a list or instance of"
+            f' {connection_type}. Received "{resolved}"'
+        )
+
+        orig_resolved_len = len(resolved)
+        resolved = resolved[:page_size]
+        if order == PaginationOrder.BACKWARD:
+            resolved = resolved[::-1]
+        edge_type = connection_type.Edge
+        edges = [
+            edge_type(
+                node=value,
+                cursor=AsyncNode.to_global_id(str(connection_type._meta.node), value.id),  # type: ignore[attr-defined]
+            )
+            for value in resolved
+        ]
+        return connection_type(
+            edges=edges,
+            page_info=PageInfo(
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+                has_previous_page=order == PaginationOrder.BACKWARD
+                and page_size < orig_resolved_len,
+                has_next_page=order == PaginationOrder.FORWARD and page_size < orig_resolved_len,
+            ),
+            count=count,
+        )
+
+    @classmethod
     async def connection_resolver(
         cls,
-        resolver: Callable,
-        connection_type: Connection,
+        resolver: Callable[..., Awaitable[ConnectionResolverResult]],
+        connection_type: ConnectionConstructor,
         root,
         info,
         **args,
-    ) -> tuple[list[graphene.ObjectType], int]:
-        resolved = await resolver(root, info, **args)
+    ) -> Connection:
+        resolved, order, page_size, total_count = await resolver(root, info, **args)
 
         if isinstance(connection_type, graphene.NonNull):
             connection_type = connection_type.of_type
 
-        connection = cls.resolve_connection(connection_type, args, resolved)
-        connection.count = len(resolved)
-        return connection
+        return cls.resolve_connection(
+            connection_type, args, resolved, page_size=page_size, order=order, count=total_count
+        )
 
 
-ConnectionField = AsyncIterableConnectionField
+ConnectionField = AsyncListConnectionField

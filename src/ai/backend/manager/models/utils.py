@@ -5,7 +5,16 @@ import functools
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+    Tuple,
+    TypeVar,
+)
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
@@ -33,6 +42,8 @@ if TYPE_CHECKING:
 
 from ..defs import LockID
 from ..types import Sentinel
+from .gql_relay import AsyncNode, PaginationOrder
+from .minilang.ordering import OrderDirection, QueryOrderParser
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 column_constraints = ["nullable", "index", "unique", "primary_key"]
@@ -376,3 +387,111 @@ def deprecation_reason_msg(version: str, detail: str | None = None) -> str:
     if detail:
         val = f"{val} {detail}"
     return val
+
+
+DEFAULT_LIMIT = 100
+
+
+def validate_connection_args(
+    *,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> PaginationOrder | None:
+    order: PaginationOrder | None = None
+
+    if after is not None:
+        order = PaginationOrder.FORWARD
+    if first is not None:
+        if first < 0:
+            raise ValueError("Argument 'first' must be a non-negative integer.")
+        order = PaginationOrder.FORWARD
+
+    if before is not None:
+        if order is PaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = PaginationOrder.BACKWARD
+    if last is not None:
+        if last < 0:
+            raise ValueError("Argument 'last' must be a non-negative integer.")
+        if order is PaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = PaginationOrder.BACKWARD
+
+    return order
+
+
+def build_sql_stmt_from_connection_arg(
+    info,
+    orm_class,
+    id_column: sa.Column,
+    order_expr: str | None = None,
+    *,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> tuple[sa.sql.Select, PaginationOrder, int]:
+    stmt = sa.select(orm_class)
+    order = validate_connection_args(after=after, first=first, before=before, last=last)
+    match order:
+        case PaginationOrder.FORWARD:
+            limit = first or DEFAULT_LIMIT
+            cursor_id = after
+        case PaginationOrder.BACKWARD:
+            limit = last or DEFAULT_LIMIT
+            cursor_id = before
+        case _:
+            # order is None
+            return stmt
+
+    # Need 'reverse' ordering on backward pagination
+    if order_expr is not None:
+        parser = QueryOrderParser()
+        order_list = parser.parse_order(orm_class, order_expr)
+    else:
+        order_list = [(id_column, OrderDirection.ASC)]
+
+    subquery = None
+    if cursor_id is not None:
+        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
+        subquery = sa.orm.aliased(
+            orm_class, sa.select(orm_class).where(id_column == _id).subquery()
+        )
+
+    if order == PaginationOrder.FORWARD:
+        stmt = stmt.order_by(
+            *[col.asc() if dir_ == OrderDirection.ASC else col.desc() for col, dir_ in order_list]
+        )
+        if subquery is not None:
+            for col, dir_ in order_list:
+                condition = (
+                    col > getattr(subquery, col.name)
+                    if dir_ == OrderDirection.ASC
+                    else col < getattr(subquery, col.name)
+                )
+                stmt = sa.select(subquery).where(condition)
+    else:
+        stmt = stmt.order_by(
+            *[col.desc() if dir_ == OrderDirection.ASC else col.asc() for col, dir_ in order_list]
+        )
+        if subquery is not None:
+            for col, dir_ in order_list:
+                condition = (
+                    col < getattr(subquery, col.name)
+                    if dir_ == OrderDirection.ASC
+                    else col > getattr(subquery, col.name)
+                )
+                stmt = sa.select(subquery).where(condition)
+
+    # To determine has_next_page or has_previous_page
+    stmt = stmt.limit(limit + 1)
+
+    return stmt, order, limit

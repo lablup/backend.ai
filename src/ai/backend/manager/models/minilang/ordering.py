@@ -1,3 +1,4 @@
+import enum
 from typing import Mapping, TypeAlias
 
 import sqlalchemy as sa
@@ -29,6 +30,11 @@ _parser = Lark(
 ColumnMapType: TypeAlias = Mapping[str, OrderSpecItem] | None
 
 
+class OrderDirection(enum.Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
 class QueryOrderTransformer(Transformer):
     def __init__(self, sa_table: sa.Table, column_map: ColumnMapType = None) -> None:
         super().__init__()
@@ -53,7 +59,7 @@ class QueryOrderTransformer(Transformer):
         except KeyError:
             raise ValueError("Unknown/unsupported field name", col_name)
 
-    def col(self, *args) -> sa.sql.elements.UnaryExpression:
+    def col(self, *args) -> tuple[sa.Column, OrderDirection]:
         children: list[Token] = args[0]
         if len(children) == 2:
             op = children[0].value
@@ -62,9 +68,10 @@ class QueryOrderTransformer(Transformer):
             op = "+"  # assume ascending if not marked
             col = self._get_col(children[0].value)
         if op == "+":
-            return col.asc()
+            return (col, OrderDirection.ASC)
         elif op == "-":
-            return col.desc()
+            return (col, OrderDirection.DESC)
+        raise ValueError(f"Invalid operation `{op}`. Please use `+` or `-`")
 
     expr = tuple
 
@@ -73,6 +80,14 @@ class QueryOrderParser:
     def __init__(self, column_map: ColumnMapType = None) -> None:
         self._column_map = column_map
         self._parser = _parser
+
+    def parse_order(self, table, order_expr: str) -> list[tuple[sa.Column, OrderDirection]]:
+        try:
+            ast = self._parser.parse(order_expr)
+            orders = QueryOrderTransformer(table, self._column_map).transform(ast)
+            return orders
+        except LarkError as e:
+            raise ValueError(f"Query ordering parsing error: {e}")
 
     def append_ordering(
         self,
@@ -84,9 +99,8 @@ class QueryOrderParser:
         the given SQLAlchemy query object.
         """
         table = sa_query.froms[0]
-        try:
-            ast = self._parser.parse(order_expr)
-            orders = QueryOrderTransformer(table, self._column_map).transform(ast)
-        except LarkError as e:
-            raise ValueError(f"Query ordering parsing error: {e}")
+        orders = [
+            col.asc() if direction == OrderDirection.ASC else col.desc()
+            for col, direction in self.parse_order(table, order_expr)
+        ]
         return sa_query.order_by(*orders)

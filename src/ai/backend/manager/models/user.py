@@ -39,11 +39,11 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode, Connection
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
-from .utils import ExtendedAsyncSAEngine
+from .utils import ExtendedAsyncSAEngine, build_sql_stmt_from_connection_arg
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -1309,12 +1309,33 @@ class UserNode(graphene.ObjectType):
         return await cls.get_user(info, uid)
 
     @classmethod
-    async def list_node(cls, info: graphene.ResolveInfo) -> list[UserNode]:
+    async def list_node(
+        cls,
+        info: graphene.ResolveInfo,
+        order_expr: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query = sa.select(UserRow)
+        query, order, limit = build_sql_stmt_from_connection_arg(
+            info,
+            UserRow,
+            UserRow.id,
+            order_expr,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(UserRow)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
-            return [cls.from_row(user_row) for user_row in user_rows]
+            result = [cls.from_row(user_row) for user_row in user_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, order, limit, total_cnt)
 
 
 class UserConnection(Connection):
