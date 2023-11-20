@@ -401,9 +401,11 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
+  build-sbom:
+    uses: ./.github/workflows/sbom.yml
 
   make-final-release:
-    needs: [build-scies, build-wheels]
+    needs: [build-scies, build-wheels, build-sbom]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: deploy-to-pypi
@@ -445,8 +447,6 @@ jobs:
       with:
         name: local-proxy
         path: dist
-    - name: SBOM report generation
-      uses: ./.github/workflows/sbom.yml
     - name: Download SBOM report
       uses: actions/download-artifact@v3
       with:
