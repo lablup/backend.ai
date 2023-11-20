@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import functools
 import ipaddress
 import itertools
 import json
@@ -98,6 +101,7 @@ inference_image_label_schema = t.Dict(
 ).ignore_extra("*")
 
 
+@functools.lru_cache()
 def get_docker_context_host() -> str | None:
     try:
         docker_config_path = Path.home() / ".docker" / "config.json"
@@ -140,12 +144,9 @@ def parse_docker_host_url(
     )
 
 
-def get_docker_connector() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+@functools.lru_cache()
+def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
     connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
-    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
-        return parse_docker_host_url(yarl.URL(raw_docker_host))
-    if raw_docker_host := get_docker_context_host():
-        return parse_docker_host_url(yarl.URL(raw_docker_host))
     match sys.platform:
         case "linux" | "darwin":
             search_paths = [
@@ -172,6 +173,14 @@ def get_docker_connector() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector
     else:
         searched_paths = ", ".join(map(os.fsdecode, search_paths))
         raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
+
+
+def get_docker_connector() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
+        return parse_docker_host_url(yarl.URL(raw_docker_host))
+    if raw_docker_host := get_docker_context_host():
+        return parse_docker_host_url(yarl.URL(raw_docker_host))
+    return search_docker_socket_files()
 
 
 async def login(
