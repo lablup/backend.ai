@@ -1650,12 +1650,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "527cd90ba3d8d7ae7dceb06fda619895768a46a1b4e423bdb24c1969823b8362",
-              "url": "https://files.pythonhosted.org/packages/51/b0/0bcd4c699e4f084d1dab66036816b7af8badba297027d846f939d62d09b9/greenlet-3.0.0-cp311-cp311-musllinux_1_1_x86_64.whl"
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "b2c02d2ad98116e914d4f3155ffc905fd0c025d901ead3f6ed07385e19122c94",
               "url": "https://files.pythonhosted.org/packages/ce/76/257d50829841cb13b163764cdef35197c8a0bd351ad94fc05795ca28fb21/greenlet-3.0.1-cp311-cp311-musllinux_1_1_x86_64.whl"
             },
