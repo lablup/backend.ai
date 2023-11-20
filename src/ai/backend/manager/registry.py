@@ -1233,6 +1233,7 @@ class AgentRegistry:
                     kernels = [KernelRow(**kernel) for kernel in kernel_data]
                     db_sess.add(session)
                     db_sess.add_all(kernels)
+                    await db_sess.flush()
 
                     if matched_dependency_session_ids:
                         dependency_rows = [
