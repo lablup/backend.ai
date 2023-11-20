@@ -11,15 +11,12 @@ import sys
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
     Final,
     Iterable,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
-    Tuple,
-    Type,
     Union,
 )
 
@@ -119,7 +116,7 @@ def get_docker_context_host() -> str | None:
 def parse_docker_host_url(
     docker_host: yarl.URL,
 ) -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
-    connector_cls: type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
+    connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
     match docker_host.scheme:
         case "http" | "https":
             return None, docker_host, aiohttp.TCPConnector()
@@ -146,7 +143,7 @@ def parse_docker_host_url(
 
 @functools.lru_cache()
 def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
-    connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
+    connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
     match sys.platform:
         case "linux" | "darwin":
             search_paths = [
@@ -267,7 +264,7 @@ def is_known_registry(val: str, known_registries: Union[Mapping[str, Any], Seque
     return False
 
 
-async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]:
+async def get_registry_info(etcd: AsyncEtcd, name: str) -> tuple[yarl.URL, dict]:
     reg_path = f"config/docker/registry/{etcd_quote(name)}"
     item = await etcd.get_prefix(reg_path)
     if not item:
@@ -315,7 +312,7 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
 
 class PlatformTagSet(Mapping):
     __slots__ = ("_data",)
-    _data: Dict[str, str]
+    _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
     def __init__(self, tags: Iterable[str]):
@@ -400,7 +397,7 @@ class ImageRef:
         self._update_tag_set()
 
     @staticmethod
-    def _parse_image_tag(s: str, using_default_registry: bool = False) -> Tuple[str, str]:
+    def _parse_image_tag(s: str, using_default_registry: bool = False) -> tuple[str, str]:
         image_tag = s.rsplit(":", maxsplit=1)
         if len(image_tag) == 1:
             image = image_tag[0]
@@ -493,7 +490,7 @@ class ImageRef:
         return self._arch
 
     @property
-    def tag_set(self) -> Tuple[str, PlatformTagSet]:
+    def tag_set(self) -> tuple[str, PlatformTagSet]:
         # e.g., '3.6', {'ubuntu', 'cuda', ...}
         return self._tag_set
 
