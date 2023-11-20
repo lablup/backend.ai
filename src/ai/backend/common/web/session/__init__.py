@@ -11,7 +11,7 @@ from aiohttp import web
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.common.web.session"))
 
 extra_config_headers = t.Dict(
     {
