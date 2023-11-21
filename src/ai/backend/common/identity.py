@@ -21,6 +21,7 @@ __all__ = (
     "get_instance_ip",
     "get_instance_type",
     "get_instance_region",
+    "get_wsl_version",
 )
 
 log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
@@ -93,6 +94,30 @@ def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
                 continue
             if addr in cidr:
                 yield addr
+
+
+def get_wsl_version() -> int:
+    """
+    Returns the current WSL version we are running on, and 0 if we are not on WSL.
+
+    ref) https://github.com/snapcore/snapd/blob/3a88dc38ca122eba97192dba3aad30f3bd3e3081/release/release.go#L116-L172
+    """
+    if not Path("/proc/sys/fs/binfmt_misc/WSLInterop").exists() and not Path("/run/WSL").exists():
+        return 0
+    root_fs_type = None
+    with open(Path("/proc/mounts"), "r") as f:
+        for line in f:
+            fields = line.split()
+            if line.startswith("#"):
+                continue
+            if len(fields) < 3 or fields[1] != "/":
+                continue
+            root_fs_type = fields[2]
+    if root_fs_type is None:
+        return 2
+    if root_fs_type in ("wslfs", "lxfs"):
+        return 1
+    return 2
 
 
 # Detect upon module load.
