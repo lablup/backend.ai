@@ -4,12 +4,14 @@ import asyncio
 from pathlib import Path
 
 from rich.console import ConsoleRenderable
+from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.validation import ValidationResult, Validator
 from textual.widget import Widget
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Input, Label, RichLog, Static
 
 
 class DirectoryPathValidator(Validator):
@@ -18,6 +20,28 @@ class DirectoryPathValidator(Validator):
             return self.success()
         else:
             return self.failure("The path is not a directory")
+
+
+class SetupLog(RichLog):
+    BINDINGS = [
+        Binding("enter", "continue", show=False),
+    ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._continue = asyncio.Event()
+
+    async def wait_continue(self) -> None:
+        """
+        Block until the user concludes the dialog.
+        If the user cancels, the result will be None.
+        """
+        self.write(Text.from_markup("\nPress [bold]Enter[/] to continue...\n"))
+        self._continue.clear()
+        await self._continue.wait()
+
+    async def action_continue(self) -> None:
+        self._continue.set()
 
 
 class InputDialog(Static):
