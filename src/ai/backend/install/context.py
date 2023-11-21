@@ -291,7 +291,9 @@ class Context(metaclass=ABCMeta):
             await self.log.wait_continue()
         if "WSL" in self.os_info.distro_variants:
             self.log.write(
-                Text.from_markup("[yellow bold]:warning: You are running under WSL environment.[/]")
+                Text.from_markup(
+                    "[yellow bold]:warning: You are running under a WSL environment.[/]"
+                )
             )
             # TODO: update the docs link
             self.log.write(
