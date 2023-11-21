@@ -1322,7 +1322,7 @@ class UserNode(graphene.ObjectType):
         query, order, limit = build_sql_stmt_from_connection_arg(
             info,
             UserRow,
-            UserRow.id,
+            UserRow.uuid,
             order_expr,
             after=after,
             first=first,

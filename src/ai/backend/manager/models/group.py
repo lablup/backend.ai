@@ -23,7 +23,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import joinedload, relationship
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
@@ -785,17 +785,41 @@ class GroupNode(graphene.ObjectType):
         sgroups = await loader.load(self.id)
         return [sg.name for sg in sgroups]
 
-    async def resolve_users(self, info: graphene.ResolveInfo, *args, **kwargs):
-        graph_ctx: GraphQueryContext = info.context
+    async def resolve_users(
+        self,
+        info: graphene.ResolveInfo,
+        order_expr: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        from .user import UserRow
 
-        group_query = (
-            sa.select(AssocGroupUserRow)
+        graph_ctx: GraphQueryContext = info.context
+        query, order, limit = build_sql_stmt_from_connection_arg(
+            info,
+            UserRow,
+            UserRow.uuid,
+            order_expr,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        user_query = query.select_from(sa.join(UserRow, AssocGroupUserRow)).where(
+            AssocGroupUserRow.group_id == self.id
+        )
+        cnt_query = (
+            sa.select(sa.func.count())
+            .select_from(AssocGroupUserRow)
             .where(AssocGroupUserRow.group_id == self.id)
-            .options(joinedload(AssocGroupUserRow.user))
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            assoc_rows = (await db_session.scalars(group_query)).all()
-            return [UserNode.from_row(assoc_row.user) for assoc_row in assoc_rows]
+            user_rows = (await db_session.scalars(user_query)).all()
+            result = [UserNode.from_row(user_row) for user_row in user_rows]
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, order, limit, total_cnt)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:

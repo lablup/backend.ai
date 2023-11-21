@@ -188,7 +188,7 @@ class PaginationOrder(enum.Enum):
 class ConnectionResolverResult(NamedTuple):
     node_list: list[Any]
     order: PaginationOrder
-    page_size: int
+    page_size: int | None
     total_count: int
 
 
@@ -221,7 +221,7 @@ class AsyncListConnectionField(IterableConnectionField):
         args: dict[str, Any] | None,
         resolved: list[Any] | Connection,
         *,
-        page_size: int,
+        page_size: int | None = None,
         order: PaginationOrder = PaginationOrder.FORWARD,
         count: int = -1,
     ) -> Connection:
@@ -234,7 +234,8 @@ class AsyncListConnectionField(IterableConnectionField):
         )
 
         orig_resolved_len = len(resolved)
-        resolved = resolved[:page_size]
+        if page_size is not None:
+            resolved = resolved[:page_size]
         if order == PaginationOrder.BACKWARD:
             resolved = resolved[::-1]
         edge_type = connection_type.Edge
@@ -250,9 +251,16 @@ class AsyncListConnectionField(IterableConnectionField):
             page_info=PageInfo(
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
-                has_previous_page=order == PaginationOrder.BACKWARD
-                and page_size < orig_resolved_len,
-                has_next_page=order == PaginationOrder.FORWARD and page_size < orig_resolved_len,
+                has_previous_page=(
+                    order == PaginationOrder.BACKWARD
+                    and page_size is not None
+                    and page_size < orig_resolved_len
+                ),
+                has_next_page=(
+                    order == PaginationOrder.FORWARD
+                    and page_size is not None
+                    and page_size < orig_resolved_len
+                ),
             ),
             count=count,
         )

@@ -438,15 +438,16 @@ def build_sql_stmt_from_connection_arg(
     first: int | None = None,
     before: str | None = None,
     last: int | None = None,
-) -> tuple[sa.sql.Select, PaginationOrder, int]:
+) -> tuple[sa.sql.Select, PaginationOrder, int | None]:
     stmt = sa.select(orm_class)
     order = validate_connection_args(after=after, first=first, before=before, last=last)
+    limit: int | None = None
     match order:
         case PaginationOrder.FORWARD:
-            limit = first or DEFAULT_LIMIT
+            limit = first
             cursor_id = after
         case PaginationOrder.BACKWARD:
-            limit = last or DEFAULT_LIMIT
+            limit = last
             cursor_id = before
         case _:
             # order is None
@@ -459,39 +460,25 @@ def build_sql_stmt_from_connection_arg(
     else:
         order_list = [(id_column, OrderDirection.ASC)]
 
-    subquery = None
+    subqueries = []
     if cursor_id is not None:
         _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        subquery = sa.orm.aliased(
-            orm_class, sa.select(orm_class).where(id_column == _id).subquery()
-        )
+        for col, direction in order_list:
+            subqueries.append(
+                (col, sa.select(col).where(id_column == _id).scalar_subquery(), direction)
+            )
 
     if order == PaginationOrder.FORWARD:
-        stmt = stmt.order_by(
-            *[col.asc() if dir_ == OrderDirection.ASC else col.desc() for col, dir_ in order_list]
-        )
-        if subquery is not None:
-            for col, dir_ in order_list:
-                condition = (
-                    col > getattr(subquery, col.name)
-                    if dir_ == OrderDirection.ASC
-                    else col < getattr(subquery, col.name)
-                )
-                stmt = sa.select(subquery).where(condition)
+        for col, subq, direction in subqueries:
+            condition = col > subq if direction == OrderDirection.ASC else col < subq
+            stmt = stmt.where(condition)
     else:
-        stmt = stmt.order_by(
-            *[col.desc() if dir_ == OrderDirection.ASC else col.asc() for col, dir_ in order_list]
-        )
-        if subquery is not None:
-            for col, dir_ in order_list:
-                condition = (
-                    col < getattr(subquery, col.name)
-                    if dir_ == OrderDirection.ASC
-                    else col > getattr(subquery, col.name)
-                )
-                stmt = sa.select(subquery).where(condition)
+        for col, subq, direction in subqueries:
+            condition = col < subq if direction == OrderDirection.ASC else col > subq
+            stmt = stmt.where(condition)
 
     # To determine has_next_page or has_previous_page
-    stmt = stmt.limit(limit + 1)
+    if limit is not None:
+        stmt = stmt.limit(limit + 1)
 
     return stmt, order, limit
