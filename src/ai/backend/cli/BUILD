@@ -12,6 +12,7 @@ visibility_private_component(
         "//src/ai/backend/client/**",
         "//src/ai/backend/storage/**",
         "//src/ai/backend/web/**",
+        "//src/ai/backend/install/**",
     ],
     allowed_dependencies=[
         "//src/ai/backend/plugin/**",

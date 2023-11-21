@@ -171,12 +171,14 @@ class Domain(graphene.ObjectType):
 
 
 class DomainInput(graphene.InputObjectType):
-    description = graphene.String(required=False)
-    is_active = graphene.Boolean(required=False, default=True)
-    total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.JSONString(required=False)
-    allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
-    integration_id = graphene.String(required=False)
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
+    total_resource_slots = graphene.JSONString(required=False, default_value={})
+    allowed_vfolder_hosts = graphene.JSONString(required=False, default_value={})
+    allowed_docker_registries = graphene.List(
+        lambda: graphene.String, required=False, default_value=[]
+    )
+    integration_id = graphene.String(required=False, default_value=None)
 
 
 class ModifyDomainInput(graphene.InputObjectType):

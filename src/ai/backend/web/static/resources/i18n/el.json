@@ -237,7 +237,15 @@
       "preopen": "προανοίγει",
       "Network": "Δίκτυο",
       "Enable": "επιτρέπω",
-      "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/) και παύλα (-)."
+      "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/) και παύλα (-).",
+      "PreOpenPortMaxCountLimit": "Μπορείτε να ορίσετε έως και {{count}} προ-ανοικτές θύρες.",
+      "StartTimeMustBeInTheFuture": "Η ώρα έναρξης πρέπει να είναι μετά την τρέχουσα ώρα.",
+      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -295,7 +303,7 @@
       "SluggedStrings": "Στιγμιότυπα αλφαριθμητικά (>3 χαρακτήρες)",
       "SessionNameAlreadyExist": "Το όνομα συνεδρίας υπάρχει ήδη",
       "SessionNameTooLong64": "Εισαγάγετε 64 χαρακτήρες ή λιγότερους.",
-      "PleaseFollowSessionNameRule": "Εισαγάγετε έναν συνδυασμό τουλάχιστον 3 γραμμάτων, αριθμών, '.', '_' και '-'."
+      "PleaseFollowSessionNameRule": "Εισαγάγετε έναν συνδυασμό τουλάχιστον 4 γραμμάτων, αριθμών, '.', '_' και '-'."
     },
     "Interactive": "Διαδραστικό",
     "Batch": "Παρτίδα",
@@ -428,7 +436,9 @@
     "Control": "Ελεγχος",
     "NewPassword": "νέος κωδικός πρόσβασης",
     "Enabled": "Ενεργοποιήθηκε",
-    "StorageProxies": "Αποθήκες"
+    "StorageProxies": "Αποθήκες",
+    "None": "Κανένα",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -763,7 +773,8 @@
     "RAM": "RAM (GB)",
     "SharedMemory": "Κοινή μνήμη (GB)",
     "NoResourcePresetToDisplay": "Δεν εμφανίζονται Προεπιλογές πόρων",
-    "Deleted": "Η προεπιλογή πόρων διαγράφηκε επιτυχώς."
+    "Deleted": "Η προεπιλογή πόρων διαγράφηκε επιτυχώς.",
+    "SHMEMShouldBeSmallerThanMemory": "Η κοινόχρηστη μνήμη πρέπει να είναι μικρότερη από τη μνήμη"
   },
   "usersettings": {
     "General": "Γενικός",

@@ -237,7 +237,15 @@
       "preopen": "事前開放ポート",
       "Network": "ネットワーク",
       "Enable": "活性化",
-      "FolderAliasInvalid": "英語の大文字と小文字、数字、アンダースコア（_）、スラッシュ（/）、ダッシュ（-）のみを入力できます。"
+      "FolderAliasInvalid": "英語の大文字と小文字、数字、アンダースコア（_）、スラッシュ（/）、ダッシュ（-）のみを入力できます。",
+      "PreOpenPortMaxCountLimit": "count}}までプレオープンポートを設定できる。",
+      "StartTimeMustBeInTheFuture": "開始時刻は現在時刻より後でなければならない。",
+      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
+      "EnqueueComputeSessionWarning": "__NOT_TRANSLATED__",
+      "SessionName": "__NOT_TRANSLATED__",
+      "ResetFormConfirm": "__NOT_TRANSLATED__",
+      "TemplateAndHistory": "__NOT_TRANSLATED__",
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -295,7 +303,7 @@
       "SluggedStrings": "最低4文字以上の固有の文字列で入力してください。",
       "SessionNameAlreadyExist": "同じ名前のセッションが既にあります",
       "SessionNameTooLong64": "64文字以下で入力してください。",
-      "PleaseFollowSessionNameRule": "少なくとも3文字以上の文字、数字、「.」、「_」、「-」の組み合わせで入力してください。"
+      "PleaseFollowSessionNameRule": "少なくとも4文字以上の文字、数字、「.」、「_」、「-」の組み合わせで入力してください。"
     },
     "Interactive": "インタラクティブ",
     "Batch": "バッチ",
@@ -428,7 +436,9 @@
     "Control": "コントロール",
     "NewPassword": "新しいパスワード",
     "Enabled": "有効",
-    "StorageProxies": "ストレージ"
+    "StorageProxies": "ストレージ",
+    "None": "なし",
+    "Image": "__NOT_TRANSLATED__"
   },
   "credential": {
     "Permission": "許可",
@@ -763,7 +773,8 @@
     "RAM": "RAM（GB）",
     "SharedMemory": "共有メモリ（GB）",
     "NoResourcePresetToDisplay": "リソースプリセット情報がありません。",
-    "Deleted": "リソースプリセットの削除に成功しました"
+    "Deleted": "リソースプリセットの削除に成功しました",
+    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない"
   },
   "usersettings": {
     "General": "一般",

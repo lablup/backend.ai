@@ -317,9 +317,9 @@ async def get_project_stats_for_period(
     root_ctx: RootContext,
     start_date: datetime,
     end_date: datetime,
-    group_ids: Optional[Sequence[UUID]] = None,
+    project_ids: Optional[Sequence[UUID]] = None,
 ) -> dict[UUID, ProjectResourceUsage]:
-    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, group_ids)
+    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, project_ids=project_ids)
     local_tz = root_ctx.shared_config["system"]["timezone"]
     usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
     total_groups, _ = parse_total_resource_group(usage_groups)
@@ -552,7 +552,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("group_id", default=None): t.String | t.Null,
+            tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
             t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
             t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         }
@@ -565,12 +565,12 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     period in dates.
     The date/time comparison is done using the configured timezone.
 
-    :param group_id: If not None, query containers only in the group.
+    :param project_id: If not None, query containers only in the project.
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
+    project_id = params["project_id"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)
@@ -582,10 +582,10 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="Invalid date values")
     if end_date <= start_date:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
-    log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", group_id, start_date, end_date)
-    group_ids = [group_id] if group_id is not None else None
+    log.info("USAGE_PER_MONTH (p:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
+    project_ids = [project_id] if project_id is not None else None
     usage_map = await get_project_stats_for_period(
-        root_ctx, start_date, end_date, group_ids=group_ids
+        root_ctx, start_date, end_date, project_ids=project_ids
     )
     resp = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)

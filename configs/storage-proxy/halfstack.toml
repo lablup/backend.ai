@@ -1,0 +1,95 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = ""                                   # env: BACKEND_ETCD_USER
+password = ""				    # env: BACKEND_ETCD_PASSWORD
+
+
+[storage-proxy]
+# An identifier of this storage proxy, which must be unique in a cluster.
+node-id = "i-storage-proxy-local"
+num-proc = 4
+# pid-file = "./storage-proxy.pid"
+event-loop = "uvloop"
+
+# ipc-base-path = "/tmp/backend.ai/ipc"
+scandir-limit = 1000
+max-upload-size = "100g"
+
+# Used to generate JWT tokens for download/upload sessions
+secret = "some-secret-private-for-storage-proxy"
+
+# The download/upload session tokens are valid for:
+session-expire = "1d"
+
+# When executed as root (e.g., to bind under-1023 ports)
+# it is recommended to set UID/GID to lower the privilege after port binding.
+# If not specified, it defaults to the owner UID/GID of the "server.py" file
+# of the installed package.
+# user = 1000
+# group = 1000
+
+# The starting port number for aiomonitor.
+# Since the storage-proxy is composed of multiple processes, each process will be exposed
+# via the port number of this base port number + pidx.
+# aiomonitor-termui-port = 48300
+# aiomonitor-webui-port = 49300
+
+
+# The socket fd path prefix to communicate with storage proxy watcher
+# The path should not have any permission issue with UID/GID
+# The full socket fd name will be like this. `/path/to/file/socket-<PIDx>`
+# watcher-insock-path-prefix = ""
+# watcher-outsock-path-prefix = ""
+
+
+# Watcher delegates root permission and do privileged tasks. This option enables the use of watcher.
+use-watcher = false
+
+
+[api.client]
+# Client-facing API
+service-addr = { host = "0.0.0.0", port = 6021 }
+ssl-enabled = false
+
+
+[api.manager]
+# Manager-facing API
+service-addr = { host = "127.0.0.1", port = 6022 }
+ssl-enabled = false
+# ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
+# ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
+secret = "some-secret-shared-with-manager"
+
+
+[debug]
+enabled = false
+asyncio = false
+enhanced-aiomonitor-task-info = false
+log-events = true
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+# If set true, use ANSI colors if the console is a terminal.
+# If set false, always disable the colored output in console logs.
+colored = true
+
+# One of: "simple", "verbose"
+format = "verbose"
+
+
+[volume]
+
+[volume.volume1]
+backend = "vfs"
+path = "vfolder/local/volume1"
