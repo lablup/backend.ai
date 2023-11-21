@@ -819,11 +819,41 @@ class PackageContext(Context):
         )
 
     async def check_prerequisites(self) -> None:
-        self.os_info = await detect_os(self)
-        self.log.write(Text.from_markup("Detected OS info: ", end=""))
-        self.log.write(self.os_info)
+        self.os_info = await detect_os()
+        text = Text()
+        text.append("Detetced OS info: ")
+        text.append(self.os_info.__rich__())  # type: ignore
+        self.log.write(text)
+        if "LiveCD" in self.os_info.distro_variants:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow bold]:warning: You are running under a temporary LiveCD/USB boot"
+                    " environment.[/]"
+                )
+            )
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Ensure that you have enough RAM disk space more than 10 GiB.[/]"
+                )
+            )
+        if "WSL" in self.os_info.distro_variants:
+            self.log.write(
+                Text.from_markup("[yellow bold]:warning: You are running under WSL environment.[/]")
+            )
+            # TODO: update the docs link
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Checkout additional pre-setup guide for WSL:"
+                    " https://docs.backend.ai/latest/[/]"
+                )
+            )
         if determine_docker_sudo():
             self.docker_sudo = ["sudo"]
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]The Docker API and commands require sudo. We will use sudo.[/]"
+                )
+            )
         else:
             self.docker_sudo = []
         await check_docker(self)

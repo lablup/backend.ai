@@ -36,6 +36,7 @@ from ai.backend.install.widgets import InputDialog
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
+from .common import detect_os
 from .context import DevContext, PackageContext, current_log
 from .types import CliArgs, DistInfo, InstallInfo, InstallModes, PrerequisiteError
 
@@ -303,7 +304,7 @@ class ModeMenu(Static):
         self._mode = mode
 
     def compose(self) -> ComposeResult:
-        yield Label("The installation mode:\n(arrow keys to change, enter to select)")
+        yield Label(id="heading")
         if self._dist_info_path is None:
             package_desc = "Install using release packages"
         else:
@@ -339,6 +340,15 @@ class ModeMenu(Static):
                     id=f"mode-{mode.value.lower()}",
                 )
         yield Label(id="mode-desc")
+
+    async def on_mount(self) -> None:
+        os_info = await detect_os()
+        text = Text()
+        text.append("Platform: ")
+        text.append_text(os_info.__rich__())  # type: ignore
+        text.append("\n\n")
+        text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
+        cast(Static, self.query_one("#heading")).update(text)
 
     def action_cursor_up(self) -> None:
         self.lv.action_cursor_up()
@@ -424,7 +434,7 @@ class InstallerApp(App):
                 yield PackageSetup(id="pkg-setup")
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         header: Header = cast(Header, self.query_one("Header"))
         header.tall = True
         self.title = "Backend.AI Installer"
