@@ -276,8 +276,7 @@ class Context(metaclass=ABCMeta):
         text.append("Detetced OS info: ")
         text.append(self.os_info.__rich__())  # type: ignore
         self.log.write(text)
-        # if "LiveCD" in self.os_info.distro_variants:
-        if True:
+        if "LiveCD" in self.os_info.distro_variants:
             self.log.write(
                 Text.from_markup(
                     "[yellow bold]:warning: You are running under a temporary LiveCD/USB boot"
