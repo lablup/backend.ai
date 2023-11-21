@@ -299,7 +299,7 @@ class Context(metaclass=ABCMeta):
             self.log.write(
                 Text.from_markup(
                     "[yellow]Checkout additional pre-setup guide for WSL:"
-                    " https://docs.backend.ai/latest/[/]"
+                    " https://docs.backend.ai/en/latest/install/env-wsl2.html[/]"
                 )
             )
             await self.log.wait_continue()
