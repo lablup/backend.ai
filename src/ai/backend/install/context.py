@@ -25,7 +25,7 @@ from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
-from textual.widgets import Label, ProgressBar, RichLog, Static
+from textual.widgets import Label, ProgressBar, Static
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
@@ -58,8 +58,9 @@ from .types import (
     ServerAddr,
     ServiceConfig,
 )
+from .widgets import SetupLog
 
-current_log: ContextVar[RichLog] = ContextVar("current_log")
+current_log: ContextVar[SetupLog] = ContextVar("current_log")
 
 
 class PostGuide(enum.Enum):
@@ -268,6 +269,51 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
+    async def check_prerequisites(self) -> None:
+        self.os_info = await detect_os()
+        text = Text()
+        text.append("Detetced OS info: ")
+        text.append(self.os_info.__rich__())  # type: ignore
+        self.log.write(text)
+        # if "LiveCD" in self.os_info.distro_variants:
+        if True:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow bold]:warning: You are running under a temporary LiveCD/USB boot"
+                    " environment.[/]"
+                )
+            )
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Ensure that you have enough RAM disk space more than 10 GiB.[/]"
+                )
+            )
+            await self.log.wait_continue()
+        if "WSL" in self.os_info.distro_variants:
+            self.log.write(
+                Text.from_markup("[yellow bold]:warning: You are running under WSL environment.[/]")
+            )
+            # TODO: update the docs link
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Checkout additional pre-setup guide for WSL:"
+                    " https://docs.backend.ai/latest/[/]"
+                )
+            )
+            await self.log.wait_continue()
+        if determine_docker_sudo():
+            self.docker_sudo = ["sudo"]
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]The Docker API and commands require sudo. We will use sudo.[/]"
+                )
+            )
+        else:
+            self.docker_sudo = []
+        await check_docker(self)
+        if self.os_info.distro == "Darwin":
+            await check_docker_desktop_mount(self)
 
     async def configure_manager(self) -> None:
         base_path = self.install_info.base_path
@@ -725,19 +771,10 @@ class DevContext(Context):
         )
 
     async def check_prerequisites(self) -> None:
-        self.os_info = await detect_os(self)
-        self.log.write(Text.from_markup("Detected OS info: ", end=""))
-        self.log.write(self.os_info)
-        if determine_docker_sudo():
-            self.docker_sudo = ["sudo"]
-        else:
-            self.docker_sudo = []
+        await super().check_prerequisites()
         await install_git_lfs(self)
         await install_git_hooks(self)
         await check_python(self)
-        await check_docker(self)
-        if self.os_info.distro == "Darwin":
-            await check_docker_desktop_mount(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)
 
@@ -819,46 +856,7 @@ class PackageContext(Context):
         )
 
     async def check_prerequisites(self) -> None:
-        self.os_info = await detect_os()
-        text = Text()
-        text.append("Detetced OS info: ")
-        text.append(self.os_info.__rich__())  # type: ignore
-        self.log.write(text)
-        if "LiveCD" in self.os_info.distro_variants:
-            self.log.write(
-                Text.from_markup(
-                    "[yellow bold]:warning: You are running under a temporary LiveCD/USB boot"
-                    " environment.[/]"
-                )
-            )
-            self.log.write(
-                Text.from_markup(
-                    "[yellow]Ensure that you have enough RAM disk space more than 10 GiB.[/]"
-                )
-            )
-        if "WSL" in self.os_info.distro_variants:
-            self.log.write(
-                Text.from_markup("[yellow bold]:warning: You are running under WSL environment.[/]")
-            )
-            # TODO: update the docs link
-            self.log.write(
-                Text.from_markup(
-                    "[yellow]Checkout additional pre-setup guide for WSL:"
-                    " https://docs.backend.ai/latest/[/]"
-                )
-            )
-        if determine_docker_sudo():
-            self.docker_sudo = ["sudo"]
-            self.log.write(
-                Text.from_markup(
-                    "[yellow]The Docker API and commands require sudo. We will use sudo.[/]"
-                )
-            )
-        else:
-            self.docker_sudo = []
-        await check_docker(self)
-        if self.os_info.distro == "Darwin":
-            await check_docker_desktop_mount(self)
+        await super().check_prerequisites()
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
