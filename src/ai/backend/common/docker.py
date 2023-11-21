@@ -250,7 +250,10 @@ async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
     return results
 
 
-def is_known_registry(val: str, known_registries: Union[Mapping[str, Any], Sequence[str]] = None):
+def is_known_registry(
+    val: str,
+    known_registries: Union[Mapping[str, Any], Sequence[str]] | None = None,
+):
     if val == default_registry:
         return True
     if known_registries is not None and val in known_registries:

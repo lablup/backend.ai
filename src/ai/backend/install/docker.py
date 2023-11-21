@@ -19,7 +19,12 @@ from .http import request_unix
 if TYPE_CHECKING:
     from .context import Context
 
-__all__ = ("check_docker",)
+__all__ = (
+    "check_docker",
+    "detect_snap_docker",
+    "detect_system_docker",
+    "determine_docker_sudo",
+)
 
 
 def parse_version(expr):
@@ -62,7 +67,7 @@ async def detect_snap_docker():
                 return pkg_data["version"]
 
 
-async def detect_system_docker(ctx: Context):
+async def detect_system_docker(ctx: Context) -> str:
     if ctx.docker_sudo:
         ctx.log.write(
             Text.from_markup("[yellow]Docker commands require sudo. We will use sudo.[/]")
@@ -149,7 +154,7 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
         return f"/tmp/{build_root_name}-{build_root_hash}-pants"
 
 
-async def determine_docker_sudo(ctx: Context) -> bool:
+async def determine_docker_sudo() -> bool:
     sock_path, docker_host, connector = get_docker_connector()
     try:
         async with aiohttp.ClientSession(connector=connector) as sess:
