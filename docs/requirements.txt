@@ -1,12 +1,11 @@
-Sphinx~=5.0
-sphinxcontrib-trio>=1.1.0
-sphinx-autodoc-typehints~=1.11.1
-sphinx-intl>=2.0
-sphinx-rtd-theme~=1.0
+Sphinx~=7.2
+sphinxcontrib-trio>=1.1.2
+sphinx-autodoc-typehints~=1.24.0
+sphinx-intl>=2.1
+sphinx-rtd-theme~=1.3
 sphinxcontrib-mermaid~=0.7.1
 sphinxcontrib-openapi~=0.8.1
 rtds-action~=1.1.0
-pygments~=2.12
+pygments~=2.16.1
 # replace the following line with native support of Sphinx in Pants
 -r ../requirements.txt
--e git+https://github.com/lablup/pygments-graphql-lexer#egg=pygments-graphql-lexer
