@@ -478,7 +478,7 @@ class Context(metaclass=ABCMeta):
             data = tomlkit.load(fp)
             wsproxy_itable = tomlkit.inline_table()
             wsproxy_itable["url"] = (
-                "http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
             )
             data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
