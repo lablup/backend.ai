@@ -118,7 +118,10 @@ async def detect_system_docker(ctx: Context) -> str:
     async with aiohttp.ClientSession(connector=connector.connector) as sess:
         async with sess.get(connector.docker_host / "version") as r:
             if r.status != 200:
-                raise RuntimeError("Failed to query the Docker daemon API")
+                raise RuntimeError(
+                    "The Docker daemon API responded with unexpected response:"
+                    f" {r.status} {r.reason}"
+                )
             response_data = await r.json()
             return response_data["Version"]
 
@@ -187,6 +190,8 @@ async def check_docker(ctx: Context) -> None:
         else:
             fail_with_system_docker_install_request()
 
+    # Compose is not a part of the docker API but a client-side plugin.
+    # We need to execute the client command to get information about it.
     proc = await asyncio.create_subprocess_exec(
         *ctx.docker_sudo, "docker", "compose", "version", stdout=asyncio.subprocess.PIPE
     )
