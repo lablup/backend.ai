@@ -305,7 +305,6 @@ class Queries(graphene.ObjectType):
 
     group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
     group_nodes = PaginatedConnectionField(GroupConnection)
-    group_sliced_nodes = PaginatedConnectionField(GroupConnection)
 
     group = graphene.Field(
         Group,
@@ -374,7 +373,6 @@ class Queries(graphene.ObjectType):
     )
 
     user_nodes = PaginatedConnectionField(UserConnection)
-    user_sliced_nodes = PaginatedConnectionField(UserConnection)
 
     keypair = graphene.Field(
         KeyPair,
@@ -824,27 +822,15 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         **args,
     ) -> ConnectionResolverResult:
-        return await GroupNode.list_cursor_paginated_node(
-            info,
-            args.get("filter"),
-            args.get("order"),
-            args.get("after"),
-            args.get("first"),
-            args.get("before"),
-            args.get("last"),
-        )
-
-    async def resolve_group_sliced_nodes(
-        root: Any,
-        info: graphene.ResolveInfo,
-        **args,
-    ) -> ConnectionResolverResult:
-        return await GroupNode.list_sql_paginated_node(
+        return await GroupNode.list_node(
             info,
             args.get("filter"),
             args.get("order"),
             args.get("offset"),
-            args.get("limit"),
+            args.get("after"),
+            args.get("first"),
+            args.get("before"),
+            args.get("last"),
         )
 
     @staticmethod
@@ -1147,10 +1133,11 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         **args,
     ) -> ConnectionResolverResult:
-        return await UserNode.list_cursor_paginated_node(
+        return await UserNode.list_node(
             info,
             args.get("filter"),
             args.get("order"),
+            args.get("offset"),
             args.get("after"),
             args.get("first"),
             args.get("before"),

@@ -19,6 +19,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NamedTuple,
     Optional,
     Protocol,
     Sequence,
@@ -1112,7 +1113,6 @@ class AsyncPaginatedConnectionField(AsyncListConnectionField):
     def __init__(self, type, *args, **kwargs):
         kwargs.setdefault("filter", graphene.String())
         kwargs.setdefault("order", graphene.String())
-        kwargs.setdefault("limit", graphene.Int())
         kwargs.setdefault("offset", graphene.Int())
         super().__init__(type, *args, **kwargs)
 
@@ -1120,7 +1120,7 @@ class AsyncPaginatedConnectionField(AsyncListConnectionField):
 PaginatedConnectionField = AsyncPaginatedConnectionField
 
 
-def build_sql_stmt_from_connection_arg(
+def _build_sql_stmt_from_connection_arg(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
@@ -1131,7 +1131,7 @@ def build_sql_stmt_from_connection_arg(
     first: int | None = None,
     before: str | None = None,
     last: int | None = None,
-) -> tuple[sa.sql.Select, PaginationOrder, int | None]:
+) -> sa.sql.Select:
     stmt = sa.select(orm_class)
     page_size: int | None = None
     cursor_id: str | None = None
@@ -1174,10 +1174,10 @@ def build_sql_stmt_from_connection_arg(
         condition_parser = QueryFilterParser()
         stmt = condition_parser.append_filter(stmt, filter_expr)
 
-    return stmt, pagination_order, page_size
+    return stmt
 
 
-def build_sql_stmt_from_sql_arg(
+def _build_sql_stmt_from_sql_arg(
     info: graphene.ResolveInfo,
     orm_class,
     id_column: sa.Column,
@@ -1192,6 +1192,7 @@ def build_sql_stmt_from_sql_arg(
         parser = QueryOrderParser()
         stmt = parser.append_ordering(stmt, order_expr)
     else:
+        # default order by id column
         stmt = stmt.order_by(id_column.asc())
 
     if filter_expr is not None:
@@ -1204,3 +1205,51 @@ def build_sql_stmt_from_sql_arg(
     if offset is not None:
         stmt = stmt.offset(offset)
     return stmt
+
+
+class SQLInfoForGQLConn(NamedTuple):
+    sql_stmt: sa.sql.Select
+    pagination_order: PaginationOrder
+    page_size: int | None
+
+
+def generate_sql_info_for_gql_connection(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: str | None = None,
+    order_expr: str | None = None,
+    offset: int | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> SQLInfoForGQLConn:
+    if offset is None:
+        stmt = _build_sql_stmt_from_connection_arg(
+            info,
+            orm_class,
+            id_column,
+            filter_expr,
+            order_expr,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        pagination_order, _, page_size = validate_connection_args(
+            after=after, first=first, before=before, last=last
+        )
+        return SQLInfoForGQLConn(stmt, pagination_order, page_size)
+    else:
+        page_size = first
+        stmt = _build_sql_stmt_from_sql_arg(
+            info,
+            orm_class,
+            id_column,
+            filter_expr,
+            order_expr,
+            limit=page_size,
+            offset=offset,
+        )
+        return SQLInfoForGQLConn(stmt, PaginationOrder.FORWARD, page_size)
