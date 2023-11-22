@@ -196,7 +196,7 @@ def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseCon
     return (
         sock_path,
         docker_host,
-        connector_cls(os.fsdecode(sock_path)),
+        connector_cls(os.fsdecode(sock_path), force_close=True),
     )
 
 
