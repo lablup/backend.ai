@@ -34,16 +34,18 @@ from .base import (
     PaginatedList,
     batch_multiresult,
     batch_result,
+    build_sql_stmt_from_connection_arg,
+    build_sql_stmt_from_sql_arg,
     mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from .gql_relay import AsyncNode, Connection, ConnectionResolverResult, PaginationOrder
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
-from .utils import ExtendedAsyncSAEngine, build_sql_stmt_from_connection_arg
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -1309,9 +1311,10 @@ class UserNode(graphene.ObjectType):
         return await cls.get_user(info, uid)
 
     @classmethod
-    async def list_node(
+    async def list_cursor_paginated_node(
         cls,
         info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
         order_expr: str | None = None,
         after: str | None = None,
         first: int | None = None,
@@ -1319,10 +1322,11 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query, order, limit = build_sql_stmt_from_connection_arg(
+        query, order, page_size = build_sql_stmt_from_connection_arg(
             info,
             UserRow,
             UserRow.uuid,
+            filter_expr,
             order_expr,
             after=after,
             first=first,
@@ -1335,7 +1339,34 @@ class UserNode(graphene.ObjectType):
             result = [cls.from_row(user_row) for user_row in user_rows]
 
             total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, order, limit, total_cnt)
+            return ConnectionResolverResult(result, order, page_size, total_cnt)
+
+    @classmethod
+    async def list_sql_paginated_node(
+        cls,
+        info: graphene.ResolveInfo,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        query = build_sql_stmt_from_sql_arg(
+            info,
+            UserRow,
+            UserRow.uuid,
+            filter_expr,
+            order_expr,
+            limit=limit,
+            offset=offset,
+        )
+        cnt_query = sa.select(sa.func.count()).select_from(UserRow)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            user_rows = (await db_session.scalars(query)).all()
+            result = [cls.from_row(user_row) for user_row in user_rows]
+
+            total_cnt = await db_session.scalar(cnt_query)
+            return ConnectionResolverResult(result, PaginationOrder.FORWARD, limit, total_cnt)
 
 
 class UserConnection(Connection):

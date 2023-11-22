@@ -35,6 +35,10 @@ class OrderDirection(enum.Enum):
     DESC = "desc"
 
 
+def get_col_from_orm(table, column_name: str):
+    return getattr(table, column_name)
+
+
 class QueryOrderTransformer(Transformer):
     def __init__(self, sa_table: sa.Table, column_map: ColumnMapType = None) -> None:
         super().__init__()
@@ -47,14 +51,24 @@ class QueryOrderTransformer(Transformer):
                 col_value, func = self._column_map[col_name]
                 match col_value:
                     case str(column):
-                        matched_col = self._sa_table.c[column]
+                        try:
+                            matched_col = self._sa_table.c[column]
+                        except AttributeError:
+                            matched_col = get_col_from_orm(self._sa_table, column)
                     case JSONFieldItem(_col, _key):
-                        matched_col = self._sa_table.c[_col].op("->>")(_key)
+                        try:
+                            _column = self._sa_table.c[_col]
+                        except AttributeError:
+                            _column = get_col_from_orm(self._sa_table, _col)
+                        matched_col = _column.op("->>")(_key)
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
                 col = func(matched_col) if func is not None else matched_col
             else:
-                col = self._sa_table.c[col_name]
+                try:
+                    col = self._sa_table.c[col_name]
+                except AttributeError:
+                    col = get_col_from_orm(self._sa_table, col_name)
             return col
         except KeyError:
             raise ValueError("Unknown/unsupported field name", col_name)

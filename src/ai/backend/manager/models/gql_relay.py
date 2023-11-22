@@ -185,6 +185,12 @@ class PaginationOrder(enum.Enum):
     BACKWARD = "backward"
 
 
+class ConnectionArgs(NamedTuple):
+    order: PaginationOrder
+    cursor: str | None
+    page_size: int | None
+
+
 class ConnectionResolverResult(NamedTuple):
     node_list: list[Any]
     order: PaginationOrder
@@ -282,6 +288,54 @@ class AsyncListConnectionField(IterableConnectionField):
         return cls.resolve_connection(
             connection_type, args, resolved, page_size=page_size, order=order, count=total_count
         )
+
+
+def validate_connection_args(
+    *,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> ConnectionArgs:
+    """
+    Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
+    It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
+
+    default pagination direction is Forward.
+    """
+    order: PaginationOrder | None = None
+    cursor: str | None = None
+    page_size: int | None = None
+
+    if after is not None:
+        order = PaginationOrder.FORWARD
+        cursor = after
+    if first is not None:
+        if first < 0:
+            raise ValueError("Argument 'first' must be a non-negative integer.")
+        order = PaginationOrder.FORWARD
+        page_size = first
+
+    if before is not None:
+        if order is PaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = PaginationOrder.BACKWARD
+        cursor = before
+    if last is not None:
+        if last < 0:
+            raise ValueError("Argument 'last' must be a non-negative integer.")
+        if order is PaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = PaginationOrder.BACKWARD
+        page_size = last
+
+    return ConnectionArgs(order or PaginationOrder.FORWARD, cursor, page_size)
 
 
 ConnectionField = AsyncListConnectionField

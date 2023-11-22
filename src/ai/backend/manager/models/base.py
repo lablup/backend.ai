@@ -68,6 +68,14 @@ from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
+from .gql_relay import (
+    AsyncListConnectionField,
+    AsyncNode,
+    PaginationOrder,
+    validate_connection_args,
+)
+from .minilang.ordering import OrderDirection, QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -1098,3 +1106,99 @@ class InferenceSessionError(graphene.ObjectType):
     session_id = graphene.UUID()
 
     errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
+
+
+class AsyncRawPaginatedConnectionField(AsyncListConnectionField):
+    def __init__(self, type, *args, **kwargs):
+        kwargs.setdefault("limit", graphene.Int())
+        kwargs.setdefault("offset", graphene.Int())
+        super().__init__(type, *args, **kwargs)
+
+
+RawPaginatedConnectionField = AsyncRawPaginatedConnectionField
+
+
+def build_sql_stmt_from_connection_arg(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: str | None = None,
+    order_expr: str | None = None,
+    *,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> tuple[sa.sql.Select, PaginationOrder, int | None]:
+    stmt = sa.select(orm_class)
+    page_size: int | None = None
+    cursor_id: str | None = None
+
+    pagination_order, cursor_id, page_size = validate_connection_args(
+        after=after, first=first, before=before, last=last
+    )
+
+    # Need to 'reverse' ordering in case of backward pagination
+    if order_expr is not None:
+        parser = QueryOrderParser()
+        order_by_list = parser.parse_order(orm_class, order_expr)
+    else:
+        # default order by id column
+        order_by_list = [(id_column, OrderDirection.ASC)]
+
+    # Apply SQL order_by
+    for col, direction in order_by_list:
+        if pagination_order == PaginationOrder.FORWARD:
+            stmt = stmt.order_by(col.asc() if direction == OrderDirection.ASC else col.desc())
+        else:
+            stmt = stmt.order_by(col.desc() if direction == OrderDirection.ASC else col.asc())
+
+    # Set cursor
+    if cursor_id is not None:
+        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
+        for col, direction in order_by_list:
+            subq = sa.select(col).where(id_column == _id).scalar_subquery()
+            if pagination_order == PaginationOrder.FORWARD:
+                condition = col > subq if direction == OrderDirection.ASC else col < subq
+            else:
+                condition = col < subq if direction == OrderDirection.ASC else col > subq
+            stmt = stmt.where(condition)
+
+    if page_size is not None:
+        # Add 1 to determine has_next_page or has_previous_page
+        stmt = stmt.limit(page_size + 1)
+
+    if filter_expr is not None:
+        condition_parser = QueryFilterParser()
+        stmt = condition_parser.append_filter(stmt, filter_expr)
+
+    return stmt, pagination_order, page_size
+
+
+def build_sql_stmt_from_sql_arg(
+    info: graphene.ResolveInfo,
+    orm_class,
+    id_column: sa.Column,
+    filter_expr: str | None = None,
+    order_expr: str | None = None,
+    *,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> sa.sql.Select:
+    stmt = sa.select(orm_class)
+    if order_expr is not None:
+        parser = QueryOrderParser()
+        stmt = parser.append_ordering(stmt, order_expr)
+    else:
+        stmt = stmt.order_by(id_column.asc())
+
+    if filter_expr is not None:
+        condition_parser = QueryFilterParser()
+        stmt = condition_parser.append_filter(stmt, filter_expr)
+
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    if offset is not None:
+        stmt = stmt.offset(offset)
+    return stmt
