@@ -18,7 +18,12 @@ from .http import request_unix
 if TYPE_CHECKING:
     from .context import Context
 
-__all__ = ("check_docker",)
+__all__ = (
+    "check_docker",
+    "detect_snap_docker",
+    "detect_system_docker",
+    "determine_docker_sudo",
+)
 
 
 def parse_version(expr):
@@ -67,10 +72,6 @@ async def detect_system_docker(ctx: Context):
         Path("/run/docker.sock"),  # Linux default
         Path("/var/run/docker.sock"),  # macOS default
     ]
-    if ctx.docker_sudo:
-        ctx.log.write(
-            Text.from_markup("[yellow]Docker commands require sudo. We will use sudo.[/]")
-        )
 
     # Read from context
     proc = await asyncio.create_subprocess_exec(

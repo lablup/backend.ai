@@ -4,17 +4,14 @@ import asyncio
 import platform
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from ai.backend.common.arch import arch_name_aliases
+from ai.backend.common.identity import get_root_fs_type, get_wsl_version
 
-from .types import OSInfo, Platform
-
-if TYPE_CHECKING:
-    from .context import Context
+from .types import OSInfo, Platform, PrerequisiteError
 
 
-async def detect_os(ctx: Context) -> OSInfo:
+async def detect_os() -> OSInfo:
     platform_kernel = sys.platform
     platform_arch = arch_name_aliases.get(platform.machine(), platform.machine())
     distro: str | None = None
@@ -71,15 +68,25 @@ async def detect_os(ctx: Context) -> OSInfo:
         assert platform_kernel == "linux"
         distro = "SUSE"
     else:
-        raise RuntimeError(
+        raise PrerequisiteError(
             "Unsupported host linux distribution: "
             f"{uname_s_output.decode()!r}, {release_metadata.decode()!r}"
         )
+    distro_variants = set()
+    root_fs_dev, root_fs_type = get_root_fs_type()
+    if root_fs_type is not None and not root_fs_dev.is_block_device():
+        distro_variants.add("LiveCD")
+    wsl_version = get_wsl_version()
+    if wsl_version > 0:
+        distro_variants.add("WSL")
+    if wsl_version == 1:
+        raise PrerequisiteError(f"Unsupported WSL version: {wsl_version}")
     return OSInfo(
         platform=Platform(f"{platform_kernel}-{platform_arch}").value,  # type: ignore
         distro=distro,
+        distro_variants=distro_variants,
     )
 
 
-async def detect_cuda(ctx: Context) -> None:
-    pass
+async def detect_cuda() -> str:
+    return "(none)"
