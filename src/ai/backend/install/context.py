@@ -255,7 +255,8 @@ class Context(metaclass=ABCMeta):
         sudo = " ".join(self.docker_sudo)
         await self.run_shell(
             f"""
-        {sudo} docker compose up --pull -d && \\
+        {sudo} docker compose pull && \\
+        {sudo} docker compose up -d && \\
         {sudo} docker compose ps
         """,
             cwd=self.install_info.base_path,
