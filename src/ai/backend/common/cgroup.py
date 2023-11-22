@@ -31,9 +31,9 @@ class CgroupVersion:
 
 
 async def get_docker_cgroup_version() -> CgroupVersion:
-    _, docker_host, connector = get_docker_connector()
-    async with aiohttp.ClientSession(connector=connector) as sess:
-        async with sess.get(docker_host / "info") as resp:
+    connector = get_docker_connector()
+    async with aiohttp.ClientSession(connector=connector.connector) as sess:
+        async with sess.get(connector.docker_host / "info") as resp:
             data = await resp.json()
             return CgroupVersion(data["CgroupVersion"], data["CgroupDriver"])
 
