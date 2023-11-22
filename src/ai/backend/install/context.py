@@ -303,7 +303,7 @@ class Context(metaclass=ABCMeta):
                 )
             )
             await self.log.wait_continue()
-        if determine_docker_sudo():
+        if await determine_docker_sudo():
             self.docker_sudo = ["sudo"]
             self.log.write(
                 Text.from_markup(
