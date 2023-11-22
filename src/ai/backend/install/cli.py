@@ -25,17 +25,17 @@ from textual.widgets import (
     ListItem,
     ListView,
     Markdown,
-    RichLog,
     Static,
     TabbedContent,
     TabPane,
 )
 
 from ai.backend.install.utils import shorten_path
-from ai.backend.install.widgets import InputDialog
+from ai.backend.install.widgets import InputDialog, SetupLog
 from ai.backend.plugin.entrypoint import find_build_root
 
 from . import __version__
+from .common import detect_os
 from .context import DevContext, PackageContext, current_log
 from .types import CliArgs, DistInfo, InstallInfo, InstallModes, PrerequisiteError
 
@@ -51,15 +51,16 @@ class DevSetup(Static):
         yield Label("Development Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-dev-log"):
-                yield RichLog(wrap=True, classes="log")
+                yield SetupLog(wrap=True, classes="log")
             with TabPane("Install Report", id="tab-dev-report"):
                 yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
+        self.query_one("SetupLog.log").focus()
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
         ctx = DevContext(dist_info, self.app)
         try:
@@ -102,15 +103,16 @@ class PackageSetup(Static):
         yield Label("Package Setup", classes="mode-title")
         with TabbedContent():
             with TabPane("Install Log", id="tab-pkg-log"):
-                yield RichLog(wrap=True, classes="log")
+                yield SetupLog(wrap=True, classes="log")
             with TabPane("Install Report", id="tab-pkg-report"):
                 yield Label("Installation is not complete.")
 
     def begin_install(self, dist_info: DistInfo) -> None:
+        self.query_one("SetupLog.log").focus()
         top_tasks.add(asyncio.create_task(self.install(dist_info)))
 
     async def install(self, dist_info: DistInfo) -> None:
-        _log: RichLog = cast(RichLog, self.query_one(".log"))
+        _log: SetupLog = cast(SetupLog, self.query_one(".log"))
         _log_token = current_log.set(_log)
         ctx = PackageContext(dist_info, self.app)
         try:
@@ -303,7 +305,7 @@ class ModeMenu(Static):
         self._mode = mode
 
     def compose(self) -> ComposeResult:
-        yield Label("The installation mode:\n(arrow keys to change, enter to select)")
+        yield Label(id="heading")
         if self._dist_info_path is None:
             package_desc = "Install using release packages"
         else:
@@ -339,6 +341,15 @@ class ModeMenu(Static):
                     id=f"mode-{mode.value.lower()}",
                 )
         yield Label(id="mode-desc")
+
+    async def on_mount(self) -> None:
+        os_info = await detect_os()
+        text = Text()
+        text.append("Platform: ")
+        text.append_text(os_info.__rich__())  # type: ignore
+        text.append("\n\n")
+        text.append("Choose the installation mode:\n(arrow keys to change, enter to select)")
+        cast(Static, self.query_one("#heading")).update(text)
 
     def action_cursor_up(self) -> None:
         self.lv.action_cursor_up()
@@ -413,7 +424,7 @@ class InstallerApp(App):
                 install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
                 yield InstallReport(install_info)
             except IOError as e:
-                log = RichLog()
+                log = SetupLog()
                 log.write("Failed to read INSTALL-INFO!")
                 log.write(e)
                 yield log
@@ -424,7 +435,7 @@ class InstallerApp(App):
                 yield PackageSetup(id="pkg-setup")
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         header: Header = cast(Header, self.query_one("Header"))
         header.tall = True
         self.title = "Backend.AI Installer"
