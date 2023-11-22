@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import functools
 import ipaddress
 import itertools
@@ -8,6 +9,7 @@ import logging
 import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
@@ -98,6 +100,20 @@ inference_image_label_schema = t.Dict(
 ).ignore_extra("*")
 
 
+class DockerConnectorSource(enum.Enum):
+    ENV_VAR = enum.auto()
+    USER_CONTEXT = enum.auto()
+    KNOWN_LOCATION = enum.auto()
+
+
+@dataclass()
+class DockerConnector:
+    sock_path: Path | None
+    docker_host: yarl.URL
+    connector: aiohttp.BaseConnector
+    source: DockerConnectorSource
+
+
 @functools.lru_cache()
 def get_docker_context_host() -> str | None:
     try:
@@ -172,12 +188,30 @@ def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseCon
         raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
 
 
-def get_docker_connector() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+def get_docker_connector() -> DockerConnector:
     if raw_docker_host := os.environ.get("DOCKER_HOST", None):
-        return parse_docker_host_url(yarl.URL(raw_docker_host))
+        sock_path, docker_host, connector = parse_docker_host_url(yarl.URL(raw_docker_host))
+        return DockerConnector(
+            sock_path,
+            docker_host,
+            connector,
+            DockerConnectorSource.ENV_VAR,
+        )
     if raw_docker_host := get_docker_context_host():
-        return parse_docker_host_url(yarl.URL(raw_docker_host))
-    return search_docker_socket_files()
+        sock_path, docker_host, connector = parse_docker_host_url(yarl.URL(raw_docker_host))
+        return DockerConnector(
+            sock_path,
+            docker_host,
+            connector,
+            DockerConnectorSource.USER_CONTEXT,
+        )
+    sock_path, docker_host, connector = search_docker_socket_files()
+    return DockerConnector(
+        sock_path,
+        docker_host,
+        connector,
+        DockerConnectorSource.KNOWN_LOCATION,
+    )
 
 
 async def login(
