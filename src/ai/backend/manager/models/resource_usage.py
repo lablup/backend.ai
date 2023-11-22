@@ -238,6 +238,7 @@ class KernelResourceUsage(BaseResourceUsageGroup):
     def to_json(self, child: bool = False) -> dict[str, Any]:
         return {
             **self.to_json_base(),
+            "agents": list(self.total_usage.agent_ids),
             "agent": self.agent,
             "group_unit": self.group_unit.value,
             "total_usage": self.total_usage.to_json(),
