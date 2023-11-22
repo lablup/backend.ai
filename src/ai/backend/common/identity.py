@@ -11,6 +11,7 @@ from typing import Awaitable, Callable, Iterable, Optional
 
 import aiodns
 import ifaddr
+import psutil
 
 from .utils import curl
 
@@ -98,14 +99,9 @@ def fetch_local_ipaddrs(cidr: BaseIPNetwork) -> Iterable[BaseIPAddress]:
 
 
 def get_root_fs_type() -> tuple[PosixPath, str]:
-    with open(Path("/proc/mounts"), "r") as f:
-        for line in f:
-            fields = line.split()
-            if line.startswith("#"):
-                continue
-            if len(fields) < 3 or fields[1] != "/":
-                continue
-            return PosixPath(fields[0]), fields[2]
+    for partition in psutil.disk_partitions():
+        if partition.mountpoint == "/":
+            return PosixPath(partition.device), partition.fstype
     raise RuntimeError("Could not find the root filesystem from the mounts.")
 
 
