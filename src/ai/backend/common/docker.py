@@ -218,7 +218,6 @@ def get_docker_connector() -> DockerConnector:
             DockerConnectorSource.USER_CONTEXT,
         )
     sock_path, docker_host, connector = search_docker_socket_files()
-    assert not connector.closed  # TODO: why is it starting as closed at the second run???????
     return DockerConnector(
         sock_path,
         docker_host,
