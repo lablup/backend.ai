@@ -1322,7 +1322,7 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query, pagination_order, page_size = generate_sql_info_for_gql_connection(
+        query, cursor, pagination_order, page_size = generate_sql_info_for_gql_connection(
             info,
             UserRow,
             UserRow.uuid,
@@ -1340,7 +1340,7 @@ class UserNode(graphene.ObjectType):
             result = [cls.from_row(user_row) for user_row in user_rows]
 
             total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, pagination_order, page_size, total_cnt)
+            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
 class UserConnection(Connection):

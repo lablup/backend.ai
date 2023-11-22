@@ -1120,6 +1120,11 @@ class AsyncPaginatedConnectionField(AsyncListConnectionField):
 PaginatedConnectionField = AsyncPaginatedConnectionField
 
 
+class _OrderingItem(NamedTuple):
+    column: sa.Column
+    order_direction: OrderDirection
+
+
 def _build_sql_stmt_from_connection_arg(
     info: graphene.ResolveInfo,
     orm_class,
@@ -1140,31 +1145,44 @@ def _build_sql_stmt_from_connection_arg(
         after=after, first=first, before=before, last=last
     )
 
-    # Need to 'reverse' ordering in case of backward pagination
+    # default order by id column
+    id_ordering_item: _OrderingItem = _OrderingItem(id_column, OrderDirection.ASC)
+    ordering_item_list: list[_OrderingItem] = []
     if order_expr is not None:
         parser = QueryOrderParser()
-        order_by_list = parser.parse_order(orm_class, order_expr)
-    else:
-        # default order by id column
-        order_by_list = [(id_column, OrderDirection.ASC)]
+        ordering_item_list = [
+            _OrderingItem(col, direction)
+            for col, direction in parser.parse_order(orm_class, order_expr)
+        ]
 
     # Apply SQL order_by
-    for col, direction in order_by_list:
-        if pagination_order == PaginationOrder.FORWARD:
-            stmt = stmt.order_by(col.asc() if direction == OrderDirection.ASC else col.desc())
-        else:
-            stmt = stmt.order_by(col.desc() if direction == OrderDirection.ASC else col.asc())
+    if pagination_order == PaginationOrder.FORWARD:
+        set_ordering = lambda col, direction: (
+            col.asc() if direction == OrderDirection.ASC else col.desc()
+        )
+    else:
+        set_ordering = lambda col, direction: (
+            col.desc() if direction == OrderDirection.ASC else col.asc()
+        )
+    for col, direction in [*ordering_item_list, id_ordering_item]:
+        stmt = stmt.order_by(set_ordering(col, direction))
 
     # Set cursor
     if cursor_id is not None:
         _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        for col, direction in order_by_list:
+        if pagination_order == PaginationOrder.FORWARD:
+            stmt = stmt.where(id_column > _id)
+            set_subquery = lambda col, subquery, direction: (
+                col >= subquery if direction == OrderDirection.ASC else col <= subquery
+            )
+        else:
+            stmt = stmt.where(id_column < _id)
+            set_subquery = lambda col, subquery, direction: (
+                col <= subquery if direction == OrderDirection.ASC else col >= subquery
+            )
+        for col, direction in ordering_item_list:
             subq = sa.select(col).where(id_column == _id).scalar_subquery()
-            if pagination_order == PaginationOrder.FORWARD:
-                condition = col > subq if direction == OrderDirection.ASC else col < subq
-            else:
-                condition = col < subq if direction == OrderDirection.ASC else col > subq
-            stmt = stmt.where(condition)
+            stmt = stmt.where(set_subquery(col, subq, direction))
 
     if page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
@@ -1209,6 +1227,7 @@ def _build_sql_stmt_from_sql_arg(
 
 class SQLInfoForGQLConn(NamedTuple):
     sql_stmt: sa.sql.Select
+    cursor: str | None
     pagination_order: PaginationOrder
     page_size: int | None
 
@@ -1237,10 +1256,10 @@ def generate_sql_info_for_gql_connection(
             before=before,
             last=last,
         )
-        pagination_order, _, page_size = validate_connection_args(
+        pagination_order, cursor, page_size = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        return SQLInfoForGQLConn(stmt, pagination_order, page_size)
+        return SQLInfoForGQLConn(stmt, cursor, pagination_order, page_size)
     else:
         page_size = first
         stmt = _build_sql_stmt_from_sql_arg(
@@ -1252,4 +1271,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return SQLInfoForGQLConn(stmt, PaginationOrder.FORWARD, page_size)
+        return SQLInfoForGQLConn(stmt, None, PaginationOrder.FORWARD, page_size)

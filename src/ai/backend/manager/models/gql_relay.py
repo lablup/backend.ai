@@ -193,7 +193,8 @@ class ConnectionArgs(NamedTuple):
 
 class ConnectionResolverResult(NamedTuple):
     node_list: list[Any]
-    order: PaginationOrder
+    cursor: str | None
+    pagination_order: PaginationOrder
     page_size: int | None
     total_count: int
 
@@ -222,8 +223,9 @@ class AsyncListConnectionField(IterableConnectionField):
         args: dict[str, Any] | None,
         resolved: list[Any] | Connection,
         *,
+        cursor: str | None = None,
         page_size: int | None = None,
-        order: PaginationOrder = PaginationOrder.FORWARD,
+        pagination_order: PaginationOrder = PaginationOrder.FORWARD,
         count: int = -1,
     ) -> Connection:
         if not isinstance(resolved, list):
@@ -237,7 +239,7 @@ class AsyncListConnectionField(IterableConnectionField):
         orig_resolved_len = len(resolved)
         if page_size is not None:
             resolved = resolved[:page_size]
-        if order == PaginationOrder.BACKWARD:
+        if pagination_order == PaginationOrder.BACKWARD:
             resolved = resolved[::-1]
         edge_type = connection_type.Edge
         edges = [
@@ -253,12 +255,12 @@ class AsyncListConnectionField(IterableConnectionField):
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
                 has_previous_page=(
-                    order == PaginationOrder.BACKWARD
+                    pagination_order == PaginationOrder.BACKWARD
                     and page_size is not None
                     and page_size < orig_resolved_len
                 ),
                 has_next_page=(
-                    order == PaginationOrder.FORWARD
+                    pagination_order == PaginationOrder.FORWARD
                     and page_size is not None
                     and page_size < orig_resolved_len
                 ),
@@ -275,13 +277,21 @@ class AsyncListConnectionField(IterableConnectionField):
         info,
         **args,
     ) -> Connection:
-        resolved, order, page_size, total_count = await resolver(root, info, **args)
+        resolved, cursor, pagination_order, page_size, total_count = await resolver(
+            root, info, **args
+        )
 
         if isinstance(connection_type, graphene.NonNull):
             connection_type = connection_type.of_type
 
         return cls.resolve_connection(
-            connection_type, args, resolved, page_size=page_size, order=order, count=total_count
+            connection_type,
+            args,
+            resolved,
+            cursor=cursor,
+            page_size=page_size,
+            pagination_order=pagination_order,
+            count=total_count,
         )
 
 
