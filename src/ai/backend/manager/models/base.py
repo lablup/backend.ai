@@ -1108,14 +1108,16 @@ class InferenceSessionError(graphene.ObjectType):
     errors = graphene.List(graphene.NonNull(InferenceSessionErrorInfo), required=True)
 
 
-class AsyncRawPaginatedConnectionField(AsyncListConnectionField):
+class AsyncPaginatedConnectionField(AsyncListConnectionField):
     def __init__(self, type, *args, **kwargs):
+        kwargs.setdefault("filter", graphene.String())
+        kwargs.setdefault("order", graphene.String())
         kwargs.setdefault("limit", graphene.Int())
         kwargs.setdefault("offset", graphene.Int())
         super().__init__(type, *args, **kwargs)
 
 
-RawPaginatedConnectionField = AsyncRawPaginatedConnectionField
+PaginatedConnectionField = AsyncPaginatedConnectionField
 
 
 def build_sql_stmt_from_connection_arg(

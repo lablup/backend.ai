@@ -199,11 +199,6 @@ class ConnectionResolverResult(NamedTuple):
 
 
 class AsyncListConnectionField(IterableConnectionField):
-    def __init__(self, type, *args, **kwargs):
-        kwargs.setdefault("filter", graphene.String())
-        kwargs.setdefault("order", graphene.String())
-        super().__init__(type, *args, **kwargs)
-
     @property
     def type(self):
         type_ = super(IterableConnectionField, self).type

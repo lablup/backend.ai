@@ -13,7 +13,7 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionField, ConnectionResolverResult
+from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
 from .etcd import (
     ContainerRegistry,
@@ -50,7 +50,7 @@ from ..api.exceptions import (
 )
 from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
-from .base import DataLoaderManager, RawPaginatedConnectionField, privileged_query, scoped_query
+from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList
 from .group import (
@@ -304,10 +304,8 @@ class Queries(graphene.ObjectType):
     )
 
     group_node = graphene.Field(GroupNode, id=graphene.String(required=True))
-    group_nodes = ConnectionField(GroupConnection)
-    # Should I impl new resolver like this? or
-    # just add arg to ConnectionField and use `first(=limit)`/`offset` combination?
-    group_sliced_nodes = RawPaginatedConnectionField(GroupConnection)
+    group_nodes = PaginatedConnectionField(GroupConnection)
+    group_sliced_nodes = PaginatedConnectionField(GroupConnection)
 
     group = graphene.Field(
         Group,
@@ -375,8 +373,8 @@ class Queries(graphene.ObjectType):
         status=graphene.String(),
     )
 
-    user_nodes = ConnectionField(UserConnection)
-    user_sliced_nodes = RawPaginatedConnectionField(UserConnection)
+    user_nodes = PaginatedConnectionField(UserConnection)
+    user_sliced_nodes = PaginatedConnectionField(UserConnection)
 
     keypair = graphene.Field(
         KeyPair,
@@ -1149,29 +1147,14 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         **args,
     ) -> ConnectionResolverResult:
-        import traceback
-
-        try:
-            return await UserNode.list_cursor_paginated_node(
-                info,
-                args.get("filter"),
-                args.get("order"),
-                args.get("after"),
-                args.get("first"),
-                args.get("before"),
-                args.get("last"),
-            )
-        except Exception as e:
-            traceback.print_exception(e)
-            raise
-
-    async def resolve_user_sliced_nodes(
-        root: Any,
-        info: graphene.ResolveInfo,
-        **args,
-    ) -> ConnectionResolverResult:
-        return await UserNode.list_sql_paginated_node(
-            info, args.get("filter"), args.get("order"), args.get("limit"), args.get("offset")
+        return await UserNode.list_cursor_paginated_node(
+            info,
+            args.get("filter"),
+            args.get("order"),
+            args.get("after"),
+            args.get("first"),
+            args.get("before"),
+            args.get("last"),
         )
 
     @staticmethod
