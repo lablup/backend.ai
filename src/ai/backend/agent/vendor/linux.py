@@ -67,9 +67,9 @@ class libnuma:
 
         async def read_cgroup_cpuset() -> tuple[set[int], str] | None:
             try:
-                _, docker_host, connector = get_docker_connector()
-                async with aiohttp.ClientSession(connector=connector) as sess:
-                    async with sess.get(docker_host / "info") as resp:
+                connector = get_docker_connector()
+                async with aiohttp.ClientSession(connector=connector.connector) as sess:
+                    async with sess.get(connector.docker_host / "info") as resp:
                         data = await resp.json()
             except (RuntimeError, aiohttp.ClientError):
                 return None
@@ -151,9 +151,9 @@ class libnuma:
                 case "darwin" | "win32":
                     try:
                         cpuset_source = "the cpus accessible by the docker service"
-                        _, docker_host, connector = get_docker_connector()
-                        async with aiohttp.ClientSession(connector=connector) as sess:
-                            async with sess.get(docker_host / "info") as resp:
+                        connector = get_docker_connector()
+                        async with aiohttp.ClientSession(connector=connector.connector) as sess:
+                            async with sess.get(connector.docker_host / "info") as resp:
                                 data = await resp.json()
                                 return {idx for idx in range(data["NCPU"])}
                     except (RuntimeError, aiohttp.ClientError):
