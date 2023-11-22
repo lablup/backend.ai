@@ -162,6 +162,7 @@ async def get_preferred_pants_local_exec_root(ctx: Context) -> str:
 
 async def determine_docker_sudo() -> bool:
     connector = get_docker_connector()
+    assert not connector.connector.closed  # TODO: why this works??????????
     try:
         async with aiohttp.ClientSession(connector=connector.connector) as sess:
             async with sess.get(connector.docker_host / "version") as r:
