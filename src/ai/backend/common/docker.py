@@ -152,13 +152,16 @@ def parse_docker_host_url(
             raise RuntimeError("unsupported connection scheme", unknown_scheme)
     return (
         path,
-        yarl.URL("http://localhost"),
-        connector_cls(decoded_path),
+        yarl.URL("http://docker"),  # a fake hostname to construct a valid URL
+        connector_cls(decoded_path, force_close=True),
     )
 
 
+# We may cache the connector type but not connector instances!
 @functools.lru_cache()
-def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+def _search_docker_socket_files_impl() -> (
+    tuple[Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]]
+):
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
     match sys.platform:
         case "linux" | "darwin":
@@ -177,15 +180,24 @@ def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseCon
             raise RuntimeError(f"unsupported platform: {platform_name}")
     for p in search_paths:
         if p.exists() and (p.is_socket() or p.is_fifo()):
-            decoded_path = os.fsdecode(p)
             return (
                 p,
-                yarl.URL("http://localhost"),
-                connector_cls(decoded_path),
+                yarl.URL("http://docker"),  # a fake hostname to construct a valid URL
+                connector_cls,
             )
     else:
         searched_paths = ", ".join(map(os.fsdecode, search_paths))
         raise RuntimeError(f"could not find the docker socket; tried: {searched_paths}")
+
+
+def search_docker_socket_files() -> tuple[Path | None, yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+    sock_path, docker_host, connector_cls = _search_docker_socket_files_impl()
+    return (
+        sock_path,
+        docker_host,
+        connector_cls(os.fsdecode(sock_path)),
+    )
 
 
 def get_docker_connector() -> DockerConnector:
