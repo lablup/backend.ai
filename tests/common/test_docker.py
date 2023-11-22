@@ -46,7 +46,7 @@ async def test_get_docker_connector(monkeypatch):
         connector = get_docker_connector()
         assert str(connector.docker_host) == "http://localhost"
         assert isinstance(connector.connector, aiohttp.UnixConnector)
-        assert connector.path == "/run/docker.sock"
+        assert connector.sock_path == "/run/docker.sock"
 
     get_docker_context_host.cache_clear()
     search_docker_socket_files.cache_clear()
