@@ -255,7 +255,7 @@ class Context(metaclass=ABCMeta):
         sudo = " ".join(self.docker_sudo)
         await self.run_shell(
             f"""
-        {sudo} docker compose up -d && \\
+        {sudo} docker compose up --pull -d && \\
         {sudo} docker compose ps
         """,
             cwd=self.install_info.base_path,
@@ -861,7 +861,7 @@ class PackageContext(Context):
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
-            *["sha256sum", "-c", csum_path.name],
+            *["shasum", "-a", "256", "-c", csum_path.name],
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
             cwd=csum_path.parent,
