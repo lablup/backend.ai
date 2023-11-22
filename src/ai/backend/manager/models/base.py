@@ -1145,7 +1145,7 @@ def _build_sql_stmt_from_connection_arg(
         after=after, first=first, before=before, last=last
     )
 
-    # default order by id column
+    # default order_by id column
     id_ordering_item: _OrderingItem = _OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[_OrderingItem] = []
     if order_expr is not None:
@@ -1167,7 +1167,7 @@ def _build_sql_stmt_from_connection_arg(
     for col, direction in [*ordering_item_list, id_ordering_item]:
         stmt = stmt.order_by(set_ordering(col, direction))
 
-    # Set cursor
+    # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
         _, _id = AsyncNode.resolve_global_id(info, cursor_id)
         if pagination_order == PaginationOrder.FORWARD:
@@ -1206,12 +1206,13 @@ def _build_sql_stmt_from_sql_arg(
     offset: int | None = None,
 ) -> sa.sql.Select:
     stmt = sa.select(orm_class)
+
     if order_expr is not None:
         parser = QueryOrderParser()
         stmt = parser.append_ordering(stmt, order_expr)
-    else:
-        # default order by id column
-        stmt = stmt.order_by(id_column.asc())
+
+    # default order_by id column
+    stmt = stmt.order_by(id_column.asc())
 
     if filter_expr is not None:
         condition_parser = QueryFilterParser()
@@ -1244,6 +1245,12 @@ def generate_sql_info_for_gql_connection(
     before: str | None = None,
     last: int | None = None,
 ) -> SQLInfoForGQLConn:
+    """
+    Get GraphQL arguments and generate SQL query statement, cursor that points an id of a node, pagination order, and page size.
+    If `offset` is None, return data to follow GraphQL Connection spec.
+    Else, return normally paginated SQL query.
+    """
+
     if offset is None:
         stmt = _build_sql_stmt_from_connection_arg(
             info,

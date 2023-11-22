@@ -820,17 +820,24 @@ class Queries(graphene.ObjectType):
     async def resolve_group_nodes(
         root: Any,
         info: graphene.ResolveInfo,
-        **args,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         return await GroupNode.list_node(
             info,
-            args.get("filter"),
-            args.get("order"),
-            args.get("offset"),
-            args.get("after"),
-            args.get("first"),
-            args.get("before"),
-            args.get("last"),
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
         )
 
     @staticmethod
@@ -1131,17 +1138,24 @@ class Queries(graphene.ObjectType):
     async def resolve_user_nodes(
         root: Any,
         info: graphene.ResolveInfo,
-        **args,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
     ) -> ConnectionResolverResult:
         return await UserNode.list_node(
             info,
-            args.get("filter"),
-            args.get("order"),
-            args.get("offset"),
-            args.get("after"),
-            args.get("first"),
-            args.get("before"),
-            args.get("last"),
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
         )
 
     @staticmethod
