@@ -75,7 +75,7 @@ from .gql_relay import (
     PaginationOrder,
     validate_connection_args,
 )
-from .minilang.ordering import OrderDirection, QueryOrderParser
+from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 
 if TYPE_CHECKING:
@@ -1120,11 +1120,6 @@ class AsyncPaginatedConnectionField(AsyncListConnectionField):
 PaginatedConnectionField = AsyncPaginatedConnectionField
 
 
-class _OrderingItem(NamedTuple):
-    column: sa.Column
-    order_direction: OrderDirection
-
-
 def _build_sql_stmt_from_connection_arg(
     info: graphene.ResolveInfo,
     orm_class,
@@ -1145,15 +1140,12 @@ def _build_sql_stmt_from_connection_arg(
         after=after, first=first, before=before, last=last
     )
 
-    # default order_by id column
-    id_ordering_item: _OrderingItem = _OrderingItem(id_column, OrderDirection.ASC)
-    ordering_item_list: list[_OrderingItem] = []
+    # Default ordering by id column
+    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
+    ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
         parser = QueryOrderParser()
-        ordering_item_list = [
-            _OrderingItem(col, direction)
-            for col, direction in parser.parse_order(orm_class, order_expr)
-        ]
+        ordering_item_list = parser.parse_order(orm_class, order_expr)
 
     # Apply SQL order_by
     if pagination_order == PaginationOrder.FORWARD:

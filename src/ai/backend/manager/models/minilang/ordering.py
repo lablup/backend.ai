@@ -1,5 +1,5 @@
 import enum
-from typing import Mapping, TypeAlias
+from typing import Mapping, NamedTuple, TypeAlias
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
@@ -33,6 +33,11 @@ ColumnMapType: TypeAlias = Mapping[str, OrderSpecItem] | None
 class OrderDirection(enum.Enum):
     ASC = "asc"
     DESC = "desc"
+
+
+class OrderingItem(NamedTuple):
+    column: sa.Column
+    order_direction: OrderDirection
 
 
 def get_col_from_orm(table, column_name: str):
@@ -73,7 +78,7 @@ class QueryOrderTransformer(Transformer):
         except KeyError:
             raise ValueError("Unknown/unsupported field name", col_name)
 
-    def col(self, *args) -> tuple[sa.Column, OrderDirection]:
+    def col(self, *args) -> OrderingItem:
         children: list[Token] = args[0]
         if len(children) == 2:
             op = children[0].value
@@ -82,9 +87,9 @@ class QueryOrderTransformer(Transformer):
             op = "+"  # assume ascending if not marked
             col = self._get_col(children[0].value)
         if op == "+":
-            return (col, OrderDirection.ASC)
+            return OrderingItem(col, OrderDirection.ASC)
         elif op == "-":
-            return (col, OrderDirection.DESC)
+            return OrderingItem(col, OrderDirection.DESC)
         raise ValueError(f"Invalid operation `{op}`. Please use `+` or `-`")
 
     expr = tuple
@@ -95,7 +100,7 @@ class QueryOrderParser:
         self._column_map = column_map
         self._parser = _parser
 
-    def parse_order(self, table, order_expr: str) -> list[tuple[sa.Column, OrderDirection]]:
+    def parse_order(self, table, order_expr: str) -> list[OrderingItem]:
         try:
             ast = self._parser.parse(order_expr)
             orders = QueryOrderTransformer(table, self._column_map).transform(ast)
