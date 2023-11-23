@@ -72,7 +72,7 @@ from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
-    PaginationOrder,
+    ConnectionPaginationOrder,
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
@@ -1121,7 +1121,7 @@ PaginatedConnectionField = AsyncPaginatedConnectionField
 
 class ConnectionArgs(NamedTuple):
     cursor: str | None
-    pagination_order: PaginationOrder
+    pagination_order: ConnectionPaginationOrder | None
     page_size: int | None
 
 
@@ -1135,42 +1135,40 @@ def validate_connection_args(
     """
     Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
     It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
-
-    Default pagination direction is Forward.
     """
-    order: PaginationOrder | None = None
+    order: ConnectionPaginationOrder | None = None
     cursor: str | None = None
     page_size: int | None = None
 
     if after is not None:
-        order = PaginationOrder.FORWARD
+        order = ConnectionPaginationOrder.FORWARD
         cursor = after
     if first is not None:
         if first < 0:
             raise ValueError("Argument 'first' must be a non-negative integer.")
-        order = PaginationOrder.FORWARD
+        order = ConnectionPaginationOrder.FORWARD
         page_size = first
 
     if before is not None:
-        if order is PaginationOrder.FORWARD:
+        if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
                 " one of (after, first) and (before, last)."
             )
-        order = PaginationOrder.BACKWARD
+        order = ConnectionPaginationOrder.BACKWARD
         cursor = before
     if last is not None:
         if last < 0:
             raise ValueError("Argument 'last' must be a non-negative integer.")
-        if order is PaginationOrder.FORWARD:
+        if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
                 " one of (after, first) and (before, last)."
             )
-        order = PaginationOrder.BACKWARD
+        order = ConnectionPaginationOrder.BACKWARD
         page_size = last
 
-    return ConnectionArgs(cursor, order or PaginationOrder.FORWARD, page_size)
+    return ConnectionArgs(cursor, order, page_size)
 
 
 def _build_sql_stmt_from_connection_arg(
@@ -1194,14 +1192,15 @@ def _build_sql_stmt_from_connection_arg(
         ordering_item_list = parser.parse_order(orm_class, order_expr)
 
     # Apply SQL order_by
-    if pagination_order == PaginationOrder.FORWARD:
-        set_ordering = lambda col, direction: (
-            col.asc() if direction == OrderDirection.ASC else col.desc()
-        )
-    else:
-        set_ordering = lambda col, direction: (
-            col.desc() if direction == OrderDirection.ASC else col.asc()
-        )
+    match pagination_order:
+        case ConnectionPaginationOrder.FORWARD | None:
+            set_ordering = lambda col, direction: (
+                col.asc() if direction == OrderDirection.ASC else col.desc()
+            )
+        case ConnectionPaginationOrder.BACKWARD:
+            set_ordering = lambda col, direction: (
+                col.desc() if direction == OrderDirection.ASC else col.asc()
+            )
     # id column should be applied last
     for col, direction in [*ordering_item_list, id_ordering_item]:
         stmt = stmt.order_by(set_ordering(col, direction))
@@ -1209,16 +1208,17 @@ def _build_sql_stmt_from_connection_arg(
     # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
         _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        if pagination_order == PaginationOrder.FORWARD:
-            stmt = stmt.where(id_column > _id)
-            set_subquery = lambda col, subquery, direction: (
-                col >= subquery if direction == OrderDirection.ASC else col <= subquery
-            )
-        else:
-            stmt = stmt.where(id_column < _id)
-            set_subquery = lambda col, subquery, direction: (
-                col <= subquery if direction == OrderDirection.ASC else col >= subquery
-            )
+        match pagination_order:
+            case ConnectionPaginationOrder.FORWARD | None:
+                stmt = stmt.where(id_column > _id)
+                set_subquery = lambda col, subquery, direction: (
+                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
+                )
+            case ConnectionPaginationOrder.BACKWARD:
+                stmt = stmt.where(id_column < _id)
+                set_subquery = lambda col, subquery, direction: (
+                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
+                )
         for col, direction in ordering_item_list:
             subq = sa.select(col).where(id_column == _id).scalar_subquery()
             stmt = stmt.where(set_subquery(col, subq, direction))
@@ -1268,7 +1268,7 @@ def _build_sql_stmt_from_sql_arg(
 class SQLInfoForGQLConn(NamedTuple):
     sql_stmt: sa.sql.Select
     cursor: str | None
-    pagination_order: PaginationOrder
+    pagination_order: ConnectionPaginationOrder | None
     page_size: int | None
 
 
@@ -1316,4 +1316,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return SQLInfoForGQLConn(stmt, None, PaginationOrder.FORWARD, page_size)
+        return SQLInfoForGQLConn(stmt, None, None, page_size)

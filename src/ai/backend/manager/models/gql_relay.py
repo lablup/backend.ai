@@ -180,7 +180,7 @@ class Connection(graphene.ObjectType):
         return super().__init_subclass_with_meta__(_meta=_meta, **options)
 
 
-class PaginationOrder(enum.Enum):
+class ConnectionPaginationOrder(enum.Enum):
     FORWARD = "forward"
     BACKWARD = "backward"
 
@@ -188,7 +188,7 @@ class PaginationOrder(enum.Enum):
 class ConnectionResolverResult(NamedTuple):
     node_list: list[Any] | Connection
     cursor: str | None
-    pagination_order: PaginationOrder
+    pagination_order: ConnectionPaginationOrder | None
     page_size: int | None
     total_count: int
 
@@ -233,7 +233,7 @@ class AsyncListConnectionField(IterableConnectionField):
         orig_resolved_len = len(resolved)
         if page_size is not None:
             resolved = resolved[:page_size]
-        if pagination_order == PaginationOrder.BACKWARD:
+        if pagination_order == ConnectionPaginationOrder.BACKWARD:
             resolved = resolved[::-1]
         edge_type = connection_type.Edge
         edges = [
@@ -249,12 +249,12 @@ class AsyncListConnectionField(IterableConnectionField):
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
                 has_previous_page=(
-                    pagination_order == PaginationOrder.BACKWARD
+                    pagination_order == ConnectionPaginationOrder.BACKWARD
                     and page_size is not None
                     and page_size < orig_resolved_len
                 ),
                 has_next_page=(
-                    pagination_order == PaginationOrder.FORWARD
+                    pagination_order == ConnectionPaginationOrder.FORWARD
                     and page_size is not None
                     and page_size < orig_resolved_len
                 ),
