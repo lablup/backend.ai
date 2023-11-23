@@ -372,6 +372,7 @@ class Queries(graphene.ObjectType):
         status=graphene.String(),
     )
 
+    user_node = graphene.Field(UserNode, id=graphene.String(required=True))
     user_nodes = PaginatedConnectionField(UserConnection)
 
     keypair = graphene.Field(
@@ -1134,6 +1135,13 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return UserList(user_list, total_count)
+
+    async def resolve_user_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await UserNode.get_node(info, id)
 
     async def resolve_user_nodes(
         root: Any,

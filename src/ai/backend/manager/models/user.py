@@ -1296,18 +1296,14 @@ class UserNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_user(cls, info: graphene.ResolveInfo, user_id) -> UserNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> UserNode:
         graph_ctx: GraphQueryContext = info.context
 
+        _, user_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
             return cls.from_row(user_row)
-
-    @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> UserNode:
-        _, uid = AsyncNode.resolve_global_id(info, id)
-        return await cls.get_user(info, uid)
 
     @classmethod
     async def get_connection(
