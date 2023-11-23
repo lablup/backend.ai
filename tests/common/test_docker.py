@@ -2,6 +2,7 @@ import collections.abc
 import functools
 import itertools
 import typing
+from pathlib import PosixPath
 from unittest.mock import MagicMock, call
 
 import aiohttp
@@ -10,44 +11,56 @@ import pytest
 from ai.backend.common.docker import (
     ImageRef,
     PlatformTagSet,
+    _search_docker_socket_files_impl,
     default_registry,
     default_repository,
     get_docker_connector,
+    get_docker_context_host,
 )
 
 
 @pytest.mark.asyncio
 async def test_get_docker_connector(monkeypatch):
+    get_docker_context_host.cache_clear()
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.setenv("DOCKER_HOST", "http://localhost:2375")
-        url, connector = get_docker_connector()
-        assert str(url) == "http://localhost:2375"
-        assert isinstance(connector, aiohttp.TCPConnector)
+        connector = get_docker_connector()
+        assert str(connector.docker_host) == "http://localhost:2375"
+        assert isinstance(connector.connector, aiohttp.TCPConnector)
 
+    get_docker_context_host.cache_clear()
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.setenv("DOCKER_HOST", "https://example.com:2375")
-        url, connector = get_docker_connector()
-        assert str(url) == "https://example.com:2375"
-        assert isinstance(connector, aiohttp.TCPConnector)
+        connector = get_docker_connector()
+        assert str(connector.docker_host) == "https://example.com:2375"
+        assert isinstance(connector.connector, aiohttp.TCPConnector)
 
+    get_docker_context_host.cache_clear()
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.setenv("DOCKER_HOST", "unix:///run/docker.sock")
         m.setattr("pathlib.Path.exists", lambda self: True)
         m.setattr("pathlib.Path.is_socket", lambda self: True)
         m.setattr("pathlib.Path.is_fifo", lambda self: False)
-        url, connector = get_docker_connector()
-        assert str(url) == "http://localhost"
-        assert isinstance(connector, aiohttp.UnixConnector)
-        assert connector.path == "/run/docker.sock"
+        connector = get_docker_connector()
+        assert str(connector.docker_host) == "http://docker"
+        assert isinstance(connector.connector, aiohttp.UnixConnector)
+        assert connector.sock_path == PosixPath("/run/docker.sock")
 
+    get_docker_context_host.cache_clear()
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.setenv("DOCKER_HOST", "unix:///run/docker.sock")
         m.setattr("pathlib.Path.exists", lambda self: False)
         m.setattr("pathlib.Path.is_socket", lambda self: False)
         m.setattr("pathlib.Path.is_fifo", lambda self: False)
-        with pytest.raises(RuntimeError, match="could not find the docker socket"):
+        with pytest.raises(RuntimeError, match="is not a valid socket file"):
             get_docker_connector()
 
+    get_docker_context_host.cache_clear()
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.setenv("DOCKER_HOST", "npipe:////./pipe/docker_engine")
         m.setattr("pathlib.Path.exists", lambda self: True)
@@ -55,17 +68,20 @@ async def test_get_docker_connector(monkeypatch):
         m.setattr("pathlib.Path.is_fifo", lambda self: True)
         mock_connector = MagicMock()
         m.setattr("aiohttp.NamedPipeConnector", mock_connector)
-        url, connector = get_docker_connector()
-        assert str(url) == "http://localhost"
-        mock_connector.assert_called_once_with(r"\\.\pipe\docker_engine")
+        connector = get_docker_connector()
+        assert str(connector.docker_host) == "http://docker"
+        mock_connector.assert_called_once_with(r"\\.\pipe\docker_engine", force_close=True)
 
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.setenv("DOCKER_HOST", "unknown://dockerhost")
         with pytest.raises(RuntimeError, match="unsupported connection scheme"):
             get_docker_connector()
 
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.delenv("DOCKER_HOST", raising=False)
+        m.setattr("ai.backend.common.docker.get_docker_context_host", lambda: None)
         m.setattr("sys.platform", "linux")
         mock_path = MagicMock()
         mock_path.home = MagicMock()
@@ -73,13 +89,15 @@ async def test_get_docker_connector(monkeypatch):
         m.setattr("pathlib.Path.exists", lambda self: True)
         m.setattr("pathlib.Path.is_socket", lambda self: True)
         m.setattr("pathlib.Path.is_fifo", lambda self: False)
-        url, connector = get_docker_connector()
+        connector = get_docker_connector()
         mock_path.assert_has_calls([call("/run/docker.sock"), call("/var/run/docker.sock")])
-        assert str(url) == "http://localhost"
-        assert isinstance(connector, aiohttp.UnixConnector)
+        assert str(connector.docker_host) == "http://docker"
+        assert isinstance(connector.connector, aiohttp.UnixConnector)
 
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.delenv("DOCKER_HOST", raising=False)
+        m.setattr("ai.backend.common.docker.get_docker_context_host", lambda: None)
         m.setattr("sys.platform", "win32")
         mock_path = MagicMock()
         m.setattr("ai.backend.common.docker.Path", mock_path)
@@ -88,12 +106,15 @@ async def test_get_docker_connector(monkeypatch):
         m.setattr("pathlib.Path.is_fifo", lambda self: True)
         mock_connector = MagicMock()
         m.setattr("aiohttp.NamedPipeConnector", mock_connector)
-        url, connector = get_docker_connector()
+        connector = get_docker_connector()
         mock_path.assert_has_calls([call(r"\\.\pipe\docker_engine")])
-        assert str(url) == "http://localhost"
+        assert str(connector.docker_host) == "http://docker"
 
+    get_docker_context_host.cache_clear()
+    _search_docker_socket_files_impl.cache_clear()
     with monkeypatch.context() as m:
         m.delenv("DOCKER_HOST", raising=False)
+        m.setattr("ai.backend.common.docker.get_docker_context_host", lambda: None)
         m.setattr("sys.platform", "aix")
         with pytest.raises(RuntimeError, match="unsupported platform"):
             get_docker_connector()

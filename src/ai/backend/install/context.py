@@ -25,7 +25,7 @@ from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
-from textual.widgets import Label, ProgressBar, RichLog, Static
+from textual.widgets import Label, ProgressBar, Static
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
@@ -37,7 +37,12 @@ from .dev import (
     install_git_lfs,
     pants_export,
 )
-from .docker import check_docker, check_docker_desktop_mount, get_preferred_pants_local_exec_root
+from .docker import (
+    check_docker,
+    check_docker_desktop_mount,
+    determine_docker_sudo,
+    get_preferred_pants_local_exec_root,
+)
 from .http import wget
 from .python import check_python
 from .types import (
@@ -53,8 +58,9 @@ from .types import (
     ServerAddr,
     ServiceConfig,
 )
+from .widgets import SetupLog
 
-current_log: ContextVar[RichLog] = ContextVar("current_log")
+current_log: ContextVar[SetupLog] = ContextVar("current_log")
 
 
 class PostGuide(enum.Enum):
@@ -63,6 +69,7 @@ class PostGuide(enum.Enum):
 
 class Context(metaclass=ABCMeta):
     os_info: OSInfo
+    docker_sudo: list[str]
 
     _post_guides: list[PostGuide]
 
@@ -90,7 +97,7 @@ class Context(metaclass=ABCMeta):
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         # local-proxy does not have fat variant. (It is always fat.)
-        if fat and name != "backendai-local-proxy":
+        if fat and name != "local-proxy":
             return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
 
@@ -245,10 +252,12 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
+        sudo = " ".join(self.docker_sudo)
         await self.run_shell(
-            """
-        sudo docker compose up -d && \\
-        sudo docker compose ps
+            f"""
+        {sudo} docker compose pull && \\
+        {sudo} docker compose up -d && \\
+        {sudo} docker compose ps
         """,
             cwd=self.install_info.base_path,
         )
@@ -261,6 +270,52 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
+    async def check_prerequisites(self) -> None:
+        self.os_info = await detect_os()
+        text = Text()
+        text.append("Detetced OS info: ")
+        text.append(self.os_info.__rich__())  # type: ignore
+        self.log.write(text)
+        if "LiveCD" in self.os_info.distro_variants:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow bold]:warning: You are running under a temporary LiveCD/USB boot"
+                    " environment.[/]"
+                )
+            )
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Ensure that you have enough RAM disk space more than 10 GiB.[/]"
+                )
+            )
+            await self.log.wait_continue()
+        if "WSL" in self.os_info.distro_variants:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow bold]:warning: You are running under a WSL environment.[/]"
+                )
+            )
+            # TODO: update the docs link
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Checkout additional pre-setup guide for WSL:"
+                    " https://docs.backend.ai/en/latest/install/env-wsl2.html[/]"
+                )
+            )
+            await self.log.wait_continue()
+        if await determine_docker_sudo():
+            self.docker_sudo = ["sudo"]
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]The Docker API and commands require sudo. We will use sudo.[/]"
+                )
+            )
+        else:
+            self.docker_sudo = []
+        await check_docker(self)
+        if self.os_info.distro == "Darwin":
+            await check_docker_desktop_mount(self)
 
     async def configure_manager(self) -> None:
         base_path = self.install_info.base_path
@@ -422,6 +477,11 @@ class Context(metaclass=ABCMeta):
         assert halfstack.redis_addr is not None
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
+            wsproxy_itable = tomlkit.inline_table()
+            wsproxy_itable["url"] = (
+                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            )
+            data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -592,66 +652,75 @@ class Context(metaclass=ABCMeta):
 
     async def populate_images(self) -> None:
         data: Any
-        match self.dist_info.image_source:
-            case ImageSource.BACKENDAI_REGISTRY:
-                self.log_header("Scanning and pulling configured Backend.AI container images...")
-                if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                    project = "stable,community,multiarch"
-                else:
-                    project = "stable,community"
-                data = {
-                    "docker": {
-                        "image": {
-                            "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                        },
-                        "registry": {
-                            "cr.backend.ai": {
-                                "": "https://cr.backend.ai",
-                                "type": "harbor2",
-                                "project": project,
+        for image_source in self.dist_info.image_sources:
+            match image_source:
+                case ImageSource.BACKENDAI_REGISTRY:
+                    self.log_header(
+                        "Scanning and pulling configured Backend.AI container images..."
+                    )
+                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+                        project = "stable,community,multiarch"
+                    else:
+                        project = "stable,community"
+                    data = {
+                        "docker": {
+                            "image": {
+                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
+                            },
+                            "registry": {
+                                "cr.backend.ai": {
+                                    "": "https://cr.backend.ai",
+                                    "type": "harbor2",
+                                    "project": project,
+                                },
                             },
                         },
-                    },
-                }
-                await self.etcd_put_json("config", data)
-                await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
-                if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                    await self.alias_image(
-                        "python",
-                        "cr.backend.ai/stable/python:3.9-ubuntu20.04",
-                        "aarch64",
+                    }
+                    await self.etcd_put_json("config", data)
+                    await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
+                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
+                        await self.alias_image(
+                            "python",
+                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "aarch64",
+                        )
+                    else:
+                        await self.alias_image(
+                            "python",
+                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "x86_64",
+                        )
+                case ImageSource.DOCKER_HUB:
+                    self.log_header(
+                        "Scanning and pulling configured Docker Hub container images..."
                     )
-                else:
-                    await self.alias_image(
-                        "python",
-                        "cr.backend.ai/stable/python:3.9-ubuntu20.04",
-                        "x86_64",
-                    )
-            case ImageSource.DOCKER_HUB:
-                self.log_header("Scanning and pulling configured Docker Hub container images...")
-                data = {
-                    "docker": {
-                        "image": {
-                            "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                        },
-                        "registry": {
-                            "index.docker.io": {
-                                "": "https://registry-1.docker.io",
-                                "type": "docker",
-                                "username": "lablup",
+                    data = {
+                        "docker": {
+                            "image": {
+                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
+                            },
+                            "registry": {
+                                "index.docker.io": {
+                                    "": "https://registry-1.docker.io",
+                                    "type": "docker",
+                                    "username": "lablup",
+                                },
                             },
                         },
-                    },
-                }
-                await self.etcd_put_json("config", data)
-                for ref in self.dist_info.image_refs:
-                    await self.run_manager_cli(["mgr", "image", "rescan", ref])
-                    await self.run_exec(["sudo", "docker", "pull", ref])
-            case ImageSource.LOCAL_DIR:
-                self.log_header("Populating local container images...")
-                for src in self.dist_info.image_sources:
-                    # TODO: Ensure src.ref
-                    await self.run_exec(["sudo", "docker", "load", "-i", str(src.file)])
+                    }
+                    await self.etcd_put_json("config", data)
+                    for ref in self.dist_info.image_refs:
+                        await self.run_manager_cli(["mgr", "image", "rescan", ref])
+                        await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
+                case ImageSource.LOCAL_DIR:
+                    self.log_header("Populating local container images...")
+                    for src in self.dist_info.image_payloads:
+                        # TODO: Ensure src.ref
+                        await self.run_exec(
+                            [*self.docker_sudo, "docker", "load", "-i", str(src.file)]
+                        )
+                case ImageSource.LOCAL_REGISTRY:
+                    raise NotImplementedError()
 
 
 class DevContext(Context):
@@ -704,13 +773,10 @@ class DevContext(Context):
         )
 
     async def check_prerequisites(self) -> None:
-        self.os_info = await detect_os(self)
+        await super().check_prerequisites()
         await install_git_lfs(self)
         await install_git_hooks(self)
         await check_python(self)
-        await check_docker(self)
-        if self.os_info.distro == "Darwin":
-            await check_docker_desktop_mount(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)
 
@@ -766,7 +832,7 @@ class PackageContext(Context):
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
+            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 15050)),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
@@ -792,14 +858,11 @@ class PackageContext(Context):
         )
 
     async def check_prerequisites(self) -> None:
-        self.os_info = await detect_os(self)
-        await check_docker(self)
-        if self.os_info.distro == "Darwin":
-            await check_docker_desktop_mount(self)
+        await super().check_prerequisites()
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
-            *["sha256sum", "-c", csum_path.name],
+            *["shasum", "-a", "256", "-c", csum_path.name],
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
             cwd=csum_path.parent,
