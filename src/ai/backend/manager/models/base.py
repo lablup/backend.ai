@@ -1212,13 +1212,11 @@ def _build_sql_stmt_from_connection_arg(
         match pagination_order:
             case ConnectionPaginationOrder.FORWARD | None:
                 conditions.append(id_column > _id)
-                # stmt = stmt.where(id_column > _id)
                 set_subquery = lambda col, subquery, direction: (
                     col >= subquery if direction == OrderDirection.ASC else col <= subquery
                 )
             case ConnectionPaginationOrder.BACKWARD:
                 conditions.append(id_column < _id)
-                # stmt = stmt.where(id_column < _id)
                 set_subquery = lambda col, subquery, direction: (
                     col <= subquery if direction == OrderDirection.ASC else col >= subquery
                 )
@@ -1233,7 +1231,6 @@ def _build_sql_stmt_from_connection_arg(
     if filter_expr is not None:
         condition_parser = QueryFilterParser()
         conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
-        # stmt = condition_parser.append_filter(stmt, filter_expr)
 
     for cond in conditions:
         stmt = stmt.where(cond)

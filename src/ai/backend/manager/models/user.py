@@ -40,7 +40,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from .gql_relay import AsyncNode, Connection, ConnectionPaginationOrder, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
@@ -1337,7 +1337,9 @@ class UserNode(graphene.ObjectType):
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(user_row) for user_row in user_rows]
+            if pagination_order == ConnectionPaginationOrder.BACKWARD:
+                user_rows = user_rows[::-1]
+            result = [cls.from_row(row) for row in user_rows]
 
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
