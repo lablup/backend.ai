@@ -186,8 +186,8 @@ class PaginationOrder(enum.Enum):
 
 
 class ConnectionArgs(NamedTuple):
-    order: PaginationOrder
     cursor: str | None
+    pagination_order: PaginationOrder
     page_size: int | None
 
 
@@ -306,7 +306,7 @@ def validate_connection_args(
     Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
     It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
 
-    default pagination direction is Forward.
+    Default pagination direction is Forward.
     """
     order: PaginationOrder | None = None
     cursor: str | None = None
@@ -340,7 +340,7 @@ def validate_connection_args(
         order = PaginationOrder.BACKWARD
         page_size = last
 
-    return ConnectionArgs(order or PaginationOrder.FORWARD, cursor, page_size)
+    return ConnectionArgs(cursor, order or PaginationOrder.FORWARD, page_size)
 
 
 ConnectionField = AsyncListConnectionField

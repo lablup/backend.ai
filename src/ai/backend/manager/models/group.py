@@ -836,7 +836,7 @@ class GroupNode(graphene.ObjectType):
             return cls.from_row(group_row)
 
     @classmethod
-    async def list_node(
+    async def get_connection(
         cls,
         info: graphene.ResolveInfo,
         filter_expr: str | None = None,

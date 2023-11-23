@@ -829,7 +829,7 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
-        return await GroupNode.list_node(
+        return await GroupNode.get_connection(
             info,
             filter,
             order,
@@ -1147,7 +1147,7 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
-        return await UserNode.list_node(
+        return await UserNode.get_connection(
             info,
             filter,
             order,

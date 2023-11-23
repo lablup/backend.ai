@@ -1310,7 +1310,7 @@ class UserNode(graphene.ObjectType):
         return await cls.get_user(info, uid)
 
     @classmethod
-    async def list_node(
+    async def get_connection(
         cls,
         info: graphene.ResolveInfo,
         filter_expr: str | None = None,

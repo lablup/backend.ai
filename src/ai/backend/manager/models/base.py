@@ -72,6 +72,7 @@ from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
+    ConnectionArgs,
     PaginationOrder,
     validate_connection_args,
 )
@@ -1127,18 +1128,11 @@ def _build_sql_stmt_from_connection_arg(
     filter_expr: str | None = None,
     order_expr: str | None = None,
     *,
-    after: str | None = None,
-    first: int | None = None,
-    before: str | None = None,
-    last: int | None = None,
+    connection_arg: ConnectionArgs,
 ) -> sa.sql.Select:
     stmt = sa.select(orm_class)
-    page_size: int | None = None
-    cursor_id: str | None = None
 
-    pagination_order, cursor_id, page_size = validate_connection_args(
-        after=after, first=first, before=before, last=last
-    )
+    cursor_id, pagination_order, page_size = connection_arg
 
     # Default ordering by id column
     id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
@@ -1239,26 +1233,25 @@ def generate_sql_info_for_gql_connection(
 ) -> SQLInfoForGQLConn:
     """
     Get GraphQL arguments and generate SQL query statement, cursor that points an id of a node, pagination order, and page size.
-    If `offset` is None, return data to follow GraphQL Connection spec.
-    Else, return normally paginated SQL query.
+    If `offset` is None, return SQL query parsed from GraphQL Connection spec arguments.
+    Else, return normally paginated SQL query and `first` is used as SQL limit.
     """
 
     if offset is None:
+        connection_arg = validate_connection_args(
+            after=after, first=first, before=before, last=last
+        )
         stmt = _build_sql_stmt_from_connection_arg(
             info,
             orm_class,
             id_column,
             filter_expr,
             order_expr,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
+            connection_arg=connection_arg,
         )
-        pagination_order, cursor, page_size = validate_connection_args(
-            after=after, first=first, before=before, last=last
+        return SQLInfoForGQLConn(
+            stmt, connection_arg.cursor, connection_arg.pagination_order, connection_arg.page_size
         )
-        return SQLInfoForGQLConn(stmt, cursor, pagination_order, page_size)
     else:
         page_size = first
         stmt = _build_sql_stmt_from_sql_arg(
