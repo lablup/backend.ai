@@ -185,14 +185,8 @@ class PaginationOrder(enum.Enum):
     BACKWARD = "backward"
 
 
-class ConnectionArgs(NamedTuple):
-    cursor: str | None
-    pagination_order: PaginationOrder
-    page_size: int | None
-
-
 class ConnectionResolverResult(NamedTuple):
-    node_list: list[Any]
+    node_list: list[Any] | Connection
     cursor: str | None
     pagination_order: PaginationOrder
     page_size: int | None
@@ -221,13 +215,13 @@ class AsyncListConnectionField(IterableConnectionField):
         cls,
         connection_type: ConnectionConstructor,
         args: dict[str, Any] | None,
-        resolved: list[Any] | Connection,
-        *,
-        cursor: str | None = None,
-        page_size: int | None = None,
-        pagination_order: PaginationOrder = PaginationOrder.FORWARD,
-        count: int = -1,
+        resolver_result: ConnectionResolverResult,
     ) -> Connection:
+        resolved = resolver_result.node_list
+        page_size = resolver_result.page_size
+        pagination_order = resolver_result.pagination_order
+        count = resolver_result.total_count
+
         if not isinstance(resolved, list):
             return resolved
 
@@ -277,9 +271,7 @@ class AsyncListConnectionField(IterableConnectionField):
         info,
         **args,
     ) -> Connection:
-        resolved, cursor, pagination_order, page_size, total_count = await resolver(
-            root, info, **args
-        )
+        result = await resolver(root, info, **args)
 
         if isinstance(connection_type, graphene.NonNull):
             connection_type = connection_type.of_type
@@ -287,60 +279,8 @@ class AsyncListConnectionField(IterableConnectionField):
         return cls.resolve_connection(
             connection_type,
             args,
-            resolved,
-            cursor=cursor,
-            page_size=page_size,
-            pagination_order=pagination_order,
-            count=total_count,
+            resolver_result=result,
         )
-
-
-def validate_connection_args(
-    *,
-    after: str | None = None,
-    first: int | None = None,
-    before: str | None = None,
-    last: int | None = None,
-) -> ConnectionArgs:
-    """
-    Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
-    It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
-
-    Default pagination direction is Forward.
-    """
-    order: PaginationOrder | None = None
-    cursor: str | None = None
-    page_size: int | None = None
-
-    if after is not None:
-        order = PaginationOrder.FORWARD
-        cursor = after
-    if first is not None:
-        if first < 0:
-            raise ValueError("Argument 'first' must be a non-negative integer.")
-        order = PaginationOrder.FORWARD
-        page_size = first
-
-    if before is not None:
-        if order is PaginationOrder.FORWARD:
-            raise ValueError(
-                "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
-            )
-        order = PaginationOrder.BACKWARD
-        cursor = before
-    if last is not None:
-        if last < 0:
-            raise ValueError("Argument 'last' must be a non-negative integer.")
-        if order is PaginationOrder.FORWARD:
-            raise ValueError(
-                "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
-            )
-        order = PaginationOrder.BACKWARD
-        page_size = last
-
-    return ConnectionArgs(cursor, order or PaginationOrder.FORWARD, page_size)
 
 
 ConnectionField = AsyncListConnectionField

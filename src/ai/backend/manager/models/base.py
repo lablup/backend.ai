@@ -72,9 +72,7 @@ from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
     AsyncNode,
-    ConnectionArgs,
     PaginationOrder,
-    validate_connection_args,
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
@@ -1121,6 +1119,60 @@ class AsyncPaginatedConnectionField(AsyncListConnectionField):
 PaginatedConnectionField = AsyncPaginatedConnectionField
 
 
+class ConnectionArgs(NamedTuple):
+    cursor: str | None
+    pagination_order: PaginationOrder
+    page_size: int | None
+
+
+def validate_connection_args(
+    *,
+    after: str | None = None,
+    first: int | None = None,
+    before: str | None = None,
+    last: int | None = None,
+) -> ConnectionArgs:
+    """
+    Validate arguments used for GraphQL relay connection, and determine pagination ordering, cursor and page size.
+    It is not allowed to use arguments for forward pagination and arguments for backward pagination at the same time.
+
+    Default pagination direction is Forward.
+    """
+    order: PaginationOrder | None = None
+    cursor: str | None = None
+    page_size: int | None = None
+
+    if after is not None:
+        order = PaginationOrder.FORWARD
+        cursor = after
+    if first is not None:
+        if first < 0:
+            raise ValueError("Argument 'first' must be a non-negative integer.")
+        order = PaginationOrder.FORWARD
+        page_size = first
+
+    if before is not None:
+        if order is PaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = PaginationOrder.BACKWARD
+        cursor = before
+    if last is not None:
+        if last < 0:
+            raise ValueError("Argument 'last' must be a non-negative integer.")
+        if order is PaginationOrder.FORWARD:
+            raise ValueError(
+                "Can only paginate with single direction, forwards or backwards. Please set only"
+                " one of (after, first) and (before, last)."
+            )
+        order = PaginationOrder.BACKWARD
+        page_size = last
+
+    return ConnectionArgs(cursor, order or PaginationOrder.FORWARD, page_size)
+
+
 def _build_sql_stmt_from_connection_arg(
     info: graphene.ResolveInfo,
     orm_class,
@@ -1150,6 +1202,7 @@ def _build_sql_stmt_from_connection_arg(
         set_ordering = lambda col, direction: (
             col.desc() if direction == OrderDirection.ASC else col.asc()
         )
+    # id column should be applied last
     for col, direction in [*ordering_item_list, id_ordering_item]:
         stmt = stmt.order_by(set_ordering(col, direction))
 
