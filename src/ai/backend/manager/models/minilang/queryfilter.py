@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
-from . import ArrayFieldItem, FieldSpecItem, JSONFieldItem
+from . import ArrayFieldItem, FieldSpecItem, JSONFieldItem, get_col_from_table
 
 __all__ = (
     "FieldSpecType",
@@ -49,6 +49,9 @@ _parser = Lark(
 
 FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 FieldSpecType: TypeAlias = Mapping[str, FieldSpecItem] | None
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
 T_Enum = TypeVar("T_Enum", bound=enum.Enum)
 
 
@@ -156,7 +159,7 @@ class QueryFilterTransformer(Transformer):
                     case ArrayFieldItem(col_name):
                         # For array columns, let's apply the expression on every item,
                         # and select the row if anyone makes the result true.
-                        col = self._sa_table.c[col_name]
+                        col = get_col_from_table(self._sa_table, col_name)
                         unnested_col = sa.func.unnest(col).alias("item")
                         subq = (
                             sa.select([sa.column("item")])
@@ -167,13 +170,13 @@ class QueryFilterTransformer(Transformer):
                     case JSONFieldItem(col_name, obj_key):
                         # For json columns, we additionally indicate the object key
                         # to retrieve the value used in the expression.
-                        col = self._sa_table.c[col_name].op("->>")(obj_key)
+                        col = get_col_from_table(self._sa_table, col_name).op("->>")(obj_key)
                         expr = build_expr(op, col, val)
                     case str(col_name):
-                        col = self._sa_table.c[col_name]
+                        col = get_col_from_table(self._sa_table, col_name)
                         expr = build_expr(op, col, val)
             else:
-                col = self._sa_table.c[col_name]
+                col = get_col_from_table(self._sa_table, col_name)
                 expr = build_expr(op, col, val)
         except KeyError:
             raise ValueError("Unknown/unsupported field name", col_name)
@@ -208,6 +211,18 @@ class QueryFilterParser:
         self._fieldspec = fieldspec
         self._parser = _parser
 
+    def parse_filter(
+        self,
+        table,
+        filter_expr: str,
+    ) -> WhereClauseType:
+        try:
+            ast = self._parser.parse(filter_expr)
+            where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+        except LarkError as e:
+            raise ValueError(f"Query filter parsing error: {e}")
+        return where_clause
+
     def append_filter(
         self,
         sa_query: FilterableSQLQuery,
@@ -225,11 +240,7 @@ class QueryFilterParser:
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")
-        try:
-            ast = self._parser.parse(filter_expr)
-            where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
-        except LarkError as e:
-            raise ValueError(f"Query filter parsing error: {e}")
+        where_clause = self.parse_filter(table, filter_expr)
         final_query = sa_query.where(where_clause)
         assert final_query is not None
         return final_query

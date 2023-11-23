@@ -75,7 +75,7 @@ from .gql_relay import (
     ConnectionPaginationOrder,
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.queryfilter import QueryFilterParser, WhereClauseType
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -1179,8 +1179,9 @@ def _build_sql_stmt_from_connection_arg(
     order_expr: str | None = None,
     *,
     connection_arg: ConnectionArgs,
-) -> sa.sql.Select:
+) -> tuple[sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    conditions: list[WhereClauseType] = []
 
     cursor_id, pagination_order, page_size = connection_arg
 
@@ -1210,12 +1211,14 @@ def _build_sql_stmt_from_connection_arg(
         _, _id = AsyncNode.resolve_global_id(info, cursor_id)
         match pagination_order:
             case ConnectionPaginationOrder.FORWARD | None:
-                stmt = stmt.where(id_column > _id)
+                conditions.append(id_column > _id)
+                # stmt = stmt.where(id_column > _id)
                 set_subquery = lambda col, subquery, direction: (
                     col >= subquery if direction == OrderDirection.ASC else col <= subquery
                 )
             case ConnectionPaginationOrder.BACKWARD:
-                stmt = stmt.where(id_column < _id)
+                conditions.append(id_column < _id)
+                # stmt = stmt.where(id_column < _id)
                 set_subquery = lambda col, subquery, direction: (
                     col <= subquery if direction == OrderDirection.ASC else col >= subquery
                 )
@@ -1229,9 +1232,12 @@ def _build_sql_stmt_from_connection_arg(
 
     if filter_expr is not None:
         condition_parser = QueryFilterParser()
-        stmt = condition_parser.append_filter(stmt, filter_expr)
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
+        # stmt = condition_parser.append_filter(stmt, filter_expr)
 
-    return stmt
+    for cond in conditions:
+        stmt = stmt.where(cond)
+    return stmt, conditions
 
 
 def _build_sql_stmt_from_sql_arg(
@@ -1243,8 +1249,9 @@ def _build_sql_stmt_from_sql_arg(
     *,
     limit: int | None = None,
     offset: int | None = None,
-) -> sa.sql.Select:
+) -> tuple[sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
         parser = QueryOrderParser()
@@ -1255,18 +1262,20 @@ def _build_sql_stmt_from_sql_arg(
 
     if filter_expr is not None:
         condition_parser = QueryFilterParser()
-        stmt = condition_parser.append_filter(stmt, filter_expr)
+        # stmt = condition_parser.append_filter(stmt, filter_expr)
+        conditions.append(condition_parser.parse_filter(orm_class, filter_expr))
 
     if limit is not None:
         stmt = stmt.limit(limit)
 
     if offset is not None:
         stmt = stmt.offset(offset)
-    return stmt
+    return stmt, conditions
 
 
 class SQLInfoForGQLConn(NamedTuple):
     sql_stmt: sa.sql.Select
+    sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
     page_size: int | None
@@ -1294,7 +1303,7 @@ def generate_sql_info_for_gql_connection(
         connection_arg = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        stmt = _build_sql_stmt_from_connection_arg(
+        stmt, conditions = _build_sql_stmt_from_connection_arg(
             info,
             orm_class,
             id_column,
@@ -1303,11 +1312,15 @@ def generate_sql_info_for_gql_connection(
             connection_arg=connection_arg,
         )
         return SQLInfoForGQLConn(
-            stmt, connection_arg.cursor, connection_arg.pagination_order, connection_arg.page_size
+            stmt,
+            conditions,
+            connection_arg.cursor,
+            connection_arg.pagination_order,
+            connection_arg.page_size,
         )
     else:
         page_size = first
-        stmt = _build_sql_stmt_from_sql_arg(
+        stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
             orm_class,
             id_column,
@@ -1316,4 +1329,4 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return SQLInfoForGQLConn(stmt, None, None, page_size)
+        return SQLInfoForGQLConn(stmt, conditions, None, None, page_size)

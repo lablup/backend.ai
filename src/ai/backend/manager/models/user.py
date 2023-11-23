@@ -1318,19 +1318,23 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query, cursor, pagination_order, page_size = generate_sql_info_for_gql_connection(
-            info,
-            UserRow,
-            UserRow.uuid,
-            filter_expr,
-            order_expr,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
+        query, conditions, cursor, pagination_order, page_size = (
+            generate_sql_info_for_gql_connection(
+                info,
+                UserRow,
+                UserRow.uuid,
+                filter_expr,
+                order_expr,
+                offset,
+                after=after,
+                first=first,
+                before=before,
+                last=last,
+            )
         )
         cnt_query = sa.select(sa.func.count()).select_from(UserRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(user_row) for user_row in user_rows]

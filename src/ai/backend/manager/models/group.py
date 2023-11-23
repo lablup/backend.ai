@@ -800,17 +800,19 @@ class GroupNode(graphene.ObjectType):
         from .user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
-        query, cursor, pagination_order, page_size = generate_sql_info_for_gql_connection(
-            info,
-            UserRow,
-            UserRow.uuid,
-            filter,
-            order,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
+        query, conditions, cursor, pagination_order, page_size = (
+            generate_sql_info_for_gql_connection(
+                info,
+                UserRow,
+                UserRow.uuid,
+                filter,
+                order,
+                offset,
+                after=after,
+                first=first,
+                before=before,
+                last=last,
+            )
         )
         user_query = query.select_from(sa.join(UserRow, AssocGroupUserRow)).where(
             AssocGroupUserRow.group_id == self.id
@@ -820,6 +822,8 @@ class GroupNode(graphene.ObjectType):
             .select_from(AssocGroupUserRow)
             .where(AssocGroupUserRow.group_id == self.id)
         )
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
             result = [UserNode.from_row(user_row) for user_row in user_rows]
@@ -848,19 +852,23 @@ class GroupNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult:
         graph_ctx: GraphQueryContext = info.context
-        query, cursor, pagination_order, page_size = generate_sql_info_for_gql_connection(
-            info,
-            GroupRow,
-            GroupRow.id,
-            filter_expr,
-            order_expr,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
+        query, conditions, cursor, pagination_order, page_size = (
+            generate_sql_info_for_gql_connection(
+                info,
+                GroupRow,
+                GroupRow.id,
+                filter_expr,
+                order_expr,
+                offset,
+                after=after,
+                first=first,
+                before=before,
+                last=last,
+            )
         )
         cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
+        for cond in conditions:
+            cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(group_row) for group_row in group_rows]
