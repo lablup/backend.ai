@@ -133,6 +133,9 @@ config_iv = t.Dict(
                 t.Key("menu_blocklist", default=None): t.Null | tx.StringList(
                     empty_str_as_empty_list=True
                 ),
+                t.Key("menu_inactivelist", default=None): t.Null | tx.StringList(
+                    empty_str_as_empty_list=True
+                ),
             }
         ).allow_extra("*"),
         t.Key("api"): t.Dict(
