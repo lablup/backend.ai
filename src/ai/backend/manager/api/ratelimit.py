@@ -67,7 +67,7 @@ async def rlim_middleware(
             remaining = rate_limit
         else:
             rolling_count = int(ret)
-            if rolling_count > rate_limit:
+            if rate_limit is not None and rolling_count > rate_limit:
                 raise RateLimitExceeded
             remaining = rate_limit - rolling_count
         response = await handler(request)
