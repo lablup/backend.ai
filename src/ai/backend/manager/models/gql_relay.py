@@ -222,7 +222,7 @@ class AsyncListConnectionField(IterableConnectionField):
         pagination_order = resolver_result.pagination_order
         count = resolver_result.total_count
 
-        if not isinstance(resolved, list):
+        if isinstance(resolved, Connection):
             return resolved
 
         assert isinstance(resolved, list), (
@@ -233,6 +233,8 @@ class AsyncListConnectionField(IterableConnectionField):
         orig_resolved_len = len(resolved)
         if page_size is not None:
             resolved = resolved[:page_size]
+        if pagination_order == ConnectionPaginationOrder.BACKWARD:
+            resolved = resolved[::-1]
         edge_type = connection_type.Edge
         edges = [
             edge_type(

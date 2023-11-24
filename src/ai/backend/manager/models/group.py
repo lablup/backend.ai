@@ -50,7 +50,6 @@ from .base import (
 from .gql_relay import (
     AsyncNode,
     Connection,
-    ConnectionPaginationOrder,
     ConnectionResolverResult,
 )
 from .storage import StorageSessionManager
@@ -827,9 +826,8 @@ class GroupNode(graphene.ObjectType):
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
-            if pagination_order == ConnectionPaginationOrder.BACKWARD:
-                user_rows = user_rows[::-1]
             result = [UserNode.from_row(row) for row in user_rows]
+
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -874,8 +872,6 @@ class GroupNode(graphene.ObjectType):
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
-            if pagination_order == ConnectionPaginationOrder.BACKWARD:
-                group_rows = group_rows[::-1]
             result = [cls.from_row(row) for row in group_rows]
 
             total_cnt = await db_session.scalar(cnt_query)
