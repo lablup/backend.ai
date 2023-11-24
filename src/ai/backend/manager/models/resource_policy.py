@@ -444,11 +444,11 @@ class UserResourcePolicy(graphene.ObjectType):
     created_at = GQLDateTime(required=True)
     max_vfolder_count = graphene.Int(
         required=False,
-        description="Added since 24.03.1. Limitation of the number of user vfolders.",
+        description="Added since 24.03.0. Limitation of the number of user vfolders.",
     )
     max_quota_scope_size = BigInt(
         required=False,
-        description="Added since 24.03.1. Limitation of the quota size of user vfolders.",
+        description="Added since 24.03.0. Limitation of the quota size of user vfolders.",
     )
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
 
@@ -524,22 +524,22 @@ class UserResourcePolicy(graphene.ObjectType):
 class CreateUserResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
         required=False,
-        description="Added since 24.03.1. Limitation of the number of user vfolders.",
+        description="Added since 24.03.0. Limitation of the number of user vfolders.",
     )
     max_quota_scope_size = BigInt(
         required=False,
-        description="Added since 24.03.1. Limitation of the quota size of user vfolders.",
+        description="Added since 24.03.0. Limitation of the quota size of user vfolders.",
     )
 
 
 class ModifyUserResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
         required=False,
-        description="Added since 24.03.1. Limitation of the number of user vfolders.",
+        description="Added since 24.03.0. Limitation of the number of user vfolders.",
     )
     max_quota_scope_size = BigInt(
         required=False,
-        description="Added since 24.03.1. Limitation of the quota size of user vfolders.",
+        description="Added since 24.03.0. Limitation of the quota size of user vfolders.",
     )
 
 
@@ -639,11 +639,11 @@ class ProjectResourcePolicy(graphene.ObjectType):
     created_at = GQLDateTime(required=True)
     max_vfolder_count = graphene.Int(
         required=False,
-        description="Added since 24.03.1. Limitation of the number of project vfolders.",
+        description="Added since 24.03.0. Limitation of the number of project vfolders.",
     )
     max_quota_scope_size = BigInt(
         required=False,
-        description="Added since 24.03.1. Limitation of the quota size of project vfolders.",
+        description="Added since 24.03.0. Limitation of the quota size of project vfolders.",
     )
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.1")
 
@@ -720,22 +720,22 @@ class ProjectResourcePolicy(graphene.ObjectType):
 class CreateProjectResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
         required=False,
-        description="Added since 24.03.1. Limitation of the number of project vfolders.",
+        description="Added since 24.03.0. Limitation of the number of project vfolders.",
     )
     max_quota_scope_size = BigInt(
         required=False,
-        description="Added since 24.03.1. Limitation of the quota size of project vfolders.",
+        description="Added since 24.03.0. Limitation of the quota size of project vfolders.",
     )
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
     max_vfolder_count = graphene.Int(
         required=False,
-        description="Added since 24.03.1. Limitation of the number of project vfolders.",
+        description="Added since 24.03.0. Limitation of the number of project vfolders.",
     )
     max_quota_scope_size = BigInt(
         required=False,
-        description="Added since 24.03.1. Limitation of the quota size of project vfolders.",
+        description="Added since 24.03.0. Limitation of the quota size of project vfolders.",
     )
 
 
