@@ -88,6 +88,14 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
             GQLMutationPrivilegeCheckMiddleware(),
         ],
     )
+
+    if result.errors:
+        for e in result.errors:
+            if isinstance(e, GraphQLError):
+                errmsg = e.formatted
+            else:
+                errmsg = {"message": str(e)}
+            log.error("ADMIN.GQL Exception: {}", errmsg)
     return result
 
 
