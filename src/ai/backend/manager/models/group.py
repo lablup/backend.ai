@@ -814,13 +814,10 @@ class GroupNode(graphene.ObjectType):
                 last=last,
             )
         )
-        user_query = query.select_from(sa.join(UserRow, AssocGroupUserRow)).where(
-            AssocGroupUserRow.group_id == self.id
-        )
+        j = sa.join(UserRow, AssocGroupUserRow)
+        user_query = query.select_from(j).where(AssocGroupUserRow.group_id == self.id)
         cnt_query = (
-            sa.select(sa.func.count())
-            .select_from(AssocGroupUserRow)
-            .where(AssocGroupUserRow.group_id == self.id)
+            sa.select(sa.func.count()).select_from(j).where(AssocGroupUserRow.group_id == self.id)
         )
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
