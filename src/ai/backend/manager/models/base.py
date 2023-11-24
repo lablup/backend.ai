@@ -1122,7 +1122,7 @@ PaginatedConnectionField = AsyncPaginatedConnectionField
 class ConnectionArgs(NamedTuple):
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    page_size: int | None
+    requested_page_size: int | None
 
 
 def validate_connection_args(
@@ -1138,7 +1138,7 @@ def validate_connection_args(
     """
     order: ConnectionPaginationOrder | None = None
     cursor: str | None = None
-    page_size: int | None = None
+    requested_page_size: int | None = None
 
     if after is not None:
         order = ConnectionPaginationOrder.FORWARD
@@ -1147,7 +1147,7 @@ def validate_connection_args(
         if first < 0:
             raise ValueError("Argument 'first' must be a non-negative integer.")
         order = ConnectionPaginationOrder.FORWARD
-        page_size = first
+        requested_page_size = first
 
     if before is not None:
         if order is ConnectionPaginationOrder.FORWARD:
@@ -1166,9 +1166,9 @@ def validate_connection_args(
                 " one of (after, first) and (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
-        page_size = last
+        requested_page_size = last
 
-    return ConnectionArgs(cursor, order, page_size)
+    return ConnectionArgs(cursor, order, requested_page_size)
 
 
 def _build_sql_stmt_from_connection_arg(
@@ -1183,7 +1183,7 @@ def _build_sql_stmt_from_connection_arg(
     stmt = sa.select(orm_class)
     conditions: list[WhereClauseType] = []
 
-    cursor_id, pagination_order, page_size = connection_arg
+    cursor_id, pagination_order, requested_page_size = connection_arg
 
     # Default ordering by id column
     id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
@@ -1224,9 +1224,9 @@ def _build_sql_stmt_from_connection_arg(
             subq = sa.select(col).where(id_column == _id).scalar_subquery()
             stmt = stmt.where(set_subquery(col, subq, direction))
 
-    if page_size is not None:
+    if requested_page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
-        stmt = stmt.limit(page_size + 1)
+        stmt = stmt.limit(requested_page_size + 1)
 
     if filter_expr is not None:
         condition_parser = QueryFilterParser()
@@ -1275,7 +1275,7 @@ class SQLInfoForGQLConn(NamedTuple):
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    page_size: int | None
+    requested_page_size: int | None
 
 
 def generate_sql_info_for_gql_connection(
@@ -1313,7 +1313,7 @@ def generate_sql_info_for_gql_connection(
             conditions,
             connection_arg.cursor,
             connection_arg.pagination_order,
-            connection_arg.page_size,
+            connection_arg.requested_page_size,
         )
     else:
         page_size = first

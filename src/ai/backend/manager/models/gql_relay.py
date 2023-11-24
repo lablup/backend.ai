@@ -189,7 +189,7 @@ class ConnectionResolverResult(NamedTuple):
     node_list: list[Any] | Connection
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    page_size: int | None
+    requested_page_size: int | None
     total_count: int
 
 
@@ -218,7 +218,7 @@ class AsyncListConnectionField(IterableConnectionField):
         resolver_result: ConnectionResolverResult,
     ) -> Connection:
         resolved = resolver_result.node_list
-        page_size = resolver_result.page_size
+        page_size = resolver_result.requested_page_size
         pagination_order = resolver_result.pagination_order
         count = resolver_result.total_count
 
