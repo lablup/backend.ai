@@ -497,8 +497,7 @@ class UserResourcePolicy(graphene.ObjectType):
             id=f"UserResourcePolicy:{row.name}",
             name=row.name,
             created_at=row.created_at,
-            max_vfolder_count=row.max_vfolder_count,
-            max_quota_scope_size=row.max_quota_scope_size,
+            max_quota_scope_size=row.max_vfolder_size,
         )
 
     @classmethod
