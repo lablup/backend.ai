@@ -245,7 +245,12 @@
       "SessionName": "__NOT_TRANSLATED__",
       "ResetFormConfirm": "__NOT_TRANSLATED__",
       "TemplateAndHistory": "__NOT_TRANSLATED__",
-      "ScheduleTimeSimple": "__NOT_TRANSLATED__"
+      "ScheduleTimeSimple": "__NOT_TRANSLATED__",
+      "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
+      "NumberOfContainer": "Nombre de conteneurs",
+      "EnterEnvironmentVariable": "Saisir le nom de la variable",
+      "EnvironmentVariableNamePatternError": "Le nom de la variable doit commencer par une lettre ou un trait de soulignement et ne peut contenir que des lettres, des chiffres et des traits de soulignement.",
+      "EnvironmentVariableDuplicateName": "Un nom de variable qui existe déjà."
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
