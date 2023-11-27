@@ -50,9 +50,9 @@ redis_helper_default_config: RedisHelperConfig = {
 
 redis_helper_config_iv = t.Dict(
     {
-        t.Key("socket_timeout", default=5.0): t.Float,
-        t.Key("socket_connect_timeout", default=2.0): t.Float,
-        t.Key("reconnect_poll_timeout", default=0.3): t.Float,
+        t.Key("socket_timeout", default=5.0): t.ToFloat,
+        t.Key("socket_connect_timeout", default=2.0): t.ToFloat,
+        t.Key("reconnect_poll_timeout", default=0.3): t.ToFloat,
     }
 ).allow_extra("*")
 
